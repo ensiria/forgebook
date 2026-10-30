@@ -7,10 +7,10 @@
  */
 import type { ReactNode } from "react";
 
-import type { ComponentDocs, PropDocs, SubcomponentDocs } from "../componentDocs";
-import { Code } from "./Code";
-import { CodeText } from "./CodeText";
-import { STRINGS } from "./strings";
+import type { ComponentDocs, PropDocs, SubcomponentDocs } from "../componentDocs.ts";
+import { Code } from "./Code.tsx";
+import { CodeText } from "./CodeText.tsx";
+import { STRINGS } from "./strings.ts";
 
 /** A prop's or an event's type as one line of TypeScript: an event's signature as an arrow. */
 const typeText = (prop: PropDocs): string =>

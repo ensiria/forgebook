@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type FixedLayout, isOverlayChecked, overlaysPastFrame } from "../src/overlays";
+import { type FixedLayout, isOverlayChecked, overlaysPastFrame } from "../src/overlays.ts";
 
 /** The layout of a story 80 px tall in a 720 px window: a menu, a full-window layer and a toast at the foot. */
 const AFTER_PLAY: FixedLayout = {

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { switchesFromGlobalTypes, switchesProblem } from "../src/switches";
+import { switchesFromGlobalTypes, switchesProblem } from "../src/switches.ts";
 
 /** A preview's `globalTypes`, as Storybook's docs write them. */
 const GLOBAL_TYPES = {

@@ -9,8 +9,8 @@ import { collectDocs } from "forgebook/catalogue-docs";
 import { catalogueMarkdown } from "forgebook/catalogue-markdown";
 import { describe, expect, it } from "vitest";
 
-import { extractStoryComponent } from "../src/vite/extractDocs";
-import { KIT_DIR } from "./fixturePaths";
+import { extractStoryComponent } from "../src/vite/extractDocs.ts";
+import { KIT_DIR } from "./fixturePaths.ts";
 
 /** The fixture package, a workspace package of the core's tests. */
 const KIT: string = KIT_DIR;

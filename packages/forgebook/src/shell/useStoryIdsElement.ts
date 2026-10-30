@@ -9,7 +9,7 @@
  */
 import { useEffect } from "react";
 
-import { STORY_IDS_ELEMENT } from "../storyIdsElement";
+import { STORY_IDS_ELEMENT } from "../storyIdsElement.ts";
 
 /**
  * Keeps the page's list of story ids current.

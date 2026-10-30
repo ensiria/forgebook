@@ -19,8 +19,8 @@
 // types from here
 /// <reference lib="dom" />
 
-import type { StoryClock, StoryClockSetting } from "./clock";
-import type { StoryTextArg, StoryTextFunction } from "./texts";
+import type { StoryClock, StoryClockSetting } from "./clock.ts";
+import type { StoryTextArg, StoryTextFunction } from "./texts.ts";
 
 /**
  * A framework, as the story types read it: what a meta names as its component, and what a render, a decorator and a

@@ -33,6 +33,9 @@
     // each file can be compiled on its own (Vite, Playwright and Node strip types file by file)
     "isolatedModules": true,
     "moduleDetection": "force",
+    // relative imports name their file (`./dates.ts`): Node runs our modules as ESM, on their own or published, and
+    // ESM finds no file without its extension; the build rewrites them to `.js`
+    "allowImportingTsExtensions": true,
 
     // Output: the bundlers and runtimes emit the JavaScript; tsc only checks
     "noEmit": true,

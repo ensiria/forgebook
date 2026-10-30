@@ -23,7 +23,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
-import { NodePackageImporter } from "sass-embedded";
 import ts from "typescript-6";
 import type { Plugin, UserConfig, ViteDevServer } from "vite";
 
@@ -65,8 +64,18 @@ const readTextFile = (file: string): string | undefined => {
   }
 };
 
-/** The core package's folder: its own dependencies resolve from here, not from the project's. */
-const PACKAGE_DIR = resolve(import.meta.dirname, "../..");
+/** This module's folder, in the core's package: the core's own dependencies resolve from here, not the project's. */
+const PACKAGE_DIR: string = import.meta.dirname;
+
+/**
+ * Sass's `pkg:` importer, when the project installs Sass (`sass-embedded`, an optional peer): a library's styles
+ * import its packages' with `pkg:` URLs. Without Sass, Vite compiles no `.scss` and needs none.
+ */
+const sassOptions = async (): Promise<NonNullable<UserConfig["css"]>> => {
+  if (packageResolver(PACKAGE_DIR)("sass-embedded") === undefined) return {};
+  const { NodePackageImporter } = await import("sass-embedded");
+  return { preprocessorOptions: { scss: { importers: [new NodePackageImporter()] } } };
+};
 
 /** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
 const FILES_QUERY = "?forgebook-files";
@@ -363,7 +372,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         css: {
           transformer: "lightningcss",
           lightningcss: { visitor: FORCED_STATES_VISITOR },
-          preprocessorOptions: { scss: { importers: [new NodePackageImporter()] } }
+          ...(await sassOptions())
         }
       };
     },

@@ -20,7 +20,7 @@ import {
   storyTree,
   type TreeFamily,
   testedStoryLocations
-} from "../src/storyTree";
+} from "../src/storyTree.ts";
 
 /** The story groups a Kaji-like catalogue names, in their order. */
 const GROUPS = ["states", "motion", "in-context", "showcase", "worst-case", "behaviour"];

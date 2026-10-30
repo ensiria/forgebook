@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { storyJsx } from "../src/storyJsx";
+import { storyJsx } from "../src/storyJsx.ts";
 
 describe("storyJsx", () => {
   it("writes each kind of value as a developer would", () => {

@@ -6,10 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { catalogueSettings } from "../src/catalogue";
-import { fixedViewOf, NOT_FIXED, withFixed, withOwnFixed } from "../src/storyGlobals";
-import { DEFAULT_SWITCHES } from "../src/switches";
-import { DEFAULT_VIEW } from "../src/viewState";
+import { catalogueSettings } from "../src/catalogue.ts";
+import { fixedViewOf, NOT_FIXED, withFixed, withOwnFixed } from "../src/storyGlobals.ts";
+import { DEFAULT_SWITCHES } from "../src/switches.ts";
+import { DEFAULT_VIEW } from "../src/viewState.ts";
 
 /** A catalogue with the default switches, a custom background and named widths. */
 const CATALOGUE = catalogueSettings("Kit", DEFAULT_SWITCHES, {

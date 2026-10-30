@@ -3,8 +3,8 @@
  *
  * @module
  */
-import type { ViewSwitch } from "../switches";
-import type { ViewState } from "../viewState";
+import type { ViewSwitch } from "../switches.ts";
+import type { ViewState } from "../viewState.ts";
 
 /**
  * A view with one switch set.

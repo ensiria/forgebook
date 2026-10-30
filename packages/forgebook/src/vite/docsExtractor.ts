@@ -12,6 +12,7 @@
  *
  * @module
  */
+import { extname } from "node:path";
 import { Worker } from "node:worker_threads";
 
 import type { StoryComponentResult } from "./adapter.ts";
@@ -54,8 +55,11 @@ export type DocsExtractor = {
   readonly close: () => Promise<void>;
 };
 
-/** The worker's module, beside this one; Node strips its types as it does this file's. */
-const WORKER_URL = new URL("./docsWorker.ts", import.meta.url);
+/**
+ * The worker's module, beside this one and with its extension: `.ts` in the sources, whose types Node strips, `.js`
+ * once built for npm, where Node strips none.
+ */
+const WORKER_URL = new URL(`./docsWorker${extname(import.meta.url)}`, import.meta.url);
 
 /** What the worker is started with: the framework's docs module, which it loads before its first answer. */
 export type DocsWorkerData = {

@@ -12,8 +12,8 @@
  * @module
  */
 
-import type { CatalogueSettings, PanelTabId } from "./catalogue";
-import { switchValueOf, switchWithRole, type ViewSwitch } from "./switches";
+import type { CatalogueSettings, PanelTabId } from "./catalogue.ts";
+import { switchValueOf, switchWithRole, type ViewSwitch } from "./switches.ts";
 
 /**
  * What Forgebook draws behind the story, in place of its page's colour (D-644): `plain`, the page's colour itself,

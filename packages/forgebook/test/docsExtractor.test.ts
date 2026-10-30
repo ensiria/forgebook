@@ -7,9 +7,9 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { createDocsExtractor } from "../src/vite/docsExtractor";
-import { KIT_DIR } from "./fixturePaths";
-import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
+import { createDocsExtractor } from "../src/vite/docsExtractor.ts";
+import { KIT_DIR } from "./fixturePaths.ts";
+import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 const KIT = join(KIT_DIR, "src");
 

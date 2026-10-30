@@ -9,7 +9,7 @@
  *
  * @module
  */
-import type { SheetsChoice, TextScale } from "../viewState";
+import type { SheetsChoice, TextScale } from "../viewState.ts";
 
 /** The shell's texts, as Forgebook writes them; `configureStrings` replaces some before the shell draws. */
 // biome-ignore lint/nursery/useExplicitType: the texts' type is their own shape (`ShellStrings`); a written one would repeat every key

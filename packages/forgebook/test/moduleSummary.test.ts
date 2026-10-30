@@ -6,7 +6,7 @@
 import ts from "typescript-6";
 import { describe, expect, it } from "vitest";
 
-import { moduleSummaryOf } from "../src/vite/docsProgram";
+import { moduleSummaryOf } from "../src/vite/docsProgram.ts";
 
 /** A file with this text. */
 const fileOf = (text: string): ts.SourceFile =>

@@ -6,7 +6,7 @@
 import type { StoryLanguage } from "@forgebook/story-format/source";
 import { describe, expect, it } from "vitest";
 
-import { shownLanguage } from "../src/languages";
+import { shownLanguage } from "../src/languages.ts";
 
 /** Italian, as a catalogue offers it. */
 const ITALIAN: StoryLanguage = { id: "it", label: "Italiano" };

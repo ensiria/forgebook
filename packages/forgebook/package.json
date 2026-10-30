@@ -1,7 +1,6 @@
 {
   "name": "forgebook",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "A catalogue for React components written as CSF stories: the story format, one frame per story, global switches for theme, contrast, motion and styles, a compare view, forced interaction states, replayable motion, a props panel from the components' types, and CATALOG.md.",
   "keywords": [
     "react",
@@ -18,6 +17,12 @@
     "directory": "packages/forgebook"
   },
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "sideEffects": [
     "*.css",
     "*.scss"
@@ -59,6 +64,9 @@
     "./catalogue": "./src/catalogue.ts"
   },
   "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build manifest --check && package-build build",
     "test": "vitest run",
     "typecheck": "tsc -p src && tsc -p src/vite && tsc -p bin && tsc -p test"
   },
@@ -76,9 +84,11 @@
     "@testing-library/user-event": "^14.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sass-embedded": "^1.80.0",
     "vite": "^8.0.0"
   },
   "devDependencies": {
+    "@forgebook/tools": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",
     "@testing-library/dom": "10.4.2",
     "@testing-library/user-event": "14.6.8",
@@ -98,6 +108,135 @@
     },
     "@testing-library/user-event": {
       "optional": true
+    },
+    "sass-embedded": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/vite/config.d.ts",
+        "default": "./dist/src/vite/config.js"
+      },
+      "./story-tree": {
+        "types": "./dist/src/storyTree.d.ts",
+        "default": "./dist/src/storyTree.js"
+      },
+      "./shell": {
+        "types": "./dist/src/shell/mountShell.d.ts",
+        "default": "./dist/src/shell/mountShell.js"
+      },
+      "./frame": {
+        "types": "./dist/src/frame/mountFrame.d.ts",
+        "default": "./dist/src/frame/mountFrame.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/forgebookPlugin.d.ts",
+        "default": "./dist/src/vite/forgebookPlugin.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/frame/renderer.d.ts",
+        "default": "./dist/src/frame/renderer.js"
+      },
+      "./story-hooks": {
+        "types": "./dist/src/frame/storyHooks.d.ts",
+        "default": "./dist/src/frame/storyHooks.js"
+      },
+      "./story-module": {
+        "types": "./dist/src/frame/storyModule.d.ts",
+        "default": "./dist/src/frame/storyModule.js"
+      },
+      "./messages": {
+        "types": "./dist/src/messages.d.ts",
+        "default": "./dist/src/messages.js"
+      },
+      "./component-docs": {
+        "types": "./dist/src/componentDocs.d.ts",
+        "default": "./dist/src/componentDocs.js"
+      },
+      "./vite/adapter": {
+        "types": "./dist/src/vite/adapter.d.ts",
+        "default": "./dist/src/vite/adapter.js"
+      },
+      "./vite/docs-program": {
+        "types": "./dist/src/vite/docsProgram.d.ts",
+        "default": "./dist/src/vite/docsProgram.js"
+      },
+      "./vite/story-meta": {
+        "types": "./dist/src/vite/storyMeta.d.ts",
+        "default": "./dist/src/vite/storyMeta.js"
+      },
+      "./catalogue-docs": {
+        "types": "./dist/bin/forgebook-docs/collectDocs.d.ts",
+        "default": "./dist/bin/forgebook-docs/collectDocs.js"
+      },
+      "./catalogue-markdown": {
+        "types": "./dist/bin/forgebook-docs/catalogueMarkdown.d.ts",
+        "default": "./dist/bin/forgebook-docs/catalogueMarkdown.js"
+      },
+      "./a11y": {
+        "types": "./dist/src/a11y.d.ts",
+        "default": "./dist/src/a11y.js"
+      },
+      "./frame-status": {
+        "types": "./dist/src/frame/frameStatus.d.ts",
+        "default": "./dist/src/frame/frameStatus.js"
+      },
+      "./story-heights": {
+        "types": "./dist/src/storyHeights.d.ts",
+        "default": "./dist/src/storyHeights.js"
+      },
+      "./story-ids-element": {
+        "types": "./dist/src/storyIdsElement.d.ts",
+        "default": "./dist/src/storyIdsElement.js"
+      },
+      "./view-state": {
+        "types": "./dist/src/viewState.d.ts",
+        "default": "./dist/src/viewState.js"
+      },
+      "./frame-clock": {
+        "types": "./dist/src/frame/frameClock.d.ts",
+        "default": "./dist/src/frame/frameClock.js"
+      },
+      "./source-files": {
+        "types": "./dist/src/sourceFiles.d.ts",
+        "default": "./dist/src/sourceFiles.js"
+      },
+      "./story-clock": {
+        "types": "./dist/src/storyClock.d.ts",
+        "default": "./dist/src/storyClock.js"
+      },
+      "./story-texts": {
+        "types": "./dist/src/storyTexts.d.ts",
+        "default": "./dist/src/storyTexts.js"
+      },
+      "./vite/auto-title": {
+        "types": "./dist/src/vite/autoTitle.d.ts",
+        "default": "./dist/src/vite/autoTitle.js"
+      },
+      "./vite/index-story-file": {
+        "types": "./dist/src/vite/indexStoryFile.d.ts",
+        "default": "./dist/src/vite/indexStoryFile.js"
+      },
+      "./vite/story-files-module": {
+        "types": "./dist/src/vite/storyFilesModule.d.ts",
+        "default": "./dist/src/vite/storyFilesModule.js"
+      },
+      "./switches": {
+        "types": "./dist/src/switches.d.ts",
+        "default": "./dist/src/switches.js"
+      },
+      "./catalogue": {
+        "types": "./dist/src/catalogue.d.ts",
+        "default": "./dist/src/catalogue.js"
+      }
+    },
+    "bin": {
+      "forgebook": "./dist/bin/forgebook/forgebook.mjs",
+      "forgebook-docs": "./dist/bin/forgebook-docs/forgebook-docs.mjs",
+      "forgebook-texts": "./dist/bin/forgebook-texts/forgebook-texts.mjs"
     }
   }
 }

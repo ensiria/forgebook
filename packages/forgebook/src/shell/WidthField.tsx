@@ -6,9 +6,9 @@
  */
 import { type ChangeEvent, type KeyboardEvent, type ReactNode, useState } from "react";
 
-import { clampedWidth, type StageWidth } from "../viewState";
-import { useCatalogue } from "./catalogueContext";
-import { STRINGS } from "./strings";
+import { clampedWidth, type StageWidth } from "../viewState.ts";
+import { useCatalogue } from "./catalogueContext.ts";
+import { STRINGS } from "./strings.ts";
 
 /** The field's props. */
 export type WidthFieldProps = {

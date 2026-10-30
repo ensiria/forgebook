@@ -13,7 +13,7 @@
  */
 import type { StoryClock } from "@forgebook/story-format/clock";
 
-import { type ClockReading, type ClockState, DEFAULT_CLOCK_STATE, readClock } from "../storyClock";
+import { type ClockReading, type ClockState, DEFAULT_CLOCK_STATE, readClock } from "../storyClock.ts";
 
 /** How often a running clock ticks, in ms of real time: often enough for a stream's words, a ring's sweep. */
 const TICK_MS = 50;

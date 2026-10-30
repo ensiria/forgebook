@@ -14,8 +14,8 @@ import {
   mergedArgTypes,
   panelArgTypesOf,
   panelProps
-} from "../src/argTypes";
-import type { PropDocs } from "../src/componentDocs";
+} from "../src/argTypes.ts";
+import type { PropDocs } from "../src/componentDocs.ts";
 
 /** The props the types of a button give. */
 const PROPS: readonly PropDocs[] = [

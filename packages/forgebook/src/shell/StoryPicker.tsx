@@ -6,10 +6,10 @@
  */
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
-import { groupLabel } from "../catalogue";
-import { groupedStories, type TreeComponent, type TreeStory } from "../storyTree";
-import { useCatalogue } from "./catalogueContext";
-import { STRINGS } from "./strings";
+import { groupLabel } from "../catalogue.ts";
+import { groupedStories, type TreeComponent, type TreeStory } from "../storyTree.ts";
+import { useCatalogue } from "./catalogueContext.ts";
+import { STRINGS } from "./strings.ts";
 
 /** The picker's props. */
 export type StoryPickerProps = {

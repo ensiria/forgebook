@@ -6,14 +6,14 @@
  */
 import type { ReactNode } from "react";
 
-import type { FixedView } from "../storyGlobals";
-import { switchWithRole, type ViewSwitch } from "../switches";
-import type { ViewState } from "../viewState";
-import { useCatalogue } from "./catalogueContext";
-import { Icon, type IconName } from "./icons";
-import { Segmented } from "./Segmented";
-import { STRINGS } from "./strings";
-import { switchValueIn, withSwitch } from "./switchView";
+import type { FixedView } from "../storyGlobals.ts";
+import { switchWithRole, type ViewSwitch } from "../switches.ts";
+import type { ViewState } from "../viewState.ts";
+import { useCatalogue } from "./catalogueContext.ts";
+import { Icon, type IconName } from "./icons.tsx";
+import { Segmented } from "./Segmented.tsx";
+import { STRINGS } from "./strings.ts";
+import { switchValueIn, withSwitch } from "./switchView.ts";
 
 /** The icon of each scheme a colour scheme switch's values draw in. */
 const SCHEME_ICONS: Readonly<Record<"light" | "dark" | "system", IconName>> = {

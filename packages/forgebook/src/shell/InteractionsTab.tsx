@@ -6,8 +6,8 @@
  */
 import type { ReactNode } from "react";
 
-import type { PlayStatus, PlayTrace } from "../playTrace";
-import { STRINGS } from "./strings";
+import type { PlayStatus, PlayTrace } from "../playTrace.ts";
+import { STRINGS } from "./strings.ts";
 
 /** The tab's props. */
 export type InteractionsTabProps = {

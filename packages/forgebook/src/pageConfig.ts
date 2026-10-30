@@ -6,8 +6,8 @@
  */
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
-import type { CatalogueLists } from "./catalogue";
-import type { ViewSwitch } from "./switches";
+import type { CatalogueLists } from "./catalogue.ts";
+import type { ViewSwitch } from "./switches.ts";
 
 /** What the shell and the frame pages read of a configuration: data, as the plugin hands it to them. */
 export type PageConfig = {

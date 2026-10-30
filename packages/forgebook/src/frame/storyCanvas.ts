@@ -4,8 +4,8 @@
  * @module
  */
 
-import { FORCE_ATTRIBUTE } from "../vite/forcedStates";
-import type { LoadedStory } from "./storyModule";
+import { FORCE_ATTRIBUTE } from "../vite/forcedStates.ts";
+import type { LoadedStory } from "./storyModule.ts";
 
 /**
  * A new canvas for the story alone: padded, centred or the whole frame, with its forced states.

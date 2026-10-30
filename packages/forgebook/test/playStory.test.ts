@@ -7,8 +7,8 @@
 import { heldStoryClock } from "@forgebook/story-format/clock";
 import { describe, expect, it } from "vitest";
 
-import { playStory } from "../src/frame/playStory";
-import type { PlayTrace } from "../src/playTrace";
+import { playStory } from "../src/frame/playStory.ts";
+import type { PlayTrace } from "../src/playTrace.ts";
 
 /** A canvas for the plays: they never read it here. */
 const CONTEXT = {

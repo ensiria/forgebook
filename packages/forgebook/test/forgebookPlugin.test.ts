@@ -8,9 +8,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { forgebookPlugin } from "../src/vite/forgebookPlugin";
-import { KIT_DIR } from "./fixturePaths";
-import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
+import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
+import { KIT_DIR } from "./fixturePaths.ts";
+import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A dev server reduced to what the plugin touches, recording what it does. */
 const fakeServer = (): {

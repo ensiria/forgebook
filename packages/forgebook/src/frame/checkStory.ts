@@ -8,8 +8,8 @@
  * @module
  */
 
-import type { Violation } from "../a11y";
-import type { A11ySettings } from "../catalogue";
+import type { Violation } from "../a11y.ts";
+import type { A11ySettings } from "../catalogue.ts";
 
 /**
  * The rules the document breaks now.

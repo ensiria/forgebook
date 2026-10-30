@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type LoadedStory, mergedPreviews, readPreview, readStory } from "../src/frame/storyModule";
+import { type LoadedStory, mergedPreviews, readPreview, readStory } from "../src/frame/storyModule.ts";
 
 /**
  * A story read from a module, failing the test when it cannot be read.

@@ -1,7 +1,6 @@
 {
   "name": "@forgebook/react",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Forgebook for React: the story types and hooks, the renderer the frame mounts a story with, and the adapter that reads a React component's props.",
   "license": "MIT",
   "repository": {
@@ -10,6 +9,12 @@
     "directory": "packages/react"
   },
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "sideEffects": false,
   "exports": {
     ".": "./src/stories.ts",
@@ -22,6 +27,9 @@
     "./docs": "./src/vite/extractDocs.ts"
   },
   "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build manifest --check && package-build build",
     "test": "vitest run",
     "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
   },
@@ -36,6 +44,7 @@
     "forgebook": "workspace:^"
   },
   "devDependencies": {
+    "@forgebook/tools": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
@@ -46,5 +55,42 @@
     "react-dom": "19.3.0",
     "vite": "8.3.5",
     "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./clock": {
+        "types": "./dist/src/clock.d.ts",
+        "default": "./dist/src/clock.js"
+      },
+      "./texts": {
+        "types": "./dist/src/texts.d.ts",
+        "default": "./dist/src/texts.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/reactRenderer.d.ts",
+        "default": "./dist/src/reactRenderer.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyJsx.d.ts",
+        "default": "./dist/src/storyJsx.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/react.d.ts",
+        "default": "./dist/src/vite/react.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
   }
 }

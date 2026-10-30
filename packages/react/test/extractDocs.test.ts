@@ -3,12 +3,14 @@
  *
  * @module
  */
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { extractComponentDocs, extractStoryComponent } from "../src/vite/extractDocs";
-import { KIT_DIR } from "./fixturePaths";
+import { extractComponentDocs, extractStoryComponent } from "../src/vite/extractDocs.ts";
+import { KIT_DIR } from "./fixturePaths.ts";
 
 /** The fixture package's components, a workspace package of the core's tests. */
 const KIT = join(KIT_DIR, "src");
@@ -117,5 +119,26 @@ describe("the order of the docs", () => {
     const first = lines();
     extractStoryComponent(join(KIT, "Select.stories.tsx"));
     expect(lines()).toEqual(first);
+  });
+});
+
+describe("a story file no tsconfig.json holds", () => {
+  it("reads a JavaScript story file that no tsconfig.json holds, from the file's own imports", () => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-js-"));
+    writeFileSync(
+      join(dir, "Tag.jsx"),
+      "/** A tag. */\nexport const Tag = (/** @type {{ label: string }} */ { label }) => <span>{label}</span>;\n"
+    );
+    writeFileSync(
+      join(dir, "Tag.stories.jsx"),
+      'import { Tag } from "./Tag";\nexport default { title: "Tags/Tag", component: Tag };\nexport const Shown = {};\n'
+    );
+    const component = extractStoryComponent(join(dir, "Tag.stories.jsx"));
+    expect(typeof component === "string" ? component : component.docs.name).toBe("Tag");
+    expect(
+      typeof component === "string" || !("file" in component)
+        ? []
+        : component.docs.props.map((prop) => prop.name)
+    ).toEqual(["label"]);
   });
 });

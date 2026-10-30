@@ -12,8 +12,8 @@ import {
   type StoryDrawing,
   type StoryRenderer,
   untracedStep
-} from "../src/frame/renderer";
-import type { LoadedArgs } from "../src/frame/storyModule";
+} from "../src/frame/renderer.ts";
+import type { LoadedArgs } from "../src/frame/storyModule.ts";
 
 /**
  * The story's element for a drawing.

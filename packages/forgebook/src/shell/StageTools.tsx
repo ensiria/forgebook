@@ -6,10 +6,10 @@
  */
 import type { ReactNode } from "react";
 
-import { MEASURE_TOOLS, type MeasureTool, type Zoom } from "../viewState";
-import { useCatalogue } from "./catalogueContext";
-import { Icon, type IconName } from "./icons";
-import { STRINGS } from "./strings";
+import { MEASURE_TOOLS, type MeasureTool, type Zoom } from "../viewState.ts";
+import { useCatalogue } from "./catalogueContext.ts";
+import { Icon, type IconName } from "./icons.tsx";
+import { STRINGS } from "./strings.ts";
 
 /** The tools' props. */
 export type StageToolsProps = {

@@ -7,10 +7,10 @@
 import type { StoryFileCode } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 
-import type { StoryCodeWriter } from "../frame/renderer";
-import type { PanelArgs } from "../messages";
-import { Code } from "./Code";
-import { useCodeWriter } from "./codeWriter";
+import type { StoryCodeWriter } from "../frame/renderer.ts";
+import type { PanelArgs } from "../messages.ts";
+import { Code } from "./Code.tsx";
+import { useCodeWriter } from "./codeWriter.ts";
 
 /** Which story's code, and the values its JSX is drawn from when it has no `render`. */
 export type StoryCodeSource = {

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { autoTitle, patternBase, STORY_FILE } from "../src/vite/autoTitle";
+import { autoTitle, patternBase, STORY_FILE } from "../src/vite/autoTitle.ts";
 
 describe("patternBase", () => {
   it("keeps the folders before the first glob", () => {

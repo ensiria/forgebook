@@ -8,7 +8,7 @@ import type { LoadedArgs, LoadedStory } from "forgebook/story-module";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { storyControlsProblem } from "../src/storyControls";
+import { storyControlsProblem } from "../src/storyControls.ts";
 
 /** A loaded story with a component, changed by `parts`. */
 const story = (parts: Partial<LoadedStory>): LoadedStory => ({

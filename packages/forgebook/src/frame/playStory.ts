@@ -13,8 +13,8 @@
  */
 import type { StepFunction, StoryContext } from "@forgebook/story-format/csf";
 
-import type { PlayStep, PlayTrace } from "../playTrace";
-import type { LoadedArgs, LoadedStory } from "./storyModule";
+import type { PlayStep, PlayTrace } from "../playTrace.ts";
+import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
 
 /** A thrown value's message. */
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));

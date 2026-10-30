@@ -180,6 +180,9 @@ importers:
         specifier: npm:typescript@6.0.3
         version: typescript@6.0.3
     devDependencies:
+      '@forgebook/tools':
+        specifier: workspace:*
+        version: link:../../tools
       '@forgebook/typescript-config':
         specifier: workspace:*
         version: link:../../config/typescript
@@ -229,6 +232,9 @@ importers:
         specifier: npm:typescript@6.0.3
         version: typescript@6.0.3
     devDependencies:
+      '@forgebook/tools':
+        specifier: workspace:*
+        version: link:../../tools
       '@forgebook/typescript-config':
         specifier: workspace:*
         version: link:../../config/typescript
@@ -262,6 +268,9 @@ importers:
 
   packages/story-format:
     devDependencies:
+      '@forgebook/tools':
+        specifier: workspace:*
+        version: link:../../tools
       '@forgebook/typescript-config':
         specifier: workspace:*
         version: link:../../config/typescript
@@ -284,6 +293,9 @@ importers:
         specifier: workspace:*
         version: link:../story-format
     devDependencies:
+      '@forgebook/tools':
+        specifier: workspace:*
+        version: link:../../tools
       '@forgebook/typescript-config':
         specifier: workspace:*
         version: link:../../config/typescript
@@ -305,6 +317,25 @@ importers:
       vite:
         specifier: 8.3.5
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1))
+
+  tools:
+    dependencies:
+      '@ensiria/cli-kit':
+        specifier: link:../../cli-kit
+        version: link:../../cli-kit
+      sass-embedded:
+        specifier: 1.106.1
+        version: 1.106.1
+    devDependencies:
+      '@forgebook/typescript-config':
+        specifier: workspace:*
+        version: link:../config/typescript
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1))

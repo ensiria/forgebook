@@ -8,21 +8,21 @@
 import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 
-import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes";
-import type { ComponentDocs, PropDocs } from "../componentDocs";
-import type { ArgValue, PanelArgs } from "../messages";
-import type { NamedValues } from "../namedValues";
-import type { PlayTrace } from "../playTrace";
-import { A11yTab, a11yHint, type CheckState } from "./A11yTab";
-import { CodeTab } from "./CodeTab";
-import type { DockTab } from "./Dock";
-import { EventsTab } from "./EventsTab";
-import { InteractionsTab, interactionsHint } from "./InteractionsTab";
-import { PartsTab, styleHooks } from "./PartsTab";
-import { PropsTab, type TextArgNote } from "./PropsTab";
-import { STRINGS } from "./strings";
-import type { EventCall } from "./useFrameMessages";
-import type { Loaded } from "./useLoaded";
+import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
+import type { ComponentDocs, PropDocs } from "../componentDocs.ts";
+import type { ArgValue, PanelArgs } from "../messages.ts";
+import type { NamedValues } from "../namedValues.ts";
+import type { PlayTrace } from "../playTrace.ts";
+import { A11yTab, a11yHint, type CheckState } from "./A11yTab.tsx";
+import { CodeTab } from "./CodeTab.tsx";
+import type { DockTab } from "./Dock.tsx";
+import { EventsTab } from "./EventsTab.tsx";
+import { InteractionsTab, interactionsHint } from "./InteractionsTab.tsx";
+import { PartsTab, styleHooks } from "./PartsTab.tsx";
+import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
+import { STRINGS } from "./strings.ts";
+import type { EventCall } from "./useFrameMessages.ts";
+import type { Loaded } from "./useLoaded.ts";
 
 /** What the tabs are built from. */
 export type DockTabsInput = {

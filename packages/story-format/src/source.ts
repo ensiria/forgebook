@@ -11,7 +11,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "./csf";
+import type { StoryGroup } from "./csf.ts";
 
 /** The props the panel can set for a story: every adjustable one, or only the named ones (none for fixed examples). */
 export type StoryControlsSetting = "all" | readonly string[];

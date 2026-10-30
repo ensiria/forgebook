@@ -7,9 +7,9 @@
  */
 import type { StoryBackground } from "@forgebook/story-format/source";
 
-import { backdropColor } from "./backdrops";
-import type { CatalogueSettings } from "./catalogue";
-import { isMoreContrastOf, schemeOf, type ViewState } from "./viewState";
+import { backdropColor } from "./backdrops.ts";
+import type { CatalogueSettings } from "./catalogue.ts";
+import { isMoreContrastOf, schemeOf, type ViewState } from "./viewState.ts";
 
 /**
  * A source's page colour for a view, or the colour of the view's backdrop.

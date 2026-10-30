@@ -18,11 +18,11 @@ import {
   useState
 } from "react";
 
-import type { StoryTree, TreeAlias, TreeComponent, TreeFamily, TreeGroup, TreeSource } from "../storyTree";
-import { Icon } from "./icons";
-import { isTyping } from "./keyboard";
-import { STRINGS } from "./strings";
-import { foundFamily, searchWords } from "./treeSearch";
+import type { StoryTree, TreeAlias, TreeComponent, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
+import { Icon } from "./icons.tsx";
+import { isTyping } from "./keyboard.ts";
+import { STRINGS } from "./strings.ts";
+import { foundFamily, searchWords } from "./treeSearch.ts";
 
 /** The sidebar's props. */
 export type SidebarProps = {

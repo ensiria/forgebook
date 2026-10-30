@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { storyCode } from "../src/vite/storyCode";
+import { storyCode } from "../src/vite/storyCode.ts";
 
 /** A story file with a story drawn from its args and two with a `render`. */
 const FILE = `import { Button } from "./Button";

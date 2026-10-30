@@ -1,0 +1,9 @@
+// The repository's commands: Node runs them directly with their types stripped, so relative imports carry `.ts`.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/node.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}

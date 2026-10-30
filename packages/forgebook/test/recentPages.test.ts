@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type RecentPage, withRecentPage } from "../src/shell/useRecentPages";
+import { type RecentPage, withRecentPage } from "../src/shell/useRecentPages.ts";
 
 /** A story's page. */
 const story = (id: string): RecentPage => ({ kind: "story", id });

@@ -10,7 +10,7 @@
  *
  * @module
  */
-import type { TreeAlias, TreeComponent, TreeFamily, TreeGroup, TreeStory } from "../storyTree";
+import type { TreeAlias, TreeComponent, TreeFamily, TreeGroup, TreeStory } from "../storyTree.ts";
 
 /**
  * A text as the search compares it: lower case, without accents.

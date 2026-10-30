@@ -7,10 +7,10 @@
 
 import type { StorySheets } from "@forgebook/story-format/source";
 
-import { backdropSheet } from "../backdrops";
-import type { CatalogueSettings } from "../catalogue";
-import { switchValueOf, type ViewSwitch } from "../switches";
-import { type LiveView, schemeOf, type ViewState } from "../viewState";
+import { backdropSheet } from "../backdrops.ts";
+import type { CatalogueSettings } from "../catalogue.ts";
+import { switchValueOf, type ViewSwitch } from "../switches.ts";
+import { type LiveView, schemeOf, type ViewState } from "../viewState.ts";
 
 /** The id of the style sheet that draws the backdrop. */
 const BACKDROP_STYLE_ID = "forgebook-backdrop-style";

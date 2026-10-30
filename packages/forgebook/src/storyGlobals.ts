@@ -12,8 +12,8 @@
  * @module
  */
 
-import type { CatalogueSettings } from "./catalogue";
-import type { ViewState } from "./viewState";
+import type { CatalogueSettings } from "./catalogue.ts";
+import type { ViewState } from "./viewState.ts";
 
 /** What a story fixes of the view; an empty `switches` and nothing else when it fixes nothing. */
 export type FixedView = {

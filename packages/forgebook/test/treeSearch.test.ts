@@ -5,9 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { steppedStory, storyStep } from "../src/shell/keyboard";
-import { foundComponent, foundFamily, searchWords } from "../src/shell/treeSearch";
-import type { TreeComponent, TreeFamily } from "../src/storyTree";
+import { steppedStory, storyStep } from "../src/shell/keyboard.ts";
+import { foundComponent, foundFamily, searchWords } from "../src/shell/treeSearch.ts";
+import type { TreeComponent, TreeFamily } from "../src/storyTree.ts";
 
 /** A component with a few stories. */
 const BUTTON: TreeComponent = {

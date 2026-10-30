@@ -11,10 +11,10 @@
  */
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useId, useRef } from "react";
 
-import type { PanelTab } from "../viewState";
-import { Icon } from "./icons";
-import { STRINGS } from "./strings";
-import { useStored } from "./useStored";
+import type { PanelTab } from "../viewState.ts";
+import { Icon } from "./icons.tsx";
+import { STRINGS } from "./strings.ts";
+import { useStored } from "./useStored.ts";
 
 /** One tab of the panel. */
 export type DockTab = {

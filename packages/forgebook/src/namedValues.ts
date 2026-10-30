@@ -10,7 +10,7 @@
  */
 import type { StorySource } from "@forgebook/story-format/source";
 
-import { type ArgValue, isChoiceList, isNamedArg, type NamedArg, type PanelArgs } from "./messages";
+import { type ArgValue, isChoiceList, isNamedArg, type NamedArg, type PanelArgs } from "./messages.ts";
 
 /** A source's named values: by the type as the props write it, then by name. */
 export type NamedValues = NonNullable<StorySource["namedValues"]>;

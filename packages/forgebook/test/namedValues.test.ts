@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type NamedValues, nameOf, panelArgsOf, storyArgsOf } from "../src/namedValues";
+import { type NamedValues, nameOf, panelArgsOf, storyArgsOf } from "../src/namedValues.ts";
 
 /** Two components a source names. */
 const IconBell = (): null => null;

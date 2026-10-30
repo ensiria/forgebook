@@ -18,8 +18,8 @@ import {
 import { forwardRef, memo, type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { reactRenderer } from "../src/reactRenderer";
-import { useStoryText } from "../src/texts";
+import { reactRenderer } from "../src/reactRenderer.tsx";
+import { useStoryText } from "../src/texts.ts";
 
 /**
  * A story from a story file's exports, as the frame reads it.

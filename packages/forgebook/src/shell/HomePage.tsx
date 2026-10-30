@@ -20,11 +20,11 @@ import {
   type TreeComponent,
   type TreeFamily,
   type TreeSource
-} from "../storyTree";
-import { PackageHtml } from "./PackageHtml";
-import { STRINGS } from "./strings";
-import { type Loaded, useLoaded } from "./useLoaded";
-import type { RecentPage } from "./useRecentPages";
+} from "../storyTree.ts";
+import { PackageHtml } from "./PackageHtml.tsx";
+import { STRINGS } from "./strings.ts";
+import { type Loaded, useLoaded } from "./useLoaded.ts";
+import type { RecentPage } from "./useRecentPages.ts";
 
 /** The most components a family's card lists before "Show all". */
 const CARD_COMPONENTS = 6;

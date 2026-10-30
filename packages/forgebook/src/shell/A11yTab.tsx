@@ -10,8 +10,8 @@
  */
 import type { ReactNode } from "react";
 
-import type { Violation } from "../a11y";
-import { STRINGS } from "./strings";
+import type { Violation } from "../a11y.ts";
+import { STRINGS } from "./strings.ts";
 
 /** The check's state: not run, running, its violations, or why it could not run. */
 export type CheckState =

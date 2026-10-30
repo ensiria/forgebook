@@ -3,8 +3,8 @@
  *
  * @module
  */
-import { boundedSidebarWidth, SIDEBAR_WIDTH } from "./SidebarHandle";
-import { useStored } from "./useStored";
+import { boundedSidebarWidth, SIDEBAR_WIDTH } from "./SidebarHandle.tsx";
+import { useStored } from "./useStored.ts";
 
 /** The sidebar's layout and its setters. */
 export type SidebarLayout = {

@@ -1,7 +1,6 @@
 {
   "name": "@forgebook/story-format",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "The story format of Forgebook: the CSF 3 types a story file is written with, generic over a framework, the StorySource a package hands a catalogue, the texts inside the stories in the shown language, and the story clock a Live story reads. No dependency: a library's stories depend on their framework's package, never on the catalogue that shows them.",
   "keywords": [
     "stories",
@@ -16,6 +15,12 @@
     "directory": "packages/story-format"
   },
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "exports": {
     "./csf": "./src/csf.ts",
     "./clock": "./src/clock.ts",
@@ -25,9 +30,13 @@
     "./testing-library": "./src/testingLibrary.ts"
   },
   "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build manifest --check && package-build build",
     "typecheck": "tsc -p src"
   },
   "devDependencies": {
+    "@forgebook/tools": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",
     "@testing-library/dom": "10.4.2",
     "@testing-library/user-event": "14.6.8"
@@ -42,6 +51,34 @@
     },
     "@testing-library/user-event": {
       "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      "./csf": {
+        "types": "./dist/src/csf.d.ts",
+        "default": "./dist/src/csf.js"
+      },
+      "./clock": {
+        "types": "./dist/src/clock.d.ts",
+        "default": "./dist/src/clock.js"
+      },
+      "./source": {
+        "types": "./dist/src/source.d.ts",
+        "default": "./dist/src/source.js"
+      },
+      "./client": {
+        "types": "./dist/src/client.d.ts"
+      },
+      "./texts": {
+        "types": "./dist/src/texts.d.ts",
+        "default": "./dist/src/texts.js"
+      },
+      "./testing-library": {
+        "types": "./dist/src/testingLibrary.d.ts",
+        "default": "./dist/src/testingLibrary.js"
+      }
     }
   }
 }

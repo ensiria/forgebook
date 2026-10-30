@@ -31,9 +31,9 @@ import {
   type StageHeight,
   type StageWidth,
   type Zoom
-} from "../viewState";
-import { useCatalogue } from "./catalogueContext";
-import { STRINGS } from "./strings";
+} from "../viewState.ts";
+import { useCatalogue } from "./catalogueContext.ts";
+import { STRINGS } from "./strings.ts";
 
 /** The viewport's props. */
 export type StageViewportProps = {

@@ -13,13 +13,13 @@
 
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
-import { isViolation, type Violation } from "./a11y";
-import { isPanelArgTypes, type PanelArgTypes } from "./argTypes";
-import { isMatrix, type Matrix } from "./matrix";
-import { isPlayTrace, type PlayTrace } from "./playTrace";
-import { type ClockState, isClockRate } from "./storyClock";
-import { type FixedView, isFixedView } from "./storyGlobals";
-import { type LiveView, MEASURE_TOOLS, type MeasureTool } from "./viewState";
+import { isViolation, type Violation } from "./a11y.ts";
+import { isPanelArgTypes, type PanelArgTypes } from "./argTypes.ts";
+import { isMatrix, type Matrix } from "./matrix.ts";
+import { isPlayTrace, type PlayTrace } from "./playTrace.ts";
+import { type ClockState, isClockRate } from "./storyClock.ts";
+import { type FixedView, isFixedView } from "./storyGlobals.ts";
+import { type LiveView, MEASURE_TOOLS, type MeasureTool } from "./viewState.ts";
 
 /**
  * An arg the props panel can show and set: what crosses between the documents as is. A list of texts or numbers is a

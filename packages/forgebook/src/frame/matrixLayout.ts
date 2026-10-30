@@ -10,9 +10,9 @@
  * @module
  */
 
-import type { Matrix, MatrixValue } from "../matrix";
-import { forceStates } from "./storyCanvas";
-import type { LoadedArgs, LoadedStory } from "./storyModule";
+import type { Matrix, MatrixValue } from "../matrix.ts";
+import { forceStates } from "./storyCanvas.ts";
+import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
 
 /** One cell of the matrix: where the story is drawn, and its values over the story's args. */
 export type MatrixCell = {

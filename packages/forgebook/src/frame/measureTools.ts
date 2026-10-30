@@ -12,7 +12,7 @@
  *
  * @module
  */
-import type { MeasureTool } from "../viewState";
+import type { MeasureTool } from "../viewState.ts";
 
 /** The id of the style sheet that draws the outlines and the grid. */
 const STYLE_ID = "forgebook-measure-style";

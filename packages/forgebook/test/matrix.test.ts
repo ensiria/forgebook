@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { PropDocs } from "../src/componentDocs";
-import { isMatrix, matrixOf, matrixProps } from "../src/matrix";
+import type { PropDocs } from "../src/componentDocs.ts";
+import { isMatrix, matrixOf, matrixProps } from "../src/matrix.ts";
 
 /** A prop of the given kind. */
 const prop = (name: string, kind: PropDocs["kind"], choices?: readonly (string | number)[]): PropDocs => ({

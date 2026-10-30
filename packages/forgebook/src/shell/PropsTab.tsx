@@ -11,11 +11,11 @@
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
-import type { PanelProp } from "../argTypes";
-import { type ArgValue, isNamedArg, type PanelArgs } from "../messages";
-import type { NamedValues } from "../namedValues";
-import { ChoiceControl, NumberField, textOf } from "./PropFields";
-import { STRINGS } from "./strings";
+import type { PanelProp } from "../argTypes.ts";
+import { type ArgValue, isNamedArg, type PanelArgs } from "../messages.ts";
+import type { NamedValues } from "../namedValues.ts";
+import { ChoiceControl, NumberField, textOf } from "./PropFields.tsx";
+import { STRINGS } from "./strings.ts";
 
 /** A prop the story gives a text by its key (`storyText("key")`): the key, and whether the panel wrote over it. */
 export type TextArgNote = {

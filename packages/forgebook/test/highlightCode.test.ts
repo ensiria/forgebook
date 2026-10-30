@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { escapeHtml, highlightCode } from "../src/vite/highlightCode";
+import { escapeHtml, highlightCode } from "../src/vite/highlightCode.ts";
 
 describe("highlightCode", () => {
   it("colours TSX with the catalogue's classes, JSX included", () => {

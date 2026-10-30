@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { sassMembers, styleSheetSummary } from "../bin/forgebook-docs/sassDocs";
+import { sassMembers, styleSheetSummary } from "../bin/forgebook-docs/sassDocs.ts";
 
 describe("sassDocs", () => {
   it("reads every documented member with its parameters and its summary across lines", () => {

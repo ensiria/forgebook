@@ -35,14 +35,60 @@ export const markSourcesChanged = (): void => {
 };
 
 /**
- * The program that holds a file: the one of the nearest `tsconfig.json` up its folders.
+ * What a story file is read with when no `tsconfig.json` holds it (a JavaScript project, a `.jsx` story in a project
+ * that does not allow JavaScript): its imports resolved as Vite resolves them, JavaScript and JSX allowed.
+ */
+const FALLBACK_OPTIONS: ts.CompilerOptions = {
+  allowJs: true,
+  jsx: ts.JsxEmit.ReactJSX,
+  module: ts.ModuleKind.ESNext,
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  target: ts.ScriptTarget.ES2022,
+  skipLibCheck: true,
+  noEmit: true
+};
+
+/**
+ * A program from its root files, the one kept under the same key reused while no source changed.
+ *
+ * @param key - the program's key: its configuration file, or the story file a program of its own is made for.
+ * @param rootNames - its root files.
+ * @param options - its compiler options.
+ */
+const keptProgram = (key: string, rootNames: readonly string[], options: ts.CompilerOptions): ts.Program => {
+  const oldProgram = programs.get(key);
+  if (oldProgram !== undefined && !outdated.has(key)) return oldProgram;
+  outdated.delete(key);
+  const program = ts.createProgram({
+    rootNames,
+    options,
+    ...(oldProgram === undefined ? {} : { oldProgram })
+  });
+  programs.set(key, program);
+  return program;
+};
+
+/**
+ * A program of the story file alone, from which its imports reach the component: for a file no configuration holds.
+ *
+ * @param file - the story file.
+ * @param options - the options of the configuration above it, when there is one; JavaScript is allowed on top.
+ */
+const fileProgram = (file: string, options: ts.CompilerOptions): DocsProgram => {
+  const program = keptProgram(`${file}#own`, [file], { ...options, allowJs: true, noEmit: true });
+  return { program, checker: program.getTypeChecker() };
+};
+
+/**
+ * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, a
+ * program of the file alone (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
  *
  * @param file - an absolute path to a source file.
- * @returns the program, or a message when no configuration holds the file.
+ * @returns the program, or a message when the configuration above it cannot be read.
  */
 export const programFor = (file: string): DocsProgram | string => {
   const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
-  if (configPath === undefined) return `No tsconfig.json above ${file}`;
+  if (configPath === undefined) return fileProgram(file, FALLBACK_OPTIONS);
   const parsed = ts.getParsedCommandLineOfConfigFile(
     configPath,
     {},
@@ -52,19 +98,8 @@ export const programFor = (file: string): DocsProgram | string => {
     }
   );
   if (parsed === undefined) return `${configPath} could not be read`;
-  const oldProgram = programs.get(configPath);
-  if (oldProgram !== undefined && !outdated.has(configPath)) {
-    if (oldProgram.getSourceFile(file) === undefined) return `${configPath} does not include ${file}`;
-    return { program: oldProgram, checker: oldProgram.getTypeChecker() };
-  }
-  outdated.delete(configPath);
-  const program = ts.createProgram({
-    rootNames: parsed.fileNames,
-    options: parsed.options,
-    ...(oldProgram === undefined ? {} : { oldProgram })
-  });
-  programs.set(configPath, program);
-  if (program.getSourceFile(file) === undefined) return `${configPath} does not include ${file}`;
+  const program = keptProgram(configPath, parsed.fileNames, parsed.options);
+  if (program.getSourceFile(file) === undefined) return fileProgram(file, parsed.options);
   return { program, checker: program.getTypeChecker() };
 };
 

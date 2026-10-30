@@ -5,7 +5,7 @@
  */
 import type { ReactNode } from "react";
 
-import type { SharedProps } from "../shared/sharedProps";
+import type { SharedProps } from "../shared/sharedProps.ts";
 
 /** The sizes, in the order the source writes them: not the alphabet's. */
 export const SIZES = ["md", "sm"] as const;

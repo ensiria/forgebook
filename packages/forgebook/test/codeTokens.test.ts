@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { codeTokens } from "../src/shell/codeTokens";
+import { codeTokens } from "../src/shell/codeTokens.ts";
 
 /** Tokens as `kind:text`, spaces left out. */
 const kinds = (text: string, names: readonly string[] = []): string[] =>

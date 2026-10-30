@@ -6,7 +6,7 @@
  */
 import { type FrameConfig, mountFrame as mountForgebookFrame } from "forgebook/frame";
 
-import { reactRenderer } from "./reactRenderer";
+import { reactRenderer } from "./reactRenderer.tsx";
 
 /**
  * Shows the story the address names in the given element, drawn with React.

@@ -19,7 +19,7 @@ import type {
   StorySource
 } from "@forgebook/story-format/source";
 
-import { sourceFiles } from "./sourceFiles";
+import { sourceFiles } from "./sourceFiles.ts";
 
 /** One story in the tree. */
 export type TreeStory = {

@@ -6,7 +6,7 @@
 import { filledText, isStoryTextArg, storyText, storyTextOf } from "@forgebook/story-format/texts";
 import { describe, expect, it } from "vitest";
 
-import { pseudoText, shownTexts, storyTextKeysOf, withStoryTexts } from "../src/storyTexts";
+import { pseudoText, shownTexts, storyTextKeysOf, withStoryTexts } from "../src/storyTexts.ts";
 
 const TEXTS = {
   en: { "card.title": "Projects", "card.count": "{count} rows" },

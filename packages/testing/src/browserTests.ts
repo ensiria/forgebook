@@ -23,9 +23,9 @@ import { storyTree, testedStoryLocations } from "forgebook/story-tree";
 import { DEFAULT_SWITCHES, switchWithRole, type ViewSwitch } from "forgebook/switches";
 import { defaultView, frameAddress, type ViewState } from "forgebook/view-state";
 
-import { findOverlaysPastFrame, isOverlayChecked } from "./overlays";
-import { findSpills } from "./spills";
-import { indexedSource, type StoryFilesOptions } from "./storyFiles";
+import { findOverlaysPastFrame, isOverlayChecked } from "./overlays.ts";
+import { findSpills } from "./spills.ts";
+import { indexedSource, type StoryFilesOptions } from "./storyFiles.ts";
 
 /** One way of showing every story. */
 export type StoryVariant = {

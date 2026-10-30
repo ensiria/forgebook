@@ -5,6 +5,6 @@
  */
 import type { Meta } from "@forgebook/react";
 
-import { Ordered } from "./Ordered";
+import { Ordered } from "./Ordered.tsx";
 
 export default { title: "Order/Ordered", component: Ordered } satisfies Meta<typeof Ordered>;

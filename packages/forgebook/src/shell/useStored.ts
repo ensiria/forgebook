@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from "react";
 
-import { useCatalogue } from "./catalogueContext";
+import { useCatalogue } from "./catalogueContext.ts";
 
 /** The stored text under a key, or none when there is none or storage is refused. */
 const readStored = (key: string): string | null => {

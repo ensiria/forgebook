@@ -5,9 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { ResolvedConfig } from "../src/vite/configFile";
-import { prebundled, type Resolve, scannedEntries } from "../src/vite/prebundled";
-import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
+import type { ResolvedConfig } from "../src/vite/configFile.ts";
+import { prebundled, type Resolve, scannedEntries } from "../src/vite/prebundled.ts";
+import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A catalogue on the stub framework, which pre-bundles one package of its own. */
 const CONFIG: ResolvedConfig = {

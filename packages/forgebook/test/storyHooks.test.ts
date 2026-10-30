@@ -6,9 +6,9 @@
 import type { StoryHookContext } from "@forgebook/story-format/csf";
 import { describe, expect, it } from "vitest";
 
-import { heldFrameClock } from "../src/frame/frameClock";
-import { prepareStory } from "../src/frame/storyHooks";
-import { type LoadedArgs, readPreview, readStory } from "../src/frame/storyModule";
+import { heldFrameClock } from "../src/frame/frameClock.ts";
+import { prepareStory } from "../src/frame/storyHooks.ts";
+import { type LoadedArgs, readPreview, readStory } from "../src/frame/storyModule.ts";
 
 /** What a loader and a set-up receive here. */
 const CONTEXT = {

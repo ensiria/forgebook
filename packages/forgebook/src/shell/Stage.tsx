@@ -13,13 +13,13 @@
 
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
-import type { PanelArgTypes } from "../argTypes";
-import { matrixOf, matrixProps } from "../matrix";
-import type { ArgValue, PanelArgs, ShellMessage } from "../messages";
-import type { NamedValues } from "../namedValues";
-import type { PlayTrace } from "../playTrace";
-import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals";
-import type { TreeComponent, TreeStory } from "../storyTree";
+import type { PanelArgTypes } from "../argTypes.ts";
+import { matrixOf, matrixProps } from "../matrix.ts";
+import type { ArgValue, PanelArgs, ShellMessage } from "../messages.ts";
+import type { NamedValues } from "../namedValues.ts";
+import type { PlayTrace } from "../playTrace.ts";
+import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
+import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import {
   frameAddress,
   isComparing,
@@ -30,25 +30,25 @@ import {
   type StageWidth,
   type ViewState,
   type Zoom
-} from "../viewState";
-import type { CheckState } from "./A11yTab";
-import { ClockControls, useStoryClockControls } from "./ClockControls";
-import { useCatalogue } from "./catalogueContext";
-import { compareVariants } from "./compareVariants";
-import { Dock } from "./Dock";
-import { dockTabs } from "./dockTabs";
-import { FrameView, tellFrames } from "./FrameView";
-import { Icon } from "./icons";
-import { MatrixPicker } from "./MatrixPicker";
-import { StageTools } from "./StageTools";
-import { StageViewport } from "./StageViewport";
-import { STRINGS } from "./strings";
-import { useComponentDocs } from "./useComponentDocs";
-import { useCopy } from "./useCopy";
-import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages";
-import { useLiveView, useLoadedView } from "./useLiveView";
-import { type PageScroll, useScrollMemory } from "./useScrollMemory";
-import { useStoryCode } from "./useStoryCode";
+} from "../viewState.ts";
+import type { CheckState } from "./A11yTab.tsx";
+import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
+import { useCatalogue } from "./catalogueContext.ts";
+import { compareVariants } from "./compareVariants.ts";
+import { Dock } from "./Dock.tsx";
+import { dockTabs } from "./dockTabs.tsx";
+import { FrameView, tellFrames } from "./FrameView.tsx";
+import { Icon } from "./icons.tsx";
+import { MatrixPicker } from "./MatrixPicker.tsx";
+import { StageTools } from "./StageTools.tsx";
+import { StageViewport } from "./StageViewport.tsx";
+import { STRINGS } from "./strings.ts";
+import { useComponentDocs } from "./useComponentDocs.ts";
+import { useCopy } from "./useCopy.ts";
+import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
+import { useLiveView, useLoadedView } from "./useLiveView.ts";
+import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
+import { useStoryCode } from "./useStoryCode.ts";
 
 /** The `argTypes` of a story before its frame reported them. */
 const NO_ARG_TYPES: PanelArgTypes = {};

@@ -11,7 +11,10 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "lint": "biome ci . && eslint .",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "build": "pnpm --filter \"./packages/*\" build",
+    "manifest": "pnpm --filter \"./packages/*\" manifest",
+    "manifest:check": "pnpm --filter \"./packages/*\" manifest --check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",

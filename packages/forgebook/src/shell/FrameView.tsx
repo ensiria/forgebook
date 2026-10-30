@@ -6,8 +6,8 @@
  */
 import type { ReactNode, Ref } from "react";
 
-import type { ShellMessage } from "../messages";
-import { STRINGS } from "./strings";
+import type { ShellMessage } from "../messages.ts";
+import { STRINGS } from "./strings.ts";
 
 /** The frame view's props. */
 export type FrameViewProps = {

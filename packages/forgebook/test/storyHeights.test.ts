@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { isStoryHeights, knownHeight, type StoryHeights } from "../src/storyHeights";
+import { isStoryHeights, knownHeight, type StoryHeights } from "../src/storyHeights.ts";
 
 /** Two stories measured at three widths. */
 const HEIGHTS: StoryHeights = {

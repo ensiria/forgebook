@@ -6,10 +6,10 @@
  */
 import type { ReactNode } from "react";
 
-import type { PropDocs } from "../componentDocs";
-import { Code } from "./Code";
-import { STRINGS } from "./strings";
-import type { EventCall } from "./useFrameMessages";
+import type { PropDocs } from "../componentDocs.ts";
+import { Code } from "./Code.tsx";
+import { STRINGS } from "./strings.ts";
+import type { EventCall } from "./useFrameMessages.ts";
 
 /** The tab's props. */
 export type EventsTabProps = {

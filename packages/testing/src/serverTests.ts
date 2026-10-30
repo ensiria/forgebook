@@ -22,7 +22,7 @@ import { BASE_LANGUAGE, withStoryTexts } from "forgebook/story-texts";
 import { storyTree, testedStoryLocations } from "forgebook/story-tree";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { storyControlsProblem } from "./storyControls";
+import { storyControlsProblem } from "./storyControls.ts";
 
 /** A second pass: each story inside a decorator, its HTML optionally checked. */
 export type StoryServerPass = {

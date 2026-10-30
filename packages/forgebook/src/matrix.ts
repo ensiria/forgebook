@@ -9,7 +9,7 @@
  *
  * @module
  */
-import type { PropDocs } from "./componentDocs";
+import type { PropDocs } from "./componentDocs.ts";
 
 /** A value an axis takes: what a choice or a toggle prop can be set to. */
 export type MatrixValue = string | number | boolean;

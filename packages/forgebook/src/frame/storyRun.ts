@@ -14,20 +14,20 @@
 
 import { type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 
-import { actionNames, mappedArgs } from "../argTypes";
-import type { Matrix } from "../matrix";
-import type { PanelArgs } from "../messages";
-import type { PlayTrace } from "../playTrace";
-import type { ClockState } from "../storyClock";
-import { withStoryTexts } from "../storyTexts";
-import type { FrameClock } from "./frameClock";
-import { matrixLayout } from "./matrixLayout";
-import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory";
-import type { MountedStory, StoryDrawing, StoryIdentity, StoryRenderer } from "./renderer";
-import { animationsSettled } from "./settle";
-import { storyCanvas } from "./storyCanvas";
-import { type PreparedStory, prepareStory } from "./storyHooks";
-import type { LoadedArgs, LoadedStory } from "./storyModule";
+import { actionNames, mappedArgs } from "../argTypes.ts";
+import type { Matrix } from "../matrix.ts";
+import type { PanelArgs } from "../messages.ts";
+import type { PlayTrace } from "../playTrace.ts";
+import type { ClockState } from "../storyClock.ts";
+import { withStoryTexts } from "../storyTexts.ts";
+import type { FrameClock } from "./frameClock.ts";
+import { matrixLayout } from "./matrixLayout.ts";
+import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
+import type { MountedStory, StoryDrawing, StoryIdentity, StoryRenderer } from "./renderer.ts";
+import { animationsSettled } from "./settle.ts";
+import { storyCanvas } from "./storyCanvas.ts";
+import { type PreparedStory, prepareStory } from "./storyHooks.ts";
+import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
 
 /** What the shell can do to a running story. */
 export type StoryControls = {

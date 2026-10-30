@@ -19,10 +19,10 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 
-import { StoryClockContext } from "./clock";
-import { StoryErrorBoundary } from "./StoryErrorBoundary";
-import { storyElement } from "./storyElement";
-import { StoryTextsContext } from "./texts";
+import { StoryClockContext } from "./clock.ts";
+import { StoryErrorBoundary } from "./StoryErrorBoundary.tsx";
+import { storyElement } from "./storyElement.ts";
+import { StoryTextsContext } from "./texts.ts";
 
 /**
  * The story in the texts' and the clock's providers; the language's provider is a decorator of the catalogue's

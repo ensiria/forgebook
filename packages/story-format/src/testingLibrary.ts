@@ -14,7 +14,7 @@
 import type { BoundFunctions, queries } from "@testing-library/dom";
 import type { UserEvent } from "@testing-library/user-event";
 
-declare module "./csf" {
+declare module "./csf.ts" {
   /** The play tools Testing Library gives. */
   interface StoryPlayTools {
     /** Testing Library's queries, bound to the story's canvas (`canvas.getByRole("button")`). */

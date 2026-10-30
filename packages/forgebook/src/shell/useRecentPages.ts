@@ -9,7 +9,7 @@
  */
 import { useEffect } from "react";
 
-import { useStored } from "./useStored";
+import { useStored } from "./useStored.ts";
 
 /** A page the home can list: a story's or a component's, by id. */
 export type RecentPage = {

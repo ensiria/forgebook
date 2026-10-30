@@ -16,9 +16,9 @@ import "./frame.scss";
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 
-import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes";
-import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue";
-import { shownLanguage } from "../languages";
+import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
+import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
+import { shownLanguage } from "../languages.ts";
 import {
   detailOf,
   type FrameMessage,
@@ -26,26 +26,26 @@ import {
   type PanelArgs,
   previewValue,
   type ShellMessage
-} from "../messages";
-import { panelArgsOf, storyArgsOf } from "../namedValues";
-import type { PlayTrace } from "../playTrace";
-import { sourceFiles } from "../sourceFiles";
-import { isClockHeldIn } from "../storyClock";
-import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGlobals";
-import { shownTexts, storyTextKeysOf, withStoryTexts } from "../storyTexts";
-import { findStory, storyTree } from "../storyTree";
-import { catalogueSwitches, type ViewSwitch } from "../switches";
-import { codeGlobalsOf, frameAddress, type LiveView, languageOf, parseView } from "../viewState";
-import { checkStory } from "./checkStory";
-import { storyFrameClock } from "./frameClock";
-import { STATUS_ATTRIBUTE } from "./frameStatus";
-import { applyView, loadSheets, viewSheets } from "./frameView";
-import { applyTools } from "./measureTools";
-import type { PlayToolsLoader } from "./playStory";
-import type { StoryDrawing, StoryRenderer } from "./renderer";
-import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule";
-import { mergedPreviews, readPreview, readStory } from "./storyModule";
-import { runStory, type StoryControls } from "./storyRun";
+} from "../messages.ts";
+import { panelArgsOf, storyArgsOf } from "../namedValues.ts";
+import type { PlayTrace } from "../playTrace.ts";
+import { sourceFiles } from "../sourceFiles.ts";
+import { isClockHeldIn } from "../storyClock.ts";
+import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGlobals.ts";
+import { shownTexts, storyTextKeysOf, withStoryTexts } from "../storyTexts.ts";
+import { findStory, storyTree } from "../storyTree.ts";
+import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
+import { codeGlobalsOf, frameAddress, type LiveView, languageOf, parseView } from "../viewState.ts";
+import { checkStory } from "./checkStory.ts";
+import { storyFrameClock } from "./frameClock.ts";
+import { STATUS_ATTRIBUTE } from "./frameStatus.ts";
+import { applyView, loadSheets, viewSheets } from "./frameView.ts";
+import { applyTools } from "./measureTools.ts";
+import type { PlayToolsLoader } from "./playStory.ts";
+import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
+import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
+import { mergedPreviews, readPreview, readStory } from "./storyModule.ts";
+import { runStory, type StoryControls } from "./storyRun.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {

@@ -7,8 +7,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { markSourcesChanged, programFor } from "../src/vite/docsProgram";
-import { KIT_DIR } from "./fixturePaths";
+import { markSourcesChanged, programFor } from "../src/vite/docsProgram.ts";
+import { KIT_DIR } from "./fixturePaths.ts";
 
 const SELECT = join(KIT_DIR, "src", "Select.tsx");
 

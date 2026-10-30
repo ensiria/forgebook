@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { type Loaded, useLoaded } from "./useLoaded";
+import { type Loaded, useLoaded } from "./useLoaded.ts";
 
 /** A component's page text: its documentation file's HTML and its file's summary. */
 export type PageDoc = {

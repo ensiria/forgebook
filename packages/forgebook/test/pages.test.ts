@@ -6,9 +6,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { ResolvedConfig } from "../src/vite/configFile";
-import { configModule, frameEntry, pageHtml, shellEntry, storiesSourceModule } from "../src/vite/pages";
-import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
+import type { ResolvedConfig } from "../src/vite/configFile.ts";
+import { configModule, frameEntry, pageHtml, shellEntry, storiesSourceModule } from "../src/vite/pages.ts";
+import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A resolved configuration with a logo, a preview, its own stories and a package's. */
 const CONFIG: ResolvedConfig = {

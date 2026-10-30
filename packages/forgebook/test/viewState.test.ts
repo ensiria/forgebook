@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type CatalogueSettings, catalogueSettings } from "../src/catalogue";
-import type { ViewSwitch } from "../src/switches";
+import { type CatalogueSettings, catalogueSettings } from "../src/catalogue.ts";
+import type { ViewSwitch } from "../src/switches.ts";
 import {
   codeGlobalsOf,
   DEFAULT_VIEW,
@@ -19,8 +19,8 @@ import {
   schemeOf,
   type ViewState,
   viewParams
-} from "../src/viewState";
-import { FIXTURE_SWITCHES } from "./fixtureSwitches";
+} from "../src/viewState.ts";
+import { FIXTURE_SWITCHES } from "./fixtureSwitches.ts";
 
 /** The fixture's switches, read from and written to an address. */
 const SWITCHES: readonly ViewSwitch[] = FIXTURE_SWITCHES;

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { clearRetry, isStaleModuleError, markRetry } from "../src/frame/staleModule";
+import { clearRetry, isStaleModuleError, markRetry } from "../src/frame/staleModule.ts";
 
 /** A session storage in memory. */
 const memoryStorage = (): Storage => {

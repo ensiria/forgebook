@@ -8,10 +8,10 @@ import "./shell.scss";
 
 import { createRoot } from "react-dom/client";
 
-import type { StoryCodeWriter } from "../frame/renderer";
-import { CodeWriterContext } from "./codeWriter";
-import { Shell, type ShellConfig } from "./Shell";
-import { configureStrings } from "./strings";
+import type { StoryCodeWriter } from "../frame/renderer.ts";
+import { CodeWriterContext } from "./codeWriter.ts";
+import { Shell, type ShellConfig } from "./Shell.tsx";
+import { configureStrings } from "./strings.ts";
 
 /** What an app passes to the shell: the catalogue's configuration and the framework's code writer. */
 export type MountShellConfig = ShellConfig & {

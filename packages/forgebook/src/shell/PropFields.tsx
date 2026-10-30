@@ -7,10 +7,10 @@
 
 import type { ChangeEvent, ReactNode } from "react";
 
-import type { PanelProp } from "../argTypes";
-import { type ArgValue, isChoiceList } from "../messages";
-import { Segmented } from "./Segmented";
-import { STRINGS } from "./strings";
+import type { PanelProp } from "../argTypes.ts";
+import { type ArgValue, isChoiceList } from "../messages.ts";
+import { Segmented } from "./Segmented.tsx";
+import { STRINGS } from "./strings.ts";
 
 /** Called with a changed value; `undefined` removes the panel's value. */
 export type OnValueChange = (name: string, value: ArgValue | undefined) => void;

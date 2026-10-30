@@ -11,8 +11,8 @@
  * @module
  */
 
-import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops";
-import type { ViewSwitch } from "./switches";
+import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
+import type { ViewSwitch } from "./switches.ts";
 
 /** A preset width of the toolbar. */
 export type StageWidthPreset = {

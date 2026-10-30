@@ -6,7 +6,7 @@
  */
 import { type ReactNode, useId } from "react";
 
-import { Icon, type IconName } from "./icons";
+import { Icon, type IconName } from "./icons.tsx";
 
 /** One option. */
 export type SegmentOption<TValue extends string | number> = {

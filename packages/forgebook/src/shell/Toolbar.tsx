@@ -7,8 +7,8 @@
  */
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
-import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals";
-import { switchControl, switchWithRole, type ViewSwitch } from "../switches";
+import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
+import { switchControl, switchWithRole, type ViewSwitch } from "../switches.ts";
 import {
   DEFAULT_VIEW,
   hasViewChanges,
@@ -19,15 +19,15 @@ import {
   type SheetsChoice,
   type StageWidth,
   type ViewState
-} from "../viewState";
-import { useCatalogue } from "./catalogueContext";
-import { Icon } from "./icons";
-import { SchemeSwitches } from "./SchemeSwitches";
-import { Segmented } from "./Segmented";
-import { STRINGS } from "./strings";
-import { switchValueIn, withSwitch } from "./switchView";
-import { usePopover } from "./usePopover";
-import { WidthField } from "./WidthField";
+} from "../viewState.ts";
+import { useCatalogue } from "./catalogueContext.ts";
+import { Icon } from "./icons.tsx";
+import { SchemeSwitches } from "./SchemeSwitches.tsx";
+import { Segmented } from "./Segmented.tsx";
+import { STRINGS } from "./strings.ts";
+import { switchValueIn, withSwitch } from "./switchView.ts";
+import { usePopover } from "./usePopover.ts";
+import { WidthField } from "./WidthField.tsx";
 
 /** The toolbar's props. */
 export type ToolbarProps = {

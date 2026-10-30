@@ -7,10 +7,10 @@
 
 import type { ReactNode } from "react";
 
-import { useCodeWriter } from "./codeWriter";
-import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock";
-import { STRINGS } from "./strings";
-import { useCopy } from "./useCopy";
+import { useCodeWriter } from "./codeWriter.ts";
+import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
+import { STRINGS } from "./strings.ts";
+import { useCopy } from "./useCopy.ts";
 
 /** The tab's props: the story whose code it shows. */
 export type CodeTabProps = StoryCodeSource;

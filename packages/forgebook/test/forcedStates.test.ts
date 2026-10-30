@@ -6,7 +6,7 @@
 import { transform } from "lightningcss";
 import { describe, expect, it } from "vitest";
 
-import { FORCED_STATES_VISITOR } from "../src/vite/forcedStates";
+import { FORCED_STATES_VISITOR } from "../src/vite/forcedStates.ts";
 
 /** A style sheet rewritten, minified so the selectors read on one line. */
 const rewrite = (css: string): string =>

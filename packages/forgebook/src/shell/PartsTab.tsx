@@ -6,9 +6,9 @@
  */
 import type { ReactNode } from "react";
 
-import type { ComponentDocs } from "../componentDocs";
-import { Code } from "./Code";
-import { STRINGS } from "./strings";
+import type { ComponentDocs } from "../componentDocs.ts";
+import { Code } from "./Code.tsx";
+import { STRINGS } from "./strings.ts";
 
 /** The props that carry a component's modifiers, each mirrored by a `data-*` styling hook. */
 const MODIFIERS = ["variant", "size", "tone", "shape", "width", "orientation"];

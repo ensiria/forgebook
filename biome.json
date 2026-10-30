@@ -181,20 +181,14 @@
       }
     },
     {
-      "includes": [
-        "packages/forgebook/src/vite/**",
-        "packages/forgebook/bin/**",
-        "packages/forgebook/test/**",
-        "packages/react/src/vite/**",
-        "fixtures/app/src/vite.config.ts",
-        "packages/testing/bin/**",
-        "packages/testing/src/**",
-        "packages/testing/test/**"
-      ],
+      "includes": ["packages/**", "tools/**", "fixtures/app/src/vite.config.ts"],
       "linter": {
         "rules": {
           "style": {
             "noRestrictedImports": "off"
+          },
+          "correctness": {
+            "useImportExtensions": "error"
           }
         }
       }
@@ -234,7 +228,7 @@
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true,
-    "defaultBranch": "main"
+    "defaultBranch": "develop"
   },
   "files": {
     "includes": ["**", "!**/*.md", "!**/*.html", "!**/*.css", "!**/*.scss", "!**/*.svg", "!pnpm-lock.yaml"]

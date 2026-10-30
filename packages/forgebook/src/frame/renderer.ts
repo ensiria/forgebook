@@ -16,8 +16,8 @@ import type { StoryClock } from "@forgebook/story-format/clock";
 import type { StepFunction, StoryContext } from "@forgebook/story-format/csf";
 import type { StoryTextTable } from "@forgebook/story-format/texts";
 
-import type { PanelArgs } from "../messages";
-import type { LoadedArgs, LoadedDecorator, LoadedStory } from "./storyModule";
+import type { PanelArgs } from "../messages.ts";
+import type { LoadedArgs, LoadedDecorator, LoadedStory } from "./storyModule.ts";
 
 /** Which story is drawn: its id, its name and its file's title, as its context gives them. */
 export type StoryIdentity = Pick<StoryContext<LoadedArgs>, "id" | "name" | "title">;

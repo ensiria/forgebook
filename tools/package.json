@@ -1,0 +1,23 @@
+{
+  "name": "@forgebook/tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The repository's own commands: the build of each package for npm, and the check of its published manifest.",
+  "type": "module",
+  "bin": {
+    "package-build": "./package-build/package-build.mts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@ensiria/cli-kit": "0.1.0",
+    "sass-embedded": "1.106.1"
+  },
+  "devDependencies": {
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "vitest": "5.0.5"
+  }
+}

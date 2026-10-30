@@ -12,7 +12,7 @@ import {
   panelArgsParam,
   parsePanelArgsParam,
   previewValue
-} from "../src/messages";
+} from "../src/messages.ts";
 
 describe("messages", () => {
   it("accepts well-formed messages and refuses others", () => {

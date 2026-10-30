@@ -10,10 +10,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { contrastSwitch, themeSwitch } from "../src/switches";
-import type { ForgebookConfig } from "../src/vite/config";
-import { findConfigFile, resolveConfig } from "../src/vite/configFile";
-import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
+import { contrastSwitch, themeSwitch } from "../src/switches.ts";
+import type { ForgebookConfig } from "../src/vite/config.ts";
+import { findConfigFile, resolveConfig } from "../src/vite/configFile.ts";
+import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A configuration with the least it needs. */
 const BASE: ForgebookConfig = {

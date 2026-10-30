@@ -6,9 +6,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 
-import type { Violation } from "../a11y";
-import { type FrameMessage, isFrameMessage } from "../messages";
-import type { PlayTrace } from "../playTrace";
+import type { Violation } from "../a11y.ts";
+import { type FrameMessage, isFrameMessage } from "../messages.ts";
+import type { PlayTrace } from "../playTrace.ts";
 
 /** A message of a frame that the stage answers. */
 export type ReadyMessage = Extract<FrameMessage, { type: "forgebook:ready" }>;

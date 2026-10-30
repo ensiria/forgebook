@@ -1,7 +1,6 @@
 {
   "name": "@forgebook/testing",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Tests from a package's stories: each story and variant in the browser with axe, spills and overlays, screenshots, and each story rendered on the server.",
   "license": "MIT",
   "repository": {
@@ -10,6 +9,12 @@
     "directory": "packages/testing"
   },
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "sideEffects": [
     "*.css"
   ],
@@ -28,6 +33,9 @@
     "./fonts.css": "./src/fonts/fonts.css"
   },
   "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build manifest --check && package-build build",
     "test": "vitest run",
     "typecheck": "tsc -p src && tsc -p bin && tsc -p test"
   },
@@ -43,6 +51,7 @@
     "vitest": "^5.0.0"
   },
   "devDependencies": {
+    "@forgebook/tools": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",
     "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
@@ -51,5 +60,43 @@
     "react": "19.3.0",
     "vite": "8.3.5",
     "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      "./browser": {
+        "types": "./dist/src/browserTests.d.ts",
+        "default": "./dist/src/browserTests.js"
+      },
+      "./server": {
+        "types": "./dist/src/serverTests.d.ts",
+        "default": "./dist/src/serverTests.js"
+      },
+      "./story-files": {
+        "types": "./dist/src/storyFiles.d.ts",
+        "default": "./dist/src/storyFiles.js"
+      },
+      "./playwright": {
+        "types": "./dist/src/playwrightConfig.d.ts",
+        "default": "./dist/src/playwrightConfig.js"
+      },
+      "./vite": {
+        "types": "./dist/src/testViteConfig.d.ts",
+        "default": "./dist/src/testViteConfig.js"
+      },
+      "./visual-browser": {
+        "types": "./dist/src/visualBrowser.d.ts",
+        "default": "./dist/src/visualBrowser.js"
+      },
+      "./overlays": {
+        "types": "./dist/src/overlays.d.ts",
+        "default": "./dist/src/overlays.js"
+      },
+      "./fonts.css": "./dist/src/fonts/fonts.css"
+    },
+    "bin": {
+      "forgebook-heights": "./dist/bin/forgebook-heights/forgebook-heights.mjs",
+      "forgebook-shot": "./dist/bin/forgebook-shot/forgebook-shot.mjs"
+    }
   }
 }

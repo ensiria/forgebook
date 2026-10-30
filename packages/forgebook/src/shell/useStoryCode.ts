@@ -5,7 +5,7 @@
  */
 import type { StoryFileCode } from "@forgebook/story-format/source";
 
-import { type Loaded, useLoaded } from "./useLoaded";
+import { type Loaded, useLoaded } from "./useLoaded.ts";
 
 /** Whether a value is one story's code: its text and its HTML. */
 const isStoryCode = (value: unknown): boolean =>

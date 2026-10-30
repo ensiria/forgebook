@@ -11,8 +11,8 @@
  */
 import { type RefObject, useEffect, useState } from "react";
 
-import { MEASURE_TOOLS, type MeasureTool, type ViewState } from "../viewState";
-import { tellFrames } from "./FrameView";
+import { MEASURE_TOOLS, type MeasureTool, type ViewState } from "../viewState.ts";
+import { tellFrames } from "./FrameView.tsx";
 
 /** The tools a joined list names, back as a list (the effect depends on the text, not on a new list each render). */
 const toolsOf = (joined: string): MeasureTool[] =>

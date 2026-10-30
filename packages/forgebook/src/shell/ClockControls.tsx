@@ -10,11 +10,11 @@
  */
 import { type ReactNode, type RefObject, useEffect, useState } from "react";
 
-import type { ShellMessage } from "../messages";
-import { CLOCK_RATES, type ClockRate, type ClockState, DEFAULT_CLOCK_STATE } from "../storyClock";
-import { Icon } from "./icons";
-import { Segmented } from "./Segmented";
-import { STRINGS } from "./strings";
+import type { ShellMessage } from "../messages.ts";
+import { CLOCK_RATES, type ClockRate, type ClockState, DEFAULT_CLOCK_STATE } from "../storyClock.ts";
+import { Icon } from "./icons.tsx";
+import { Segmented } from "./Segmented.tsx";
+import { STRINGS } from "./strings.ts";
 
 /** The clock's state for the shown story, and how to change it in its frame. */
 export type StoryClockControls = {

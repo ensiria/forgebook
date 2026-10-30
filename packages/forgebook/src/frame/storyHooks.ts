@@ -13,7 +13,7 @@
 
 import type { StoryHookContext } from "@forgebook/story-format/csf";
 
-import type { LoadedArgs, LoadedStory } from "./storyModule";
+import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
 
 /** A story ready to be drawn: what its loaders returned, and how to undo its set-ups. */
 export type PreparedStory = {

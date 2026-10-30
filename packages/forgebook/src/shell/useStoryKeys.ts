@@ -6,9 +6,9 @@
  */
 import { useEffect, useMemo, useRef } from "react";
 
-import { type StoryTree, sidebarStoryIds } from "../storyTree";
-import { useCatalogue } from "./catalogueContext";
-import { steppedStory, storyStep } from "./keyboard";
+import { type StoryTree, sidebarStoryIds } from "../storyTree.ts";
+import { useCatalogue } from "./catalogueContext.ts";
+import { steppedStory, storyStep } from "./keyboard.ts";
 
 /**
  * Listens to the keys that walk the stories.

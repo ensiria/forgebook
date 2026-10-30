@@ -5,9 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { catalogueSettings } from "../src/catalogue";
-import { storyBackground } from "../src/storyBackground";
-import { DEFAULT_SWITCHES } from "../src/switches";
+import { catalogueSettings } from "../src/catalogue.ts";
+import { storyBackground } from "../src/storyBackground.ts";
+import { DEFAULT_SWITCHES } from "../src/switches.ts";
 
 /** A catalogue with the default switches and backgrounds. */
 const CATALOGUE = catalogueSettings("", DEFAULT_SWITCHES);

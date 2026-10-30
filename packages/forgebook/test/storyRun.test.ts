@@ -8,12 +8,12 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { heldFrameClock } from "../src/frame/frameClock";
-import type { PlayToolsLoader } from "../src/frame/playStory";
-import { type LoadedStory, readStory } from "../src/frame/storyModule";
-import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun";
-import type { PanelArgs } from "../src/messages";
-import { domRenderer } from "./domRenderer";
+import { heldFrameClock } from "../src/frame/frameClock.ts";
+import type { PlayToolsLoader } from "../src/frame/playStory.ts";
+import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
+import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun.ts";
+import type { PanelArgs } from "../src/messages.ts";
+import { domRenderer } from "./domRenderer.ts";
 
 /** What a run told the frame. */
 type Reports = {

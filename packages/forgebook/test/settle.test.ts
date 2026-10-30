@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { endingAnimations, type SettlingAnimation } from "../src/frame/settle";
+import { endingAnimations, type SettlingAnimation } from "../src/frame/settle.ts";
 
 /** An animation with the given number of iterations. */
 const animation = (iterations: number, name: string): SettlingAnimation & { readonly name: string } => ({

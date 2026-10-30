@@ -15,7 +15,7 @@
 
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
-import type { PropDocs } from "./componentDocs";
+import type { PropDocs } from "./componentDocs.ts";
 
 /** A control as the panel draws it; `none` for an arg the panel lists without a control. */
 export type PanelControl =

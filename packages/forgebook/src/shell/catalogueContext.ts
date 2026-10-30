@@ -6,8 +6,8 @@
  */
 import { createContext, useContext } from "react";
 
-import { type CatalogueSettings, catalogueSettings } from "../catalogue";
-import { DEFAULT_SWITCHES } from "../switches";
+import { type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
+import { DEFAULT_SWITCHES } from "../switches.ts";
 
 /** The catalogue's settings; the defaults until the shell provides its own. */
 export const CatalogueContext = createContext<CatalogueSettings>(catalogueSettings("", DEFAULT_SWITCHES));

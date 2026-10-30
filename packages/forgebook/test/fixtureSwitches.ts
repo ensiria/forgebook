@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { catalogueSwitches, DEFAULT_SWITCHES, type ViewSwitch } from "../src/switches";
+import { catalogueSwitches, DEFAULT_SWITCHES, type ViewSwitch } from "../src/switches.ts";
 
 /** The library's motion, speed and press feedback, on its own attributes. */
 const LIBRARY_SWITCHES: readonly ViewSwitch[] = [

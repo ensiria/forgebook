@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { indexStoryFile } from "../src/vite/indexStoryFile";
+import { indexStoryFile } from "../src/vite/indexStoryFile.ts";
 
 describe("indexStoryFile", () => {
   it("reads the title through satisfies and the stories with their names, in order", () => {

@@ -9,12 +9,12 @@
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue";
-import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages";
-import { sourceFiles } from "../sourceFiles";
-import { storyBackground } from "../storyBackground";
-import { type FixedView, NOT_FIXED } from "../storyGlobals";
-import { knownHeight, type StoryHeights } from "../storyHeights";
+import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
+import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
+import { sourceFiles } from "../sourceFiles.ts";
+import { storyBackground } from "../storyBackground.ts";
+import { type FixedView, NOT_FIXED } from "../storyGlobals.ts";
+import { knownHeight, type StoryHeights } from "../storyHeights.ts";
 import {
   type ComponentLocation,
   componentId,
@@ -25,25 +25,25 @@ import {
   sidebarStoryIds,
   storyTree,
   type TreeStory
-} from "../storyTree";
-import { catalogueSwitches, type ViewSwitch } from "../switches";
-import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState";
-import { ComponentPage } from "./ComponentPage";
-import { CatalogueContext, useCatalogue } from "./catalogueContext";
-import { HomePage } from "./HomePage";
-import { Sidebar, type SidebarProps } from "./Sidebar";
-import { SidebarHandle } from "./SidebarHandle";
-import { Stage } from "./Stage";
-import { StoryPicker } from "./StoryPicker";
-import { STRINGS } from "./strings";
-import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar";
-import { type RecentPage, useRecentPages } from "./useRecentPages";
-import type { PageScroll, PageVisit } from "./useScrollMemory";
-import { useSidebarLayout } from "./useSidebarLayout";
-import { useStoryHeights } from "./useStoryHeights";
-import { useStoryIdsElement } from "./useStoryIdsElement";
-import { useStoryKeys } from "./useStoryKeys";
-import { useSystemDark } from "./useSystemDark";
+} from "../storyTree.ts";
+import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
+import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
+import { ComponentPage } from "./ComponentPage.tsx";
+import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
+import { HomePage } from "./HomePage.tsx";
+import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
+import { SidebarHandle } from "./SidebarHandle.tsx";
+import { Stage } from "./Stage.tsx";
+import { StoryPicker } from "./StoryPicker.tsx";
+import { STRINGS } from "./strings.ts";
+import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
+import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
+import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
+import { useSidebarLayout } from "./useSidebarLayout.ts";
+import { useStoryHeights } from "./useStoryHeights.ts";
+import { useStoryIdsElement } from "./useStoryIdsElement.ts";
+import { useStoryKeys } from "./useStoryKeys.ts";
+import { useSystemDark } from "./useSystemDark.ts";
 
 /** What an app passes to the shell. */
 export type ShellConfig = {

@@ -6,7 +6,7 @@
  */
 import { createContext, useContext } from "react";
 
-import type { StoryCodeWriter } from "../frame/renderer";
+import type { StoryCodeWriter } from "../frame/renderer.ts";
 
 /** Writes nothing until the app gives the framework's writer. */
 const NO_WRITER: StoryCodeWriter = (): string => "";

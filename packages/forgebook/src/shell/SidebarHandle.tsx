@@ -5,7 +5,7 @@
  */
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
-import { STRINGS } from "./strings";
+import { STRINGS } from "./strings.ts";
 
 /** The sidebar's width, in CSS px: the default, the bounds, and one arrow key's step. */
 export const SIDEBAR_WIDTH = { initial: 248, min: 192, max: 448, step: 16 } as const;

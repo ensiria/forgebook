@@ -5,7 +5,7 @@
  */
 import type { ReactNode } from "react";
 
-import { codeTokens } from "./codeTokens";
+import { codeTokens } from "./codeTokens.ts";
 
 /**
  * Coloured code.

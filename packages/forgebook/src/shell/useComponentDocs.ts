@@ -3,8 +3,8 @@
  *
  * @module
  */
-import { type ComponentDocs, isComponentDocs } from "../componentDocs";
-import { type Loaded, useLoaded } from "./useLoaded";
+import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
+import { type Loaded, useLoaded } from "./useLoaded.ts";
 
 /** The panel's data: loading, a component, no component (a page), or why it failed. */
 export type DocsState = Loaded<ComponentDocs>;

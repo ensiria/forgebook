@@ -10,9 +10,9 @@
  * @module
  */
 
-import type { CatalogueSettings } from "../catalogue";
-import { type CompareAxes, SHEETS_CHOICES, type ViewState } from "../viewState";
-import { STRINGS } from "./strings";
+import type { CatalogueSettings } from "../catalogue.ts";
+import { type CompareAxes, SHEETS_CHOICES, type ViewState } from "../viewState.ts";
+import { STRINGS } from "./strings.ts";
 
 /** What the compare view reads of the catalogue: its switches and its text sizes. */
 export type CompareCatalogue = Pick<CatalogueSettings, "switches" | "textSizes">;

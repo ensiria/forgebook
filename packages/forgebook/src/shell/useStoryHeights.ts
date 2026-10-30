@@ -10,8 +10,8 @@
  */
 import { useMemo } from "react";
 
-import { isStoryHeights, type StoryHeights } from "../storyHeights";
-import { type Loaded, useLoaded } from "./useLoaded";
+import { isStoryHeights, type StoryHeights } from "../storyHeights.ts";
+import { type Loaded, useLoaded } from "./useLoaded.ts";
 
 /** The file's answer as a state: the heights, or none for anything else. */
 const heightsState = (value: unknown): Loaded<StoryHeights> =>

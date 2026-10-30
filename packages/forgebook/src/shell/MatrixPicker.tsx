@@ -6,8 +6,8 @@
  */
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
-import type { PropDocs } from "../componentDocs";
-import { STRINGS } from "./strings";
+import type { PropDocs } from "../componentDocs.ts";
+import { STRINGS } from "./strings.ts";
 
 /** The picker's props. */
 export type MatrixPickerProps = {

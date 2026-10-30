@@ -6,11 +6,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { catalogueSettings, groupLabel } from "../src/catalogue";
-import { configureStrings, STRINGS } from "../src/shell/strings";
-import { groupedStories } from "../src/storyTree";
-import { DEFAULT_SWITCHES } from "../src/switches";
-import { mergedLists } from "../src/vite/configFile";
+import { catalogueSettings, groupLabel } from "../src/catalogue.ts";
+import { configureStrings, STRINGS } from "../src/shell/strings.ts";
+import { groupedStories } from "../src/storyTree.ts";
+import { DEFAULT_SWITCHES } from "../src/switches.ts";
+import { mergedLists } from "../src/vite/configFile.ts";
 
 describe("catalogueSettings", () => {
   it("gives a catalogue that sets no list today's: four widths, six zoom steps, three text sizes, five backgrounds", () => {

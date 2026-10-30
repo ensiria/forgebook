@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { componentImport } from "../src/vite/storyMeta";
+import { componentImport } from "../src/vite/storyMeta.ts";
 
 describe("componentImport", () => {
   it("finds the module the meta's component is imported from, named or default, without a program", () => {
