@@ -23,6 +23,8 @@ const fakeServer = (): {
   const listeners = new Map<string, (file: string) => void>();
   const record = { added: [] as string[], invalidated: [] as string[], reloads: 0 };
   const server = {
+    // the catalogue's pages answer here; a plugin without a configuration passes every request on
+    middlewares: { use: (): undefined => undefined },
     watcher: {
       add: (paths: string[]): void => void record.added.push(...paths),
       on: (event: string, listener: (file: string) => void): void => void listeners.set(event, listener)

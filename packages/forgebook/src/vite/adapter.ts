@@ -11,6 +11,8 @@
  * @module
  */
 
+import type { PluginOption } from "vite";
+
 import type { ComponentDocs, NoComponentDocs } from "../componentDocs.ts";
 
 /** A story file's component: its docs and the file that declares it. */
@@ -42,6 +44,19 @@ export type FrameworkAdapter = {
   readonly name: string;
   /** The URL of the module that exports the framework's `extractStoryComponent`, loaded in the docs' worker. */
   readonly docsModule: string;
+  /**
+   * The browser modules the generated pages import, as specifiers the catalogue's folder resolves: the frame page's
+   * (`mountFrame` with the framework's renderer) and the code writer the shell writes a story's code with
+   * (`storyJsx`).
+   */
+  readonly pages: {
+    /** The module exporting the framework's `mountFrame` (`@forgebook/react/frame`). */
+    readonly frame: string;
+    /** The module exporting the framework's code writer as `codeOf` (`@forgebook/react/code`). */
+    readonly code: string;
+  };
+  /** The Vite plugins the framework needs in a catalogue (React's Fast Refresh); none by default. */
+  readonly vitePlugins?: () => Promise<readonly PluginOption[]>;
 };
 
 /**

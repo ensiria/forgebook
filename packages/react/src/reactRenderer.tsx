@@ -1,6 +1,6 @@
 /**
  * Forgebook's renderer for React: draws a story in a canvas with a React root of its own, inside the texts' and the
- * clock's providers and the shown language's, and catches what the story throws.
+ * clock's providers and the catalogue's decorators, and catches what the story throws.
  *
  * @remarks
  * The frame runs everything else the same for every framework (`forgebook/renderer`): the play function, Replay, the
@@ -25,33 +25,17 @@ import { storyElement } from "./storyElement";
 import { StoryTextsContext } from "./texts";
 
 /**
- * A story inside its language's provider.
+ * The story in the texts' and the clock's providers; the language's provider is a decorator of the catalogue's
+ * preview, inside these.
  *
- * @remarks
- * A React catalogue's languages are `StoryLanguage`s of `@forgebook/react` (their provider returns `ReactNode`); the
- * frame passes them on unread, as the format's `StoryLanguage<unknown>`, so what the provider returns is taken back as
- * React's here, the one place it comes back.
- *
- * @param wrap - the language's provider.
- * @param story - the story.
- */
-const languageWrapped = (wrap: NonNullable<StoryDrawing["wrap"]>, story: ReactNode): ReactNode =>
-  wrap(story) as ReactNode;
-
-/**
- * The story in the texts', clock's and language's providers.
- *
- * @param drawing - the story's texts, clock and language.
+ * @param drawing - the story's texts and clock.
  * @param story - the story's element, to wrap.
  */
-const inProviders = (drawing: StoryDrawing, story: ReactNode): ReactNode => {
-  const inLanguage = drawing.wrap === undefined ? story : languageWrapped(drawing.wrap, story);
-  return (
-    <StoryTextsContext.Provider value={drawing.texts}>
-      <StoryClockContext.Provider value={drawing.clock}>{inLanguage}</StoryClockContext.Provider>
-    </StoryTextsContext.Provider>
-  );
-};
+const inProviders = (drawing: StoryDrawing, story: ReactNode): ReactNode => (
+  <StoryTextsContext.Provider value={drawing.texts}>
+    <StoryClockContext.Provider value={drawing.clock}>{story}</StoryClockContext.Provider>
+  </StoryTextsContext.Provider>
+);
 
 /**
  * What a render and a decorator receive.
@@ -109,7 +93,8 @@ export const reactRenderer: StoryRenderer = {
             <Drawn onDrawn={markDrawn}>
               {storyElement(
                 drawing.story,
-                contextOf(drawing, () => canvas)
+                contextOf(drawing, () => canvas),
+                drawing.decorators
               )}
             </Drawn>
           </StoryErrorBoundary>
@@ -128,6 +113,6 @@ export const reactRenderer: StoryRenderer = {
   },
   renderToString: (drawing: StoryDrawing): string => {
     const context = contextOf(drawing, () => document.body);
-    return renderToString(inProviders(drawing, storyElement(drawing.story, context)));
+    return renderToString(inProviders(drawing, storyElement(drawing.story, context, drawing.decorators)));
   }
 };

@@ -16,7 +16,7 @@ import "./frame.scss";
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 
-import { shownLanguage, storyLanguages } from "../languages";
+import { shownLanguage } from "../languages";
 import {
   detailOf,
   type FrameMessage,
@@ -40,7 +40,7 @@ import { applyView, loadSheets, viewSheets } from "./frameView";
 import { applyTools } from "./measureTools";
 import type { StoryDrawing, StoryRenderer } from "./renderer";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule";
-import { readStory } from "./storyModule";
+import { mergedPreviews, readPreview, readStory } from "./storyModule";
 import { runStory, type StoryControls } from "./storyRun";
 
 /** What an app passes to the frame. */
@@ -51,6 +51,11 @@ export type FrameConfig = {
   readonly sources: readonly StorySource[];
   /** The languages every story can be drawn in, as the shell's configuration gives them; none turns them off. */
   readonly languages?: readonly StoryLanguage[];
+  /**
+   * The catalogue's previews, as their modules: its presets' first, its own last (`forgebook.preview.ts`). Their
+   * decorators wrap every story, their parameters sit under every meta's, their setups run before any story renders.
+   */
+  readonly previews?: readonly unknown[];
   /** The switches of the toolbar and the View menu, as the shell's configuration gives them; the theme and contrast by default. */
   readonly switches?: readonly ViewSwitch[];
 };
@@ -98,10 +103,9 @@ const answerShell = (message: ShellMessage, controls: StoryControls, storyId: st
 export const mountFrame = async (container: HTMLElement, config: FrameConfig): Promise<void> => {
   const params = new URLSearchParams(window.location.search);
   const storyId = params.get("story") ?? "";
-  const switches = catalogueSwitches(config.switches, [
-    ...(config.languages ?? []),
-    ...config.sources.flatMap((each) => each.languages ?? [])
-  ]);
+  const languages = config.languages ?? [];
+  const switches = catalogueSwitches(config.switches, languages);
+  const preview = mergedPreviews((config.previews ?? []).map(readPreview));
   const view = parseView(window.location.search, switches);
   applyView(document.documentElement, view, switches);
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount
@@ -157,28 +161,24 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   }
   try {
     await source.setup?.();
+    await preview.setup?.();
     await loadSheets(document, viewSheets(source.sheets, view));
-    const story = readStory(await load(), location.story.exportName);
+    const story = readStory(await load(), location.story.exportName, preview.parameters);
     if (typeof story === "string") {
       fail(story);
       return;
     }
     let controls: StoryControls | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
-    const languages = storyLanguages(config.languages ?? [], source.languages ?? []);
     window.addEventListener("message", (event: MessageEvent): void => {
       if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
       if (controls !== undefined) answerShell(event.data, controls, storyId);
     });
-    // the language's texts and provider, and the switches the story reads, for a view
-    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "wrap" | "globals"> => {
-      const language = shownLanguage(languages, languageOf(live, switches));
-      return {
-        texts: shownTexts(source.texts, language),
-        wrap: language?.wrap,
-        globals: codeGlobalsOf(live, switches)
-      };
-    };
+    // the language's texts, and the switches the story reads (the language's provider reads its id among them)
+    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => ({
+      texts: shownTexts(source.texts, shownLanguage(languages, languageOf(live, switches))),
+      globals: codeGlobalsOf(live, switches)
+    });
     const shown = shownFor(view);
     const { texts } = shown;
     const running = runStory({
@@ -186,6 +186,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       story,
       renderer: config.renderer,
       clock,
+      decorators: preview.decorators,
       ...shown,
       resolveArgs: (args: PanelArgs): Readonly<Record<string, unknown>> =>
         storyArgsOf(args, source.namedValues),

@@ -59,8 +59,8 @@ export type StoryRunOptions = {
   readonly clock: FrameClock;
   /** The texts inside the stories in the shown language. */
   readonly texts: StoryTextTable;
-  /** The shown language's provider around the story; none for the stories' own text. */
-  readonly wrap: StoryDrawing["wrap"];
+  /** The catalogue's decorators, outside the story's own. */
+  readonly decorators: StoryDrawing["decorators"];
   /** The values of the switches applied by code, by id. */
   readonly globals: StoryDrawing["globals"];
   /** The panel's values as the story takes them (a named value turned back into the value). */
@@ -104,11 +104,12 @@ const errorElement = (document: Document, error: Error): HTMLElement => {
 /** What the frame changes in a running story when the shell sends a new view: no new mount, the story keeps its state. */
 export type RunningStory = {
   /**
-   * Draws the story in another language, or with other values of the switches applied by code.
+   * Draws the story in another language, or with other values of the switches applied by code (the language's
+   * provider reads its id among them).
    *
-   * @param shown - the texts and the provider of the language now shown, and the switches' values.
+   * @param shown - the texts of the language now shown, and the switches' values.
    */
-  readonly setShown: (shown: Pick<StoryDrawing, "texts" | "wrap" | "globals">) => void;
+  readonly setShown: (shown: Pick<StoryDrawing, "texts" | "globals">) => void;
 };
 
 /**
@@ -120,7 +121,8 @@ export type RunningStory = {
 export const runStory = (options: StoryRunOptions): RunningStory => {
   const { container, story, renderer, clock } = options;
   const document = container.ownerDocument;
-  let { texts, wrap, globals } = options;
+  const { decorators } = options;
+  let { texts, globals } = options;
   let text = storyTextOf(texts);
   let args: LoadedArgs = story.args;
   let eventNames: readonly string[] = [];
@@ -151,7 +153,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     args: { ...shownArgs(), ...values },
     texts,
     clock,
-    wrap,
+    decorators,
     globals
   });
 
@@ -259,8 +261,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
 
   mountStory();
   return {
-    setShown: (shown: Pick<StoryDrawing, "texts" | "wrap" | "globals">): void => {
-      ({ texts, wrap, globals } = shown);
+    setShown: (shown: Pick<StoryDrawing, "texts" | "globals">): void => {
+      ({ texts, globals } = shown);
       text = storyTextOf(texts);
       redraw();
     }

@@ -24,7 +24,8 @@ describe("collectDocs and catalogueMarkdown", () => {
     expect(data.components.map((component) => [component.title, component.subpath])).toEqual([
       ["Inputs/Selection/Select", "./select"]
     ]);
-    expect(data.modules.map((module) => module.subpath)).toEqual(["./utils/format-size"]);
+    // the kit's preset is one of its modules too, as a library's `./forgebook` is
+    expect(data.modules.map((module) => module.subpath)).toEqual(["./utils/format-size", "./forgebook"]);
     expect(data.sassModules.map((module) => module.subpath)).toEqual(["./scss/ring"]);
     expect(data.styleSheets).toEqual([{ subpath: "./kit.css", summary: "The fixture kit's style sheet." }]);
   });

@@ -1,5 +1,5 @@
 /**
- * What a package hands a catalogue: its story files, its style sheets, its languages.
+ * What a package hands a catalogue: its story files, its style sheets, its texts.
  *
  * @remarks
  * Every package with stories exports one `StorySource` from a development-only `./stories` subpath, never published;
@@ -63,10 +63,11 @@ export type StorySheets = {
 };
 
 /**
- * A language a source offers the View menu: each story is drawn inside its provider. `TStoryResult` is what the
- * framework's stories draw (`ReactNode` in React); `unknown` where the language is only passed on (the catalogue).
+ * A language a catalogue offers (the View menu's Language row): its id and name, and whether its texts are a
+ * pseudo-translation. Data only: the provider that draws a story in a language is a decorator of the catalogue's
+ * preview, which reads the language as `context.globals.lang`.
  */
-export type StoryLanguage<TStoryResult = unknown> = {
+export type StoryLanguage = {
   /** A stable id, written in the address (`pseudo`). */
   readonly id: string;
   /** The name in the View menu (`Pseudo`). */
@@ -76,16 +77,6 @@ export type StoryLanguage<TStoryResult = unknown> = {
    * brackets) instead of a table of their own; `false` by default.
    */
   readonly isPseudo?: boolean;
-  /**
-   * The story inside the language's provider (`(story) => <Provider messages={…}>{story}</Provider>`).
-   *
-   * @remarks
-   * Written as a method so a framework's language (`StoryLanguage<ReactNode>`) is a `StoryLanguage` the catalogue
-   * passes on unread: a method's parameter is compared both ways, a function property's only one way.
-   *
-   * @param story - the story as the framework draws it.
-   */
-  wrap(story: TStoryResult): TStoryResult;
 };
 
 /** A story's `render` as written in its file. */
@@ -139,8 +130,8 @@ export type StoryMarkdown = {
   readonly html: string;
 };
 
-/** A package's stories, as the catalogue reads them; `TStoryResult` as in `StoryLanguage`. */
-export type StorySource<TStoryResult = unknown> = {
+/** A package's stories, as the catalogue reads them. */
+export type StorySource = {
   /** A stable id, part of every story id's URL (`acme-ui`). */
   readonly id: string;
   /** The name in the sidebar (`Kaji UI`). */
@@ -179,8 +170,6 @@ export type StorySource<TStoryResult = unknown> = {
    * default.
    */
   readonly texts?: Readonly<Record<string, Readonly<Record<string, string>>>>;
-  /** The languages the View menu offers besides the stories' own text; none by default. */
-  readonly languages?: readonly StoryLanguage<TStoryResult>[];
   /**
    * What the source needs before any of its stories renders (a polyfill to load), awaited by the frame and by the
    * server tests; nothing by default.

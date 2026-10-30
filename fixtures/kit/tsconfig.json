@@ -4,7 +4,9 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@forgebook/typescript-config/react.json",
   "compilerOptions": {
-    "types": ["vite/client", "@forgebook/story-format/client"]
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    // its preset (`forgebook.ts`) reads Forgebook's configuration types, whose modules carry `.ts` (Node loads them)
+    "allowImportingTsExtensions": true
   },
-  "include": ["src", "stories.ts"]
+  "include": ["src", "stories.ts", "forgebook.ts"]
 }

@@ -4,13 +4,9 @@
  * @module
  */
 import { filledText, isStoryTextArg, storyText, storyTextOf } from "@forgebook/story-format/texts";
-import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { pseudoText, shownTexts, storyTextKeysOf, withStoryTexts } from "../src/storyTexts";
-
-/** Draws a story as it is. */
-const asItIs = (story: ReactNode): ReactNode => story;
 
 const TEXTS = {
   en: { "card.title": "Projects", "card.count": "{count} rows" },
@@ -23,7 +19,7 @@ describe("story texts", () => {
   });
 
   it("puts a language's texts over the English ones, which fill the keys it lacks", () => {
-    expect(shownTexts(TEXTS, { id: "it", label: "Italiano", wrap: asItIs })).toEqual({
+    expect(shownTexts(TEXTS, { id: "it", label: "Italiano" })).toEqual({
       "card.title": "Progetti",
       "card.count": "{count} rows"
     });
@@ -33,8 +29,7 @@ describe("story texts", () => {
     const pseudo = shownTexts(TEXTS, {
       id: "pseudo",
       label: "Pseudo",
-      isPseudo: true,
-      wrap: asItIs
+      isPseudo: true
     });
     expect(pseudo["card.count"]).toMatch(/^\[\{count\} röwš·+\]$/);
     expect(pseudoText("Save")).toBe("[Šåvé··]");

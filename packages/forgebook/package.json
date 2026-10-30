@@ -23,10 +23,12 @@
     "*.scss"
   ],
   "bin": {
+    "forgebook": "./bin/forgebook/forgebook.mts",
     "forgebook-docs": "./bin/forgebook-docs/forgebook-docs.mts",
     "forgebook-texts": "./bin/forgebook-texts/forgebook-texts.mts"
   },
   "exports": {
+    ".": "./src/vite/config.ts",
     "./story-tree": "./src/storyTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./frame": "./src/frame/mountFrame.ts",

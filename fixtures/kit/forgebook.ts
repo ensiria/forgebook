@@ -1,9 +1,12 @@
 /**
- * The fixture catalogue's switches: the theme and the contrast, and the motion, speed and press feedback of a
- * Kaji-like library, with today's values and names, so the shell's tests see the View menu a library's preset gives.
+ * The fixture kit's preset for Forgebook, as a library ships one (Kaji UI's `./forgebook`): the theme and the
+ * contrast, and the kit's motion, speed and press feedback, with their values and names, so a catalogue that shows
+ * the kit gets its View menu with `presets: [kitPreset()]`.
  *
  * @module
  */
+
+import { definePreset, type ForgebookPreset } from "forgebook";
 import { contrastSwitch, themeSwitch, type ViewSwitch } from "forgebook/switches";
 
 /** How much motion plays: the system's (no attribute), then from everything to nothing. */
@@ -50,11 +53,13 @@ const pressSwitch: ViewSwitch = {
   ]
 };
 
-/** The switches the shell and the frame pages declare. */
-export const SWITCHES: readonly ViewSwitch[] = [
-  themeSwitch(),
-  contrastSwitch(),
-  motionSwitch,
-  speedSwitch,
-  pressSwitch
-];
+/**
+ * The kit's preset.
+ *
+ * @returns the preset, for a catalogue's `presets`.
+ */
+export const kitPreset = (): ForgebookPreset =>
+  definePreset({
+    name: "fixture-kit",
+    switches: [themeSwitch(), contrastSwitch(), motionSwitch, speedSwitch, pressSwitch]
+  });

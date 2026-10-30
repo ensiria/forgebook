@@ -62,8 +62,8 @@ export type ShellConfig = {
   /** The frame page's address, relative to the shell's (`frame.html`). */
   readonly frameUrl: string;
   /**
-   * The languages every story can be drawn in (the View menu's Language row), each with the wrapper that draws a story
-   * in it; none turns them off. Give the frame the same list. A source may add its own.
+   * The languages every story can be drawn in (the View menu's Language row); none turns them off. Give the frame
+   * the same list.
    */
   readonly languages?: readonly StoryLanguage[];
   /**
@@ -440,9 +440,8 @@ export const Shell = ({
     setIsOpen: setIsSidebarOpen
   } = useSidebarLayout();
   const switches = useMemo(
-    () =>
-      catalogueSwitches(declaredSwitches, [...languages, ...sources.flatMap((each) => each.languages ?? [])]),
-    [declaredSwitches, languages, sources]
+    () => catalogueSwitches(declaredSwitches, languages),
+    [declaredSwitches, languages]
   );
   const { address, visit, pageAddress, openPage, replaceAddress } = useAddress(switches);
   // each page's last scroll position, kept across the component pages and the stage

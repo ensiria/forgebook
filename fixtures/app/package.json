@@ -5,14 +5,14 @@
   "description": "The fixture catalogue: Forgebook's shell and frame over the fixture kit, drawn with React, and the shell's browser tests.",
   "type": "module",
   "scripts": {
-    "dev": "vite --config src/vite.config.ts",
-    "typecheck": "tsc -p src && tsc -p shell",
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "typecheck": "tsc -p . && tsc -p shell",
     "test:shell": "playwright test -c shell/playwright.config.ts"
   },
   "devDependencies": {
     "@fixture/kit": "workspace:*",
     "@forgebook/react": "workspace:*",
-    "@forgebook/story-format": "workspace:*",
     "@forgebook/testing": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",
     "@playwright/test": "1.64.1",

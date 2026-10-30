@@ -1,0 +1,178 @@
+/**
+ * The two pages a catalogue is made of, as the plugin generates them from its configuration: their HTML, the
+ * entries that mount the shell and the frame, the configuration the pages read, and the source of the project's own
+ * stories. Pure: a resolved configuration in, text out.
+ *
+ * @remarks
+ * An app writes no page: the shell's entry mounts the shell with the configuration's data, its sources and the
+ * framework's code writer; the frame's mounts the framework's frame with the sources and the previews. The sources
+ * are imported by specifier (each exports `source`), the project's own stories through a generated source, the
+ * previews and the logo by path, so their code is bundled as any import is.
+ *
+ * @module
+ */
+import { join } from "node:path";
+
+import type { PageConfig } from "../pageConfig.ts";
+import type { ResolvedConfig } from "./configFile.ts";
+
+/** The pages, by their file name. */
+export const PAGE_FILES = ["index.html", "frame.html"] as const;
+
+/** A page's file name. */
+export type PageFile = (typeof PAGE_FILES)[number];
+
+/** The module the pages read the configuration's data from. */
+export const CONFIG_MODULE = "virtual:forgebook/config";
+
+/**
+ * The entries the pages load, by page: file names in the configuration's folder, never written to disk. Named as
+ * files rather than virtual modules because the build names a page's chunk and its style sheet after its entry, and a
+ * virtual module's id cannot be part of a file name.
+ */
+export const PAGE_ENTRIES: Readonly<Record<PageFile, string>> = {
+  "index.html": ".forgebook-shell.ts",
+  "frame.html": ".forgebook-frame.ts"
+};
+
+/** The file name, in the configuration's folder, of the project's own stories' source (never written to disk). */
+export const STORIES_SOURCE_FILE = ".forgebook-stories.ts";
+
+/** The project's own stories' source id. */
+export const OWN_SOURCE_ID = "stories";
+
+/**
+ * Text set in HTML: its `<`, `>`, `&` and quotes escaped.
+ *
+ * @param text - the text.
+ */
+const escaped = (text: string): string =>
+  text.replace(/[&<>"]/g, (character) => `&#${character.charCodeAt(0)};`);
+
+/**
+ * A page's HTML: its title, the frame's head tags, the root the entry mounts in.
+ *
+ * @param page - the page.
+ * @param config - the configuration.
+ */
+export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
+  [
+    "<!doctype html>",
+    '<html lang="en">',
+    "  <head>",
+    '    <meta charset="utf-8" />',
+    '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
+    `    <title>${escaped(page === "index.html" ? config.title : "Story")}</title>`,
+    ...(page === "frame.html" && config.head !== "" ? [config.head] : []),
+    "  </head>",
+    "  <body>",
+    '    <div id="root"></div>',
+    `    <script type="module" src="/${PAGE_ENTRIES[page]}"></script>`,
+    "  </body>",
+    "</html>",
+    ""
+  ].join("\n");
+
+/**
+ * The configuration's data, as the pages' module exports it.
+ *
+ * @param config - the configuration.
+ */
+export const configModule = (config: ResolvedConfig): string => {
+  const data: PageConfig = {
+    title: config.title,
+    heights: config.heights,
+    switches: config.switches,
+    languages: config.languages
+  };
+  return `export default ${JSON.stringify(data)};`;
+};
+
+/**
+ * The imports of the sources, and the list they make: the project's own stories first, then each package's.
+ *
+ * @param config - the configuration.
+ */
+const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; readonly list: string } => {
+  const own = config.stories.length > 0 ? [`./${STORIES_SOURCE_FILE}`] : [];
+  const specifiers = [...own.map((file) => join(config.dir, file.slice(2))), ...config.sources];
+  return {
+    imports: specifiers.map(
+      (specifier, index) => `import { source as source${index} } from ${JSON.stringify(specifier)};`
+    ),
+    list: `[${specifiers.map((_specifier, index) => `source${index}`).join(", ")}]`
+  };
+};
+
+/**
+ * The shell's entry: the shell mounted with the configuration's data, the logo, the sources and the code writer.
+ *
+ * @param config - the configuration.
+ */
+export const shellEntry = (config: ResolvedConfig): string => {
+  const sources = sourcesCode(config);
+  return [
+    'import { mountShell } from "forgebook/shell";',
+    `import { codeOf } from ${JSON.stringify(config.framework.pages.code)};`,
+    `import config from ${JSON.stringify(CONFIG_MODULE)};`,
+    ...(config.logo === undefined ? [] : [`import logo from ${JSON.stringify(`${config.logo}?url`)};`]),
+    ...sources.imports,
+    'const root = document.getElementById("root");',
+    "if (root !== null)",
+    "  mountShell(root, {",
+    "    title: config.title,",
+    ...(config.logo === undefined ? [] : ["    logo,"]),
+    ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
+    `    sources: ${sources.list},`,
+    '    frameUrl: "frame.html",',
+    "    languages: config.languages,",
+    ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
+    "    codeOf",
+    "  });",
+    ""
+  ].join("\n");
+};
+
+/**
+ * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
+ *
+ * @param config - the configuration.
+ */
+export const frameEntry = (config: ResolvedConfig): string => {
+  const sources = sourcesCode(config);
+  return [
+    `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
+    `import config from ${JSON.stringify(CONFIG_MODULE)};`,
+    ...sources.imports,
+    ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
+    'const root = document.getElementById("root");',
+    "if (root !== null)",
+    "  void mountFrame(root, {",
+    `    sources: ${sources.list},`,
+    "    languages: config.languages,",
+    ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
+    `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
+    "  });",
+    ""
+  ].join("\n");
+};
+
+/**
+ * The source of the project's own stories: one `?forgebook-files` import per glob, named after the catalogue.
+ *
+ * @param config - the configuration.
+ */
+export const storiesSourceModule = (config: ResolvedConfig): string =>
+  [
+    ...config.stories.map(
+      (pattern, index) =>
+        `import files${index} from ${JSON.stringify(`./${pattern.replace(/^\.\//, "")}?forgebook-files`)};`
+    ),
+    "export const source = {",
+    `  id: ${JSON.stringify(OWN_SOURCE_ID)},`,
+    `  name: ${JSON.stringify(config.title)},`,
+    `  files: [${config.stories.map((_pattern, index) => `files${index}`).join(", ")}],`,
+    "  sheets: { required: [], theme: [], restyled: [] }",
+    "};",
+    ""
+  ].join("\n");

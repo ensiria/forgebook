@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@forgebook/story-format": "workspace:*",
+    "@vitejs/plugin-react": "6.1.2",
     "typescript-6": "npm:typescript@6.0.3"
   },
   "peerDependencies": {

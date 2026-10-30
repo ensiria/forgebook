@@ -64,7 +64,7 @@ const run = async (
     renderer: domRenderer,
     clock: heldFrameClock(0),
     texts: {},
-    wrap: undefined,
+    decorators: [],
     globals: {},
     resolveArgs: (args: PanelArgs): PanelArgs => args,
     onControlsReady: (controls: StoryControls): void => {

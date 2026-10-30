@@ -1,12 +1,13 @@
 /**
- * A story drawn as React: its render (or the meta's component) inside its decorators. The story's canvas and each
- * cell of its matrix draw it the same way.
+ * A story drawn as React: its render (or the meta's component) inside its decorators, the story's, the meta's and
+ * the catalogue's (its preview's), in that order outward. The story's canvas and each cell of its matrix draw it the
+ * same way.
  *
  * @module
  */
 
 import type { StoryContext } from "@forgebook/story-format/csf";
-import type { LoadedArgs, LoadedStory } from "forgebook/story-module";
+import type { LoadedArgs, LoadedDecorator, LoadedStory } from "forgebook/story-module";
 import { createElement, type FunctionComponent, type ReactNode } from "react";
 
 /** A loaded story as React draws it: its component, render and decorators return React's output. */
@@ -25,8 +26,9 @@ type ReactStory = {
  * @remarks
  * The frame reads a story file without its types (`forgebook/story-module`: a function is taken with the signature
  * CSF gives it), so what its functions return is `unknown` there. A React story file is written against
- * `@forgebook/react`'s `Meta` and `Story`, whose component, render and decorators return `ReactNode`: that is what
- * this view takes on trust, as the frame takes the functions' parameters.
+ * `@forgebook/react`'s `Meta` and `Story`, and its catalogue's preview against its `Preview`, whose components,
+ * renders and decorators return `ReactNode`: that is what this view takes on trust, as the frame takes the functions'
+ * parameters.
  *
  * @param story - the loaded story.
  */
@@ -37,9 +39,14 @@ const asReactStory = (story: LoadedStory): ReactStory => story as ReactStory;
  *
  * @param loaded - the story.
  * @param context - the args and the canvas its render, play and decorators read.
+ * @param outer - the catalogue's decorators, outside the story's and the meta's.
  */
-export const storyElement = (loaded: LoadedStory, context: StoryContext<LoadedArgs>): ReactNode => {
-  const story = asReactStory(loaded);
+export const storyElement = (
+  loaded: LoadedStory,
+  context: StoryContext<LoadedArgs>,
+  outer: readonly LoadedDecorator[]
+): ReactNode => {
+  const story = asReactStory({ ...loaded, decorators: [...loaded.decorators, ...outer] });
   const renderStory = (): ReactNode => {
     if (story.render !== undefined) return story.render(context.args, context);
     return story.component === undefined ? null : createElement(story.component, context.args);

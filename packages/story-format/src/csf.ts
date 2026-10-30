@@ -196,3 +196,17 @@ export type CsfStory<TRenderer extends Renderer, TArgs, TWrittenArgs> = {
   /** Wrappers inside the meta's. */
   readonly decorators?: readonly Decorator<TRenderer, TArgs>[];
 };
+
+/**
+ * A catalogue's preview (`forgebook.preview.ts`), for a framework: what applies to every story in the frames. Its
+ * decorators wrap every story outside the meta's and the story's own (a provider, the language's provider reading
+ * `context.globals.lang`), its parameters sit under every meta's, and its setup runs once before any story renders.
+ */
+export type CsfPreview<TRenderer extends Renderer> = {
+  /** Wrappers for every story, outermost last. */
+  readonly decorators?: readonly Decorator<TRenderer, Readonly<Record<string, unknown>>>[];
+  /** Settings every story starts from, under its meta's and its own. */
+  readonly parameters?: StoryParameters;
+  /** What the stories need before any renders (a polyfill to load); nothing by default. */
+  readonly setup?: () => Promise<void>;
+};

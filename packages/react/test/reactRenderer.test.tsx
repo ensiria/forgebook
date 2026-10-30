@@ -6,8 +6,15 @@
  */
 
 import { heldStoryClock } from "@forgebook/story-format/clock";
+import type { StoryContext } from "@forgebook/story-format/csf";
 import type { StoryDrawing } from "forgebook/renderer";
-import { type LoadedStory, readStory } from "forgebook/story-module";
+import {
+  type LoadedArgs,
+  type LoadedDecorator,
+  type LoadedStory,
+  readPreview,
+  readStory
+} from "forgebook/story-module";
 import { type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -37,25 +44,34 @@ const Greeting = ({ name }: { readonly name?: unknown }): ReactNode => {
   );
 };
 
+/** A catalogue's decorator: the language's provider, reading the language from the story's globals. */
+const inLanguage = (story: () => ReactNode, context: StoryContext<LoadedArgs>): ReactNode => (
+  <div lang={context.globals["lang"]}>{story()}</div>
+);
+
 /**
  * A drawing of the greeting.
  *
  * @param args - its args.
- * @param wrap - the language's provider; none by default.
+ * @param decorators - the catalogue's decorators; none by default.
  */
-const drawing = (args: Record<string, unknown>, wrap?: StoryDrawing["wrap"]): StoryDrawing => ({
+const drawing = (
+  args: Record<string, unknown>,
+  decorators: readonly LoadedDecorator[] = []
+): StoryDrawing => ({
   story: loaded({ render: (storyArgs: { readonly name?: unknown }) => <Greeting name={storyArgs.name} /> }),
   args,
   texts: { hello: "Ciao" },
   clock: heldStoryClock(0),
-  wrap,
-  globals: {}
+  decorators,
+  globals: { lang: "it" }
 });
 
 describe("reactRenderer", () => {
-  it("renders a story on the server inside its language and with its texts", () => {
+  it("renders a story on the server inside the catalogue's decorators, which read its globals, with its texts", () => {
     const html = reactRenderer.renderToString(
-      drawing({ name: "Ada" }, (story: ReactNode): ReactNode => <div lang="it">{story}</div>)
+      // the decorator comes as a catalogue's preview gives it, read without its types
+      drawing({ name: "Ada" }, readPreview({ decorators: [inLanguage] }).decorators)
     );
     expect(html).toContain('<div lang="it">');
     expect(html).toContain("Ciao");

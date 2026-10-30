@@ -1,5 +1,6 @@
 /**
- * The entry of the catalogue's page: renders the shell in an element.
+ * The entry of the catalogue's page: renders the shell in an element. Called by the page the plugin generates from
+ * the catalogue's configuration (`vite/pages.ts`), not by an app.
  *
  * @module
  */

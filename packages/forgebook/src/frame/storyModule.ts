@@ -109,9 +109,14 @@ const decoratorsOf = (part: Readonly<Record<string, unknown>>): LoadedDecorator[
  *
  * @param module - the module, as `import()` gave it.
  * @param exportName - the story's named export.
+ * @param previewParameters - the catalogue's preview's parameters, under the meta's and the story's; none by default.
  * @returns what the frame renders, or why it cannot.
  */
-export const readStory = (module: unknown, exportName: string): LoadedStory | string => {
+export const readStory = (
+  module: unknown,
+  exportName: string,
+  previewParameters: Readonly<Record<string, unknown>> = {}
+): LoadedStory | string => {
   if (!isRecord(module)) return "The story file did not load as a module";
   const meta = module["default"];
   const story = module[exportName];
@@ -119,7 +124,7 @@ export const readStory = (module: unknown, exportName: string): LoadedStory | st
   if (!isRecord(story)) return `The story file has no story "${exportName}"`;
   const metaArgs = isRecord(meta["args"]) ? meta["args"] : {};
   const storyArgs = isRecord(story["args"]) ? story["args"] : {};
-  const parameters = { ...parametersOf(meta), ...parametersOf(story) };
+  const parameters = { ...previewParameters, ...parametersOf(meta), ...parametersOf(story) };
   const layout = parameters["layout"];
   return {
     component: isFunction<LoadedComponent>(meta["component"]) ? meta["component"] : undefined,
@@ -132,5 +137,54 @@ export const readStory = (module: unknown, exportName: string): LoadedStory | st
     controls: controlsSetting(parameters["controls"]),
     layout: layout === "centered" || layout === "fullscreen" ? layout : "padded",
     clockStart: clockStartOf(parameters["clock"])
+  };
+};
+
+/** A catalogue's preview, read: its decorators, its parameters and its setup. */
+export type LoadedPreview = {
+  /** Its decorators, innermost first. */
+  readonly decorators: readonly LoadedDecorator[];
+  /** Its parameters, under every meta's. */
+  readonly parameters: Readonly<Record<string, unknown>>;
+  /** What runs once before any story renders; nothing when it has none. */
+  readonly setup: (() => Promise<void>) | undefined;
+};
+
+/** The preview of a catalogue that has none. */
+export const NO_PREVIEW: LoadedPreview = { decorators: [], parameters: {}, setup: undefined };
+
+/**
+ * A catalogue's preview read safely, as a story file is: from the default export of its module, or the module itself.
+ *
+ * @param module - the preview's module, as `import()` gave it; none for a catalogue without one.
+ */
+export const readPreview = (module: unknown): LoadedPreview => {
+  if (!isRecord(module)) return NO_PREVIEW;
+  const preview = isRecord(module["default"]) ? module["default"] : module;
+  const setup = preview["setup"];
+  return {
+    decorators: decoratorsOf(preview),
+    parameters: parametersOf(preview),
+    setup: isFunction<() => Promise<void>>(setup) ? setup : undefined
+  };
+};
+
+/**
+ * Previews read one after another, as a catalogue's presets and its own: decorators of the later ones outside the
+ * earlier ones', parameters of the later ones over the earlier ones', every setup in order.
+ *
+ * @param previews - the previews, the catalogue's own last.
+ */
+export const mergedPreviews = (previews: readonly LoadedPreview[]): LoadedPreview => {
+  const setups = previews.flatMap((preview) => (preview.setup === undefined ? [] : [preview.setup]));
+  return {
+    decorators: previews.flatMap((preview) => preview.decorators),
+    parameters: Object.fromEntries(previews.flatMap((preview) => Object.entries(preview.parameters))),
+    setup:
+      setups.length === 0
+        ? undefined
+        : async (): Promise<void> => {
+            for (const setup of setups) await setup();
+          }
   };
 };

@@ -1,0 +1,21 @@
+/**
+ * What the shell and the frame pages read of a catalogue's configuration (`vite/config.ts`): data, as the plugin hands
+ * it to the generated pages through `virtual:forgebook/config`.
+ *
+ * @module
+ */
+import type { StoryLanguage } from "@forgebook/story-format/source";
+
+import type { ViewSwitch } from "./switches";
+
+/** What the shell and the frame pages read of a configuration: data, as the plugin hands it to them. */
+export type PageConfig = {
+  /** The catalogue's name. */
+  readonly title: string;
+  /** The heights file's address, relative to the pages; none without one. */
+  readonly heights: string | undefined;
+  /** The switches, the presets' and the catalogue's merged. */
+  readonly switches: readonly ViewSwitch[] | undefined;
+  /** The languages, the presets' and the catalogue's merged. */
+  readonly languages: readonly StoryLanguage[];
+};

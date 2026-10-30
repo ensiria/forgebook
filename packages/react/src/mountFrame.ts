@@ -1,5 +1,6 @@
 /**
- * The frame page of a React catalogue: Forgebook's frame, drawing its stories with React.
+ * The frame page of a React catalogue: Forgebook's frame, drawing its stories with React. Called by the page the
+ * plugin generates from the catalogue's configuration, not by an app.
  *
  * @module
  */

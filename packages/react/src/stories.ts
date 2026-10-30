@@ -10,8 +10,13 @@
  *
  * @module
  */
-import type { Decorator as CsfDecorator, CsfMeta, CsfStory, WrittenArg } from "@forgebook/story-format/csf";
-import type { StoryLanguage as CsfStoryLanguage, StorySource } from "@forgebook/story-format/source";
+import type {
+  Decorator as CsfDecorator,
+  CsfMeta,
+  CsfPreview,
+  CsfStory,
+  WrittenArg
+} from "@forgebook/story-format/csf";
 import type { ReactNode } from "react";
 
 /**
@@ -64,8 +69,8 @@ export type Story<TComponent extends AnyComponent = NoComponent> = CsfStory<
 /** Wraps a React story: a provider, a container of a given width. */
 export type Decorator<TArgs> = CsfDecorator<ReactRenderer, TArgs>;
 
-/** A language whose provider wraps React stories. */
-export type StoryLanguage = CsfStoryLanguage<ReactNode>;
-
-/** A package's React stories, as a catalogue reads them. */
-export type ReactStorySource = StorySource<ReactNode>;
+/**
+ * A React catalogue's preview (`forgebook.preview.ts`): decorators around every story (its providers, the language's
+ * reading `context.globals.lang`), parameters under every meta's, a setup before any story renders.
+ */
+export type Preview = CsfPreview<ReactRenderer>;

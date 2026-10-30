@@ -11,6 +11,7 @@
  * @module
  */
 import { type ArgValue, isNamedArg, type PanelArgs } from "forgebook/messages";
+import type { StoryCodeWriter } from "forgebook/renderer";
 
 /** One attribute as JSX writes it. */
 const attribute = (name: string, value: ArgValue): string => {
@@ -44,3 +45,6 @@ export const storyJsx = (component: string, args: PanelArgs): string => {
   if (inner === undefined) return `${opening}${isOneLine ? " " : ""}/>`;
   return `${opening}>${inner}</${component}>`;
 };
+
+/** The code writer a React catalogue's shell writes a story's code with: the name the generated pages import. */
+export const codeOf: StoryCodeWriter = storyJsx;

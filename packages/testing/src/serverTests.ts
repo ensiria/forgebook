@@ -11,24 +11,27 @@
  * @module
  */
 
-import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
+import type { StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 import { heldFrameClock } from "forgebook/frame-clock";
 import type { StoryRenderer } from "forgebook/renderer";
 import { sourceFiles } from "forgebook/source-files";
-import { readStory } from "forgebook/story-module";
+import { type LoadedDecorator, mergedPreviews, readPreview, readStory } from "forgebook/story-module";
 import { BASE_LANGUAGE, withStoryTexts } from "forgebook/story-texts";
 import { storyLocations, storyTree } from "forgebook/story-tree";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { storyControlsProblem } from "./storyControls";
 
-/** A second pass: each story inside a wrapper, its HTML optionally checked. */
+/** A second pass: each story inside a decorator, its HTML optionally checked. */
 export type StoryServerPass = {
   /** The pass's name, in each test's title (`partial catalogue`). */
   readonly name: string;
-  /** The story inside the wrapper (`(story) => <Provider messages={partial}>{story}</Provider>`); none draws it alone. */
-  readonly render: StoryLanguage["wrap"] | undefined;
+  /**
+   * The decorator the story is drawn in (`(story) => <Provider messages={partial}>{story()}</Provider>`), outside its
+   * own; none draws it alone.
+   */
+  readonly decorator: LoadedDecorator | undefined;
   /** Checks the story's HTML, with Vitest's `expect` (no message key shown, for a partial catalogue); none by default. */
   readonly check?: (html: string) => void;
 };
@@ -37,6 +40,8 @@ export type StoryServerPass = {
 export type StoryServerTestsOptions = {
   /** The framework that draws the stories (`reactRenderer` of `@forgebook/react`). */
   readonly renderer: StoryRenderer;
+  /** The catalogue's previews' modules (its presets' first), whose decorators and parameters every story gets. */
+  readonly previews?: readonly unknown[];
   /** A second pass over every story. */
   readonly wrap?: StoryServerPass;
 };
@@ -49,11 +54,13 @@ export type StoryServerTestsOptions = {
  */
 export const storyServerTests = (source: StorySource, options: StoryServerTestsOptions): void => {
   const passes: readonly StoryServerPass[] = [
-    { name: "alone", render: undefined },
+    { name: "alone", decorator: undefined },
     ...(options.wrap === undefined ? [] : [options.wrap])
   ];
+  const preview = mergedPreviews((options.previews ?? []).map(readPreview));
   beforeAll(async () => {
     await source.setup?.();
+    await preview.setup?.();
   });
   const locations = storyLocations(storyTree([source]));
   for (const [title, entries] of Map.groupBy(locations, (location) => location.component.title)) {
@@ -62,7 +69,7 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
         it.each(passes)(`${story.name} renders on the server ($name)`, async (pass) => {
           const load = sourceFiles(source).stories[component.file];
           if (load === undefined) throw new Error(`No loader for ${component.file}`);
-          const loaded = readStory(await load(), story.exportName);
+          const loaded = readStory(await load(), story.exportName, preview.parameters);
           if (typeof loaded === "string") throw new Error(loaded);
           // the stories' own texts: what the catalogue shows when no language is chosen
           const texts = source.texts?.[BASE_LANGUAGE] ?? {};
@@ -75,7 +82,7 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
               texts,
               // a Live story renders at its start, as the frame's tests picture it (D-504)
               clock: heldFrameClock(loaded.clockStart ?? 0),
-              wrap: pass.render,
+              decorators: [...preview.decorators, ...(pass.decorator === undefined ? [] : [pass.decorator])],
               globals: {}
             });
           }).not.toThrow();

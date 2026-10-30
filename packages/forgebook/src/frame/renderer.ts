@@ -14,11 +14,10 @@
 
 import type { StoryClock } from "@forgebook/story-format/clock";
 import type { StepFunction } from "@forgebook/story-format/csf";
-import type { StoryLanguage } from "@forgebook/story-format/source";
 import type { StoryTextTable } from "@forgebook/story-format/texts";
 
 import type { PanelArgs } from "../messages";
-import type { LoadedArgs, LoadedStory } from "./storyModule";
+import type { LoadedArgs, LoadedDecorator, LoadedStory } from "./storyModule";
 
 /** One story to draw, as the frame hands it to the framework. */
 export type StoryDrawing = {
@@ -30,8 +29,11 @@ export type StoryDrawing = {
   readonly texts: StoryTextTable;
   /** The story clock the story reads (held at its start, or running for a Live story). */
   readonly clock: StoryClock;
-  /** The shown language's provider around the story; none for the stories' own text. */
-  readonly wrap: StoryLanguage["wrap"] | undefined;
+  /**
+   * The catalogue's decorators (its preview's), outside the meta's and the story's own: the providers every story
+   * is drawn in, the language's among them (it reads `context.globals.lang`).
+   */
+  readonly decorators: readonly LoadedDecorator[];
   /** The values of the switches applied by code, by id: the story's `context.globals`. */
   readonly globals: Readonly<Record<string, string>>;
 };

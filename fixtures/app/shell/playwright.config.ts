@@ -1,5 +1,5 @@
 /**
- * The catalogue's own browser tests: the shell and its frames, on the fixture app (`src/`), the flows
+ * The catalogue's own browser tests: the shell and its frames, on the fixture catalogue (`forgebook.config.ts`), the flows
  * the unit tests cannot reach (the address, the panel, the stage, the keys, the errors).
  *
  * @remarks
@@ -21,7 +21,9 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"]],
   webServer: {
-    command: `pnpm exec vite --config ${join(import.meta.dirname, "..", "src", "vite.config.ts")} --host 127.0.0.1 --port ${PORT} --strictPort`,
+    // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own
+    command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT}`,
+    cwd: join(import.meta.dirname, ".."),
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: false
   },
