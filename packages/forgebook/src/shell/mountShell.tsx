@@ -11,6 +11,7 @@ import { createRoot } from "react-dom/client";
 import type { StoryCodeWriter } from "../frame/renderer";
 import { CodeWriterContext } from "./codeWriter";
 import { Shell, type ShellConfig } from "./Shell";
+import { configureStrings } from "./strings";
 
 /** What an app passes to the shell: the catalogue's configuration and the framework's code writer. */
 export type MountShellConfig = ShellConfig & {
@@ -39,6 +40,7 @@ const setPageIcon = (logo: string): void => {
  */
 export const mountShell = (container: HTMLElement, config: MountShellConfig): void => {
   if (config.logo !== undefined) setPageIcon(config.logo);
+  configureStrings(config.lists?.strings ?? {});
   const { codeOf, ...shell } = config;
   createRoot(container).render(
     <CodeWriterContext.Provider value={codeOf}>

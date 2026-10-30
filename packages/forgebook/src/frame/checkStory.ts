@@ -7,17 +7,23 @@
  *
  * @module
  */
-import { AXE_TAGS, type Violation } from "../a11y";
+
+import type { Violation } from "../a11y";
+import type { A11ySettings } from "../catalogue";
 
 /**
  * The rules the document breaks now.
  *
  * @param document - the frame's document.
+ * @param rules - the catalogue's accessibility rules: its tags and the rules it turns off.
  * @returns each broken rule with the elements that break it.
  */
-export const checkStory = async (document: Document): Promise<Violation[]> => {
+export const checkStory = async (document: Document, rules: A11ySettings): Promise<Violation[]> => {
   const { default: axe } = await import("axe-core");
-  const results = await axe.run(document, { runOnly: { type: "tag", values: [...AXE_TAGS] } });
+  const results = await axe.run(document, {
+    runOnly: { type: "tag", values: [...rules.tags] },
+    rules: Object.fromEntries(rules.disabledRules.map((rule) => [rule, { enabled: false }]))
+  });
   return results.violations.map((violation) => ({
     id: violation.id,
     help: violation.help,

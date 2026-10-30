@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { type CatalogueSettings, catalogueSettings } from "../src/catalogue";
 import type { ViewSwitch } from "../src/switches";
 import {
   codeGlobalsOf,
@@ -24,8 +25,11 @@ import { FIXTURE_SWITCHES } from "./fixtureSwitches";
 /** The fixture's switches, read from and written to an address. */
 const SWITCHES: readonly ViewSwitch[] = FIXTURE_SWITCHES;
 
+/** The fixture's catalogue: its switches, and every list at its default. */
+const CATALOGUE: CatalogueSettings = catalogueSettings("Fixture", SWITCHES);
+
 /** The view without any change. */
-const DEFAULTS: ViewState = defaultView(SWITCHES);
+const DEFAULTS: ViewState = defaultView(CATALOGUE);
 
 /**
  * A view with some switches set.
@@ -47,7 +51,7 @@ describe("the view in the address", () => {
     expect(
       parseView(
         "?theme=dark&contrast=more&motion=reduced&speed=slow&press=darken&sheets=structure&text=125&lang=pseudo&compare=1",
-        SWITCHES
+        CATALOGUE
       )
     ).toEqual(
       withSwitches(
@@ -62,7 +66,7 @@ describe("the view in the address", () => {
         { sheets: "structure", text: 125, compare: ["theme", "contrast"] }
       )
     );
-    expect(parseView("?theme=purple&text=110&motion=fast", SWITCHES)).toEqual(DEFAULTS);
+    expect(parseView("?theme=purple&text=110&motion=fast", CATALOGUE)).toEqual(DEFAULTS);
     expect(DEFAULTS.switches).toEqual({
       theme: "light",
       contrast: "standard",
@@ -77,7 +81,7 @@ describe("the view in the address", () => {
     expect(viewParams(DEFAULTS, SWITCHES).toString()).toBe("");
     const view = withSwitches({ motion: "all", speed: "fast", lang: "pseudo" }, { text: 150 });
     expect(viewParams(view, SWITCHES).toString()).toBe("motion=all&speed=fast&text=150&lang=pseudo");
-    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
+    expect(parseView(viewParams(view, SWITCHES).toString(), CATALOGUE)).toEqual(view);
   });
 
   it("marks the View menu when a menu switch, the style sheets or the text size changed, not the theme or contrast", () => {
@@ -112,36 +116,36 @@ describe("the view in the address", () => {
   it("keeps the stage's width and the closed panel, and reads a width out of range as the whole stage", () => {
     const view = withSwitches({}, { width: 560, isPanelOpen: false, panelTab: "a11y" });
     expect(viewParams(view, SWITCHES).toString()).toBe("width=560&panel=closed&tab=a11y");
-    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
-    expect(parseView("?width=12", SWITCHES).width).toBe("fill");
-    expect(parseView("?width=500.5", SWITCHES).width).toBe("fill");
-    expect(parseView("?width=wide", SWITCHES).width).toBe("fill");
+    expect(parseView(viewParams(view, SWITCHES).toString(), CATALOGUE)).toEqual(view);
+    expect(parseView("?width=12", CATALOGUE).width).toBe("fill");
+    expect(parseView("?width=500.5", CATALOGUE).width).toBe("fill");
+    expect(parseView("?width=wide", CATALOGUE).width).toBe("fill");
   });
 
   it("keeps the story's height from the foot handle, and reads one out of range as the story's own (note 142)", () => {
     const view = withSwitches({}, { width: 560, height: 320 });
     expect(viewParams(view, SWITCHES).toString()).toBe("width=560&height=320");
-    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
-    expect(parseView("?height=12", SWITCHES).height).toBe("auto");
-    expect(parseView("?height=99999", SWITCHES).height).toBe("auto");
-    expect(parseView("?height=tall", SWITCHES).height).toBe("auto");
+    expect(parseView(viewParams(view, SWITCHES).toString(), CATALOGUE)).toEqual(view);
+    expect(parseView("?height=12", CATALOGUE).height).toBe("auto");
+    expect(parseView("?height=99999", CATALOGUE).height).toBe("auto");
+    expect(parseView("?height=tall", CATALOGUE).height).toBe("auto");
   });
 
   it("reads the compared axes: switches, text or sheets, two at most, and the older names", () => {
-    expect(parseView("?compare=text", SWITCHES).compare).toEqual(["text"]);
-    expect(parseView("?compare=motion,speed,press", SWITCHES).compare).toEqual(["motion", "speed"]);
-    expect(parseView("?compare=1", SWITCHES).compare).toEqual(["theme", "contrast"]);
-    expect(parseView("?compare=theme", SWITCHES).compare).toEqual(["theme", "contrast"]);
-    expect(parseView("?compare=language", SWITCHES).compare).toEqual(["lang"]);
-    expect(parseView("?compare=sideways", SWITCHES).compare).toEqual([]);
+    expect(parseView("?compare=text", CATALOGUE).compare).toEqual(["text"]);
+    expect(parseView("?compare=motion,speed,press", CATALOGUE).compare).toEqual(["motion", "speed"]);
+    expect(parseView("?compare=1", CATALOGUE).compare).toEqual(["theme", "contrast"]);
+    expect(parseView("?compare=theme", CATALOGUE).compare).toEqual(["theme", "contrast"]);
+    expect(parseView("?compare=language", CATALOGUE).compare).toEqual(["lang"]);
+    expect(parseView("?compare=sideways", CATALOGUE).compare).toEqual([]);
     expect(viewParams(withSwitches({}, { compare: ["sheets"] }), SWITCHES).toString()).toBe("compare=sheets");
   });
 
   it("keeps the zoom and the tools, in the tools' order, leaving out unknown ones", () => {
     const view = withSwitches({}, { zoom: 150, tools: ["outline", "measure"] });
     expect(viewParams(view, SWITCHES).toString()).toBe("zoom=150&tools=outline%2Cmeasure");
-    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
-    expect(parseView("?tools=measure,ruler,outline&zoom=300", SWITCHES)).toMatchObject({
+    expect(parseView(viewParams(view, SWITCHES).toString(), CATALOGUE)).toEqual(view);
+    expect(parseView("?tools=measure,ruler,outline&zoom=300", CATALOGUE)).toMatchObject({
       tools: ["outline", "measure"],
       zoom: 100
     });

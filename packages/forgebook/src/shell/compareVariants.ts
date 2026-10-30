@@ -10,9 +10,12 @@
  * @module
  */
 
-import type { ViewSwitch } from "../switches";
-import { type CompareAxes, SHEETS_CHOICES, TEXT_SCALES, type ViewState } from "../viewState";
+import type { CatalogueSettings } from "../catalogue";
+import { type CompareAxes, SHEETS_CHOICES, type ViewState } from "../viewState";
 import { STRINGS } from "./strings";
+
+/** What the compare view reads of the catalogue: its switches and its text sizes. */
+export type CompareCatalogue = Pick<CatalogueSettings, "switches" | "textSizes">;
 
 /** One frame of the compare view. */
 export type CompareVariant = {
@@ -36,11 +39,11 @@ type AxisVariant = CompareVariant & {
  * The values one axis sets, each with its label.
  *
  * @param axis - a switch's id, `text` or `sheets`.
- * @param switches - the catalogue's switches.
+ * @param catalogue - the catalogue's switches and text sizes.
  */
-const axisVariants = (axis: string, switches: readonly ViewSwitch[]): AxisVariant[] => {
+const axisVariants = (axis: string, catalogue: CompareCatalogue): AxisVariant[] => {
   if (axis === "text") {
-    return TEXT_SCALES.map((text) => ({
+    return catalogue.textSizes.map((text) => ({
       label: STRINGS.textScale(text),
       isDefault: false,
       viewOf: (view: ViewState): ViewState => ({ ...view, text })
@@ -53,7 +56,7 @@ const axisVariants = (axis: string, switches: readonly ViewSwitch[]): AxisVarian
       viewOf: (view: ViewState): ViewState => ({ ...view, sheets })
     }));
   }
-  const each = switches.find((candidate) => candidate.id === axis);
+  const each = catalogue.switches.find((candidate) => candidate.id === axis);
   if (each === undefined) return [];
   return each.values
     .filter((value) => value.isUnset !== true)
@@ -72,14 +75,14 @@ const axisVariants = (axis: string, switches: readonly ViewSwitch[]): AxisVarian
  * outermost: every theme at the standard contrast, then at more).
  *
  * @param axes - the compared axes.
- * @param switches - the catalogue's switches.
+ * @param catalogue - the catalogue's switches and text sizes.
  */
-export const compareVariants = (axes: CompareAxes, switches: readonly ViewSwitch[]): CompareVariant[] => {
+export const compareVariants = (axes: CompareAxes, catalogue: CompareCatalogue): CompareVariant[] => {
   const [first, second] = axes;
   if (first === undefined) return [];
-  const firsts = axisVariants(first, switches);
+  const firsts = axisVariants(first, catalogue);
   if (second === undefined) return firsts;
-  return axisVariants(second, switches).flatMap((outer) =>
+  return axisVariants(second, catalogue).flatMap((outer) =>
     firsts.map((inner) => ({
       label: STRINGS.compareCell(outer.isDefault ? [inner.label] : [inner.label, outer.label]),
       viewOf: (view: ViewState): ViewState => outer.viewOf(inner.viewOf(view))

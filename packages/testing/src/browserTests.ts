@@ -16,7 +16,7 @@
  */
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { AXE_TAGS } from "forgebook/a11y";
+import { type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import { heldClockAddress } from "forgebook/story-clock";
 import { storyLocations, storyTree } from "forgebook/story-tree";
@@ -84,6 +84,8 @@ export type StoryBrowserTestsOptions = StoryFilesOptions & {
   readonly frameUrl?: string;
   /** The catalogue's switches, as the frame page's configuration gives them; the theme and the contrast by default. */
   readonly switches?: readonly ViewSwitch[];
+  /** The catalogue's lists, as its configuration gives them: its accessibility rules, backgrounds, text sizes. */
+  readonly lists?: CatalogueLists;
   /** The variants; `storyVariants` of the switches by default. */
   readonly variants?: readonly StoryVariant[];
   /** Compare each frame with its reference image instead of running the checks; `false` by default. */
@@ -126,7 +128,8 @@ const overlayProblems = async (
 export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
   const { frameUrl = "frame.html", switches = DEFAULT_SWITCHES, screenshot = false, check } = options;
   const variants = options.variants ?? storyVariants(switches);
-  const defaults = defaultView(switches);
+  const catalogue = catalogueSettings("", switches, options.lists);
+  const defaults = defaultView(catalogue);
   const tree = storyTree([indexedSource(options)]);
   const groups = Map.groupBy(storyLocations(tree), (location) => location.component.title);
   for (const [title, locations] of groups) {
@@ -158,7 +161,10 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
               });
               return;
             }
-            const { violations } = await new AxeBuilder({ page }).withTags([...AXE_TAGS]).analyze();
+            const { violations } = await new AxeBuilder({ page })
+              .withTags([...catalogue.a11y.tags])
+              .disableRules([...catalogue.a11y.disabledRules])
+              .analyze();
             expect(violations.map((violation) => `${violation.id}: ${violation.help}`)).toEqual([]);
             const spills = await page.evaluate(findSpills, ".forgebook-frame");
             expect(

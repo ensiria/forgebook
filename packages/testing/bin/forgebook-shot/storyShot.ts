@@ -10,7 +10,8 @@
  */
 import { AxeBuilder } from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
-import { AXE_TAGS, type Violation } from "forgebook/a11y";
+import type { Violation } from "forgebook/a11y";
+import { DEFAULT_A11Y_TAGS } from "forgebook/catalogue";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import { frameAddressOf } from "forgebook/view-state";
 
@@ -86,13 +87,15 @@ export const takeShot = async (request: ShotRequest): Promise<StoryShot> => {
     if (request.out !== undefined)
       await page.screenshot({ path: request.out, fullPage: true, animations: "disabled" });
     const violations: Violation[] | undefined = request.isA11y
-      ? (await new AxeBuilder({ page }).withTags([...AXE_TAGS]).analyze()).violations.map((violation) => ({
-          id: violation.id,
-          help: violation.help,
-          impact: violation.impact ?? undefined,
-          helpUrl: violation.helpUrl,
-          targets: violation.nodes.map((node) => node.target.map(String).join(" "))
-        }))
+      ? (await new AxeBuilder({ page }).withTags([...DEFAULT_A11Y_TAGS]).analyze()).violations.map(
+          (violation) => ({
+            id: violation.id,
+            help: violation.help,
+            impact: violation.impact ?? undefined,
+            helpUrl: violation.helpUrl,
+            targets: violation.nodes.map((node) => node.target.map(String).join(" "))
+          })
+        )
       : undefined;
     return {
       story: request.story,

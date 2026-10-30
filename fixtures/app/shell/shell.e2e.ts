@@ -485,6 +485,42 @@ test.describe("the stage", () => {
     await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-motion-amount");
   });
 
+  test("the catalogue's own width, background and grid step reach the toolbar and the frame", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await page.getByRole("radio", { name: "Phone L" }).check({ force: true });
+    await expect(page).toHaveURL(/width=412/);
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    await page.getByLabel("Background").selectOption("paper");
+    await expect(page).toHaveURL(/backdrop=paper/);
+    // a style element's text is not shown text: its content is read as is
+    await expect
+      .poll(async () =>
+        frameOf(page)
+          .locator("#forgebook-backdrop-style")
+          .evaluate((style) => style.textContent)
+      )
+      .toContain("#f5efe0");
+    await page.goto(story("overview", "tools=grid"));
+    await frameStatus(page);
+    await expect(frameOf(page).locator("#root")).toHaveCSS("background-size", "4px 4px, 4px 4px");
+  });
+
+  test("the catalogue renames a text of the shell, and keeps what the browser stores under its own id", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await expect(page.getByRole("tab", { name: /Parts and hooks/ })).toBeVisible();
+    await page.getByRole("separator", { name: "Sidebar width" }).focus();
+    await page.keyboard.press("ArrowRight");
+    const keys = await page.evaluate(() => Object.keys(window.localStorage));
+    expect(keys).toContain("fixture:sidebar-width");
+    expect(keys.filter((key) => key.startsWith("forgebook:"))).toEqual([]);
+  });
+
   test("the frame says it loads until its story is ready", async ({ page }) => {
     await page.goto(story("overview"));
     await frameStatus(page);

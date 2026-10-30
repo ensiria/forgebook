@@ -12,27 +12,24 @@
  * @module
  */
 
+import type { CatalogueSettings, PanelTabId } from "./catalogue";
 import { switchValueOf, switchWithRole, type ViewSwitch } from "./switches";
 
 /**
- * What Forgebook draws behind the story, in place of its page's colour (D-644): the page's colour itself (`plain`,
- * following the theme), a checkerboard (transparency), a vivid gradient (glass and blur), a light and a dark
- * desktop-like picture (fixed, whatever the theme), or a page of content (text and rows, in the theme's light or
- * dark). Forgebook draws them itself, never the library it shows (D-67).
+ * What Forgebook draws behind the story, in place of its page's colour (D-644): `plain`, the page's colour itself,
+ * or the id of one of the catalogue's backdrops (`backdrops.ts`). Forgebook draws them itself, never the library it
+ * shows (D-67).
  */
-export type BackdropChoice =
-  | "plain"
-  | "checkerboard"
-  | "gradient"
-  | "lightDesktop"
-  | "darkDesktop"
-  | "content";
+export type BackdropChoice = string;
+
+/** The page's own colour: no backdrop drawn. */
+export const PLAIN_BACKDROP = "plain";
 
 /** Which style sheets the frame loads besides the required ones. */
 export type SheetsChoice = "full" | "structure" | "restyled";
 
-/** The root font size, in percent of the browser's: lengths in rem follow it. */
-export type TextScale = 100 | 125 | 150;
+/** The root font size, in percent of the browser's (one of the catalogue's text sizes): lengths in rem follow it. */
+export type TextScale = number;
 
 /**
  * What the compare view sets side by side: the values of one switch, or of two (the theme at both contrasts), or
@@ -47,10 +44,10 @@ export const OWN_COMPARE_AXES = ["text", "sheets"] as const;
 export type MeasureTool = "outline" | "grid" | "measure";
 
 /** The story's zoom on the stage, in percent: it scales the drawing, never the layout. */
-export type Zoom = 50 | 75 | 100 | 125 | 150 | 200;
+export type Zoom = number;
 
 /** A tab of the panel under a story. */
-export type PanelTab = "props" | "events" | "play" | "parts" | "code" | "a11y";
+export type PanelTab = PanelTabId;
 
 /** The story's width on the stage: the stage's whole width, or a width in CSS px (a preset, or dragged). */
 export type StageWidth = "fill" | number;
@@ -105,21 +102,8 @@ export const DEFAULT_VIEW: ViewState = {
   tools: []
 };
 
-/** Every backdrop, in the menu's order. */
-export const BACKDROP_CHOICES: readonly BackdropChoice[] = [
-  "plain",
-  "checkerboard",
-  "gradient",
-  "lightDesktop",
-  "darkDesktop",
-  "content"
-];
-
 /** Every style sheet setting, in the menu's order. */
 export const SHEETS_CHOICES: readonly SheetsChoice[] = ["full", "structure", "restyled"];
-
-/** Every text size, in the menu's order. */
-export const TEXT_SCALES: readonly TextScale[] = [100, 125, 150];
 
 /**
  * Whether the stage compares the story across a switch's values.
@@ -127,9 +111,6 @@ export const TEXT_SCALES: readonly TextScale[] = [100, 125, 150];
  * @param view - the view.
  */
 export const isComparing = (view: ViewState): boolean => view.compare.length > 0;
-
-/** Every zoom, in the menu's order. */
-export const ZOOMS: readonly Zoom[] = [50, 75, 100, 125, 150, 200];
 
 /** Every tool, in the bar's order. */
 export const MEASURE_TOOLS: readonly MeasureTool[] = ["outline", "grid", "measure"];
@@ -140,28 +121,27 @@ const toolsOf = (value: string | null): MeasureTool[] => {
   return MEASURE_TOOLS.filter((tool) => names.includes(tool));
 };
 
-/** The panel's tabs, in its order. */
-export const PANEL_TABS: readonly PanelTab[] = ["props", "events", "play", "parts", "code", "a11y"];
-
-/** The stage's preset widths, in CSS px: a phone, the stage beside the props panel (the tests' narrow variant), a tablet, a laptop. */
-export const STAGE_WIDTHS: readonly number[] = [360, 560, 768, 1024];
-
-/** The narrowest and widest story a width in the address or a drag may set, in CSS px. */
-export const STAGE_WIDTH_RANGE = { min: 240, max: 2560 } as const;
+/** What the view reads of a catalogue: its switches and the lists its values are checked against. */
+export type ViewCatalogue = Pick<
+  CatalogueSettings,
+  "switches" | "widthRange" | "zooms" | "textSizes" | "backdrops" | "tabs"
+>;
 
 /**
- * A width kept in the range, in whole pixels.
+ * A width kept in a catalogue's range, in whole pixels.
  *
  * @param width - a width in CSS px.
+ * @param range - the narrowest and widest a story may be set.
  */
-export const clampedWidth = (width: number): number =>
-  Math.round(Math.min(STAGE_WIDTH_RANGE.max, Math.max(STAGE_WIDTH_RANGE.min, width)));
+export const clampedWidth = (width: number, range: ViewCatalogue["widthRange"]): number =>
+  Math.round(Math.min(range.max, Math.max(range.min, width)));
 
 /** The width a parameter names: a whole number of px in the range, otherwise the stage's whole width. */
-const stageWidth = (value: string | null): StageWidth => {
+const stageWidth = (value: string | null, range: ViewCatalogue["widthRange"]): StageWidth => {
   const width = Number(value);
-  return value !== null && Number.isInteger(width) && clampedWidth(width) === width ? width : "fill";
+  return value !== null && Number.isInteger(width) && clampedWidth(width, range) === width ? width : "fill";
 };
+
 /** The lowest and highest story a height in the address or a drag may set, in CSS px. */
 export const STAGE_HEIGHT_RANGE = { min: 48, max: 4000 } as const;
 
@@ -229,31 +209,35 @@ const compareAxesOf = (value: string | null, switches: readonly ViewSwitch[]): C
  * The view a URL's query describes.
  *
  * @param search - the query (`?theme=dark&motion=reduced`), with or without `?`.
- * @param switches - the catalogue's switches.
+ * @param catalogue - the catalogue's switches and lists.
  */
-export const parseView = (search: string, switches: readonly ViewSwitch[]): ViewState => {
+export const parseView = (search: string, catalogue: ViewCatalogue): ViewState => {
   const params = new URLSearchParams(search);
   return {
-    switches: switchValuesOf(params, switches),
-    backdrop: choice(params.get("backdrop"), BACKDROP_CHOICES, DEFAULT_VIEW.backdrop),
+    switches: switchValuesOf(params, catalogue.switches),
+    backdrop: choice(
+      params.get("backdrop"),
+      catalogue.backdrops.map((backdrop) => backdrop.id),
+      DEFAULT_VIEW.backdrop
+    ),
     sheets: choice(params.get("sheets"), SHEETS_CHOICES, DEFAULT_VIEW.sheets),
-    text: choice(params.get("text"), TEXT_SCALES, DEFAULT_VIEW.text),
-    compare: compareAxesOf(params.get("compare"), switches),
-    width: stageWidth(params.get("width")),
+    text: choice(params.get("text"), catalogue.textSizes, DEFAULT_VIEW.text),
+    compare: compareAxesOf(params.get("compare"), catalogue.switches),
+    width: stageWidth(params.get("width"), catalogue.widthRange),
     height: stageHeight(params.get("height")),
     isPanelOpen: params.get("panel") !== "closed",
-    panelTab: choice(params.get("tab"), PANEL_TABS, DEFAULT_VIEW.panelTab),
-    zoom: choice(params.get("zoom"), ZOOMS, DEFAULT_VIEW.zoom),
+    panelTab: choice(params.get("tab"), catalogue.tabs, catalogue.tabs[0] ?? DEFAULT_VIEW.panelTab),
+    zoom: choice(params.get("zoom"), catalogue.zooms, DEFAULT_VIEW.zoom),
     tools: toolsOf(params.get("tools"))
   };
 };
 
 /**
- * The view without any change, for a catalogue's switches.
+ * The view without any change, for a catalogue.
  *
- * @param switches - the catalogue's switches.
+ * @param catalogue - the catalogue's switches and lists.
  */
-export const defaultView = (switches: readonly ViewSwitch[]): ViewState => parseView("", switches);
+export const defaultView = (catalogue: ViewCatalogue): ViewState => parseView("", catalogue);
 
 /**
  * Whether a switch's value in a view is its default (a switch the view does not hold counts as its default).

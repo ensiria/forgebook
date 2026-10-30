@@ -53,20 +53,10 @@ export type ReplayMode =
     };
 
 /**
- * The groups a component's stories fall into in the sidebar, in their order: the kinds of story a component page
- * has. A story without a group (the Overview, one value) sits above them.
+ * A group of stories in the sidebar (`states`, `in-context`): its order and heading come from the catalogue's
+ * configuration (or a library's preset); a group it does not name sits after the named ones.
  */
-export const STORY_GROUPS = [
-  "states",
-  "motion",
-  "in-context",
-  "showcase",
-  "worst-case",
-  "behaviour"
-] as const;
-
-/** A group of stories in the sidebar. */
-export type StoryGroup = (typeof STORY_GROUPS)[number];
+export type StoryGroup = string;
 
 /** The settings the catalogue reads from a meta or a story; anything else under `parameters` is left alone. */
 export type StoryParameters = {
@@ -80,7 +70,7 @@ export type StoryParameters = {
    * others are listed without a control.
    */
   readonly controls?: false | readonly string[];
-  /** The story's group in the sidebar, written plainly (the index reads it); none puts it above the groups. */
+  /** The story's group in the sidebar, a plain string (the index reads it); none puts it above the groups. */
   readonly group?: StoryGroup;
   /**
    * Whether the story is the component's demo, drawn at the top of its page: one real, well-made use of it, not a

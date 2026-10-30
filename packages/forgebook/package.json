@@ -53,7 +53,8 @@
     "./story-texts": "./src/storyTexts.ts",
     "./vite/index-story-file": "./src/vite/indexStoryFile.ts",
     "./vite/story-files-module": "./src/vite/storyFilesModule.ts",
-    "./switches": "./src/switches.ts"
+    "./switches": "./src/switches.ts",
+    "./catalogue": "./src/catalogue.ts"
   },
   "scripts": {
     "test": "vitest run",

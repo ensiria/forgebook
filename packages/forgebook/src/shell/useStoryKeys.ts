@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef } from "react";
 
 import { type StoryTree, sidebarStoryIds } from "../storyTree";
+import { useCatalogue } from "./catalogueContext";
 import { steppedStory, storyStep } from "./keyboard";
 
 /**
@@ -23,7 +24,15 @@ export const useStoryKeys = (
   firstOfPage: string | undefined,
   openStory: (id: string) => void
 ): void => {
-  const storyIds = useMemo(() => sidebarStoryIds(tree), [tree]);
+  const { storyGroups } = useCatalogue();
+  const storyIds = useMemo(
+    () =>
+      sidebarStoryIds(
+        tree,
+        storyGroups.map((group) => group.id)
+      ),
+    [tree, storyGroups]
+  );
   // the latest opener, without listening again on every render
   const openRef = useRef(openStory);
   openRef.current = openStory;

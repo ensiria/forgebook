@@ -1,6 +1,6 @@
 /**
- * The accessibility check of a story: the axe rules every story passes, the same in the generated tests and in the
- * catalogue's Accessibility card, and a violation as the card shows it.
+ * A violation of the accessibility check of a story, as the catalogue's Accessibility card shows it; the rules
+ * checked are the catalogue's (`catalogue.ts`, WCAG 2.2 A and AA by default), the same in the generated tests.
  *
  * @remarks
  * The card runs the check in the story's frame, on what the story shows at that moment (an open menu, a dark theme),
@@ -8,9 +8,6 @@
  *
  * @module
  */
-
-/** The axe rules every story passes: WCAG 2.2 at levels A and AA. */
-export const AXE_TAGS: readonly string[] = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /** How bad a violation is, as axe rates it. */
 export type ViolationImpact = "minor" | "moderate" | "serious" | "critical";

@@ -26,9 +26,9 @@ const storedWidth = (stored: string | null): number => {
 
 /** The sidebar's layout. */
 export const useSidebarLayout = (): SidebarLayout => {
-  const [width, setWidth] = useStored("forgebook:sidebar-width", storedWidth, String);
+  const [width, setWidth] = useStored("sidebar-width", storedWidth, String);
   const [isOpen, setIsOpen] = useStored(
-    "forgebook:sidebar",
+    "sidebar",
     (stored: string | null): boolean => stored !== "hidden",
     (shown: boolean): string => (shown ? "shown" : "hidden")
   );

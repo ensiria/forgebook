@@ -31,6 +31,7 @@ import {
 } from "../viewState";
 import type { CheckState } from "./A11yTab";
 import { ClockControls, useStoryClockControls } from "./ClockControls";
+import { useCatalogue } from "./catalogueContext";
 import { compareVariants } from "./compareVariants";
 import { Dock } from "./Dock";
 import { dockTabs } from "./dockTabs";
@@ -40,7 +41,6 @@ import { MatrixPicker } from "./MatrixPicker";
 import { StageTools } from "./StageTools";
 import { StageViewport } from "./StageViewport";
 import { STRINGS } from "./strings";
-import { useSwitches } from "./switchesContext";
 import { useComponentDocs } from "./useComponentDocs";
 import { useCopy } from "./useCopy";
 import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages";
@@ -186,7 +186,8 @@ export const Stage = ({
   const [calls, setCalls] = useState<readonly EventCall[]>([]);
   // each story's play trace, by story: a trace belongs to the story that played
   const [traces, setTraces] = useState<ReadonlyMap<string, PlayTrace>>(new Map());
-  const switches = useSwitches();
+  const catalogue = useCatalogue();
+  const { switches } = catalogue;
   const storyCheck = useStoryCheck(frameRef, frameAddress(frameUrl, story.id, view, switches));
   const eventNames = useMemo(
     () =>
@@ -268,6 +269,7 @@ export const Stage = ({
     if (reportedHeight !== undefined) setLastHeight(reportedHeight);
   }, [reportedHeight]);
 
+  // a tab the catalogue turns off is never shown
   const tabs = dockTabs({
     docs,
     code,
@@ -293,7 +295,7 @@ export const Stage = ({
     },
     check: storyCheck.check,
     onCheck: isComparing(view) ? undefined : storyCheck.run
-  });
+  }).filter((tab) => catalogue.tabs.includes(tab.id));
 
   return (
     <div className="forgebook-workspace">
@@ -334,7 +336,7 @@ export const Stage = ({
             </div>
             {isComparing(view) ? (
               <div className="forgebook-compare">
-                {compareVariants(view.compare, switches).map((variant) => (
+                {compareVariants(view.compare, catalogue).map((variant) => (
                   <figure
                     key={variant.label}
                     className="forgebook-compare__cell"

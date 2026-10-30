@@ -44,7 +44,7 @@ export type DockProps = {
 const HEIGHT = { initial: 300, min: 120, step: 24 } as const;
 
 /** Where this browser keeps the panel's height. */
-const HEIGHT_KEY = "forgebook:dock-height";
+const HEIGHT_KEY = "dock-height";
 
 /** The height a stored text holds, or the default. */
 const storedHeight = (stored: string | null): number => {

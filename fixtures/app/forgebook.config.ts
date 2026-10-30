@@ -19,5 +19,11 @@ export default defineConfig({
     { id: "it", label: "Italiano" },
     { id: "pseudo", label: "Pseudo", isPseudo: true }
   ],
-  presets: [kitPreset()]
+  presets: [kitPreset()],
+  // lists of its own, so the shell's tests see each set by a catalogue
+  id: "fixture",
+  widths: [{ width: 360 }, { width: 412, label: "Phone L" }, { width: 560 }, { width: 768 }, { width: 1024 }],
+  backgrounds: { custom: [{ id: "paper", label: "Paper", light: { color: "#f5efe0" } }] },
+  strings: { "tabs.parts": "Parts and hooks" },
+  gridStep: 4
 });

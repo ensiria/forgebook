@@ -1,6 +1,6 @@
 /**
  * The backdrops Forgebook draws behind a story in place of its page's colour (D-644): a checkerboard, a vivid
- * abstract picture, a light and a dark desktop-like picture, and a page of content. They show what a translucent
+ * abstract picture, a light and a dark desktop-like picture, a page of content, and a catalogue's own. They show what a translucent
  * surface (a menu's or a popover's glass, its blur) does, which the page's plain colour hides.
  *
  * @remarks
@@ -13,10 +13,8 @@
  *
  * @module
  */
-import type { BackdropChoice } from "./viewState";
-
 /** A backdrop as CSS, for one colour scheme. */
-type BackdropLook = {
+export type BackdropLook = {
   /** The colour under the pictures, which the box of a loading story waits on. */
   readonly color: string;
   /** The picture's layers, as the `background` shorthand writes them (image, position, size, repeat), top first. */
@@ -24,15 +22,37 @@ type BackdropLook = {
 };
 
 /** A drawn backdrop: its look in a light and a dark theme, the same look when it does not follow the theme. */
-type DrawnBackdrop = {
+export type DrawnBackdrop = {
   /** The look in the light theme. */
   readonly light: BackdropLook;
   /** The look in the dark theme. */
   readonly dark: BackdropLook;
 };
 
-/** Every backdrop but the page's own colour. */
-type DrawnBackdropChoice = Exclude<BackdropChoice, "plain">;
+/** A backdrop the View menu offers: its id (the address's `backdrop`), its name, its look. */
+export type Backdrop = {
+  /** Its id, as the address writes it (`checkerboard`). */
+  readonly id: string;
+  /** Its name in the View menu. */
+  readonly label: string;
+  /** Its look in each scheme. */
+  readonly drawn: DrawnBackdrop;
+};
+
+/**
+ * A catalogue's own backdrop, as its configuration writes it: a colour and, optionally, CSS layers over it, for the
+ * light scheme and, when it differs, the dark one.
+ */
+export type CustomBackdrop = {
+  /** Its id, as the address writes it. */
+  readonly id: string;
+  /** Its name in the View menu. */
+  readonly label: string;
+  /** Its look in the light scheme (and the dark one without `dark`). */
+  readonly light: { readonly color: string; readonly layers?: string };
+  /** Its look in the dark scheme; the light one by default. */
+  readonly dark?: { readonly color: string; readonly layers?: string };
+};
 
 /**
  * A text written inside an SVG document, with the characters XML reserves escaped.
@@ -211,42 +231,59 @@ const contentPage = (palette: PagePalette): BackdropLook => {
   };
 };
 
-/** Every drawn backdrop. */
-const BACKDROPS: Readonly<Record<DrawnBackdropChoice, DrawnBackdrop>> = {
-  checkerboard: fixed(CHECKERBOARD),
-  gradient: fixed(GRADIENT),
-  lightDesktop: fixed(LIGHT_DESKTOP),
-  darkDesktop: fixed(DARK_DESKTOP),
-  content: {
-    light: contentPage({
-      page: "#ffffff",
-      text: "#1f2328",
-      secondary: "#656d76",
-      divider: "#d8dee4",
-      icons: ["#4f7cff", "#22c55e", "#f59e0b", "#ec4899"]
-    }),
-    dark: contentPage({
-      page: "#16181d",
-      text: "#e6e8eb",
-      secondary: "#9aa1ab",
-      divider: "#2d3139",
-      icons: ["#6b8cff", "#34d399", "#fbbf24", "#f472b6"]
-    })
-  }
+/** The page of content, in both schemes. */
+const CONTENT: DrawnBackdrop = {
+  light: contentPage({
+    page: "#ffffff",
+    text: "#1f2328",
+    secondary: "#656d76",
+    divider: "#d8dee4",
+    icons: ["#4f7cff", "#22c55e", "#f59e0b", "#ec4899"]
+  }),
+  dark: contentPage({
+    page: "#16181d",
+    text: "#e6e8eb",
+    secondary: "#9aa1ab",
+    divider: "#2d3139",
+    icons: ["#6b8cff", "#34d399", "#fbbf24", "#f472b6"]
+  })
+};
+
+/** The backdrops Forgebook draws, in the View menu's order: every one but the page's own colour. */
+export const BUILT_IN_BACKDROPS: readonly Backdrop[] = [
+  { id: "checkerboard", label: "Checkerboard", drawn: fixed(CHECKERBOARD) },
+  { id: "gradient", label: "Vivid picture", drawn: fixed(GRADIENT) },
+  { id: "lightDesktop", label: "Light desktop", drawn: fixed(LIGHT_DESKTOP) },
+  { id: "darkDesktop", label: "Dark desktop", drawn: fixed(DARK_DESKTOP) },
+  { id: "content", label: "Page of content", drawn: CONTENT }
+];
+
+/**
+ * A catalogue's own backdrop, drawn as the built-in ones are.
+ *
+ * @param custom - the backdrop as the configuration writes it.
+ */
+export const customBackdrop = (custom: CustomBackdrop): Backdrop => {
+  const look = (written: CustomBackdrop["light"]): BackdropLook => ({
+    color: written.color,
+    layers: written.layers ?? "none"
+  });
+  return {
+    id: custom.id,
+    label: custom.label,
+    drawn: { light: look(custom.light), dark: look(custom.dark ?? custom.light) }
+  };
 };
 
 /**
  * The colour a backdrop is drawn on, which the box of a loading story waits on.
  *
- * @param backdrop - the backdrop.
- * @param isDark - whether the story is drawn in the dark theme (the page of content follows it).
- * @returns the CSS colour; none for `plain`, which is the page's own colour.
+ * @param backdrop - the backdrop; none for the page's own colour.
+ * @param isDark - whether the story is drawn in the dark scheme (a backdrop may follow it).
+ * @returns the CSS colour; none for the page's own colour.
  */
-export const backdropColor = (backdrop: BackdropChoice, isDark: boolean): string | undefined => {
-  if (backdrop === "plain") return undefined;
-  const drawn = BACKDROPS[backdrop];
-  return (isDark ? drawn.dark : drawn.light).color;
-};
+export const backdropColor = (backdrop: Backdrop | undefined, isDark: boolean): string | undefined =>
+  backdrop === undefined ? undefined : (isDark ? backdrop.drawn.dark : backdrop.drawn.light).color;
 
 /** A `body` rule that draws a look over whatever background the source's sheets set. */
 const bodyRule = (selector: string, look: BackdropLook): string =>
@@ -260,13 +297,16 @@ const bodyRule = (selector: string, look: BackdropLook): string =>
  * story's own elements keep every colour they set. The dark look follows the scheme the view draws in (its colour
  * scheme switch's, `switches.ts`), the system's preference for `system`; with forced colours the sheet draws nothing.
  *
- * @param backdrop - the backdrop.
+ * @param backdrop - the backdrop; none for the page's own colour.
  * @param scheme - the scheme the story is drawn in.
- * @returns the CSS; empty for `plain`.
+ * @returns the CSS; empty for the page's own colour.
  */
-export const backdropSheet = (backdrop: BackdropChoice, scheme: "light" | "dark" | "system"): string => {
-  if (backdrop === "plain") return "";
-  const { light, dark } = BACKDROPS[backdrop];
+export const backdropSheet = (
+  backdrop: Backdrop | undefined,
+  scheme: "light" | "dark" | "system"
+): string => {
+  if (backdrop === undefined) return "";
+  const { light, dark } = backdrop.drawn;
   if (light === dark || scheme === "light")
     return `@media (forced-colors: none) { ${bodyRule("body", light)} }`;
   if (scheme === "dark") return `@media (forced-colors: none) { ${bodyRule("body", dark)} }`;

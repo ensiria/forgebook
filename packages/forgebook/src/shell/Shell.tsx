@@ -9,6 +9,7 @@
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages";
 import { sourceFiles } from "../sourceFiles";
 import { storyBackground } from "../storyBackground";
@@ -25,15 +26,15 @@ import {
   type TreeStory
 } from "../storyTree";
 import { catalogueSwitches, type ViewSwitch } from "../switches";
-import { parseView, type StageWidth, type ViewState, viewParams } from "../viewState";
+import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState";
 import { ComponentPage } from "./ComponentPage";
+import { CatalogueContext, useCatalogue } from "./catalogueContext";
 import { HomePage } from "./HomePage";
 import { Sidebar, type SidebarProps } from "./Sidebar";
 import { SidebarHandle } from "./SidebarHandle";
 import { Stage } from "./Stage";
 import { StoryPicker } from "./StoryPicker";
 import { STRINGS } from "./strings";
-import { SwitchesContext } from "./switchesContext";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar";
 import { type RecentPage, useRecentPages } from "./useRecentPages";
 import type { PageScroll, PageVisit } from "./useScrollMemory";
@@ -71,6 +72,8 @@ export type ShellConfig = {
    * Give the frame the same list.
    */
   readonly switches?: readonly ViewSwitch[];
+  /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
+  readonly lists?: CatalogueLists;
 };
 
 /** The page an address names: one story, a component's page, or the home (an address that names none). */
@@ -149,15 +152,15 @@ const pageOf = (story: string | null, component: string | null): Page => {
 /**
  * The current address.
  *
- * @param switches - the catalogue's switches, for the view's values.
+ * @param catalogue - the catalogue's switches and lists, for the view's values.
  */
-const readAddress = (switches: readonly ViewSwitch[]): Address => {
+const readAddress = (catalogue: ViewCatalogue): Address => {
   const params = new URLSearchParams(window.location.search);
   const story = params.get("story");
   const component = params.get("component");
   return {
     page: pageOf(story, component),
-    view: parseView(window.location.search, switches),
+    view: parseView(window.location.search, catalogue),
     panelArgs: parsePanelArgsParam(params.get("args")),
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== "")
   };
@@ -382,18 +385,19 @@ type AddressState = {
 };
 
 /** The address, read again when the history goes back or forth. */
-const useAddress = (switches: readonly ViewSwitch[]): AddressState => {
-  const [address, setAddress] = useState<Address>(() => readAddress(switches));
+const useAddress = (catalogue: CatalogueSettings): AddressState => {
+  const { switches } = catalogue;
+  const [address, setAddress] = useState<Address>(() => readAddress(catalogue));
   const [visit, setVisit] = useState<PageVisit>(() => visitOf(address, false));
   useEffect(() => {
     const onBack = (): void => {
-      const next = readAddress(switches);
+      const next = readAddress(catalogue);
       setAddress(next);
       setVisit(visitOf(next, true));
     };
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
-  }, [switches]);
+  }, [catalogue]);
   // a height set with the foot handle belongs to the story it was set on: another page starts at its own (D-515)
   const pageAddress = (page: Page): Address => ({
     page,
@@ -419,19 +423,12 @@ const useAddress = (switches: readonly ViewSwitch[]): AddressState => {
 };
 
 /**
- * The catalogue's page.
+ * The catalogue's page inside its settings: everything below reads them, the shell's own hooks (the sidebar's width,
+ * the keys, the recent pages) included.
  *
  * @param props - the configuration.
  */
-export const Shell = ({
-  title,
-  logo,
-  heights,
-  sources,
-  frameUrl,
-  languages = NO_LANGUAGES,
-  switches: declaredSwitches
-}: ShellConfig): ReactNode => {
+const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const {
     width: sidebarWidth,
@@ -439,11 +436,9 @@ export const Shell = ({
     isOpen: isSidebarOpen,
     setIsOpen: setIsSidebarOpen
   } = useSidebarLayout();
-  const switches = useMemo(
-    () => catalogueSwitches(declaredSwitches, languages),
-    [declaredSwitches, languages]
-  );
-  const { address, visit, pageAddress, openPage, replaceAddress } = useAddress(switches);
+  const catalogue = useCatalogue();
+  const { switches } = catalogue;
+  const { address, visit, pageAddress, openPage, replaceAddress } = useAddress(catalogue);
   // each page's last scroll position, kept across the component pages and the stage
   const scrollPositions = useRef(new Map<string, number>());
   const scroll: PageScroll = { visit, positions: scrollPositions.current };
@@ -451,7 +446,16 @@ export const Shell = ({
   const [shownWidth, setShownWidth] = useState<number | undefined>(undefined);
   const storyHeights = useStoryHeights(heights);
   const isSystemDark = useSystemDark();
-  useStoryIdsElement(useMemo(() => sidebarStoryIds(tree), [tree]));
+  useStoryIdsElement(
+    useMemo(
+      () =>
+        sidebarStoryIds(
+          tree,
+          catalogue.storyGroups.map((group) => group.id)
+        ),
+      [tree, catalogue.storyGroups]
+    )
+  );
 
   const shown = shownPage(tree, address.page);
   const location = shown.kind === "story" || shown.kind === "component" ? shown.location : undefined;
@@ -501,101 +505,118 @@ export const Shell = ({
   );
 
   return (
-    <SwitchesContext.Provider value={switches}>
-      <div className="catalogue">
-        <Sidebar
-          width={sidebarWidth}
-          isOpen={isSidebarOpen}
-          onHide={(): void => setIsSidebarOpen(false)}
-          title={title}
-          logo={logo}
-          tree={tree}
+    <div className="catalogue">
+      <Sidebar
+        width={sidebarWidth}
+        isOpen={isSidebarOpen}
+        onHide={(): void => setIsSidebarOpen(false)}
+        title={title}
+        logo={logo}
+        tree={tree}
+        isHome={shown.kind === "home"}
+        homeHref={addressQuery(pageAddress(HOME), switches)}
+        onOpenHome={(): void => openPage(HOME)}
+        current={sidebarCurrent(location, shownStoryId)}
+        componentHref={(sourceId: string, componentTitle: string): string =>
+          addressQuery(pageAddress(componentPage(sourceId, componentTitle)), switches)
+        }
+        onOpenComponent={(sourceId: string, componentTitle: string): void =>
+          openPage(componentPage(sourceId, componentTitle))
+        }
+      />
+      {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
+      <main className="forgebook-main">
+        <ShellBar
           isHome={shown.kind === "home"}
-          homeHref={addressQuery(pageAddress(HOME), switches)}
-          onOpenHome={(): void => openPage(HOME)}
-          current={sidebarCurrent(location, shownStoryId)}
-          componentHref={(sourceId: string, componentTitle: string): string =>
-            addressQuery(pageAddress(componentPage(sourceId, componentTitle)), switches)
-          }
-          onOpenComponent={(sourceId: string, componentTitle: string): void =>
-            openPage(componentPage(sourceId, componentTitle))
-          }
+          view={address.view}
+          onViewChange={changeView}
+          isStoryPage={shown.kind === "story"}
+          onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
+          shownWidth={shown.kind === "story" ? shownWidth : undefined}
         />
-        {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
-        <main className="forgebook-main">
-          <ShellBar
-            isHome={shown.kind === "home"}
+        {shown.kind === "home" ? (
+          <HomePage
+            title={title}
+            tree={tree}
+            sources={sources}
+            recent={recent}
+            hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
+            onOpen={(page: RecentPage): void => openPage(page)}
+            header={header}
+          />
+        ) : null}
+        {shown.kind === "component" ? (
+          <ComponentPage
+            component={shown.location.component}
+            view={address.view}
+            frameUrl={frameUrl}
+            hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches)}
+            onOpen={(story: TreeStory): void => openPage(storyPage(story))}
+            loadDocs={files?.docs[shown.location.component.file]}
+            loadCode={files?.code[shown.location.component.file]}
+            loadPage={files?.pages[shown.location.component.file]}
+            background={storyBackground(
+              shown.location.source.background,
+              address.view,
+              catalogue,
+              isSystemDark
+            )}
+            heightOf={(storyId: string): number | undefined =>
+              knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH))
+            }
+            header={header}
+            scroll={scroll}
+          />
+        ) : null}
+        {shown.kind === "story" ? (
+          <Stage
+            component={shown.location.component}
+            story={shown.location.story}
             view={address.view}
             onViewChange={changeView}
-            isStoryPage={shown.kind === "story"}
-            onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
-            shownWidth={shown.kind === "story" ? shownWidth : undefined}
+            panelArgs={address.panelArgs}
+            onPanelArgsChange={(panelArgs: PanelArgs): void => replaceAddress({ ...address, panelArgs })}
+            matrixAxes={address.matrix}
+            onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
+            frameUrl={frameUrl}
+            loadCode={files?.code[shown.location.component.file]}
+            loadDocs={files?.docs[shown.location.component.file]}
+            namedValues={source?.namedValues}
+            header={header}
+            onShownWidthChange={setShownWidth}
+            scroll={scroll}
+            backgroundOf={(view: Pick<ViewState, "switches" | "backdrop">): string | undefined =>
+              storyBackground(shown.location.source.background, view, catalogue, isSystemDark)
+            }
+            measuredHeight={stageHeight(
+              storyHeights,
+              shown.location.story.id,
+              address.view.width,
+              shownWidth
+            )}
           />
-          {shown.kind === "home" ? (
-            <HomePage
-              title={title}
-              tree={tree}
-              sources={sources}
-              recent={recent}
-              hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
-              onOpen={(page: RecentPage): void => openPage(page)}
-              header={header}
-            />
-          ) : null}
-          {shown.kind === "component" ? (
-            <ComponentPage
-              component={shown.location.component}
-              view={address.view}
-              frameUrl={frameUrl}
-              hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches)}
-              onOpen={(story: TreeStory): void => openPage(storyPage(story))}
-              loadDocs={files?.docs[shown.location.component.file]}
-              loadCode={files?.code[shown.location.component.file]}
-              loadPage={files?.pages[shown.location.component.file]}
-              background={storyBackground(
-                shown.location.source.background,
-                address.view,
-                switches,
-                isSystemDark
-              )}
-              heightOf={(storyId: string): number | undefined =>
-                knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH))
-              }
-              header={header}
-              scroll={scroll}
-            />
-          ) : null}
-          {shown.kind === "story" ? (
-            <Stage
-              component={shown.location.component}
-              story={shown.location.story}
-              view={address.view}
-              onViewChange={changeView}
-              panelArgs={address.panelArgs}
-              onPanelArgsChange={(panelArgs: PanelArgs): void => replaceAddress({ ...address, panelArgs })}
-              matrixAxes={address.matrix}
-              onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
-              frameUrl={frameUrl}
-              loadCode={files?.code[shown.location.component.file]}
-              loadDocs={files?.docs[shown.location.component.file]}
-              namedValues={source?.namedValues}
-              header={header}
-              onShownWidthChange={setShownWidth}
-              scroll={scroll}
-              backgroundOf={(view: Pick<ViewState, "switches" | "backdrop">): string | undefined =>
-                storyBackground(shown.location.source.background, view, switches, isSystemDark)
-              }
-              measuredHeight={stageHeight(
-                storyHeights,
-                shown.location.story.id,
-                address.view.width,
-                shownWidth
-              )}
-            />
-          ) : null}
-          {shown.kind === "missing" ? header : null}
-        </main>
-      </div>
-    </SwitchesContext.Provider>
+        ) : null}
+        {shown.kind === "missing" ? header : null}
+      </main>
+    </div>
+  );
+};
+
+/**
+ * The catalogue's page: its settings computed once from the configuration (its switches, its languages' switch, its
+ * lists) and provided to the whole page.
+ *
+ * @param props - the configuration.
+ */
+export const Shell = (props: ShellConfig): ReactNode => {
+  const { title, switches, languages = NO_LANGUAGES, lists } = props;
+  const catalogue = useMemo(
+    () => catalogueSettings(title, catalogueSwitches(switches, languages), lists),
+    [title, switches, languages, lists]
+  );
+  return (
+    <CatalogueContext.Provider value={catalogue}>
+      <ShellPage {...props} />
+    </CatalogueContext.Provider>
   );
 };

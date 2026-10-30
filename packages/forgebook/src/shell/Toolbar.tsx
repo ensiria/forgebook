@@ -9,23 +9,20 @@ import { type ChangeEvent, type ReactNode, useId } from "react";
 
 import { switchControl, switchWithRole, type ViewSwitch } from "../switches";
 import {
-  BACKDROP_CHOICES,
   DEFAULT_VIEW,
   hasViewChanges,
   isComparing,
   isMenuSwitch,
+  PLAIN_BACKDROP,
   SHEETS_CHOICES,
   type SheetsChoice,
-  STAGE_WIDTHS,
   type StageWidth,
-  TEXT_SCALES,
-  type TextScale,
   type ViewState
 } from "../viewState";
+import { useCatalogue } from "./catalogueContext";
 import { Icon, type IconName } from "./icons";
 import { Segmented } from "./Segmented";
 import { STRINGS } from "./strings";
-import { useSwitches } from "./switchesContext";
 import { usePopover } from "./usePopover";
 import { WidthField } from "./WidthField";
 
@@ -133,7 +130,8 @@ const SwitchRow = ({
  */
 const ViewMenu = ({ view, onViewChange }: ToolbarProps): ReactNode => {
   const { isOpen, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
-  const switches = useSwitches();
+  const catalogue = useCatalogue();
+  const { switches } = catalogue;
   const backdropId = useId();
   const menuSwitches = switches.filter(isMenuSwitch);
 
@@ -173,15 +171,14 @@ const ViewMenu = ({ view, onViewChange }: ToolbarProps): ReactNode => {
               id={backdropId}
               className="forgebook-select"
               value={view.backdrop}
-              onChange={(event: ChangeEvent<HTMLSelectElement>): void => {
-                const { value } = event.currentTarget;
-                const backdrop = BACKDROP_CHOICES.find((choice) => choice === value);
-                if (backdrop !== undefined) onViewChange({ ...view, backdrop });
-              }}
+              onChange={(event: ChangeEvent<HTMLSelectElement>): void =>
+                onViewChange({ ...view, backdrop: event.currentTarget.value })
+              }
             >
-              {BACKDROP_CHOICES.map((backdrop) => (
-                <option key={backdrop} value={backdrop}>
-                  {STRINGS.backdrops[backdrop]}
+              <option value={PLAIN_BACKDROP}>{STRINGS.backdropPlain}</option>
+              {catalogue.backdrops.map((backdrop) => (
+                <option key={backdrop.id} value={backdrop.id}>
+                  {backdrop.label}
                 </option>
               ))}
             </select>
@@ -203,10 +200,10 @@ const ViewMenu = ({ view, onViewChange }: ToolbarProps): ReactNode => {
             <span className="forgebook-popover__label">{STRINGS.text}</span>
             <Segmented
               label={STRINGS.text}
-              options={TEXT_SCALES.map((text) => ({ value: text, label: STRINGS.textScale(text) }))}
+              options={catalogue.textSizes.map((text) => ({ value: text, label: STRINGS.textScale(text) }))}
               value={view.text}
               isDisabled={view.compare.includes("text")}
-              onValueChange={(text: TextScale): void => onViewChange({ ...view, text })}
+              onValueChange={(text: number): void => onViewChange({ ...view, text })}
             />
           </div>
           <div className="forgebook-popover__foot">
@@ -281,7 +278,7 @@ const CompareMenu = ({
   isDisabled
 }: ToolbarProps & { readonly isDisabled: boolean }): ReactNode => {
   const { isOpen, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
-  const switches = useSwitches();
+  const switches = useCatalogue().switches;
   const name = useId();
   return (
     <div className="forgebook-view-menu">
@@ -359,7 +356,7 @@ const SchemeSwitches = ({
   onViewChange,
   isStoryPage
 }: Pick<ToolbarProps, "view" | "onViewChange"> & { readonly isStoryPage: boolean }): ReactNode => {
-  const switches = useSwitches();
+  const switches = useCatalogue().switches;
   const scheme = switchWithRole(switches, "colorScheme");
   const contrast = switchWithRole(switches, "contrast");
   const isCompared = (each: ViewSwitch): boolean => isStoryPage && view.compare.includes(each.id);
@@ -417,47 +414,53 @@ export const Toolbar = ({
   isStoryPage = true,
   onShowSidebar,
   shownWidth
-}: ToolbarProps): ReactNode => (
-  <div className="forgebook-toolbar">
-    {onShowSidebar === undefined ? null : <ShowSidebarButton onShowSidebar={onShowSidebar} />}
-    <SchemeSwitches view={view} onViewChange={onViewChange} isStoryPage={isStoryPage} />
-    <span className="forgebook-toolbar__divider" />
-    <ViewMenu view={view} onViewChange={onViewChange} />
-    <span className="forgebook-toolbar__divider" />
-    <div className="forgebook-toolbar__width">
-      <span className="forgebook-toolbar__icon" title={STRINGS.width}>
-        <Icon name="width" size={14} />
-      </span>
-      <Segmented
-        label={STRINGS.width}
-        isDisabled={isStoryPage && isComparing(view)}
-        options={[
-          { value: "fill", label: STRINGS.widthFill },
-          ...STAGE_WIDTHS.map((width) => ({ value: width, label: STRINGS.widthPx(width) }))
-        ]}
-        value={view.width}
-        onValueChange={(width: StageWidth): void => onViewChange({ ...view, width })}
-        after={
-          <WidthField
-            width={view.width}
-            shownWidth={shownWidth}
-            onWidthChange={(width: StageWidth): void => onViewChange({ ...view, width })}
-          />
-        }
-      />
+}: ToolbarProps): ReactNode => {
+  const { widths } = useCatalogue();
+  return (
+    <div className="forgebook-toolbar">
+      {onShowSidebar === undefined ? null : <ShowSidebarButton onShowSidebar={onShowSidebar} />}
+      <SchemeSwitches view={view} onViewChange={onViewChange} isStoryPage={isStoryPage} />
+      <span className="forgebook-toolbar__divider" />
+      <ViewMenu view={view} onViewChange={onViewChange} />
+      <span className="forgebook-toolbar__divider" />
+      <div className="forgebook-toolbar__width">
+        <span className="forgebook-toolbar__icon" title={STRINGS.width}>
+          <Icon name="width" size={14} />
+        </span>
+        <Segmented
+          label={STRINGS.width}
+          isDisabled={isStoryPage && isComparing(view)}
+          options={[
+            { value: "fill", label: STRINGS.widthFill },
+            ...widths.map((preset) => ({
+              value: preset.width,
+              label: preset.label ?? STRINGS.widthPx(preset.width)
+            }))
+          ]}
+          value={view.width}
+          onValueChange={(width: StageWidth): void => onViewChange({ ...view, width })}
+          after={
+            <WidthField
+              width={view.width}
+              shownWidth={shownWidth}
+              onWidthChange={(width: StageWidth): void => onViewChange({ ...view, width })}
+            />
+          }
+        />
+      </div>
+      <span className="forgebook-toolbar__spacer" />
+      <button
+        type="button"
+        className="forgebook-button"
+        title={STRINGS.panel}
+        aria-pressed={view.isPanelOpen}
+        disabled={!isStoryPage}
+        onClick={(): void => onViewChange({ ...view, isPanelOpen: !view.isPanelOpen })}
+      >
+        <Icon name="panel" size={14} />
+        <span className="forgebook-button__label">{STRINGS.panel}</span>
+      </button>
+      <CompareMenu view={view} onViewChange={onViewChange} isDisabled={!isStoryPage} />
     </div>
-    <span className="forgebook-toolbar__spacer" />
-    <button
-      type="button"
-      className="forgebook-button"
-      title={STRINGS.panel}
-      aria-pressed={view.isPanelOpen}
-      disabled={!isStoryPage}
-      onClick={(): void => onViewChange({ ...view, isPanelOpen: !view.isPanelOpen })}
-    >
-      <Icon name="panel" size={14} />
-      <span className="forgebook-button__label">{STRINGS.panel}</span>
-    </button>
-    <CompareMenu view={view} onViewChange={onViewChange} isDisabled={!isStoryPage} />
-  </div>
-);
+  );
+};

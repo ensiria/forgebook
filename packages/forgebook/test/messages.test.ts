@@ -48,7 +48,7 @@ describe("messages", () => {
     };
     expect(isShellMessage({ type: "forgebook:view", view })).toBe(true);
     expect(isShellMessage({ type: "forgebook:view", view: { ...view, switches: { theme: 2 } } })).toBe(false);
-    expect(isShellMessage({ type: "forgebook:view", view: { ...view, text: 110 } })).toBe(false);
+    expect(isShellMessage({ type: "forgebook:view", view: { ...view, text: "110" } })).toBe(false);
     expect(isShellMessage({ type: "forgebook:view", view: { ...view, switches: undefined } })).toBe(false);
     expect(isShellMessage({ type: "forgebook:check" })).toBe(true);
     expect(isShellMessage({ type: "forgebook:matrix", matrix: null })).toBe(true);

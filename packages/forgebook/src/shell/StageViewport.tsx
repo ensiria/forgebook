@@ -28,11 +28,11 @@ import {
   clampedHeight,
   clampedWidth,
   STAGE_HEIGHT_RANGE,
-  STAGE_WIDTH_RANGE,
   type StageHeight,
   type StageWidth,
   type Zoom
 } from "../viewState";
+import { useCatalogue } from "./catalogueContext";
 import { STRINGS } from "./strings";
 
 /** The viewport's props. */
@@ -181,6 +181,7 @@ export const StageViewport = ({
   onHeightChange,
   children
 }: StageViewportProps): ReactNode => {
+  const { widthRange } = useCatalogue();
   const roomRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const scale = zoom / 100;
@@ -215,7 +216,7 @@ export const StageViewport = ({
   useEffect(() => onShownWidthChange?.(reportedWidth), [onShownWidthChange, reportedWidth]);
   useEffect(() => (): void => onShownWidthChange?.(undefined), [onShownWidthChange]);
 
-  const currentWidth = (): number => roomRef.current?.offsetWidth ?? STAGE_WIDTH_RANGE.min;
+  const currentWidth = (): number => roomRef.current?.offsetWidth ?? widthRange.min;
 
   const startDrag = (side: Side, event: PointerEvent<HTMLDivElement>): void => {
     if (onWidthChange === undefined || event.button !== 0) return;
@@ -226,7 +227,10 @@ export const StageViewport = ({
     const startWidth = currentWidth();
     // centred: a handle moved by x changes the width by twice x, in the story's own px
     const widthAt = (clientX: number): number =>
-      clampedWidth(startWidth + (2 * (side === "end" ? clientX - startX : startX - clientX)) / scale);
+      clampedWidth(
+        startWidth + (2 * (side === "end" ? clientX - startX : startX - clientX)) / scale,
+        widthRange
+      );
     const move = (moveEvent: globalThis.PointerEvent): void => setDragWidth(widthAt(moveEvent.clientX));
     const end = (endEvent: globalThis.PointerEvent): void => {
       handle.removeEventListener("pointermove", move);
@@ -245,8 +249,8 @@ export const StageViewport = ({
     const step = event.shiftKey ? KEY_STEP.large : KEY_STEP.normal;
     const outward = side === "end" ? "ArrowRight" : "ArrowLeft";
     const inward = side === "end" ? "ArrowLeft" : "ArrowRight";
-    if (event.key === outward) onWidthChange(clampedWidth(currentWidth() + step));
-    else if (event.key === inward) onWidthChange(clampedWidth(currentWidth() - step));
+    if (event.key === outward) onWidthChange(clampedWidth(currentWidth() + step, widthRange));
+    else if (event.key === inward) onWidthChange(clampedWidth(currentWidth() - step, widthRange));
     else return;
     event.preventDefault();
   };
@@ -266,8 +270,8 @@ export const StageViewport = ({
         role="separator"
         aria-orientation="vertical"
         aria-label={STRINGS.widthHandle}
-        aria-valuemin={STAGE_WIDTH_RANGE.min}
-        aria-valuemax={STAGE_WIDTH_RANGE.max}
+        aria-valuemin={widthRange.min}
+        aria-valuemax={widthRange.max}
         aria-valuenow={dragWidth ?? shownWidth}
         title={STRINGS.widthHandleHint}
         tabIndex={0}

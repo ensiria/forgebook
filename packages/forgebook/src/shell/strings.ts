@@ -2,14 +2,18 @@
  * Every text the catalogue's shell shows, in one place: the catalogue is a development tool in English, and keeping
  * its words together keeps them consistent and ready for a translation.
  *
+ * @remarks
+ * A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
+ * its configuration): the shell applies the replacements once, before it draws (`configureStrings`), as a translation
+ * is set up, so every module keeps reading `STRINGS`. A text that takes values (`allStories(count)`) stays the shell's.
+ *
  * @module
  */
-import type { StoryGroup } from "@forgebook/story-format/csf";
+import type { SheetsChoice, TextScale } from "../viewState";
 
-import type { BackdropChoice, SheetsChoice, TextScale } from "../viewState";
-
-/** The shell's texts. */
-export const STRINGS = {
+/** The shell's texts, as Forgebook writes them; `configureStrings` replaces some before the shell draws. */
+// biome-ignore lint/nursery/useExplicitType: the texts' type is their own shape (`ShellStrings`); a written one would repeat every key
+const shellStrings = {
   searchPlaceholder: "Search",
   searchLabel: "Search components and stories",
   componentsNav: "Components",
@@ -26,14 +30,7 @@ export const STRINGS = {
   view: "View",
   viewChanged: "A view setting is changed",
   backdrop: "Background",
-  backdrops: {
-    plain: "Plain",
-    checkerboard: "Checkerboard",
-    gradient: "Vivid picture",
-    lightDesktop: "Light desktop",
-    darkDesktop: "Dark desktop",
-    content: "Page of content"
-  } satisfies Record<BackdropChoice, string>,
+  backdropPlain: "Plain",
   sheets: "Styles",
   sheetChoices: { full: "Full", structure: "Structure only", restyled: "Restyled" } satisfies Record<
     SheetsChoice,
@@ -109,14 +106,6 @@ export const STRINGS = {
   a11yNone: "No WCAG 2.2 A or AA rule is broken in the story as it is now.",
   a11yError: "The check could not run",
   a11yNotInCompare: "One story at a time: leave Compare to check it",
-  storyGroups: {
-    states: "States",
-    motion: "Motion",
-    "in-context": "In context",
-    showcase: "Showcase",
-    "worst-case": "Worst cases",
-    behaviour: "Behaviour"
-  } satisfies Record<StoryGroup, string>,
   replay: "Replay",
   clockLabel: "Story clock",
   clockPause: "Pause the clock",
@@ -174,4 +163,46 @@ export const STRINGS = {
   docsLoading: "Reading the component…",
   docsError: "The component could not be read",
   indexProblems: "Some story files could not be placed"
-} as const;
+};
+
+/** The shell's texts. */
+export type ShellStrings = typeof shellStrings;
+
+/** The shell's texts, as shown. */
+export const STRINGS: ShellStrings = shellStrings;
+
+/**
+ * Whether a value is a group of texts (`tabs`), whose members a path can name.
+ *
+ * @param value - a value among the texts.
+ */
+const isTextGroup = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Replaces one text, by its path among the shell's texts (`props`, `tabs.props`): only a plain text, never a text
+ * that takes values, and nothing for a path that names none.
+ *
+ * @param texts - the texts, or a group of them.
+ * @param path - the text's name, then its name within each group.
+ * @param text - the new text.
+ */
+const replaceText = (texts: Record<string, unknown>, path: readonly string[], text: string): void => {
+  const [name, ...rest] = path;
+  if (name === undefined) return;
+  const current = texts[name];
+  if (rest.length === 0) {
+    if (typeof current === "string") texts[name] = text;
+    return;
+  }
+  if (isTextGroup(current)) replaceText(current, rest, text);
+};
+
+/**
+ * Applies a catalogue's replacements to the shell's texts, once, before the shell draws.
+ *
+ * @param replacements - the new texts, by their path (`tabs.props`).
+ */
+export const configureStrings = (replacements: Readonly<Record<string, string>>): void => {
+  for (const [path, text] of Object.entries(replacements)) replaceText(STRINGS, path.split("."), text);
+};

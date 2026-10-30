@@ -21,6 +21,9 @@ import {
   type TreeFamily
 } from "../src/storyTree";
 
+/** The story groups a Kaji-like catalogue names, in their order. */
+const GROUPS = ["states", "motion", "in-context", "showcase", "worst-case", "behaviour"];
+
 /** A source with the given files, no style sheets. */
 const source = (index: StoryFiles["index"], families?: readonly string[]): StorySource => ({
   id: "kit",
@@ -170,7 +173,7 @@ describe("storyTree", () => {
     const component = findStory(grouped, "kit:feedback-skeleton--long")?.component;
     expect(findStory(grouped, "kit:feedback-skeleton--long")?.story.description).toBe("Hard names.");
     expect(
-      groupedStories(component?.stories ?? []).map((section) => [
+      groupedStories(component?.stories ?? [], GROUPS).map((section) => [
         section.group,
         section.stories.map((story) => story.exportName)
       ])
@@ -181,7 +184,7 @@ describe("storyTree", () => {
       ["worst-case", ["Long"]]
     ]);
     // the keys walk the stories as the sidebar lists them, not in the order of the file
-    expect(sidebarStoryIds(grouped)).toEqual([
+    expect(sidebarStoryIds(grouped, GROUPS)).toEqual([
       "kit:feedback-skeleton--overview",
       "kit:feedback-skeleton--rows",
       "kit:feedback-skeleton--arrival",
@@ -245,7 +248,7 @@ describe("aliases and related components (D-492)", () => {
       { name: undefined, components: [], aliases: [{ name: "DataTable", title: "Recipes/DataTable" }] }
     ]);
     // one story per export: the alias adds no story, so no second test or image
-    expect(sidebarStoryIds(tree).filter((id) => id.startsWith("kit:recipes-data-table"))).toEqual([
+    expect(sidebarStoryIds(tree, GROUPS).filter((id) => id.startsWith("kit:recipes-data-table"))).toEqual([
       "kit:recipes-data-table--overview",
       "kit:recipes-data-table--sorted"
     ]);

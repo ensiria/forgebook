@@ -14,6 +14,7 @@
 import type { StoryFileCode } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
 
+import { groupLabel } from "../catalogue";
 import type { ComponentDocs } from "../componentDocs";
 import type { PanelArgs, ShellMessage } from "../messages";
 import { groupedStories, mainStory, type TreeComponent, type TreeStory } from "../storyTree";
@@ -21,6 +22,7 @@ import type { ViewSwitch } from "../switches";
 import { frameAddress, liveView, type ViewState } from "../viewState";
 import { ApiReference } from "./ApiReference";
 import { CodeText } from "./CodeText";
+import { useCatalogue } from "./catalogueContext";
 import { useCodeWriter } from "./codeWriter";
 import { FrameView } from "./FrameView";
 import { Icon } from "./icons";
@@ -28,7 +30,6 @@ import { PackageHtml } from "./PackageHtml";
 import { StageViewport } from "./StageViewport";
 import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock";
 import { STRINGS } from "./strings";
-import { useSwitches } from "./switchesContext";
 import { useComponentDocs } from "./useComponentDocs";
 import { useCopy } from "./useCopy";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages";
@@ -338,7 +339,8 @@ export const ComponentPage = ({
   // the frames keep the view they loaded with; only the style sheets load them again, the rest of the view (the
   // switches, the language among them) is sent to them live
   const frameView = useLoadedView(view.sheets, view);
-  const switches = useSwitches();
+  const catalogue = useCatalogue();
+  const { switches } = catalogue;
   const exampleIds = useMemo(() => examples.map((story) => story.id), [examples]);
   const queue = useFrameQueue(exampleIds, pageRef);
   const { heights, settled } = useFrameMessages({
@@ -389,10 +391,15 @@ export const ComponentPage = ({
           {examples.length === 0 ? null : (
             <section className="forgebook-doc__section" aria-labelledby="forgebook-examples">
               <h2 id="forgebook-examples">{STRINGS.examples}</h2>
-              {groupedStories(examples).map((section) => (
+              {groupedStories(
+                examples,
+                catalogue.storyGroups.map((group) => group.id)
+              ).map((section) => (
                 <section key={section.group ?? ""} className="forgebook-doc__group">
                   {section.group === undefined ? null : (
-                    <h3 className="forgebook-doc__group-name">{STRINGS.storyGroups[section.group]}</h3>
+                    <h3 className="forgebook-doc__group-name">
+                      {groupLabel(catalogue.storyGroups, section.group)}
+                    </h3>
                   )}
                   {section.stories.map((story) => (
                     <Example

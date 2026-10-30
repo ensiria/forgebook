@@ -6,6 +6,7 @@
  */
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
+import type { CatalogueLists } from "./catalogue";
 import type { ViewSwitch } from "./switches";
 
 /** What the shell and the frame pages read of a configuration: data, as the plugin hands it to them. */
@@ -18,4 +19,6 @@ export type PageConfig = {
   readonly switches: readonly ViewSwitch[] | undefined;
   /** The languages, the presets' and the catalogue's merged. */
   readonly languages: readonly StoryLanguage[];
+  /** The lists (widths, backgrounds, story groups, texts…), the presets' and the catalogue's merged. */
+  readonly lists: CatalogueLists;
 };

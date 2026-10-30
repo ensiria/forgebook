@@ -16,6 +16,7 @@ import "./frame.scss";
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 
+import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue";
 import { shownLanguage } from "../languages";
 import {
   detailOf,
@@ -58,6 +59,8 @@ export type FrameConfig = {
   readonly previews?: readonly unknown[];
   /** The switches of the toolbar and the View menu, as the shell's configuration gives them; the theme and contrast by default. */
   readonly switches?: readonly ViewSwitch[];
+  /** The catalogue's lists (its backgrounds, text sizes, grid step, accessibility rules…); the defaults when none. */
+  readonly lists?: CatalogueLists;
 };
 
 /** Tells the shell, which is the parent page on the same origin. */
@@ -72,8 +75,14 @@ const tellShell = (message: FrameMessage): void => {
  * @param message - the message.
  * @param controls - the rendered story's controls.
  * @param storyId - the story's id, for the answers.
+ * @param rules - the catalogue's accessibility rules, for a check.
  */
-const answerShell = (message: ShellMessage, controls: StoryControls, storyId: string): void => {
+const answerShell = (
+  message: ShellMessage,
+  controls: StoryControls,
+  storyId: string,
+  rules: A11ySettings
+): void => {
   if (message.type === "forgebook:replay") void controls.replay();
   else if (message.type === "forgebook:args") controls.setPanelArgs(message.args);
   else if (message.type === "forgebook:events") controls.setEvents(message.names);
@@ -82,7 +91,7 @@ const answerShell = (message: ShellMessage, controls: StoryControls, storyId: st
   else if (message.type === "forgebook:clock") controls.setClock(message.state);
   else if (message.type === "forgebook:clock-restart") controls.restartClock();
   else if (message.type === "forgebook:check") {
-    checkStory(document)
+    checkStory(document, rules)
       .then((violations) => tellShell({ type: "forgebook:checked", storyId, violations }))
       .catch((error: unknown) =>
         tellShell({
@@ -105,18 +114,19 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const storyId = params.get("story") ?? "";
   const languages = config.languages ?? [];
   const switches = catalogueSwitches(config.switches, languages);
+  const catalogue = catalogueSettings("", switches, config.lists);
   const preview = mergedPreviews((config.previews ?? []).map(readPreview));
-  const view = parseView(window.location.search, switches);
-  applyView(document.documentElement, view, switches);
+  const view = parseView(window.location.search, catalogue);
+  applyView(document.documentElement, view, catalogue);
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount
   let changeShown: ((live: LiveView) => void) | undefined;
   // the shell sends the live part of a changed view: applied on the root, and kept in the address so a reload (an
   // edit, a stale module) shows the same view
   window.addEventListener("message", (event: MessageEvent): void => {
     if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
-    if (event.data.type === "forgebook:tools") applyTools(document, event.data.tools);
+    if (event.data.type === "forgebook:tools") applyTools(document, event.data.tools, catalogue.gridStep);
     if (event.data.type !== "forgebook:view") return;
-    applyView(document.documentElement, event.data.view, switches);
+    applyView(document.documentElement, event.data.view, catalogue);
     changeShown?.(event.data.view);
     const address = frameAddress(
       window.location.pathname,
@@ -172,7 +182,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
     window.addEventListener("message", (event: MessageEvent): void => {
       if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
-      if (controls !== undefined) answerShell(event.data, controls, storyId);
+      if (controls !== undefined) answerShell(event.data, controls, storyId, catalogue.a11y);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them)
     const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => ({

@@ -15,6 +15,7 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
+import type { CatalogueLists, PanelTabId } from "../catalogue.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
@@ -51,6 +52,8 @@ export type ResolvedConfig = {
   readonly head: string;
   /** The folders the dev server watches for new story files, absolute. */
   readonly watch: readonly string[];
+  /** The lists (widths, backgrounds, story groups…), the presets' and the catalogue's merged. */
+  readonly lists: CatalogueLists;
 };
 
 /**
@@ -72,6 +75,48 @@ const mergedById = <TEntry extends { readonly id: string }>(
   const merged = new Map<string, TEntry>();
   for (const list of lists) for (const entry of list ?? []) merged.set(entry.id, entry);
   return [...merged.values()];
+};
+
+/**
+ * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
+ * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
+ * earlier one with the same id or name; the tabs turned off and the rules turned off by any.
+ *
+ * @param all - the presets' lists, then the catalogue's.
+ */
+export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
+  const tabs: Partial<Record<PanelTabId, false>> = {};
+  const strings: Record<string, string> = {};
+  let merged: CatalogueLists = {};
+  for (const lists of all) {
+    Object.assign(tabs, lists.tabs);
+    Object.assign(strings, lists.strings);
+    merged = {
+      ...merged,
+      ...(lists.id === undefined ? {} : { id: lists.id }),
+      ...(lists.widths === undefined ? {} : { widths: lists.widths }),
+      ...(lists.widthRange === undefined ? {} : { widthRange: lists.widthRange }),
+      ...(lists.zooms === undefined ? {} : { zooms: lists.zooms }),
+      ...(lists.textSizes === undefined ? {} : { textSizes: lists.textSizes }),
+      ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep })
+    };
+  }
+  const builtIn = all.findLast((lists) => lists.backgrounds?.builtIn !== undefined)?.backgrounds?.builtIn;
+  const tags = all.findLast((lists) => lists.a11y?.tags !== undefined)?.a11y?.tags;
+  return {
+    ...merged,
+    backgrounds: {
+      ...(builtIn === undefined ? {} : { builtIn }),
+      custom: mergedById(all.map((lists) => lists.backgrounds?.custom))
+    },
+    storyGroups: mergedById(all.map((lists) => lists.storyGroups)),
+    tabs,
+    a11y: {
+      ...(tags === undefined ? {} : { tags }),
+      disabledRules: [...new Set(all.flatMap((lists) => lists.a11y?.disabledRules ?? []))]
+    },
+    strings
+  };
 };
 
 /**
@@ -134,7 +179,8 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     head: [...presets.map((preset) => preset.head ?? ""), config.head ?? ""]
       .filter((tags) => tags !== "")
       .join("\n"),
-    watch: (config.watch ?? []).map(absolute)
+    watch: (config.watch ?? []).map(absolute),
+    lists: mergedLists([...presets, config])
   };
 };
 

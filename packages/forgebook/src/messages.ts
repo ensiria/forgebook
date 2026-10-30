@@ -15,7 +15,7 @@ import { isViolation, type Violation } from "./a11y";
 import { isMatrix, type Matrix } from "./matrix";
 import { isPlayTrace, type PlayTrace } from "./playTrace";
 import { type ClockState, isClockRate } from "./storyClock";
-import { BACKDROP_CHOICES, type LiveView, MEASURE_TOOLS, type MeasureTool, TEXT_SCALES } from "./viewState";
+import { type LiveView, MEASURE_TOOLS, type MeasureTool } from "./viewState";
 
 /** An arg the props panel can show and set: what crosses between the documents as is. */
 export type ArgValue = string | number | boolean | null | NamedArg;
@@ -187,8 +187,8 @@ const isLiveView = (value: unknown): value is LiveView =>
   isRecord(value) &&
   isRecord(value["switches"]) &&
   Object.values(value["switches"]).every((switchValue) => typeof switchValue === "string") &&
-  BACKDROP_CHOICES.some((backdrop) => backdrop === value["backdrop"]) &&
-  TEXT_SCALES.some((text) => text === value["text"]);
+  typeof value["backdrop"] === "string" &&
+  typeof value["text"] === "number";
 
 /** Whether a value is a story clock's state. */
 const isClockState = (value: unknown): value is ClockState =>

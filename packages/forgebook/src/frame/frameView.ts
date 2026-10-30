@@ -8,6 +8,7 @@
 import type { StorySheets } from "@forgebook/story-format/source";
 
 import { backdropSheet } from "../backdrops";
+import type { CatalogueSettings } from "../catalogue";
 import { switchValueOf, type ViewSwitch } from "../switches";
 import { type LiveView, schemeOf, type ViewState } from "../viewState";
 
@@ -93,12 +94,17 @@ const applySwitch = (root: HTMLElement, each: ViewSwitch, value: string | undefi
  *
  * @param root - the document's root element.
  * @param view - the view's live part: the frame applies it again whenever the shell sends a change.
- * @param switches - the catalogue's switches.
+ * @param catalogue - the catalogue's switches and backdrops.
  */
-export const applyView = (root: HTMLElement, view: LiveView, switches: readonly ViewSwitch[]): void => {
-  for (const each of switches) applySwitch(root, each, view.switches[each.id]);
+export const applyView = (
+  root: HTMLElement,
+  view: LiveView,
+  catalogue: Pick<CatalogueSettings, "switches" | "backdrops">
+): void => {
+  for (const each of catalogue.switches) applySwitch(root, each, view.switches[each.id]);
   root.style.fontSize = `${view.text}%`;
-  applyBackdrop(root.ownerDocument, backdropSheet(view.backdrop, schemeOf(view, switches)));
+  const backdrop = catalogue.backdrops.find((each) => each.id === view.backdrop);
+  applyBackdrop(root.ownerDocument, backdropSheet(backdrop, schemeOf(view, catalogue.switches)));
 };
 
 /**

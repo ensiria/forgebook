@@ -20,7 +20,7 @@ export type RecentPage = {
 };
 
 /** The storage key. */
-const RECENT_KEY = "forgebook:recent-pages";
+const RECENT_KEY = "recent-pages";
 
 /** The most pages kept. */
 const MOST_RECENT = 8;

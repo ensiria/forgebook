@@ -5,14 +5,14 @@
  * The sidebar lists every story before any is loaded, so the index comes from the code itself, parsed with Vite's
  * parser (the same files Vite compiles). The title and the story names must therefore be written as plain strings,
  * `parameters.controls` (the shell decides from it whether a story has a props panel before loading it) as `false`
- * or a list of plain strings, `parameters.group` as one of `STORY_GROUPS`, `parameters.height` as a number, and the meta's `alsoIn`, `related` and
+ * or a list of plain strings, `parameters.group` as a plain string, `parameters.height` as a number, and the meta's `alsoIn`, `related` and
  * `keywords` as lists of plain strings; a story is a named `export const`, and
  * the first sentence of the TSDoc above it says what it shows. Pure: text in, index or problem out.
  *
  * @module
  */
 
-import { STORY_GROUPS, type StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryGroup } from "@forgebook/story-format/csf";
 import type { StoryControlsSetting, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import { type ESTree, parseSync } from "vite";
 
@@ -93,20 +93,17 @@ const stringListOf = (
   return strings;
 };
 
-/** Whether a value is one of the story groups. */
-const isStoryGroup = (value: unknown): value is StoryGroup => STORY_GROUPS.some((group) => group === value);
-
 /**
- * An object's `parameters.group`: `undefined` when it sets none, the group, or a problem when it is not one of the
- * groups written plainly.
+ * An object's `parameters.group`: `undefined` when it sets none, the group, or a problem when it is not a plain
+ * string.
  */
 const groupOf = (object: ESTree.ObjectExpression): StoryGroup | undefined | Error => {
   const parameters = propertyValue(object, "parameters");
   if (parameters?.type !== "ObjectExpression") return undefined;
   const group = propertyValue(parameters, "group");
   if (group === undefined) return undefined;
-  if (group.type === "Literal" && isStoryGroup(group.value)) return group.value;
-  return new Error(`\`parameters.group\` must be written as one of ${STORY_GROUPS.join(", ")}`);
+  if (group.type === "Literal" && typeof group.value === "string" && group.value !== "") return group.value;
+  return new Error("`parameters.group` must be written as a plain string");
 };
 
 /**

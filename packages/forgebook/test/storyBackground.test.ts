@@ -5,8 +5,12 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { catalogueSettings } from "../src/catalogue";
 import { storyBackground } from "../src/storyBackground";
 import { DEFAULT_SWITCHES } from "../src/switches";
+
+/** A catalogue with the default switches and backgrounds. */
+const CATALOGUE = catalogueSettings("", DEFAULT_SWITCHES);
 
 const BACKGROUND = { light: "#fafafa", dark: "#111111", darkMore: "#000000" };
 
@@ -16,7 +20,7 @@ describe("storyBackground", () => {
       storyBackground(
         BACKGROUND,
         { switches: { theme: "light", contrast: "standard" }, backdrop: "plain" },
-        DEFAULT_SWITCHES,
+        CATALOGUE,
         false
       )
     ).toBe("#fafafa");
@@ -24,7 +28,7 @@ describe("storyBackground", () => {
       storyBackground(
         BACKGROUND,
         { switches: { theme: "dark", contrast: "more" }, backdrop: "plain" },
-        DEFAULT_SWITCHES,
+        CATALOGUE,
         false
       )
     ).toBe("#000000");
@@ -33,7 +37,7 @@ describe("storyBackground", () => {
       storyBackground(
         BACKGROUND,
         { switches: { theme: "light", contrast: "more" }, backdrop: "plain" },
-        DEFAULT_SWITCHES,
+        CATALOGUE,
         false
       )
     ).toBe("#fafafa");
@@ -44,7 +48,7 @@ describe("storyBackground", () => {
       storyBackground(
         BACKGROUND,
         { switches: { theme: "system", contrast: "standard" }, backdrop: "plain" },
-        DEFAULT_SWITCHES,
+        CATALOGUE,
         true
       )
     ).toBe("#111111");
@@ -52,7 +56,7 @@ describe("storyBackground", () => {
       storyBackground(
         BACKGROUND,
         { switches: { theme: "system", contrast: "standard" }, backdrop: "plain" },
-        DEFAULT_SWITCHES,
+        CATALOGUE,
         false
       )
     ).toBe("#fafafa");
@@ -60,7 +64,7 @@ describe("storyBackground", () => {
       storyBackground(
         undefined,
         { switches: { theme: "dark", contrast: "standard" }, backdrop: "plain" },
-        DEFAULT_SWITCHES,
+        CATALOGUE,
         true
       )
     ).toBeUndefined();

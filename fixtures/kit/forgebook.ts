@@ -1,7 +1,7 @@
 /**
  * The fixture kit's preset for Forgebook, as a library ships one (Kaji UI's `./forgebook`): the theme and the
- * contrast, and the kit's motion, speed and press feedback, with their values and names, so a catalogue that shows
- * the kit gets its View menu with `presets: [kitPreset()]`.
+ * contrast, the kit's motion, speed and press feedback, and its story groups, with their values and names, so a
+ * catalogue that shows the kit gets its View menu and its groups with `presets: [kitPreset()]`.
  *
  * @module
  */
@@ -61,5 +61,14 @@ const pressSwitch: ViewSwitch = {
 export const kitPreset = (): ForgebookPreset =>
   definePreset({
     name: "fixture-kit",
-    switches: [themeSwitch(), contrastSwitch(), motionSwitch, speedSwitch, pressSwitch]
+    switches: [themeSwitch(), contrastSwitch(), motionSwitch, speedSwitch, pressSwitch],
+    // the kinds of story a component's page has, in their order
+    storyGroups: [
+      { id: "states", label: "States" },
+      { id: "motion", label: "Motion" },
+      { id: "in-context", label: "In context" },
+      { id: "showcase", label: "Showcase" },
+      { id: "worst-case", label: "Worst cases" },
+      { id: "behaviour", label: "Behaviour" }
+    ]
   });

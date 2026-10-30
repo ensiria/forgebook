@@ -150,11 +150,16 @@ describe("indexStoryFile", () => {
     });
   });
 
-  it("refuses a group that is not one of the story groups", () => {
-    const text = `export default { title: "A/B" };
+  it("takes any group written as a plain string, the catalogue's or not, and refuses one that is not", () => {
+    const named = `export default { title: "A/B" };
       export const X = { parameters: { group: "extras" } };`;
-    expect(indexStoryFile("A.stories.tsx", text)).toBe(
-      "A.stories.tsx: story X: `parameters.group` must be written as one of states, motion, in-context, showcase, worst-case, behaviour"
+    const index = indexStoryFile("A.stories.tsx", named);
+    expect(typeof index === "string" ? index : index.stories[0]?.group).toBe("extras");
+    const computed = `const GROUP = "extras";
+      export default { title: "A/B" };
+      export const X = { parameters: { group: GROUP } };`;
+    expect(indexStoryFile("A.stories.tsx", computed)).toBe(
+      "A.stories.tsx: story X: `parameters.group` must be written as a plain string"
     );
   });
 

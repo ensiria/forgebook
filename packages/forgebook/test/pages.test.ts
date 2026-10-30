@@ -23,7 +23,8 @@ const CONFIG: ResolvedConfig = {
   languages: [{ id: "it", label: "Italiano" }],
   previews: ["/catalogue/forgebook.preview.tsx"],
   head: '<link rel="stylesheet" href="/fonts.css" />',
-  watch: []
+  watch: [],
+  lists: {}
 };
 
 describe("the generated pages", () => {
@@ -52,7 +53,7 @@ describe("the generated pages", () => {
 
   it("hands the pages the configuration's data, and the own stories as one source named after the catalogue", () => {
     expect(configModule(CONFIG)).toBe(
-      'export default {"title":"Acme <UI>","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}]};'
+      'export default {"title":"Acme <UI>","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}],"lists":{}};'
     );
     const source = storiesSourceModule(CONFIG);
     expect(source).toContain('import files0 from "./src/**/*.stories.tsx?forgebook-files";');

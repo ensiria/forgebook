@@ -13,11 +13,12 @@
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
+import type { CatalogueLists } from "../catalogue.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 
 /** What a library's preset gives a catalogue. */
-export type ForgebookPreset = {
+export type ForgebookPreset = CatalogueLists & {
   /** The preset's name, in a problem's message (`kaji-ui`). */
   readonly name: string;
   /** The switches it declares, before the catalogue's. */
@@ -30,8 +31,8 @@ export type ForgebookPreset = {
   readonly head?: string;
 };
 
-/** A catalogue's configuration. */
-export type ForgebookConfig = {
+/** A catalogue's configuration: the lists of `CatalogueLists` (widths, backgrounds, story groups…) besides these. */
+export type ForgebookConfig = CatalogueLists & {
   /** The framework its stories are written for (`react()` of `@forgebook/react/vite`). */
   readonly framework: FrameworkAdapter;
   /** Its name, in the page's title and the sidebar. */

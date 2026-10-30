@@ -6,7 +6,9 @@
  */
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
+import { groupLabel } from "../catalogue";
 import { groupedStories, type TreeComponent, type TreeStory } from "../storyTree";
+import { useCatalogue } from "./catalogueContext";
 import { STRINGS } from "./strings";
 
 /** The picker's props. */
@@ -36,7 +38,11 @@ export const StoryPicker = ({
   onOpenStory
 }: StoryPickerProps): ReactNode => {
   const id = useId();
-  const sections = groupedStories(component.stories);
+  const { storyGroups } = useCatalogue();
+  const sections = groupedStories(
+    component.stories,
+    storyGroups.map((group) => group.id)
+  );
   return (
     <div className="forgebook-picker">
       <label className="forgebook-popover__label" htmlFor={id}>
@@ -61,7 +67,7 @@ export const StoryPicker = ({
               </option>
             ))
           ) : (
-            <optgroup key={section.group} label={STRINGS.storyGroups[section.group]}>
+            <optgroup key={section.group} label={groupLabel(storyGroups, section.group)}>
               {section.stories.map((story) => (
                 <option key={story.id} value={story.id}>
                   {story.name}

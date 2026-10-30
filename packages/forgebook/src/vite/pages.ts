@@ -83,7 +83,8 @@ export const configModule = (config: ResolvedConfig): string => {
     title: config.title,
     heights: config.heights,
     switches: config.switches,
-    languages: config.languages
+    languages: config.languages,
+    lists: config.lists
   };
   return `export default ${JSON.stringify(data)};`;
 };
@@ -127,6 +128,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     '    frameUrl: "frame.html",',
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
+    "    lists: config.lists,",
     "    codeOf",
     "  });",
     ""
@@ -151,6 +153,7 @@ export const frameEntry = (config: ResolvedConfig): string => {
     `    sources: ${sources.list},`,
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
+    "    lists: config.lists,",
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ""

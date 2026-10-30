@@ -11,7 +11,7 @@
  *
  * @module
  */
-import { STORY_GROUPS, type StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryGroup } from "@forgebook/story-format/csf";
 import type {
   StoryBackground,
   StoryControlsSetting,
@@ -453,27 +453,38 @@ export type StoryGroupSection = {
 };
 
 /**
- * A component's stories by group: the ungrouped ones first, then each group in `STORY_GROUPS`' order; empty groups
- * are left out.
+ * A component's stories by group: the ungrouped ones first, then the groups the catalogue names in its order, then
+ * the groups it does not name, by id; empty groups are left out.
  *
  * @param stories - the component's stories, in the order of the file.
+ * @param order - the groups the catalogue names, in their order.
  */
-export const groupedStories = (stories: readonly TreeStory[]): StoryGroupSection[] =>
-  [undefined, ...STORY_GROUPS]
+export const groupedStories = (
+  stories: readonly TreeStory[],
+  order: readonly string[]
+): StoryGroupSection[] => {
+  const unnamed = [...new Set(stories.flatMap((story) => (story.group === undefined ? [] : [story.group])))]
+    .filter((group) => !order.includes(group))
+    .sort();
+  return [undefined, ...order, ...unnamed]
     .map((group) => ({ group, stories: stories.filter((story) => story.group === group) }))
     .filter((section) => section.stories.length > 0);
+};
 
 /**
  * Every story's id in the sidebar's order: each component's stories by group, as the sidebar lists them.
  *
  * @param tree - the tree.
+ * @param order - the groups the catalogue names, in their order.
  */
-export const sidebarStoryIds = (tree: StoryTree): string[] =>
+export const sidebarStoryIds = (tree: StoryTree, order: readonly string[]): string[] =>
   tree.sources.flatMap((source) =>
     source.families.flatMap((family) =>
       family.groups.flatMap((group) =>
         group.components.flatMap((component) =>
-          groupedStories(component.stories).flatMap((section) => section.stories.map((story) => story.id))
+          groupedStories(component.stories, order).flatMap((section) =>
+            section.stories.map((story) => story.id)
+          )
         )
       )
     )

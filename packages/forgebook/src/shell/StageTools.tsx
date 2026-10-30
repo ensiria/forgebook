@@ -6,7 +6,8 @@
  */
 import type { ReactNode } from "react";
 
-import { MEASURE_TOOLS, type MeasureTool, ZOOMS, type Zoom } from "../viewState";
+import { MEASURE_TOOLS, type MeasureTool, type Zoom } from "../viewState";
+import { useCatalogue } from "./catalogueContext";
 import { Icon, type IconName } from "./icons";
 import { STRINGS } from "./strings";
 
@@ -36,9 +37,10 @@ const TOOL_ICONS: Readonly<Record<MeasureTool, IconName>> = {
  * @param props - the zoom, the tools and their setters.
  */
 export const StageTools = ({ zoom, onZoomChange, tools, onToolsChange }: StageToolsProps): ReactNode => {
-  const step = ZOOMS.indexOf(zoom);
-  const zoomOut = ZOOMS[step - 1];
-  const zoomIn = ZOOMS[step + 1];
+  const { zooms } = useCatalogue();
+  const step = zooms.indexOf(zoom);
+  const zoomOut = zooms[step - 1];
+  const zoomIn = zooms[step + 1];
   return (
     <div className="forgebook-stage-tools" role="toolbar" aria-label={STRINGS.stageTools}>
       <div className="forgebook-stage-tools__group">

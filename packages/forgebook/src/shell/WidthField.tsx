@@ -6,7 +6,8 @@
  */
 import { type ChangeEvent, type KeyboardEvent, type ReactNode, useState } from "react";
 
-import { clampedWidth, STAGE_WIDTHS, type StageWidth } from "../viewState";
+import { clampedWidth, type StageWidth } from "../viewState";
+import { useCatalogue } from "./catalogueContext";
 import { STRINGS } from "./strings";
 
 /** The field's props. */
@@ -15,7 +16,7 @@ export type WidthFieldProps = {
   readonly width: StageWidth;
   /** The width the story really has, in CSS px: measured on a story's page; none on a component's page. */
   readonly shownWidth: number | undefined;
-  /** Called with a typed width, kept within the stage's range (`STAGE_WIDTH_RANGE`). */
+  /** Called with a typed width, kept within the catalogue's range. */
   readonly onWidthChange: (width: StageWidth) => void;
 };
 
@@ -27,13 +28,14 @@ export type WidthFieldProps = {
 export const WidthField = ({ width, shownWidth, onWidthChange }: WidthFieldProps): ReactNode => {
   // the field's text while it is being typed in
   const [draft, setDraft] = useState<string | undefined>(undefined);
-  const isCustom = width !== "fill" && !STAGE_WIDTHS.includes(width);
+  const { widths, widthRange } = useCatalogue();
+  const isCustom = width !== "fill" && !widths.some((preset) => preset.width === width);
   const shown = shownWidth ?? (width === "fill" ? undefined : width);
   const commit = (): void => {
     if (draft === undefined) return;
     const typed = Number(draft);
     setDraft(undefined);
-    if (draft.trim() !== "" && Number.isFinite(typed)) onWidthChange(clampedWidth(typed));
+    if (draft.trim() !== "" && Number.isFinite(typed)) onWidthChange(clampedWidth(typed, widthRange));
   };
   return (
     <span className="forgebook-width-field" data-custom={isCustom ? "" : undefined}>

@@ -1,5 +1,5 @@
 /**
- * The tools drawn over a story in its frame: every element's outline, an 8 px grid, and the box of the element under
+ * The tools drawn over a story in its frame: every element's outline, a grid (8 px by default, the catalogue's step), and the box of the element under
  * the pointer with its size, padding and margin.
  *
  * @remarks
@@ -20,8 +20,13 @@ const STYLE_ID = "forgebook-measure-style";
 /** The id of the overlay that draws the measured box. */
 const OVERLAY_ID = "forgebook-measure-overlay";
 
-/** The sheet for the outline and the grid tools. */
-const toolSheet = (tools: readonly MeasureTool[]): string =>
+/**
+ * The sheet for the outline and the grid tools.
+ *
+ * @param tools - the tools drawn.
+ * @param gridStep - the grid's step, in CSS px.
+ */
+const toolSheet = (tools: readonly MeasureTool[], gridStep: number): string =>
   [
     tools.includes("outline")
       ? `body *:not(#root, #${OVERLAY_ID}, #${OVERLAY_ID} *) { ` +
@@ -30,7 +35,7 @@ const toolSheet = (tools: readonly MeasureTool[]): string =>
     tools.includes("grid")
       ? "#root { background-image: linear-gradient(rgb(23 104 228 / 0.12) 1px, transparent 1px), " +
         "linear-gradient(90deg, rgb(23 104 228 / 0.12) 1px, transparent 1px) !important; " +
-        "background-size: 8px 8px !important; }"
+        `background-size: ${gridStep}px ${gridStep}px !important; }`
       : ""
   ].join("\n");
 
@@ -115,9 +120,10 @@ let stopMeasuring: (() => void) | undefined;
  *
  * @param document - the frame's document.
  * @param tools - the tools to draw; none removes them all.
+ * @param gridStep - the grid's step, in CSS px; 8 by default.
  */
-export const applyTools = (document: Document, tools: readonly MeasureTool[]): void => {
-  const sheet = toolSheet(tools);
+export const applyTools = (document: Document, tools: readonly MeasureTool[], gridStep = 8): void => {
+  const sheet = toolSheet(tools, gridStep);
   let style = document.getElementById(STYLE_ID);
   if (style === null) {
     style = document.createElement("style");
