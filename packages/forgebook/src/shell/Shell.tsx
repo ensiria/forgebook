@@ -9,7 +9,6 @@
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { storyLanguages } from "../languages";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages";
 import { sourceFiles } from "../sourceFiles";
 import { storyBackground } from "../storyBackground";
@@ -25,6 +24,7 @@ import {
   storyTree,
   type TreeStory
 } from "../storyTree";
+import { catalogueSwitches, type ViewSwitch } from "../switches";
 import { parseView, type StageWidth, type ViewState, viewParams } from "../viewState";
 import { ComponentPage } from "./ComponentPage";
 import { HomePage } from "./HomePage";
@@ -33,6 +33,7 @@ import { SidebarHandle } from "./SidebarHandle";
 import { Stage } from "./Stage";
 import { StoryPicker } from "./StoryPicker";
 import { STRINGS } from "./strings";
+import { SwitchesContext } from "./switchesContext";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar";
 import { type RecentPage, useRecentPages } from "./useRecentPages";
 import type { PageScroll, PageVisit } from "./useScrollMemory";
@@ -65,6 +66,11 @@ export type ShellConfig = {
    * in it; none turns them off. Give the frame the same list. A source may add its own.
    */
   readonly languages?: readonly StoryLanguage[];
+  /**
+   * The switches of the toolbar and the View menu (`switches.ts`): the theme and the contrast when none are given.
+   * Give the frame the same list.
+   */
+  readonly switches?: readonly ViewSwitch[];
 };
 
 /** The page an address names: one story, a component's page, or the home (an address that names none). */
@@ -72,6 +78,9 @@ type Page =
   | { readonly kind: "story"; readonly id: string }
   | { readonly kind: "component"; readonly id: string }
   | { readonly kind: "home" };
+
+/** No languages: a catalogue that offers none. */
+const NO_LANGUAGES: readonly StoryLanguage[] = [];
 
 /** The home. */
 const HOME: Page = { kind: "home" };
@@ -137,22 +146,34 @@ const pageOf = (story: string | null, component: string | null): Page => {
   return HOME;
 };
 
-/** The current address. */
-const readAddress = (): Address => {
+/**
+ * The current address.
+ *
+ * @param switches - the catalogue's switches, for the view's values.
+ */
+const readAddress = (switches: readonly ViewSwitch[]): Address => {
   const params = new URLSearchParams(window.location.search);
   const story = params.get("story");
   const component = params.get("component");
   return {
     page: pageOf(story, component),
-    view: parseView(window.location.search),
+    view: parseView(window.location.search, switches),
     panelArgs: parsePanelArgsParam(params.get("args")),
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== "")
   };
 };
 
-/** The query of an address. */
-const addressQuery = ({ page, view, panelArgs, matrix }: Address): string => {
-  const params = viewParams(view);
+/**
+ * The query of an address.
+ *
+ * @param address - the page, the view, the panel's values and the matrix's axes.
+ * @param switches - the catalogue's switches, for the view's values.
+ */
+const addressQuery = (
+  { page, view, panelArgs, matrix }: Address,
+  switches: readonly ViewSwitch[]
+): string => {
+  const params = viewParams(view, switches);
   if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
   const args = page.kind === "story" ? panelArgsParam(panelArgs) : "";
@@ -361,18 +382,18 @@ type AddressState = {
 };
 
 /** The address, read again when the history goes back or forth. */
-const useAddress = (): AddressState => {
-  const [address, setAddress] = useState<Address>(readAddress);
+const useAddress = (switches: readonly ViewSwitch[]): AddressState => {
+  const [address, setAddress] = useState<Address>(() => readAddress(switches));
   const [visit, setVisit] = useState<PageVisit>(() => visitOf(address, false));
   useEffect(() => {
     const onBack = (): void => {
-      const next = readAddress();
+      const next = readAddress(switches);
       setAddress(next);
       setVisit(visitOf(next, true));
     };
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
-  }, []);
+  }, [switches]);
   // a height set with the foot handle belongs to the story it was set on: another page starts at its own (D-515)
   const pageAddress = (page: Page): Address => ({
     page,
@@ -386,12 +407,12 @@ const useAddress = (): AddressState => {
     pageAddress,
     openPage: (page: Page): void => {
       const next = pageAddress(page);
-      window.history.pushState(null, "", addressQuery(next));
+      window.history.pushState(null, "", addressQuery(next, switches));
       setAddress(next);
       setVisit(visitOf(next, false));
     },
     replaceAddress: (next: Address): void => {
-      window.history.replaceState(null, "", addressQuery(next));
+      window.history.replaceState(null, "", addressQuery(next, switches));
       setAddress(next);
     }
   };
@@ -408,7 +429,8 @@ export const Shell = ({
   heights,
   sources,
   frameUrl,
-  languages = []
+  languages = NO_LANGUAGES,
+  switches: declaredSwitches
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const {
@@ -417,7 +439,12 @@ export const Shell = ({
     isOpen: isSidebarOpen,
     setIsOpen: setIsSidebarOpen
   } = useSidebarLayout();
-  const { address, visit, pageAddress, openPage, replaceAddress } = useAddress();
+  const switches = useMemo(
+    () =>
+      catalogueSwitches(declaredSwitches, [...languages, ...sources.flatMap((each) => each.languages ?? [])]),
+    [declaredSwitches, languages, sources]
+  );
+  const { address, visit, pageAddress, openPage, replaceAddress } = useAddress(switches);
   // each page's last scroll position, kept across the component pages and the stage
   const scrollPositions = useRef(new Map<string, number>());
   const scroll: PageScroll = { visit, positions: scrollPositions.current };
@@ -447,7 +474,6 @@ export const Shell = ({
 
   const source = sources.find((candidate) => candidate.id === location?.source.id);
   const files = source === undefined ? undefined : sourceFiles(source);
-  const shownLanguages = storyLanguages(languages, source?.languages ?? []);
   const header = (
     <ShellHeader
       problems={tree.problems}
@@ -468,7 +494,7 @@ export const Shell = ({
       related={
         <RelatedLinks
           related={relatedComponents(tree, location)}
-          hrefOf={(page: Page): string => addressQuery(pageAddress(page))}
+          hrefOf={(page: Page): string => addressQuery(pageAddress(page), switches)}
           onOpen={openPage}
         />
       }
@@ -476,96 +502,101 @@ export const Shell = ({
   );
 
   return (
-    <div className="catalogue">
-      <Sidebar
-        width={sidebarWidth}
-        isOpen={isSidebarOpen}
-        onHide={(): void => setIsSidebarOpen(false)}
-        title={title}
-        logo={logo}
-        tree={tree}
-        isHome={shown.kind === "home"}
-        homeHref={addressQuery(pageAddress(HOME))}
-        onOpenHome={(): void => openPage(HOME)}
-        current={sidebarCurrent(location, shownStoryId)}
-        componentHref={(sourceId: string, componentTitle: string): string =>
-          addressQuery(pageAddress(componentPage(sourceId, componentTitle)))
-        }
-        onOpenComponent={(sourceId: string, componentTitle: string): void =>
-          openPage(componentPage(sourceId, componentTitle))
-        }
-      />
-      {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
-      <main className="forgebook-main">
-        <ShellBar
+    <SwitchesContext.Provider value={switches}>
+      <div className="catalogue">
+        <Sidebar
+          width={sidebarWidth}
+          isOpen={isSidebarOpen}
+          onHide={(): void => setIsSidebarOpen(false)}
+          title={title}
+          logo={logo}
+          tree={tree}
           isHome={shown.kind === "home"}
-          view={address.view}
-          onViewChange={changeView}
-          isStoryPage={shown.kind === "story"}
-          onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
-          languages={shownLanguages}
-          shownWidth={shown.kind === "story" ? shownWidth : undefined}
+          homeHref={addressQuery(pageAddress(HOME), switches)}
+          onOpenHome={(): void => openPage(HOME)}
+          current={sidebarCurrent(location, shownStoryId)}
+          componentHref={(sourceId: string, componentTitle: string): string =>
+            addressQuery(pageAddress(componentPage(sourceId, componentTitle)), switches)
+          }
+          onOpenComponent={(sourceId: string, componentTitle: string): void =>
+            openPage(componentPage(sourceId, componentTitle))
+          }
         />
-        {shown.kind === "home" ? (
-          <HomePage
-            title={title}
-            tree={tree}
-            sources={sources}
-            recent={recent}
-            hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page))}
-            onOpen={(page: RecentPage): void => openPage(page)}
-            header={header}
-          />
-        ) : null}
-        {shown.kind === "component" ? (
-          <ComponentPage
-            component={shown.location.component}
-            view={address.view}
-            frameUrl={frameUrl}
-            hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)))}
-            onOpen={(story: TreeStory): void => openPage(storyPage(story))}
-            loadDocs={files?.docs[shown.location.component.file]}
-            loadCode={files?.code[shown.location.component.file]}
-            loadPage={files?.pages[shown.location.component.file]}
-            background={storyBackground(shown.location.source.background, address.view, isSystemDark)}
-            heightOf={(storyId: string): number | undefined =>
-              knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH))
-            }
-            header={header}
-            scroll={scroll}
-          />
-        ) : null}
-        {shown.kind === "story" ? (
-          <Stage
-            component={shown.location.component}
-            story={shown.location.story}
+        {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
+        <main className="forgebook-main">
+          <ShellBar
+            isHome={shown.kind === "home"}
             view={address.view}
             onViewChange={changeView}
-            panelArgs={address.panelArgs}
-            onPanelArgsChange={(panelArgs: PanelArgs): void => replaceAddress({ ...address, panelArgs })}
-            matrixAxes={address.matrix}
-            onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
-            frameUrl={frameUrl}
-            loadCode={files?.code[shown.location.component.file]}
-            loadDocs={files?.docs[shown.location.component.file]}
-            languages={shownLanguages}
-            namedValues={source?.namedValues}
-            header={header}
-            onShownWidthChange={setShownWidth}
-            scroll={scroll}
-            backgroundOf={(
-              view: Pick<ViewState, "theme" | "isMoreContrast" | "backdrop">
-            ): string | undefined => storyBackground(shown.location.source.background, view, isSystemDark)}
-            measuredHeight={stageHeight(
-              storyHeights,
-              shown.location.story.id,
-              address.view.width,
-              shownWidth
-            )}
+            isStoryPage={shown.kind === "story"}
+            onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
+            shownWidth={shown.kind === "story" ? shownWidth : undefined}
           />
-        ) : null}
-        {shown.kind === "missing" ? header : null}
-      </main>
-    </div>
+          {shown.kind === "home" ? (
+            <HomePage
+              title={title}
+              tree={tree}
+              sources={sources}
+              recent={recent}
+              hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
+              onOpen={(page: RecentPage): void => openPage(page)}
+              header={header}
+            />
+          ) : null}
+          {shown.kind === "component" ? (
+            <ComponentPage
+              component={shown.location.component}
+              view={address.view}
+              frameUrl={frameUrl}
+              hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches)}
+              onOpen={(story: TreeStory): void => openPage(storyPage(story))}
+              loadDocs={files?.docs[shown.location.component.file]}
+              loadCode={files?.code[shown.location.component.file]}
+              loadPage={files?.pages[shown.location.component.file]}
+              background={storyBackground(
+                shown.location.source.background,
+                address.view,
+                switches,
+                isSystemDark
+              )}
+              heightOf={(storyId: string): number | undefined =>
+                knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH))
+              }
+              header={header}
+              scroll={scroll}
+            />
+          ) : null}
+          {shown.kind === "story" ? (
+            <Stage
+              component={shown.location.component}
+              story={shown.location.story}
+              view={address.view}
+              onViewChange={changeView}
+              panelArgs={address.panelArgs}
+              onPanelArgsChange={(panelArgs: PanelArgs): void => replaceAddress({ ...address, panelArgs })}
+              matrixAxes={address.matrix}
+              onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
+              frameUrl={frameUrl}
+              loadCode={files?.code[shown.location.component.file]}
+              loadDocs={files?.docs[shown.location.component.file]}
+              namedValues={source?.namedValues}
+              header={header}
+              onShownWidthChange={setShownWidth}
+              scroll={scroll}
+              backgroundOf={(view: Pick<ViewState, "switches" | "backdrop">): string | undefined =>
+                storyBackground(shown.location.source.background, view, switches, isSystemDark)
+              }
+              measuredHeight={stageHeight(
+                storyHeights,
+                shown.location.story.id,
+                address.view.width,
+                shownWidth
+              )}
+            />
+          ) : null}
+          {shown.kind === "missing" ? header : null}
+        </main>
+      </div>
+    </SwitchesContext.Provider>
   );
 };

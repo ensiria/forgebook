@@ -56,7 +56,7 @@ const inProviders = (drawing: StoryDrawing, story: ReactNode): ReactNode => {
 /**
  * What a render and a decorator receive.
  *
- * @param drawing - the story's args, texts and clock.
+ * @param drawing - the story's args, texts, clock and switches' values.
  * @param canvasOf - the element the story is drawn in, read only when a story asks for it: on the server there is
  *   none, and a story that reads it there fails as it would in a page rendered on the server.
  */
@@ -65,6 +65,7 @@ const contextOf = (drawing: StoryDrawing, canvasOf: () => HTMLElement): StoryCon
   step: untracedStep,
   text: storyTextOf(drawing.texts),
   clock: drawing.clock,
+  globals: drawing.globals,
   get canvasElement(): HTMLElement {
     return canvasOf();
   }
@@ -118,8 +119,8 @@ export const reactRenderer: StoryRenderer = {
     draw();
     return {
       drawn,
-      update: (args: LoadedArgs): void => {
-        drawing = { ...drawing, args };
+      update: (next: StoryDrawing): void => {
+        drawing = next;
         draw();
       },
       unmount: (): void => root.unmount()

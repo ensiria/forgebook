@@ -11,7 +11,6 @@
  * @module
  */
 
-import type { StoryLanguage } from "@forgebook/story-format/source";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { matrixOf, matrixProps } from "../matrix";
@@ -41,6 +40,7 @@ import { MatrixPicker } from "./MatrixPicker";
 import { StageTools } from "./StageTools";
 import { StageViewport } from "./StageViewport";
 import { STRINGS } from "./strings";
+import { useSwitches } from "./switchesContext";
 import { useComponentDocs } from "./useComponentDocs";
 import { useCopy } from "./useCopy";
 import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages";
@@ -80,8 +80,6 @@ export type StageProps = {
   readonly loadDocs: (() => Promise<unknown>) | undefined;
   /** The values the story's source names for types the panel cannot write (icons). */
   readonly namedValues: NamedValues | undefined;
-  /** The story's languages, for the compare view's language mode. */
-  readonly languages: readonly StoryLanguage[];
   /** What stays above the story while it scrolls: the component's header. */
   readonly header: ReactNode;
   /** Called with the width the story really has, for the toolbar's width field. */
@@ -92,9 +90,7 @@ export type StageProps = {
    * The colour the story's page has in a view (its source's, or the backdrop's when the view draws one), which its
    * box waits on; none without one.
    */
-  readonly backgroundOf: (
-    view: Pick<ViewState, "theme" | "isMoreContrast" | "backdrop">
-  ) => string | undefined;
+  readonly backgroundOf: (view: Pick<ViewState, "switches" | "backdrop">) => string | undefined;
   /** Where its scrolling part starts: the shell's visit of the page and every page's last position. */
   readonly scroll: PageScroll;
 };
@@ -170,7 +166,6 @@ export const Stage = ({
   frameUrl,
   loadCode,
   loadDocs,
-  languages,
   namedValues,
   header,
   onShownWidthChange,
@@ -191,7 +186,8 @@ export const Stage = ({
   const [calls, setCalls] = useState<readonly EventCall[]>([]);
   // each story's play trace, by story: a trace belongs to the story that played
   const [traces, setTraces] = useState<ReadonlyMap<string, PlayTrace>>(new Map());
-  const storyCheck = useStoryCheck(frameRef, frameAddress(frameUrl, story.id, view));
+  const switches = useSwitches();
+  const storyCheck = useStoryCheck(frameRef, frameAddress(frameUrl, story.id, view, switches));
   const eventNames = useMemo(
     () =>
       docs.status === "ready"
@@ -254,11 +250,13 @@ export const Stage = ({
   const canReplay = replayable === story.id && !isComparing(view);
   // the compare view's frames each run their own clock from the start, so no one control drives them all
   const hasClock = clocked === story.id && !isComparing(view);
-  // the frame loads again only for another story, style sheets or language; the rest of the view is sent live
+  // the frame loads again only for another story or style sheets; the rest of the view (the switches, the language
+  // among them) is sent live
   const address = frameAddress(
     frameUrl,
     story.id,
-    useLoadedView(`${story.id}|${view.sheets}|${view.language}`, view)
+    useLoadedView(`${story.id}|${view.sheets}`, view),
+    switches
   );
   useLiveView(storyRef, view, !isComparing(view));
   useScrollMemory(storyRef, scroll);
@@ -325,7 +323,7 @@ export const Stage = ({
               <CopyIdButton storyId={story.id} />
               <a
                 className="forgebook-button forgebook-button--icon"
-                href={frameAddress(frameUrl, story.id, view)}
+                href={frameAddress(frameUrl, story.id, view, switches)}
                 target="_blank"
                 rel="noopener"
                 title={STRINGS.openFrame}
@@ -336,17 +334,17 @@ export const Stage = ({
             </div>
             {isComparing(view) ? (
               <div className="forgebook-compare">
-                {compareVariants(view.compare, languages).map((variant) => (
+                {compareVariants(view.compare, switches).map((variant) => (
                   <figure
                     key={variant.label}
                     className="forgebook-compare__cell"
                     // the label (the shell's text) reads on the page's colour; the frame draws the backdrop
-                    style={{ backgroundColor: backgroundOf({ ...view, ...variant.view, backdrop: "plain" }) }}
+                    style={{ backgroundColor: backgroundOf({ ...variant.viewOf(view), backdrop: "plain" }) }}
                   >
                     <figcaption className="forgebook-compare__label">{variant.label}</figcaption>
                     <FrameView
                       title={`${title} · ${variant.label}`}
-                      address={frameAddress(frameUrl, story.id, { ...view, ...variant.view })}
+                      address={frameAddress(frameUrl, story.id, variant.viewOf(view), switches)}
                       heights={heights}
                       settled={settled}
                       fallbackHeight={lastHeight}

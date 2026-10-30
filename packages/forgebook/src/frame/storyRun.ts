@@ -61,6 +61,8 @@ export type StoryRunOptions = {
   readonly texts: StoryTextTable;
   /** The shown language's provider around the story; none for the stories' own text. */
   readonly wrap: StoryDrawing["wrap"];
+  /** The values of the switches applied by code, by id. */
+  readonly globals: StoryDrawing["globals"];
   /** The panel's values as the story takes them (a named value turned back into the value). */
   readonly resolveArgs: (args: PanelArgs) => Readonly<Record<string, unknown>>;
   /**
@@ -99,15 +101,27 @@ const errorElement = (document: Document, error: Error): HTMLElement => {
   return box;
 };
 
+/** What the frame changes in a running story when the shell sends a new view: no new mount, the story keeps its state. */
+export type RunningStory = {
+  /**
+   * Draws the story in another language, or with other values of the switches applied by code.
+   *
+   * @param shown - the texts and the provider of the language now shown, and the switches' values.
+   */
+  readonly setShown: (shown: Pick<StoryDrawing, "texts" | "wrap" | "globals">) => void;
+};
+
 /**
  * Runs a story in its container.
  *
  * @param options - the story, its framework, its clock, texts and language, and what to tell the shell.
+ * @returns what the frame can change while it runs.
  */
-export const runStory = (options: StoryRunOptions): void => {
-  const { container, story, renderer, clock, texts, wrap } = options;
+export const runStory = (options: StoryRunOptions): RunningStory => {
+  const { container, story, renderer, clock } = options;
   const document = container.ownerDocument;
-  const text = storyTextOf(texts);
+  let { texts, wrap, globals } = options;
+  let text = storyTextOf(texts);
   let args: LoadedArgs = story.args;
   let eventNames: readonly string[] = [];
   let matrix: Matrix | undefined;
@@ -137,7 +151,8 @@ export const runStory = (options: StoryRunOptions): void => {
     args: { ...shownArgs(), ...values },
     texts,
     clock,
-    wrap
+    wrap,
+    globals
   });
 
   const clearError = (): void => {
@@ -199,7 +214,7 @@ export const runStory = (options: StoryRunOptions): void => {
   // new args (the panel, Replay, the events) draw the story again: a value that made it throw can be changed back
   const redraw = (): void => {
     clearError();
-    for (const { story: each, values } of mounted) each.update(drawing(values).args);
+    for (const { story: each, values } of mounted) each.update(drawing(values));
   };
 
   const mountMatrix = (axes: Matrix): void => {
@@ -223,7 +238,7 @@ export const runStory = (options: StoryRunOptions): void => {
       // a failed play still ends the wait; its rejection reaches the page as an error the tests record
       void playStory(
         story.play,
-        { args: shownArgs(), canvasElement: canvas, text, clock },
+        { args: shownArgs(), canvasElement: canvas, text, clock, globals },
         (): void => {
           if (hasPlayed) return;
           hasPlayed = true;
@@ -243,4 +258,11 @@ export const runStory = (options: StoryRunOptions): void => {
   };
 
   mountStory();
+  return {
+    setShown: (shown: Pick<StoryDrawing, "texts" | "wrap" | "globals">): void => {
+      ({ texts, wrap, globals } = shown);
+      text = storyTextOf(texts);
+      redraw();
+    }
+  };
 };

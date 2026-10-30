@@ -15,17 +15,7 @@ import { isViolation, type Violation } from "./a11y";
 import { isMatrix, type Matrix } from "./matrix";
 import { isPlayTrace, type PlayTrace } from "./playTrace";
 import { type ClockState, isClockRate } from "./storyClock";
-import {
-  BACKDROP_CHOICES,
-  type LiveView,
-  MEASURE_TOOLS,
-  type MeasureTool,
-  MOTION_CHOICES,
-  PRESS_CHOICES,
-  SPEED_CHOICES,
-  TEXT_SCALES,
-  THEME_CHOICES
-} from "./viewState";
+import { BACKDROP_CHOICES, type LiveView, MEASURE_TOOLS, type MeasureTool, TEXT_SCALES } from "./viewState";
 
 /** An arg the props panel can show and set: what crosses between the documents as is. */
 export type ArgValue = string | number | boolean | null | NamedArg;
@@ -164,7 +154,7 @@ export type ShellMessage =
   | {
       /** The view's live part changed: the frame applies it on its root, without loading again. */
       readonly type: "forgebook:view";
-      /** The theme, contrast, motion, speed, press feedback, backdrop and text size. */
+      /** The switches' values, the backdrop and the text size. */
       readonly view: LiveView;
     };
 
@@ -195,11 +185,8 @@ export const isNamedArg = (value: unknown): value is NamedArg =>
 /** Whether a value is the view's live part. */
 const isLiveView = (value: unknown): value is LiveView =>
   isRecord(value) &&
-  THEME_CHOICES.some((theme) => theme === value["theme"]) &&
-  typeof value["isMoreContrast"] === "boolean" &&
-  MOTION_CHOICES.some((motion) => motion === value["motion"]) &&
-  SPEED_CHOICES.some((speed) => speed === value["speed"]) &&
-  PRESS_CHOICES.some((press) => press === value["press"]) &&
+  isRecord(value["switches"]) &&
+  Object.values(value["switches"]).every((switchValue) => typeof switchValue === "string") &&
   BACKDROP_CHOICES.some((backdrop) => backdrop === value["backdrop"]) &&
   TEXT_SCALES.some((text) => text === value["text"]);
 

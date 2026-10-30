@@ -28,6 +28,7 @@ const elementOf = (drawing: StoryDrawing, canvas: HTMLElement): HTMLElement => {
     step: untracedStep,
     text: storyTextOf(drawing.texts),
     clock: drawing.clock,
+    globals: drawing.globals,
     canvasElement: canvas
   };
   const drawn: unknown = drawing.story.render?.(drawing.args, context);
@@ -55,8 +56,8 @@ export const domRenderer: StoryRenderer = {
     draw();
     return {
       drawn,
-      update: (args: LoadedArgs): void => {
-        drawing = { ...drawing, args };
+      update: (next: StoryDrawing): void => {
+        drawing = next;
         draw();
       },
       unmount: (): void => canvas.replaceChildren()

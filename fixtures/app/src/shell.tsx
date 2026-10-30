@@ -9,6 +9,7 @@ import { mountShell } from "forgebook/shell";
 
 import { LANGUAGES } from "./languages";
 import logoUrl from "./logo.svg?url";
+import { SWITCHES } from "./switches";
 
 const root = document.getElementById("root");
 if (root !== null)
@@ -20,5 +21,6 @@ if (root !== null)
     sources: [source],
     frameUrl: "frame.html",
     languages: LANGUAGES,
+    switches: SWITCHES,
     codeOf: storyJsx
   });

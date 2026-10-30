@@ -32,6 +32,8 @@ export type StoryDrawing = {
   readonly clock: StoryClock;
   /** The shown language's provider around the story; none for the stories' own text. */
   readonly wrap: StoryLanguage["wrap"] | undefined;
+  /** The values of the switches applied by code, by id: the story's `context.globals`. */
+  readonly globals: Readonly<Record<string, string>>;
 };
 
 /** What the frame keeps of a story drawn in a canvas. */
@@ -41,8 +43,11 @@ export type MountedStory = {
    * story throws while it is first drawn (the error goes to `onError` instead).
    */
   readonly drawn: Promise<void>;
-  /** Draws the story again with other args, keeping its state; a story that threw is tried again. */
-  readonly update: (args: LoadedArgs) => void;
+  /**
+   * Draws the story again, keeping its state: other args, other switch values, another language; a story that threw
+   * is tried again.
+   */
+  readonly update: (drawing: StoryDrawing) => void;
   /** Takes the story away from its canvas. */
   readonly unmount: () => void;
 };

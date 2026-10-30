@@ -54,7 +54,7 @@ describe("isOverlayChecked", () => {
   it("leaves out a view with the structure sheets only, where a library's surfaces are bare and unsized", () => {
     expect(isOverlayChecked({ sheets: "structure" })).toBe(false);
     expect(isOverlayChecked({})).toBe(true);
-    expect(isOverlayChecked({ sheets: "full", theme: "dark" })).toBe(true);
+    expect(isOverlayChecked({ sheets: "full", switches: { theme: "dark" } })).toBe(true);
     expect(isOverlayChecked({ sheets: "restyled" })).toBe(true);
   });
 });

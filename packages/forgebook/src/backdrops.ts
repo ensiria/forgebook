@@ -257,19 +257,21 @@ const bodyRule = (selector: string, look: BackdropLook): string =>
  *
  * @remarks
  * The rule sits on `body`, where the sources set their page colour, and wins over it with `!important`, so the
- * story's own elements keep every colour they set. The dark look follows the theme the frame's root names
- * (`data-theme`, none for the system's); with forced colours the sheet draws nothing.
+ * story's own elements keep every colour they set. The dark look follows the scheme the view draws in (its colour
+ * scheme switch's, `switches.ts`), the system's preference for `system`; with forced colours the sheet draws nothing.
  *
  * @param backdrop - the backdrop.
+ * @param scheme - the scheme the story is drawn in.
  * @returns the CSS; empty for `plain`.
  */
-export const backdropSheet = (backdrop: BackdropChoice): string => {
+export const backdropSheet = (backdrop: BackdropChoice, scheme: "light" | "dark" | "system"): string => {
   if (backdrop === "plain") return "";
   const { light, dark } = BACKDROPS[backdrop];
-  if (light === dark) return `@media (forced-colors: none) { ${bodyRule("body", light)} }`;
+  if (light === dark || scheme === "light")
+    return `@media (forced-colors: none) { ${bodyRule("body", light)} }`;
+  if (scheme === "dark") return `@media (forced-colors: none) { ${bodyRule("body", dark)} }`;
   return [
-    `@media (forced-colors: none) { ${bodyRule("body", light)} ${bodyRule(':root[data-theme="dark"] body', dark)} }`,
-    "@media (forced-colors: none) and (prefers-color-scheme: dark) { " +
-      `${bodyRule(":root:not([data-theme]) body", dark)} }`
+    `@media (forced-colors: none) { ${bodyRule("body", light)} }`,
+    `@media (forced-colors: none) and (prefers-color-scheme: dark) { ${bodyRule("body", dark)} }`
   ].join("\n");
 };

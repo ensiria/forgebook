@@ -12,7 +12,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
 import { AXE_TAGS, type Violation } from "forgebook/a11y";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
-import { frameAddress, parseView } from "forgebook/view-state";
+import { frameAddressOf } from "forgebook/view-state";
 
 import type { ShotStatus, StoryShot } from "./storyShot.types.ts";
 
@@ -42,10 +42,8 @@ export type ShotRequest = {
  * @param view - the view as the catalogue's address writes it.
  */
 export const shotAddress = (catalogue: string, story: string, view: string): string =>
-  new URL(
-    frameAddress("frame.html", story, parseView(view)),
-    catalogue.endsWith("/") ? catalogue : `${catalogue}/`
-  ).href;
+  new URL(frameAddressOf("frame.html", story, view), catalogue.endsWith("/") ? catalogue : `${catalogue}/`)
+    .href;
 
 /**
  * Opens a story's frame, waits for it, and reports what it shows.

@@ -6,15 +6,7 @@
  */
 import type { StoryGroup } from "@forgebook/story-format/csf";
 
-import type {
-  BackdropChoice,
-  MotionChoice,
-  PressChoice,
-  SheetsChoice,
-  SpeedChoice,
-  TextScale,
-  ThemeChoice
-} from "../viewState";
+import type { BackdropChoice, SheetsChoice, TextScale } from "../viewState";
 
 /** The shell's texts. */
 export const STRINGS = {
@@ -31,30 +23,8 @@ export const STRINGS = {
   aliasHint: (place: string): string => `Lives in ${place}: listed here too`,
   alsoIn: (places: string): string => `also listed in ${places}`,
   related: "Related",
-  themeGroup: "Theme",
-  themes: { light: "Light", dark: "Dark", system: "System" } satisfies Record<ThemeChoice, string>,
-  moreContrast: "More contrast",
   view: "View",
   viewChanged: "A view setting is changed",
-  motion: "Motion",
-  motions: {
-    system: "System",
-    all: "All",
-    feedback: "Feedback",
-    essential: "Essential",
-    reduced: "Reduced",
-    off: "Off"
-  } satisfies Record<MotionChoice, string>,
-  speed: "Speed",
-  speeds: { slow: "Slow", normal: "Normal", fast: "Fast" } satisfies Record<SpeedChoice, string>,
-  press: "Press",
-  presses: {
-    default: "Default",
-    shrink: "Shrink",
-    darken: "Darken",
-    darkenWithoutHover: "Darken, no hover",
-    off: "Off"
-  } satisfies Record<PressChoice, string>,
   backdrop: "Background",
   backdrops: {
     plain: "Plain",
@@ -71,25 +41,14 @@ export const STRINGS = {
   >,
   text: "Text",
   textScale: (scale: TextScale): string => `${scale}%`,
-  language: "Language",
-  storiesLanguage: "Stories' own",
   resetView: "Reset to defaults",
   viewInAddress: "Saved in the address",
   compare: "Compare",
-  compareModes: {
-    off: "Off",
-    theme: "Themes and contrast",
-    language: "Languages",
-    text: "Text sizes",
-    sheets: "Styles"
-  },
-  compareThemes: {
-    light: "Light",
-    dark: "Dark",
-    lightMore: "Light · more contrast",
-    darkMore: "Dark · more contrast"
-  },
-  compareNoLanguages: "The story's source offers no language",
+  compareOff: "Off",
+  compareText: "Text sizes",
+  compareSheets: "Styles",
+  compareOf: (labels: readonly string[]): string => labels.join(" × "),
+  compareCell: (labels: readonly string[]): string => labels.join(" · "),
   width: "Width",
   widthFill: "Fill",
   widthPx: (width: number): string => `${width}`,

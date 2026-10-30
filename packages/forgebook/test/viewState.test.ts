@@ -1,107 +1,170 @@
 /**
- * Tests for the view in the address.
+ * Tests for the view in the address, over a Kaji-like library's switches.
  *
  * @module
  */
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_VIEW, frameAddress, hasViewChanges, parseView, viewParams } from "../src/viewState";
+import type { ViewSwitch } from "../src/switches";
+import {
+  codeGlobalsOf,
+  DEFAULT_VIEW,
+  defaultView,
+  frameAddress,
+  hasViewChanges,
+  isMoreContrastOf,
+  languageOf,
+  parseView,
+  schemeOf,
+  type ViewState,
+  viewParams
+} from "../src/viewState";
+import { FIXTURE_SWITCHES } from "./fixtureSwitches";
+
+/** The fixture's switches, read from and written to an address. */
+const SWITCHES: readonly ViewSwitch[] = FIXTURE_SWITCHES;
+
+/** The view without any change. */
+const DEFAULTS: ViewState = defaultView(SWITCHES);
+
+/**
+ * A view with some switches set.
+ *
+ * @param values - the switches' values.
+ * @param rest - the rest of the view.
+ */
+const withSwitches = (
+  values: Readonly<Record<string, string>>,
+  rest: Partial<ViewState> = {}
+): ViewState => ({
+  ...DEFAULTS,
+  ...rest,
+  switches: { ...DEFAULTS.switches, ...values }
+});
 
 describe("the view in the address", () => {
   it("reads every switch, and the defaults for anything missing or invalid", () => {
     expect(
       parseView(
-        "?theme=dark&contrast=more&motion=reduced&speed=slow&press=darken&sheets=structure&text=125&lang=pseudo&compare=1"
+        "?theme=dark&contrast=more&motion=reduced&speed=slow&press=darken&sheets=structure&text=125&lang=pseudo&compare=1",
+        SWITCHES
       )
-    ).toEqual({
-      theme: "dark",
-      isMoreContrast: true,
-      motion: "reduced",
-      speed: "slow",
-      press: "darken",
-      backdrop: "plain",
-      sheets: "structure",
-      text: 125,
-      language: "pseudo",
-      compare: "theme",
-      width: "fill",
-      height: "auto",
-      isPanelOpen: true,
-      panelTab: "props",
-      zoom: 100,
-      tools: []
+    ).toEqual(
+      withSwitches(
+        {
+          theme: "dark",
+          contrast: "more",
+          motion: "reduced",
+          speed: "slow",
+          press: "darken",
+          lang: "pseudo"
+        },
+        { sheets: "structure", text: 125, compare: ["theme", "contrast"] }
+      )
+    );
+    expect(parseView("?theme=purple&text=110&motion=fast", SWITCHES)).toEqual(DEFAULTS);
+    expect(DEFAULTS.switches).toEqual({
+      theme: "light",
+      contrast: "standard",
+      motion: "system",
+      speed: "normal",
+      press: "default",
+      lang: ""
     });
-    expect(parseView("?theme=purple&text=110")).toEqual(DEFAULT_VIEW);
   });
 
-  it("writes only what differs from the defaults, and reads back the same view", () => {
-    expect(viewParams(DEFAULT_VIEW).toString()).toBe("");
-    const view = {
-      ...DEFAULT_VIEW,
-      motion: "essential",
-      speed: "fast",
-      text: 150,
-      language: "pseudo"
-    } as const;
-    expect(viewParams(view).toString()).toBe("motion=essential&speed=fast&text=150&lang=pseudo");
-    expect(parseView(viewParams(view).toString())).toEqual(view);
+  it("writes only what differs from the defaults, the language last, and reads back the same view", () => {
+    expect(viewParams(DEFAULTS, SWITCHES).toString()).toBe("");
+    const view = withSwitches({ motion: "all", speed: "fast", lang: "pseudo" }, { text: 150 });
+    expect(viewParams(view, SWITCHES).toString()).toBe("motion=all&speed=fast&text=150&lang=pseudo");
+    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
   });
 
-  it("marks the View menu when motion, speed, style sheets, text size or language changed, not theme or contrast", () => {
-    expect(hasViewChanges({ ...DEFAULT_VIEW, theme: "dark", isMoreContrast: true })).toBe(false);
-    expect(hasViewChanges({ ...DEFAULT_VIEW, speed: "slow" })).toBe(true);
-    expect(hasViewChanges({ ...DEFAULT_VIEW, sheets: "restyled" })).toBe(true);
-    expect(hasViewChanges({ ...DEFAULT_VIEW, language: "pseudo" })).toBe(true);
+  it("marks the View menu when a menu switch, the style sheets or the text size changed, not the theme or contrast", () => {
+    expect(hasViewChanges(withSwitches({ theme: "dark", contrast: "more" }), SWITCHES)).toBe(false);
+    expect(hasViewChanges(withSwitches({ speed: "slow" }), SWITCHES)).toBe(true);
+    expect(hasViewChanges(withSwitches({}, { sheets: "restyled" }), SWITCHES)).toBe(true);
+    expect(hasViewChanges(withSwitches({ lang: "pseudo" }), SWITCHES)).toBe(true);
   });
 
   it("gives a frame the story and the view, never what only the shell reads", () => {
     expect(
-      frameAddress("frame.html", "kit:a-b--c", {
-        ...DEFAULT_VIEW,
-        theme: "dark",
-        compare: "language",
-        width: 560,
-        height: 320,
-        isPanelOpen: false,
-        panelTab: "code",
-        zoom: 200,
-        tools: ["grid"]
-      })
+      frameAddress(
+        "frame.html",
+        "kit:a-b--c",
+        withSwitches(
+          { theme: "dark" },
+          {
+            compare: ["lang"],
+            width: 560,
+            height: 320,
+            isPanelOpen: false,
+            panelTab: "code",
+            zoom: 200,
+            tools: ["grid"]
+          }
+        ),
+        SWITCHES
+      )
     ).toBe("frame.html?theme=dark&story=kit%3Aa-b--c");
   });
 
   it("keeps the stage's width and the closed panel, and reads a width out of range as the whole stage", () => {
-    const view = { ...DEFAULT_VIEW, width: 560, isPanelOpen: false, panelTab: "a11y" } as const;
-    expect(viewParams(view).toString()).toBe("width=560&panel=closed&tab=a11y");
-    expect(parseView(viewParams(view).toString())).toEqual(view);
-    expect(parseView("?width=12").width).toBe("fill");
-    expect(parseView("?width=500.5").width).toBe("fill");
-    expect(parseView("?width=wide").width).toBe("fill");
+    const view = withSwitches({}, { width: 560, isPanelOpen: false, panelTab: "a11y" });
+    expect(viewParams(view, SWITCHES).toString()).toBe("width=560&panel=closed&tab=a11y");
+    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
+    expect(parseView("?width=12", SWITCHES).width).toBe("fill");
+    expect(parseView("?width=500.5", SWITCHES).width).toBe("fill");
+    expect(parseView("?width=wide", SWITCHES).width).toBe("fill");
   });
 
   it("keeps the story's height from the foot handle, and reads one out of range as the story's own (note 142)", () => {
-    const view = { ...DEFAULT_VIEW, width: 560, height: 320 } as const;
-    expect(viewParams(view).toString()).toBe("width=560&height=320");
-    expect(parseView(viewParams(view).toString())).toEqual(view);
-    expect(parseView("?height=12").height).toBe("auto");
-    expect(parseView("?height=99999").height).toBe("auto");
-    expect(parseView("?height=tall").height).toBe("auto");
+    const view = withSwitches({}, { width: 560, height: 320 });
+    expect(viewParams(view, SWITCHES).toString()).toBe("width=560&height=320");
+    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
+    expect(parseView("?height=12", SWITCHES).height).toBe("auto");
+    expect(parseView("?height=99999", SWITCHES).height).toBe("auto");
+    expect(parseView("?height=tall", SWITCHES).height).toBe("auto");
   });
 
-  it("reads every compare mode, and 1, the older form, as the themes", () => {
-    expect(parseView("?compare=text").compare).toBe("text");
-    expect(parseView("?compare=1").compare).toBe("theme");
-    expect(parseView("?compare=sideways").compare).toBe("off");
-    expect(viewParams({ ...DEFAULT_VIEW, compare: "sheets" }).toString()).toBe("compare=sheets");
+  it("reads the compared axes: switches, text or sheets, two at most, and the older names", () => {
+    expect(parseView("?compare=text", SWITCHES).compare).toEqual(["text"]);
+    expect(parseView("?compare=motion,speed,press", SWITCHES).compare).toEqual(["motion", "speed"]);
+    expect(parseView("?compare=1", SWITCHES).compare).toEqual(["theme", "contrast"]);
+    expect(parseView("?compare=theme", SWITCHES).compare).toEqual(["theme", "contrast"]);
+    expect(parseView("?compare=language", SWITCHES).compare).toEqual(["lang"]);
+    expect(parseView("?compare=sideways", SWITCHES).compare).toEqual([]);
+    expect(viewParams(withSwitches({}, { compare: ["sheets"] }), SWITCHES).toString()).toBe("compare=sheets");
   });
 
   it("keeps the zoom and the tools, in the tools' order, leaving out unknown ones", () => {
-    const view = { ...DEFAULT_VIEW, zoom: 150, tools: ["outline", "measure"] } as const;
-    expect(viewParams(view).toString()).toBe("zoom=150&tools=outline%2Cmeasure");
-    expect(parseView(viewParams(view).toString())).toEqual(view);
-    expect(parseView("?tools=measure,ruler,outline&zoom=300")).toMatchObject({
+    const view = withSwitches({}, { zoom: 150, tools: ["outline", "measure"] });
+    expect(viewParams(view, SWITCHES).toString()).toBe("zoom=150&tools=outline%2Cmeasure");
+    expect(parseView(viewParams(view, SWITCHES).toString(), SWITCHES)).toEqual(view);
+    expect(parseView("?tools=measure,ruler,outline&zoom=300", SWITCHES)).toMatchObject({
       tools: ["outline", "measure"],
       zoom: 100
+    });
+  });
+});
+
+describe("what the catalogue reads of the switches", () => {
+  it("reads the scheme, the contrast and the language from their roles", () => {
+    const view = withSwitches({ theme: "system", contrast: "more", lang: "pseudo" });
+    expect(schemeOf(view, SWITCHES)).toBe("system");
+    expect(isMoreContrastOf(view, SWITCHES)).toBe(true);
+    expect(languageOf(view, SWITCHES)).toBe("pseudo");
+  });
+
+  it("draws light at the standard contrast in a catalogue without those switches", () => {
+    expect(schemeOf(DEFAULT_VIEW, [])).toBe("light");
+    expect(isMoreContrastOf(DEFAULT_VIEW, [])).toBe(false);
+    expect(languageOf(DEFAULT_VIEW, [])).toBe("");
+  });
+
+  it("hands the story the switches applied by code: the language here", () => {
+    expect(codeGlobalsOf(withSwitches({ theme: "dark", lang: "pseudo" }), SWITCHES)).toEqual({
+      lang: "pseudo"
     });
   });
 });

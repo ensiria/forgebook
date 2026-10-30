@@ -43,14 +43,12 @@ export const useLiveView = (
   view: ViewState,
   isEnabled: boolean
 ): void => {
-  const { theme, isMoreContrast, motion, speed, press, backdrop, text } = view;
+  // a view changed elsewhere (the width, the panel) keeps its switches' object, so it sends nothing
+  const { switches, backdrop, text } = view;
   useEffect(() => {
     if (!isEnabled) return;
-    tellFrames(container.current, {
-      type: "forgebook:view",
-      view: { theme, isMoreContrast, motion, speed, press, backdrop, text }
-    });
-  }, [container, theme, isMoreContrast, motion, speed, press, backdrop, text, isEnabled]);
+    tellFrames(container.current, { type: "forgebook:view", view: { switches, backdrop, text } });
+  }, [container, switches, backdrop, text, isEnabled]);
   // the tools draw over every frame, the compare view's too
   const tools = view.tools.join(",");
   useEffect(() => {

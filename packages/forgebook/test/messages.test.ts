@@ -42,18 +42,14 @@ describe("messages", () => {
     expect(isShellMessage({ type: "forgebook:events", names: ["onValueChange"] })).toBe(true);
     expect(isShellMessage({ type: "forgebook:events", names: [1] })).toBe(false);
     const view = {
-      theme: "dark",
-      isMoreContrast: true,
-      motion: "reduced",
-      speed: "slow",
-      press: "off",
-      backdrop: "plain",
+      switches: { theme: "dark", contrast: "more", motion: "reduced" },
+      backdrop: "checkerboard",
       text: 125
     };
     expect(isShellMessage({ type: "forgebook:view", view })).toBe(true);
-    expect(isShellMessage({ type: "forgebook:view", view: { ...view, theme: "purple" } })).toBe(false);
+    expect(isShellMessage({ type: "forgebook:view", view: { ...view, switches: { theme: 2 } } })).toBe(false);
     expect(isShellMessage({ type: "forgebook:view", view: { ...view, text: 110 } })).toBe(false);
-    expect(isShellMessage({ type: "forgebook:view", view: { ...view, speed: "reduced" } })).toBe(false);
+    expect(isShellMessage({ type: "forgebook:view", view: { ...view, switches: undefined } })).toBe(false);
     expect(isShellMessage({ type: "forgebook:check" })).toBe(true);
     expect(isShellMessage({ type: "forgebook:matrix", matrix: null })).toBe(true);
     expect(

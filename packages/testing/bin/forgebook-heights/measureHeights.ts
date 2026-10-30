@@ -15,7 +15,7 @@ import { type Browser, chromium, type Page } from "@playwright/test";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryHeights } from "forgebook/story-heights";
 import { STORY_IDS_ELEMENT } from "forgebook/story-ids-element";
-import { frameAddress, parseView } from "forgebook/view-state";
+import { frameAddressOf } from "forgebook/view-state";
 import { preview } from "vite";
 
 import type { HeightFailure } from "./measureHeights.types.ts";
@@ -146,7 +146,7 @@ const measureStory = async (
 ): Promise<readonly number[] | HeightFailure> => {
   const [first = WIDTH_RANGE.min] = widths;
   await page.setViewportSize({ width: first, height: VIEWPORT_HEIGHT });
-  await page.goto(new URL(frameAddress("frame.html", storyId, parseView("")), address).href);
+  await page.goto(new URL(frameAddressOf("frame.html", storyId, ""), address).href);
   const status = await page
     .waitForFunction(
       `document.documentElement.getAttribute(${JSON.stringify(STATUS_ATTRIBUTE)})`,

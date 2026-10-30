@@ -3,32 +3,16 @@
  * frames and the tests open the same address.
  *
  * @remarks
- * Only values that differ from the defaults are written; an unknown or invalid value reads as the default. The frame
- * turns the view into the attributes Kaji UI reads (`data-theme`, `data-contrast`, `data-motion-amount`,
- * `data-motion`, `data-press`), the style sheets,
- * the root font size and the backdrop Forgebook draws behind the story. The stage's width, height, zoom and tools and the panel (open, its tab) are the shell's alone: a frame's address leaves them
+ * Only values that differ from the defaults are written; an unknown or invalid value reads as the default. The view
+ * holds a value for each switch the catalogue declares (`switches.ts`: the theme, the contrast, the language, the
+ * library's own), which the frame applies on its root or hands the story; and Forgebook's own settings: the style
+ * sheets, the root font size and the backdrop Forgebook draws behind the story. The stage's width, height, zoom and tools and the panel (open, its tab) are the shell's alone: a frame's address leaves them
  * out. Pure.
  *
  * @module
  */
 
-/** The theme: a fixed scheme, or the system's. */
-export type ThemeChoice = "light" | "dark" | "system";
-
-/**
- * How much motion plays: the system's (no attribute), or one of `data-motion-amount`'s values, from everything to
- * nothing; `reduced` plays as the system's Reduce Motion does.
- */
-export type MotionChoice = "system" | "all" | "feedback" | "essential" | "reduced" | "off";
-
-/** How fast motion plays: one of `data-motion`'s values; `normal` writes no attribute. */
-export type SpeedChoice = "normal" | "slow" | "fast";
-
-/**
- * What a held-down control does: the library's own default (no attribute), or one of `data-press`'s values (D-582):
- * a shrink, a darker fill, a darker fill without a hover fill, or no press feedback.
- */
-export type PressChoice = "default" | "shrink" | "darken" | "darkenWithoutHover" | "off";
+import { switchValueOf, switchWithRole, type ViewSwitch } from "./switches";
 
 /**
  * What Forgebook draws behind the story, in place of its page's colour (D-644): the page's colour itself (`plain`,
@@ -51,10 +35,13 @@ export type SheetsChoice = "full" | "structure" | "restyled";
 export type TextScale = 100 | 125 | 150;
 
 /**
- * What the compare view sets side by side: the themes at both contrasts, the source's languages, the text sizes or
- * the style sheets; `off` shows the story once.
+ * What the compare view sets side by side: the values of one switch, or of two (the theme at both contrasts), or
+ * Forgebook's text sizes or style sheets; none shows the story once. Each is a switch's id, `text` or `sheets`.
  */
-export type CompareMode = "off" | "theme" | "language" | "text" | "sheets";
+export type CompareAxes = readonly string[];
+
+/** Forgebook's own settings the compare view can set side by side. */
+export const OWN_COMPARE_AXES = ["text", "sheets"] as const;
 
 /** A tool drawn over the story: every element's outline, an 8 px grid, the box of the element under the pointer. */
 export type MeasureTool = "outline" | "grid" | "measure";
@@ -76,26 +63,16 @@ export type StageHeight = "auto" | number;
 
 /** Every switch of the toolbar. */
 export type ViewState = {
-  /** The theme. */
-  readonly theme: ThemeChoice;
-  /** Whether high contrast is on (`data-contrast="more"`); off is the standard level, not the system's. */
-  readonly isMoreContrast: boolean;
-  /** How much motion plays. */
-  readonly motion: MotionChoice;
-  /** How fast motion plays. */
-  readonly speed: SpeedChoice;
-  /** What a held-down control does. */
-  readonly press: PressChoice;
+  /** Each declared switch's value, by the switch's id; a switch the address leaves out has its default. */
+  readonly switches: Readonly<Record<string, string>>;
   /** What is drawn behind the story. */
   readonly backdrop: BackdropChoice;
   /** The style sheets. */
   readonly sheets: SheetsChoice;
   /** The text size. */
   readonly text: TextScale;
-  /** The id of one of the source's languages; empty for the stories' own text. */
-  readonly language: string;
-  /** What the stage compares side by side: nothing, or the story across one switch's values. */
-  readonly compare: CompareMode;
+  /** What the stage compares side by side: nothing (empty), or the story across one or two switches' values. */
+  readonly compare: CompareAxes;
   /** The story's width on the stage. */
   readonly width: StageWidth;
   /** The story's height on the stage. */
@@ -111,23 +88,15 @@ export type ViewState = {
 };
 
 /** The part of the view a frame applies on its root without loading again, so the story keeps its state. */
-export type LiveView = Pick<
-  ViewState,
-  "theme" | "isMoreContrast" | "motion" | "speed" | "press" | "backdrop" | "text"
->;
+export type LiveView = Pick<ViewState, "switches" | "backdrop" | "text">;
 
 /** The view without any change. */
 export const DEFAULT_VIEW: ViewState = {
-  theme: "light",
-  isMoreContrast: false,
-  motion: "system",
-  speed: "normal",
-  press: "default",
+  switches: {},
   backdrop: "plain",
   sheets: "full",
   text: 100,
-  language: "",
-  compare: "off",
+  compare: [],
   width: "fill",
   height: "auto",
   isPanelOpen: true,
@@ -135,31 +104,6 @@ export const DEFAULT_VIEW: ViewState = {
   zoom: 100,
   tools: []
 };
-
-/** Every value of each choice, in the toolbar's order. */
-export const THEME_CHOICES: readonly ThemeChoice[] = ["light", "dark", "system"];
-
-/** Every motion amount, in the menu's order. */
-export const MOTION_CHOICES: readonly MotionChoice[] = [
-  "system",
-  "all",
-  "feedback",
-  "essential",
-  "reduced",
-  "off"
-];
-
-/** Every speed, in the menu's order. */
-export const SPEED_CHOICES: readonly SpeedChoice[] = ["slow", "normal", "fast"];
-
-/** Every press feedback, in the menu's order. */
-export const PRESS_CHOICES: readonly PressChoice[] = [
-  "default",
-  "shrink",
-  "darken",
-  "darkenWithoutHover",
-  "off"
-];
 
 /** Every backdrop, in the menu's order. */
 export const BACKDROP_CHOICES: readonly BackdropChoice[] = [
@@ -177,23 +121,12 @@ export const SHEETS_CHOICES: readonly SheetsChoice[] = ["full", "structure", "re
 /** Every text size, in the menu's order. */
 export const TEXT_SCALES: readonly TextScale[] = [100, 125, 150];
 
-/** Every compare mode, in the menu's order. */
-export const COMPARE_MODES: readonly CompareMode[] = ["off", "theme", "language", "text", "sheets"];
-
-/**
- * The compare mode a parameter names: `1`, the form older addresses wrote, is the themes.
- *
- * @param value - the `compare` parameter.
- */
-const compareMode = (value: string | null): CompareMode =>
-  value === "1" ? "theme" : choice(value, COMPARE_MODES, DEFAULT_VIEW.compare);
-
 /**
  * Whether the stage compares the story across a switch's values.
  *
  * @param view - the view.
  */
-export const isComparing = (view: ViewState): boolean => view.compare !== "off";
+export const isComparing = (view: ViewState): boolean => view.compare.length > 0;
 
 /** Every zoom, in the menu's order. */
 export const ZOOMS: readonly Zoom[] = [50, 75, 100, 125, 150, 200];
@@ -254,24 +187,58 @@ const choice = <TChoice extends string | number>(
 ): TChoice => choices.find((option) => String(option) === value) ?? fallback;
 
 /**
+ * Each declared switch's value an address names, the default for one it leaves out or names wrongly.
+ *
+ * @param params - the address's parameters.
+ * @param switches - the declared switches.
+ */
+const switchValuesOf = (
+  params: URLSearchParams,
+  switches: readonly ViewSwitch[]
+): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    switches.map((each) => [
+      each.id,
+      switchValueOf(each, params.get(each.id) ?? undefined)?.value ?? each.default
+    ])
+  );
+
+/**
+ * The compared axes a `compare` parameter names: one or two switch ids, `text` or `sheets`. `theme` (and `1`, the form
+ * older addresses wrote) is the colour scheme at both contrasts, `language` the language switch, as the toolbar
+ * named them before switches were declared.
+ *
+ * @param value - the parameter.
+ * @param switches - the declared switches.
+ */
+const compareAxesOf = (value: string | null, switches: readonly ViewSwitch[]): CompareAxes => {
+  if (value === null || value === "") return [];
+  const scheme = switchWithRole(switches, "colorScheme");
+  const contrast = switchWithRole(switches, "contrast");
+  const legacy: Readonly<Record<string, readonly (string | undefined)[]>> = {
+    "1": [scheme?.id, contrast?.id],
+    theme: [scheme?.id, contrast?.id],
+    language: [switchWithRole(switches, "language")?.id]
+  };
+  const named = legacy[value] ?? value.split(",");
+  const known = [...switches.map((each) => each.id), ...OWN_COMPARE_AXES];
+  return named.filter((axis): axis is string => axis !== undefined && known.includes(axis)).slice(0, 2);
+};
+
+/**
  * The view a URL's query describes.
  *
  * @param search - the query (`?theme=dark&motion=reduced`), with or without `?`.
+ * @param switches - the catalogue's switches.
  */
-export const parseView = (search: string): ViewState => {
+export const parseView = (search: string, switches: readonly ViewSwitch[]): ViewState => {
   const params = new URLSearchParams(search);
   return {
-    theme: choice(params.get("theme"), THEME_CHOICES, DEFAULT_VIEW.theme),
-    isMoreContrast: params.get("contrast") === "more",
-    motion: choice(params.get("motion"), MOTION_CHOICES, DEFAULT_VIEW.motion),
-    speed: choice(params.get("speed"), SPEED_CHOICES, DEFAULT_VIEW.speed),
-    press: choice(params.get("press"), PRESS_CHOICES, DEFAULT_VIEW.press),
+    switches: switchValuesOf(params, switches),
     backdrop: choice(params.get("backdrop"), BACKDROP_CHOICES, DEFAULT_VIEW.backdrop),
     sheets: choice(params.get("sheets"), SHEETS_CHOICES, DEFAULT_VIEW.sheets),
     text: choice(params.get("text"), TEXT_SCALES, DEFAULT_VIEW.text),
-    // checked against the story's source by the frame: an id it does not offer draws the stories' own text
-    language: params.get("lang") ?? DEFAULT_VIEW.language,
-    compare: compareMode(params.get("compare")),
+    compare: compareAxesOf(params.get("compare"), switches),
     width: stageWidth(params.get("width")),
     height: stageHeight(params.get("height")),
     isPanelOpen: params.get("panel") !== "closed",
@@ -281,18 +248,37 @@ export const parseView = (search: string): ViewState => {
   };
 };
 
-/** The parameters a frame's document reads: only what differs from the defaults. */
-const frameParams = (view: ViewState): URLSearchParams => {
+/**
+ * The view without any change, for a catalogue's switches.
+ *
+ * @param switches - the catalogue's switches.
+ */
+export const defaultView = (switches: readonly ViewSwitch[]): ViewState => parseView("", switches);
+
+/**
+ * Whether a switch's value in a view is its default (a switch the view does not hold counts as its default).
+ *
+ * @param view - the view.
+ * @param each - the switch.
+ */
+const isDefault = (view: Pick<ViewState, "switches">, each: ViewSwitch): boolean =>
+  (view.switches[each.id] ?? each.default) === each.default;
+
+/**
+ * The parameters a frame's document reads, only what differs from the defaults: the switches in their declared
+ * order, then Forgebook's own settings, then the language.
+ */
+const frameParams = (view: ViewState, switches: readonly ViewSwitch[]): URLSearchParams => {
   const params = new URLSearchParams();
-  if (view.theme !== DEFAULT_VIEW.theme) params.set("theme", view.theme);
-  if (view.isMoreContrast) params.set("contrast", "more");
-  if (view.motion !== DEFAULT_VIEW.motion) params.set("motion", view.motion);
-  if (view.speed !== DEFAULT_VIEW.speed) params.set("speed", view.speed);
-  if (view.press !== DEFAULT_VIEW.press) params.set("press", view.press);
+  const language = switchWithRole(switches, "language");
+  const setSwitch = (each: ViewSwitch): void => {
+    if (!isDefault(view, each)) params.set(each.id, view.switches[each.id] ?? each.default);
+  };
+  for (const each of switches) if (each !== language) setSwitch(each);
   if (view.backdrop !== DEFAULT_VIEW.backdrop) params.set("backdrop", view.backdrop);
   if (view.sheets !== DEFAULT_VIEW.sheets) params.set("sheets", view.sheets);
   if (view.text !== DEFAULT_VIEW.text) params.set("text", String(view.text));
-  if (view.language !== DEFAULT_VIEW.language) params.set("lang", view.language);
+  if (language !== undefined) setSwitch(language);
   return params;
 };
 
@@ -300,11 +286,12 @@ const frameParams = (view: ViewState): URLSearchParams => {
  * The query parameters of a view: only what differs from the defaults.
  *
  * @param view - the view.
+ * @param switches - the catalogue's switches.
  * @returns the parameters, in a stable order.
  */
-export const viewParams = (view: ViewState): URLSearchParams => {
-  const params = frameParams(view);
-  if (view.compare !== DEFAULT_VIEW.compare) params.set("compare", view.compare);
+export const viewParams = (view: ViewState, switches: readonly ViewSwitch[]): URLSearchParams => {
+  const params = frameParams(view, switches);
+  if (isComparing(view)) params.set("compare", view.compare.join(","));
   if (view.width !== DEFAULT_VIEW.width) params.set("width", String(view.width));
   if (view.height !== DEFAULT_VIEW.height) params.set("height", String(view.height));
   if (!view.isPanelOpen) params.set("panel", "closed");
@@ -315,19 +302,25 @@ export const viewParams = (view: ViewState): URLSearchParams => {
 };
 
 /**
- * Whether one of the View menu's settings (motion, speed, press, background, style sheets, text size, language) is
- * changed: the menu button then shows a dot, so a view is never left changed by mistake.
+ * Whether one of the View menu's settings is changed (a switch the toolbar does not show itself, the background,
+ * the style sheets, the text size): the menu button then shows a dot, so a view is never left changed by mistake.
  *
  * @param view - the view.
+ * @param switches - the catalogue's switches.
  */
-export const hasViewChanges = (view: ViewState): boolean =>
-  view.motion !== DEFAULT_VIEW.motion ||
-  view.speed !== DEFAULT_VIEW.speed ||
-  view.press !== DEFAULT_VIEW.press ||
+export const hasViewChanges = (view: ViewState, switches: readonly ViewSwitch[]): boolean =>
+  switches.some((each) => isMenuSwitch(each) && !isDefault(view, each)) ||
   view.backdrop !== DEFAULT_VIEW.backdrop ||
   view.sheets !== DEFAULT_VIEW.sheets ||
-  view.text !== DEFAULT_VIEW.text ||
-  view.language !== DEFAULT_VIEW.language;
+  view.text !== DEFAULT_VIEW.text;
+
+/**
+ * Whether a switch sits in the View menu: every one but the colour scheme and the contrast, which the toolbar shows.
+ *
+ * @param each - the switch.
+ */
+export const isMenuSwitch = (each: ViewSwitch): boolean =>
+  each.role !== "colorScheme" && each.role !== "contrast";
 
 /**
  * The address of a story's frame.
@@ -335,9 +328,15 @@ export const hasViewChanges = (view: ViewState): boolean =>
  * @param frameUrl - the frame page (`frame.html`).
  * @param id - the story's id.
  * @param view - the view; what only the shell reads (compare, the stage's width, the panel) is left out.
+ * @param switches - the catalogue's switches.
  */
-export const frameAddress = (frameUrl: string, id: string, view: ViewState): string => {
-  const params = frameParams(view);
+export const frameAddress = (
+  frameUrl: string,
+  id: string,
+  view: ViewState,
+  switches: readonly ViewSwitch[]
+): string => {
+  const params = frameParams(view, switches);
   params.set("story", id);
   return `${frameUrl}?${params.toString()}`;
 };
@@ -348,11 +347,94 @@ export const frameAddress = (frameUrl: string, id: string, view: ViewState): str
  * @param view - the view.
  */
 export const liveView = (view: ViewState): LiveView => ({
-  theme: view.theme,
-  isMoreContrast: view.isMoreContrast,
-  motion: view.motion,
-  speed: view.speed,
-  press: view.press,
+  switches: view.switches,
   backdrop: view.backdrop,
   text: view.text
 });
+
+/**
+ * The scheme a view draws in: its colour scheme switch's, light when the catalogue has none.
+ *
+ * @param view - the view's switches.
+ * @param switches - the catalogue's switches.
+ */
+export const schemeOf = (
+  view: Pick<ViewState, "switches">,
+  switches: readonly ViewSwitch[]
+): "light" | "dark" | "system" => {
+  const scheme = switchWithRole(switches, "colorScheme");
+  if (scheme === undefined) return "light";
+  return switchValueOf(scheme, view.switches[scheme.id])?.scheme ?? "light";
+};
+
+/**
+ * Whether a view draws in the higher contrast: its contrast switch's value says so; never without one.
+ *
+ * @param view - the view's switches.
+ * @param switches - the catalogue's switches.
+ */
+export const isMoreContrastOf = (
+  view: Pick<ViewState, "switches">,
+  switches: readonly ViewSwitch[]
+): boolean => {
+  const contrast = switchWithRole(switches, "contrast");
+  if (contrast === undefined) return false;
+  return switchValueOf(contrast, view.switches[contrast.id])?.isMore === true;
+};
+
+/**
+ * The language a view shows: the language switch's value, empty for the stories' own text.
+ *
+ * @param view - the view's switches.
+ * @param switches - the catalogue's switches.
+ */
+export const languageOf = (view: Pick<ViewState, "switches">, switches: readonly ViewSwitch[]): string => {
+  const language = switchWithRole(switches, "language");
+  return language === undefined ? "" : (view.switches[language.id] ?? language.default);
+};
+
+/**
+ * The values of the switches applied by code, by id: what the story reads as `context.globals`.
+ *
+ * @param view - the view's switches.
+ * @param switches - the catalogue's switches.
+ */
+export const codeGlobalsOf = (
+  view: Pick<ViewState, "switches">,
+  switches: readonly ViewSwitch[]
+): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    switches
+      .filter((each) => each.apply.kind === "code")
+      .map((each) => [each.id, view.switches[each.id] ?? each.default])
+  );
+
+/** The parameters only the shell reads: a frame's address leaves them out. */
+const SHELL_PARAMETERS = [
+  "compare",
+  "width",
+  "height",
+  "panel",
+  "tab",
+  "zoom",
+  "tools",
+  "args",
+  "matrix",
+  "component"
+];
+
+/**
+ * The address of a story's frame from a catalogue's address query, for a tool that does not know the catalogue's
+ * switches (`forgebook-shot`): every parameter but the shell's own is kept as written.
+ *
+ * @param frameUrl - the frame page (`frame.html`).
+ * @param id - the story's id.
+ * @param search - the catalogue's query (`theme=dark&lang=it`), with or without `?`.
+ */
+export const frameAddressOf = (frameUrl: string, id: string, search: string): string => {
+  const params = new URLSearchParams(search);
+  for (const name of SHELL_PARAMETERS) params.delete(name);
+  params.delete("story");
+  params.set("story", id);
+  return `${frameUrl}?${params.toString()}`;
+};

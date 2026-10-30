@@ -9,7 +9,7 @@ import { heldStoryClock } from "@forgebook/story-format/clock";
 import type { StoryDrawing } from "forgebook/renderer";
 import { type LoadedStory, readStory } from "forgebook/story-module";
 import { type ReactNode, useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { reactRenderer } from "../src/reactRenderer";
 import { useStoryText } from "../src/texts";
@@ -48,11 +48,9 @@ const drawing = (args: Record<string, unknown>, wrap?: StoryDrawing["wrap"]): St
   args,
   texts: { hello: "Ciao" },
   clock: heldStoryClock(0),
-  wrap
+  wrap,
+  globals: {}
 });
-
-/** Lets React commit what it was asked to draw. */
-const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("reactRenderer", () => {
   it("renders a story on the server inside its language and with its texts", () => {
@@ -69,10 +67,10 @@ describe("reactRenderer", () => {
     const mounted = reactRenderer.mount(canvas, drawing({ name: "Ada" }), () => undefined);
     await mounted.drawn;
     canvas.querySelector("button")?.click();
-    await settle();
-    mounted.update({ name: "Grace" });
-    await settle();
-    expect(canvas.textContent).toBe("Ciao Grace 1");
+    // React commits when it schedules: each step waits for what it should show, not for a fixed time
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Ada 1"));
+    mounted.update(drawing({ name: "Grace" }));
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Grace 1"));
     mounted.unmount();
     expect(canvas.textContent).toBe("");
   });
@@ -85,12 +83,10 @@ describe("reactRenderer", () => {
       errors.push(error.message)
     );
     await mounted.drawn;
-    mounted.update({ name: "boom" });
-    await settle();
-    expect(errors).toEqual(["No greeting for boom"]);
+    mounted.update(drawing({ name: "boom" }));
+    await vi.waitFor(() => expect(errors).toEqual(["No greeting for boom"]));
     expect(canvas.textContent).toBe("");
-    mounted.update({ name: "Ada" });
-    await settle();
-    expect(canvas.textContent).toContain("Ciao Ada");
+    mounted.update(drawing({ name: "Ada" }));
+    await vi.waitFor(() => expect(canvas.textContent).toContain("Ciao Ada"));
   });
 });

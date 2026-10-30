@@ -20,7 +20,8 @@ import { AXE_TAGS } from "forgebook/a11y";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import { heldClockAddress } from "forgebook/story-clock";
 import { storyLocations, storyTree } from "forgebook/story-tree";
-import { DEFAULT_VIEW, frameAddress, type ViewState } from "forgebook/view-state";
+import { DEFAULT_SWITCHES, switchWithRole, type ViewSwitch } from "forgebook/switches";
+import { defaultView, frameAddress, type ViewState } from "forgebook/view-state";
 
 import { findOverlaysPastFrame, isOverlayChecked } from "./overlays";
 import { findSpills } from "./spills";
@@ -30,7 +31,10 @@ import { indexedSource, type StoryFilesOptions } from "./storyFiles";
 export type StoryVariant = {
   /** The variant's name, in the test's title and the reference image's name. */
   readonly name: string;
-  /** The switches it sets over the defaults; never the backdrop: every test draws the story on its page's colour. */
+  /**
+   * What it sets over the defaults: switches' values, the style sheets, the text size; never the backdrop, since
+   * every test draws the story on its page's colour.
+   */
   readonly view: Partial<Omit<ViewState, "backdrop">>;
   /** The frame's width in CSS px; the test browser's default when none. */
   readonly width?: number;
@@ -39,21 +43,48 @@ export type StoryVariant = {
 /** The narrow variant's width: about the catalogue's stage beside the props panel in a laptop window, in CSS px. */
 export const NARROW_WIDTH = 560;
 
-/** The variants every story is tested in: the four themes, the structure only, and a narrow frame. */
-export const STORY_VARIANTS: readonly StoryVariant[] = [
-  { name: "light", view: { theme: "light" } },
-  { name: "dark", view: { theme: "dark" } },
-  { name: "light-more", view: { theme: "light", isMoreContrast: true } },
-  { name: "dark-more", view: { theme: "dark", isMoreContrast: true } },
-  { name: "structure", view: { theme: "light", sheets: "structure" } },
-  { name: "narrow", view: { theme: "light" }, width: NARROW_WIDTH }
-];
+/**
+ * The variants every story is tested in, from the catalogue's switches: each scheme of its colour scheme switch (the
+ * system's left out, it draws one of them), each at more contrast when it has a contrast switch (`dark-more`), then the
+ * first scheme with the structure only, and in a narrow frame.
+ *
+ * @param switches - the catalogue's switches.
+ */
+export const storyVariants = (switches: readonly ViewSwitch[]): StoryVariant[] => {
+  const scheme = switchWithRole(switches, "colorScheme");
+  const contrast = switchWithRole(switches, "contrast");
+  const more = contrast?.values.find((value) => value.isMore === true);
+  const schemes = (scheme?.values ?? []).filter((value) => value.isUnset !== true);
+  const schemeView = (value: string | undefined): Readonly<Record<string, string>> =>
+    scheme === undefined || value === undefined ? {} : { [scheme.id]: value };
+  const first = schemeView(schemes[0]?.value);
+  const named = schemes.length > 0 ? schemes : [undefined];
+  return [
+    ...named.map((value) => ({
+      name: value?.value ?? "default",
+      view: { switches: schemeView(value?.value) }
+    })),
+    ...(contrast === undefined || more === undefined
+      ? []
+      : named.map((value) => ({
+          name: `${value?.value ?? "default"}-more`,
+          view: { switches: { ...schemeView(value?.value), [contrast.id]: more.value } }
+        }))),
+    { name: "structure", view: { switches: first, sheets: "structure" } },
+    { name: "narrow", view: { switches: first }, width: NARROW_WIDTH }
+  ];
+};
+
+/** The variants of a catalogue with the default switches: light, dark, both at more contrast, structure, narrow. */
+export const STORY_VARIANTS: readonly StoryVariant[] = storyVariants(DEFAULT_SWITCHES);
 
 /** The generated tests' options. */
 export type StoryBrowserTestsOptions = StoryFilesOptions & {
   /** The frame page, relative to the test's `baseURL`; `frame.html` by default. */
   readonly frameUrl?: string;
-  /** The variants; `STORY_VARIANTS` by default. */
+  /** The catalogue's switches, as the frame page's configuration gives them; the theme and the contrast by default. */
+  readonly switches?: readonly ViewSwitch[];
+  /** The variants; `storyVariants` of the switches by default. */
   readonly variants?: readonly StoryVariant[];
   /** Compare each frame with its reference image instead of running the checks; `false` by default. */
   readonly screenshot?: boolean;
@@ -93,7 +124,9 @@ const overlayProblems = async (
  * the source's own.
  */
 export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
-  const { frameUrl = "frame.html", variants = STORY_VARIANTS, screenshot = false, check } = options;
+  const { frameUrl = "frame.html", switches = DEFAULT_SWITCHES, screenshot = false, check } = options;
+  const variants = options.variants ?? storyVariants(switches);
+  const defaults = defaultView(switches);
   const tree = storyTree([indexedSource(options)]);
   const groups = Map.groupBy(storyLocations(tree), (location) => location.component.title);
   for (const [title, locations] of groups) {
@@ -110,8 +143,13 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
               await page.setViewportSize({ width: variant.width, height: 800 });
             // a Live story is checked and pictured at its start: its clock held, so its image never changes (D-504);
             // always on its page's own colour, whatever a variant names: a backdrop is for looking (D-644, D-653)
-            const view: ViewState = { ...DEFAULT_VIEW, ...variant.view, backdrop: "plain" };
-            await page.goto(heldClockAddress(frameAddress(frameUrl, story.id, view)));
+            const view: ViewState = {
+              ...defaults,
+              ...variant.view,
+              switches: { ...defaults.switches, ...variant.view.switches },
+              backdrop: "plain"
+            };
+            await page.goto(heldClockAddress(frameAddress(frameUrl, story.id, view, switches)));
             await expect(page.locator("html")).toHaveAttribute(STATUS_ATTRIBUTE, "ready");
             if (screenshot) {
               await expect(page).toHaveScreenshot(`${story.id.replace(":", "--")}--${variant.name}.png`, {

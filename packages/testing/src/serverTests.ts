@@ -75,7 +75,8 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
               texts,
               // a Live story renders at its start, as the frame's tests picture it (D-504)
               clock: heldFrameClock(loaded.clockStart ?? 0),
-              wrap: pass.render
+              wrap: pass.render,
+              globals: {}
             });
           }).not.toThrow();
           pass.check?.(html);

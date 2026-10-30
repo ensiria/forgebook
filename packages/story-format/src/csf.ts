@@ -127,6 +127,11 @@ export type StoryContext<TArgs> = {
    * the Unix epoch when the story declares no `parameters.clock` (D-504).
    */
   readonly clock: StoryClock;
+  /**
+   * The values of the catalogue's switches applied by code, by the switch's id (CSF's name): what a decorator reads
+   * to pick a provider's theme, a density, a locale. Empty outside a catalogue.
+   */
+  readonly globals: Readonly<Record<string, string>>;
 };
 
 /** Wraps a story: a provider, a container of a given width. */

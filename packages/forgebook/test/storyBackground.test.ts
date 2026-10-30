@@ -6,32 +6,63 @@
 import { describe, expect, it } from "vitest";
 
 import { storyBackground } from "../src/storyBackground";
+import { DEFAULT_SWITCHES } from "../src/switches";
 
 const BACKGROUND = { light: "#fafafa", dark: "#111111", darkMore: "#000000" };
 
 describe("storyBackground", () => {
   it("takes the theme's colour, and the more-contrast one where the source gives it", () => {
     expect(
-      storyBackground(BACKGROUND, { theme: "light", isMoreContrast: false, backdrop: "plain" }, false)
+      storyBackground(
+        BACKGROUND,
+        { switches: { theme: "light", contrast: "standard" }, backdrop: "plain" },
+        DEFAULT_SWITCHES,
+        false
+      )
     ).toBe("#fafafa");
     expect(
-      storyBackground(BACKGROUND, { theme: "dark", isMoreContrast: true, backdrop: "plain" }, false)
+      storyBackground(
+        BACKGROUND,
+        { switches: { theme: "dark", contrast: "more" }, backdrop: "plain" },
+        DEFAULT_SWITCHES,
+        false
+      )
     ).toBe("#000000");
     // no lightMore: the light theme's colour
     expect(
-      storyBackground(BACKGROUND, { theme: "light", isMoreContrast: true, backdrop: "plain" }, false)
+      storyBackground(
+        BACKGROUND,
+        { switches: { theme: "light", contrast: "more" }, backdrop: "plain" },
+        DEFAULT_SWITCHES,
+        false
+      )
     ).toBe("#fafafa");
   });
 
   it("follows the system for the system theme, and has none for a source without colours", () => {
     expect(
-      storyBackground(BACKGROUND, { theme: "system", isMoreContrast: false, backdrop: "plain" }, true)
+      storyBackground(
+        BACKGROUND,
+        { switches: { theme: "system", contrast: "standard" }, backdrop: "plain" },
+        DEFAULT_SWITCHES,
+        true
+      )
     ).toBe("#111111");
     expect(
-      storyBackground(BACKGROUND, { theme: "system", isMoreContrast: false, backdrop: "plain" }, false)
+      storyBackground(
+        BACKGROUND,
+        { switches: { theme: "system", contrast: "standard" }, backdrop: "plain" },
+        DEFAULT_SWITCHES,
+        false
+      )
     ).toBe("#fafafa");
     expect(
-      storyBackground(undefined, { theme: "dark", isMoreContrast: false, backdrop: "plain" }, true)
+      storyBackground(
+        undefined,
+        { switches: { theme: "dark", contrast: "standard" }, backdrop: "plain" },
+        DEFAULT_SWITCHES,
+        true
+      )
     ).toBeUndefined();
   });
 });

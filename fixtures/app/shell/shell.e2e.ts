@@ -465,6 +465,26 @@ test.describe("the stage", () => {
     await expect(frameOf(page).locator("html")).toHaveAttribute("data-test-mark", "kept");
   });
 
+  test("a switch the catalogue declares sits in the View menu and reaches the frame live", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await frameOf(page)
+      .locator("html")
+      .evaluate((root) => root.setAttribute("data-test-mark", "kept"));
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    const motion = page.getByRole("group", { name: "Motion" });
+    await expect(motion.getByRole("radio")).toHaveCount(6);
+    await motion.getByRole("radio", { name: "Reduced" }).check({ force: true });
+    await expect(page).toHaveURL(/motion=reduced/);
+    await expect(frameOf(page).locator("html")).toHaveAttribute("data-motion-amount", "reduced");
+    await expect(frameOf(page).locator("html")).toHaveAttribute("data-test-mark", "kept");
+    // its unset value, the system's, writes nothing on the root
+    await motion.getByRole("radio", { name: "System" }).check({ force: true });
+    await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-motion-amount");
+  });
+
   test("the frame says it loads until its story is ready", async ({ page }) => {
     await page.goto(story("overview"));
     await frameStatus(page);
@@ -491,8 +511,8 @@ test.describe("the stage", () => {
     await expect(page.locator(".forgebook-compare__label")).toHaveText([
       "Light",
       "Dark",
-      "Light · more contrast",
-      "Dark · more contrast"
+      "Light · More contrast",
+      "Dark · More contrast"
     ]);
   });
 });
@@ -554,6 +574,19 @@ test.describe("the stories' texts", () => {
     await page.goto(story("in-row", "lang=pseudo"));
     await frameStatus(page);
     await expect(frameOf(page).locator("span").first()).toHaveText(/^\[Bîllîñg pérîöd·+\]$/);
+  });
+
+  test("another language draws the story without loading its frame again", async ({ page }) => {
+    await page.goto(story("in-row"));
+    await frameStatus(page);
+    await frameOf(page)
+      .locator("html")
+      .evaluate((root) => root.setAttribute("data-test-mark", "kept"));
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    await page.getByLabel("Language").selectOption("it");
+    await expect(page).toHaveURL(/lang=it/);
+    await expect(frameOf(page).locator("span").first()).toHaveText("Periodo di fatturazione");
+    await expect(frameOf(page).locator("html")).toHaveAttribute("data-test-mark", "kept");
   });
 
   test("an arg named by its key reaches the story in the chosen language, and the panel shows it with its key", async ({

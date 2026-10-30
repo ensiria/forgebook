@@ -50,7 +50,8 @@
     "./story-clock": "./src/storyClock.ts",
     "./story-texts": "./src/storyTexts.ts",
     "./vite/index-story-file": "./src/vite/indexStoryFile.ts",
-    "./vite/story-files-module": "./src/vite/storyFilesModule.ts"
+    "./vite/story-files-module": "./src/vite/storyFilesModule.ts",
+    "./switches": "./src/switches.ts"
   },
   "scripts": {
     "test": "vitest run",

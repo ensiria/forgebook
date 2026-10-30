@@ -8,25 +8,30 @@
 import type { StoryBackground } from "@forgebook/story-format/source";
 
 import { backdropColor } from "./backdrops";
-import type { ViewState } from "./viewState";
+import type { ViewSwitch } from "./switches";
+import { isMoreContrastOf, schemeOf, type ViewState } from "./viewState";
 
 /**
  * A source's page colour for a view, or the colour of the view's backdrop.
  *
  * @param background - the source's colours; none when it gives none.
- * @param view - the theme and the contrast the story is drawn in, and the backdrop behind it.
+ * @param view - the switches' values the story is drawn in, and the backdrop behind it.
+ * @param switches - the catalogue's switches, for its colour scheme and contrast.
  * @param isSystemDark - whether the system prefers dark, for the `system` theme.
  * @returns the CSS colour, or none when the source gives none.
  */
 export const storyBackground = (
   background: StoryBackground | undefined,
-  view: Pick<ViewState, "theme" | "isMoreContrast" | "backdrop">,
+  view: Pick<ViewState, "switches" | "backdrop">,
+  switches: readonly ViewSwitch[],
   isSystemDark: boolean
 ): string | undefined => {
-  const isDark = view.theme === "dark" || (view.theme === "system" && isSystemDark);
+  const scheme = schemeOf(view, switches);
+  const isDark = scheme === "dark" || (scheme === "system" && isSystemDark);
+  const isMoreContrast = isMoreContrastOf(view, switches);
   const backdrop = backdropColor(view.backdrop, isDark);
   if (backdrop !== undefined) return backdrop;
   if (background === undefined) return undefined;
-  if (isDark) return view.isMoreContrast ? (background.darkMore ?? background.dark) : background.dark;
-  return view.isMoreContrast ? (background.lightMore ?? background.light) : background.light;
+  if (isDark) return isMoreContrast ? (background.darkMore ?? background.dark) : background.dark;
+  return isMoreContrast ? (background.lightMore ?? background.light) : background.light;
 };

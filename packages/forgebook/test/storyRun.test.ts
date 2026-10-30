@@ -65,6 +65,7 @@ const run = async (
     clock: heldFrameClock(0),
     texts: {},
     wrap: undefined,
+    globals: {},
     resolveArgs: (args: PanelArgs): PanelArgs => args,
     onControlsReady: (controls: StoryControls): void => {
       reports.controls = controls;

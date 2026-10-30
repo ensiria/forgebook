@@ -17,6 +17,7 @@ import { type MouseEvent, type ReactNode, useId, useMemo, useRef, useState } fro
 import type { ComponentDocs } from "../componentDocs";
 import type { PanelArgs, ShellMessage } from "../messages";
 import { groupedStories, mainStory, type TreeComponent, type TreeStory } from "../storyTree";
+import type { ViewSwitch } from "../switches";
 import { frameAddress, liveView, type ViewState } from "../viewState";
 import { ApiReference } from "./ApiReference";
 import { CodeText } from "./CodeText";
@@ -27,6 +28,7 @@ import { PackageHtml } from "./PackageHtml";
 import { StageViewport } from "./StageViewport";
 import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock";
 import { STRINGS } from "./strings";
+import { useSwitches } from "./switchesContext";
 import { useComponentDocs } from "./useComponentDocs";
 import { useCopy } from "./useCopy";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages";
@@ -75,6 +77,8 @@ export type ComponentPageProps = {
 type ExampleContext = Pick<ComponentPageProps, "component" | "view" | "frameUrl" | "hrefOf" | "onOpen"> & {
   /** The view the frames loaded with. */
   readonly frameView: ViewState;
+  /** The catalogue's switches, for the frames' addresses. */
+  readonly switches: readonly ViewSwitch[];
   /** Each frame's reported height, by its address. */
   readonly heights: ReadonlyMap<string, number>;
   /** The addresses of the frames that finished loading. */
@@ -219,7 +223,7 @@ const Example = ({
             {isMounted ? (
               <FrameView
                 title={STRINGS.frameTitle(context.component.name, story.name)}
-                address={frameAddress(context.frameUrl, story.id, context.frameView)}
+                address={frameAddress(context.frameUrl, story.id, context.frameView, context.switches)}
                 heights={context.heights}
                 settled={context.settled}
                 fallbackHeight={fallbackHeight}
@@ -331,9 +335,10 @@ export const ComponentPage = ({
     () => component.stories.filter((story) => story.id !== demo?.id),
     [component, demo]
   );
-  // the frames keep the view they loaded with; only the style sheets or the language load them again, the rest of
-  // the view is sent to them live
-  const frameView = useLoadedView(`${view.sheets}|${view.language}`, view);
+  // the frames keep the view they loaded with; only the style sheets load them again, the rest of the view (the
+  // switches, the language among them) is sent to them live
+  const frameView = useLoadedView(view.sheets, view);
+  const switches = useSwitches();
   const exampleIds = useMemo(() => examples.map((story) => story.id), [examples]);
   const queue = useFrameQueue(exampleIds, pageRef);
   const { heights, settled } = useFrameMessages({
@@ -359,6 +364,7 @@ export const ComponentPage = ({
     hrefOf,
     onOpen,
     frameView,
+    switches,
     heights,
     settled,
     code,
