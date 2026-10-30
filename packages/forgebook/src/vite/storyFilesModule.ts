@@ -12,7 +12,7 @@
 import { globSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import type { StoryFileIndex } from "@ensiria/story-format/source";
+import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { indexStoryFile } from "./indexStoryFile.ts";
 

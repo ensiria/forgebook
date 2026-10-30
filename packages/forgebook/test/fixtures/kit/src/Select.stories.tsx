@@ -3,8 +3,8 @@
  *
  * @module
  */
-import type { Meta, Story, StoryContext } from "@ensiria/story-format/csf";
-import { storyText } from "@ensiria/story-format/texts";
+import type { Meta, Story, StoryContext } from "@forgebook/story-format/csf";
+import { storyText } from "@forgebook/story-format/texts";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 

@@ -11,7 +11,7 @@
  *
  * @module
  */
-import type { StepFunction, StoryContext } from "@ensiria/story-format/csf";
+import type { StepFunction, StoryContext } from "@forgebook/story-format/csf";
 
 import type { PlayStep, PlayTrace } from "../playTrace";
 import type { LoadedArgs, LoadedStory } from "./storyModule";

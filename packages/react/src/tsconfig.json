@@ -1,0 +1,11 @@
+// The React package's sources that run in a page: the renderer, the frame page and the code writer. `vite/` runs on
+// Node and has its own tsconfig.json.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": ["."],
+  "exclude": ["vite"]
+}

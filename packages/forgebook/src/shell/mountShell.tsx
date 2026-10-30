@@ -7,7 +7,15 @@ import "./shell.scss";
 
 import { createRoot } from "react-dom/client";
 
+import type { StoryCodeWriter } from "../frame/renderer";
+import { CodeWriterContext } from "./codeWriter";
 import { Shell, type ShellConfig } from "./Shell";
+
+/** What an app passes to the shell: the catalogue's configuration and the framework's code writer. */
+export type MountShellConfig = ShellConfig & {
+  /** Writes a story drawn from its args in the framework's code (`storyJsx` of `@forgebook/react`). */
+  readonly codeOf: StoryCodeWriter;
+};
 
 /**
  * The page's icon: the catalogue's logo, replacing any the page declares.
@@ -26,9 +34,14 @@ const setPageIcon = (logo: string): void => {
  * Shows the catalogue in the given element.
  *
  * @param container - the element the page renders into.
- * @param config - the catalogue's name, its logo, its sources and its frame page.
+ * @param config - the catalogue's name, its logo, its sources, its frame page and the framework's code writer.
  */
-export const mountShell = (container: HTMLElement, config: ShellConfig): void => {
+export const mountShell = (container: HTMLElement, config: MountShellConfig): void => {
   if (config.logo !== undefined) setPageIcon(config.logo);
-  createRoot(container).render(<Shell {...config} />);
+  const { codeOf, ...shell } = config;
+  createRoot(container).render(
+    <CodeWriterContext.Provider value={codeOf}>
+      <Shell {...shell} />
+    </CodeWriterContext.Provider>
+  );
 };

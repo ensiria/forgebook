@@ -1,0 +1,13 @@
+// Code that runs on Node: the Vite plugin, the commands, the test kit's server side. Run by Node with its types
+// stripped, so relative imports carry the `.ts` extension where Node runs a file directly.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["es2024"],
+    "types": ["node"],
+    // the bundler finds `./dates` as `dates.ts`; Node's own resolution would want the extension
+    "module": "preserve",
+    "moduleResolution": "bundler"
+  }
+}

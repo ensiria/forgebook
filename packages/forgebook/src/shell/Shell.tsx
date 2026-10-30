@@ -4,8 +4,9 @@
  *
  * @module
  */
+/* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
-import type { StoryLanguage, StorySource } from "@ensiria/story-format/source";
+import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { storyLanguages } from "../languages";

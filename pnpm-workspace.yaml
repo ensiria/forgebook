@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+  # the fixture package the extractor tests read and the React package's fixture app shows
+  - "packages/forgebook/test/fixtures/kit"
+  - "config/*"
+
+# cli-kit is not published yet: it comes from its local checkout until it is, and this line goes before the first
+# push (a link outside the repository is never published)
+overrides:
+  "@ensiria/cli-kit": "link:../cli-kit"

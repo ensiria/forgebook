@@ -1,6 +1,6 @@
 // The story format: types only, read by the packages that write stories and by the catalogue that shows them.
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@radar/typescript-config/react.json",
+  "extends": "@forgebook/typescript-config/react.json",
   "include": ["."]
 }

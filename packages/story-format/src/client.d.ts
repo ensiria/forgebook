@@ -1,6 +1,6 @@
 /**
  * The types of the `?forgebook-files` and `?forgebook-markdown` imports, for the module that declares a source: add
- * `@ensiria/story-format/client` to that folder's `compilerOptions.types`, beside `vite/client`.
+ * `@forgebook/story-format/client` to that folder's `compilerOptions.types`, beside `vite/client`.
  *
  * @remarks
  * A script, not a module (no top-level import or export), so the wildcard declaration is global; the catalogue's Vite

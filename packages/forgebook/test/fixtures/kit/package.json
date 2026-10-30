@@ -7,6 +7,13 @@
     "./utils/format-size": "./src/formatSize.ts",
     "./scss/ring": "./src/scss/_ring.scss",
     "./kit.css": "./src/kit.scss",
-    "./stories": "./stories.ts"
+    "./stories": "./stories.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
   }
 }

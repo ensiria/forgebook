@@ -1,5 +1,5 @@
 {
-  "name": "@ensiria/forgebook",
+  "name": "forgebook",
   "version": "0.0.0",
   "private": true,
   "description": "A catalogue for React components written as CSF stories: the story format, one frame per story, global switches for theme, contrast, motion and styles, a compare view, forced interaction states, replayable motion, a props panel from the components' types, and CATALOG.md.",
@@ -14,7 +14,7 @@
   "author": "Jason Scoppetta",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JasonScoppetta/dev-tooling.git",
+    "url": "git+https://github.com/Ensiria/forgebook.git",
     "directory": "packages/forgebook"
   },
   "type": "module",
@@ -24,32 +24,41 @@
   ],
   "bin": {
     "forgebook-docs": "./bin/forgebook-docs/forgebook-docs.mts",
-    "forgebook-heights": "./bin/forgebook-heights/forgebook-heights.mts",
-    "forgebook-shot": "./bin/forgebook-shot/forgebook-shot.mts",
     "forgebook-texts": "./bin/forgebook-texts/forgebook-texts.mts"
   },
   "exports": {
     "./story-tree": "./src/storyTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
-    "./frame": "./src/frame/mountFrame.tsx",
+    "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
-    "./testing/browser": "./src/testing/browserTests.ts",
-    "./testing/server": "./src/testing/serverTests.ts",
-    "./testing/story-files": "./src/testing/storyFiles.ts",
-    "./testing/playwright": "./src/testing/playwrightConfig.ts",
-    "./testing/vite": "./src/testing/testViteConfig.ts",
-    "./testing/visual-browser": "./src/testing/visualBrowser.ts",
-    "./testing/fonts.css": "./src/testing/fonts/fonts.css"
+    "./renderer": "./src/frame/renderer.ts",
+    "./story-module": "./src/frame/storyModule.ts",
+    "./messages": "./src/messages.ts",
+    "./component-docs": "./src/componentDocs.ts",
+    "./vite/adapter": "./src/vite/adapter.ts",
+    "./vite/docs-program": "./src/vite/docsProgram.ts",
+    "./vite/story-meta": "./src/vite/storyMeta.ts",
+    "./catalogue-docs": "./bin/forgebook-docs/collectDocs.ts",
+    "./catalogue-markdown": "./bin/forgebook-docs/catalogueMarkdown.ts",
+    "./a11y": "./src/a11y.ts",
+    "./frame-status": "./src/frame/frameStatus.ts",
+    "./story-heights": "./src/storyHeights.ts",
+    "./story-ids-element": "./src/storyIdsElement.ts",
+    "./view-state": "./src/viewState.ts",
+    "./frame-clock": "./src/frame/frameClock.ts",
+    "./source-files": "./src/sourceFiles.ts",
+    "./story-clock": "./src/storyClock.ts",
+    "./story-texts": "./src/storyTexts.ts",
+    "./vite/index-story-file": "./src/vite/indexStoryFile.ts",
+    "./vite/story-files-module": "./src/vite/storyFilesModule.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p src/testing && tsc -p bin && tsc -p test",
-    "test:shell": "playwright test -c test/shell/playwright.config.ts"
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p bin && tsc -p test"
   },
   "dependencies": {
-    "@axe-core/playwright": "4.14.0",
-    "@ensiria/cli-kit": "workspace:*",
-    "@ensiria/story-format": "workspace:*",
+    "@ensiria/cli-kit": "0.1.0",
+    "@forgebook/story-format": "workspace:*",
     "axe-core": "4.14.0",
     "highlight.js": "11.12.0",
     "lightningcss": "1.33.0",
@@ -59,16 +68,14 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "vite": "^8.0.0",
-    "@playwright/test": "^1.64.0",
-    "vitest": "^5.0.0"
+    "vite": "^8.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1",
-    "@radar/typescript-config": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "happy-dom": "21.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "sass-embedded": "1.106.1",

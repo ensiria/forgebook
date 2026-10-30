@@ -3,7 +3,7 @@
 // TypeScript service only finds files named tsconfig.json.
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@radar/typescript-config/react.json",
+  "extends": "@forgebook/typescript-config/react.json",
   "compilerOptions": {
     "types": ["vite/client"]
   },

@@ -9,8 +9,8 @@
  *
  * @module
  */
-import type { StoryLanguage, StorySource } from "@ensiria/story-format/source";
-import { isStoryTextArg, type StoryTextFunction, type StoryTextTable } from "@ensiria/story-format/texts";
+import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
+import { isStoryTextArg, type StoryTextFunction, type StoryTextTable } from "@forgebook/story-format/texts";
 
 /** The language every key is in. */
 export const BASE_LANGUAGE = "en";

@@ -11,7 +11,7 @@
  *
  * @module
  */
-import type { StoryClock } from "@ensiria/story-format/clock";
+import type { StoryClock } from "@forgebook/story-format/clock";
 
 import { type ClockReading, type ClockState, DEFAULT_CLOCK_STATE, readClock } from "../storyClock";
 

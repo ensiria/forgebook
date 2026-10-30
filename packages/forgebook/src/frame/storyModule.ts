@@ -9,8 +9,8 @@
  * @module
  */
 
-import type { ForcedState, ReplayMode, StoryContext, StoryParameters } from "@ensiria/story-format/csf";
-import type { StoryControlsSetting } from "@ensiria/story-format/source";
+import type { ForcedState, ReplayMode, StoryContext, StoryParameters } from "@forgebook/story-format/csf";
+import type { StoryControlsSetting } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 
 /** Args as the frame handles them: whatever the story's component takes. */

@@ -5,7 +5,7 @@
  * @module
  */
 
-import type { StoryLanguage } from "@ensiria/story-format/source";
+import type { StoryLanguage } from "@forgebook/story-format/source";
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
 import {

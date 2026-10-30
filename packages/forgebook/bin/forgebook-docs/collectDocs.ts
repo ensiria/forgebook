@@ -12,9 +12,9 @@
 import { globSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import type { StoryFileIndex } from "@ensiria/story-format/source";
+import type { StoryFileIndex } from "@forgebook/story-format/source";
 
-import { extractStoryComponent } from "../../src/vite/extractDocs.ts";
+import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import type {
   CatalogueComponent,
@@ -47,11 +47,12 @@ const sourceExports = (manifest: unknown): Readonly<Record<string, string>> => {
   );
 };
 
-/** The components of the package's story files. */
+/** The components of the package's story files, read by the framework's extractor. */
 const collectComponents = (
   packageDir: string,
   exports: Readonly<Record<string, string>>,
-  problems: string[]
+  problems: string[],
+  extractStoryComponent: ExtractStoryComponent
 ): { components: CatalogueComponent[]; componentFiles: Set<string> } => {
   const components: CatalogueComponent[] = [];
   const componentFiles = new Set<string>();
@@ -110,8 +111,12 @@ const readExport = (subpath: string, source: string, file: string): ReadExport =
  * Reads a package for its catalogue.
  *
  * @param packageDir - the package's folder.
+ * @param extractStoryComponent - the framework's reading of a story file's component (its docs module).
  */
-export const collectDocs = (packageDir: string): CollectedDocs => {
+export const collectDocs = (
+  packageDir: string,
+  extractStoryComponent: ExtractStoryComponent
+): CollectedDocs => {
   const manifest: unknown = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
   const packageName =
     typeof manifest === "object" &&
@@ -122,7 +127,12 @@ export const collectDocs = (packageDir: string): CollectedDocs => {
       : packageDir;
   const exports = sourceExports(manifest);
   const problems: string[] = [];
-  const { components, componentFiles } = collectComponents(packageDir, exports, problems);
+  const { components, componentFiles } = collectComponents(
+    packageDir,
+    exports,
+    problems,
+    extractStoryComponent
+  );
   const modules: ModuleDocs[] = [];
   const sassModules: SassModuleDocs[] = [];
   const styleSheets: StyleSheetDocs[] = [];

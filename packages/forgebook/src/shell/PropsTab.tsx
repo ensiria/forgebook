@@ -6,7 +6,7 @@
  * @module
  */
 
-import type { StoryControlsSetting } from "@ensiria/story-format/source";
+import type { StoryControlsSetting } from "@forgebook/story-format/source";
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
 import type { ComponentDocs, PropDocs } from "../componentDocs";

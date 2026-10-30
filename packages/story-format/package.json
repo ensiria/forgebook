@@ -1,5 +1,5 @@
 {
-  "name": "@ensiria/story-format",
+  "name": "@forgebook/story-format",
   "version": "0.0.0",
   "private": true,
   "description": "The story format of the Ensiria packages: the CSF 3 types a story file is written with, the StorySource a package hands a catalogue, the texts inside the stories in the shown language, and the story clock a Live story reads. React only: a library's stories depend on the format, not on the catalogue that shows them.",
@@ -13,7 +13,7 @@
   "author": "Jason Scoppetta",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JasonScoppetta/dev-tooling.git",
+    "url": "git+https://github.com/Ensiria/forgebook.git",
     "directory": "packages/story-format"
   },
   "type": "module",
@@ -31,7 +31,7 @@
     "react": "^19.0.0"
   },
   "devDependencies": {
-    "@radar/typescript-config": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
     "@types/react": "19.3.0"
   }
 }

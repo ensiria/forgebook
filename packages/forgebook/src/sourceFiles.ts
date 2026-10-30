@@ -8,7 +8,7 @@
  *
  * @module
  */
-import type { StoryFiles, StorySource } from "@ensiria/story-format/source";
+import type { StoryFiles, StorySource } from "@forgebook/story-format/source";
 
 /** The merged files of each source seen, by the source object itself. */
 const MERGED = new WeakMap<StorySource, StoryFiles>();

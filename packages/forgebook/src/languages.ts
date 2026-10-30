@@ -10,7 +10,7 @@
  *
  * @module
  */
-import type { StoryLanguage } from "@ensiria/story-format/source";
+import type { StoryLanguage } from "@forgebook/story-format/source";
 
 /**
  * The languages of a story: the catalogue's, then its source's, one per id, with the source's wrapper for an id both
@@ -26,3 +26,12 @@ export const storyLanguages = (
   ...catalogue.map((language) => source.find((own) => own.id === language.id) ?? language),
   ...source.filter((own) => !catalogue.some((language) => language.id === own.id))
 ];
+
+/**
+ * The language a view shows, among a story's: none for the stories' own text, or for an id the story does not offer.
+ *
+ * @param languages - the story's languages.
+ * @param id - the view's language id; empty for the stories' own text.
+ */
+export const shownLanguage = (languages: readonly StoryLanguage[], id: string): StoryLanguage | undefined =>
+  languages.find((language) => language.id === id);

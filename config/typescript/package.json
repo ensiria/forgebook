@@ -1,0 +1,9 @@
+{
+  "name": "@forgebook/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The TypeScript settings every package of the repository extends.",
+  "files": [
+    "*.json"
+  ]
+}

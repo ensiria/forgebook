@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { forgebookPlugin } from "../src/vite/forgebookPlugin";
+import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
 
 /** A dev server reduced to what the plugin touches, recording what it does. */
 const fakeServer = (): {
@@ -96,7 +97,7 @@ const hooksOf = (
 
 describe("forgebookPlugin's ?forgebook-files modules", () => {
   it("answers a pattern with one module: each file's index and the loaders of its module, docs and code", async () => {
-    const hooks = hooksOf(forgebookPlugin());
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
     const id = hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(KIT, "stories.ts"));
     expect(typeof id).toBe("string");
     const loaded = await hooks.load(String(id));
@@ -110,7 +111,7 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
   });
 
   it("leaves every other import to Vite", () => {
-    const hooks = hooksOf(forgebookPlugin());
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
     expect(hooks.resolveId("./src/Select.tsx", join(KIT, "stories.ts"))).toBeNull();
   });
 });
@@ -118,13 +119,15 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
 describe("forgebookPlugin in the dev server", () => {
   it("watches the given folders", () => {
     const fake = fakeServer();
-    hooksOf(forgebookPlugin({ watch: ["/kit/src", "/kit/stories"] })).configureServer(fake.server);
+    hooksOf(
+      forgebookPlugin({ framework: STUB_FRAMEWORK, watch: ["/kit/src", "/kit/stories"] })
+    ).configureServer(fake.server);
     expect(fake.added).toEqual(["/kit/src", "/kit/stories"]);
   });
 
   it("renews the patterns' modules and reloads when a story file is added or removed", async () => {
     const fake = fakeServer();
-    const hooks = hooksOf(forgebookPlugin({ watch: ["/kit/src"] }));
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK, watch: ["/kit/src"] }));
     const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(KIT, "stories.ts")));
     await hooks.load(id);
     await hooks.closeBundle();

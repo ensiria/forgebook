@@ -4,7 +4,7 @@
  *
  * @module
  */
-import type { StoryLanguage } from "@ensiria/story-format/source";
+import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import { type CompareMode, SHEETS_CHOICES, TEXT_SCALES, type ViewState } from "../viewState";
 import { STRINGS } from "./strings";

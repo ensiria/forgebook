@@ -7,6 +7,7 @@
 
 import type { ReactNode } from "react";
 
+import { useCodeWriter } from "./codeWriter";
 import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock";
 import { STRINGS } from "./strings";
 import { useCopy } from "./useCopy";
@@ -21,6 +22,7 @@ export type CodeTabProps = StoryCodeSource;
  */
 export const CodeTab = (props: CodeTabProps): ReactNode => {
   const { isCopied, copy } = useCopy();
+  const write = useCodeWriter();
   const hasRender = props.code[props.exportName] !== undefined;
   return (
     <div className="forgebook-prop-group">
@@ -31,7 +33,7 @@ export const CodeTab = (props: CodeTabProps): ReactNode => {
         <button
           type="button"
           className="forgebook-text-button"
-          onClick={(): void => copy(storyCodeText(props))}
+          onClick={(): void => copy(storyCodeText(props, write))}
           aria-live="polite"
         >
           {isCopied ? STRINGS.copied : STRINGS.copy}

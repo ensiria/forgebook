@@ -13,7 +13,7 @@
  * @module
  */
 
-import type { ForcedState } from "@ensiria/story-format/csf";
+import type { ForcedState } from "@forgebook/story-format/csf";
 import type { CustomAtRules, Selector, SelectorComponent, Visitor } from "lightningcss";
 
 /** The attribute that forces states on an element and everything inside it. */

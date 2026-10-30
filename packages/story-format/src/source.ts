@@ -5,7 +5,7 @@
  * Every package with stories exports one `StorySource` from a development-only `./stories` subpath, never published;
  * an app lists the sources it shows (D-57). A source names its story files once per pattern, with an import the
  * catalogue's Vite plugin answers (`import files from "../src/**\/*.stories.tsx?forgebook-files"`, typed by
- * `@ensiria/story-format/client`): one module with every file's index (read without running the files), and the loaders
+ * `@forgebook/story-format/client`): one module with every file's index (read without running the files), and the loaders
  * of its stories, its component's docs and its code (D-438). The style sheets are the URLs the frame loads for each
  * Styles setting.
  *

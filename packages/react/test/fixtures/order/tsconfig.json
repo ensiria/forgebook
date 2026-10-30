@@ -1,0 +1,6 @@
+// Components whose types write their values in every form the docs read in source order, for the extractor's tests.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "include": ["."]
+}

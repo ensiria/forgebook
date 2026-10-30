@@ -6,8 +6,8 @@
  * A source names its story files with `import files from "<pattern>?forgebook-files"`: the plugin answers each with
  * one module (`storyFilesModule.ts`) holding every matched file's index, read from its source with Vite's parser, and
  * the loaders of its module, of its component's docs and of its code (D-438). Those loaders ask for
- * `?forgebook-docs`, answered with the component's props read from its types (`extractDocs.ts`) or `{ error }` for
- * the panel, `?forgebook-code`, answered with each story's `render` as written (`storyCode.ts`),
+ * `?forgebook-docs`, answered with the component's props as the framework reads them (`adapter.ts`, in a worker) or
+ * `{ error }` for the panel, `?forgebook-code`, answered with each story's `render` as written (`storyCode.ts`),
  * `?forgebook-page`, answered with the component's documentation file as HTML (`componentPage.ts`), and
  * `?forgebook-markdown`, a source's own Markdown file (its introduction on the home) as HTML. It also sets
  * Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
@@ -22,19 +22,20 @@
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-import type { StoryMarkdown } from "@ensiria/story-format/source";
+import type { StoryMarkdown } from "@forgebook/story-format/source";
 import { NodePackageImporter } from "sass-embedded";
 import ts from "typescript-6";
 import type { Plugin, UserConfig, ViteDevServer } from "vite";
 
+import type { FrameworkAdapter } from "./adapter.ts";
 import { componentPage, markdownHtml } from "./componentPage.ts";
 import { createDocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { moduleSummaryOf } from "./docsProgram.ts";
-import { componentImport } from "./extractDocs.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { highlightCode } from "./highlightCode.ts";
 import { storyCode } from "./storyCode.ts";
 import { storyFilesModule } from "./storyFilesModule.ts";
+import { componentImport } from "./storyMeta.ts";
 
 /** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
 const FILES_QUERY = "?forgebook-files";
@@ -65,6 +66,8 @@ const DOCS_QUERY = "?forgebook-docs";
 
 /** The plugin's options. */
 export type ForgebookPluginOptions = {
+  /** The framework the stories are written for: what reads a component's props (`react()` of `@forgebook/react/vite`). */
+  readonly framework: FrameworkAdapter;
   /** Folders outside the app the dev server watches for new story files (each source's `src` and `stories`). */
   readonly watch?: readonly string[];
 };
@@ -193,15 +196,15 @@ const patternModule = (
 /**
  * The catalogue's Vite plugin.
  *
- * @param options - the folders to watch; none by default.
+ * @param options - the framework, and the folders to watch (none by default).
  * @returns the plugin, for the app's `plugins`.
  */
-export const forgebookPlugin = ({ watch = [] }: ForgebookPluginOptions = {}): Plugin => {
+export const forgebookPlugin = ({ framework, watch = [] }: ForgebookPluginOptions): Plugin => {
   /** The modules of the patterns, renewed when a story file is added or removed. */
   const filesModules = new Set<string>();
   // the docs are read in a worker: a package's TypeScript program takes seconds to build and would hold every other
   // answer of the dev server meanwhile
-  const docs = createDocsExtractor();
+  const docs = createDocsExtractor(framework.docsModule);
   return {
     name: "ensiria-forgebook",
     enforce: "pre",

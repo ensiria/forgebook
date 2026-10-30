@@ -1,0 +1,10 @@
+// The React adapter for the Vite plugin and its docs module: Node loads them directly with their types stripped (the
+// app's Vite config, the docs' worker, forgebook-docs), so relative imports carry the `.ts` extension.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/node.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}

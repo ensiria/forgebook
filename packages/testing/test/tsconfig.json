@@ -1,0 +1,10 @@
+// The test kit's own tests, run by Vitest on Node.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "allowImportingTsExtensions": true
+  },
+  "include": [".", "../src"]
+}

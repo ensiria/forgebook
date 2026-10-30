@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { filledText, isStoryTextArg, storyText, storyTextOf } from "@ensiria/story-format/texts";
+import { filledText, isStoryTextArg, storyText, storyTextOf } from "@forgebook/story-format/texts";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 

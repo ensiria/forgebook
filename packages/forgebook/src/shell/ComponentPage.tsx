@@ -11,7 +11,7 @@
  *
  * @module
  */
-import type { StoryFileCode } from "@ensiria/story-format/source";
+import type { StoryFileCode } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
 
 import type { ComponentDocs } from "../componentDocs";
@@ -20,6 +20,7 @@ import { groupedStories, mainStory, type TreeComponent, type TreeStory } from ".
 import { frameAddress, liveView, type ViewState } from "../viewState";
 import { ApiReference } from "./ApiReference";
 import { CodeText } from "./CodeText";
+import { useCodeWriter } from "./codeWriter";
 import { FrameView } from "./FrameView";
 import { Icon } from "./icons";
 import { PackageHtml } from "./PackageHtml";
@@ -130,6 +131,7 @@ const ExampleCode = ({
   readonly isShown: boolean;
 }): ReactNode => {
   const { isCopied, copy } = useCopy();
+  const write = useCodeWriter();
   return (
     // the code stays in the page while closed, so it opens with a transition; inert keeps it out of Tab and
     // screen readers until then
@@ -138,7 +140,7 @@ const ExampleCode = ({
         <button
           type="button"
           className="forgebook-example__copy"
-          onClick={(): void => copy(storyCodeText(source))}
+          onClick={(): void => copy(storyCodeText(source, write))}
           aria-live="polite"
         >
           {isCopied ? STRINGS.copied : STRINGS.copy}

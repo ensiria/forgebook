@@ -14,10 +14,10 @@
  */
 import { Worker } from "node:worker_threads";
 
-import type { extractStoryComponent } from "./extractDocs.ts";
+import type { StoryComponentResult } from "./adapter.ts";
 
 /** What the extractor answers for a story file: its component's docs, none, or why it cannot be read. */
-export type DocsResult = ReturnType<typeof extractStoryComponent>;
+export type DocsResult = StoryComponentResult;
 
 /** A message to the worker: a story file's docs to read, or the news that a source file changed. */
 export type DocsRequest =
@@ -57,12 +57,19 @@ export type DocsExtractor = {
 /** The worker's module, beside this one; Node strips its types as it does this file's. */
 const WORKER_URL = new URL("./docsWorker.ts", import.meta.url);
 
+/** What the worker is started with: the framework's docs module, which it loads before its first answer. */
+export type DocsWorkerData = {
+  /** The URL of the module exporting the framework's `extractStoryComponent`. */
+  readonly docsModule: string;
+};
+
 /**
  * A docs extractor with its worker, started on its first request.
  *
+ * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).
  * @returns the extractor.
  */
-export const createDocsExtractor = (): DocsExtractor => {
+export const createDocsExtractor = (docsModule: string): DocsExtractor => {
   let worker: Worker | undefined;
   let nextId = 0;
   // every request sent and not answered yet, a warm-up's answer included (none reads it)
@@ -71,7 +78,8 @@ export const createDocsExtractor = (): DocsExtractor => {
   const warmUps: string[] = [];
   const started = (): Worker => {
     if (worker !== undefined) return worker;
-    const created = new Worker(WORKER_URL);
+    const workerData: DocsWorkerData = { docsModule };
+    const created = new Worker(WORKER_URL, { workerData });
     created.unref();
     created.on("message", (response: DocsResponse): void => {
       pending.get(response.id)?.(response.result);

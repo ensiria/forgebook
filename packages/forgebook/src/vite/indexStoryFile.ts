@@ -12,8 +12,8 @@
  * @module
  */
 
-import { STORY_GROUPS, type StoryGroup } from "@ensiria/story-format/csf";
-import type { StoryControlsSetting, StoryFileIndex, StoryIndexEntry } from "@ensiria/story-format/source";
+import { STORY_GROUPS, type StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryControlsSetting, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import { type ESTree, parseSync } from "vite";
 
 /** An expression without the TypeScript wrappers a meta is often written with (`satisfies Meta<…>`, `as Meta`). */

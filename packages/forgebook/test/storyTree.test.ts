@@ -4,7 +4,7 @@
  * @module
  */
 
-import type { StoryFiles, StorySource } from "@ensiria/story-format/source";
+import type { StoryFiles, StorySource } from "@forgebook/story-format/source";
 import { describe, expect, it } from "vitest";
 
 import {

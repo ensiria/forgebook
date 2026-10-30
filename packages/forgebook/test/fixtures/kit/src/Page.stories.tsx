@@ -3,7 +3,7 @@
  *
  * @module
  */
-import type { Meta, Story } from "@ensiria/story-format/csf";
+import type { Meta, Story } from "@forgebook/story-format/csf";
 
 export default { title: "Foundations/Page" } satisfies Meta;
 

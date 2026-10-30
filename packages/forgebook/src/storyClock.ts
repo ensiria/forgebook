@@ -3,7 +3,7 @@
  * hold it): the speeds, the state the controls set, and the address that holds the clock at its start (D-504).
  *
  * @remarks
- * Pure. The clock a story reads is typed in `@ensiria/story-format/clock`; the frame runs it (`frame/frameClock.ts`).
+ * Pure. The clock a story reads is typed in `@forgebook/story-format/clock`; the frame runs it (`frame/frameClock.ts`).
  * Holding the clock goes through the frame's address, as everything that changes what a frame draws does (one
  * document per story): the generated and visual tests open a Live story held at its start, so its image never
  * changes and its play function moves it on with `advance` (D-628).

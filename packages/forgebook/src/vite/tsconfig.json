@@ -2,7 +2,7 @@
 // the `.ts` extension.
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@radar/typescript-config/node.json",
+  "extends": "@forgebook/typescript-config/node.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true
   },

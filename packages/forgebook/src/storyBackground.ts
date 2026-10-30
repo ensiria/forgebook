@@ -5,7 +5,7 @@
  *
  * @module
  */
-import type { StoryBackground } from "@ensiria/story-format/source";
+import type { StoryBackground } from "@forgebook/story-format/source";
 
 import { backdropColor } from "./backdrops";
 import type { ViewState } from "./viewState";

@@ -1,0 +1,87 @@
+/**
+ * The contract between Forgebook and a framework: how the frame draws one story in one canvas, draws it again with
+ * other args and takes it away, and how the shell writes a story drawn from its args as code.
+ *
+ * @remarks
+ * The frame owns everything a framework does not need to know: the address and the view, the messages with the
+ * shell, the style sheets, the play function, Replay, the matrix's layout, the story clock and the error shown in
+ * place of a story. A framework package (`@forgebook/react`) implements this type and hands it to the frame; another
+ * framework implements the same type. A story's decorators, providers and error capture are the framework's, since
+ * they return or catch the framework's own output.
+ *
+ * @module
+ */
+
+import type { StoryClock } from "@forgebook/story-format/clock";
+import type { StepFunction } from "@forgebook/story-format/csf";
+import type { StoryLanguage } from "@forgebook/story-format/source";
+import type { StoryTextTable } from "@forgebook/story-format/texts";
+
+import type { PanelArgs } from "../messages";
+import type { LoadedArgs, LoadedStory } from "./storyModule";
+
+/** One story to draw, as the frame hands it to the framework. */
+export type StoryDrawing = {
+  /** The story: its render or component, its decorators, its layout. */
+  readonly story: LoadedStory;
+  /** The args as the story receives them: the texts named by key resolved, the recorded events wrapped. */
+  readonly args: LoadedArgs;
+  /** The texts inside the stories in the shown language, for the story's `text` and its text hooks. */
+  readonly texts: StoryTextTable;
+  /** The story clock the story reads (held at its start, or running for a Live story). */
+  readonly clock: StoryClock;
+  /** The shown language's provider around the story; none for the stories' own text. */
+  readonly wrap: StoryLanguage["wrap"] | undefined;
+};
+
+/** What the frame keeps of a story drawn in a canvas. */
+export type MountedStory = {
+  /**
+   * Resolves once the story is drawn in its canvas, so the play function finds what it drives; never resolves when the
+   * story throws while it is first drawn (the error goes to `onError` instead).
+   */
+  readonly drawn: Promise<void>;
+  /** Draws the story again with other args, keeping its state; a story that threw is tried again. */
+  readonly update: (args: LoadedArgs) => void;
+  /** Takes the story away from its canvas. */
+  readonly unmount: () => void;
+};
+
+/** A framework, as the frame uses it. */
+export type StoryRenderer = {
+  /**
+   * Draws a story in a canvas the frame owns.
+   *
+   * @param canvas - the element the story is drawn in.
+   * @param drawing - the story, its args, texts, clock and language.
+   * @param onError - called with the error when the story throws while it is drawn; the frame shows it instead.
+   */
+  readonly mount: (
+    canvas: HTMLElement,
+    drawing: StoryDrawing,
+    onError: (error: Error) => void
+  ) => MountedStory;
+  /**
+   * The story drawn as HTML on the server, for the generated server tests; throws when the story throws.
+   *
+   * @param drawing - the story, its args, texts, clock and language.
+   */
+  readonly renderToString: (drawing: StoryDrawing) => string;
+};
+
+/**
+ * Writes a story drawn from its args as the framework's code, for the Code tab and Show code (`<Button tone="danger" />`
+ * in React): the shell knows the component's name and the panel's values, and the framework knows its syntax.
+ *
+ * @param component - the component's name, as its documentation names it.
+ * @param args - the values of the moment, a named value by its name.
+ */
+export type StoryCodeWriter = (component: string, args: PanelArgs) => string;
+
+/** The `step` a render and a decorator receive: outside a play there is no trace, so a step only runs its part. */
+export const untracedStep: StepFunction = async (
+  _label: string,
+  run: () => Promise<void> | void
+): Promise<void> => {
+  await run();
+};

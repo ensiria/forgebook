@@ -1,0 +1,42 @@
+// The rules every TypeScript file of the repo follows. A package never extends this file directly: it extends the file
+// for its kind of code (node.json, react.json), which adds the runtime's types and module settings.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // Type checking: everything strict, plus the checks strict leaves out
+    "strict": true,
+    // arr[i] and record[key] may be undefined: the type says so, and the code checks
+    "noUncheckedIndexedAccess": true,
+    // `prop?: T` means "absent", not "undefined": a prop that may receive undefined says `prop?: T | undefined`, and in
+    // contracts a cleared value is null (absent and cleared differ)
+    "exactOptionalPropertyTypes": true,
+    // an overriding method says `override`, so renaming the base method breaks the build instead of the behaviour
+    "noImplicitOverride": true,
+    // every branch of a function returns, and a switch case never falls through by accident
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    // a property read from an index signature uses brackets (record["key"]), so it does not look like a declared one
+    "noPropertyAccessFromIndexSignature": true,
+    // catch (error) is `unknown`: it is narrowed before use
+    "useUnknownInCatchVariables": true,
+
+    // Modules: imports are written as they will run
+    // `import type` for types only, kept or erased exactly as written (no guessing by the compiler)
+    "verbatimModuleSyntax": true,
+    // only syntax that can be erased (no enum, namespace, parameter properties): Node can run any of our files by
+    // stripping the types, and the code reads the same as the JavaScript it becomes
+    "erasableSyntaxOnly": true,
+    // a file with a different case than its import is an error (macOS forgives it, CI on Linux does not)
+    "forceConsistentCasingInFileNames": true,
+    // JSON files can be imported with their types (contracts, locales, shortcuts)
+    "resolveJsonModule": true,
+    // each file can be compiled on its own (Vite, Playwright and Node strip types file by file)
+    "isolatedModules": true,
+    "moduleDetection": "force",
+
+    // Output: the bundlers and runtimes emit the JavaScript; tsc only checks
+    "noEmit": true,
+    "target": "es2024",
+    "skipLibCheck": true
+  }
+}

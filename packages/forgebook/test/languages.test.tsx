@@ -4,11 +4,11 @@
  * @module
  */
 
-import type { StoryLanguage } from "@ensiria/story-format/source";
+import type { StoryLanguage } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { storyLanguages } from "../src/languages";
+import { shownLanguage, storyLanguages } from "../src/languages";
 
 /** A language whose wrapper marks the story with a name. */
 const language = (id: string, mark: string): StoryLanguage => ({
@@ -32,5 +32,17 @@ describe("storyLanguages", () => {
 
   it("offers none when neither does", () => {
     expect(storyLanguages([], [])).toEqual([]);
+  });
+});
+
+describe("shownLanguage", () => {
+  it("finds the view's language among the story's", () => {
+    const italian = language("it", "catalogue");
+    expect(shownLanguage([language("fr", "catalogue"), italian], "it")).toBe(italian);
+  });
+
+  it("is none for the stories' own text and for a language the story does not offer", () => {
+    expect(shownLanguage([language("it", "catalogue")], "")).toBeUndefined();
+    expect(shownLanguage([], "it")).toBeUndefined();
   });
 });

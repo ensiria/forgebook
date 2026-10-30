@@ -3,8 +3,8 @@
  *
  * @module
  */
-/// <reference types="@ensiria/story-format/client" />
-import type { StorySource } from "@ensiria/story-format/source";
+/// <reference types="@forgebook/story-format/client" />
+import type { StorySource } from "@forgebook/story-format/source";
 
 import en from "./locales/en.json";
 import it from "./locales/it.json";

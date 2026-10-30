@@ -11,7 +11,7 @@
  * @module
  */
 
-import type { StoryLanguage } from "@ensiria/story-format/source";
+import type { StoryLanguage } from "@forgebook/story-format/source";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { matrixOf, matrixProps } from "../matrix";

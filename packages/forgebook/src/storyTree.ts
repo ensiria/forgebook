@@ -11,13 +11,13 @@
  *
  * @module
  */
-import { STORY_GROUPS, type StoryGroup } from "@ensiria/story-format/csf";
+import { STORY_GROUPS, type StoryGroup } from "@forgebook/story-format/csf";
 import type {
   StoryBackground,
   StoryControlsSetting,
   StoryFileIndex,
   StorySource
-} from "@ensiria/story-format/source";
+} from "@forgebook/story-format/source";
 
 import { sourceFiles } from "./sourceFiles";
 

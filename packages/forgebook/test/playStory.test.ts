@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { heldStoryClock } from "@ensiria/story-format/clock";
+import { heldStoryClock } from "@forgebook/story-format/clock";
 import { describe, expect, it } from "vitest";
 
 import { playStory } from "../src/frame/playStory";

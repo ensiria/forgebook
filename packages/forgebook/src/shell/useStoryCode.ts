@@ -3,7 +3,7 @@
  *
  * @module
  */
-import type { StoryFileCode } from "@ensiria/story-format/source";
+import type { StoryFileCode } from "@forgebook/story-format/source";
 
 import { type Loaded, useLoaded } from "./useLoaded";
 

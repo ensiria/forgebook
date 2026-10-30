@@ -1,15 +1,16 @@
 /**
  * A story's code, as the panel's Code tab and the component page show it: its `render` as written, coloured by the
- * plugin, or, for a story drawn from its args, the component's JSX with the values of the moment.
+ * plugin, or, for a story drawn from its args, the component in the framework's code with the values of the moment.
  *
  * @module
  */
-import type { StoryFileCode } from "@ensiria/story-format/source";
+import type { StoryFileCode } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 
+import type { StoryCodeWriter } from "../frame/renderer";
 import type { PanelArgs } from "../messages";
 import { Code } from "./Code";
-import { storyJsx } from "./storyJsx";
+import { useCodeWriter } from "./codeWriter";
 
 /** Which story's code, and the values its JSX is drawn from when it has no `render`. */
 export type StoryCodeSource = {
@@ -17,7 +18,7 @@ export type StoryCodeSource = {
   readonly code: StoryFileCode;
   /** The story's export name. */
   readonly exportName: string;
-  /** The component's name, for the JSX of a story drawn from its args. */
+  /** The component's name, for the code of a story drawn from its args. */
   readonly componentName: string;
   /** The values of the moment: the story's args, with the panel's over them on the story page. */
   readonly args: PanelArgs;
@@ -27,9 +28,12 @@ export type StoryCodeSource = {
  * The story's code as text, as copied.
  *
  * @param source - the file's code, the story, the component's name and the args.
+ * @param write - the framework's code writer, for a story drawn from its args.
  */
-export const storyCodeText = ({ code, exportName, componentName, args }: StoryCodeSource): string =>
-  code[exportName]?.text ?? storyJsx(componentName, args);
+export const storyCodeText = (
+  { code, exportName, componentName, args }: StoryCodeSource,
+  write: StoryCodeWriter
+): string => code[exportName]?.text ?? write(componentName, args);
 
 /**
  * The story's code, coloured.
@@ -37,6 +41,7 @@ export const storyCodeText = ({ code, exportName, componentName, args }: StoryCo
  * @param props - the file's code, the story, the component's name and the args.
  */
 export const StoryCodeBlock = (source: StoryCodeSource): ReactNode => {
+  const write = useCodeWriter();
   const render = source.code[source.exportName];
   if (render !== undefined) {
     // biome-ignore lint/style/useNamingConvention: React's own name for markup set as HTML
@@ -51,7 +56,7 @@ export const StoryCodeBlock = (source: StoryCodeSource): ReactNode => {
   // the attributes' names are names, not types: only the component's name is coloured as one
   return (
     <pre className="forgebook-code-block">
-      <Code text={storyCodeText(source)} names={Object.keys(source.args)} />
+      <Code text={storyCodeText(source, write)} names={Object.keys(source.args)} />
     </pre>
   );
 };

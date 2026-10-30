@@ -8,7 +8,7 @@
  *
  * @module
  */
-import type { StorySource } from "@ensiria/story-format/source";
+import type { StorySource } from "@forgebook/story-format/source";
 
 import { type ArgValue, isNamedArg, type NamedArg, type PanelArgs } from "./messages";
 

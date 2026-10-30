@@ -8,11 +8,12 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createDocsExtractor } from "../src/vite/docsExtractor";
+import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
 
 const KIT = join(import.meta.dirname, "fixtures", "kit", "src");
 
 describe("createDocsExtractor", () => {
-  const extractor = createDocsExtractor();
+  const extractor = createDocsExtractor(STUB_FRAMEWORK.docsModule);
   afterAll(() => extractor.close());
 
   it("reads a story file's component docs off the calling thread, after a warm-up", async () => {

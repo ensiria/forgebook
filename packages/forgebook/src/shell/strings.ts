@@ -4,7 +4,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "@ensiria/story-format/csf";
+import type { StoryGroup } from "@forgebook/story-format/csf";
 
 import type {
   BackdropChoice,

@@ -1,12 +1,11 @@
 /**
  * The view applied to a frame's document: the switches Kaji-style libraries read on the root, the root font size,
- * the backdrop drawn behind the story, the style sheets for the Styles setting and the language's provider.
+ * the backdrop drawn behind the story and the style sheets for the Styles setting.
  *
  * @module
  */
 
-import type { StoryLanguage, StorySheets } from "@ensiria/story-format/source";
-import type { ReactNode } from "react";
+import type { StorySheets } from "@forgebook/story-format/source";
 
 import { backdropSheet } from "../backdrops";
 import type { BackdropChoice, LiveView, ViewState } from "../viewState";
@@ -86,17 +85,3 @@ export const loadSheets = async (document: Document, urls: readonly string[]): P
     )
   );
 };
-
-/**
- * A story drawn in the view's language: inside that language's provider when the source offers it, as it is
- * otherwise.
- *
- * @param languages - the source's languages.
- * @param view - the view.
- * @param story - the story's element.
- */
-export const inLanguage = (
-  languages: readonly StoryLanguage[],
-  view: ViewState,
-  story: ReactNode
-): ReactNode => languages.find((language) => language.id === view.language)?.wrap(story) ?? story;

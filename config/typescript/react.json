@@ -1,0 +1,12 @@
+// Code that runs in a page: the shell, the frame, the stories (React, built by Vite).
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": [],
+    "jsx": "react-jsx",
+    "module": "preserve",
+    "moduleResolution": "bundler"
+  }
+}
