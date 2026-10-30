@@ -1,0 +1,25 @@
+/**
+ * The fixture package's stories, as a package hands them to a catalogue.
+ *
+ * @module
+ */
+/// <reference types="@ensiria/story-format/client" />
+import type { StorySource } from "@ensiria/story-format/source";
+
+import en from "./locales/en.json";
+import it from "./locales/it.json";
+import logoUrl from "./logo.svg?url";
+import files from "./src/*.stories.tsx?forgebook-files";
+
+/** The fixture package's stories. */
+export const source: StorySource = {
+  id: "kit",
+  name: "Fixture kit",
+  logo: logoUrl,
+  // invented colours, so the tests can see a story's box wait on its page colour
+  background: { light: "#fafafa", dark: "#111111" },
+  files: [files],
+  texts: { en, it },
+  sheets: { required: [], theme: [], restyled: [] },
+  home: () => import("./home.md?forgebook-markdown")
+};

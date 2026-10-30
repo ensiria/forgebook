@@ -1,0 +1,5 @@
+{
+  "select.inRow.caption": "Billing period",
+  "select.inRow.count": "{count} plans",
+  "select.hint": "Billed at the start of each period"
+}

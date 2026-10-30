@@ -1,0 +1,78 @@
+{
+  "name": "@ensiria/forgebook",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A catalogue for React components written as CSF stories: the story format, one frame per story, global switches for theme, contrast, motion and styles, a compare view, forced interaction states, replayable motion, a props panel from the components' types, and CATALOG.md.",
+  "keywords": [
+    "react",
+    "catalogue",
+    "stories",
+    "csf",
+    "design-system"
+  ],
+  "license": "MIT",
+  "author": "Jason Scoppetta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonScoppetta/dev-tooling.git",
+    "directory": "packages/forgebook"
+  },
+  "type": "module",
+  "sideEffects": [
+    "*.css",
+    "*.scss"
+  ],
+  "bin": {
+    "forgebook-docs": "./bin/forgebook-docs/forgebook-docs.mts",
+    "forgebook-heights": "./bin/forgebook-heights/forgebook-heights.mts",
+    "forgebook-shot": "./bin/forgebook-shot/forgebook-shot.mts",
+    "forgebook-texts": "./bin/forgebook-texts/forgebook-texts.mts"
+  },
+  "exports": {
+    "./story-tree": "./src/storyTree.ts",
+    "./shell": "./src/shell/mountShell.tsx",
+    "./frame": "./src/frame/mountFrame.tsx",
+    "./vite": "./src/vite/forgebookPlugin.ts",
+    "./testing/browser": "./src/testing/browserTests.ts",
+    "./testing/server": "./src/testing/serverTests.ts",
+    "./testing/story-files": "./src/testing/storyFiles.ts",
+    "./testing/playwright": "./src/testing/playwrightConfig.ts",
+    "./testing/vite": "./src/testing/testViteConfig.ts",
+    "./testing/visual-browser": "./src/testing/visualBrowser.ts",
+    "./testing/fonts.css": "./src/testing/fonts/fonts.css"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p src/testing && tsc -p bin && tsc -p test",
+    "test:shell": "playwright test -c test/shell/playwright.config.ts"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@ensiria/cli-kit": "workspace:*",
+    "@ensiria/story-format": "workspace:*",
+    "axe-core": "4.14.0",
+    "highlight.js": "11.12.0",
+    "lightningcss": "1.33.0",
+    "marked": "18.1.0",
+    "typescript-6": "npm:typescript@6.0.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^8.0.0",
+    "@playwright/test": "^1.64.0",
+    "vitest": "^5.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@radar/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sass-embedded": "1.106.1",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

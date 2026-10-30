@@ -1,0 +1,59 @@
+/**
+ * The shell's icons: small stroke drawings, decorative (the control around each carries the name).
+ *
+ * @module
+ */
+import type { ReactNode } from "react";
+
+/** The icons, by name. */
+const PATHS = {
+  sun: "M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1M8 5a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z",
+  moon: "M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z",
+  monitor: "M2 3h12v8H2zM6 14h4M8 11v3",
+  contrast: "M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2Zm0 0v12",
+  sliders: "M3 4h6M12 4h1M3 8h1M7 8h6M3 12h7M13 12h0M10 2.5v3M5.5 6.5v3M11.5 10.5v3",
+  chevronDown: "m4 6 4 4 4-4",
+  chevronRight: "m6 4 4 4-4 4",
+  compare: "M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z",
+  replay: "M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v2.5H5",
+  restart: "M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v2.5H11",
+  pause: "M5.5 3.5v9M10.5 3.5v9",
+  play: "M5 3.5v9l7.5-4.5Z",
+  search: "M7 2.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 0 0 0-9ZM10.5 10.5l3 3",
+  panel: "M2 3h12v10H2zM2 9.5h12",
+  outline: "M2.5 2.5h11v11h-11zM5 5h6v6H5z",
+  grid: "M2 2h12v12H2zM6 2v12M10 2v12M2 6h12M2 10h12",
+  ruler: "M2 10.5 10.5 2l3.5 3.5L5.5 14zM5 8l1.5 1.5M7 6l1 1M9 4l1.5 1.5",
+  sidebar: "M2 3h12v10H2zM6 3v10",
+  close: "M4 4l8 8M12 4l-8 8",
+  external: "M9 2.5h4.5V7M13.5 2.5 8 8M11.5 9.5v4h-9v-9h4",
+  width: "M2 4v8M14 4v8M4.5 8h7M6 6.5 4.5 8 6 9.5M10 6.5l1.5 1.5-1.5 1.5",
+  plus: "M8 3.5v9M3.5 8h9",
+  minus: "M3.5 8h9",
+  hash: "M6 2.5 5 13.5M11 2.5l-1 11M3 6h10.5M2.5 10H13",
+  check: "m3.5 8.5 3 3 6-7"
+} as const;
+
+/** An icon's name. */
+export type IconName = keyof typeof PATHS;
+
+/**
+ * One icon, 16 px by default, in the current colour.
+ *
+ * @param props - the icon and its size in px.
+ */
+export const Icon = ({ name, size = 16 }: { readonly name: IconName; readonly size?: number }): ReactNode => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d={PATHS[name]} />
+  </svg>
+);

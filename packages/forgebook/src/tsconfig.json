@@ -1,0 +1,12 @@
+// The catalogue's pages: the shell and the frame, which run in a page. `vite/` is the plugin, which Node loads
+// directly with the app's Vite config, so it has its own tsconfig.json. One tsconfig.json per folder: the editor's
+// TypeScript service only finds files named tsconfig.json.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@radar/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": ["."],
+  "exclude": ["vite", "testing"]
+}

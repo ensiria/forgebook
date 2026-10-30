@@ -1,0 +1,405 @@
+/**
+ * The stage: the chosen story in its frame, at the view's width, with Replay, a Live story's clock controls (D-504)
+ * and a link to the frame alone, or the
+ * four variants side by side in the compare view; the panel docked under it when it is open.
+ *
+ * @remarks
+ * The story and the panel scroll apart: reading the props, the code or the accessibility results never moves the
+ * story away. The view's live part (theme, contrast, motion, text size) reaches the shown frame as a message, so the
+ * story keeps its state; only the story, the style sheets or the language load the frame again.
+ *
+ * @module
+ */
+
+import type { StoryLanguage } from "@ensiria/story-format/source";
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+
+import { matrixOf, matrixProps } from "../matrix";
+import type { ArgValue, PanelArgs, ShellMessage } from "../messages";
+import type { NamedValues } from "../namedValues";
+import type { PlayTrace } from "../playTrace";
+import type { TreeComponent, TreeStory } from "../storyTree";
+import {
+  frameAddress,
+  isComparing,
+  liveView,
+  type MeasureTool,
+  type PanelTab,
+  type StageHeight,
+  type StageWidth,
+  type ViewState,
+  type Zoom
+} from "../viewState";
+import type { CheckState } from "./A11yTab";
+import { ClockControls, useStoryClockControls } from "./ClockControls";
+import { compareVariants } from "./compareVariants";
+import { Dock } from "./Dock";
+import { dockTabs } from "./dockTabs";
+import { FrameView, tellFrames } from "./FrameView";
+import { Icon } from "./icons";
+import { MatrixPicker } from "./MatrixPicker";
+import { StageTools } from "./StageTools";
+import { StageViewport } from "./StageViewport";
+import { STRINGS } from "./strings";
+import { useComponentDocs } from "./useComponentDocs";
+import { useCopy } from "./useCopy";
+import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages";
+import { useLiveView, useLoadedView } from "./useLiveView";
+import { type PageScroll, useScrollMemory } from "./useScrollMemory";
+import { useStoryCode } from "./useStoryCode";
+
+/** The height of the first frame before its story reports its own, in CSS px. */
+const INITIAL_FRAME_HEIGHT = 240;
+
+/** The most calls the Events tab keeps. */
+const MAX_CALLS = 50;
+
+/** The stage's props. */
+export type StageProps = {
+  /** The component the story belongs to. */
+  readonly component: TreeComponent;
+  /** The shown story. */
+  readonly story: TreeStory;
+  /** The view. */
+  readonly view: ViewState;
+  /** Called with the changed view (the width the handle set, the panel's tab). */
+  readonly onViewChange: (view: ViewState) => void;
+  /** The values set in the Props tab, over the story's own args (kept in the address). */
+  readonly panelArgs: PanelArgs;
+  /** Called with the panel's changed values. */
+  readonly onPanelArgsChange: (args: PanelArgs) => void;
+  /** The matrix's axes (kept in the address): the rows' prop, then the columns'; empty draws the story alone. */
+  readonly matrixAxes: readonly string[];
+  /** Called with the chosen axes. */
+  readonly onMatrixAxesChange: (axes: readonly string[]) => void;
+  /** The frame page's address. */
+  readonly frameUrl: string;
+  /** Loads the story file's code for the Code tab; `undefined` when the source has none. */
+  readonly loadCode: (() => Promise<unknown>) | undefined;
+  /** Loads the component's docs for the panel; `undefined` when the source has none for the file. */
+  readonly loadDocs: (() => Promise<unknown>) | undefined;
+  /** The values the story's source names for types the panel cannot write (icons). */
+  readonly namedValues: NamedValues | undefined;
+  /** The story's languages, for the compare view's language mode. */
+  readonly languages: readonly StoryLanguage[];
+  /** What stays above the story while it scrolls: the component's header. */
+  readonly header: ReactNode;
+  /** Called with the width the story really has, for the toolbar's width field. */
+  readonly onShownWidthChange: (width: number | undefined) => void;
+  /** The story's measured height at about its width (`forgebook-heights`), for its box while it loads; none unmeasured. */
+  readonly measuredHeight: number | undefined;
+  /**
+   * The colour the story's page has in a view (its source's, or the backdrop's when the view draws one), which its
+   * box waits on; none without one.
+   */
+  readonly backgroundOf: (
+    view: Pick<ViewState, "theme" | "isMoreContrast" | "backdrop">
+  ) => string | undefined;
+  /** Where its scrolling part starts: the shell's visit of the page and every page's last position. */
+  readonly scroll: PageScroll;
+};
+
+/**
+ * The accessibility check of the shown story: its state, cleared when the story or the view changes, and how to run
+ * it in the frame.
+ *
+ * @param frameRef - the story's frame.
+ * @param checkKey - the story and the view, as one text: a check belongs to them.
+ */
+const useStoryCheck = (
+  frameRef: RefObject<HTMLIFrameElement | null>,
+  checkKey: string
+): { check: CheckState; run: () => void; receive: (result: CheckResult) => void } => {
+  const [check, setCheck] = useState<CheckState>({ status: "idle" });
+  const [checkedKey, setCheckedKey] = useState(checkKey);
+  if (checkedKey !== checkKey) {
+    setCheckedKey(checkKey);
+    setCheck({ status: "idle" });
+  }
+  return {
+    check,
+    run: (): void => {
+      setCheck({ status: "running" });
+      const message: ShellMessage = { type: "forgebook:check" };
+      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+    },
+    receive: (result: CheckResult): void =>
+      setCheck(
+        "error" in result
+          ? { status: "error", message: result.error }
+          : { status: "done", violations: result.violations }
+      )
+  };
+};
+
+/**
+ * Copies the story's id (`kit:inputs-selection-select--overview`), the name tests and tools address it by; the id
+ * shows as the button's tooltip.
+ *
+ * @param props - the story's id.
+ */
+const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
+  const { isCopied, copy } = useCopy();
+  return (
+    <button
+      type="button"
+      className="forgebook-button forgebook-button--icon"
+      title={`${STRINGS.copyStoryId}: ${storyId}`}
+      aria-label={isCopied ? STRINGS.copied : STRINGS.copyStoryId}
+      onClick={(): void => copy(storyId)}
+    >
+      <Icon name={isCopied ? "check" : "hash"} size={14} />
+    </button>
+  );
+};
+
+/**
+ * The stage.
+ *
+ * @param props - the component, the story, the view, the panel's values, the frame page and the loaders.
+ */
+export const Stage = ({
+  component,
+  story,
+  view,
+  onViewChange,
+  panelArgs,
+  onPanelArgsChange,
+  matrixAxes,
+  onMatrixAxesChange,
+  frameUrl,
+  loadCode,
+  loadDocs,
+  languages,
+  namedValues,
+  header,
+  onShownWidthChange,
+  measuredHeight,
+  backgroundOf,
+  scroll
+}: StageProps): ReactNode => {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const storyRef = useRef<HTMLDivElement>(null);
+  const docs = useComponentDocs(loadDocs);
+  const code = useStoryCode(loadCode);
+  // the story's own args, as each frame reported them, by story
+  const [storyArgs, setStoryArgs] = useState<ReadonlyMap<string, PanelArgs>>(new Map());
+  // the args each story gives a text by its key, as its frame reported them
+  const [storyTextKeys, setStoryTextKeys] = useState<ReadonlyMap<string, Readonly<Record<string, string>>>>(
+    new Map()
+  );
+  const [calls, setCalls] = useState<readonly EventCall[]>([]);
+  // each story's play trace, by story: a trace belongs to the story that played
+  const [traces, setTraces] = useState<ReadonlyMap<string, PlayTrace>>(new Map());
+  const storyCheck = useStoryCheck(frameRef, frameAddress(frameUrl, story.id, view));
+  const eventNames = useMemo(
+    () =>
+      docs.status === "ready"
+        ? docs.value.props.filter((prop) => prop.kind === "event").map((prop) => prop.name)
+        : [],
+    [docs]
+  );
+
+  // a story of fixed examples ignores its args, so a matrix of them would repeat one drawing
+  const axisProps =
+    docs.status === "ready" && (story.controls === "all" || story.controls.length > 0)
+      ? matrixProps(docs.value.props)
+      : [];
+  const matrix = useMemo(
+    () => (docs.status === "ready" ? matrixOf(docs.value.props, matrixAxes) : undefined) ?? null,
+    [docs, matrixAxes]
+  );
+
+  const clockControls = useStoryClockControls(frameRef, story.id);
+  const { replayable, clocked, heights, settled } = useFrameMessages({
+    onReady: (frame: Window, message: ReadyMessage): void => {
+      setStoryArgs((current) => new Map(current).set(message.storyId, message.args));
+      setStoryTextKeys((current) => new Map(current).set(message.storyId, message.textKeys));
+      const send = (shellMessage: ShellMessage): void =>
+        frame.postMessage(shellMessage, window.location.origin);
+      send({ type: "forgebook:events", names: eventNames });
+      send({ type: "forgebook:args", args: panelArgs });
+      send({ type: "forgebook:matrix", matrix });
+      // the view may have changed while the frame loaded
+      if (!isComparing(view)) send({ type: "forgebook:view", view: liveView(view) });
+      send({ type: "forgebook:tools", tools: view.tools });
+      if (message.hasClock && !isComparing(view)) clockControls.sendTo(frame);
+    },
+    onCall: (call: EventCall): void => setCalls((current) => [call, ...current].slice(0, MAX_CALLS)),
+    onPlay: (storyId: string, trace: PlayTrace): void =>
+      setTraces((current) => new Map(current).set(storyId, trace)),
+    onChecked: (result: CheckResult): void => {
+      if (result.storyId === story.id) storyCheck.receive(result);
+    }
+  });
+
+  // the docs may arrive after the frames: they learn the events then
+  useEffect(
+    () => tellFrames(storyRef.current, { type: "forgebook:events", names: eventNames }),
+    [eventNames]
+  );
+  useEffect(() => tellFrames(storyRef.current, { type: "forgebook:matrix", matrix }), [matrix]);
+  // the values reach the frames from the address, so going back in the history sets them too
+  useEffect(() => tellFrames(storyRef.current, { type: "forgebook:args", args: panelArgs }), [panelArgs]);
+  const changeValue = (name: string, value: ArgValue | undefined): void => {
+    const { [name]: _removed, ...rest } = panelArgs;
+    onPanelArgsChange(value === undefined ? rest : { ...rest, [name]: value });
+  };
+
+  const replay = (): void => {
+    const message: ShellMessage = { type: "forgebook:replay" };
+    frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+  };
+  const title = STRINGS.frameTitle(component.name, story.name);
+  const canReplay = replayable === story.id && !isComparing(view);
+  // the compare view's frames each run their own clock from the start, so no one control drives them all
+  const hasClock = clocked === story.id && !isComparing(view);
+  // the frame loads again only for another story, style sheets or language; the rest of the view is sent live
+  const address = frameAddress(
+    frameUrl,
+    story.id,
+    useLoadedView(`${story.id}|${view.sheets}|${view.language}`, view)
+  );
+  useLiveView(storyRef, view, !isComparing(view));
+  useScrollMemory(storyRef, scroll);
+  // a story not shown yet waits at its measured height, or keeps the last story's, until it reports its own, so the
+  // page does not jump twice
+  const reportedHeight = heights.get(address);
+  const [lastHeight, setLastHeight] = useState(INITIAL_FRAME_HEIGHT);
+  useEffect(() => {
+    if (reportedHeight !== undefined) setLastHeight(reportedHeight);
+  }, [reportedHeight]);
+
+  const tabs = dockTabs({
+    docs,
+    code,
+    exportName: story.exportName,
+    componentName: component.name,
+    controls: story.controls,
+    values: { ...storyArgs.get(story.id), ...panelArgs },
+    onValueChange: changeValue,
+    onReset: (): void => onPanelArgsChange({}),
+    namedValues,
+    textArgs: Object.fromEntries(
+      Object.entries(storyTextKeys.get(story.id) ?? {}).map(([name, key]) => [
+        name,
+        { key, isChanged: panelArgs[name] !== undefined }
+      ])
+    ),
+    calls: calls.filter((call) => call.storyId === story.id),
+    onClearCalls: (): void => setCalls([]),
+    trace: isComparing(view) ? undefined : traces.get(story.id),
+    onPlayAgain: (): void => {
+      const message: ShellMessage = { type: "forgebook:play-again" };
+      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+    },
+    check: storyCheck.check,
+    onCheck: isComparing(view) ? undefined : storyCheck.run
+  });
+
+  return (
+    <div className="forgebook-workspace">
+      {header}
+      <div className="forgebook-story-pane">
+        <div ref={storyRef} className="forgebook-scroll">
+          <section className="forgebook-story" aria-label={STRINGS.storyLabel}>
+            <div className="forgebook-story__bar">
+              <div className="forgebook-stage__heading">
+                <h2 className="forgebook-stage__title">{story.name}</h2>
+                {story.description === undefined ? null : (
+                  <p className="forgebook-stage__description" title={story.description}>
+                    {story.description}
+                  </p>
+                )}
+              </div>
+              {axisProps.length === 0 ? null : (
+                <MatrixPicker props={axisProps} axes={matrixAxes} onAxesChange={onMatrixAxesChange} />
+              )}
+              {canReplay ? (
+                <button type="button" className="forgebook-button" onClick={replay}>
+                  <Icon name="replay" size={14} />
+                  {STRINGS.replay}
+                </button>
+              ) : null}
+              {hasClock ? <ClockControls controls={clockControls} /> : null}
+              <CopyIdButton storyId={story.id} />
+              <a
+                className="forgebook-button forgebook-button--icon"
+                href={frameAddress(frameUrl, story.id, view)}
+                target="_blank"
+                rel="noopener"
+                title={STRINGS.openFrame}
+                aria-label={STRINGS.openFrame}
+              >
+                <Icon name="external" size={14} />
+              </a>
+            </div>
+            {isComparing(view) ? (
+              <div className="forgebook-compare">
+                {compareVariants(view.compare, languages).map((variant) => (
+                  <figure
+                    key={variant.label}
+                    className="forgebook-compare__cell"
+                    // the label (the shell's text) reads on the page's colour; the frame draws the backdrop
+                    style={{ backgroundColor: backgroundOf({ ...view, ...variant.view, backdrop: "plain" }) }}
+                  >
+                    <figcaption className="forgebook-compare__label">{variant.label}</figcaption>
+                    <FrameView
+                      title={`${title} · ${variant.label}`}
+                      address={frameAddress(frameUrl, story.id, { ...view, ...variant.view })}
+                      heights={heights}
+                      settled={settled}
+                      fallbackHeight={lastHeight}
+                      sceneHeight={story.height}
+                    />
+                  </figure>
+                ))}
+              </div>
+            ) : (
+              <StageViewport
+                zoom={view.zoom}
+                width={view.width}
+                onWidthChange={(width: StageWidth): void => onViewChange({ ...view, width })}
+                onShownWidthChange={onShownWidthChange}
+                background={backgroundOf(view)}
+                height={view.height}
+                onHeightChange={(height: StageHeight): void => onViewChange({ ...view, height })}
+              >
+                {(fixedHeight: number | undefined): ReactNode => (
+                  <FrameView
+                    ref={frameRef}
+                    key={story.id}
+                    title={title}
+                    address={address}
+                    heights={heights}
+                    settled={settled}
+                    fallbackHeight={measuredHeight ?? lastHeight}
+                    sceneHeight={story.height}
+                    fixedHeight={fixedHeight}
+                  />
+                )}
+              </StageViewport>
+            )}
+          </section>
+        </div>
+        {/* outside the scrolling part: the tools stay in the pane's corner whatever the story's height or zoom */}
+        {isComparing(view) ? null : (
+          <StageTools
+            zoom={view.zoom}
+            onZoomChange={(zoom: Zoom): void => onViewChange({ ...view, zoom })}
+            tools={view.tools}
+            onToolsChange={(tools: readonly MeasureTool[]): void => onViewChange({ ...view, tools })}
+          />
+        )}
+      </div>
+      {view.isPanelOpen ? (
+        <Dock
+          tabs={tabs}
+          activeTab={view.panelTab}
+          onTabChange={(panelTab: PanelTab): void => onViewChange({ ...view, panelTab })}
+          onClose={(): void => onViewChange({ ...view, isPanelOpen: false })}
+        />
+      ) : null}
+    </div>
+  );
+};

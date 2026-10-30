@@ -1,0 +1,73 @@
+/**
+ * Tests for `forgebook-docs`: reading the fixture package, its Sass and style sheets, and the dense Markdown.
+ *
+ * @module
+ */
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import { catalogueMarkdown } from "../bin/forgebook-docs/catalogueMarkdown";
+import { collectDocs } from "../bin/forgebook-docs/collectDocs";
+import { sassMembers, styleSheetSummary } from "../bin/forgebook-docs/sassDocs";
+
+const KIT = join(import.meta.dirname, "fixtures", "kit");
+
+describe("sassDocs", () => {
+  it("reads every documented member with its parameters and its summary across lines", () => {
+    expect(
+      sassMembers("/// One.\n/// Two.\n/// @param x\n@mixin a(\n  $x,\n  $y: 1px\n) {}\n@function b() {}")
+    ).toEqual([
+      { kind: "mixin", name: "a", parameters: ["$x", "$y"], summary: "One. Two." },
+      { kind: "function", name: "b", parameters: [], summary: "" }
+    ]);
+  });
+
+  it("gives a style sheet the first sentence of its leading comment", () => {
+    expect(styleSheetSummary('// The sheet. More words.\n// Still the comment.\n@use "x";')).toBe(
+      "The sheet."
+    );
+  });
+});
+
+describe("collectDocs and catalogueMarkdown", () => {
+  const { data, problems } = collectDocs(KIT);
+  const text = catalogueMarkdown(data);
+
+  it("reads the components with stories, the modules, the Sass modules and the style sheets, not the stories export", () => {
+    expect(problems).toEqual([]);
+    expect(data.components.map((component) => [component.title, component.subpath])).toEqual([
+      ["Inputs/Selection/Select", "./select"]
+    ]);
+    expect(data.modules.map((module) => module.subpath)).toEqual(["./utils/format-size"]);
+    expect(data.sassModules.map((module) => module.subpath)).toEqual(["./scss/ring"]);
+    expect(data.styleSheets).toEqual([{ subpath: "./kit.css", summary: "The fixture kit's style sheet." }]);
+  });
+
+  it("writes one dense line per entry", () => {
+    expect(text).toContain("### Inputs › Selection");
+    expect(text).toContain(
+      "- **Select** `@fixture/kit/select`: Lets the user pick one value from a list. value:string size=sm|md*|lg rows:number isDisabled onValueChange(value) options!:readonly string[] hint:ReactNode · parts: root, trigger, list"
+    );
+    expect(text).toContain(
+      "- `@fixture/kit/utils/format-size` formatSize(value, unit?): A size written with its unit. Also: formatSizeOf(size), SIZES, types SizeUnit"
+    );
+    expect(text).toContain(
+      "- `ring`: ring($color, $width): A ring around a part, drawn as a box shadow, in the given colour; double($length): Twice a length"
+    );
+    expect(text).toContain("- `@fixture/kit/kit.css`: The fixture kit's style sheet.");
+    expect(text).not.toContain("Page");
+  });
+
+  it("writes each family's ungrouped components first, then its groups, each heading once", () => {
+    const [select] = data.components;
+    if (select === undefined) throw new Error("the fixture kit has no component");
+    const titled = ["Data/Lists/List", "Data/Value", "Data/Code/Diff", "Data/Board", "Actions/Button"].map(
+      (title) => ({ ...select, title, name: title.split("/").at(-1) ?? title })
+    );
+    const headings = catalogueMarkdown({ ...data, components: titled })
+      .split("\n")
+      .filter((line) => line.startsWith("### "));
+    expect(headings).toEqual(["### Actions", "### Data", "### Data › Code", "### Data › Lists"]);
+  });
+});

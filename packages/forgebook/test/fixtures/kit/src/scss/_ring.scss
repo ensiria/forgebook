@@ -1,0 +1,16 @@
+// A fixture Sass module for the catalogue's tests.
+
+/// A ring around a part, drawn as a box shadow,
+/// in the given colour.
+/// @param {*} $color - the colour.
+@mixin ring(
+  $color,
+  $width: 1px
+) {
+  box-shadow: 0 0 0 $width $color;
+}
+
+/// Twice a length.
+@function double($length) {
+  @return $length * 2;
+}

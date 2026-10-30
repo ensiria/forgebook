@@ -1,0 +1,12 @@
+{
+  "name": "@fixture/kit",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./select": "./src/Select.tsx",
+    "./utils/format-size": "./src/formatSize.ts",
+    "./scss/ring": "./src/scss/_ring.scss",
+    "./kit.css": "./src/kit.scss",
+    "./stories": "./stories.ts"
+  }
+}

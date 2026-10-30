@@ -1,0 +1,38 @@
+// The catalogue's own helpers for its shell.
+
+@use "tokens" as *;
+
+/// The keyboard focus ring: an outline halo (forced colours keep it) and an inset edge, the part's shadow kept.
+/// @param {String} $placement [outside] - `inside` draws the halo within the edge, for rows and tabs.
+/// @param {*} $shadow [null] - the part's own shadow.
+/// @param {*} $edge [$focus-edge] - the edge while focused.
+@mixin focus-ring($placement: outside, $shadow: null, $edge: $focus-edge) {
+  &:focus-visible {
+    outline: $focus-width solid $focus-halo;
+    @if $placement == inside {
+      outline-offset: -$focus-width;
+    } @else {
+      outline-offset: 0;
+    }
+    @if $shadow {
+      box-shadow: $edge, $shadow;
+    } @else {
+      box-shadow: $edge;
+    }
+  }
+}
+
+/// One line, cut with an ellipsis.
+@mixin truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/// A group label: small capitals.
+@mixin label {
+  font: $text-label;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

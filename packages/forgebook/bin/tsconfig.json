@@ -1,0 +1,9 @@
+// The catalogue's commands: Node runs them directly with their types stripped, so relative imports carry `.ts`.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@radar/typescript-config/node.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}

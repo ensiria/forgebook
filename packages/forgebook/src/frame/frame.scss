@@ -1,0 +1,69 @@
+// The frame's page: only the story's room. The background and the text colour are the source's (its required style
+// sheets style `body`), so the frame follows the view's switches like the story does; the catalogue sets only the
+// spacing and its own error message.
+
+@use "../styles/tokens" as *;
+
+@layer catalogue {
+  body {
+    margin: 0;
+  }
+
+  .forgebook-frame {
+    box-sizing: border-box;
+
+    &[data-layout="padded"] {
+      padding: $space-6;
+    }
+
+    &[data-layout="centered"] {
+      display: grid;
+      place-items: center;
+      min-height: 12rem;
+      padding: $space-6;
+    }
+
+    &[data-layout="fullscreen"] {
+      min-height: 100vh;
+    }
+  }
+
+  // a story as a matrix: the names take the frame's own text colour, so they read in every theme
+  .forgebook-matrix__table {
+    border-collapse: collapse;
+  }
+
+  .forgebook-matrix__corner,
+  .forgebook-matrix__name {
+    padding: $space-2 $space-3;
+    font: $text-mono-small;
+    text-align: start;
+    white-space: nowrap;
+    opacity: 0.7;
+  }
+
+  .forgebook-matrix__cell {
+    padding: $space-3;
+    vertical-align: middle;
+  }
+
+  .forgebook-frame-error {
+    margin: $space-6;
+    font: $text-body;
+    color: $danger-text;
+  }
+
+  .forgebook-frame-error__message {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  // the stack scrolls inside its box: a long line must not widen the frame
+  .forgebook-frame-error__stack {
+    margin: $space-3 0 0;
+    overflow-x: auto;
+    font: $text-mono-small;
+    color: $text-secondary;
+    white-space: pre;
+  }
+}
