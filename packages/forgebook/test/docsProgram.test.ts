@@ -8,8 +8,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { markSourcesChanged, programFor } from "../src/vite/docsProgram";
+import { KIT_DIR } from "./fixturePaths";
 
-const SELECT = join(import.meta.dirname, "fixtures", "kit", "src", "Select.tsx");
+const SELECT = join(KIT_DIR, "src", "Select.tsx");
 
 describe("programFor", () => {
   it("reads the same program again while no source changed, and a new one after a change", () => {

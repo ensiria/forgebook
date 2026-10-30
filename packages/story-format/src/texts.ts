@@ -3,8 +3,9 @@
  * names a text by its key, and the package's locale files hold the words (`stories/locales/en.json`, `it.json`, …).
  *
  * @remarks
- * The catalogue provides the texts of the shown language (`StoryTextsContext`), English where a language lacks a key;
- * a story reads them with `useStoryText()` in a component or `context.text()` in a render or a play function, and an
+ * The catalogue provides the texts of the shown language, English where a language lacks a key; a story reads them
+ * with `context.text()` in a render or a play function, or a framework's own access in a component (`useStoryText()`
+ * in `@forgebook/react/texts`), and an
  * arg names one with `storyText("key")`: args are plain data, written before any language is known, so the catalogue
  * gives the story the text in the shown language and the props panel shows it with its key. A key is written as a
  * plain string literal (`text("skeleton.dashboard.title")`, `storyText("button.save")`), so `forgebook-texts` can find
@@ -13,8 +14,6 @@
  *
  * @module
  */
-import { createContext, useContext } from "react";
-
 /** One language's texts, by key. */
 export type StoryTextTable = Readonly<Record<string, string>>;
 
@@ -72,13 +71,3 @@ export const storyText = (key: string, values?: StoryTextValues): StoryTextArg =
  */
 export const isStoryTextArg = (value: unknown): value is StoryTextArg =>
   typeof value === "object" && value !== null && "storyText" in value && typeof value.storyText === "string";
-
-/** The texts of the shown language, as the catalogue's frame provides them; none outside a catalogue. */
-export const StoryTextsContext = createContext<StoryTextTable>({});
-
-/**
- * The text function of the shown language, for a component inside a story.
- *
- * @returns `text(key, values?)`.
- */
-export const useStoryText = (): StoryTextFunction => storyTextOf(useContext(StoryTextsContext));

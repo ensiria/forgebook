@@ -69,7 +69,7 @@ const config: Linter.Config[] = [
   },
   {
     // tests are long on purpose: one case after another
-    files: ["**/*.test.ts", "**/*.test.tsx", "**/test/**"],
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/*.e2e.ts", "**/test/**"],
     rules: { "max-lines": "off" }
   }
 ];

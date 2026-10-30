@@ -3,15 +3,15 @@
  *
  * @module
  */
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { extractComponentDocs, extractStoryComponent } from "../src/vite/extractDocs";
+import { KIT_DIR } from "./fixturePaths";
 
 /** The fixture package's components, a workspace package of the core's tests. */
-const KIT = join(dirname(createRequire(import.meta.url).resolve("@fixture/kit/package.json")), "src");
+const KIT = join(KIT_DIR, "src");
 
 describe("extractComponentDocs", () => {
   const docs = extractComponentDocs(join(KIT, "Select.stories.tsx"));

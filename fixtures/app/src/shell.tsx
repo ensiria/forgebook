@@ -4,9 +4,9 @@
  * @module
  */
 import { source } from "@fixture/kit/stories";
+import { storyJsx } from "@forgebook/react/code";
 import { mountShell } from "forgebook/shell";
 
-import { storyJsx } from "../../src/storyJsx";
 import { LANGUAGES } from "./languages";
 import logoUrl from "./logo.svg?url";
 

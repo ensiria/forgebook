@@ -9,8 +9,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { componentPage, markdownHtml, pageFileOf, pageMarkdown } from "../src/vite/componentPage";
+import { KIT_DIR } from "./fixturePaths";
 
-const KIT = join(import.meta.dirname, "fixtures", "kit", "src");
+const KIT = join(KIT_DIR, "src");
 
 describe("component pages", () => {
   it("finds the documentation file by the component's name in kebab case", () => {

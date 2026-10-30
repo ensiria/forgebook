@@ -10,9 +10,8 @@
  * @module
  */
 
-import { StoryClockContext } from "@forgebook/story-format/clock";
 import type { StoryContext } from "@forgebook/story-format/csf";
-import { StoryTextsContext, storyTextOf } from "@forgebook/story-format/texts";
+import { storyTextOf } from "@forgebook/story-format/texts";
 import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
 import { untracedStep } from "forgebook/renderer";
 import type { LoadedArgs } from "forgebook/story-module";
@@ -20,8 +19,24 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 
+import { StoryClockContext } from "./clock";
 import { StoryErrorBoundary } from "./StoryErrorBoundary";
 import { storyElement } from "./storyElement";
+import { StoryTextsContext } from "./texts";
+
+/**
+ * A story inside its language's provider.
+ *
+ * @remarks
+ * A React catalogue's languages are `StoryLanguage`s of `@forgebook/react` (their provider returns `ReactNode`); the
+ * frame passes them on unread, as the format's `StoryLanguage<unknown>`, so what the provider returns is taken back as
+ * React's here, the one place it comes back.
+ *
+ * @param wrap - the language's provider.
+ * @param story - the story.
+ */
+const languageWrapped = (wrap: NonNullable<StoryDrawing["wrap"]>, story: ReactNode): ReactNode =>
+  wrap(story) as ReactNode;
 
 /**
  * The story in the texts', clock's and language's providers.
@@ -30,7 +45,7 @@ import { storyElement } from "./storyElement";
  * @param story - the story's element, to wrap.
  */
 const inProviders = (drawing: StoryDrawing, story: ReactNode): ReactNode => {
-  const inLanguage = drawing.wrap === undefined ? story : drawing.wrap(story);
+  const inLanguage = drawing.wrap === undefined ? story : languageWrapped(drawing.wrap, story);
   return (
     <StoryTextsContext.Provider value={drawing.texts}>
       <StoryClockContext.Provider value={drawing.clock}>{inLanguage}</StoryClockContext.Provider>

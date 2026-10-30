@@ -1,0 +1,10 @@
+// The shell's browser tests, run by Playwright on Node.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/node.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}

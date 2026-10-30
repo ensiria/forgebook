@@ -1,6 +1,0 @@
-// A small package of components, read by the extractor's tests.
-{
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@forgebook/typescript-config/react.json",
-  "include": ["src"]
-}

@@ -1,9 +1,9 @@
 /**
- * The catalogue's own browser tests: the shell and its frames, on the fixture app (`test/app`), the flows
+ * The catalogue's own browser tests: the shell and its frames, on the fixture app (`src/`), the flows
  * the unit tests cannot reach (the address, the panel, the stage, the keys, the errors).
  *
  * @remarks
- * Run with `pnpm --filter @forgebook/react test:shell`. The port comes from `FORGEBOOK_SHELL_PORT`, so two
+ * Run with `pnpm --filter @fixture/app test:shell`. The port comes from `FORGEBOOK_SHELL_PORT`, so two
  * worktrees can run the tests at once.
  *
  * @module
@@ -21,7 +21,7 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"]],
   webServer: {
-    command: `pnpm exec vite --config ${join(import.meta.dirname, "..", "app", "vite.config.ts")} --host 127.0.0.1 --port ${PORT} --strictPort`,
+    command: `pnpm exec vite --config ${join(import.meta.dirname, "..", "src", "vite.config.ts")} --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: false
   },

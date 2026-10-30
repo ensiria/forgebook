@@ -2,9 +2,8 @@
   "name": "@forgebook/story-format",
   "version": "0.0.0",
   "private": true,
-  "description": "The story format of the Ensiria packages: the CSF 3 types a story file is written with, the StorySource a package hands a catalogue, the texts inside the stories in the shown language, and the story clock a Live story reads. React only: a library's stories depend on the format, not on the catalogue that shows them.",
+  "description": "The story format of Forgebook: the CSF 3 types a story file is written with, generic over a framework, the StorySource a package hands a catalogue, the texts inside the stories in the shown language, and the story clock a Live story reads. No dependency: a library's stories depend on their framework's package, never on the catalogue that shows them.",
   "keywords": [
-    "react",
     "stories",
     "csf",
     "design-system"
@@ -27,11 +26,7 @@
   "scripts": {
     "typecheck": "tsc -p src"
   },
-  "peerDependencies": {
-    "react": "^19.0.0"
-  },
   "devDependencies": {
-    "@forgebook/typescript-config": "workspace:*",
-    "@types/react": "19.3.0"
+    "@forgebook/typescript-config": "workspace:*"
   }
 }

@@ -4,7 +4,7 @@
  *
  * @module
  */
-import type { StoryLanguage } from "@forgebook/story-format/source";
+import type { StoryLanguage } from "@forgebook/react";
 import type { ReactNode } from "react";
 
 /** Draws a story as it is. */

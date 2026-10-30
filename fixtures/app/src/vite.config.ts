@@ -4,10 +4,9 @@
  * @module
  */
 
+import { react } from "@forgebook/react/vite";
 import { forgebookPlugin } from "forgebook/vite";
 import { defineConfig } from "vite";
-
-import { react } from "../../src/vite/react.ts";
 
 export default defineConfig({
   root: import.meta.dirname,

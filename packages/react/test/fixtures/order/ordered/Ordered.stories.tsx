@@ -3,7 +3,7 @@
  *
  * @module
  */
-import type { Meta } from "@forgebook/story-format/csf";
+import type { Meta } from "@forgebook/react";
 
 import { Ordered } from "./Ordered";
 

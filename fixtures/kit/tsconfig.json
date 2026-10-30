@@ -1,0 +1,10 @@
+// The fixture kit: a small package of React components with their stories, read by the extractor's and the plugin's
+// tests and shown by the fixture catalogue.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client", "@forgebook/story-format/client"]
+  },
+  "include": ["src", "stories.ts"]
+}

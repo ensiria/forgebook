@@ -4,23 +4,23 @@
  *
  * @remarks
  * Objects, strings and lists are checked for their shape; a function's parameters cannot be checked at run time, so a
- * function is taken with the signature CSF gives it (a component, a render, a play function, a decorator).
+ * function is taken with the signature CSF gives it (a component, a render, a play function, a decorator). What a
+ * component, a render and a decorator return is the framework's (`unknown` here); its renderer draws it.
  *
  * @module
  */
 
 import type { ForcedState, ReplayMode, StoryContext, StoryParameters } from "@forgebook/story-format/csf";
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
-import type { ReactNode } from "react";
 
 /** Args as the frame handles them: whatever the story's component takes. */
 export type LoadedArgs = Readonly<Record<string, unknown>>;
 
-/** A component of the loaded file. */
-export type LoadedComponent = (props: LoadedArgs) => ReactNode;
+/** A component of the loaded file: what it returns is the framework's. */
+export type LoadedComponent = (props: LoadedArgs) => unknown;
 
 /** A decorator of the loaded file. */
-export type LoadedDecorator = (story: () => ReactNode, context: StoryContext<LoadedArgs>) => ReactNode;
+export type LoadedDecorator = (story: () => unknown, context: StoryContext<LoadedArgs>) => unknown;
 
 /** What the frame renders: the meta and one story, merged. */
 export type LoadedStory = {
@@ -29,7 +29,7 @@ export type LoadedStory = {
   /** The meta's args, then the story's. */
   readonly args: LoadedArgs;
   /** The story's render, when it has one. */
-  readonly render: ((args: LoadedArgs, context: StoryContext<LoadedArgs>) => ReactNode) | undefined;
+  readonly render: ((args: LoadedArgs, context: StoryContext<LoadedArgs>) => unknown) | undefined;
   /** The story's play function. */
   readonly play: ((context: StoryContext<LoadedArgs>) => Promise<void> | void) | undefined;
   /** The story's decorators first (innermost), then the meta's. */

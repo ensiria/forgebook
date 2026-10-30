@@ -4,17 +4,16 @@
  *
  * @module
  */
-import { createRequire } from "node:module";
-import { dirname } from "node:path";
 
 import { collectDocs } from "forgebook/catalogue-docs";
 import { catalogueMarkdown } from "forgebook/catalogue-markdown";
 import { describe, expect, it } from "vitest";
 
 import { extractStoryComponent } from "../src/vite/extractDocs";
+import { KIT_DIR } from "./fixturePaths";
 
 /** The fixture package, a workspace package of the core's tests. */
-const KIT = dirname(createRequire(import.meta.url).resolve("@fixture/kit/package.json"));
+const KIT: string = KIT_DIR;
 
 describe("collectDocs and catalogueMarkdown", () => {
   const { data, problems } = collectDocs(KIT, extractStoryComponent);

@@ -1,0 +1,11 @@
+// The fixture catalogue's pages and its Vite config.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    // the Vite plugin and the React adapter carry the `.ts` extension in their own imports (Node loads them directly)
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}

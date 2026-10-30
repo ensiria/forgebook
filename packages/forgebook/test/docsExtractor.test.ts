@@ -8,9 +8,10 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createDocsExtractor } from "../src/vite/docsExtractor";
+import { KIT_DIR } from "./fixturePaths";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
 
-const KIT = join(import.meta.dirname, "fixtures", "kit", "src");
+const KIT = join(KIT_DIR, "src");
 
 describe("createDocsExtractor", () => {
   const extractor = createDocsExtractor(STUB_FRAMEWORK.docsModule);

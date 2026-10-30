@@ -186,7 +186,7 @@
         "packages/forgebook/bin/**",
         "packages/forgebook/test/**",
         "packages/react/src/vite/**",
-        "packages/react/test/app/vite.config.ts",
+        "fixtures/app/src/vite.config.ts",
         "packages/testing/bin/**",
         "packages/testing/src/**",
         "packages/testing/test/**"
@@ -220,10 +220,7 @@
       }
     },
     {
-      "includes": [
-        "packages/testing/src/playwrightConfig.ts",
-        "packages/react/test/shell/playwright.config.ts"
-      ],
+      "includes": ["packages/testing/src/playwrightConfig.ts", "fixtures/app/shell/playwright.config.ts"],
       "linter": {
         "rules": {
           "style": {

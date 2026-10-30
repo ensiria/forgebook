@@ -6,13 +6,13 @@
  */
 
 import { heldStoryClock } from "@forgebook/story-format/clock";
-import { useStoryText } from "@forgebook/story-format/texts";
 import type { StoryDrawing } from "forgebook/renderer";
 import { type LoadedStory, readStory } from "forgebook/story-module";
 import { type ReactNode, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { reactRenderer } from "../src/reactRenderer";
+import { useStoryText } from "../src/texts";
 
 /**
  * A story from a story file's exports, as the frame reads it.

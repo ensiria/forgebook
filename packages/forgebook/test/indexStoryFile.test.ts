@@ -9,7 +9,7 @@ import { indexStoryFile } from "../src/vite/indexStoryFile";
 
 describe("indexStoryFile", () => {
   it("reads the title through satisfies and the stories with their names, in order", () => {
-    const text = `import type { Meta, Story } from "@forgebook/story-format/csf";
+    const text = `import type { Meta, Story } from "@forgebook/react";
       export default { title: "Inputs/Selection/Select", component: Select } satisfies Meta<typeof Select>;
       export const Overview: Story<typeof Select> = { render: () => null };
       export const Danger = { name: "Danger · small", args: { tone: "danger" } } satisfies Story;

@@ -9,39 +9,32 @@
  * keeps tool-specific settings.
  * A Live story (`parameters.clock`) reads the story clock the catalogue runs (`./clock`, D-504).
  *
+ * The types are generic over a renderer, as Storybook's are: what a framework's component is and what a render
+ * returns. A framework's package names them for its own (`Meta<typeof Button>` in `@forgebook/react`), and story
+ * files import them from there; nothing here depends on a framework.
+ *
  * @module
  */
-import type { ReactNode } from "react";
+// a story draws in a page (`canvasElement`): code on Node that reads these types (the catalogue's plugin) gets the DOM's
+// types from here
+/// <reference lib="dom" />
 
 import type { StoryClock, StoryClockSetting } from "./clock";
 import type { StoryTextArg, StoryTextFunction } from "./texts";
 
 /**
- * Any function component (the library writes no class components); the props are what the stories' args fill in.
- * Its parameter is `never` so a component of any props is assignable to it.
+ * A framework, as the story types read it: what a meta names as its component, and what a render, a decorator and a
+ * language's provider return.
  */
-export type AnyComponent = (props: never) => ReactNode;
-
-/** A component's props, every one optional: what a story's args may set. */
-export type ArgsOf<TComponent extends AnyComponent> = TComponent extends (props: infer TProps) => ReactNode
-  ? Partial<TProps>
-  : never;
+export type Renderer = {
+  /** A component of the framework. */
+  readonly component: unknown;
+  /** What a story draws (`ReactNode` in React). */
+  readonly storyResult: unknown;
+};
 
 /** A value a story's args may write for a prop: the prop's own, or, where it takes a text, a text named by its key. */
 export type WrittenArg<TValue> = string extends TValue ? TValue | StoryTextArg : TValue;
-
-/**
- * What a story's `args` may write: the component's props, every one optional, a prop that takes a text also as
- * `storyText("key")`. The render and the play function receive `ArgsOf`, the text already in the shown language.
- */
-export type WrittenArgsOf<TComponent extends AnyComponent> = TComponent extends (
-  props: infer TProps
-) => ReactNode
-  ? { [TName in keyof TProps]?: WrittenArg<TProps[TName]> }
-  : never;
-
-/** A page with no component (a foundations page): no args. */
-export type NoComponent = () => ReactNode;
 
 /** An interaction state the catalogue can show without the pointer or the keyboard (`parameters.forceState`). */
 export type ForcedState = "hover" | "active" | "focus" | "focus-visible" | "focus-within";
@@ -137,10 +130,16 @@ export type StoryContext<TArgs> = {
 };
 
 /** Wraps a story: a provider, a container of a given width. */
-export type Decorator<TArgs> = (story: () => ReactNode, context: StoryContext<TArgs>) => ReactNode;
+export type Decorator<TRenderer extends Renderer, TArgs> = (
+  story: () => TRenderer["storyResult"],
+  context: StoryContext<TArgs>
+) => TRenderer["storyResult"];
 
-/** A story file's default export. */
-export type Meta<TComponent extends AnyComponent = NoComponent> = {
+/**
+ * A story file's default export, for a framework: `TComponent` is the component it shows, `TArgs` what its render
+ * receives and `TWrittenArgs` what its args may write (a framework's package derives both from the component's props).
+ */
+export type CsfMeta<TRenderer extends Renderer, TComponent, TArgs, TWrittenArgs> = {
   /** Where it sits in the catalogue: `Family/Name` or `Family/Group/Name` (`Inputs/Selection/Select`). */
   readonly title: string;
   /** The component the stories show; their args are its props. */
@@ -151,9 +150,9 @@ export type Meta<TComponent extends AnyComponent = NoComponent> = {
    * `subcomponents`, so the stories stay readable by it. Written in the meta as an object of imported components: the
    * catalogue reads it without running the file.
    */
-  readonly subcomponents?: Readonly<Record<string, AnyComponent>>;
+  readonly subcomponents?: Readonly<Record<string, TRenderer["component"]>>;
   /** Args every story of the file starts from. */
-  readonly args?: WrittenArgsOf<TComponent>;
+  readonly args?: TWrittenArgs;
   /**
    * Other places the catalogue lists the component in, besides its title's, as `Family` or `Family/Group`
    * (`["Data/Tables"]`): a component that belongs to one family but is looked for in another. Each place shows an
@@ -174,21 +173,21 @@ export type Meta<TComponent extends AnyComponent = NoComponent> = {
   /** Settings for every story of the file. */
   readonly parameters?: StoryParameters;
   /** Wrappers for every story of the file, outermost last. */
-  readonly decorators?: readonly Decorator<ArgsOf<TComponent>>[];
+  readonly decorators?: readonly Decorator<TRenderer, TArgs>[];
 };
 
-/** A story: a named export of a story file. */
-export type Story<TComponent extends AnyComponent = NoComponent> = {
+/** A story, a named export of a story file, for a framework: its args as in `CsfMeta`. */
+export type CsfStory<TRenderer extends Renderer, TArgs, TWrittenArgs> = {
   /** The name in the catalogue; by default the export's name in sentence case (`KeyboardOpen` → "Keyboard open"). */
   readonly name?: string;
   /** Args over the meta's. */
-  readonly args?: WrittenArgsOf<TComponent>;
+  readonly args?: TWrittenArgs;
   /** What the story renders; by default the meta's component with the args. */
-  readonly render?: (args: ArgsOf<TComponent>, context: StoryContext<ArgsOf<TComponent>>) => ReactNode;
+  readonly render?: (args: TArgs, context: StoryContext<TArgs>) => TRenderer["storyResult"];
   /** Runs after the story renders: a keyboard flow, an async path (the tests run it too). */
-  readonly play?: (context: StoryContext<ArgsOf<TComponent>>) => Promise<void> | void;
+  readonly play?: (context: StoryContext<TArgs>) => Promise<void> | void;
   /** Settings over the meta's. */
   readonly parameters?: StoryParameters;
   /** Wrappers inside the meta's. */
-  readonly decorators?: readonly Decorator<ArgsOf<TComponent>>[];
+  readonly decorators?: readonly Decorator<TRenderer, TArgs>[];
 };

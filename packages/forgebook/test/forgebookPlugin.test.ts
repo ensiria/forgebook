@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { forgebookPlugin } from "../src/vite/forgebookPlugin";
+import { KIT_DIR } from "./fixturePaths";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework";
 
 /** A dev server reduced to what the plugin touches, recording what it does. */
@@ -56,7 +57,7 @@ const fakeServer = (): {
 };
 
 /** The fixture package, whose story files the patterns match. */
-const KIT = join(import.meta.dirname, "fixtures", "kit");
+const KIT: string = KIT_DIR;
 
 /** The plugin's hooks, called as Vite calls them, with the files a load asked to watch. */
 const hooksOf = (
