@@ -29,6 +29,9 @@ const elementOf = (drawing: StoryDrawing, canvas: HTMLElement): HTMLElement => {
     text: storyTextOf(drawing.texts),
     clock: drawing.clock,
     globals: drawing.globals,
+    loaded: drawing.loaded,
+    ...drawing.identity,
+    parameters: drawing.story.parameters,
     canvasElement: canvas
   };
   const drawn: unknown = drawing.story.render?.(drawing.args, context);

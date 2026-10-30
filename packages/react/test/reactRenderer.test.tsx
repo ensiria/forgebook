@@ -15,7 +15,7 @@ import {
   readPreview,
   readStory
 } from "forgebook/story-module";
-import { type ReactNode, useState } from "react";
+import { forwardRef, memo, type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { reactRenderer } from "../src/reactRenderer";
@@ -59,13 +59,23 @@ const drawing = (
   args: Record<string, unknown>,
   decorators: readonly LoadedDecorator[] = []
 ): StoryDrawing => ({
+  identity: { id: "kit:kit-greeting--greeting", name: "Greeting", title: "Kit/Greeting" },
   story: loaded({ render: (storyArgs: { readonly name?: unknown }) => <Greeting name={storyArgs.name} /> }),
   args,
   texts: { hello: "Ciao" },
   clock: heldStoryClock(0),
   decorators,
-  globals: { lang: "it" }
+  globals: { lang: "it" },
+  loaded: {}
 });
+
+/** A component made by `memo`: an object, not a function. */
+const Memoized = memo(({ name }: { readonly name?: unknown }): ReactNode => <b>{String(name)}</b>);
+
+/** A component made by `forwardRef`: an object, not a function. */
+const Forwarded = forwardRef<HTMLElement, { readonly name?: unknown }>(({ name }, ref) => (
+  <i ref={ref}>{String(name)}</i>
+));
 
 describe("reactRenderer", () => {
   it("renders a story on the server inside the catalogue's decorators, which read its globals, with its texts", () => {
@@ -104,5 +114,14 @@ describe("reactRenderer", () => {
     expect(canvas.textContent).toBe("");
     mounted.update(drawing({ name: "Ada" }));
     await vi.waitFor(() => expect(canvas.textContent).toContain("Ciao Ada"));
+  });
+
+  it("draws a meta's component made by memo or forwardRef, with the story's args", () => {
+    for (const component of [Memoized, Forwarded]) {
+      const story = readStory({ default: { title: "Kit/Name", component }, Shown: {} }, "Shown");
+      if (typeof story === "string") throw new Error(story);
+      const html = reactRenderer.renderToString({ ...drawing({ name: "Ada" }), story });
+      expect(html).toContain("Ada");
+    }
   });
 });

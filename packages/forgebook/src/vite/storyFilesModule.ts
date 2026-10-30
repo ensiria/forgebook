@@ -14,6 +14,7 @@ import { join, relative, resolve } from "node:path";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
+import { autoTitle, patternBase } from "./autoTitle.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
 
 /**
@@ -49,7 +50,12 @@ export const storyFilesModule = (root: string, pattern: string, watch: (file: st
   for (const key of keys) {
     const file = resolve(root, key);
     watch(file);
-    const entry = indexStoryFile(file, readFileSync(file, "utf8"));
+    const title = autoTitle(patternBase(pattern), key);
+    const entry = indexStoryFile(
+      file,
+      readFileSync(file, "utf8"),
+      title === undefined ? {} : { autoTitle: title }
+    );
     if (typeof entry === "string") throw new Error(entry);
     index[key] = entry;
   }

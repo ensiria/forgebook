@@ -15,6 +15,7 @@ import { join, resolve } from "node:path";
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
+import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import type {
   CatalogueComponent,
@@ -56,12 +57,16 @@ const collectComponents = (
 ): { components: CatalogueComponent[]; componentFiles: Set<string> } => {
   const components: CatalogueComponent[] = [];
   const componentFiles = new Set<string>();
-  const storyFiles = globSync("**/*.stories.tsx", { cwd: packageDir })
+  const storyFiles = globSync("**/*.stories.*", { cwd: packageDir })
+    .filter((file) => STORY_FILE.test(file))
     .filter((file) => !file.split("/").some((segment) => segment === "node_modules" || segment === "dist"))
     .sort();
   for (const relative of storyFiles) {
     const file = join(packageDir, relative);
-    const index: StoryFileIndex | string = indexStoryFile(file, readFileSync(file, "utf8"));
+    // a meta without a title is placed by its path from the package's folder: the catalogue's patterns are not known
+    const title = autoTitle("", relative);
+    const options = title === undefined ? {} : { autoTitle: title };
+    const index: StoryFileIndex | string = indexStoryFile(file, readFileSync(file, "utf8"), options);
     const component = extractStoryComponent(file);
     if (typeof index === "string" || typeof component === "string") {
       problems.push(typeof index === "string" ? index : `${relative}: ${String(component)}`);

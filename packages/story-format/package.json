@@ -21,12 +21,27 @@
     "./clock": "./src/clock.ts",
     "./source": "./src/source.ts",
     "./client": "./src/client.d.ts",
-    "./texts": "./src/texts.ts"
+    "./texts": "./src/texts.ts",
+    "./testing-library": "./src/testingLibrary.ts"
   },
   "scripts": {
     "typecheck": "tsc -p src"
   },
   "devDependencies": {
-    "@forgebook/typescript-config": "workspace:*"
+    "@forgebook/typescript-config": "workspace:*",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8"
+  },
+  "peerDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/user-event": "^14.6.0"
+  },
+  "peerDependenciesMeta": {
+    "@testing-library/dom": {
+      "optional": true
+    },
+    "@testing-library/user-event": {
+      "optional": true
+    }
   }
 }

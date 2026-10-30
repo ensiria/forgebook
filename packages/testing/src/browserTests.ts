@@ -19,7 +19,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import { heldClockAddress } from "forgebook/story-clock";
-import { storyLocations, storyTree } from "forgebook/story-tree";
+import { storyTree, testedStoryLocations } from "forgebook/story-tree";
 import { DEFAULT_SWITCHES, switchWithRole, type ViewSwitch } from "forgebook/switches";
 import { defaultView, frameAddress, type ViewState } from "forgebook/view-state";
 
@@ -131,7 +131,7 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
   const catalogue = catalogueSettings("", switches, options.lists);
   const defaults = defaultView(catalogue);
   const tree = storyTree([indexedSource(options)]);
-  const groups = Map.groupBy(storyLocations(tree), (location) => location.component.title);
+  const groups = Map.groupBy(testedStoryLocations(tree), (location) => location.component.title);
   for (const [title, locations] of groups) {
     test.describe(title, () => {
       for (const { story } of locations) {

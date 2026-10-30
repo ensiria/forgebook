@@ -18,7 +18,8 @@ import {
   storyId,
   storyName,
   storyTree,
-  type TreeFamily
+  type TreeFamily,
+  testedStoryLocations
 } from "../src/storyTree";
 
 /** The story groups a Kaji-like catalogue names, in their order. */
@@ -193,18 +194,47 @@ describe("storyTree", () => {
     ]);
   });
 
+  it("places Storybook's titles of any depth", () => {
+    const deep = storyTree([
+      source({
+        "./x.stories.tsx": { title: "Lonely", stories: [] },
+        "./y.stories.tsx": { title: "Atoms/Forms/Inputs/Field", stories: [] }
+      })
+    ]);
+    expect(deep.problems).toEqual([]);
+    const places = deep.sources[0]?.families.map((family) => ({
+      family: family.name,
+      groups: family.groups.map((group) => ({
+        group: group.name,
+        components: group.components.map((component) => component.name)
+      }))
+    }));
+    expect(places).toEqual([
+      { family: "Atoms", groups: [{ group: "Forms / Inputs", components: ["Field"] }] },
+      { family: "Lonely", groups: [{ group: undefined, components: ["Lonely"] }] }
+    ]);
+  });
+
+  it("reports what the index noted, and keeps the file", () => {
+    const noted = storyTree([
+      source({ "./x.stories.tsx": { title: "A/X", notes: ["its title is written by code"], stories: [] } })
+    ]);
+    expect(noted.problems).toEqual(["Kit: ./x.stories.tsx: its title is written by code"]);
+    expect(noted.sources[0]?.families[0]?.groups[0]?.components.map((component) => component.name)).toEqual([
+      "X"
+    ]);
+  });
+
   it("leaves out and reports titles it cannot place and titles used twice", () => {
     const broken = storyTree([
       source({
-        "./x.stories.tsx": { title: "Lonely", stories: [] },
-        "./y.stories.tsx": { title: "A/B/C/D", stories: [] },
+        "./y.stories.tsx": { title: "A//D", stories: [] },
         "./z.stories.tsx": { title: "A/B", stories: [] },
         "./w.stories.tsx": { title: "A/B", stories: [] }
       })
     ]);
     expect(broken.problems).toEqual([
-      'Kit: ./x.stories.tsx: "Lonely" is not Family/Name or Family/Group/Name',
-      'Kit: ./y.stories.tsx: "A/B/C/D" is not Family/Name or Family/Group/Name',
+      'Kit: ./y.stories.tsx: "A//D" has an empty segment',
       'Kit: ./w.stories.tsx and ./z.stories.tsx have the same title "A/B"'
     ]);
     expect(broken.sources[0]?.families[0]?.groups[0]?.components.map((component) => component.file)).toEqual([
@@ -287,6 +317,35 @@ describe("aliases and related components (D-492)", () => {
       'Kit: ./a.stories.tsx: also in "A/B/C" is not Family or Family/Group',
       'Kit: ./a.stories.tsx: also in "Recipes/" has an empty segment',
       'Kit: ./b.stories.tsx is also in "Data/Tables", which already lists a Table'
+    ]);
+  });
+});
+
+describe("tags", () => {
+  const tagged = storyTree([
+    source({
+      "./x.stories.tsx": {
+        title: "A/X",
+        stories: [
+          { exportName: "Shown", tags: ["autodocs"] },
+          { exportName: "Hidden", tags: ["!dev"] },
+          { exportName: "Untested", tags: ["!test"] }
+        ]
+      }
+    })
+  ]);
+  const component = tagged.sources[0]?.families[0]?.groups[0]?.components[0];
+
+  it("lists no story tagged !dev, which still opens by its address", () => {
+    expect(component?.stories.map((story) => story.exportName)).toEqual(["Shown", "Untested"]);
+    expect(component?.unlisted.map((story) => story.exportName)).toEqual(["Hidden"]);
+    expect(findStory(tagged, "kit:a-x--hidden")?.story.exportName).toBe("Hidden");
+  });
+
+  it("tests every story but those tagged !test", () => {
+    expect(testedStoryLocations(tagged).map((location) => location.story.exportName)).toEqual([
+      "Shown",
+      "Hidden"
     ]);
   });
 });

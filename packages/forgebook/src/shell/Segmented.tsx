@@ -30,6 +30,8 @@ export type SegmentedProps<TValue extends string | number> = {
   readonly onValueChange: (value: TValue) => void;
   /** Whether the choice is off (the compare view fixes the theme); `false` by default. */
   readonly isDisabled?: boolean;
+  /** Why the choice is off, as its tooltip (the story sets it); none by default. */
+  readonly disabledNote?: string | undefined;
   /** What closes the group inside its frame (the width's field after its presets); none by default. */
   readonly after?: ReactNode;
 };
@@ -45,11 +47,16 @@ export const Segmented = <TValue extends string | number>({
   value,
   onValueChange,
   isDisabled = false,
+  disabledNote,
   after
 }: SegmentedProps<TValue>): ReactNode => {
   const name = useId();
   return (
-    <fieldset className="forgebook-segmented" disabled={isDisabled}>
+    <fieldset
+      className="forgebook-segmented"
+      disabled={isDisabled}
+      title={isDisabled ? disabledNote : undefined}
+    >
       <legend className="forgebook-visually-hidden">{label}</legend>
       {options.map((option) => (
         <label

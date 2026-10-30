@@ -1,7 +1,9 @@
 /**
  * The panel's Props tab: the props the story lets the panel set, grouped by control (choices, text and numbers,
  * toggles), each with its description and default, then the props it cannot set. A story of fixed examples sets none:
- * the tab says so and lists every prop for reading (D-64).
+ * the tab says so and lists every prop for reading (D-64). The props come with the story's `argTypes` laid over them
+ * (`argTypes.ts`): a control they name (a list, buttons, checkboxes, a range, a colour, a date) wins over the one
+ * the prop's type gives.
  *
  * @module
  */
@@ -9,10 +11,10 @@
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
-import type { ComponentDocs, PropDocs } from "../componentDocs";
+import type { PanelProp } from "../argTypes";
 import { type ArgValue, isNamedArg, type PanelArgs } from "../messages";
 import type { NamedValues } from "../namedValues";
-import { Segmented } from "./Segmented";
+import { ChoiceControl, NumberField, textOf } from "./PropFields";
 import { STRINGS } from "./strings";
 
 /** A prop the story gives a text by its key (`storyText("key")`): the key, and whether the panel wrote over it. */
@@ -25,8 +27,8 @@ export type TextArgNote = {
 
 /** The tab's props. */
 export type PropsTabProps = {
-  /** The component's docs. */
-  readonly docs: ComponentDocs;
+  /** The props, from the component's types with the story's `argTypes` laid over them. */
+  readonly props: readonly PanelProp[];
   /** The values shown: the story's args with the panel's changes. */
   readonly values: PanelArgs;
   /** The props the story lets the panel set. */
@@ -41,17 +43,12 @@ export type PropsTabProps = {
   readonly textArgs?: Readonly<Record<string, TextArgNote>>;
 };
 
-/** A value as a text field shows it: texts and numbers as they are, anything else empty. */
-const textOf = (value: ArgValue | undefined): string =>
-  typeof value === "string" || typeof value === "number" ? String(value) : "";
-
-/** A value as a choice holds it: a text or a number, otherwise none. */
-const choiceOf = (value: ArgValue | undefined): string | number | undefined =>
-  typeof value === "string" || typeof value === "number" ? value : undefined;
-
-/** A colour prop, by the name convention: `color`, or a name ending in `Color` (`accentColor`). */
-const isColorProp = (prop: PropDocs): boolean =>
-  prop.kind === "text" && (prop.name === "color" || prop.name.endsWith("Color"));
+/** A colour prop: named so by its `argTypes`, or by the name convention (`color`, `accentColor`). */
+const isColorProp = (prop: PanelProp): boolean =>
+  prop.control === "color" ||
+  (prop.control === undefined &&
+    prop.kind === "text" &&
+    (prop.name === "color" || prop.name.endsWith("Color")));
 
 /** A CSS colour as the colour picker takes it (`#rrggbb`), or black when the value is not one. */
 const pickerColor = (value: ArgValue | undefined): string =>
@@ -60,22 +57,11 @@ const pickerColor = (value: ArgValue | undefined): string =>
 /** No prop named by a text key. */
 const NO_TEXT_ARGS: Readonly<Record<string, TextArgNote>> = {};
 
-/** The value of the choice that leaves a prop to the story: no choice of a component is an empty text. */
-const UNSET = "";
-
-/** The most choices shown as buttons, and the longest label; past either, a list. */
-const FEW_CHOICES = { count: 4, length: 10 } as const;
-
-/** Whether a choice's values fit side by side as buttons. */
-const isFewChoices = (choices: readonly (string | number)[]): boolean =>
-  choices.length <= FEW_CHOICES.count &&
-  choices.every((choice) => choice !== UNSET && String(choice).length <= FEW_CHOICES.length);
-
 /** A prop's name, whether it is required, and its type (whole in the tooltip when it is cut). */
-const PropHead = ({ prop }: { readonly prop: PropDocs }): ReactNode => (
+const PropHead = ({ prop }: { readonly prop: PanelProp }): ReactNode => (
   <div className="forgebook-prop__head">
     <code className="forgebook-prop__name">
-      {prop.name}
+      {prop.label ?? prop.name}
       {prop.isRequired ? (
         <span className="forgebook-prop__required" title={STRINGS.required}>
           *
@@ -89,7 +75,7 @@ const PropHead = ({ prop }: { readonly prop: PropDocs }): ReactNode => (
 );
 
 /** A prop's description and default, under its control. */
-const PropNote = ({ id, prop }: { readonly id: string; readonly prop: PropDocs }): ReactNode =>
+const PropNote = ({ id, prop }: { readonly id: string; readonly prop: PanelProp }): ReactNode =>
   prop.description === "" && prop.defaultValue === undefined ? null : (
     <p id={id} className="forgebook-prop__description">
       {prop.description}
@@ -131,56 +117,6 @@ const TextArgLine = ({
   </p>
 );
 
-/** A choice's control: buttons side by side for a few short values, a list otherwise. */
-const ChoiceControl = ({
-  prop,
-  value,
-  descriptionId,
-  onValueChange
-}: {
-  readonly prop: PropDocs;
-  readonly value: ArgValue | undefined;
-  readonly descriptionId: string;
-  readonly onValueChange: PropsTabProps["onValueChange"];
-}): ReactNode => {
-  const choices = prop.choices ?? [];
-  const unsetLabel =
-    prop.defaultValue === undefined ? STRINGS.unset : STRINGS.unsetDefault(prop.defaultValue);
-  if (isFewChoices(choices)) {
-    return (
-      <Segmented
-        label={prop.name}
-        options={[
-          { value: UNSET, label: unsetLabel },
-          ...choices.map((choice) => ({ value: choice, label: String(choice) }))
-        ]}
-        value={choiceOf(value) ?? UNSET}
-        onValueChange={(chosen: string | number): void =>
-          onValueChange(prop.name, chosen === UNSET ? undefined : chosen)
-        }
-      />
-    );
-  }
-  return (
-    <select
-      aria-label={prop.name}
-      aria-describedby={descriptionId}
-      value={textOf(value)}
-      onChange={(event: ChangeEvent<HTMLSelectElement>): void => {
-        const chosen = choices.find((choice) => String(choice) === event.target.value);
-        onValueChange(prop.name, chosen);
-      }}
-    >
-      <option value="">{unsetLabel}</option>
-      {choices.map((choice) => (
-        <option key={String(choice)} value={String(choice)}>
-          {String(choice)}
-        </option>
-      ))}
-    </select>
-  );
-};
-
 /** One adjustable prop with its control. */
 const PropControl = ({
   prop,
@@ -189,7 +125,7 @@ const PropControl = ({
   textArg,
   onValueChange
 }: {
-  readonly prop: PropDocs;
+  readonly prop: PanelProp;
   readonly value: ArgValue | undefined;
   /** The values the source names for the prop's type, when it names some. */
   readonly named: Readonly<Record<string, unknown>> | undefined;
@@ -199,7 +135,7 @@ const PropControl = ({
 }): ReactNode => {
   // the description is shown under the control and named by it, so the control's name is the prop alone
   const descriptionId = useId();
-  const label = prop.name;
+  const label = prop.label ?? prop.name;
   if (named !== undefined) {
     return (
       <div className="forgebook-prop">
@@ -238,19 +174,34 @@ const PropControl = ({
       </div>
     );
   }
+  if (prop.kind === "number") {
+    return (
+      <div className="forgebook-prop">
+        <PropHead prop={prop} />
+        <div className="forgebook-prop__field">
+          <NumberField
+            prop={prop}
+            value={value}
+            descriptionId={descriptionId}
+            onValueChange={onValueChange}
+          />
+        </div>
+        <PropNote id={descriptionId} prop={prop} />
+      </div>
+    );
+  }
   return (
     <div className="forgebook-prop">
       <PropHead prop={prop} />
       <div className="forgebook-prop__field">
         <input
-          type={prop.kind === "number" ? "number" : "text"}
+          type="text"
           aria-label={label}
           aria-describedby={descriptionId}
           value={textOf(value)}
           onChange={(event: ChangeEvent<HTMLInputElement>): void => {
             const text = event.target.value;
-            if (text === "") onValueChange(prop.name, undefined);
-            else onValueChange(prop.name, prop.kind === "number" ? Number(text) : text);
+            onValueChange(prop.name, text === "" ? undefined : text);
           }}
         />
         {/* a colour picker beside the text: the field still takes any CSS colour, a token's var() included */}
@@ -258,7 +209,7 @@ const PropControl = ({
           <input
             type="color"
             className="forgebook-prop__color"
-            aria-label={STRINGS.pickColor(prop.name)}
+            aria-label={STRINGS.pickColor(label)}
             value={pickerColor(value)}
             onChange={(event: ChangeEvent<HTMLInputElement>): void =>
               onValueChange(prop.name, event.target.value)
@@ -280,7 +231,7 @@ const Toggle = ({
   value,
   onValueChange
 }: {
-  readonly prop: PropDocs;
+  readonly prop: PanelProp;
   readonly value: ArgValue | undefined;
   readonly onValueChange: PropsTabProps["onValueChange"];
 }): ReactNode => {
@@ -295,7 +246,7 @@ const Toggle = ({
           onValueChange(prop.name, event.target.checked)
         }
       />
-      <code>{prop.name}</code>
+      <code>{prop.label ?? prop.name}</code>
       <span id={descriptionId} className="forgebook-visually-hidden">
         {prop.description}
       </span>
@@ -306,10 +257,10 @@ const Toggle = ({
 /**
  * The Props tab.
  *
- * @param props - the docs, the values, which props the story lets the panel set, and the setters.
+ * @param props - the props, the values, which props the story lets the panel set, and the setters.
  */
 export const PropsTab = ({
-  docs,
+  props,
   values,
   controls,
   onValueChange,
@@ -319,12 +270,13 @@ export const PropsTab = ({
 }: PropsTabProps): ReactNode => {
   // a prop of a type the source names values for is chosen among them, a node that takes a text is set as one; any
   // other `other` prop cannot be set from the panel
-  const isNamed = (prop: PropDocs): boolean => prop.kind === "other" && namedValues[prop.type] !== undefined;
-  const isSettable = (prop: PropDocs): boolean =>
+  const isNamed = (prop: PanelProp): boolean =>
+    prop.kind === "other" && prop.control === undefined && namedValues[prop.type] !== undefined;
+  const isSettable = (prop: PanelProp): boolean =>
     (prop.kind !== "other" || prop.canTakeText === true || isNamed(prop)) &&
     prop.kind !== "event" &&
     (controls === "all" || controls.includes(prop.name));
-  const settable = docs.props.filter(isSettable);
+  const settable = props.filter(isSettable);
   const groups = [
     {
       title: STRINGS.propGroups.choice,
@@ -336,7 +288,7 @@ export const PropsTab = ({
     }
   ].filter((group) => group.props.length > 0);
   const toggles = settable.filter((prop) => prop.kind === "toggle");
-  const others = docs.props.filter((prop) => prop.kind !== "event" && !isSettable(prop));
+  const others = props.filter((prop) => prop.kind !== "event" && !isSettable(prop));
   const hasControls = controls === "all" || controls.length > 0;
   return (
     <div className="forgebook-tab-props">

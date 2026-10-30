@@ -16,8 +16,32 @@ import {
 
 describe("messages", () => {
   it("accepts well-formed messages and refuses others", () => {
-    const ready = { type: "forgebook:ready", storyId: "a", canReplay: false, hasClock: false, textKeys: {} };
+    const ready = {
+      type: "forgebook:ready",
+      storyId: "a",
+      canReplay: false,
+      hasClock: false,
+      textKeys: {},
+      argTypes: {},
+      controls: "all",
+      actions: ["onPress"],
+      fixed: { switches: { theme: "dark" }, width: 360 }
+    };
     expect(isFrameMessage({ ...ready, args: { size: "sm" } })).toBe(true);
+    expect(isFrameMessage({ ...ready, args: { sizes: ["sm", 2] } })).toBe(true);
+    expect(isFrameMessage({ ...ready, args: { sizes: ["sm", {}] } })).toBe(false);
+    expect(
+      isFrameMessage({
+        ...ready,
+        args: {},
+        argTypes: { size: { isHidden: false, control: "radio", options: ["sm", "md"] } },
+        controls: ["size"]
+      })
+    ).toBe(true);
+    expect(
+      isFrameMessage({ ...ready, args: {}, argTypes: { size: { isHidden: false, control: "dial" } } })
+    ).toBe(false);
+    expect(isFrameMessage({ ...ready, args: {}, controls: false })).toBe(false);
     expect(isFrameMessage({ ...ready, args: { hint: "Pick one" }, textKeys: { hint: "select.hint" } })).toBe(
       true
     );

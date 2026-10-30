@@ -23,7 +23,8 @@ const BUTTON: TreeComponent = {
       group: undefined,
       description: undefined,
       isMain: false,
-      height: undefined
+      height: undefined,
+      tags: []
     },
     {
       id: "kit:b--danger",
@@ -33,7 +34,8 @@ const BUTTON: TreeComponent = {
       group: undefined,
       description: "A destructive action.",
       isMain: false,
-      height: undefined
+      height: undefined,
+      tags: []
     },
     {
       id: "kit:b--long",
@@ -43,9 +45,11 @@ const BUTTON: TreeComponent = {
       group: "worst-case",
       description: "Ünbreakable text.",
       isMain: false,
-      height: undefined
+      height: undefined,
+      tags: []
     }
   ],
+  unlisted: [],
   alsoIn: [],
   related: [],
   keywords: ["Pressable", "CTA"]

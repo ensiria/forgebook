@@ -30,8 +30,13 @@ export type StoryIndexEntry = {
   readonly height?: number;
   /** Whether the story sets `parameters.main: true`: the component's demo. */
   readonly isMain?: boolean;
-  /** The first sentence of the story's TSDoc: what it shows and what to notice. */
+  /**
+   * The first sentence of the story's TSDoc, or its `parameters.docs.description.story`: what it shows and what to
+   * notice.
+   */
   readonly description?: string;
+  /** The story's tags, the meta's then its own, a `!name` taking `name` away (Storybook's tags). */
+  readonly tags?: readonly string[];
 };
 
 /** One story file, read statically: what the catalogue shows before loading it. */
@@ -48,7 +53,11 @@ export type StoryFileIndex = {
   readonly related?: readonly string[];
   /** The meta's `keywords`, when it sets one: other words the search finds the component by (D-603). */
   readonly keywords?: readonly string[];
-  /** Its stories, in the order of the file. */
+  /** The meta's `parameters.docs.description.component`, when written plainly. */
+  readonly description?: string;
+  /** What the index noticed without refusing the file (a title written by code, placed by its path). */
+  readonly notes?: readonly string[];
+  /** Its stories, in the order of the file (or of its `__namedExportsOrder`). */
   readonly stories: readonly StoryIndexEntry[];
 };
 

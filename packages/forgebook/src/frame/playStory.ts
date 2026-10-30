@@ -22,6 +22,20 @@ const messageOf = (error: unknown): string => (error instanceof Error ? error.me
 /** Milliseconds since an instant, rounded. */
 const since = (start: number): number => Math.round(performance.now() - start);
 
+/** The play tools a project's Testing Library gives, as the frame uses them without depending on it. */
+export type PlayTools = {
+  /** Testing Library's `within`: its queries bound to an element. */
+  readonly within: (element: HTMLElement) => unknown;
+  /** Testing Library's `userEvent`. */
+  readonly userEvent: unknown;
+};
+
+/**
+ * Loads the play tools, on the first play that runs: a catalogue whose stories have no play never loads them. The
+ * generated frame passes one when the project installs Testing Library.
+ */
+export type PlayToolsLoader = () => Promise<PlayTools>;
+
 /**
  * Plays a story, then calls `onPlayed`.
  *
@@ -29,13 +43,15 @@ const since = (start: number): number => Math.round(performance.now() - start);
  * @param context - the args and the canvas the play reads; the play's `step` is added here.
  * @param onPlayed - called once the play is over, at once when there is none, whether it passed or failed.
  * @param onTrace - called with the trace after every change; never without a play.
+ * @param tools - the play tools to hand the play (`canvas` bound to its canvas, `userEvent`); none without them.
  * @returns the play's promise, rejected when the play failed.
  */
 export const playStory = async (
   play: LoadedStory["play"],
   context: Omit<StoryContext<LoadedArgs>, "step">,
   onPlayed: () => void,
-  onTrace: (trace: PlayTrace) => void = (): void => undefined
+  onTrace: (trace: PlayTrace) => void = (): void => undefined,
+  tools: PlayTools | undefined = undefined
 ): Promise<void> => {
   if (play === undefined) {
     onPlayed();
@@ -63,7 +79,9 @@ export const playStory = async (
   const start = performance.now();
   report({ status: "running" });
   try {
-    await play({ ...context, step });
+    const toolsContext =
+      tools === undefined ? {} : { canvas: tools.within(context.canvasElement), userEvent: tools.userEvent };
+    await play({ ...context, step, ...toolsContext });
     report({ status: "passed", ms: since(start) });
   } catch (error) {
     report({ status: "failed", ms: since(start), error: messageOf(error) });

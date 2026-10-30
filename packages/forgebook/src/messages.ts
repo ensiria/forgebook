@@ -11,14 +11,21 @@
  * @module
  */
 
+import type { StoryControlsSetting } from "@forgebook/story-format/source";
+
 import { isViolation, type Violation } from "./a11y";
+import { isPanelArgTypes, type PanelArgTypes } from "./argTypes";
 import { isMatrix, type Matrix } from "./matrix";
 import { isPlayTrace, type PlayTrace } from "./playTrace";
 import { type ClockState, isClockRate } from "./storyClock";
+import { type FixedView, isFixedView } from "./storyGlobals";
 import { type LiveView, MEASURE_TOOLS, type MeasureTool } from "./viewState";
 
-/** An arg the props panel can show and set: what crosses between the documents as is. */
-export type ArgValue = string | number | boolean | null | NamedArg;
+/**
+ * An arg the props panel can show and set: what crosses between the documents as is. A list of texts or numbers is a
+ * multiple choice's (`check`, `multi-select`); a date is a number of ms since the Unix epoch, as Storybook's.
+ */
+export type ArgValue = string | number | boolean | null | readonly (string | number)[] | NamedArg;
 
 /**
  * A value the panel names instead of sending it: one of the source's `namedValues` (an icon component), which cannot
@@ -49,6 +56,14 @@ export type FrameMessage =
       readonly args: PanelArgs;
       /** The args written `storyText("key")`, with their keys, for the panel to show beside the text. */
       readonly textKeys: Readonly<Record<string, string>>;
+      /** How the panel shows the args, from the story's `argTypes`, by arg. */
+      readonly argTypes: PanelArgTypes;
+      /** The props the panel can set, as the story's parameters say once it ran (written by code too). */
+      readonly controls: StoryControlsSetting;
+      /** The args the frame records as actions (a spy, an `argTypes` action), whatever the shell names. */
+      readonly actions: readonly string[];
+      /** What the story fixes of the view (its `globals`, Storybook's backgrounds and viewport). */
+      readonly fixed: FixedView;
     }
   | {
       /** The story's height changed. */
@@ -171,8 +186,17 @@ export const isPanelArgs = (value: unknown): value is PanelArgs =>
       typeof arg === "string" ||
       typeof arg === "number" ||
       typeof arg === "boolean" ||
+      isChoiceList(arg) ||
       isNamedArg(arg)
   );
+
+/**
+ * Whether a value is a multiple choice's values: a list of texts and numbers.
+ *
+ * @param value - any value.
+ */
+export const isChoiceList = (value: unknown): value is readonly (string | number)[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string" || typeof item === "number");
 
 /**
  * Whether a value is a named arg.
@@ -198,6 +222,10 @@ const isClockState = (value: unknown): value is ClockState =>
 const isStringList = (value: unknown): value is readonly string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
 
+/** Whether a value is a controls setting: every prop, or the listed ones. */
+const isControlsSetting = (value: unknown): value is StoryControlsSetting =>
+  value === "all" || isStringList(value);
+
 /** Whether a value is the text keys of a story's args: names to keys. */
 const isTextKeys = (value: unknown): value is Readonly<Record<string, string>> =>
   isRecord(value) && Object.values(value).every((key) => typeof key === "string");
@@ -215,7 +243,11 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
         typeof value["canReplay"] === "boolean" &&
         typeof value["hasClock"] === "boolean" &&
         isPanelArgs(value["args"]) &&
-        isTextKeys(value["textKeys"])
+        isTextKeys(value["textKeys"]) &&
+        isPanelArgTypes(value["argTypes"]) &&
+        isControlsSetting(value["controls"]) &&
+        isStringList(value["actions"]) &&
+        isFixedView(value["fixed"])
       );
     case "forgebook:size":
       return typeof value["height"] === "number";

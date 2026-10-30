@@ -13,6 +13,7 @@ import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages";
 import { sourceFiles } from "../sourceFiles";
 import { storyBackground } from "../storyBackground";
+import { type FixedView, NOT_FIXED } from "../storyGlobals";
 import { knownHeight, type StoryHeights } from "../storyHeights";
 import {
   type ComponentLocation,
@@ -227,6 +228,15 @@ const sidebarCurrent = (
   location === undefined
     ? undefined
     : { sourceId: location.source.id, title: location.component.title, storyId };
+
+/**
+ * What the shown story fixes of the view, for the toolbar; nothing on any other page.
+ *
+ * @param fixedViews - what each story's frame reported.
+ * @param shown - the page shown.
+ */
+const fixedOfShown = (fixedViews: ReadonlyMap<string, FixedView>, shown: Shown): FixedView =>
+  shown.kind === "story" ? (fixedViews.get(shown.location.story.id) ?? NOT_FIXED) : NOT_FIXED;
 
 /**
  * The bar above the page: the view's switches, which act on stories; on the home only the way back to a hidden
@@ -444,6 +454,8 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
   const scroll: PageScroll = { visit, positions: scrollPositions.current };
   // the width the shown story really has, measured on its stage, for the toolbar's width field
   const [shownWidth, setShownWidth] = useState<number | undefined>(undefined);
+  // what each story fixes of the view, as its frame reported it: the toolbar shows it for the shown story
+  const [fixedViews, setFixedViews] = useState<ReadonlyMap<string, FixedView>>(new Map());
   const storyHeights = useStoryHeights(heights);
   const isSystemDark = useSystemDark();
   useStoryIdsElement(
@@ -533,6 +545,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           isStoryPage={shown.kind === "story"}
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
+          fixed={fixedOfShown(fixedViews, shown)}
         />
         {shown.kind === "home" ? (
           <HomePage
@@ -574,6 +587,9 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
             story={shown.location.story}
             view={address.view}
             onViewChange={changeView}
+            onFixedChange={(storyId: string, fixed: FixedView): void =>
+              setFixedViews((current) => new Map(current).set(storyId, fixed))
+            }
             panelArgs={address.panelArgs}
             onPanelArgsChange={(panelArgs: PanelArgs): void => replaceAddress({ ...address, panelArgs })}
             matrixAxes={address.matrix}

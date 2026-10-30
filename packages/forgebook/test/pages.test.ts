@@ -24,7 +24,8 @@ const CONFIG: ResolvedConfig = {
   previews: ["/catalogue/forgebook.preview.tsx"],
   head: '<link rel="stylesheet" href="/fonts.css" />',
   watch: [],
-  lists: {}
+  lists: {},
+  hasPlayTools: false
 };
 
 describe("the generated pages", () => {
@@ -49,6 +50,13 @@ describe("the generated pages", () => {
     expect(entry).toContain(`import { mountFrame } from ${JSON.stringify(STUB_FRAMEWORK.pages.frame)};`);
     expect(entry).toContain('import * as preview0 from "/catalogue/forgebook.preview.tsx";');
     expect(entry).toContain("previews: [preview0]");
+  });
+
+  it("loads Testing Library for the plays only when the project installs it, and only on the first play", () => {
+    expect(frameEntry(CONFIG)).not.toContain("@testing-library");
+    const entry = frameEntry({ ...CONFIG, hasPlayTools: true });
+    expect(entry).toContain('import("@testing-library/dom"), import("@testing-library/user-event")');
+    expect(entry).not.toMatch(/^import .*@testing-library/m);
   });
 
   it("hands the pages the configuration's data, and the own stories as one source named after the catalogue", () => {

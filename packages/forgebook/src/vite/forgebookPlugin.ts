@@ -28,8 +28,9 @@ import ts from "typescript-6";
 import type { Plugin, UserConfig, ViteDevServer } from "vite";
 
 import type { FrameworkAdapter } from "./adapter.ts";
+import { STORY_FILE } from "./autoTitle.ts";
 import { componentPage, markdownHtml } from "./componentPage.ts";
-import { findConfigFile, loadConfigFile, type ResolvedConfig } from "./configFile.ts";
+import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { moduleSummaryOf } from "./docsProgram.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
@@ -46,9 +47,26 @@ import {
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
+import { prebundled, scannedEntries } from "./prebundled.ts";
 import { storyCode } from "./storyCode.ts";
 import { storyFilesModule } from "./storyFilesModule.ts";
 import { componentImport } from "./storyMeta.ts";
+
+/**
+ * A file's text, or none when it cannot be read.
+ *
+ * @param file - the file.
+ */
+const readTextFile = (file: string): string | undefined => {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return undefined;
+  }
+};
+
+/** The core package's folder: its own dependencies resolve from here, not from the project's. */
+const PACKAGE_DIR = resolve(import.meta.dirname, "../..");
 
 /** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
 const FILES_QUERY = "?forgebook-files";
@@ -58,9 +76,6 @@ const FILES_PREFIX = "\0forgebook-files:";
 
 /** Between the folder and the pattern in a pattern module's id: no path or pattern holds it. */
 const FILES_SEPARATOR = "::";
-
-/** A story file, as the sources' globs match them. */
-const STORY_FILE = /\.stories\.tsx?$/;
 
 /** The query that asks for a story file's code: each story's `render` as written. */
 const CODE_QUERY = "?forgebook-code";
@@ -331,6 +346,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
           ? {}
           : {
               root: config.dir,
+              // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
+              // story files (the project's and the sources') are scanned for what their components import
+              optimizeDeps: {
+                include: prebundled(config, packageResolver(config.dir), packageResolver(PACKAGE_DIR)),
+                entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
+              },
               build: {
                 rolldownOptions: {
                   input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") }

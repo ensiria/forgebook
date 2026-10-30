@@ -16,7 +16,12 @@ const CONTEXT = {
   canvasElement: {} as HTMLElement,
   text: (key: string): string => key,
   clock: heldStoryClock(0),
-  globals: {}
+  globals: {},
+  loaded: {},
+  id: "kit:a-b--x",
+  name: "X",
+  title: "A/B",
+  parameters: {}
 };
 
 describe("playStory", () => {

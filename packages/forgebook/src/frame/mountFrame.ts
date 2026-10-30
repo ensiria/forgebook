@@ -16,6 +16,7 @@ import "./frame.scss";
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 
+import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue";
 import { shownLanguage } from "../languages";
 import {
@@ -30,6 +31,7 @@ import { panelArgsOf, storyArgsOf } from "../namedValues";
 import type { PlayTrace } from "../playTrace";
 import { sourceFiles } from "../sourceFiles";
 import { isClockHeldIn } from "../storyClock";
+import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGlobals";
 import { shownTexts, storyTextKeysOf, withStoryTexts } from "../storyTexts";
 import { findStory, storyTree } from "../storyTree";
 import { catalogueSwitches, type ViewSwitch } from "../switches";
@@ -39,6 +41,7 @@ import { storyFrameClock } from "./frameClock";
 import { STATUS_ATTRIBUTE } from "./frameStatus";
 import { applyView, loadSheets, viewSheets } from "./frameView";
 import { applyTools } from "./measureTools";
+import type { PlayToolsLoader } from "./playStory";
 import type { StoryDrawing, StoryRenderer } from "./renderer";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule";
 import { mergedPreviews, readPreview, readStory } from "./storyModule";
@@ -61,6 +64,8 @@ export type FrameConfig = {
   readonly switches?: readonly ViewSwitch[];
   /** The catalogue's lists (its backgrounds, text sizes, grid step, accessibility rules…); the defaults when none. */
   readonly lists?: CatalogueLists;
+  /** Loads the play tools, when the project installs Testing Library (the generated frame passes it then). */
+  readonly playTools?: PlayToolsLoader;
 };
 
 /** Tells the shell, which is the parent page on the same origin. */
@@ -118,6 +123,8 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const preview = mergedPreviews((config.previews ?? []).map(readPreview));
   const view = parseView(window.location.search, catalogue);
   applyView(document.documentElement, view, catalogue);
+  // what the story fixes of the view, once it is read: every view the frame applies has it over the shell's
+  let fixed: FixedView = NOT_FIXED;
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount
   let changeShown: ((live: LiveView) => void) | undefined;
   // the shell sends the live part of a changed view: applied on the root, and kept in the address so a reload (an
@@ -126,7 +133,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
     if (event.data.type === "forgebook:tools") applyTools(document, event.data.tools, catalogue.gridStep);
     if (event.data.type !== "forgebook:view") return;
-    applyView(document.documentElement, event.data.view, catalogue);
+    applyView(document.documentElement, withFixed(event.data.view, fixed), catalogue);
     changeShown?.(event.data.view);
     const address = frameAddress(
       window.location.pathname,
@@ -173,11 +180,13 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     await source.setup?.();
     await preview.setup?.();
     await loadSheets(document, viewSheets(source.sheets, view));
-    const story = readStory(await load(), location.story.exportName, preview.parameters);
+    const story = readStory(await load(), location.story.exportName, preview);
     if (typeof story === "string") {
       fail(story);
       return;
     }
+    fixed = fixedViewOf(story.globals, story.parameters, catalogue);
+    applyView(document.documentElement, withFixed(view, fixed), catalogue);
     let controls: StoryControls | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
     window.addEventListener("message", (event: MessageEvent): void => {
@@ -185,15 +194,20 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       if (controls !== undefined) answerShell(event.data, controls, storyId, catalogue.a11y);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them)
-    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => ({
-      texts: shownTexts(source.texts, shownLanguage(languages, languageOf(live, switches))),
-      globals: codeGlobalsOf(live, switches)
-    });
+    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => {
+      const switchesShown = { switches: { ...live.switches, ...fixed.switches } };
+      return {
+        texts: shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
+        globals: codeGlobalsOf(switchesShown, switches)
+      };
+    };
     const shown = shownFor(view);
     const { texts } = shown;
     const running = runStory({
       container,
       story,
+      identity: { id: storyId, name: location.story.name, title: location.component.title },
+      ...(config.playTools === undefined ? {} : { playTools: config.playTools }),
       renderer: config.renderer,
       clock,
       decorators: preview.decorators,
@@ -216,7 +230,11 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           canReplay: story.replay !== undefined,
           hasClock: story.clockStart !== undefined,
           args,
-          textKeys
+          textKeys,
+          argTypes: panelArgTypesOf(story.argTypes, excludedControls(story.parameters["controls"])),
+          controls: story.controls,
+          actions: actionNames(story.args, story.argTypes),
+          fixed
         });
         changeShown = (live: LiveView): void => running.setShown(shownFor(live));
       },
@@ -230,6 +248,11 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           values: values.map(previewValue),
           details: values.map(detailOf)
         })
+    });
+    // the shell opens another story by loading another page: the set-ups' cleanups run as this one goes (a page kept
+    // for the back button keeps its story)
+    window.addEventListener("pagehide", (event: PageTransitionEvent): void => {
+      if (!event.persisted) running.leave();
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

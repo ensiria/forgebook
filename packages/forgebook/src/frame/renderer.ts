@@ -13,14 +13,19 @@
  */
 
 import type { StoryClock } from "@forgebook/story-format/clock";
-import type { StepFunction } from "@forgebook/story-format/csf";
+import type { StepFunction, StoryContext } from "@forgebook/story-format/csf";
 import type { StoryTextTable } from "@forgebook/story-format/texts";
 
 import type { PanelArgs } from "../messages";
 import type { LoadedArgs, LoadedDecorator, LoadedStory } from "./storyModule";
 
+/** Which story is drawn: its id, its name and its file's title, as its context gives them. */
+export type StoryIdentity = Pick<StoryContext<LoadedArgs>, "id" | "name" | "title">;
+
 /** One story to draw, as the frame hands it to the framework. */
 export type StoryDrawing = {
+  /** Which story it is. */
+  readonly identity: StoryIdentity;
   /** The story: its render or component, its decorators, its layout. */
   readonly story: LoadedStory;
   /** The args as the story receives them: the texts named by key resolved, the recorded events wrapped. */
@@ -36,6 +41,8 @@ export type StoryDrawing = {
   readonly decorators: readonly LoadedDecorator[];
   /** The values of the switches applied by code, by id: the story's `context.globals`. */
   readonly globals: Readonly<Record<string, string>>;
+  /** What the story's loaders returned: its `context.loaded`. */
+  readonly loaded: Readonly<Record<string, unknown>>;
 };
 
 /** What the frame keeps of a story drawn in a canvas. */

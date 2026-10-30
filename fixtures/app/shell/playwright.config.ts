@@ -21,8 +21,9 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"]],
   webServer: {
-    // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own
-    command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT}`,
+    // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
+    // dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here
+    command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT} --force`,
     cwd: join(import.meta.dirname, ".."),
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: false

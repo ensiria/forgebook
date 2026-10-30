@@ -13,10 +13,12 @@
 
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
+import type { PanelArgTypes } from "../argTypes";
 import { matrixOf, matrixProps } from "../matrix";
 import type { ArgValue, PanelArgs, ShellMessage } from "../messages";
 import type { NamedValues } from "../namedValues";
 import type { PlayTrace } from "../playTrace";
+import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals";
 import type { TreeComponent, TreeStory } from "../storyTree";
 import {
   frameAddress,
@@ -48,6 +50,36 @@ import { useLiveView, useLoadedView } from "./useLiveView";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory";
 import { useStoryCode } from "./useStoryCode";
 
+/** The `argTypes` of a story before its frame reported them. */
+const NO_ARG_TYPES: PanelArgTypes = {};
+
+/**
+ * What the stage's handles set the width with; none, so no handles, when the story fixes the width.
+ *
+ * @param fixed - what the story fixes.
+ * @param view - the view shown.
+ * @param onViewChange - the view's setter.
+ */
+const widthSetter = (
+  fixed: FixedView,
+  view: ViewState,
+  onViewChange: (view: ViewState) => void
+): ((width: StageWidth) => void) | undefined =>
+  fixed.width === undefined ? (width: StageWidth): void => onViewChange({ ...view, width }) : undefined;
+
+/**
+ * A story's `argTypes`, controls, actions and fixed view for the panel and the stage: as its frame read them once it ran, which sees a setting
+ * written by code the index leaves out; the index's controls and no `argTypes` or actions before.
+ *
+ * @param panels - what each story's frame reported, by story.
+ * @param story - the story.
+ */
+const reportedPanel = (
+  panels: ReadonlyMap<string, Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed">>,
+  story: TreeStory
+): Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed"> =>
+  panels.get(story.id) ?? { argTypes: NO_ARG_TYPES, controls: story.controls, actions: [], fixed: NOT_FIXED };
+
 /** The height of the first frame before its story reports its own, in CSS px. */
 const INITIAL_FRAME_HEIGHT = 240;
 
@@ -64,6 +96,8 @@ export type StageProps = {
   readonly view: ViewState;
   /** Called with the changed view (the width the handle set, the panel's tab). */
   readonly onViewChange: (view: ViewState) => void;
+  /** Called with what a story fixes of the view, once its frame read it, for the toolbar to show. */
+  readonly onFixedChange: (storyId: string, fixed: FixedView) => void;
   /** The values set in the Props tab, over the story's own args (kept in the address). */
   readonly panelArgs: PanelArgs;
   /** Called with the panel's changed values. */
@@ -157,8 +191,9 @@ const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
 export const Stage = ({
   component,
   story,
-  view,
-  onViewChange,
+  view: ownView,
+  onViewChange: onOwnViewChange,
+  onFixedChange,
   panelArgs,
   onPanelArgsChange,
   matrixAxes,
@@ -183,6 +218,15 @@ export const Stage = ({
   const [storyTextKeys, setStoryTextKeys] = useState<ReadonlyMap<string, Readonly<Record<string, string>>>>(
     new Map()
   );
+  // each story's `argTypes` and controls, as its frame read them once it ran
+  const [storyPanels, setStoryPanels] = useState<
+    ReadonlyMap<string, Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed">>
+  >(new Map());
+  // the story is drawn with what it fixes of the view; a change from here keeps the user's own in the address
+  const panel = reportedPanel(storyPanels, story);
+  const view = withFixed(ownView, panel.fixed);
+  const onViewChange = (changed: ViewState): void =>
+    onOwnViewChange(withOwnFixed(changed, ownView, panel.fixed));
   const [calls, setCalls] = useState<readonly EventCall[]>([]);
   // each story's play trace, by story: a trace belongs to the story that played
   const [traces, setTraces] = useState<ReadonlyMap<string, PlayTrace>>(new Map());
@@ -212,6 +256,15 @@ export const Stage = ({
     onReady: (frame: Window, message: ReadyMessage): void => {
       setStoryArgs((current) => new Map(current).set(message.storyId, message.args));
       setStoryTextKeys((current) => new Map(current).set(message.storyId, message.textKeys));
+      setStoryPanels((current) =>
+        new Map(current).set(message.storyId, {
+          argTypes: message.argTypes,
+          controls: message.controls,
+          actions: message.actions,
+          fixed: message.fixed
+        })
+      );
+      onFixedChange(message.storyId, message.fixed);
       const send = (shellMessage: ShellMessage): void =>
         frame.postMessage(shellMessage, window.location.origin);
       send({ type: "forgebook:events", names: eventNames });
@@ -275,7 +328,9 @@ export const Stage = ({
     code,
     exportName: story.exportName,
     componentName: component.name,
-    controls: story.controls,
+    argTypes: panel.argTypes,
+    controls: panel.controls,
+    actions: panel.actions,
     values: { ...storyArgs.get(story.id), ...panelArgs },
     onValueChange: changeValue,
     onReset: (): void => onPanelArgsChange({}),
@@ -359,7 +414,7 @@ export const Stage = ({
               <StageViewport
                 zoom={view.zoom}
                 width={view.width}
-                onWidthChange={(width: StageWidth): void => onViewChange({ ...view, width })}
+                onWidthChange={widthSetter(panel.fixed, view, onViewChange)}
                 onShownWidthChange={onShownWidthChange}
                 background={backgroundOf(view)}
                 height={view.height}

@@ -1,0 +1,11 @@
+// The Storybook fixture: stories typed with Storybook's own types, as a project that moves to Forgebook has them.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["src", "stories.ts"]
+}

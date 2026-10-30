@@ -8,7 +8,8 @@
 import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 
-import type { ComponentDocs } from "../componentDocs";
+import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes";
+import type { ComponentDocs, PropDocs } from "../componentDocs";
 import type { ArgValue, PanelArgs } from "../messages";
 import type { NamedValues } from "../namedValues";
 import type { PlayTrace } from "../playTrace";
@@ -35,6 +36,10 @@ export type DockTabsInput = {
   readonly componentName: string;
   /** The props the story lets the panel set. */
   readonly controls: StoryControlsSetting;
+  /** The story's `argTypes`, as its frame reported them; none before it is ready. */
+  readonly argTypes: PanelArgTypes;
+  /** The args the story's frame records as actions (a spy, an `argTypes` action); none before it is ready. */
+  readonly actions: readonly string[];
   /** The values of the moment: the story's args with the panel's over them. */
   readonly values: PanelArgs;
   /** Called with a changed value; `undefined` removes the panel's value. */
@@ -69,11 +74,79 @@ const notice = (text: string, isProblem: boolean): ReactNode => (
   </p>
 );
 
+/**
+ * The Props tab, when the story has a prop to show.
+ *
+ * @param input - what the tabs are built from.
+ * @param props - the props, from the types with the `argTypes` laid over them.
+ */
+const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] =>
+  props.some((prop) => prop.kind !== "event")
+    ? [
+        {
+          id: "props",
+          label: STRINGS.tabs.props,
+          content: (
+            <PropsTab
+              props={props}
+              values={input.values}
+              controls={input.controls}
+              onValueChange={input.onValueChange}
+              onReset={input.onReset}
+              namedValues={input.namedValues}
+              textArgs={input.textArgs}
+            />
+          )
+        }
+      ]
+    : [];
+
+/**
+ * The events the Events tab lists: the component's, then the story's actions its types do not name.
+ *
+ * @param props - the component's props; none for a story without one.
+ * @param actions - the story's actions.
+ */
+const eventsOf = (props: readonly PropDocs[], actions: readonly string[]): readonly PropDocs[] => {
+  const events = props.filter((prop) => prop.kind === "event");
+  const named = new Set(events.map((event) => event.name));
+  return [
+    ...events,
+    ...actions
+      .filter((name) => !named.has(name))
+      .map((name): PropDocs => ({ name, kind: "event", type: "", description: "", isRequired: false }))
+  ];
+};
+
+/**
+ * The Events tab, when the story has an event or an action.
+ *
+ * @param input - what the tabs are built from.
+ * @param events - the events and actions.
+ */
+const eventsTab = (input: DockTabsInput, events: readonly PropDocs[]): DockTab[] =>
+  events.length === 0
+    ? []
+    : [
+        {
+          id: "events",
+          label: STRINGS.tabs.events,
+          hint: input.calls.length === 0 ? undefined : String(input.calls.length),
+          content: <EventsTab events={events} calls={input.calls} onClearCalls={input.onClearCalls} />
+        }
+      ];
+
 /** The tabs read from the component's docs: Props, Events, Parts and styling. */
 const docsTabs = (input: DockTabsInput): DockTab[] => {
   const { docs } = input;
-  if (docs.status === "none")
-    return input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)];
+  // a story without a component (a render of its own) still has the args its `argTypes` name
+  if (docs.status === "none") {
+    return [
+      ...propsTab(input, panelProps([], input.argTypes)),
+      ...eventsTab(input, eventsOf([], input.actions)),
+      ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)])
+    ];
+  }
   if (docs.status === "loading") {
     return [{ id: "props", label: STRINGS.tabs.props, content: notice(STRINGS.docsLoading, false) }];
   }
@@ -87,33 +160,10 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
     ];
   }
   const component = docs.value;
-  const events = component.props.filter((prop) => prop.kind === "event");
+  const events = eventsOf(component.props, input.actions);
   const tabs: DockTab[] = [];
-  if (component.props.some((prop) => prop.kind !== "event")) {
-    tabs.push({
-      id: "props",
-      label: STRINGS.tabs.props,
-      content: (
-        <PropsTab
-          docs={component}
-          values={input.values}
-          controls={input.controls}
-          onValueChange={input.onValueChange}
-          onReset={input.onReset}
-          namedValues={input.namedValues}
-          textArgs={input.textArgs}
-        />
-      )
-    });
-  }
-  if (events.length > 0) {
-    tabs.push({
-      id: "events",
-      label: STRINGS.tabs.events,
-      hint: input.calls.length === 0 ? undefined : String(input.calls.length),
-      content: <EventsTab events={events} calls={input.calls} onClearCalls={input.onClearCalls} />
-    });
-  }
+  tabs.push(...propsTab(input, panelProps(component.props, input.argTypes)));
+  tabs.push(...eventsTab(input, events));
   if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
   if (component.parts.length > 0 || styleHooks(component).length > 0) {
     tabs.push({

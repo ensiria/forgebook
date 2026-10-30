@@ -14,7 +14,7 @@
 import { join } from "node:path";
 
 import type { PageConfig } from "../pageConfig.ts";
-import type { ResolvedConfig } from "./configFile.ts";
+import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -136,6 +136,20 @@ export const shellEntry = (config: ResolvedConfig): string => {
 };
 
 /**
+ * The frame's loader of the play tools: Testing Library's `within` and `userEvent`, imported on the first play, so a
+ * catalogue whose stories have no play never loads them.
+ */
+const playToolsLoader = (): string => {
+  const imports = PLAY_TOOLS_PACKAGES.map((name) => `import(${JSON.stringify(name)})`).join(", ");
+  return [
+    "    playTools: async () => {",
+    `      const [dom, events] = await Promise.all([${imports}]);`,
+    "      return { within: dom.within, userEvent: events.userEvent };",
+    "    },"
+  ].join("\n");
+};
+
+/**
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
@@ -154,6 +168,7 @@ export const frameEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    ...(config.hasPlayTools ? [playToolsLoader()] : []),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ""

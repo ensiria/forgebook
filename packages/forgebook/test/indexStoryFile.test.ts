@@ -24,20 +24,134 @@ describe("indexStoryFile", () => {
     });
   });
 
-  it("refuses a meta held in a variable: the title must be written in the default export", () => {
-    const text = "const meta = { title: 'A/B' }; export default meta; export const X = {};";
-    expect(indexStoryFile("A.stories.tsx", text)).toBe(
-      "A.stories.tsx: the meta's title must be a plain string"
+  it("reads a meta held in a constant of the file (`export default meta`)", () => {
+    const text = "const meta = { title: 'A/B' } satisfies Meta; export default meta; export const X = {};";
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({ title: "A/B", stories: [{ exportName: "X" }] });
+  });
+
+  it("takes the path's title for a meta without one, and notes a title written by code", () => {
+    expect(
+      indexStoryFile("A.stories.tsx", "export default {}; export const X = {};", { autoTitle: "A" })
+    ).toEqual({
+      title: "A",
+      stories: [{ exportName: "X" }]
+    });
+    expect(
+      indexStoryFile("A.stories.tsx", 'export default { title: "A/" + family };', { autoTitle: "Kit/A" })
+    ).toEqual({
+      title: "Kit/A",
+      notes: ['its title is written by code, so it is placed by its path as "Kit/A"'],
+      stories: []
+    });
+  });
+
+  it("refuses a file without a meta, or without a title when its path gives none", () => {
+    expect(indexStoryFile("A.stories.tsx", "export const X = {};")).toBe(
+      "A.stories.tsx has no meta: the default export is an object (CSF)"
+    );
+    expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/" + family };')).toBe(
+      "A.stories.tsx: the meta's title must be a plain string (or the file must sit where its path makes one)"
     );
   });
 
-  it("refuses a file without a meta or with a computed title", () => {
-    expect(indexStoryFile("A.stories.tsx", "export const X = {};")).toBe(
-      "A.stories.tsx has no default export: the meta is the default export (CSF)"
-    );
-    expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/" + family };')).toBe(
-      "A.stories.tsx: the meta's title must be a plain string"
-    );
+  it("reads CSF 2 function stories with the properties assigned after them", () => {
+    const text = `export default { title: "A/B" };
+      export const Primary = (args) => <Button {...args} />;
+      Primary.storyName = "The primary";
+      Primary.parameters = { controls: ["label"] };
+      export function Secondary() { return null; }
+      Secondary.tags = ["!autodocs"];`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [
+        { exportName: "Primary", name: "The primary", controls: ["label"] },
+        { exportName: "Secondary", tags: ["!autodocs"] }
+      ]
+    });
+  });
+
+  it("reads CSF 2 stories bound from a template, with the properties assigned after them", () => {
+    const text = `export default { title: "A/B" };
+      const Template = (args) => <Button {...args} />;
+      export const Primary = Template.bind({});
+      Primary.storyName = "Bound";
+      export const helper = format.call(null);`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [{ exportName: "Primary", name: "Bound" }]
+    });
+  });
+
+  it("reads re-exported stories under their exported names, never another file's", () => {
+    const text = `export default { title: "A/B" };
+      const Base = {};
+      export { Base as Overview };
+      export { Other } from "./other.stories";`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [{ exportName: "Overview" }]
+    });
+  });
+
+  it("keeps only the stories includeStories and excludeStories let in, and skips what is no story", () => {
+    const listed = `export default { title: "A/B", excludeStories: ["mockData"] };
+      export const mockData = { rows: [] };
+      export const Overview = {};
+      export const VERSION = "1";`;
+    const index = indexStoryFile("A.stories.tsx", listed);
+    expect(typeof index === "string" ? index : index.stories.map((story) => story.exportName)).toEqual([
+      "Overview"
+    ]);
+    const matched = `export default { title: "A/B", includeStories: /^[A-Z]/ };
+      export const mockData = {};
+      export const Overview = {};`;
+    const included = indexStoryFile("A.stories.tsx", matched);
+    expect(
+      typeof included === "string" ? included : included.stories.map((story) => story.exportName)
+    ).toEqual(["Overview"]);
+  });
+
+  it("orders the stories as __namedExportsOrder says", () => {
+    const text = `export default { title: "A/B" };
+      export const First = {};
+      export const Second = {};
+      export const __namedExportsOrder = ["Second", "First"];`;
+    const index = indexStoryFile("A.stories.tsx", text);
+    expect(typeof index === "string" ? index : index.stories.map((story) => story.exportName)).toEqual([
+      "Second",
+      "First"
+    ]);
+  });
+
+  it("combines the meta's tags with each story's, a !tag taking one away", () => {
+    const text = `export default { title: "A/B", tags: ["autodocs", "beta"] };
+      export const X = { tags: ["!beta", "new"] };
+      export const Y = {};`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [
+        { exportName: "X", tags: ["autodocs", "!beta", "new"] },
+        { exportName: "Y", tags: ["autodocs", "beta"] }
+      ]
+    });
+  });
+
+  it("reads the docs descriptions Storybook's files write, the TSDoc first", () => {
+    const text = `export default {
+        title: "A/B",
+        parameters: { docs: { description: { component: "A button." } } }
+      };
+      export const X = { parameters: { docs: { description: { story: "The default." } } } };
+      /** From the TSDoc. */
+      export const Y = { parameters: { docs: { description: { story: "Not this." } } } };`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      description: "A button.",
+      stories: [
+        { exportName: "X", description: "The default." },
+        { exportName: "Y", description: "From the TSDoc." }
+      ]
+    });
   });
 
   it("reads each story's controls and the meta's, written plainly", () => {
@@ -68,7 +182,7 @@ describe("indexStoryFile", () => {
     expect(
       indexStoryFile(
         "A.stories.tsx",
-        'export default { title: "A/B" }; export const X = { parameters: { height: ROOM } };'
+        'export default { title: "A/B" }; export const X = { parameters: { height: 0 } };'
       )
     ).toBe(
       "A.stories.tsx: story X: `parameters.height` must be written as a plain positive number of CSS px"
@@ -94,18 +208,21 @@ describe("indexStoryFile", () => {
       keywords: ["horizontal", "row"],
       stories: [{ exportName: "Overview" }]
     });
-    expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", keywords: WORDS };')).toBe(
+    expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", keywords: "row" };')).toBe(
       "A.stories.tsx: the meta's `keywords` must be written as a list of plain strings"
     );
   });
 
-  it("refuses other places or related components that are not plain strings", () => {
-    expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", alsoIn: PLACES };')).toBe(
+  it("refuses other places or related components written plainly but wrongly, and leaves code to the frame", () => {
+    expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", alsoIn: [1] };')).toBe(
       "A.stories.tsx: the meta's `alsoIn` must be written as a list of plain strings"
     );
     expect(
       indexStoryFile("A.stories.tsx", 'export default { title: "A/B", related: [TITLES.button] };')
-    ).toBe("A.stories.tsx: the meta's `related` must be written as a list of plain strings");
+    ).toEqual({
+      title: "A/B",
+      stories: []
+    });
   });
 
   it("marks the story whose parameters say it is the component's demo, written plainly", () => {
@@ -119,12 +236,19 @@ describe("indexStoryFile", () => {
     });
   });
 
-  it("refuses controls that are not written plainly: the shell reads them without running the file", () => {
-    const text = `export default { title: "A/B" };
-      export const X = { parameters: { controls: NAMES } };`;
-    expect(indexStoryFile("A.stories.tsx", text)).toBe(
+  it("refuses controls written plainly but wrongly, and leaves controls written by code to the frame", () => {
+    const wrong = `export default { title: "A/B" };
+      export const X = { parameters: { controls: true } };`;
+    expect(indexStoryFile("A.stories.tsx", wrong)).toBe(
       "A.stories.tsx: story X: `parameters.controls` must be written as `false` or a list of plain strings"
     );
+    const computed = `export default { title: "A/B" };
+      export const X = { parameters: { controls: NAMES } };
+      export const Y = { parameters: { controls: { exclude: ["onClick"] } } };`;
+    expect(indexStoryFile("A.stories.tsx", computed)).toEqual({
+      title: "A/B",
+      stories: [{ exportName: "X" }, { exportName: "Y" }]
+    });
   });
 
   it("reads each story's group and the first sentence of its TSDoc, without its tags", () => {
@@ -150,7 +274,7 @@ describe("indexStoryFile", () => {
     });
   });
 
-  it("takes any group written as a plain string, the catalogue's or not, and refuses one that is not", () => {
+  it("takes any group written as a plain string, the catalogue's or not, and leaves one written by code", () => {
     const named = `export default { title: "A/B" };
       export const X = { parameters: { group: "extras" } };`;
     const index = indexStoryFile("A.stories.tsx", named);
@@ -158,9 +282,10 @@ describe("indexStoryFile", () => {
     const computed = `const GROUP = "extras";
       export default { title: "A/B" };
       export const X = { parameters: { group: GROUP } };`;
-    expect(indexStoryFile("A.stories.tsx", computed)).toBe(
-      "A.stories.tsx: story X: `parameters.group` must be written as a plain string"
-    );
+    expect(indexStoryFile("A.stories.tsx", computed)).toEqual({
+      title: "A/B",
+      stories: [{ exportName: "X" }]
+    });
   });
 
   it("reports a syntax error", () => {

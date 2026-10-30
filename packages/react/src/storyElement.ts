@@ -8,12 +8,12 @@
 
 import type { StoryContext } from "@forgebook/story-format/csf";
 import type { LoadedArgs, LoadedDecorator, LoadedStory } from "forgebook/story-module";
-import { createElement, type FunctionComponent, type ReactNode } from "react";
+import { createElement, type ElementType, type ReactNode } from "react";
 
 /** A loaded story as React draws it: its component, render and decorators return React's output. */
 type ReactStory = {
-  /** The meta's component. */
-  readonly component: FunctionComponent<LoadedArgs> | undefined;
+  /** The meta's component: a function, a class, or what `memo` and `forwardRef` make. */
+  readonly component: ElementType<LoadedArgs> | undefined;
   /** The story's render. */
   readonly render: ((args: LoadedArgs, context: StoryContext<LoadedArgs>) => ReactNode) | undefined;
   /** The decorators, innermost first. */

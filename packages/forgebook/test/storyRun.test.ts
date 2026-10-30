@@ -6,9 +6,10 @@
  * @module
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock";
+import type { PlayToolsLoader } from "../src/frame/playStory";
 import { type LoadedStory, readStory } from "../src/frame/storyModule";
 import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun";
 import type { PanelArgs } from "../src/messages";
@@ -53,7 +54,9 @@ const badge = (extra: Record<string, unknown> = {}): LoadedStory =>
  * @returns the container and what the run reported.
  */
 const run = async (
-  story: LoadedStory
+  story: LoadedStory,
+  playTools?: PlayToolsLoader,
+  onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined
 ): Promise<{ readonly container: HTMLElement; readonly reports: Reports }> => {
   const container = document.createElement("div");
   document.body.append(container);
@@ -61,6 +64,8 @@ const run = async (
   const options: StoryRunOptions = {
     container,
     story,
+    identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
+    ...(playTools === undefined ? {} : { playTools }),
     renderer: domRenderer,
     clock: heldFrameClock(0),
     texts: {},
@@ -70,7 +75,7 @@ const run = async (
     onControlsReady: (controls: StoryControls): void => {
       reports.controls = controls;
     },
-    onEvent: () => undefined,
+    onEvent,
     onError: (message: string): void => {
       reports.errors.push(message);
     },
@@ -160,5 +165,141 @@ describe("runStory with a second framework", () => {
     const { container, reports } = await run(badge({ args: { label: "boom" } }));
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
     expect(reports.controls).toBeUndefined();
+  });
+
+  it("draws and plays the story with what its loaders returned", async () => {
+    const seen: unknown[] = [];
+    const { container } = await run(
+      badge({
+        loaders: [async (): Promise<Record<string, unknown>> => ({ label: "Loaded" })],
+        render: (_args: unknown, context: { readonly loaded: Record<string, unknown> }): HTMLElement => {
+          const element = document.createElement("span");
+          element.textContent = String(context.loaded["label"]);
+          return element;
+        },
+        play: (context: { readonly loaded: Record<string, unknown> }): void => {
+          seen.push(context.loaded["label"]);
+        }
+      })
+    );
+    expect(container.textContent).toBe("Loaded");
+    expect(seen).toEqual(["Loaded"]);
+  });
+
+  it("undoes the set-ups before mounting the story again, then sets them up anew", async () => {
+    const events: string[] = [];
+    let count = 0;
+    const { reports } = await run(
+      badge({
+        beforeEach: (): (() => void) => {
+          count += 1;
+          const mount = count;
+          events.push(`set up ${mount}`);
+          return (): void => {
+            events.push(`undone ${mount}`);
+          };
+        }
+      })
+    );
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(events).toEqual(["set up 1", "undone 1", "set up 2"]);
+  });
+
+  it("shows the error of a loader that throws, and never gets ready", async () => {
+    const { container, reports } = await run(
+      badge({
+        loaders: (): never => {
+          throw new Error("No data");
+        }
+      })
+    );
+    expect(reports.errors).toEqual(["No data"]);
+    expect(reports.controls).toBeUndefined();
+    expect(container.textContent).toContain("No data");
+  });
+
+  it("hands the play the story's id, name, title and parameters, and the play tools when the project has them", async () => {
+    const seen: Record<string, unknown>[] = [];
+    const play = (context: Record<string, unknown>): void => {
+      seen.push(context);
+    };
+    let loads = 0;
+    const tools: PlayToolsLoader = async () => {
+      loads += 1;
+      return {
+        within: (element: HTMLElement): string => `queries of ${element.tagName}`,
+        userEvent: "events"
+      };
+    };
+    await run(badge({ play, parameters: { layout: "centered" } }), tools);
+    expect(seen[0]).toMatchObject({
+      id: "kit:kit-badge--badge",
+      name: "Badge",
+      title: "Kit/Badge",
+      parameters: { layout: "centered" },
+      canvas: "queries of DIV",
+      userEvent: "events"
+    });
+    await run(badge(), tools);
+    expect(loads).toBe(1);
+    await run(badge({ play }));
+    expect(seen[1]).not.toHaveProperty("canvas");
+  });
+
+  it("draws the value a mapping's key stands for, from the story's args and from the panel's", async () => {
+    const { container, reports } = await run(
+      badge({
+        args: { label: "short" },
+        argTypes: { label: { options: ["short", "long"], mapping: { short: "New", long: "Brand new" } } }
+      })
+    );
+    expect(container.textContent).toBe("New");
+    controlsOf(reports).setPanelArgs({ label: "long" });
+    expect(container.textContent).toBe("Brand new");
+  });
+
+  it("records a spy's calls and an argTypes action's, and the play still reads the spy's calls", async () => {
+    const onPress = vi.fn();
+    const calls: string[] = [];
+    let wasCalled = false;
+    await run(
+      badge({
+        args: { label: "New", onPress },
+        argTypes: { onClose: { action: "closed" } },
+        play: (context: { readonly args: Record<string, (value: string) => void> }): void => {
+          context.args["onPress"]?.("a");
+          context.args["onClose"]?.("b");
+          wasCalled = vi.isMockFunction(context.args["onPress"]) && onPress.mock.calls.length === 1;
+        }
+      }),
+      undefined,
+      (name: string, values: readonly unknown[]): void => {
+        calls.push(`${name}(${values.join(", ")})`);
+      }
+    );
+    expect(calls).toEqual(["onPress(a)", "onClose(b)"]);
+    expect(wasCalled).toBe(true);
+  });
+
+  it("mounts the story anew for another matrix only, and clears its spies before each mount", async () => {
+    const onPress = vi.fn();
+    let plays = 0;
+    const { reports } = await run(
+      badge({
+        args: { label: "New", onPress },
+        play: (context: { readonly args: Record<string, () => void> }): void => {
+          plays += 1;
+          context.args["onPress"]?.();
+        }
+      })
+    );
+    controlsOf(reports).setMatrix(undefined);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(plays).toBe(1);
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(plays).toBe(2);
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

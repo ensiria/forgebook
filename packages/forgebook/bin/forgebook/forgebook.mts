@@ -61,7 +61,11 @@ await defineScript({
       valueName: "address",
       description: "dev: the address to listen on; localhost by default."
     },
-    out: { type: "string", valueName: "folder", description: "build: the folder to write; dist by default." }
+    out: { type: "string", valueName: "folder", description: "build: the folder to write; dist by default." },
+    force: {
+      type: "boolean",
+      description: "dev: pre-bundle the dependencies again, ignoring Vite's cache (as a first start does)."
+    }
   },
   positionals: [{ name: "command", description: "What to do.", required: true, choices: ["dev", "build"] }],
   examples: [
@@ -86,7 +90,8 @@ await defineScript({
         server: {
           ...(port === undefined ? {} : { port, strictPort: true }),
           ...(options.host === undefined ? {} : { host: options.host })
-        }
+        },
+        ...(options.force === true ? { optimizeDeps: { force: true } } : {})
       })
     );
     await server.listen();

@@ -58,6 +58,68 @@ export type ReplayMode =
  */
 export type StoryGroup = string;
 
+/** The controls an arg can have in the props panel, as Storybook names them. */
+export type ArgControlType =
+  | "select"
+  | "radio"
+  | "inline-radio"
+  | "check"
+  | "inline-check"
+  | "multi-select"
+  | "boolean"
+  | "text"
+  | "number"
+  | "range"
+  | "color"
+  | "date"
+  | "object"
+  | "file";
+
+/** An arg's control: its type, or `false` for none, or the type with its settings. */
+export type ArgControl =
+  | ArgControlType
+  | false
+  | {
+      /** The control; from the arg's type when left out. */
+      readonly type?: ArgControlType;
+      /** The names the panel shows for the options, by option. */
+      readonly labels?: Readonly<Record<string, string>>;
+      /** A range's or a number's lowest value. */
+      readonly min?: number;
+      /** A range's or a number's highest value. */
+      readonly max?: number;
+      /** A range's or a number's step. */
+      readonly step?: number;
+      /** Whether the control is off: the arg is shown, not set. */
+      readonly disable?: boolean;
+    };
+
+/**
+ * How the props panel shows one arg (Storybook's `argTypes`): over what the component's types say, or alone for an
+ * arg the types do not name. The story's entry is laid over the meta's.
+ */
+export type ArgType = {
+  /** The name the panel shows; the arg's by default. */
+  readonly name?: string;
+  /** What the arg does, over its TSDoc. */
+  readonly description?: string;
+  /** Its control. */
+  readonly control?: ArgControl;
+  /** The values a choice offers: texts or numbers, or keys of `mapping`. */
+  readonly options?: readonly unknown[];
+  /** The value each option stands for, by option: the panel sends the option, the story receives the value. */
+  readonly mapping?: Readonly<Record<string, unknown>>;
+  /** The table's settings: `disable` hides the arg from the panel. */
+  readonly table?: { readonly disable?: boolean };
+  /** Records the arg's calls in the Events tab, under this name (Storybook's actions); a spy (`fn()`) is recorded too. */
+  readonly action?: string;
+};
+
+/** A story's or a meta's `argTypes`, by arg. */
+export type ArgTypes<TArgs> = { readonly [Name in keyof TArgs]?: ArgType } & Readonly<
+  Record<string, ArgType>
+>;
+
 /** The settings the catalogue reads from a meta or a story; anything else under `parameters` is left alone. */
 export type StoryParameters = {
   /** The states forced on the whole story; a part can force its own with `data-forgebook-force`. */
@@ -67,9 +129,13 @@ export type StoryParameters = {
   /**
    * The props the panel can set for the story: every adjustable prop by default, only the listed ones, or none
    * (`false`) for a story that draws fixed examples and ignores its args, which then shows no props (its column stays, empty, so the story keeps its width). With a list, the
-   * others are listed without a control.
+   * others are listed without a control. Storybook's `{ include, exclude }` is read too: `include` as the list,
+   * `exclude` hiding those args.
    */
-  readonly controls?: false | readonly string[];
+  readonly controls?:
+    | false
+    | readonly string[]
+    | { readonly include?: readonly string[]; readonly exclude?: readonly string[] };
   /** The story's group in the sidebar, a plain string (the index reads it); none puts it above the groups. */
   readonly group?: StoryGroup;
   /**
@@ -122,7 +188,63 @@ export type StoryContext<TArgs> = {
    * to pick a provider's theme, a density, a locale. Empty outside a catalogue.
    */
   readonly globals: Readonly<Record<string, string>>;
+  /** What the story's loaders returned, merged: the preview's, then the meta's, then the story's (CSF's `loaded`). */
+  readonly loaded: Readonly<Record<string, unknown>>;
+  /** The story's id in the catalogue (`kit:inputs-select--overview`). */
+  readonly id: string;
+  /** The story's name as the catalogue shows it (`Keyboard open`). */
+  readonly name: string;
+  /** The title of its file's meta (`Inputs/Select`). */
+  readonly title: string;
+  /** The story's parameters: the preview's, under the meta's, under its own. */
+  readonly parameters: Readonly<Record<string, unknown>>;
 };
+
+/**
+ * What a play function receives besides the story's context, filled in by the libraries the project installs.
+ *
+ * @remarks
+ * Empty here: Forgebook depends on no testing library. A project that installs `@testing-library/dom` and
+ * `@testing-library/user-event` gets `canvas` and `userEvent` in every play, and imports
+ * `@forgebook/story-format/testing-library` once to type them (it adds them to this interface).
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: an interface other modules add to (declaration merging), empty until one does
+export interface StoryPlayTools {}
+
+/** What a play function receives: the story's context, its `step`, and the play tools the project installed. */
+export type StoryPlayContext<TArgs> = StoryContext<TArgs> & StoryPlayTools;
+
+/**
+ * What a loader and a `beforeEach` receive: the story's args and what it is shown with, before it is drawn. No canvas:
+ * they also run before a story is drawn on the server, where there is none.
+ */
+export type StoryHookContext<TArgs> = Pick<
+  StoryContext<TArgs>,
+  "args" | "text" | "clock" | "globals" | "loaded" | "id" | "name" | "title" | "parameters"
+>;
+
+/**
+ * Fetches what a story needs before it is drawn (CSF's loader): what it returns reaches the story's render, play and
+ * decorators as `context.loaded`. Every loader of a story runs at once; a later one's key wins (the story's over the
+ * meta's over the preview's). It receives an empty `loaded`.
+ */
+export type StoryLoader<TArgs> = (
+  context: StoryHookContext<TArgs>
+) => Promise<Readonly<Record<string, unknown>> | undefined> | Readonly<Record<string, unknown>> | undefined;
+
+/** Undoes what a `beforeEach` set up: run when the story is mounted again or its frame is left. */
+export type StoryCleanup = () => Promise<void> | void;
+
+/**
+ * Sets up what a story needs before it is drawn, after its loaders (CSF's `beforeEach`: a mocked date, a stored
+ * value), one after another: the preview's, the meta's, the story's. It may return the cleanup that undoes it.
+ */
+export type StoryBeforeEach<TArgs> = (
+  context: StoryHookContext<TArgs>
+) => Promise<StoryCleanup | undefined> | StoryCleanup | undefined;
+
+/** One function of a kind, or a list of them, as CSF lets a meta, a story or a preview write it. */
+export type OneOrMany<TFunction> = TFunction | readonly TFunction[];
 
 /** Wraps a story: a provider, a container of a given width. */
 export type Decorator<TRenderer extends Renderer, TArgs> = (
@@ -135,8 +257,11 @@ export type Decorator<TRenderer extends Renderer, TArgs> = (
  * receives and `TWrittenArgs` what its args may write (a framework's package derives both from the component's props).
  */
 export type CsfMeta<TRenderer extends Renderer, TComponent, TArgs, TWrittenArgs> = {
-  /** Where it sits in the catalogue: `Family/Name` or `Family/Group/Name` (`Inputs/Selection/Select`). */
-  readonly title: string;
+  /**
+   * Where it sits in the catalogue: `Family/Name` or `Family/Group/Name` (`Inputs/Selection/Select`); any depth is
+   * placed. Written plainly; without one, the file's path from its pattern's folder is the title.
+   */
+  readonly title?: string;
   /** The component the stories show; their args are its props. */
   readonly component?: TComponent;
   /**
@@ -148,6 +273,14 @@ export type CsfMeta<TRenderer extends Renderer, TComponent, TArgs, TWrittenArgs>
   readonly subcomponents?: Readonly<Record<string, TRenderer["component"]>>;
   /** Args every story of the file starts from. */
   readonly args?: TWrittenArgs;
+  /** How the props panel shows the args (Storybook's `argTypes`). */
+  readonly argTypes?: ArgTypes<TWrittenArgs>;
+  /**
+   * The catalogue's switches the story fixes, by the switch's id (`{ theme: "dark" }`), and Storybook's
+   * `backgrounds` and `viewport` (`{ backgrounds: { value: "dark" } }`): drawn so whatever the toolbar says, which
+   * shows them as set by the story.
+   */
+  readonly globals?: Readonly<Record<string, unknown>>;
   /**
    * Other places the catalogue lists the component in, besides its title's, as `Family` or `Family/Group`
    * (`["Data/Tables"]`): a component that belongs to one family but is looked for in another. Each place shows an
@@ -169,6 +302,20 @@ export type CsfMeta<TRenderer extends Renderer, TComponent, TArgs, TWrittenArgs>
   readonly parameters?: StoryParameters;
   /** Wrappers for every story of the file, outermost last. */
   readonly decorators?: readonly Decorator<TRenderer, TArgs>[];
+  /** What every story of the file renders when it writes no render of its own. */
+  readonly render?: (args: TArgs, context: StoryContext<TArgs>) => TRenderer["storyResult"];
+  /** The play function of every story of the file that writes none of its own. */
+  readonly play?: (context: StoryPlayContext<TArgs>) => Promise<void> | void;
+  /** Loaders for every story of the file, after the preview's. */
+  readonly loaders?: OneOrMany<StoryLoader<TArgs>>;
+  /** Set-ups for every story of the file, after the preview's. */
+  readonly beforeEach?: OneOrMany<StoryBeforeEach<TArgs>>;
+  /** Tags of every story of the file (`["autodocs"]`); a story's `!name` takes one away. Written plainly. */
+  readonly tags?: readonly string[];
+  /** The named exports that are stories: a list of names or a regular expression; every one by default. */
+  readonly includeStories?: readonly string[] | RegExp;
+  /** The named exports that are not stories (shared data): a list of names or a regular expression. */
+  readonly excludeStories?: readonly string[] | RegExp;
 };
 
 /** A story, a named export of a story file, for a framework: its args as in `CsfMeta`. */
@@ -177,20 +324,35 @@ export type CsfStory<TRenderer extends Renderer, TArgs, TWrittenArgs> = {
   readonly name?: string;
   /** Args over the meta's. */
   readonly args?: TWrittenArgs;
+  /** How the props panel shows the args (Storybook's `argTypes`). */
+  readonly argTypes?: ArgTypes<TWrittenArgs>;
+  /**
+   * The catalogue's switches the story fixes, by the switch's id (`{ theme: "dark" }`), and Storybook's
+   * `backgrounds` and `viewport` (`{ backgrounds: { value: "dark" } }`): drawn so whatever the toolbar says, which
+   * shows them as set by the story.
+   */
+  readonly globals?: Readonly<Record<string, unknown>>;
   /** What the story renders; by default the meta's component with the args. */
   readonly render?: (args: TArgs, context: StoryContext<TArgs>) => TRenderer["storyResult"];
   /** Runs after the story renders: a keyboard flow, an async path (the tests run it too). */
-  readonly play?: (context: StoryContext<TArgs>) => Promise<void> | void;
+  readonly play?: (context: StoryPlayContext<TArgs>) => Promise<void> | void;
   /** Settings over the meta's. */
   readonly parameters?: StoryParameters;
   /** Wrappers inside the meta's. */
   readonly decorators?: readonly Decorator<TRenderer, TArgs>[];
+  /** Loaders after the meta's. */
+  readonly loaders?: OneOrMany<StoryLoader<TArgs>>;
+  /** Set-ups after the meta's. */
+  readonly beforeEach?: OneOrMany<StoryBeforeEach<TArgs>>;
+  /** Tags over the meta's: `!name` takes one of the meta's away. Written plainly. */
+  readonly tags?: readonly string[];
 };
 
 /**
  * A catalogue's preview (`forgebook.preview.ts`), for a framework: what applies to every story in the frames. Its
  * decorators wrap every story outside the meta's and the story's own (a provider, the language's provider reading
- * `context.globals.lang`), its parameters sit under every meta's, and its setup runs once before any story renders.
+ * `context.globals.lang`), its parameters sit under every meta's, its setup runs once before any story renders, and
+ * its loaders and set-ups run before every story's own.
  */
 export type CsfPreview<TRenderer extends Renderer> = {
   /** Wrappers for every story, outermost last. */
@@ -199,4 +361,21 @@ export type CsfPreview<TRenderer extends Renderer> = {
   readonly parameters?: StoryParameters;
   /** What the stories need before any renders (a polyfill to load); nothing by default. */
   readonly setup?: () => Promise<void>;
+  /** Loaders for every story, before the meta's and the story's. */
+  readonly loaders?: OneOrMany<StoryLoader<Readonly<Record<string, unknown>>>>;
+  /** Set-ups for every story, before the meta's and the story's. */
+  readonly beforeEach?: OneOrMany<StoryBeforeEach<Readonly<Record<string, unknown>>>>;
+  /** Args every story starts from, under its meta's (Storybook's project args). */
+  readonly args?: Readonly<Record<string, unknown>>;
+  /** How the props panel shows args of every story, under the meta's and the story's. */
+  readonly argTypes?: Readonly<Record<string, ArgType>>;
+  /**
+   * Storybook's toolbar of the preview's own globals: read by the configuration on Node, through
+   * `switchesFromGlobalTypes`, never by the frames.
+   */
+  readonly globalTypes?: Readonly<Record<string, unknown>>;
+  /** The globals' first values, for `switchesFromGlobalTypes`. */
+  readonly initialGlobals?: Readonly<Record<string, unknown>>;
+  /** Tags of every story, under the meta's. */
+  readonly tags?: readonly string[];
 };

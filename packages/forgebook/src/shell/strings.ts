@@ -148,6 +148,8 @@ const shellStrings = {
   unsetDefault: (value: string): string => `— (${value})`,
   defaultIs: "Default:",
   pickColor: (prop: string): string => `${prop}: pick a colour`,
+  rangeValue: (prop: string): string => `${prop}: value`,
+  setByStory: "Set by the story",
   required: "Required",
   resetArgs: "Reset",
   events: "Events",

@@ -16,9 +16,10 @@ import { storyTextOf } from "@forgebook/story-format/texts";
 import { heldFrameClock } from "forgebook/frame-clock";
 import type { StoryRenderer } from "forgebook/renderer";
 import { sourceFiles } from "forgebook/source-files";
+import { prepareStory } from "forgebook/story-hooks";
 import { type LoadedDecorator, mergedPreviews, readPreview, readStory } from "forgebook/story-module";
 import { BASE_LANGUAGE, withStoryTexts } from "forgebook/story-texts";
-import { storyLocations, storyTree } from "forgebook/story-tree";
+import { storyTree, testedStoryLocations } from "forgebook/story-tree";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { storyControlsProblem } from "./storyControls";
@@ -62,30 +63,51 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
     await source.setup?.();
     await preview.setup?.();
   });
-  const locations = storyLocations(storyTree([source]));
+  const locations = testedStoryLocations(storyTree([source]));
   for (const [title, entries] of Map.groupBy(locations, (location) => location.component.title)) {
     describe(title, () => {
       for (const { story, component } of entries) {
         it.each(passes)(`${story.name} renders on the server ($name)`, async (pass) => {
           const load = sourceFiles(source).stories[component.file];
           if (load === undefined) throw new Error(`No loader for ${component.file}`);
-          const loaded = readStory(await load(), story.exportName, preview.parameters);
+          const loaded = readStory(await load(), story.exportName, preview);
           if (typeof loaded === "string") throw new Error(loaded);
           // the stories' own texts: what the catalogue shows when no language is chosen
           const texts = source.texts?.[BASE_LANGUAGE] ?? {};
+          const args = withStoryTexts(loaded.args, storyTextOf(texts));
+          // a Live story renders at its start, as the frame's tests picture it (D-504)
+          const clock = heldFrameClock(loaded.clockStart ?? 0);
+          // the loaders and set-ups run as in the frame, so a story drawn from what they load renders here too
+          const identity = { id: story.id, name: story.name, title: component.title };
+          const prepared = await prepareStory(loaded, {
+            ...identity,
+            args,
+            text: storyTextOf(texts),
+            clock,
+            globals: {},
+            parameters: loaded.parameters
+          });
           let html = "";
-          // a render error fails the test: the server does not run error boundaries, and none may be swallowed
-          expect(() => {
-            html = options.renderer.renderToString({
-              story: loaded,
-              args: withStoryTexts(loaded.args, storyTextOf(texts)),
-              texts,
-              // a Live story renders at its start, as the frame's tests picture it (D-504)
-              clock: heldFrameClock(loaded.clockStart ?? 0),
-              decorators: [...preview.decorators, ...(pass.decorator === undefined ? [] : [pass.decorator])],
-              globals: {}
-            });
-          }).not.toThrow();
+          try {
+            // a render error fails the test: the server does not run error boundaries, and none may be swallowed
+            expect(() => {
+              html = options.renderer.renderToString({
+                identity,
+                story: loaded,
+                args,
+                texts,
+                clock,
+                decorators: [
+                  ...preview.decorators,
+                  ...(pass.decorator === undefined ? [] : [pass.decorator])
+                ],
+                globals: {},
+                loaded: prepared.loaded
+              });
+            }).not.toThrow();
+          } finally {
+            await prepared.cleanup();
+          }
           pass.check?.(html);
         });
         it(`${story.name} declares the controls it uses`, async () => {

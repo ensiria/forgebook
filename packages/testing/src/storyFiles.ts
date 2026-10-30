@@ -14,6 +14,7 @@ import { join } from "node:path";
 
 import type { StoryFileIndex, StorySource } from "@forgebook/story-format/source";
 import { sourceFiles } from "forgebook/source-files";
+import { autoTitle, patternBase } from "forgebook/vite/auto-title";
 import { indexStoryFile } from "forgebook/vite/index-story-file";
 import { storyFileKeys } from "forgebook/vite/story-files-module";
 
@@ -46,7 +47,13 @@ export const storyFiles = (options: StoryFilesOptions): string[] =>
 export const indexedSource = (options: StoryFilesOptions): StorySource => {
   const index: Record<string, StoryFileIndex> = {};
   for (const file of storyFiles(options)) {
-    const entry = indexStoryFile(file, readFileSync(join(options.root, file), "utf8"));
+    // the title the plugin gives: from the first pattern that matches the file, as each pattern is one module
+    const pattern = options.patterns.find((candidate) =>
+      storyFileKeys(options.root, [candidate]).includes(file)
+    );
+    const title = pattern === undefined ? undefined : autoTitle(patternBase(pattern), file);
+    const text = readFileSync(join(options.root, file), "utf8");
+    const entry = indexStoryFile(file, text, title === undefined ? {} : { autoTitle: title });
     if (typeof entry === "string") throw new Error(entry);
     index[file] = entry;
   }

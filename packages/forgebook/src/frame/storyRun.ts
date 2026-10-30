@@ -6,13 +6,15 @@
  * @remarks
  * The framework only draws (`renderer.ts`); everything a story does over time is here, so each framework behaves the
  * same. The play function runs once per mount, like a test, not on every change of the args, and reads the args of
- * the moment it runs.
+ * the moment it runs. Every mount runs the story's loaders and set-ups first (`storyHooks.ts`), after the cleanups of
+ * the mount before.
  *
  * @module
  */
 
 import { type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 
+import { actionNames, mappedArgs } from "../argTypes";
 import type { Matrix } from "../matrix";
 import type { PanelArgs } from "../messages";
 import type { PlayTrace } from "../playTrace";
@@ -20,10 +22,11 @@ import type { ClockState } from "../storyClock";
 import { withStoryTexts } from "../storyTexts";
 import type { FrameClock } from "./frameClock";
 import { matrixLayout } from "./matrixLayout";
-import { playStory } from "./playStory";
-import type { MountedStory, StoryDrawing, StoryRenderer } from "./renderer";
+import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory";
+import type { MountedStory, StoryDrawing, StoryIdentity, StoryRenderer } from "./renderer";
 import { animationsSettled } from "./settle";
 import { storyCanvas } from "./storyCanvas";
+import { type PreparedStory, prepareStory } from "./storyHooks";
 import type { LoadedArgs, LoadedStory } from "./storyModule";
 
 /** What the shell can do to a running story. */
@@ -53,6 +56,10 @@ export type StoryRunOptions = {
   readonly container: HTMLElement;
   /** The story. */
   readonly story: LoadedStory;
+  /** Which story it is: its context's id, name and title. */
+  readonly identity: StoryIdentity;
+  /** Loads the play tools the project installed, for the first play; none without them. */
+  readonly playTools?: PlayToolsLoader;
   /** The framework that draws it. */
   readonly renderer: StoryRenderer;
   /** The story clock the story reads: running from its start for a Live story, held otherwise. */
@@ -103,6 +110,8 @@ const errorElement = (document: Document, error: Error): HTMLElement => {
 
 /** What the frame changes in a running story when the shell sends a new view: no new mount, the story keeps its state. */
 export type RunningStory = {
+  /** Takes the story away and runs its set-ups' cleanups: the frame's page is being left. */
+  readonly leave: () => void;
   /**
    * Draws the story in another language, or with other values of the switches applied by code (the language's
    * provider reads its id among them).
@@ -111,6 +120,32 @@ export type RunningStory = {
    */
   readonly setShown: (shown: Pick<StoryDrawing, "texts" | "globals">) => void;
 };
+
+/** A story's handler of an event, as the frame calls it. */
+type Handler = (...values: unknown[]) => unknown;
+
+/**
+ * Whether an arg is a handler the frame can wrap: a function, taken with the signature an event's handler has.
+ *
+ * @param value - the arg.
+ */
+const isHandler = (value: unknown): value is Handler => typeof value === "function";
+
+/**
+ * Clears the calls of the spies among a story's args, as Storybook does before it draws a story: each mount's play
+ * counts its own calls.
+ *
+ * @param args - the story's args.
+ */
+const clearSpies = (args: LoadedArgs): void => {
+  for (const value of Object.values(args)) {
+    const clear: unknown = typeof value === "function" ? Reflect.get(value, "mockClear") : undefined;
+    if (typeof clear === "function") Reflect.apply(clear, value, []);
+  }
+};
+
+/** A story before its loaders ran, or after its set-ups were undone: nothing loaded, nothing to undo. */
+const NOT_PREPARED: PreparedStory = { loaded: {}, cleanup: async (): Promise<void> => undefined };
 
 /**
  * Runs a story in its container.
@@ -131,30 +166,52 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let shownError: HTMLElement | undefined;
   let mountCount = 0;
   let hasPlayed = false;
+  let prepared: PreparedStory = NOT_PREPARED;
 
-  // every recorded event reports its calls, then runs the story's own handler when it has one
+  // the story's actions are recorded whatever the shell names: a spy, an `argTypes` action
+  const actions = actionNames(story.args, story.argTypes);
+  // every recorded event reports its calls, then runs the story's own handler when it has one; the handler is
+  // wrapped, not replaced, so a spy stays one (`expect(args.onPress).toHaveBeenCalled()` reads its calls)
   const recorded = (): LoadedArgs =>
     Object.fromEntries(
-      eventNames.map((name) => {
+      [...new Set([...eventNames, ...actions])].map((name) => {
         const own = args[name];
+        const report = (values: readonly unknown[]): void => options.onEvent(name, values);
+        if (!isHandler(own)) {
+          return [
+            name,
+            (...values: unknown[]): undefined => {
+              report(values);
+              return undefined;
+            }
+          ];
+        }
         return [
           name,
-          (...values: unknown[]): unknown => {
-            options.onEvent(name, values);
-            return typeof own === "function" ? own(...values) : undefined;
-          }
+          new Proxy(own, {
+            apply: (target: Handler, thisArg: unknown, values: unknown[]): unknown => {
+              report(values);
+              return Reflect.apply(target, thisArg, values);
+            }
+          })
         ];
       })
     );
   // an arg written `storyText("key")` reaches the story as the text of the shown language
-  const shownArgs = (): LoadedArgs => ({ ...withStoryTexts(args, text), ...recorded() });
+  // an arg holding a key of its `mapping` reaches the story as the value the key stands for
+  const shownArgs = (): LoadedArgs => ({
+    ...withStoryTexts(mappedArgs(args, story.argTypes), text),
+    ...recorded()
+  });
   const drawing = (values: LoadedArgs): StoryDrawing => ({
+    identity: options.identity,
     story,
     args: { ...shownArgs(), ...values },
     texts,
     clock,
     decorators,
-    globals
+    globals,
+    loaded: prepared.loaded
   });
 
   const clearError = (): void => {
@@ -201,7 +258,10 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       eventNames = names;
       redraw();
     },
+    // the shell sends the matrix when the story is ready: the same one again must not mount the story anew (its play
+    // would run twice)
     setMatrix: (next: Matrix | undefined): void => {
+      if (JSON.stringify(next) === JSON.stringify(matrix)) return;
       matrix = next;
       mountStory();
     },
@@ -234,33 +294,104 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     container.append(canvas);
     const alone = renderer.mount(canvas, drawing({}), showError);
     mounted = [{ story: alone, values: {} }];
-    void alone.drawn.then(() => {
+    void alone.drawn.then(async () => {
       // a later mount (Replay, the matrix) replaced this one before it was drawn: its play would drive a gone story
       if (count !== mountCount) return;
+      const tools = await playTools();
+      if (count !== mountCount || tools instanceof Error) return;
       // a failed play still ends the wait; its rejection reaches the page as an error the tests record
       void playStory(
         story.play,
-        { args: shownArgs(), canvasElement: canvas, text, clock, globals },
+        {
+          ...options.identity,
+          args: shownArgs(),
+          canvasElement: canvas,
+          text,
+          clock,
+          globals,
+          loaded: prepared.loaded,
+          parameters: story.parameters
+        },
         (): void => {
           if (hasPlayed) return;
           hasPlayed = true;
           options.onControlsReady(controls);
         },
-        options.onTrace
+        options.onTrace,
+        tools
       );
     });
   };
 
-  // a new mount draws the story from scratch: its own state starts over and its play function runs again
+  // the play tools the project installed, loaded for a story with a play; a failure to load them is shown as the
+  // story's error
+  const playTools = async (): Promise<PlayTools | undefined | Error> => {
+    if (story.play === undefined) return undefined;
+    try {
+      return await options.playTools?.();
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      showError(failure);
+      return failure;
+    }
+  };
+
+  // the set-ups of the mount before undone, then the story's loaders and set-ups: whether this mount is still the last
+  // one, and may draw
+  const prepareMount = async (count: number): Promise<boolean> => {
+    clearSpies(story.args);
+    // taken before waiting: a mount that starts meanwhile must not undo the same set-ups again
+    const previous = prepared;
+    prepared = NOT_PREPARED;
+    try {
+      await previous.cleanup();
+      const next = await prepareStory(story, {
+        ...options.identity,
+        args: shownArgs(),
+        text,
+        clock,
+        globals,
+        parameters: story.parameters
+      });
+      // a later mount started while this one loaded: its set-ups are undone, the later one draws
+      if (count !== mountCount) {
+        await next.cleanup();
+        return false;
+      }
+      prepared = next;
+      return true;
+    } catch (error) {
+      if (count === mountCount) showError(error instanceof Error ? error : new Error(String(error)));
+      return false;
+    }
+  };
+
+  // a new mount draws the story from scratch: its loaders and set-ups run again, its own state starts over and its
+  // play function runs again
   const mountStory = (): void => {
     unmountAll();
     mountCount += 1;
-    if (matrix === undefined) mountAlone();
-    else mountMatrix(matrix);
+    void prepareMount(mountCount).then((isLast) => {
+      if (!isLast) return;
+      // a framework may throw while it starts drawing, before its own error capture is in place: shown as any error
+      try {
+        if (matrix === undefined) mountAlone();
+        else mountMatrix(matrix);
+      } catch (error) {
+        showError(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
   };
 
   mountStory();
   return {
+    leave: (): void => {
+      mountCount += 1;
+      unmountAll();
+      const previous = prepared;
+      prepared = NOT_PREPARED;
+      void previous.cleanup();
+    },
     setShown: (shown: Pick<StoryDrawing, "texts" | "globals">): void => {
       ({ texts, globals } = shown);
       text = storyTextOf(texts);

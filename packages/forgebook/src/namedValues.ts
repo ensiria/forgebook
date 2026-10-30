@@ -10,7 +10,7 @@
  */
 import type { StorySource } from "@forgebook/story-format/source";
 
-import { type ArgValue, isNamedArg, type NamedArg, type PanelArgs } from "./messages";
+import { type ArgValue, isChoiceList, isNamedArg, type NamedArg, type PanelArgs } from "./messages";
 
 /** A source's named values: by the type as the props write it, then by name. */
 export type NamedValues = NonNullable<StorySource["namedValues"]>;
@@ -31,8 +31,8 @@ export const nameOf = (value: unknown, namedValues: NamedValues): NamedArg | und
 };
 
 /**
- * A story's own args as the panel can show them: texts, numbers, booleans and `null` as they are, a named value by
- * its name; anything else is left out.
+ * A story's own args as the panel can show them: texts, numbers, booleans, `null` and lists of texts and numbers (a
+ * multiple choice's) as they are, a named value by its name; anything else is left out.
  *
  * @param args - the story's args.
  * @param namedValues - the source's named values; none by default.
@@ -47,7 +47,8 @@ export const panelArgsOf = (
         value === null ||
         typeof value === "string" ||
         typeof value === "number" ||
-        typeof value === "boolean"
+        typeof value === "boolean" ||
+        isChoiceList(value)
       ) {
         return [[name, value]];
       }

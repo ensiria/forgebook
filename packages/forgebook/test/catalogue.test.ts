@@ -98,6 +98,7 @@ describe("story groups", () => {
         controls: "all" as const,
         description: undefined,
         height: undefined,
+        tags: [],
         isMain: false
       })),
       ["states", "behaviour"]

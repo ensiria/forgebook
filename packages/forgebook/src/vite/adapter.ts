@@ -55,6 +55,11 @@ export type FrameworkAdapter = {
     /** The module exporting the framework's code writer as `codeOf` (`@forgebook/react/code`). */
     readonly code: string;
   };
+  /**
+   * The packages the framework's pages import in the browser (`react-dom/client`): pre-bundled before the first page
+   * opens, since Vite's scanner cannot read pages that are generated; none by default.
+   */
+  readonly browserDependencies?: readonly string[];
   /** The Vite plugins the framework needs in a catalogue (React's Fast Refresh); none by default. */
   readonly vitePlugins?: () => Promise<readonly PluginOption[]>;
 };

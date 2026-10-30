@@ -1,6 +1,6 @@
 /**
- * The fixture catalogue: Forgebook over the fixture kit, drawn with React, with the kit's preset (its switches) and
- * two languages. The shell's browser tests run on it (`shell/`).
+ * The fixture catalogue: Forgebook over the fixture kit and the Storybook fixture, drawn with React, with the kit's
+ * preset (its switches) and two languages. The shell's browser tests run on it (`shell/`).
  *
  * @module
  */
@@ -14,7 +14,8 @@ export default defineConfig({
   logo: "logo.svg",
   // invented heights, so the tests can see a story's box wait at its measured height
   heights: "story-heights.json",
-  sources: ["@fixture/kit/stories"],
+  // the kit's stories, and stories written the Storybook way, each file one Storybook feature Forgebook reads
+  sources: ["@fixture/kit/stories", "@fixture/storybook/stories"],
   languages: [
     { id: "it", label: "Italiano" },
     { id: "pseudo", label: "Pseudo", isPseudo: true }

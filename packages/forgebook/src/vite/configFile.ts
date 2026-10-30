@@ -10,6 +10,7 @@
  * @module
  */
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -54,6 +55,37 @@ export type ResolvedConfig = {
   readonly watch: readonly string[];
   /** The lists (widths, backgrounds, story groups…), the presets' and the catalogue's merged. */
   readonly lists: CatalogueLists;
+  /** Whether the project installs Testing Library, whose `canvas` and `userEvent` every play then receives. */
+  readonly hasPlayTools: boolean;
+};
+
+/** The packages of the play tools: both installed, or the plays get neither. */
+export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/user-event"] as const;
+
+/**
+ * Resolves packages as Node does from a folder: a package's (or subpath's) file, or none when it is not there.
+ *
+ * @param dir - the folder, the configuration's.
+ */
+export const packageResolver =
+  (dir: string) =>
+  (name: string): string | undefined => {
+    const require = createRequire(resolve(dir, "package.json"));
+    try {
+      return require.resolve(name);
+    } catch {
+      return undefined;
+    }
+  };
+
+/**
+ * Whether the project in a folder installs the play tools' packages, found as Node finds them from there.
+ *
+ * @param dir - the configuration's folder.
+ */
+const hasPlayToolsIn = (dir: string): boolean => {
+  const resolvePackage = packageResolver(dir);
+  return PLAY_TOOLS_PACKAGES.every((name) => resolvePackage(name) !== undefined);
 };
 
 /**
@@ -180,7 +212,8 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
       .filter((tags) => tags !== "")
       .join("\n"),
     watch: (config.watch ?? []).map(absolute),
-    lists: mergedLists([...presets, config])
+    lists: mergedLists([...presets, config]),
+    hasPlayTools: hasPlayToolsIn(dir)
   };
 };
 

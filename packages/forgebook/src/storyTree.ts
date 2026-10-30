@@ -3,8 +3,8 @@
  * with every story's id.
  *
  * @remarks
- * A story's place comes from its file's title (`Family/Name` or `Family/Group/Name`), so the sidebar needs no list
- * kept by hand. Ids follow CSF: the title and the export name in lower-case kebab, joined by `--`, here prefixed by
+ * A story's place comes from its file's title (`Family/Name` or `Family/Group/Name`, or Storybook's titles of any
+ * depth), so the sidebar needs no list kept by hand. Ids follow CSF: the title and the export name in lower-case kebab, joined by `--`, here prefixed by
  * the source's id, so two packages can hold the same title. A component its meta lists in other places (`alsoIn`)
  * gets an alias entry in each, and related components (`related`) name each other both ways (D-492): an alias is not
  * a component, so the stories, the ids and the tests stay one per file. Pure.
@@ -39,6 +39,8 @@ export type TreeStory = {
   readonly isMain: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default (D-469). */
   readonly height: number | undefined;
+  /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
+  readonly tags: readonly string[];
 };
 
 /** One component (one story file). */
@@ -49,8 +51,13 @@ export type TreeComponent = {
   readonly title: string;
   /** The story file, a key of the source's `index` and `stories`. */
   readonly file: string;
-  /** Its stories, in the order of the file. */
+  /** Its stories the catalogue lists (the sidebar's count, the picker, the page), in the order of the file. */
   readonly stories: readonly TreeStory[];
+  /**
+   * Its stories tagged `!dev`, as Storybook's: listed nowhere, still opened by their address and tested; empty when
+   * none.
+   */
+  readonly unlisted: readonly TreeStory[];
   /** The other places it is listed in, as the meta writes them (`Data/Tables`); empty when none (D-492). */
   readonly alsoIn: readonly string[];
   /**
@@ -158,12 +165,26 @@ export const storyName = (exportName: string): string => {
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-/** A title's segments, or why it cannot be placed. */
-const titleSegments = (title: string): readonly string[] | string => {
+/** Where a title places a component: its family, its group within the family, its name. */
+type TitlePlace = { readonly family: string; readonly group: string | undefined; readonly name: string };
+
+/**
+ * Where a title places its component, or why it cannot be placed.
+ *
+ * @remarks
+ * `Family/Name` and `Family/Group/Name` are Forgebook's titles. Storybook's may have any depth: one segment is a
+ * family with a component of the same name; past three, the segments between the family and the name make the group
+ * (`Atoms / Forms`), so every title of a Storybook project has a place.
+ *
+ * @param title - the meta's title.
+ */
+const titlePlace = (title: string): TitlePlace | string => {
   const segments = title.split("/").map((segment) => segment.trim());
   if (segments.some((segment) => segment === "")) return `"${title}" has an empty segment`;
-  if (segments.length < 2 || segments.length > 3) return `"${title}" is not Family/Name or Family/Group/Name`;
-  return segments;
+  const [family = "", ...rest] = segments;
+  const name = rest.at(-1) ?? family;
+  const between = rest.slice(0, -1);
+  return { family, group: between.length === 0 ? undefined : between.join(" / "), name };
 };
 
 /**
@@ -204,9 +225,10 @@ const placedFiles = (source: StorySource, problems: string[]): PlacedFile[] => {
   const placed: PlacedFile[] = [];
   const seenTitles = new Map<string, string>();
   for (const [file, entry] of Object.entries<StoryFileIndex>(sourceFiles(source).index)) {
-    const segments = titleSegments(entry.title);
-    if (typeof segments === "string") {
-      problems.push(`${source.name}: ${file}: ${segments}`);
+    for (const note of entry.notes ?? []) problems.push(`${source.name}: ${file}: ${note}`);
+    const place = titlePlace(entry.title);
+    if (typeof place === "string") {
+      problems.push(`${source.name}: ${file}: ${place}`);
       continue;
     }
     const other = seenTitles.get(entry.title);
@@ -215,14 +237,7 @@ const placedFiles = (source: StorySource, problems: string[]): PlacedFile[] => {
       continue;
     }
     seenTitles.set(entry.title, file);
-    const [family = "", ...rest] = segments;
-    placed.push({
-      file,
-      entry,
-      family,
-      group: rest.length === 2 ? rest[0] : undefined,
-      name: rest.at(-1) ?? ""
-    });
+    placed.push({ file, entry, ...place });
   }
   return placed;
 };
@@ -319,6 +334,9 @@ const placeAliases = (
   }
 };
 
+/** Whether a story is kept out of the catalogue's lists: tagged `!dev`, as Storybook's sidebar leaves it out. */
+const isUnlisted = (story: Pick<TreeStory, "tags">): boolean => story.tags.includes("!dev");
+
 /** The families of one source, from its files. */
 const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] => {
   const placed = placedFiles(source, problems);
@@ -333,13 +351,15 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       group: story.group,
       description: story.description,
       isMain: story.isMain === true,
-      height: story.height ?? entry.height
+      height: story.height ?? entry.height,
+      tags: story.tags ?? []
     }));
     groupAt(families, family, group).components.push({
       name,
       title: entry.title,
       file,
-      stories,
+      stories: stories.filter((story) => !isUnlisted(story)),
+      unlisted: stories.filter(isUnlisted),
       alsoIn: entry.alsoIn ?? [],
       related: related.get(entry.title) ?? [],
       keywords: entry.keywords ?? []
@@ -398,7 +418,8 @@ export type StoryLocation = {
 };
 
 /**
- * Every story of the tree with its place, in the sidebar's order.
+ * Every story of the tree with its place: each component's listed stories in the sidebar's order, then its unlisted
+ * ones.
  *
  * @param tree - the tree.
  */
@@ -407,11 +428,26 @@ export const storyLocations = (tree: StoryTree): StoryLocation[] =>
     source.families.flatMap((family) =>
       family.groups.flatMap((group) =>
         group.components.flatMap((component) =>
-          component.stories.map((story) => ({ source, family, group, component, story }))
+          [...component.stories, ...component.unlisted].map((story) => ({
+            source,
+            family,
+            group,
+            component,
+            story
+          }))
         )
       )
     )
   );
+
+/**
+ * Every story the generated tests check, with its place: all but those tagged `!test`, as Storybook's test runner
+ * leaves them out.
+ *
+ * @param tree - the tree.
+ */
+export const testedStoryLocations = (tree: StoryTree): StoryLocation[] =>
+  storyLocations(tree).filter((location) => !location.story.tags.includes("!test"));
 
 /**
  * Where a story sits.

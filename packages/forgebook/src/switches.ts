@@ -211,3 +211,72 @@ export const catalogueSwitches = (
   if (problem !== undefined) throw new Error(`Forgebook's switches: ${problem}`);
   return switches;
 };
+
+/** What a switch made from a `globalType` may take besides it: where it applies, what the catalogue reads of it. */
+export type GlobalTypeSwitchOverride = Partial<Pick<ViewSwitch, "label" | "apply" | "role" | "control">>;
+
+/** How `switchesFromGlobalTypes` reads Storybook's preview. */
+export type GlobalTypesOptions = {
+  /** The preview's `initialGlobals`: each switch's default, over the `globalType`'s `defaultValue`. */
+  readonly initialGlobals?: Readonly<Record<string, unknown>>;
+  /**
+   * What each switch takes besides its `globalType`, by id: by default a switch applies by code (the story's
+   * decorators read `context.globals`, as Storybook's do) and the catalogue reads nothing of it.
+   */
+  readonly overrides?: Readonly<Record<string, GlobalTypeSwitchOverride>>;
+};
+
+/** The globals of Storybook's own addons: the catalogue has its own background, width and measuring tools. */
+const ADDON_GLOBALS = ["backgrounds", "viewport", "measureEnabled", "outline", "grid"];
+
+/** Whether a value is a plain object. */
+const isRecordValue = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * The values of a `globalType`'s toolbar: each item a text, or `{ value, title }`; an item without a text value (a
+ * reset) is left out.
+ *
+ * @param items - the toolbar's `items`.
+ */
+const globalTypeValues = (items: unknown): SwitchValue[] =>
+  (Array.isArray(items) ? items : []).flatMap((item): SwitchValue[] => {
+    if (typeof item === "string") return [{ value: item, label: item }];
+    if (!isRecordValue(item) || typeof item["value"] !== "string") return [];
+    const title = item["title"];
+    return [{ value: item["value"], label: typeof title === "string" ? title : item["value"] }];
+  });
+
+/**
+ * The catalogue's switches from Storybook's `globalTypes` (a toolbar of a preview's own globals): one switch per
+ * `globalType` with toolbar items, applied by code, so the decorators that read `context.globals` work as in
+ * Storybook. Its label is the toolbar's title (or the `globalType`'s `name`, or its id); its default the preview's
+ * `initialGlobals`, or its `defaultValue`, or its first value. The globals of Storybook's addons and the address's
+ * own names are left out.
+ *
+ * @param globalTypes - the preview's `globalTypes`, as plain data (the configuration reads it on Node).
+ * @param options - the preview's `initialGlobals`, and what a switch takes besides its `globalType`.
+ */
+export const switchesFromGlobalTypes = (
+  globalTypes: Readonly<Record<string, unknown>>,
+  options: GlobalTypesOptions = {}
+): ViewSwitch[] =>
+  Object.entries(globalTypes).flatMap(([id, globalType]): ViewSwitch[] => {
+    if (!isRecordValue(globalType) || ADDON_GLOBALS.includes(id) || RESERVED_IDS.includes(id)) return [];
+    const toolbar = isRecordValue(globalType["toolbar"]) ? globalType["toolbar"] : {};
+    const values = globalTypeValues(toolbar["items"]);
+    const [first] = values;
+    if (first === undefined) return [];
+    const initial = options.initialGlobals?.[id] ?? globalType["defaultValue"];
+    const title = toolbar["title"] ?? globalType["name"];
+    return [
+      {
+        id,
+        label: typeof title === "string" ? title : id,
+        values,
+        default: values.some((value) => value.value === initial) ? String(initial) : first.value,
+        apply: { kind: "code" },
+        ...options.overrides?.[id]
+      }
+    ];
+  });

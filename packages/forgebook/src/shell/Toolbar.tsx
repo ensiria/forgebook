@@ -7,6 +7,7 @@
  */
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
+import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals";
 import { switchControl, switchWithRole, type ViewSwitch } from "../switches";
 import {
   DEFAULT_VIEW,
@@ -20,9 +21,11 @@ import {
   type ViewState
 } from "../viewState";
 import { useCatalogue } from "./catalogueContext";
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
+import { SchemeSwitches } from "./SchemeSwitches";
 import { Segmented } from "./Segmented";
 import { STRINGS } from "./strings";
+import { switchValueIn, withSwitch } from "./switchView";
 import { usePopover } from "./usePopover";
 import { WidthField } from "./WidthField";
 
@@ -38,34 +41,9 @@ export type ToolbarProps = {
   readonly onShowSidebar?: (() => void) | undefined;
   /** The width the shown story really has, in CSS px, for the width field; none on a component's page. */
   readonly shownWidth?: number | undefined;
+  /** What the shown story fixes of the view: shown, and not changeable here; nothing by default. */
+  readonly fixed?: FixedView;
 };
-
-/** The icon of each scheme a colour scheme switch's values draw in. */
-const SCHEME_ICONS: Readonly<Record<"light" | "dark" | "system", IconName>> = {
-  light: "sun",
-  dark: "moon",
-  system: "monitor"
-};
-
-/**
- * A view with one switch set.
- *
- * @param view - the view.
- * @param each - the switch.
- * @param value - its new value.
- */
-const withSwitch = (view: ViewState, each: ViewSwitch, value: string): ViewState => ({
-  ...view,
-  switches: { ...view.switches, [each.id]: value }
-});
-
-/**
- * A switch's value in a view.
- *
- * @param view - the view.
- * @param each - the switch.
- */
-const switchValueIn = (view: ViewState, each: ViewSwitch): string => view.switches[each.id] ?? each.default;
 
 /**
  * One switch's row in the View menu: segments, or a list for many values.
@@ -75,14 +53,17 @@ const switchValueIn = (view: ViewState, each: ViewSwitch): string => view.switch
 const SwitchRow = ({
   each,
   view,
-  onViewChange
+  onViewChange,
+  isFixed
 }: {
   readonly each: ViewSwitch;
   readonly view: ViewState;
   readonly onViewChange: (view: ViewState) => void;
+  /** Whether the story sets the switch. */
+  readonly isFixed: boolean;
 }): ReactNode => {
   const listId = useId();
-  const isCompared = view.compare.includes(each.id);
+  const isCompared = view.compare.includes(each.id) || isFixed;
   if (switchControl(each) === "list") {
     return (
       <div className="forgebook-popover__row">
@@ -94,6 +75,7 @@ const SwitchRow = ({
           className="forgebook-select"
           value={switchValueIn(view, each)}
           disabled={isCompared}
+          title={isFixed ? STRINGS.setByStory : undefined}
           onChange={(event: ChangeEvent<HTMLSelectElement>): void =>
             onViewChange(withSwitch(view, each, event.currentTarget.value))
           }
@@ -115,6 +97,7 @@ const SwitchRow = ({
         options={each.values.map((value) => ({ value: value.value, label: value.label }))}
         value={switchValueIn(view, each)}
         isDisabled={isCompared}
+        disabledNote={isFixed ? STRINGS.setByStory : undefined}
         onValueChange={(value: string): void => onViewChange(withSwitch(view, each, value))}
       />
     </div>
@@ -128,7 +111,15 @@ const SwitchRow = ({
  *
  * @param props - the view and its setter.
  */
-const ViewMenu = ({ view, onViewChange }: ToolbarProps): ReactNode => {
+const ViewMenu = ({
+  view,
+  onViewChange,
+  fixed = NOT_FIXED,
+  hasOwnChanges
+}: ToolbarProps & {
+  /** Whether the user changed the view: a value the story fixes is not a change of theirs. */
+  readonly hasOwnChanges: boolean;
+}): ReactNode => {
   const { isOpen, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
   const catalogue = useCatalogue();
   const { switches } = catalogue;
@@ -147,7 +138,7 @@ const ViewMenu = ({ view, onViewChange }: ToolbarProps): ReactNode => {
       >
         <Icon name="sliders" size={14} />
         {STRINGS.view}
-        {hasViewChanges(view, switches) ? (
+        {hasOwnChanges ? (
           <span className="forgebook-dot" role="img" aria-label={STRINGS.viewChanged} />
         ) : null}
         <Icon name="chevronDown" size={12} />
@@ -161,7 +152,13 @@ const ViewMenu = ({ view, onViewChange }: ToolbarProps): ReactNode => {
           aria-label={STRINGS.view}
         >
           {menuSwitches.map((each) => (
-            <SwitchRow key={each.id} each={each} view={view} onViewChange={onViewChange} />
+            <SwitchRow
+              key={each.id}
+              each={each}
+              view={view}
+              onViewChange={onViewChange}
+              isFixed={fixed.switches[each.id] !== undefined}
+            />
           ))}
           <div className="forgebook-popover__row">
             <label className="forgebook-popover__label" htmlFor={backdropId}>
@@ -171,6 +168,8 @@ const ViewMenu = ({ view, onViewChange }: ToolbarProps): ReactNode => {
               id={backdropId}
               className="forgebook-select"
               value={view.backdrop}
+              disabled={fixed.backdrop !== undefined}
+              title={fixed.backdrop === undefined ? undefined : STRINGS.setByStory}
               onChange={(event: ChangeEvent<HTMLSelectElement>): void =>
                 onViewChange({ ...view, backdrop: event.currentTarget.value })
               }
@@ -275,7 +274,8 @@ const compareChoices = (switches: readonly ViewSwitch[]): CompareChoice[] => {
 const CompareMenu = ({
   view,
   onViewChange,
-  isDisabled
+  isDisabled,
+  fixed = NOT_FIXED
 }: ToolbarProps & { readonly isDisabled: boolean }): ReactNode => {
   const { isOpen, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
   const switches = useCatalogue().switches;
@@ -312,6 +312,8 @@ const CompareMenu = ({
                 <input
                   type="radio"
                   name={name}
+                  // a switch the story fixes would draw the same story in every cell
+                  disabled={choice.axes.some((axis) => fixed.switches[axis] !== undefined)}
                   checked={view.compare.join(",") === choice.axes.join(",")}
                   onChange={(): void => {
                     onViewChange({ ...view, compare: choice.axes });
@@ -346,82 +348,33 @@ export const ShowSidebarButton = ({ onShowSidebar }: { readonly onShowSidebar: (
 );
 
 /**
- * The colour scheme switch and the contrast switch, at the toolbar's start: the scheme as segments with icons, a
- * two-value contrast as a toggle (a longer one as segments).
- *
- * @param props - the view, its setter, and whether a story's page is shown (the compare view sets them there).
- */
-const SchemeSwitches = ({
-  view,
-  onViewChange,
-  isStoryPage
-}: Pick<ToolbarProps, "view" | "onViewChange"> & { readonly isStoryPage: boolean }): ReactNode => {
-  const switches = useCatalogue().switches;
-  const scheme = switchWithRole(switches, "colorScheme");
-  const contrast = switchWithRole(switches, "contrast");
-  const isCompared = (each: ViewSwitch): boolean => isStoryPage && view.compare.includes(each.id);
-  const more = contrast?.values.find((value) => value.isMore === true);
-  const standard = contrast?.values.find((value) => value.isMore !== true);
-  if (scheme === undefined && contrast === undefined) return null;
-  return (
-    <div className="forgebook-toolbar__group">
-      {scheme === undefined ? null : (
-        <Segmented
-          label={scheme.label}
-          isDisabled={isCompared(scheme)}
-          options={scheme.values.map((value) => ({
-            value: value.value,
-            label: value.label,
-            icon: SCHEME_ICONS[value.scheme ?? "light"]
-          }))}
-          value={switchValueIn(view, scheme)}
-          onValueChange={(value: string): void => onViewChange(withSwitch(view, scheme, value))}
-        />
-      )}
-      {contrast === undefined || more === undefined || standard === undefined ? null : (
-        <button
-          type="button"
-          className="forgebook-button"
-          title={contrast.label}
-          aria-pressed={switchValueIn(view, contrast) === more.value}
-          disabled={isCompared(contrast)}
-          onClick={(): void =>
-            onViewChange(
-              withSwitch(
-                view,
-                contrast,
-                switchValueIn(view, contrast) === more.value ? standard.value : more.value
-              )
-            )
-          }
-        >
-          <Icon name="contrast" size={14} />
-          <span className="forgebook-button__label">{contrast.label}</span>
-        </button>
-      )}
-    </div>
-  );
-};
-
-/**
  * The toolbar.
  *
  * @param props - the view, its setter, the page shown and the story's width.
  */
 export const Toolbar = ({
-  view,
-  onViewChange,
+  view: ownView,
+  onViewChange: onOwnViewChange,
   isStoryPage = true,
   onShowSidebar,
-  shownWidth
+  shownWidth,
+  fixed = NOT_FIXED
 }: ToolbarProps): ReactNode => {
-  const { widths } = useCatalogue();
+  const { widths, switches } = useCatalogue();
+  // the story's fixed values are shown, and a change of anything else keeps the user's own in the address
+  const view = withFixed(ownView, fixed);
+  const onViewChange = (changed: ViewState): void => onOwnViewChange(withOwnFixed(changed, ownView, fixed));
   return (
     <div className="forgebook-toolbar">
       {onShowSidebar === undefined ? null : <ShowSidebarButton onShowSidebar={onShowSidebar} />}
-      <SchemeSwitches view={view} onViewChange={onViewChange} isStoryPage={isStoryPage} />
+      <SchemeSwitches view={view} onViewChange={onViewChange} isStoryPage={isStoryPage} fixed={fixed} />
       <span className="forgebook-toolbar__divider" />
-      <ViewMenu view={view} onViewChange={onViewChange} />
+      <ViewMenu
+        view={view}
+        onViewChange={onViewChange}
+        fixed={fixed}
+        hasOwnChanges={hasViewChanges(ownView, switches)}
+      />
       <span className="forgebook-toolbar__divider" />
       <div className="forgebook-toolbar__width">
         <span className="forgebook-toolbar__icon" title={STRINGS.width}>
@@ -429,7 +382,8 @@ export const Toolbar = ({
         </span>
         <Segmented
           label={STRINGS.width}
-          isDisabled={isStoryPage && isComparing(view)}
+          isDisabled={(isStoryPage && isComparing(view)) || fixed.width !== undefined}
+          disabledNote={fixed.width === undefined ? undefined : STRINGS.setByStory}
           options={[
             { value: "fill", label: STRINGS.widthFill },
             ...widths.map((preset) => ({
@@ -460,7 +414,7 @@ export const Toolbar = ({
         <Icon name="panel" size={14} />
         <span className="forgebook-button__label">{STRINGS.panel}</span>
       </button>
-      <CompareMenu view={view} onViewChange={onViewChange} isDisabled={!isStoryPage} />
+      <CompareMenu view={view} onViewChange={onViewChange} isDisabled={!isStoryPage} fixed={fixed} />
     </div>
   );
 };

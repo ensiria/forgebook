@@ -50,6 +50,9 @@ const contextOf = (drawing: StoryDrawing, canvasOf: () => HTMLElement): StoryCon
   text: storyTextOf(drawing.texts),
   clock: drawing.clock,
   globals: drawing.globals,
+  loaded: drawing.loaded,
+  ...drawing.identity,
+  parameters: drawing.story.parameters,
   get canvasElement(): HTMLElement {
     return canvasOf();
   }

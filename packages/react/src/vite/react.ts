@@ -17,6 +17,14 @@ export const react = (): FrameworkAdapter => ({
   name: "react",
   docsModule: new URL("./extractDocs.ts", import.meta.url).href,
   pages: { frame: "@forgebook/react/frame", code: "@forgebook/react/code" },
+  // what the renderer and the JSX of the stories import in the frame (the server render for the generated tests)
+  browserDependencies: [
+    "react",
+    "react/jsx-runtime",
+    "react/jsx-dev-runtime",
+    "react-dom/client",
+    "react-dom/server"
+  ],
   // Fast Refresh: an edited component updates in its frame and the story keeps its state
   vitePlugins: async (): Promise<readonly PluginOption[]> => {
     const { default: plugin } = await import("@vitejs/plugin-react");

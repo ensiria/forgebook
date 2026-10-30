@@ -20,10 +20,19 @@ describe("named values", () => {
     expect(nameOf(() => null, NAMED)).toBeUndefined();
   });
 
-  it("gives the panel a story's texts, numbers, booleans, nulls and named values, and nothing else", () => {
+  it("gives the panel a story's texts, numbers, booleans, nulls, choice lists and named values, nothing else", () => {
     expect(
       panelArgsOf(
-        { size: "sm", rows: 3, isOpen: true, none: null, onX: () => 1, list: [], icon: IconBell },
+        {
+          size: "sm",
+          rows: 3,
+          isOpen: true,
+          none: null,
+          onX: () => 1,
+          sides: ["top", 2],
+          items: [{ id: 1 }],
+          icon: IconBell
+        },
         NAMED
       )
     ).toEqual({
@@ -31,6 +40,7 @@ describe("named values", () => {
       rows: 3,
       isOpen: true,
       none: null,
+      sides: ["top", 2],
       icon: { of: "IconComponent", named: "IconBell" }
     });
   });
