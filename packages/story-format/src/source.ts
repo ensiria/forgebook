@@ -86,6 +86,11 @@ export type StoryLanguage = {
    * brackets) instead of a table of their own; `false` by default.
    */
   readonly isPseudo?: boolean;
+  /**
+   * `rtl` for a language read right to left (Arabic, Hebrew): picked, it draws the stories right to left, as a page in
+   * that language is; left to right by default.
+   */
+  readonly dir?: "rtl";
 };
 
 /** A story's `render` as written in its file. */
