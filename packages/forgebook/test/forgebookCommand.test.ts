@@ -1,9 +1,10 @@
 /**
- * Tests for `forgebook stories` and `forgebook story` as a person or a CI step runs them: a process on a small
- * catalogue with no dev server running, so each answers from a server of its own.
+ * Tests for `forgebook stories`, `forgebook story` and `forgebook mcp` as a person, a CI step or an agent runs them: a
+ * process on a small catalogue with no dev server running, so each answers from a server of its own.
  *
  * @module
  */
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -110,5 +111,38 @@ describe("forgebook story", () => {
     const run = forgebook(healthy, ["story", "stories:nothing--here"]);
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain('No story "stories:nothing--here"');
+  }, 60_000);
+});
+
+describe("forgebook mcp", () => {
+  it("answers an agent's handshake and tool calls on stdout, one message per line, and ends with its input", () => {
+    const messages = [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-11-25", capabilities: {} }
+      },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "get_story", arguments: { id: "stories:actions-button--primary" } }
+      }
+    ];
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", healthy, "--url", NO_SERVER], {
+      input: messages.map((message) => JSON.stringify(message)).join("\n"),
+      encoding: "utf8"
+    });
+    expect(run.status).toBe(0);
+    const answers: unknown[] = run.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(answers).toMatchObject([
+      { id: 1, result: { protocolVersion: "2025-11-25", serverInfo: { name: "forgebook" } } },
+      { id: 2, result: { isError: false, structuredContent: { args: { size: "md", label: "Save" } } } }
+    ]);
   }, 60_000);
 });

@@ -211,3 +211,22 @@ export const filteredStories = (document: StoriesDocument, filter: StoriesFilter
     )
   };
 };
+
+/**
+ * Whether a value is the stories document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isStoriesDocument = (value: unknown): value is StoriesDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["components"]) &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is the story document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isStoryDocument = (value: unknown): value is StoryDocument =>
+  isRecord(value) && value["schema"] === 1 && isRecord(value["story"]) && Array.isArray(value["problems"]);

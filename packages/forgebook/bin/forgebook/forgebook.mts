@@ -7,17 +7,18 @@
  * @module
  */
 import { resolve } from "node:path";
+import { createInterface } from "node:readline";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
 import { EXIT } from "@ensiria/cli-kit/constants";
-import { formatJson } from "@ensiria/cli-kit/files";
+import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 import { build, createServer } from "vite";
 
 import type { StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
-import { filteredStories } from "../../src/vite/agentApi.ts";
+import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import {
   CONFIG_FILES,
@@ -25,9 +26,11 @@ import {
   loadConfigFile,
   type ResolvedConfig
 } from "../../src/vite/configFile.ts";
+import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { storiesText, storyText } from "./agentText.ts";
 import { catalogueVite } from "./catalogueVite.ts";
+import { catalogueTools } from "./mcpTools.ts";
 
 /** The command, as the hints print it. */
 const COMMAND = "forgebook";
@@ -112,18 +115,6 @@ const printAnswer = (
   if (problems.length > 0)
     throw new ScriptError(`${problems.length} problems`, { exitCode: EXIT.failure, isReported: true });
 };
-
-/** Whether a value is the stories document the catalogue answers. */
-const isStoriesDocument = (value: unknown): value is StoriesDocument =>
-  typeof value === "object" &&
-  value !== null &&
-  "schema" in value &&
-  value.schema === 1 &&
-  "components" in value;
-
-/** Whether a value is the story document the catalogue answers. */
-const isStoryDocument = (value: unknown): value is StoryDocument =>
-  typeof value === "object" && value !== null && "schema" in value && value.schema === 1 && "story" in value;
 
 await defineCommands({
   name: "forgebook",
@@ -232,6 +223,47 @@ await defineCommands({
         if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
         const document = filteredStories(body, { source: options.source, component: options.component });
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
+      }
+    }),
+    mcp: forgebook.command({
+      summary:
+        "Serve the catalogue's stories to an agent over the Model Context Protocol, on stdin and stdout.",
+      header: false,
+      options: {
+        url: {
+          type: "string",
+          env: "FORGEBOOK_URL",
+          valueName: "address",
+          description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+        }
+      },
+      examples: [
+        {
+          command: `${COMMAND} mcp`,
+          description: "What an agent's MCP configuration runs (npx forgebook mcp)."
+        }
+      ],
+      run: async ({ options, io, log }): Promise<void> => {
+        const config = await configOf(options.config);
+        // kept for the server's life: an agent's questions in a row each answer at once
+        const client = await catalogueClient(config, options.url);
+        log.debug(
+          client.runningAt === undefined ? "Answering from a server of its own" : `Asking ${client.runningAt}`
+        );
+        const server = {
+          info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
+          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
+          tools: catalogueTools(client.ask)
+        };
+        let session = NEW_SESSION;
+        // stdout carries only the protocol's messages, one per line, answered in the order they came
+        for await (const line of createInterface({ input: io.stdin })) {
+          if (line.trim() === "") continue;
+          const step = await answerMcpMessage(line, session, server);
+          session = step.session;
+          if (step.reply !== undefined) io.stdout.write(`${step.reply}\n`);
+        }
+        await client.close();
       }
     }),
     story: forgebook.command({
