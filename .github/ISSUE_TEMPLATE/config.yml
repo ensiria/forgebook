@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question
+    url: https://github.com/Ensiria/forgebook/discussions
+    about: How to write a story, configure a catalogue, use a feature.
+  - name: Security problem
+    url: https://github.com/Ensiria/forgebook/security/advisories/new
+    about: Report it privately, never in a public issue.

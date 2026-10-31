@@ -1,0 +1,33 @@
+name: Proposal
+description: A new feature, option or behaviour.
+labels: [proposal]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Forgebook stays light (no new dependency of the core), so a proposal starts here and the code follows once
+        the shape is agreed.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you need from a catalogue today, and what it costs without it.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: The shape you have in mind
+      description: How a story, the configuration or the catalogue would use it.
+      render: ts
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: Existing features, other tools, code in your project.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to write the pull request once the shape is agreed.

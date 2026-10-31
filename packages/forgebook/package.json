@@ -1,7 +1,7 @@
 {
   "name": "forgebook",
   "version": "0.1.0",
-  "description": "A catalogue for React components written as CSF stories: the story format, one frame per story, global switches for theme, contrast, motion and styles, a compare view, forced interaction states, replayable motion, a props panel from the components' types, and CATALOG.md.",
+  "description": "See every component in every theme, contrast, language and width: CSF stories, one frame per story, and a props table from the components' types.",
   "keywords": [
     "react",
     "catalogue",
