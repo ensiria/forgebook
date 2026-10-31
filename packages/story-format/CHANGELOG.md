@@ -1,3 +1,13 @@
+## 0.1.1 (2026-10-31)
+
+### 🩹 Fixes
+
+- **story-format:** drop internal decision ids from the published docs ([2d01b96](https://github.com/ensiria/forgebook/commit/2d01b96))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.0 (2026-10-31)
 
 ### 🚀 Features

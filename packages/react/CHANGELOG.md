@@ -1,3 +1,18 @@
+## 0.1.1 (2026-10-31)
+
+### 🩹 Fixes
+
+- **react:** drop internal decision ids from the published docs ([6a77ecb](https://github.com/ensiria/forgebook/commit/6a77ecb))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.1
+- Updated forgebook to 0.1.1
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.0 (2026-10-31)
 
 ### 🚀 Features

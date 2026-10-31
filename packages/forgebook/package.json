@@ -1,6 +1,6 @@
 {
   "name": "forgebook",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "See every component in every theme, contrast, language and width: CSF stories, one frame per story, and a props table from the components' types.",
   "keywords": [
     "react",
