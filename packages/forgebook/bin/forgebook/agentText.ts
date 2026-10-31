@@ -1,16 +1,18 @@
 /**
- * The answers of `forgebook stories` and `forgebook story` as text for a terminal: a table of the stories, one story's
- * facts, and the problems. Pure: documents in, text out, laid out with cli-kit's helpers.
+ * The answers of `forgebook stories`, `forgebook story`, `forgebook check` and `forgebook errors` as text for a
+ * terminal: a table of the stories, one story's facts, a check's problems, the frames' errors, the pictures taken. Pure: documents in, text out, laid out with cli-kit's helpers.
  *
  * @remarks
  * Nothing is cut to the terminal's width: ids and links are what a reader copies, so a long line wraps instead.
  *
  * @module
  */
+import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
-import type { StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
+import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { ErrorsDocument, StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
 
 /** The style with no width to fit, so no cell is cut. */
 const uncut = (style: OutputStyle): OutputStyle => ({ ...style, width: Number.POSITIVE_INFINITY });
@@ -53,3 +55,76 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
   return keyValue(entries, uncut(style));
 };
+
+/**
+ * A check's report as a table: one row per problem, its story, its view and its kind; a story that passes in a view gets
+ * one row saying so.
+ *
+ * @param report - the check's report.
+ * @param style - colours, glyphs and width.
+ */
+export const checkText = (report: StoryCheckReport, style: OutputStyle): string =>
+  table(
+    report.results.flatMap((result) =>
+      result.problems.length === 0
+        ? [[result.storyId, result.view || "default", "passes"]]
+        : result.problems.map((problem) => [
+            result.storyId,
+            result.view || "default",
+            `${problem.kind}: ${problem.message}`
+          ])
+    ),
+    { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Result" }] },
+    uncut(style)
+  );
+
+/**
+ * The frames' errors as a table: their number, the story, what went wrong; nothing when there are none.
+ *
+ * @param document - the errors document.
+ * @param style - colours, glyphs and width.
+ */
+export const errorsText = (document: ErrorsDocument, style: OutputStyle): string =>
+  document.errors.length === 0
+    ? ""
+    : table(
+        document.errors.map((error) => [String(error.n), error.storyId, `${error.kind}: ${error.message}`]),
+        { columns: [{ header: "#", tone: "muted" }, { header: "Story" }, { header: "Error" }] },
+        uncut(style)
+      );
+
+/**
+ * What `forgebook errors` prints of an answer: its JSON (one line per error while following, so each can be read as it
+ * comes), or its table.
+ *
+ * @param document - the errors document.
+ * @param mode - whether as JSON, and whether following.
+ * @param style - colours, glyphs and width.
+ */
+export const errorsOutput = (
+  document: ErrorsDocument,
+  mode: { readonly isJson: boolean; readonly isFollowing: boolean },
+  style: OutputStyle
+): string => {
+  if (!mode.isJson) return `${errorsText(document, style)}\n`;
+  if (mode.isFollowing) return document.errors.map((error) => `${JSON.stringify(error)}\n`).join("");
+  return formatJson(document);
+};
+
+/**
+ * The pictures taken as a table: the story, the view, the file.
+ *
+ * @param report - the picture run's report.
+ * @param shownFile - how a file is written for the reader (relative to where the command runs).
+ * @param style - colours, glyphs and width.
+ */
+export const shotText = (
+  report: StoryShotReport,
+  shownFile: (file: string) => string,
+  style: OutputStyle
+): string =>
+  table(
+    report.shots.map((shot) => [shot.storyId, shot.view || "default", shownFile(shot.file)]),
+    { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Picture" }] },
+    uncut(style)
+  );

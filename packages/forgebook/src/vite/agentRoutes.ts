@@ -17,9 +17,11 @@ import type { StorySource } from "@forgebook/story-format/source";
 import type { ViteDevServer } from "vite";
 
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
+import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { findStory, storyTree } from "../storyTree.ts";
+import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
+import type { ErrorsDocument } from "./agent.types.ts";
 import { type CataloguePages, type LoadedStoryParts, storiesDocument, storyDocument } from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
@@ -91,6 +93,78 @@ export type AgentAnswer = {
 /** The header that names the catalogue's folder, so a client knows the server it found serves its catalogue. */
 export const ROOT_HEADER = "forgebook-root";
 
+/** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
+type RouteContext = {
+  /** The sources and the preview, as the dev server loaded them. */
+  readonly loaded: AgentModule;
+  /** The sources' story tree. */
+  readonly tree: StoryTree;
+  /** The catalogue's configuration. */
+  readonly config: ResolvedConfig;
+  /** The query. */
+  readonly params: URLSearchParams;
+  /** Where the catalogue is served, for the links. */
+  readonly pages: CataloguePages;
+  /** The view the links open in; empty for the default view. */
+  readonly view: string;
+};
+
+/**
+ * The errors the open frames reported after the number asked for, and the index's problems.
+ *
+ * @param context - what the routes read.
+ * @param live - the errors, when frames report to this server.
+ */
+const errorsAnswer = (context: RouteContext, live: LiveErrors | undefined): AgentAnswer => {
+  const since = Number(context.params.get("since") ?? "0");
+  const body: ErrorsDocument = {
+    schema: 1,
+    errors: live?.since(Number.isFinite(since) ? since : 0) ?? [],
+    last: live?.last() ?? 0,
+    problems: context.tree.problems
+  };
+  return { status: 200, body };
+};
+
+/**
+ * The stories, with each component's "Used in" when asked for and offered.
+ *
+ * @param context - what the routes read.
+ */
+const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
+  const { config, params, tree, pages, view, loaded } = context;
+  const usage =
+    config.lists.usedIn !== false && params.get("usedIn") === "true"
+      ? await usageBySource(loaded.sources)
+      : undefined;
+  return { status: 200, body: storiesDocument(config.title, tree, pages, view, usage) };
+};
+
+/**
+ * One story in detail, its component's "Used in" when offered.
+ *
+ * @param context - what the routes read.
+ */
+const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
+  const { config, params, tree, pages, view, loaded } = context;
+  const id = params.get("id") ?? "";
+  const location = findStory(tree, id);
+  const source = loaded.sources.find((each) => each.id === location?.source.id);
+  if (location === undefined || source === undefined)
+    return { status: 404, body: { error: `No story "${id}"` } };
+  const files = sourceFiles(source);
+  const file = location.component.file;
+  const parts: LoadedStoryParts = {
+    module: await settled(files.stories[file]),
+    docs: await settled(files.docs[file]),
+    preview: loaded.preview
+  };
+  const index = config.lists.usedIn === false ? undefined : await sourceUsage(source);
+  // a usage that cannot be read leaves "Used in" out, never the story
+  const usage = index === undefined || typeof index === "string" ? undefined : { tree, index };
+  return { status: 200, body: storyDocument(location, parts, pages, view, usage) };
+};
+
 /**
  * Answers one of the API's paths.
  *
@@ -100,42 +174,31 @@ export const ROOT_HEADER = "forgebook-root";
  * @param params - the query: `id` for a story, `view` for the links, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
  * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
+ * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
+ *   command's own, which no frame reports to.
  */
 export const agentAnswer = async (
   load: (id: string) => Promise<unknown>,
   config: ResolvedConfig,
   route: string,
   params: URLSearchParams,
-  origin: string
+  origin: string,
+  live?: LiveErrors
 ): Promise<AgentAnswer> => {
-  const view = params.get("view") ?? "";
-  const pages: CataloguePages = { page: `${origin}/`, frame: `${origin}/frame.html` };
   try {
     const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
-    const tree = storyTree(loaded.sources);
-    const isUsedIn = config.lists.usedIn !== false;
-    if (route === "stories") {
-      const usage =
-        isUsedIn && params.get("usedIn") === "true" ? await usageBySource(loaded.sources) : undefined;
-      return { status: 200, body: storiesDocument(config.title, tree, pages, view, usage) };
-    }
-    if (route !== "story") return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
-    const id = params.get("id") ?? "";
-    const location = findStory(tree, id);
-    const source = loaded.sources.find((each) => each.id === location?.source.id);
-    if (location === undefined || source === undefined)
-      return { status: 404, body: { error: `No story "${id}"` } };
-    const files = sourceFiles(source);
-    const file = location.component.file;
-    const parts: LoadedStoryParts = {
-      module: await settled(files.stories[file]),
-      docs: await settled(files.docs[file]),
-      preview: loaded.preview
+    const context: RouteContext = {
+      loaded,
+      tree: storyTree(loaded.sources),
+      config,
+      params,
+      pages: { page: `${origin}/`, frame: `${origin}/frame.html` },
+      view: params.get("view") ?? ""
     };
-    const index = isUsedIn ? await sourceUsage(source) : undefined;
-    // a usage that cannot be read leaves "Used in" out, never the story
-    const usage = index === undefined || typeof index === "string" ? undefined : { tree, index };
-    return { status: 200, body: storyDocument(location, parts, pages, view, usage) };
+    if (route === "errors") return errorsAnswer(context, live);
+    if (route === "stories") return await storiesAnswer(context);
+    if (route === "story") return await storyAnswer(context);
+    return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
   }
@@ -146,10 +209,11 @@ export const agentAnswer = async (
  *
  * @param server - the dev server, which loads the modules.
  * @param config - the catalogue's configuration.
+ * @param live - the errors the open frames report.
  * @returns a Connect middleware: it answers its own paths and passes every other request on.
  */
 export const agentMiddleware =
-  (server: ViteDevServer, config: ResolvedConfig) =>
+  (server: ViteDevServer, config: ResolvedConfig, live: LiveErrors) =>
   (request: IncomingMessage, response: ServerResponse, next: (error?: unknown) => void): void => {
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
     if (!url.pathname.startsWith(AGENT_API)) {
@@ -157,12 +221,17 @@ export const agentMiddleware =
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
-    void agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, url.origin).then(
-      ({ status, body }) => {
-        response.statusCode = status;
-        response.setHeader("Content-Type", "application/json");
-        response.setHeader(ROOT_HEADER, config.dir);
-        response.end(`${JSON.stringify(body)}\n`);
-      }
-    );
+    void agentAnswer(
+      (id) => server.ssrLoadModule(id),
+      config,
+      route,
+      url.searchParams,
+      url.origin,
+      live
+    ).then(({ status, body }) => {
+      response.statusCode = status;
+      response.setHeader("Content-Type", "application/json");
+      response.setHeader(ROOT_HEADER, config.dir);
+      response.end(`${JSON.stringify(body)}\n`);
+    });
   };

@@ -151,13 +151,21 @@ its name.
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
+| `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
+| `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
+| `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
+| `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and a Claude Code skill with `--skill`) |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
 ## For agents
+
+`forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
+and the commands that check one, as a section of `AGENTS.md` (renewed in place when it runs again; `--skill` writes
+the same as a Claude Code skill).
 
 A coding agent can use the catalogue while it works: find a story's id, read a story's args and its component's
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for
@@ -167,7 +175,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers four tools: `list_stories`, `get_story`, `story_address`, and `new_stories`, which writes a component's first stories from its props and answers the text without writing a file. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers seven tools: `list_stories`, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.

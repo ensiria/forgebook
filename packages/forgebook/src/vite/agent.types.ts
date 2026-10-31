@@ -10,6 +10,7 @@
  * @module
  */
 import type { ComponentDocs } from "../componentDocs.ts";
+import type { LiveError } from "../liveErrors.ts";
 
 /** The version of the documents' shape. */
 export type AgentSchema = 1;
@@ -36,6 +37,8 @@ export type AgentStory = {
   readonly tags: readonly string[];
   /** Whether it is listed nowhere (`!dev`), opened only by its address. */
   readonly isUnlisted: boolean;
+  /** The height its scene declares (`parameters.height`), in CSS px, when it declares one. */
+  readonly height?: number;
   /** Where it opens. */
   readonly links: StoryLinks;
 };
@@ -109,5 +112,17 @@ export type StoryDocument = {
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
+  readonly problems: readonly string[];
+};
+
+/** What the open frames reported while someone edited, and the story index's problems. */
+export type ErrorsDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The errors after the number asked for, oldest first: render errors and failed plays. */
+  readonly errors: readonly LiveError[];
+  /** The number of the last error so far: ask for the errors since it next time. */
+  readonly last: number;
+  /** The story index's problems now (a broken story file, a title taken twice). */
   readonly problems: readonly string[];
 };

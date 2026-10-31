@@ -19,6 +19,7 @@ import { storyTextOf } from "@forgebook/story-format/texts";
 import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
 import { shownLanguage } from "../languages.ts";
+import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
 import {
   detailOf,
   type FrameMessage,
@@ -66,6 +67,16 @@ export type FrameConfig = {
   readonly lists?: CatalogueLists;
   /** Loads the play tools, when the project installs Testing Library (the generated frame passes it then). */
   readonly playTools?: PlayToolsLoader;
+};
+
+/**
+ * Tells the dev server about an error, for an agent following them (`forgebook errors`); nothing in a build, which has
+ * no connection to it.
+ *
+ * @param report - the error.
+ */
+const tellDevServer = (report: LiveErrorReport): void => {
+  import.meta.hot?.send(LIVE_ERROR_EVENT, report);
 };
 
 /** Tells the shell, which is the parent page on the same origin. */
@@ -153,6 +164,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const reportError = (message: string): void => {
     document.documentElement.setAttribute(STATUS_ATTRIBUTE, "error");
     tellShell({ type: "forgebook:error", storyId, message });
+    tellDevServer({ kind: "render", storyId, view: window.location.search, message });
   };
   const fail = (message: string): void => {
     const box = document.createElement("div");
@@ -239,7 +251,16 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         changeShown = (live: LiveView): void => running.setShown(shownFor(live));
       },
       onError: reportError,
-      onTrace: (trace: PlayTrace): void => tellShell({ type: "forgebook:play", storyId, trace }),
+      onTrace: (trace: PlayTrace): void => {
+        tellShell({ type: "forgebook:play", storyId, trace });
+        if (trace.status === "failed")
+          tellDevServer({
+            kind: "play",
+            storyId,
+            view: window.location.search,
+            message: trace.error ?? "The play failed"
+          });
+      },
       onEvent: (name: string, values: readonly unknown[]): void =>
         tellShell({
           type: "forgebook:call",

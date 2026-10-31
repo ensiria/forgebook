@@ -1,11 +1,11 @@
 /**
- * Tests for `forgebook stories`, `forgebook story` and `forgebook mcp` as a person, a CI step or an agent runs them: a
- * process on a small catalogue with no dev server running, so each answers from a server of its own.
+ * Tests for the `forgebook` commands as a person, a CI step or an agent runs them: a process on a small catalogue with
+ * no dev server running, so each answers from a server of its own; `agents` in a project folder of its own.
  *
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -172,4 +172,29 @@ describe("forgebook new", () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain("Select.stories.tsx exists");
   }, 60_000);
+});
+
+describe("forgebook agents", () => {
+  it("prints the instructions, with the commands that check a story", () => {
+    const run = runScriptProcess(ENTRY, ["agents", "--print"]);
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain("## Stories (Forgebook)");
+    expect(run.stdout).toContain("npx forgebook check <id> --json");
+  });
+
+  it("adds its section to the project's AGENTS.md, renews it when run again, and writes the skill", () => {
+    const project = join(root, "project");
+    mkdirSync(project, { recursive: true });
+    writeFileSync(join(project, "AGENTS.md"), "# Ours\n\nKeep this.\n");
+    const agents = (): number | null =>
+      spawnSync(process.execPath, [ENTRY, "agents", "--skill"], { cwd: project, encoding: "utf8" }).status;
+    expect(agents()).toBe(0);
+    expect(agents()).toBe(0);
+    const text = readFileSync(join(project, "AGENTS.md"), "utf8");
+    expect(text.startsWith("# Ours\n\nKeep this.\n")).toBe(true);
+    expect(text.split("## Stories (Forgebook)")).toHaveLength(2);
+    expect(readFileSync(join(project, ".claude", "skills", "forgebook", "SKILL.md"), "utf8")).toContain(
+      "name: forgebook"
+    );
+  });
 });

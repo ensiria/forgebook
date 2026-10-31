@@ -26,7 +26,8 @@ const SERVER: McpServer = {
       inputSchema: { type: "object" },
       call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => ({
         structured: { got: args },
-        isError: args["fail"] === true
+        isError: args["fail"] === true,
+        ...(args["picture"] === true ? { images: [{ data: "iVBORw0KGgo=", mimeType: "image/png" }] } : {})
       })
     }
   ]
@@ -131,6 +132,24 @@ describe("the stateless era", () => {
         content: [{ type: "text", text: '{"got":{"fail":true}}' }],
         structuredContent: { got: { fail: true } },
         isError: true
+      }
+    });
+  });
+
+  it("sends a tool's pictures after its JSON, as image content", async () => {
+    const { answer } = await send({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: withMeta({ name: "echo", arguments: { picture: true } })
+    });
+    expect(answer).toMatchObject({
+      result: {
+        content: [
+          { type: "text", text: '{"got":{"picture":true}}' },
+          { type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" }
+        ],
+        isError: false
       }
     });
   });

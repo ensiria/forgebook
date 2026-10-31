@@ -26,6 +26,7 @@ import type { StoryMarkdown } from "@forgebook/story-format/source";
 import ts from "typescript-6";
 import type { Plugin, UserConfig, ViteDevServer } from "vite";
 
+import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
@@ -364,6 +365,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const filesModules = new Set<string>();
   /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
   const usageModules = new Set<string>();
+  /** The errors the open frames report, for `forgebook errors` and the agents. */
+  const live = createLiveErrors();
   let config = options.config;
   // the docs are read in a worker, made once the framework is known: a package's TypeScript program takes seconds to
   // build and would hold every other answer of the dev server meanwhile
@@ -495,7 +498,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       // an edited component or type file changes its docs: the worker renews its programs on their next read
       server.watcher.on("change", (file: string): void => renewOnChange(server, file));
       // the answers to tools and agents (`forgebook stories`, `forgebook mcp`), from the same sources as the pages
-      if (config !== undefined) server.middlewares.use(agentMiddleware(server, config));
+      if (config !== undefined) server.middlewares.use(agentMiddleware(server, config, live));
+      server.ws.on(LIVE_ERROR_EVENT, (report: unknown): void => {
+        if (isLiveErrorReport(report)) live.add(report, new Date());
+      });
       // the catalogue's pages, made here: no HTML file is written
       server.middlewares.use((request, response, next): void => {
         const page = requestedPage(request.url ?? "/");

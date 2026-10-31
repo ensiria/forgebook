@@ -46,6 +46,16 @@ export type McpToolResult = {
   readonly structured: unknown;
   /** Whether the call failed (a story that does not exist): the agent reads why in the answer. */
   readonly isError: boolean;
+  /** Pictures sent beside the answer, for the agent to look at; none by default. */
+  readonly images?: readonly McpImage[];
+};
+
+/** A picture in a tool's answer. */
+export type McpImage = {
+  /** Its bytes, in base64. */
+  readonly data: string;
+  /** Its type (`image/png`). */
+  readonly mimeType: string;
 };
 
 /** A tool the server offers. */
@@ -152,14 +162,17 @@ const toolList = (server: McpServer): Readonly<Record<string, unknown>>[] =>
     inputSchema: tool.inputSchema
   }));
 
-/** A tool's answer as the protocol gives it: its JSON as text and as structured content. */
+/** A tool's answer as the protocol gives it: its JSON as text and as structured content, then its pictures. */
 const toolResult = async (
   tool: McpTool,
   args: Readonly<Record<string, unknown>>
 ): Promise<Record<string, unknown>> => {
-  const { structured, isError } = await tool.call(args);
+  const { structured, isError, images = [] } = await tool.call(args);
   return {
-    content: [{ type: "text", text: JSON.stringify(structured) }],
+    content: [
+      { type: "text", text: JSON.stringify(structured) },
+      ...images.map((image) => ({ type: "image", data: image.data, mimeType: image.mimeType }))
+    ],
     structuredContent: structured,
     isError
   };

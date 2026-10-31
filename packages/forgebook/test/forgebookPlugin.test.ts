@@ -40,7 +40,9 @@ const fakeServer = (): {
     ws: {
       send: (): void => {
         record.reloads += 1;
-      }
+      },
+      // the frames' errors arrive here (`liveErrors.ts`); none in these tests
+      on: (): void => undefined
     }
   };
   return {

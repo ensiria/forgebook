@@ -8,6 +8,7 @@
 
 import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
 import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
+import { isLiveErrorReport } from "../liveErrors.ts";
 import {
   componentId,
   findComponent,
@@ -21,6 +22,7 @@ import type {
   AgentComponent,
   AgentStory,
   AgentUsingComponent,
+  ErrorsDocument,
   StoriesDocument,
   StoryDocument,
   StoryLinks
@@ -59,6 +61,7 @@ const agentStory = (
   description: story.description,
   tags: story.tags,
   isUnlisted,
+  ...(story.height === undefined ? {} : { height: story.height }),
   links: storyLinks(pages, story.id, view)
 });
 
@@ -265,6 +268,31 @@ export const filteredStories = (document: StoriesDocument, filter: StoriesFilter
     )
   };
 };
+
+/**
+ * Whether a value is the errors document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isErrorsDocument = (value: unknown): value is ErrorsDocument =>
+  typeof value === "object" &&
+  value !== null &&
+  "schema" in value &&
+  value.schema === 1 &&
+  "errors" in value &&
+  Array.isArray(value.errors) &&
+  value.errors.every(
+    (error: unknown) =>
+      isLiveErrorReport(error) &&
+      "n" in error &&
+      typeof error.n === "number" &&
+      "at" in error &&
+      typeof error.at === "string"
+  ) &&
+  "last" in value &&
+  typeof value.last === "number" &&
+  "problems" in value &&
+  Array.isArray(value.problems);
 
 /**
  * Whether a value is the stories document, as a client receives it over HTTP.

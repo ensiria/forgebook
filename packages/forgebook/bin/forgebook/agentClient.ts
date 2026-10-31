@@ -76,6 +76,42 @@ const ownClient = async (config: ResolvedConfig, origin: string): Promise<Catalo
   };
 };
 
+/** A catalogue a browser can open: its address, and how to let it go. */
+export type ServedCatalogue = {
+  /** Its address (`http://localhost:5173`). */
+  readonly origin: string;
+  /** Where it was already running, or none for a server started for the command. */
+  readonly runningAt: string | undefined;
+  /** Stops the server it started; nothing for a running one. */
+  readonly close: () => Promise<void>;
+};
+
+/**
+ * The catalogue served over HTTP, for a browser to open its frames: the running dev server at the address when it
+ * serves this catalogue, else a dev server of its own on a free port (its answers' middleware has no address).
+ *
+ * @param config - the catalogue's configuration.
+ * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ */
+export const servedCatalogue = async (
+  config: ResolvedConfig,
+  url: string | undefined
+): Promise<ServedCatalogue> => {
+  const origin = (url ?? DEFAULT_ORIGIN).replace(/\/+$/, "");
+  const running = await runningClient(origin, config);
+  if (running !== undefined) return { origin, runningAt: origin, close: async () => undefined };
+  const server: ViteDevServer = await createServer(
+    await catalogueVite(config, { server: { port: 0, host: "127.0.0.1" }, logLevel: "error" })
+  );
+  await server.listen();
+  const address = server.resolvedUrls?.local[0]?.replace(/\/+$/, "");
+  if (address === undefined) {
+    await server.close();
+    throw new Error("The catalogue's dev server started with no address");
+  }
+  return { origin: address, runningAt: undefined, close: () => server.close() };
+};
+
 /**
  * The catalogue's answers: the running dev server at the address when it serves this catalogue, a server of its own
  * otherwise.
