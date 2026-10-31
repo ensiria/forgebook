@@ -3,7 +3,7 @@
  * component that never opens: a component's link opens its page, and its stories are picked in the page's header, so
  * nothing in the list folds under the pointer. A family stays open once opened; a search finds a component by its
  * name, its place, its meta's search words or its stories' names and descriptions. A component listed in other places too (`alsoIn`) has an
- * alias entry in each, beside the components that live there, which says where it lives and opens its page (D-492).
+ * alias entry in each, beside the components that live there, which says where it lives and opens its page.
  *
  * @module
  */
@@ -140,8 +140,8 @@ const ComponentEntry = ({
 const familyOf = (title: string): string => title.split("/")[0]?.trim() ?? title;
 
 /**
- * An alias entry: the name of a component that lives elsewhere, marked with the family it lives in, opening its page
- * (D-492). It is never marked as the shown page: the entry where the component lives is, so the sidebar says where
+ * An alias entry: the name of a component that lives elsewhere, marked with the family it lives in, opening its page.
+ * It is never marked as the shown page: the entry where the component lives is, so the sidebar says where
  * it sits.
  */
 const AliasEntry = ({

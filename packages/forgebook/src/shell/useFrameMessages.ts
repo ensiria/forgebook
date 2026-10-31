@@ -23,7 +23,7 @@ export type EventCall = Omit<Extract<FrameMessage, { type: "forgebook:call" }>, 
 export type FrameReports = {
   /** The id of the last story that said it can replay. */
   readonly replayable: string | undefined;
-  /** The id of the last story that said it reads the story clock (a Live story, D-504). */
+  /** The id of the last story that said it reads the story clock (a Live story). */
   readonly clocked: string | undefined;
   /** Each frame's content height in CSS px, by its address. */
   readonly heights: ReadonlyMap<string, number>;

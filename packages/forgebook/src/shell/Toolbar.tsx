@@ -107,7 +107,7 @@ const SwitchRow = ({
 /**
  * The View menu: every declared switch the toolbar does not show itself, the background, the style sheets and the
  * text size, with a dot on its button when one is changed. The background is a list: its six names are too long for
- * a row of segments (D-649).
+ * a row of segments.
  *
  * @param props - the view and its setter.
  */

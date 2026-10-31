@@ -3,10 +3,10 @@
  * the view, then has the framework draw the story and, once its play function is over, tells the shell it is ready.
  *
  * @remarks
- * One document per story (D-56): the style sheets of the Styles setting, the switches on the root and anything the
+ * One document per story: the style sheets of the Styles setting, the switches on the root and anything the
  * story mounts on `body` stay in this document. The tests open the same address and wait for `data-forgebook-status`
  * on the root (`ready` or `error`), never for a delay. A Live story's clock runs from its start, or stays held there when
- * the address says so (`clock=held`, what the tests open; D-504). The framework is the renderer the framework package
+ * the address says so (`clock=held`, what the tests open). The framework is the renderer the framework package
  * passes (`renderer.ts`); nothing here depends on one.
  *
  * @module

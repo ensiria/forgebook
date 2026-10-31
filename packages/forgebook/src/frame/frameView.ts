@@ -16,7 +16,7 @@ import { type LiveView, schemeOf, type ViewState } from "../viewState.ts";
 const BACKDROP_STYLE_ID = "forgebook-backdrop-style";
 
 /**
- * Draws a backdrop behind the story (D-644): its own style sheet in the document's head, made once and rewritten on
+ * Draws a backdrop behind the story: its own style sheet in the document's head, made once and rewritten on
  * every change, empty for the page's own colour.
  *
  * @param document - the frame's document.

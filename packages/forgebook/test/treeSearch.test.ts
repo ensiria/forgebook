@@ -55,7 +55,7 @@ const BUTTON: TreeComponent = {
   keywords: ["Pressable", "CTA"]
 };
 
-/** A family holding it, and an alias of a component that lives elsewhere (D-492). */
+/** A family holding it, and an alias of a component that lives elsewhere. */
 const ACTIONS: TreeFamily = {
   name: "Actions",
   groups: [
@@ -78,7 +78,7 @@ describe("the sidebar's search", () => {
     expect(foundComponent(BUTTON, searchWords("buttons actions"))).toBe(BUTTON);
   });
 
-  it("finds a component whole by its meta's search words, folded (D-603)", () => {
+  it("finds a component whole by its meta's search words, folded", () => {
     expect(foundComponent(BUTTON, searchWords("pressable"))).toBe(BUTTON);
     expect(foundComponent(BUTTON, searchWords("cta actions"))).toBe(BUTTON);
   });

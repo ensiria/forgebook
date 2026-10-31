@@ -1,7 +1,7 @@
 /**
  * The panel's Props tab: the props the story lets the panel set, grouped by control (choices, text and numbers,
  * toggles), each with its description and default, then the props it cannot set. A story of fixed examples sets none:
- * the tab says so and lists every prop for reading (D-64). The props come with the story's `argTypes` laid over them
+ * the tab says so and lists every prop for reading. The props come with the story's `argTypes` laid over them
  * (`argTypes.ts`): a control they name (a list, buttons, checkboxes, a range, a colour, a date) wins over the one
  * the prop's type gives.
  *

@@ -265,7 +265,7 @@ const componentPage = (sourceId: string, title: string): Page => ({
 type LinkedComponent = { readonly page: Page; readonly name: string };
 
 /**
- * The components related to the shown one (D-492), with their names.
+ * The components related to the shown one, with their names.
  *
  * @param tree - the tree.
  * @param location - the shown component's place; none on the home or a missing page.
@@ -318,7 +318,7 @@ const RelatedLinks = ({
  *
  * @remarks
  * The place is always where the component lives, with the other places it is listed in, so a page opened from an
- * alias entry says where it really sits; its related components follow its name (D-492).
+ * alias entry says where it really sits; its related components follow its name.
  *
  * @param props - the problems, the shown component's place, the message when a named page is missing, the picker
  * of the component's stories, and the related components.
@@ -408,7 +408,7 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
   }, [catalogue]);
-  // a height set with the foot handle belongs to the story it was set on: another page starts at its own (D-515)
+  // a height set with the foot handle belongs to the story it was set on: another page starts at its own
   const pageAddress = (page: Page): Address => ({
     page,
     view: { ...address.view, height: "auto" },

@@ -1,11 +1,11 @@
 /**
  * The sidebar's search: every word of the query must appear in a component's name, its title (family and group), its
  * meta's search words or one of its stories' names and descriptions, in any order, so "button danger" or "inputs date"
- * find what they mean, and "hstack" finds the row another library calls so (D-603).
+ * find what they mean, and "hstack" finds the row another library calls so.
  *
  * @remarks
  * Case and accents are ignored. A component whose own name, title and search words hold every word is found whole; otherwise only
- * the stories that hold the words the component lacks are kept. An alias entry (D-492) is found by its name, the place
+ * the stories that hold the words the component lacks are kept. An alias entry is found by its name, the place
  * it is listed in and the place it lives in, whole or not at all: its stories are picked on its page. Pure.
  *
  * @module

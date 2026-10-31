@@ -4,7 +4,7 @@
  *
  * @remarks
  * The repo type-checks with TypeScript 7, whose native compiler has no JavaScript API; TypeScript 6 (the version
- * typescript-eslint uses too) reads the same configurations (D-58).
+ * typescript-eslint uses too) reads the same configurations.
  *
  * @module
  */

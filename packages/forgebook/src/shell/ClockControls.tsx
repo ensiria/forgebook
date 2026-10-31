@@ -1,5 +1,5 @@
 /**
- * The story clock's controls on the stage, for a Live story: pause and resume, restart, and the speed (D-504).
+ * The story clock's controls on the stage, for a Live story: pause and resume, restart, and the speed.
  *
  * @remarks
  * The state lives in the shell, per shown story: a new story starts running at real time, and a frame that loads

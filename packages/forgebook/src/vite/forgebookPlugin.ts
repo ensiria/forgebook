@@ -5,7 +5,7 @@
  * @remarks
  * A source names its story files with `import files from "<pattern>?forgebook-files"`: the plugin answers each with
  * one module (`storyFilesModule.ts`) holding every matched file's index, read from its source with Vite's parser, and
- * the loaders of its module, of its component's docs and of its code (D-438). Those loaders ask for
+ * the loaders of its module, of its component's docs and of its code. Those loaders ask for
  * `?forgebook-docs`, answered with the component's props as the framework reads them (`adapter.ts`, in a worker) or
  * `{ error }` for the panel, `?forgebook-code`, answered with each story's `render` as written (`storyCode.ts`),
  * `?forgebook-page`, answered with the component's documentation file as HTML (`componentPage.ts`), and

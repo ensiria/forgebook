@@ -1,15 +1,15 @@
 /**
- * The backdrops Forgebook draws behind a story in place of its page's colour (D-644): a checkerboard, a vivid
+ * The backdrops Forgebook draws behind a story in place of its page's colour: a checkerboard, a vivid
  * abstract picture, a light and a dark desktop-like picture, a page of content, and a catalogue's own. They show what a translucent
  * surface (a menu's or a popover's glass, its blur) does, which the page's plain colour hides.
  *
  * @remarks
  * Every picture is drawn here in CSS gradients and inline SVG: no image file, nothing fetched, nothing of the library
- * the catalogue shows (D-67), invented words only. The frame turns the chosen backdrop into a style sheet of its
+ * the catalogue shows, invented words only. The frame turns the chosen backdrop into a style sheet of its
  * own (`backdropSheet`) that replaces the `body` background its source sets, so the story's own layout and colours
  * are unchanged; the shell reads the backdrop's colour (`backdropColor`) for the box a story waits in while it loads.
- * The desktop pictures are fixed whatever the theme; the page of content follows the theme, as an app's page would
- * (D-651). With forced colours nothing is drawn: the system's palette decides the page (D-650). Pure.
+ * The desktop pictures are fixed whatever the theme; the page of content follows the theme, as an app's page would.
+ * With forced colours nothing is drawn: the system's palette decides the page. Pure.
  *
  * @module
  */

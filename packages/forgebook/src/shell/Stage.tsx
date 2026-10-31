@@ -1,5 +1,5 @@
 /**
- * The stage: the chosen story in its frame, at the view's width, with Replay, a Live story's clock controls (D-504)
+ * The stage: the chosen story in its frame, at the view's width, with Replay, a Live story's clock controls
  * and a link to the frame alone, or the
  * four variants side by side in the compare view; the panel docked under it when it is open.
  *

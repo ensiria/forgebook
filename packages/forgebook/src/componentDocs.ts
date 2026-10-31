@@ -3,7 +3,7 @@
  * shared by the plugin that extracts it (Node) and the shell that shows it (the page).
  *
  * @remarks
- * Every prop has a kind, decided from its type, which is the panel's group and control (D-58, D-64): a union of
+ * Every prop has a kind, decided from its type, which is the panel's group and control: a union of
  * literals is a choice, `string` text, `number` a number, `boolean` a toggle, a function named `on<Something>` an
  * event; anything else cannot be set from the panel. The data crosses from the plugin to the page as JSON, so the
  * shell checks it on arrival (`isComponentDocs`).

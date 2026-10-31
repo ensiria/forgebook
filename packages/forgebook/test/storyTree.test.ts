@@ -117,7 +117,7 @@ describe("storyTree", () => {
     expect(findStory(withControls, "kit:feedback-counter--plain")?.story.controls).toBe("all");
   });
 
-  it("gives each story the height its scene needs: its own, else the meta's (D-469)", () => {
+  it("gives each story the height its scene needs: its own, else the meta's", () => {
     const tall = storyTree([
       source({
         "./h.stories.tsx": {
@@ -243,7 +243,7 @@ describe("storyTree", () => {
   });
 });
 
-describe("aliases and related components (D-492)", () => {
+describe("aliases and related components", () => {
   const tree = storyTree([
     source({
       "./table.stories.tsx": { title: "Data/Tables/Table", stories: [{ exportName: "Overview" }] },
@@ -286,7 +286,7 @@ describe("aliases and related components (D-492)", () => {
     expect(tree.problems).toEqual([]);
   });
 
-  it("keeps a component's search words, none when its meta sets none (D-603)", () => {
+  it("keeps a component's search words, none when its meta sets none", () => {
     expect(findComponent(tree, "kit:layout-inline")?.component.keywords).toEqual(["horizontal", "row"]);
     expect(findComponent(tree, "kit:layout-stack")?.component.keywords).toEqual([]);
   });

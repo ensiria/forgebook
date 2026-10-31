@@ -178,7 +178,7 @@ const Example = ({
   const [isCodeShown, setIsCodeShown] = useState(false);
   const codeId = useId();
   // the story's measured height when there is one; a guess otherwise, larger for the demo; never below the height its
-  // scene needs, which its frame has from the start (D-469)
+  // scene needs, which its frame has from the start
   const fallbackHeight = Math.max(
     story.height ?? 0,
     context.heightOf(story.id) ?? (isDemo ? DEMO_FALLBACK_HEIGHT : FALLBACK_HEIGHT)

@@ -6,7 +6,7 @@
  * A story's place comes from its file's title (`Family/Name` or `Family/Group/Name`, or Storybook's titles of any
  * depth), so the sidebar needs no list kept by hand. Ids follow CSF: the title and the export name in lower-case kebab, joined by `--`, here prefixed by
  * the source's id, so two packages can hold the same title. A component its meta lists in other places (`alsoIn`)
- * gets an alias entry in each, and related components (`related`) name each other both ways (D-492): an alias is not
+ * gets an alias entry in each, and related components (`related`) name each other both ways: an alias is not
  * a component, so the stories, the ids and the tests stay one per file. Pure.
  *
  * @module
@@ -37,7 +37,7 @@ export type TreeStory = {
   readonly description: string | undefined;
   /** Whether it is the component's demo (`parameters.main`). */
   readonly isMain: boolean;
-  /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default (D-469). */
+  /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
@@ -58,18 +58,18 @@ export type TreeComponent = {
    * none.
    */
   readonly unlisted: readonly TreeStory[];
-  /** The other places it is listed in, as the meta writes them (`Data/Tables`); empty when none (D-492). */
+  /** The other places it is listed in, as the meta writes them (`Data/Tables`); empty when none. */
   readonly alsoIn: readonly string[];
   /**
-   * The titles of its related components, both ways: those its meta names and those whose meta names it, by name
-   * (D-492).
+   * The titles of its related components, both ways: those its meta names and those whose meta names it, by name.
+   *
    */
   readonly related: readonly string[];
-  /** Other words the search finds it by, as the meta writes them; empty when none (D-603). */
+  /** Other words the search finds it by, as the meta writes them; empty when none. */
   readonly keywords: readonly string[];
 };
 
-/** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`, D-492). */
+/** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`). */
 export type TreeAlias = {
   /** The component's name (`DataTable`). */
   readonly name: string;

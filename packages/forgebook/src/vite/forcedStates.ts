@@ -7,7 +7,7 @@
  * `:active`, `:focus`, `:focus-visible` and `:focus-within`, at every depth (inside `:is()`, `:not()`, `:has()`). The
  * real state still works, the specificity stays the same (an attribute weighs what a pseudo-class does), and the
  * library's CSS carries nothing for the catalogue: the rewrite runs only in the catalogue's build, as a Lightning CSS
- * visitor (D-60). A story forces a state with `parameters.forceState` (on its root) or `data-forgebook-force` on a
+ * visitor. A story forces a state with `parameters.forceState` (on its root) or `data-forgebook-force` on a
  * part.
  *
  * @module

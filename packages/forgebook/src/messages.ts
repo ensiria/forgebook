@@ -5,7 +5,7 @@
  * The frame tells the shell what the loaded story can do (Replay, a story clock, its args), how tall it is (the shell sizes the frame
  * to it, so a story never scrolls inside a box), every call of an event, or why it failed. The shell asks the frame to
  * replay, sends the props panel's values, names the events to record, and runs, holds, speeds up or restarts the
- * story clock (D-504). Every message is checked on arrival
+ * story clock. Every message is checked on arrival
  * (`isFrameMessage`, `isShellMessage`): a page may receive messages from anything it embeds or is embedded in.
  *
  * @module

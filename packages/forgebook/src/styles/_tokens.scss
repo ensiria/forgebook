@@ -1,5 +1,5 @@
 // The catalogue's own look, at build time: it depends on no library it shows, so a defect in one never breaks the
-// tool used to find it (D-67). The shell is always light at standard contrast; the switches act on the frames only,
+// tool used to find it. The shell is always light at standard contrast; the switches act on the frames only,
 // so these are Sass values, not custom properties. Every text colour reaches 4.5:1 on the surface it is used on
 // (`test/styleTokens.test.ts` checks the code palette).
 

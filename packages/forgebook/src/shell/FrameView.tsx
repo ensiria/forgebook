@@ -22,7 +22,7 @@ export type FrameViewProps = {
   /**
    * The height the story's scene needs (its `parameters.height`), in CSS px: the frame is never shorter, from the
    * start, so the window an overlay is placed in has that room while the story's document stays as tall as its
-   * content (D-469). None by default.
+   * content. None by default.
    */
   readonly sceneHeight?: number | undefined;
   /**

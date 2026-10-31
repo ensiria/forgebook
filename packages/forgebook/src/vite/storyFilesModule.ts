@@ -4,7 +4,7 @@
  *
  * @remarks
  * One module per pattern, instead of an import per file: in development the browser fetched every index module one by
- * one, a few hundred requests per frame (D-438). The keys are the files' paths relative to the declaring module
+ * one, a few hundred requests per frame. The keys are the files' paths relative to the declaring module
  * (`../src/x.stories.tsx`), the same keys `storyFileKeys` gives the tests that read the files from the disk.
  *
  * @module

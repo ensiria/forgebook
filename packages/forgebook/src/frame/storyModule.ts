@@ -73,7 +73,7 @@ export type LoadedStory = {
   readonly parameters: Readonly<Record<string, unknown>>;
   /** The layout in the frame. */
   readonly layout: NonNullable<StoryParameters["layout"]>;
-  /** A Live story's clock start, in ms since the Unix epoch (`parameters.clock`); none for a still (D-504). */
+  /** A Live story's clock start, in ms since the Unix epoch (`parameters.clock`); none for a still. */
   readonly clockStart: number | undefined;
 };
 

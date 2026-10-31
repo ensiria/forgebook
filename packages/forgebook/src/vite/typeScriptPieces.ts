@@ -1,6 +1,6 @@
 /**
  * Code of the TypeScript family (TypeScript, TSX, JavaScript, JSX) split into the pieces a reader tells apart, from
- * the TypeScript compiler's syntactic classifications, for `highlightCode.ts` to colour (D-690).
+ * the TypeScript compiler's syntactic classifications, for `highlightCode.ts` to colour.
  *
  * @remarks
  * highlight.js has no JSX grammar: it reads JSX as HTML, so an attribute holding a function or a `>` ends the tag
@@ -11,7 +11,7 @@
  * keywords, literals (a regular expression among the strings), comments, JSX and the names declared by a class, an
  * interface, an enum, a namespace or a type parameter apart; a name they leave as a plain identifier is placed from
  * the block's syntax tree: a type where a type is written, a function where it is called or declared, a property
- * where it is read or declared (D-691). The rest (operators, punctuation, plain names, JSX text) stays plain.
+ * where it is read or declared. The rest (operators, punctuation, plain names, JSX text) stays plain.
  *
  * The pieces are slices of the code, in order, covering it whole: the caller escapes each one, so a coloured piece
  * never splits an HTML entity.

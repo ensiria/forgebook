@@ -170,7 +170,7 @@ describe("indexStoryFile", () => {
     });
   });
 
-  it("reads the height a story's scene needs, its own and the meta's, written plainly (D-469)", () => {
+  it("reads the height a story's scene needs, its own and the meta's, written plainly", () => {
     const text = `export default { title: "A/B", parameters: { height: 240 } };
       export const Open = { parameters: { height: 320 } };
       export const Closed = {};`;
@@ -189,7 +189,7 @@ describe("indexStoryFile", () => {
     );
   });
 
-  it("reads the meta's other places and related components, written plainly (D-492)", () => {
+  it("reads the meta's other places and related components, written plainly", () => {
     const text = `export default { title: "Recipes/DataTable", alsoIn: ["Data/Tables"], related: ["Data/Tables/Table"] };
       export const Overview = {};`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
@@ -200,7 +200,7 @@ describe("indexStoryFile", () => {
     });
   });
 
-  it("reads the meta's search words, written plainly (D-603)", () => {
+  it("reads the meta's search words, written plainly", () => {
     const text = `export default { title: "Layout/Inline", keywords: ["horizontal", "row"] };
       export const Overview = {};`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({

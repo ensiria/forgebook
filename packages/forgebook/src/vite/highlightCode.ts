@@ -5,7 +5,7 @@
  * @remarks
  * The TypeScript family (TypeScript, TSX, JavaScript, JSX) is split by the TypeScript compiler
  * (`typeScriptPieces.ts`): highlight.js reads JSX as HTML and loses the rest of the example at the first function or
- * `>` in an attribute (D-690). highlight.js keeps the other languages a component's documentation writes (CSS, SCSS,
+ * `>` in an attribute. highlight.js keeps the other languages a component's documentation writes (CSS, SCSS,
  * JSON, bash, HTML), on its own instance, so nothing else that uses highlight.js in the same process sees these
  * settings. Both write the same classes, with the catalogue's prefix (`forgebook-hl-keyword`), coloured by the
  * shell's style sheet with its code palette. A language neither knows is escaped and left plain.

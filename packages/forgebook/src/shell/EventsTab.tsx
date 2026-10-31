@@ -1,6 +1,6 @@
 /**
  * The panel's Events tab: each event of the component with its signature highlighted and its description, then the
- * calls the story made, newest first (D-64).
+ * calls the story made, newest first.
  *
  * @module
  */

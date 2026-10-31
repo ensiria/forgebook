@@ -1,4 +1,4 @@
-// The catalogue's page, with its own look (`../styles/_tokens.scss`): it depends on no library it shows (D-67). The
+// The catalogue's page, with its own look (`../styles/_tokens.scss`): it depends on no library it shows. The
 // page is always light at standard contrast: the switches act on the frames.
 
 @use "../styles/tokens" as *;
@@ -295,7 +295,7 @@
     flex: 1;
   }
 
-  // an alias entry says, quietly, the family its component lives in (D-492)
+  // an alias entry says, quietly, the family its component lives in
   .forgebook-tree__alias {
     display: inline-flex;
     align-items: center;
@@ -744,7 +744,7 @@
     }
   }
 
-  // a Live story's clock controls: one group beside Replay (D-504)
+  // a Live story's clock controls: one group beside Replay
   .forgebook-clock {
     display: inline-flex;
     flex: none;
@@ -966,12 +966,12 @@
     color: $accent-text;
   }
 
-  // the other places the component is listed in, after the place it lives in (D-492)
+  // the other places the component is listed in, after the place it lives in
   .forgebook-header__also-in {
     color: $text-tertiary;
   }
 
-  // the related components, under the name (D-492)
+  // the related components, under the name
   .forgebook-header__related {
     display: flex;
     flex-wrap: wrap;

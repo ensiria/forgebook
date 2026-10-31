@@ -1,7 +1,7 @@
 /**
  * The colour a story's box waits on while the story loads: its source's page colour for the theme and contrast the
  * view shows, so the box is not white before a dark story and does not change colour when the story appears; the
- * colour of the backdrop Forgebook draws instead, when the view sets one (D-652). Pure.
+ * colour of the backdrop Forgebook draws instead, when the view sets one. Pure.
  *
  * @module
  */

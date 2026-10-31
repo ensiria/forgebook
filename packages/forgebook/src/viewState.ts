@@ -16,9 +16,9 @@ import type { CatalogueSettings, PanelTabId } from "./catalogue.ts";
 import { switchValueOf, switchWithRole, type ViewSwitch } from "./switches.ts";
 
 /**
- * What Forgebook draws behind the story, in place of its page's colour (D-644): `plain`, the page's colour itself,
+ * What Forgebook draws behind the story, in place of its page's colour: `plain`, the page's colour itself,
  * or the id of one of the catalogue's backdrops (`backdrops.ts`). Forgebook draws them itself, never the library it
- * shows (D-67).
+ * shows.
  */
 export type BackdropChoice = string;
 

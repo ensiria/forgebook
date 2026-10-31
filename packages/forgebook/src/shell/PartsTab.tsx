@@ -1,6 +1,6 @@
 /**
  * The panel's Parts and styling tab: the keys of `classNames`, `styles` and `refs`, the `data-*` hooks of the
- * modifiers, and the test ids of the parts (D-64).
+ * modifiers, and the test ids of the parts.
  *
  * @module
  */

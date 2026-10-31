@@ -1,6 +1,6 @@
 /**
  * One story run in its frame, whatever framework draws it: the args (the story's, the panel's, the texts named by key,
- * the recorded events), the play function, Replay, the matrix, the story clock a Live story reads (D-504) and the
+ * the recorded events), the play function, Replay, the matrix, the story clock a Live story reads and the
  * error shown in place of a story that throws.
  *
  * @remarks
@@ -45,7 +45,7 @@ export type StoryControls = {
   readonly setClock: (state: ClockState) => void;
   /**
    * Brings the story clock back to its start and mounts the story again, so its own state starts over too and its
-   * play function runs again (D-629).
+   * play function runs again.
    */
   readonly restartClock: () => void;
 };

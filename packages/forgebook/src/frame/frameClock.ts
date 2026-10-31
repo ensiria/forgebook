@@ -1,13 +1,13 @@
 /**
  * The story clock a frame runs for its story: it starts at the story's moment and then moves with real time, at the
- * speed the shell's controls set, or stays held (D-504).
+ * speed the shell's controls set, or stays held.
  *
  * @remarks
  * The clock is stepped: it ticks every `TICK_MS` of real time while it runs, and `now()` is the moment of its last
- * tick, so a render reads one moment throughout and React can subscribe to it (`useStoryNow`, D-627). Pausing keeps the
+ * tick, so a render reads one moment throughout and React can subscribe to it (`useStoryNow`). Pausing keeps the
  * moment; Restart brings it back to the start (the frame mounts the story again with it); `advance` jumps at once,
  * held or not. Listeners hear every tick and every jump. The clock names no date library: the library shown turns
- * the milliseconds into its own time type (D-67).
+ * the milliseconds into its own time type.
  *
  * @module
  */
