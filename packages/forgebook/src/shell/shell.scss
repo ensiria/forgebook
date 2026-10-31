@@ -1601,7 +1601,8 @@
     max-width: 56rem;
     margin: 0 auto;
     padding: $space-6 $space-8 $space-8;
-    animation: forgebook-rise $duration-medium $ease-out both;
+    // backwards, not both: a transform kept after the rise would make the page the box of an example over the page
+    animation: forgebook-rise $duration-medium $ease-out backwards;
   }
 
   .forgebook-home__head {
@@ -1865,6 +1866,63 @@
     &[aria-expanded="true"] svg {
       transform: rotate(90deg);
     }
+  }
+
+  // an example's box over the page: fixed (never moved, so its frame keeps its story), its stage taking the room
+  // its bar and code leave; the slot keeps its place in the list (`useFullPage.ts`)
+  .forgebook-example__box[data-full] {
+    position: fixed;
+    inset: $space-6;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    box-shadow: $shadow-popover;
+
+    &:hover {
+      box-shadow: $shadow-popover;
+    }
+
+    .forgebook-example__stage {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+  }
+
+  .forgebook-example__width {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  .forgebook-full-shade {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    background: #1d1d1f33;
+  }
+
+  .forgebook-example__full {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    margin-inline-start: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: color $duration-quick ease-out;
+    @include mixins.focus-ring;
+
+    &:hover {
+      color: $text;
+    }
+  }
+
+  .forgebook-example__full + .forgebook-example__open {
+    margin-inline-start: 0;
   }
 
   .forgebook-example__open {

@@ -647,6 +647,73 @@ test.describe("the component's page", () => {
     await expect(examples.first()).toHaveAccessibleName("Overview");
     await expect(page.getByRole("article", { name: "In row", exact: true })).toHaveCount(0);
   });
+
+  test("an example's box fills the page and goes back to its place, its story never loaded again", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const overview = page.getByRole("article", { name: "Overview", exact: true });
+    const frame = overview.locator("iframe");
+    const root = overview.frameLocator("iframe").locator("html");
+    await expect(root).toHaveAttribute("data-forgebook-status", /.+/);
+    await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
+    const place = await overview.locator(".forgebook-example__box").boundingBox();
+    const address = page.url();
+    await overview.getByRole("button", { name: "Fill the page with Overview" }).click();
+    const box = page.getByRole("dialog", { name: "Overview" });
+    // over the page, the page's own size less its margin, and the story fills the room it has
+    await expect.poll(async () => (await box.boundingBox())?.width).toBe(1280 - 48);
+    await expect.poll(async () => (await frame.boundingBox())?.height ?? 0).toBeGreaterThan(600);
+    // the list keeps the box's place: nothing under it moves
+    await expect(overview.locator(".forgebook-example__slot")).toHaveCSS("height", `${place?.height}px`);
+    await expect(root).toHaveAttribute("data-test-mark", "kept");
+    // a moment's look, not a page: the address stays as it was
+    expect(page.url()).toBe(address);
+    await page.keyboard.press("Escape");
+    await expect(box).toHaveCount(0);
+    await expect(overview.locator(".forgebook-example__box[data-full]")).toHaveCount(0);
+    // opened by the pointer, Escape leaves no focus ring on its button
+    await expect(overview.getByRole("button", { name: "Fill the page with Overview" })).not.toHaveCSS(
+      "outline-style",
+      "solid"
+    );
+    await expect(root).toHaveAttribute("data-test-mark", "kept");
+    // a press on the shade brings it back too
+    await overview.getByRole("button", { name: "Fill the page with Overview" }).click();
+    await page.locator(".forgebook-full-shade").click({ position: { x: 5, y: 5 } });
+    await expect(overview.locator(".forgebook-example__box[data-full]")).toHaveCount(0);
+  });
+
+  test("over the page, an example's story takes a width of its own, which the page and the address never see", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const overview = page.getByRole("article", { name: "Overview", exact: true });
+    const frame = overview.locator("iframe");
+    const pageWidth = (await frame.boundingBox())?.width;
+    const address = page.url();
+    // in the list the stage has no handles: the width is the page's
+    await expect(overview.locator(".forgebook-viewport__handle")).toHaveCount(0);
+    await overview.getByRole("button", { name: "Fill the page with Overview" }).click();
+    const box = page.getByRole("dialog", { name: "Overview" });
+    await settled(box);
+    await box.getByRole("radio", { name: "560" }).check({ force: true });
+    await expect.poll(async () => (await frame.boundingBox())?.width).toBe(560);
+    await expect(box.locator(".forgebook-viewport__handle")).toHaveCount(2);
+    expect(page.url()).toBe(address);
+    await page.keyboard.press("Escape");
+    await expect.poll(async () => (await frame.boundingBox())?.width).toBe(pageWidth);
+    // opened again, it starts at the page's width
+    await overview.getByRole("button", { name: "Fill the page with Overview" }).click();
+    await expect(box.getByRole("radio", { name: "Fill" })).toBeChecked();
+  });
+
+  test("every example opens its story from its bar, not only the demo", async ({ page }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const overview = page.getByRole("article", { name: "Overview", exact: true });
+    await overview.getByRole("link", { name: "Open the story Overview" }).click();
+    await expect(page).toHaveURL(/story=kit%3Ainputs-selection-select--overview/);
+  });
 });
 
 test.describe("the toolbar each person arranges", () => {

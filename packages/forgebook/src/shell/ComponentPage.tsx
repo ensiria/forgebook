@@ -11,27 +11,20 @@
  *
  * @module
  */
-import type { StoryFileCode } from "@forgebook/story-format/source";
-import { type MouseEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 
 import { groupLabel } from "../catalogue.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
 import type { PanelArgs, ShellMessage } from "../messages.ts";
 import { groupedStories, mainStory, type TreeComponent, type TreeStory } from "../storyTree.ts";
-import type { ViewSwitch } from "../switches.ts";
-import { frameAddress, liveView, type ViewState } from "../viewState.ts";
+import { liveView, type ViewState } from "../viewState.ts";
 import { ApiReference } from "./ApiReference.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
-import { useCodeWriter } from "./codeWriter.ts";
-import { FrameView } from "./FrameView.tsx";
-import { Icon } from "./icons.tsx";
+import { Example, type ExampleContext } from "./Example.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
-import { StageViewport } from "./StageViewport.tsx";
-import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
 import { STRINGS } from "./strings.ts";
 import { useComponentDocs } from "./useComponentDocs.ts";
-import { useCopy } from "./useCopy.ts";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
 import { useFrameQueue } from "./useFrameQueue.ts";
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
@@ -39,12 +32,6 @@ import type { Loaded } from "./useLoaded.ts";
 import { type PageDoc, usePageDoc } from "./usePageDoc.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCode } from "./useStoryCode.ts";
-
-/** The height of a frame before its story reports its own, in CSS px. */
-const FALLBACK_HEIGHT = 160;
-
-/** The demo's height before its story reports its own, in CSS px: the demo is the page's first, larger frame. */
-const DEMO_FALLBACK_HEIGHT = 280;
 
 /** The component page's props. */
 export type ComponentPageProps = {
@@ -72,199 +59,6 @@ export type ComponentPageProps = {
   readonly header: ReactNode;
   /** Where its scrolling part starts: the shell's visit of the page and every page's last position. */
   readonly scroll: PageScroll;
-};
-
-/** What every example of the page shares: the frames' address, view and reports, the code, how to open a story. */
-type ExampleContext = Pick<ComponentPageProps, "component" | "view" | "frameUrl" | "hrefOf" | "onOpen"> & {
-  /** The view the frames loaded with. */
-  readonly frameView: ViewState;
-  /** The catalogue's switches, for the frames' addresses. */
-  readonly switches: readonly ViewSwitch[];
-  /** Each frame's reported height, by its address. */
-  readonly heights: ReadonlyMap<string, number>;
-  /** The addresses of the frames that finished loading. */
-  readonly settled: ReadonlySet<string>;
-  /** The story file's code. */
-  readonly code: Loaded<StoryFileCode>;
-  /** The component's name, for the JSX of a story drawn from its args. */
-  readonly componentName: string;
-  /** A story's own args, as its frame reported them; none before it loads. */
-  readonly argsOf: (storyId: string) => PanelArgs;
-  /** A story's measured height, for its box while it loads. */
-  readonly heightOf: (storyId: string) => number | undefined;
-  /** The colour the stories' page has, which each box waits on. */
-  readonly background: string | undefined;
-};
-
-/** A link to a story's own page, opened in place unless the user asks for another tab. */
-const StoryLink = ({
-  story,
-  hrefOf,
-  onOpen,
-  className,
-  children
-}: Pick<ComponentPageProps, "hrefOf" | "onOpen"> & {
-  readonly story: TreeStory;
-  readonly className: string;
-  readonly children: ReactNode;
-}): ReactNode => (
-  <a
-    className={className}
-    href={hrefOf(story)}
-    onClick={(event: MouseEvent<HTMLAnchorElement>): void => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-      event.preventDefault();
-      onOpen(story);
-    }}
-  >
-    {children}
-  </a>
-);
-
-/**
- * The code under an example: closed until asked for, then opened in place with a button that copies it.
- *
- * @param props - the story's code and whether it is shown.
- */
-const ExampleCode = ({
-  id,
-  source,
-  isShown
-}: {
-  readonly id: string;
-  readonly source: StoryCodeSource;
-  readonly isShown: boolean;
-}): ReactNode => {
-  const { isCopied, copy } = useCopy();
-  const write = useCodeWriter();
-  return (
-    // the code stays in the page while closed, so it opens with a transition; inert keeps it out of Tab and
-    // screen readers until then
-    <div id={id} className="forgebook-example__code" data-open={isShown ? "" : undefined} inert={!isShown}>
-      <div className="forgebook-example__code-inner">
-        <button
-          type="button"
-          className="forgebook-example__copy"
-          onClick={(): void => copy(storyCodeText(source, write))}
-          aria-live="polite"
-        >
-          {isCopied ? STRINGS.copied : STRINGS.copy}
-        </button>
-        <StoryCodeBlock {...source} />
-      </div>
-    </div>
-  );
-};
-
-/**
- * One example: its title and description (the demo has none: it opens the page), its story in a frame, and a bar
- * that shows its code.
- *
- * @param props - the story, whether it is the demo, whether its frame may load, where the queue watches it, and what
- * every example shares.
- */
-const Example = ({
-  story,
-  isDemo,
-  isMounted,
-  observe,
-  ...context
-}: ExampleContext & {
-  readonly story: TreeStory;
-  readonly isDemo: boolean;
-  readonly isMounted: boolean;
-  readonly observe?: (element: HTMLElement | null) => void;
-}): ReactNode => {
-  const [isCodeShown, setIsCodeShown] = useState(false);
-  const codeId = useId();
-  // the story's measured height when there is one; a guess otherwise, larger for the demo; never below the height its
-  // scene needs, which its frame has from the start
-  const fallbackHeight = Math.max(
-    story.height ?? 0,
-    context.heightOf(story.id) ?? (isDemo ? DEMO_FALLBACK_HEIGHT : FALLBACK_HEIGHT)
-  );
-  const source: StoryCodeSource | undefined =
-    context.code.status === "ready"
-      ? {
-          code: context.code.value,
-          exportName: story.exportName,
-          componentName: context.componentName,
-          args: context.argsOf(story.id)
-        }
-      : undefined;
-  return (
-    <article
-      ref={observe}
-      className="forgebook-example"
-      data-demo={isDemo ? "" : undefined}
-      aria-label={isDemo ? STRINGS.frameTitle(context.component.name, story.name) : story.name}
-    >
-      {isDemo ? null : (
-        <header className="forgebook-example__head">
-          <h4 className="forgebook-example__title">
-            <StoryLink
-              story={story}
-              hrefOf={context.hrefOf}
-              onOpen={context.onOpen}
-              className="forgebook-link"
-            >
-              {story.name}
-            </StoryLink>
-          </h4>
-          {story.description === undefined ? null : (
-            <p className="forgebook-example__description">
-              <CodeText text={story.description} />
-            </p>
-          )}
-        </header>
-      )}
-      <div className="forgebook-example__box">
-        <div className="forgebook-example__stage">
-          <StageViewport width={context.view.width} background={context.background}>
-            {isMounted ? (
-              <FrameView
-                title={STRINGS.frameTitle(context.component.name, story.name)}
-                address={frameAddress(context.frameUrl, story.id, context.frameView, context.switches)}
-                heights={context.heights}
-                settled={context.settled}
-                fallbackHeight={fallbackHeight}
-                sceneHeight={story.height}
-              />
-            ) : (
-              // the frame's room until its turn comes, so the page does not jump when it loads
-              <div className="forgebook-frame-placeholder" style={{ height: fallbackHeight }} />
-            )}
-          </StageViewport>
-        </div>
-        <div className="forgebook-example__bar">
-          {source === undefined ? null : (
-            <button
-              type="button"
-              className="forgebook-example__toggle"
-              aria-expanded={isCodeShown}
-              aria-controls={codeId}
-              onClick={(): void => setIsCodeShown(!isCodeShown)}
-            >
-              <Icon name="chevronRight" size={12} />
-              {isCodeShown ? STRINGS.hideCode : STRINGS.showCode}
-            </button>
-          )}
-          {isDemo ? (
-            <StoryLink
-              story={story}
-              hrefOf={context.hrefOf}
-              onOpen={context.onOpen}
-              className="forgebook-example__open"
-            >
-              {STRINGS.openStory}
-              <Icon name="external" size={12} />
-            </StoryLink>
-          ) : null}
-        </div>
-        {source === undefined ? null : <ExampleCode id={codeId} source={source} isShown={isCodeShown} />}
-      </div>
-    </article>
-  );
 };
 
 /**
