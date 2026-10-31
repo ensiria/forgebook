@@ -1,3 +1,15 @@
+## 0.1.3 (2026-10-31)
+
+### 🚀 Features
+
+- **forgebook:** forgebook mcp, the catalogue for agents ([8aa0bbe](https://github.com/ensiria/forgebook/commit/8aa0bbe))
+- **forgebook:** forgebook stories and forgebook story ([5e8ae16](https://github.com/ensiria/forgebook/commit/5e8ae16))
+- **forgebook:** the dev server answers tools and agents ([7a873af](https://github.com/ensiria/forgebook/commit/7a873af))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.2 (2026-10-31)
 
 ### 🩹 Fixes
