@@ -95,6 +95,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   key of any control (`keys: { width: "w" }`), a reader changes theirs in the View menu. The View menu's values are
   saved under a name and picked again; `views` in the configuration offers some to every reader. A dot marks each
   control whose value is not its default.
+- **Touch on the computer**: the Touch switch turns the mouse into a finger for the stories, two with Shift
+  ([below](#touch)); `forgebook dev --touch` opens Chromium with its real touch emulation.
 - **Widths** to draw a story at, and a **compare** view that draws the same story once per value of one or two
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
@@ -142,6 +144,29 @@ Without `toolbar`, the colour scheme, the contrast and the width start there. A 
 shows nowhere, not even on the toolbar, and keeps its default (the width can still be dragged on the stage). A preset
 may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
 that is no control at all stops the catalogue with an error saying which.
+
+## Touch
+
+The Touch switch (in View, `m` by default) lets a story be tried as on a phone, from the computer:
+
+- the story receives a finger's events: `pointerdown`/`move`/`up` of the `touch` type and, in Chromium,
+  `touchstart`/`move`/`end`; a tap clicks, a press held half a second opens the context menu;
+- its CSS answers as a phone's: `(hover: none)` and `(pointer: coarse)` match, the mouse's `:hover` does not;
+  `navigator.maxTouchPoints` says 5;
+- the cursor is a round dot; Shift fixes a centre, and a press then puts a second finger mirrored around it, so a drag
+  pinches and rotates;
+- a drag scrolls what it can, as the `touch-action` on the way allows, and flings on.
+
+A story reads the switch in its globals (`context.globals.touch`, `"mouse"` or `"touch"`) to draw only the version
+that fits the pointer, and follows the switch live; a story fixes it with `globals: { touch: "touch" }`.
+
+**It is a simulation.** Events made by a page are not trusted, so the browser's own reactions do not follow them:
+its native scrolling (the drag's scrolling is an approximation, without the rubber band), focus and selection from a
+touch, and `touch-action` applied by the browser. In Safari and Firefox the stories get pointer events only (only
+Chromium lets a page build touch events). A virtual keyboard, the viewport shrinking under it, safe areas and real iOS
+Safari need a device. For real touch events and native scrolling, `forgebook dev --touch` opens the catalogue in a
+Chromium window with Chromium's own touch emulation (it needs `@forgebook/testing` and Playwright, as `check` does).
+`controls: { touch: false }` takes the switch away.
 
 ## Coming from Storybook
 

@@ -48,6 +48,7 @@ import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import { mergedPreviews, readPreview, readStory } from "./storyModule.ts";
 import { runStory, type StoryControls } from "./storyRun.ts";
+import { followTouch } from "./touchLayer.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {
@@ -130,11 +131,14 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const params = new URLSearchParams(window.location.search);
   const storyId = params.get("story") ?? "";
   const languages = config.languages ?? [];
-  const switches = catalogueSwitches(config.switches, languages, config.lists?.controls?.direction !== false);
+  const switches = catalogueSwitches(config.switches, languages, config.lists?.controls);
   const catalogue = catalogueSettings("", switches, config.lists);
   const preview = mergedPreviews((config.previews ?? []).map(readPreview));
   const view = parseView(window.location.search, catalogue);
   applyView(document.documentElement, view, catalogue);
+  // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
+  // sees touch
+  followTouch(document);
   // what the story fixes of the view, once it is read: every view the frame applies has it over the shell's
   let fixed: FixedView = NOT_FIXED;
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount

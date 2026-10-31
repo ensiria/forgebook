@@ -17,7 +17,8 @@ const rewrite = (css: string): string =>
     visitor: FORCED_STATES_VISITOR
   }).code.toString();
 
-const HOVER = ":is(:hover,[data-forgebook-force~=hover],[data-forgebook-force~=hover] *)";
+const HOVER =
+  ":is(:hover:where(:not(:root[data-forgebook-touch] *)),[data-forgebook-force~=hover],[data-forgebook-force~=hover] *)";
 
 describe("FORCED_STATES_VISITOR", () => {
   it("lets a forced state match wherever the real one does", () => {

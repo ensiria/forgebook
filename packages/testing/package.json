@@ -32,6 +32,7 @@
     "./overlays": "./src/overlays.ts",
     "./check": "./src/checkStories.ts",
     "./shot": "./src/shotStories.ts",
+    "./touch": "./src/touchWindow.ts",
     "./fonts.css": "./src/fonts/fonts.css"
   },
   "scripts": {
@@ -101,6 +102,10 @@
       "./shot": {
         "types": "./dist/src/shotStories.d.ts",
         "default": "./dist/src/shotStories.js"
+      },
+      "./touch": {
+        "types": "./dist/src/touchWindow.d.ts",
+        "default": "./dist/src/touchWindow.js"
       },
       "./fonts.css": "./dist/src/fonts/fonts.css"
     },

@@ -28,6 +28,7 @@ import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { openTouchWindow } from "./touchWindowRun.ts";
 
 await defineCommands({
   name: "forgebook",
@@ -53,13 +54,21 @@ await defineCommands({
         force: {
           type: "boolean",
           description: "Pre-bundle the dependencies again, ignoring Vite's cache (as a first start does)."
+        },
+        touch: {
+          type: "boolean",
+          description:
+            "Also open the catalogue in a Chromium window with Chromium's own touch emulation: the mouse makes real " +
+            "touch events, native scrolling included (needs @forgebook/testing and Playwright). Still a computer: no " +
+            "virtual keyboard, no iOS Safari; a device remains the last word."
         }
       },
       examples: [
         { command: `${COMMAND} dev`, description: "Run the catalogue of the folder you are in." },
-        { command: `${COMMAND} dev --port 6006`, description: "On a given port." }
+        { command: `${COMMAND} dev --port 6006`, description: "On a given port." },
+        { command: `${COMMAND} dev --touch`, description: "And try the stories with Chromium's real touch." }
       ],
-      run: async ({ options, onInterrupt }): Promise<void> => {
+      run: async ({ options, onInterrupt, log }): Promise<void> => {
         const config = await configOf(options.config);
         const port = options.port === undefined ? undefined : Number(options.port);
         if (port !== undefined && !Number.isInteger(port))
@@ -75,6 +84,7 @@ await defineCommands({
         );
         await server.listen();
         server.printUrls();
+        if (options.touch === true) await openTouchWindow(config.dir, server.resolvedUrls?.local[0], log);
         await new Promise<void>((done) => {
           onInterrupt(() => {
             void server.close().then(done);

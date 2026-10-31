@@ -74,7 +74,8 @@ describe("the view in the address", () => {
       speed: "normal",
       press: "default",
       lang: "",
-      dir: "ltr"
+      dir: "ltr",
+      touch: "mouse"
     });
   });
 
@@ -180,9 +181,11 @@ describe("what the catalogue reads of the switches", () => {
     expect(languageOf(DEFAULT_VIEW, [])).toBe("");
   });
 
-  it("hands the story the switches applied by code: the language here", () => {
+  it("hands the story the switches applied by code, the language here, and the touch switch", () => {
     expect(codeGlobalsOf(withSwitches({ theme: "dark", lang: "pseudo" }), SWITCHES)).toEqual({
-      lang: "pseudo"
+      lang: "pseudo",
+      touch: "mouse"
     });
+    expect(codeGlobalsOf(withSwitches({ touch: "touch" }), SWITCHES)["touch"]).toBe("touch");
   });
 });

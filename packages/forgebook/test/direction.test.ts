@@ -13,7 +13,7 @@ import { mergedLists } from "../src/vite/configFile.ts";
 describe("the direction switch", () => {
   it("comes after a catalogue's switches and its languages, writing nothing for left to right", () => {
     const switches = catalogueSwitches(undefined, [{ id: "ar", label: "العربية", dir: "rtl" }]);
-    expect(switches.map((each) => each.id)).toEqual(["theme", "contrast", "lang", "dir"]);
+    expect(switches.map((each) => each.id)).toEqual(["theme", "contrast", "lang", "dir", "touch"]);
     expect(directionSwitch().apply).toEqual({ kind: "attribute", name: "dir" });
     expect(directionSwitch().values.find((value) => value.value === "ltr")?.isUnset).toBe(true);
   });
@@ -23,12 +23,15 @@ describe("the direction switch", () => {
     expect(catalogueSwitches([...DEFAULT_SWITCHES, own], []).map((each) => each.id)).toEqual([
       "theme",
       "contrast",
-      "writing"
+      "writing",
+      "touch"
     ]);
     const lists = mergedLists([{ controls: { direction: false } }]);
-    expect(
-      catalogueSwitches(undefined, [], lists.controls?.direction !== false).map((each) => each.id)
-    ).toEqual(["theme", "contrast"]);
+    expect(catalogueSwitches(undefined, [], lists.controls).map((each) => each.id)).toEqual([
+      "theme",
+      "contrast",
+      "touch"
+    ]);
     // turning it off is not one of Forgebook's own controls: those stay
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES, lists).ownControls).toEqual([
       "backdrop",

@@ -9,6 +9,7 @@ import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
 import type { PlacedControl } from "../toolbarLayout.ts";
 import { ControlKeyField } from "./ControlKeyField.tsx";
+import { InfoTip } from "./InfoTip.tsx";
 import { Icon } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
 import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
@@ -58,6 +59,8 @@ export const ControlRow = ({
     layout.move(control.id, target);
     onAnnounce(STRINGS.controlMoved(label, target + 1, count));
   };
+  // a switch's note (the touch simulation's limits): an info button beside its value
+  const description = control.kind === "switch" ? control.switch.description : undefined;
   return (
     <li
       className="forgebook-arrange"
@@ -84,6 +87,7 @@ export const ControlRow = ({
       </span>
       <div className="forgebook-arrange__control">
         <ToolbarControl control={control} form="row" {...context} />
+        {description === undefined ? null : <InfoTip note={description} about={label} />}
       </div>
       <ControlKeyField
         label={label}

@@ -16,6 +16,7 @@ import {
 } from "react";
 
 import type { ToolbarControl as Control } from "../toolbarLayout.ts";
+import { InfoTip } from "./InfoTip.tsx";
 import { STRINGS } from "./strings.ts";
 import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
@@ -140,6 +141,9 @@ export const PinnedControl = ({
       onContextMenu={open}
     >
       <ToolbarControl control={control} form="bar" {...context} />
+      {control.kind === "switch" && control.switch.description !== undefined ? (
+        <InfoTip note={control.switch.description} about={controlLabel(control)} />
+      ) : null}
       {isChanged ? (
         <span
           className="forgebook-dot forgebook-toolbar__changed"

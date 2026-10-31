@@ -604,7 +604,8 @@
   .forgebook-toolbar {
     container: toolbar / inline-size;
     position: relative;
-    z-index: 1;
+    // its menus open over the story pane, the floating stage tools included (2), under a full-page example (19)
+    z-index: 3;
     flex: none;
     display: flex;
     align-items: center;
@@ -964,6 +965,8 @@
 
   .forgebook-popover {
     position: absolute;
+    // above the toolbar's other parts: a wrapped bar's pinned controls (placed for their dot) come later in the page
+    z-index: 2;
     top: calc(100% + $space-1-5);
     left: 0;
     display: flex;
@@ -1022,8 +1025,56 @@
 
   // the View menu takes its rows' whole width: its cells may scroll, so their least width says nothing of it; a
   // narrow window caps it (`ViewMenu.tsx`)
+  // its height, padding included, is capped to the window (`ViewMenu.tsx`)
   .forgebook-popover--arrange {
+    box-sizing: border-box;
     width: max-content;
+  }
+
+  // the menu's middle, between the views and the foot: it scrolls when the window is shorter than the menu; the
+  // padding keeps the rows' focus rings inside the scrolled box
+  .forgebook-popover__body {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    min-height: 0;
+    margin: (-$space-1) (-$space-1);
+    padding: $space-1;
+    overflow-y: auto;
+  }
+
+  // a control's info button and its note, shown on hover or focus in the top layer (`InfoTip.tsx`)
+  .forgebook-info-tip {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: $text-tertiary;
+    @include mixins.focus-ring;
+
+    &:hover {
+      color: $text;
+    }
+  }
+
+  .forgebook-info-tip__note {
+    position: fixed;
+    inset: auto;
+    max-width: 18rem;
+    margin: 0;
+    padding: $space-2 $space-2-5;
+    border: 0;
+    border-radius: $radius-control;
+    background: $surface;
+    box-shadow: $shadow-popover;
+    font: $text-caption;
+    color: $text;
+    white-space: normal;
   }
 
   // the named views at the top of the View menu: a row of chips that wraps, the save button last
@@ -1169,6 +1220,9 @@
 
   // a value too wide for a narrow window's menu scrolls within its cell
   .forgebook-arrange__control {
+    display: flex;
+    align-items: center;
+    gap: $space-1-5;
     justify-self: start;
     max-width: 100%;
     min-width: 0;
@@ -1237,6 +1291,7 @@
     flex: none;
     display: flex;
     align-items: center;
+    gap: $space-1;
     white-space: nowrap;
   }
 

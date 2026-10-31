@@ -4,7 +4,8 @@
  *
  * @remarks
  * `:hover` becomes `:is(:hover, [data-forgebook-force~="hover"], [data-forgebook-force~="hover"] *)`, and so on for
- * `:active`, `:focus`, `:focus-visible` and `:focus-within`, at every depth (inside `:is()`, `:not()`, `:has()`). The
+ * `:active`, `:focus`, `:focus-visible` and `:focus-within`, at every depth (inside `:is()`, `:not()`, `:has()`); the
+ * real `:hover` matches only while touch is not simulated (`touchMedia.ts`). The
  * real state still works, the specificity stays the same (an attribute weighs what a pseudo-class does), and the
  * library's CSS carries nothing for the catalogue: the rewrite runs only in the catalogue's build, as a Lightning CSS
  * visitor. A story forces a state with `parameters.forceState` (on its root) or `data-forgebook-force` on a
@@ -15,6 +16,8 @@
 
 import type { ForcedState } from "@forgebook/story-format/csf";
 import type { CustomAtRules, Selector, SelectorComponent, Visitor } from "lightningcss";
+
+import { NOT_UNDER_TOUCH, touchMediaRules } from "./touchMedia.ts";
 
 /** The attribute that forces states on an element and everything inside it. */
 export const FORCE_ATTRIBUTE = "data-forgebook-force";
@@ -32,12 +35,22 @@ const forcingAttribute = (state: ForcedState): SelectorComponent => ({
   operation: { operator: "includes", value: state }
 });
 
+/**
+ * The real state: `:hover` only outside a root that simulates touch (a finger does not hover), any other as it is.
+ *
+ * @param state - the state.
+ */
+const realState = (state: ForcedState): Selector =>
+  state === "hover"
+    ? [{ type: "pseudo-class", kind: "hover" }, NOT_UNDER_TOUCH]
+    : [{ type: "pseudo-class", kind: state }];
+
 /** `:is(:<state>, [force~=state], [force~=state] *)`: the state, real or forced. */
 const realOrForced = (state: ForcedState): SelectorComponent => ({
   type: "pseudo-class",
   kind: "is",
   selectors: [
-    [{ type: "pseudo-class", kind: state }],
+    realState(state),
     [forcingAttribute(state)],
     [forcingAttribute(state), { type: "combinator", value: "descendant" }, { type: "universal" }]
   ]
@@ -70,5 +83,11 @@ export const forcedSelector = (selector: Selector): Selector =>
       : withNested(component)
   );
 
-/** The Lightning CSS visitor that applies the rewrite to every style sheet the catalogue builds. */
-export const FORCED_STATES_VISITOR: Visitor<CustomAtRules> = { Selector: forcedSelector };
+/**
+ * The Lightning CSS visitor that applies the rewrite to every style sheet the catalogue builds, with the touch
+ * simulation's (`touchMedia.ts`): the media rules that ask about the pointer follow the simulated touch.
+ */
+export const FORCED_STATES_VISITOR: Visitor<CustomAtRules> = {
+  Selector: forcedSelector,
+  Rule: { media: touchMediaRules }
+};

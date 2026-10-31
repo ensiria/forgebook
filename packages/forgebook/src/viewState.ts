@@ -383,7 +383,9 @@ export const languageOf = (view: Pick<ViewState, "switches">, switches: readonly
 };
 
 /**
- * The values of the switches applied by code, by id: what the story reads as `context.globals`.
+ * The values of the switches applied by code, by id, and the touch switch's: what the story reads as
+ * `context.globals`. A story reads the touch switch's value (`mouse` or `touch`) to draw only the version that fits
+ * it: a row's swipe actions for a finger, its menu button for a mouse.
  *
  * @param view - the view's switches.
  * @param switches - the catalogue's switches.
@@ -394,7 +396,7 @@ export const codeGlobalsOf = (
 ): Readonly<Record<string, string>> =>
   Object.fromEntries(
     switches
-      .filter((each) => each.apply.kind === "code")
+      .filter((each) => each.apply.kind === "code" || each.role === "touch")
       .map((each) => [each.id, view.switches[each.id] ?? each.default])
   );
 

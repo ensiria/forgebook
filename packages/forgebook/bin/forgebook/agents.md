@@ -26,6 +26,11 @@ in JSON with `--json`, and every answer carries the links that open a story for 
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
 - Add a worst case: very long text, words without spaces, huge numbers (`forgebook new` writes one).
+- To try a component as on a phone, the catalogue's Touch switch (`touch=touch` in a view: `--view "touch=touch"`)
+  sends the story a finger's events and a phone's hover and pointer media. It is a simulation: native scrolling, the
+  virtual keyboard and real Safari still need a device, or `forgebook dev --touch` (Chromium's real touch).
+  A story reads it as `context.globals.touch` (`"mouse"` or `"touch"`) or fixes it with
+  `globals: { touch: "touch" }`.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.

@@ -36,6 +36,7 @@ const shellStrings = {
     `${control}: press ${key} for the next value, Shift+${key} for the one before`,
   changeKey: "Change the key: press it, then the new key; Backspace takes it away",
   pressAKey: "Press a key",
+  aboutControl: (control: string): string => `About ${control}`,
   namedViews: "Views",
   saveView: "Save view…",
   viewName: "View name",
@@ -65,7 +66,8 @@ const shellStrings = {
   pinnedNoRoom: "Pinned: back on the toolbar when there is room",
   resetToolbar: "Reset toolbar",
   wrapToolbar: "Wrap the toolbar onto more lines when it is full",
-  hiddenControls: (count: number): string => `${count} hidden`,
+  hiddenControls: (count: number, pinned: number): string =>
+    pinned === 0 ? `${count} hidden` : `${count} hidden · ${pinned} on the toolbar`,
   toolbarInBrowser: "The toolbar is kept in this browser",
   compare: "Compare",
   compareOff: "Off",

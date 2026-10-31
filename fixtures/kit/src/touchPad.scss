@@ -1,0 +1,34 @@
+// The touch pad's look: plain, so the tests read its parts; the hover and the phone's media show a change they can
+// see.
+.touch-pad {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 20rem;
+  font: 14px / 1.4 system-ui, sans-serif;
+}
+
+.touch-pad__hover:hover {
+  background: rgb(255 0 0);
+}
+
+.touch-pad__phone {
+  display: none;
+}
+
+@media (hover: none) {
+  .touch-pad__phone {
+    display: block;
+  }
+}
+
+.touch-pad__list {
+  height: 6rem;
+  margin: 0;
+  overflow: auto;
+}
+
+.touch-pad__drawing {
+  height: 4rem;
+  background: rgb(0 0 0 / 0.08);
+  touch-action: none;
+}

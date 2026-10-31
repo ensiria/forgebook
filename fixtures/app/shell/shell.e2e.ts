@@ -785,6 +785,7 @@ test.describe("the toolbar each person arranges", () => {
       "press",
       "lang",
       "dir",
+      "touch",
       "backdrop",
       "sheets",
       "text"
@@ -849,7 +850,7 @@ test.describe("the toolbar each person arranges", () => {
     await page.keyboard.press("ArrowUp");
     await expect(handle).toBeFocused();
     expect((await menuRows(page)).slice(0, 4)).toEqual(["theme", "contrast", "motion", "width"]);
-    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 11");
+    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 12");
     expect(await barControls(page)).toEqual(["theme", "contrast", "motion", "width"]);
     // by pointer: the theme dragged below the contrast
     const grip = page.getByRole("button", { name: "Move Theme" });
@@ -879,8 +880,11 @@ test.describe("the toolbar each person arranges", () => {
     await expect
       .poll(() =>
         rowsDrawn.evaluateAll((rows) => {
-          const tops = rows.map((row) => row.getBoundingClientRect().top);
-          const steps = new Set(tops.slice(1).map((top, index) => Math.round(top - (tops[index] ?? 0))));
+          // the room between one row and the next, the same everywhere: a row with a note under it is taller
+          const boxes = rows.map((row) => row.getBoundingClientRect());
+          const steps = new Set(
+            boxes.slice(1).map((box, index) => Math.round(box.top - (boxes[index]?.bottom ?? 0)))
+          );
           const shifted = rows.filter((row) => (row as HTMLElement).style.transform !== "").length;
           return { steps: steps.size, shifted };
         })
@@ -904,7 +908,8 @@ test.describe("the toolbar each person arranges", () => {
     expect(await barControls(page)).toEqual(["theme", "width"]);
     await openView(page);
     expect(await menuRows(page)).not.toContain("theme");
-    await page.getByRole("button", { name: "1 hidden" }).click();
+    // the count says how many of the hidden still sit on the bar
+    await page.getByRole("button", { name: "1 hidden · 1 on the toolbar" }).click();
     await expect(page.getByRole("button", { name: "Pin Theme to the toolbar" })).toHaveAttribute(
       "aria-pressed",
       "true"
@@ -1034,6 +1039,198 @@ test.describe("the stories' texts", () => {
     await note.getByRole("button", { name: "Back to the text" }).click();
     await expect(frameOf(page).locator("small")).toHaveText("Addebitato all'inizio di ogni periodo");
     await expect(note.getByRole("button")).toHaveCount(0);
+  });
+});
+
+test.describe("touch", () => {
+  /** The touch pad's story, in touch or with the mouse. */
+  const touchPad = (query = "touch=touch"): string => `/?story=kit:interaction-touch-pad--overview&${query}`;
+
+  /** The pad's event log, one entry a line. */
+  const eventLog = (page: Page): Promise<string[]> =>
+    frameOf(page).getByRole("list", { name: "Events" }).getByRole("listitem").allTextContents();
+
+  /** The centre of a part of the story, in the page. */
+  const centreOf = async (part: Locator): Promise<{ x: number; y: number }> => {
+    const box = await part.boundingBox();
+    if (box === null) throw new Error("the part is not drawn");
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+
+  test("a tap sends a finger's events and a touch click, a long press the menu, and the CSS answers as a phone's", async ({
+    page
+  }) => {
+    await page.goto(touchPad());
+    await frameStatus(page);
+    const button = await centreOf(frameOf(page).getByRole("button", { name: "Press me" }));
+    await page.mouse.move(button.x, button.y);
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect
+      .poll(() => eventLog(page))
+      .toEqual(["pointerdown touch", "touchstart 1", "pointerup touch", "touchend 0", "click touch"]);
+    await page.mouse.down();
+    await page.waitForTimeout(650);
+    await page.mouse.up();
+    await expect.poll(async () => (await eventLog(page)).includes("contextmenu")).toBe(true);
+    await expect(frameOf(page).getByText("A phone's media")).toBeVisible();
+    const hover = frameOf(page).getByText("Hover me");
+    const point = await centreOf(hover);
+    await page.mouse.move(point.x, point.y);
+    await expect(hover).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(frameOf(page).locator(".forgebook-touch-dot:not([hidden])")).toHaveCount(1);
+  });
+
+  test("a drag scrolls a list, not a part that keeps its moves, and Shift puts two fingers down", async ({
+    page
+  }) => {
+    await page.goto(touchPad());
+    await frameStatus(page);
+    const list = frameOf(page).getByRole("list", { name: "Scrolling list" });
+    const start = await centreOf(list);
+    await page.mouse.move(start.x, start.y + 30);
+    await page.mouse.down();
+    for (let step = 1; step <= 8; step += 1) await page.mouse.move(start.x, start.y + 30 - step * 8);
+    await page.mouse.up();
+    await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(40);
+    // after the lift the dot stays where the finger left the screen, not where it went down
+    const dot = frameOf(page).locator(".forgebook-touch-dot:not([hidden])");
+    const lifted = await centreOf(dot);
+    expect(Math.round(lifted.y)).toBe(Math.round(start.y + 30 - 64));
+    const drawing = await centreOf(frameOf(page).getByRole("img", { name: "Drawing area" }));
+    await page.mouse.move(drawing.x, drawing.y);
+    await page.keyboard.down("Shift");
+    // close to Shift's centre: the fingers are spread apart, and the second one does not jump when the press comes
+    await page.mouse.move(drawing.x + 10, drawing.y);
+    const secondDot = frameOf(page).locator(".forgebook-touch-dot").nth(1);
+    const before = await secondDot.evaluate((dot) => dot.style.translate);
+    await page.mouse.down();
+    expect(await secondDot.evaluate((dot) => dot.style.translate)).toBe(before);
+    await page.mouse.up();
+    await page.mouse.move(drawing.x + 40, drawing.y);
+    await page.mouse.down();
+    await page.mouse.move(drawing.x + 50, drawing.y + 4);
+    await page.mouse.up();
+    await page.keyboard.up("Shift");
+    const entries = await eventLog(page);
+    expect(entries).toContain("touchstart 2");
+    expect(entries.filter((entry) => entry === "pointermove touch").length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("the demos: a captured swipe, a carousel one photo a swipe, a sheet dragged, a pinch and a pull", async ({
+    page
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const demo = (id: string): string => `/?story=kit:touch-demos-${id}&touch=touch`;
+    const drag = async (from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      for (let step = 1; step <= 12; step += 1)
+        await page.mouse.move(from.x + ((to.x - from.x) * step) / 12, from.y + ((to.y - from.y) * step) / 12);
+      await page.mouse.up();
+    };
+    // a row captures its pointer in its pointerdown, and a sideways swipe stays the row's on a pan-y list
+    await page.goto(demo("swipe-list--inbox"));
+    await frameStatus(page);
+    const row = frameOf(page).locator(".swipe-row__content").first();
+    const rowBox = await row.boundingBox();
+    if (rowBox === null) throw new Error("the row is not drawn");
+    await drag(
+      { x: rowBox.x + rowBox.width - 30, y: rowBox.y + rowBox.height / 2 },
+      { x: rowBox.x + rowBox.width - 200, y: rowBox.y + rowBox.height / 2 }
+    );
+    await expect(row).toHaveAttribute("style", /translate: -160px/);
+    // a carousel snaps to the next photo, not past it
+    await page.goto(demo("carousel--places"));
+    await frameStatus(page);
+    const track = frameOf(page).locator(".carousel__track");
+    const trackBox = await track.boundingBox();
+    if (trackBox === null) throw new Error("the carousel is not drawn");
+    await drag(
+      { x: trackBox.x + trackBox.width - 40, y: trackBox.y + 100 },
+      { x: trackBox.x + 120, y: trackBox.y + 100 }
+    );
+    await expect
+      .poll(() => track.evaluate((element) => element.scrollLeft / element.clientWidth))
+      .toBeCloseTo(1, 1);
+    // the sheet's handle drags it up from its peek (a quick drag flicks it past half)
+    await page.goto(demo("bottom-sheet--nearby"));
+    await frameStatus(page);
+    const handle = await centreOf(frameOf(page).getByRole("button", { name: "Resize the sheet" }));
+    await drag(handle, { x: handle.x, y: handle.y - 140 });
+    await expect(frameOf(page).locator(".bottom-sheet__sheet")).toHaveAttribute("style", /height: (50|88)%/);
+    // two fingers pinch the photo
+    await page.goto(demo("photo-viewer--sunset"));
+    await frameStatus(page);
+    const stage = await centreOf(frameOf(page).getByRole("img", { name: "Sunset over the bay" }));
+    await page.mouse.move(stage.x, stage.y);
+    await page.keyboard.down("Shift");
+    await page.mouse.move(stage.x + 40, stage.y);
+    await drag({ x: stage.x + 40, y: stage.y }, { x: stage.x + 80, y: stage.y + 40 });
+    await page.keyboard.up("Shift");
+    await expect(frameOf(page).locator(".photo-viewer__readout span")).not.toHaveText("100% · 0°");
+    // a feed pulled from its top refreshes
+    await page.goto(demo("pull-to-refresh--friends"));
+    await frameStatus(page);
+    const feed = await centreOf(frameOf(page).locator(".pull-feed__list"));
+    await drag({ x: feed.x, y: feed.y - 100 }, { x: feed.x, y: feed.y + 80 });
+    await expect(frameOf(page).locator(".pull-feed__list li").first()).toHaveText(/^New post 1/);
+    expect(errors).toEqual([]);
+  });
+
+  test("a story reads the Touch switch to draw only its version, and a story may fix touch", async ({
+    page
+  }) => {
+    await page.goto("/?story=kit:interaction-touch-pad--by-pointer");
+    await frameStatus(page);
+    await expect(frameOf(page).getByText("Open the row's menu for its actions")).toBeVisible();
+    await page.getByRole("button", { name: /^View/ }).click();
+    await popoversSettled(page);
+    await page
+      .getByRole("dialog", { name: "View" })
+      .getByRole("group", { name: "Touch" })
+      .getByRole("radio", { name: "Touch" })
+      .check({ force: true });
+    await expect(frameOf(page).getByText("Swipe the row for its actions")).toBeVisible();
+    await page.goto("/?story=kit:interaction-touch-pad--touch-only");
+    await frameStatus(page);
+    await expect(frameOf(page).locator("html")).toHaveAttribute("data-forgebook-touch", "touch");
+  });
+
+  test("the Touch switch says what is simulated, and the mouse comes back when it is off", async ({
+    page
+  }) => {
+    await page.goto(touchPad());
+    await frameStatus(page);
+    await page.getByRole("button", { name: /^View/ }).click();
+    await popoversSettled(page);
+    // the limits are a note on an info button, not a paragraph: shown on hover, in the menu and on the bar
+    await page.getByRole("dialog", { name: "View" }).getByRole("button", { name: "About Touch" }).hover();
+    await expect(
+      page.getByRole("tooltip").filter({ hasText: /^Simulated: the story receives/ })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Pin Touch to the toolbar" }).click();
+    // a full bar moves what has no room into View: wrapping keeps every pinned control on the bar
+    await page
+      .getByRole("switch", { name: "Wrap the toolbar onto more lines when it is full" })
+      .check({ force: true });
+    await expect(
+      page
+        .locator('.forgebook-toolbar__pinned[data-control="touch"]')
+        .getByRole("button", { name: "About Touch" })
+    ).toBeVisible();
+    await page
+      .getByRole("dialog", { name: "View" })
+      .getByRole("group", { name: "Touch" })
+      .getByRole("radio", { name: "Mouse" })
+      .check({ force: true });
+    await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-touch");
+    await page.getByRole("button", { name: /^View/ }).click();
+    await expect(page.locator(".forgebook-popover")).toHaveCount(0);
+    const button = await centreOf(frameOf(page).getByRole("button", { name: "Press me" }));
+    await page.mouse.click(button.x, button.y);
+    await expect.poll(async () => (await eventLog(page)).includes("click mouse")).toBe(true);
   });
 });
 

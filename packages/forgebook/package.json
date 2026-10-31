@@ -65,7 +65,8 @@
     "./switches": "./src/switches.ts",
     "./catalogue": "./src/catalogue.ts",
     "./story-check": "./src/storyCheck.ts",
-    "./spills": "./src/spills.ts"
+    "./spills": "./src/spills.ts",
+    "./real-touch": "./src/realTouch.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -251,6 +252,10 @@
       "./spills": {
         "types": "./dist/src/spills.d.ts",
         "default": "./dist/src/spills.js"
+      },
+      "./real-touch": {
+        "types": "./dist/src/realTouch.d.ts",
+        "default": "./dist/src/realTouch.js"
       }
     },
     "bin": {

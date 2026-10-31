@@ -148,7 +148,7 @@ const HiddenControls = ({
         aria-controls={listId}
         onClick={(): void => setIsOpen(!isOpen)}
       >
-        {STRINGS.hiddenControls(hidden.length)}
+        {STRINGS.hiddenControls(hidden.length, hidden.filter((each) => each.isPinned).length)}
         <Icon name={isOpen ? "chevronDown" : "chevronRight"} size={12} />
       </button>
       {isOpen ? (
@@ -220,12 +220,15 @@ export const ViewMenu = ({
   const ids = menuControlIds(layout.placed);
   const order = shown.map((each) => each.control.id).join(",");
   useShiftedRows(listRef, order, draggedId);
-  // the menu never runs past the window's edge: a narrow window keeps it inside, its widest values then scroll
+  // the menu never runs past the window's edges: a narrow window keeps it inside, its widest values then scroll; a
+  // short one scrolls its rows, the foot staying in sight
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!isDrawn || panel === null) return;
     const keepInside = (): void => {
-      panel.style.maxWidth = `${window.innerWidth - panel.getBoundingClientRect().left - EDGE_PX}px`;
+      const box = panel.getBoundingClientRect();
+      panel.style.maxWidth = `${window.innerWidth - box.left - EDGE_PX}px`;
+      panel.style.maxHeight = `${window.innerHeight - box.top - EDGE_PX}px`;
     };
     keepInside();
     window.addEventListener("resize", keepInside);
@@ -336,49 +339,52 @@ export const ViewMenu = ({
           role="dialog"
           aria-label={STRINGS.view}
         >
-          <NamedViews view={context.view} ownView={ownView} onViewChange={context.onViewChange} />
-          <ol
-            ref={listRef}
-            className="forgebook-arrange-list"
-            data-dragging={draggedId === undefined ? undefined : ""}
-          >
-            {shown.map((each, index) => (
-              <ControlRow
-                key={each.control.id}
-                each={each}
-                index={index}
-                count={shown.length}
-                isDragged={each.control.id === draggedId}
-                isMoved={movedIds.includes(each.control.id)}
-                isChanged={hasViewChanges(ownView, switches, [each.control.id])}
-                layout={layout}
-                hintId={hintId}
-                onGrab={grab}
-                onAnnounce={setAnnounced}
-                {...context}
+          {/* the rows scroll between the views and the foot, which stays in sight: the menu fits the window */}
+          <div className="forgebook-popover__body">
+            <NamedViews view={context.view} ownView={ownView} onViewChange={context.onViewChange} />
+            <ol
+              ref={listRef}
+              className="forgebook-arrange-list"
+              data-dragging={draggedId === undefined ? undefined : ""}
+            >
+              {shown.map((each, index) => (
+                <ControlRow
+                  key={each.control.id}
+                  each={each}
+                  index={index}
+                  count={shown.length}
+                  isDragged={each.control.id === draggedId}
+                  isMoved={movedIds.includes(each.control.id)}
+                  isChanged={hasViewChanges(ownView, switches, [each.control.id])}
+                  layout={layout}
+                  hintId={hintId}
+                  onGrab={grab}
+                  onAnnounce={setAnnounced}
+                  {...context}
+                />
+              ))}
+            </ol>
+            <span id={hintId} className="forgebook-visually-hidden">
+              {STRINGS.moveControlHint}
+            </span>
+            <span className="forgebook-visually-hidden" aria-live="polite">
+              {announced}
+            </span>
+            <HiddenControls hidden={hidden} layout={layout} {...context} />
+            <label className="forgebook-wrap-choice">
+              <input
+                type="checkbox"
+                role="switch"
+                aria-checked={layout.isWrapped}
+                className="forgebook-switch"
+                checked={layout.isWrapped}
+                onChange={(event: ChangeEvent<HTMLInputElement>): void =>
+                  layout.setIsWrapped(event.currentTarget.checked)
+                }
               />
-            ))}
-          </ol>
-          <span id={hintId} className="forgebook-visually-hidden">
-            {STRINGS.moveControlHint}
-          </span>
-          <span className="forgebook-visually-hidden" aria-live="polite">
-            {announced}
-          </span>
-          <HiddenControls hidden={hidden} layout={layout} {...context} />
-          <label className="forgebook-wrap-choice">
-            <input
-              type="checkbox"
-              role="switch"
-              aria-checked={layout.isWrapped}
-              className="forgebook-switch"
-              checked={layout.isWrapped}
-              onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-                layout.setIsWrapped(event.currentTarget.checked)
-              }
-            />
-            {STRINGS.wrapToolbar}
-          </label>
+              {STRINGS.wrapToolbar}
+            </label>
+          </div>
           <div className="forgebook-popover__foot">
             <button
               type="button"

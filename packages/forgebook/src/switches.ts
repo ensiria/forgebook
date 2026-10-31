@@ -47,7 +47,7 @@ export type SwitchApply =
  * tests' themes), the contrast (the source's more-contrast colours, the tests' variants), the language (the stories'
  * texts and the language's provider), the direction (a catalogue's own switch in place of the ready-made one).
  */
-export type SwitchRole = "colorScheme" | "contrast" | "language" | "direction";
+export type SwitchRole = "colorScheme" | "contrast" | "language" | "direction" | "touch";
 
 /** A switch of the toolbar or the View menu. */
 export type ViewSwitch = {
@@ -65,6 +65,8 @@ export type ViewSwitch = {
   readonly role?: SwitchRole;
   /** How the View menu offers it: a row of segments (by default, up to six values) or a list. */
   readonly control?: "segments" | "list";
+  /** What a reader should know of it, in a sentence or two: under its row in the View menu and in its tooltip. */
+  readonly description?: string;
 };
 
 /** The address's own parameters: a switch may not take their names. */
@@ -185,6 +187,31 @@ export const directionSwitch = (): ViewSwitch => ({
 });
 
 /**
+ * How the stories are touched: with the mouse (no attribute), or as a finger, simulated in the frame
+ * (`data-forgebook-touch` on its root: the frame's touch layer and the catalogue's CSS rewrite read it). A simulation:
+ * events made by a page are not trusted, so native scrolling, focus, a virtual keyboard and real Safari stay a
+ * device's, or `forgebook dev --touch`'s.
+ */
+export const touchSwitch = (): ViewSwitch => ({
+  id: "touch",
+  label: "Touch",
+  role: "touch",
+  description:
+    "Simulated: the story receives a finger's events and a phone's hover and pointer media, Shift for two fingers. " +
+    "Native scrolling, focus from a touch, the virtual keyboard and real Safari still need a device, or " +
+    "forgebook dev --touch for Chromium's real touch.",
+  apply: { kind: "attribute", name: "data-forgebook-touch" },
+  default: "mouse",
+  values: [
+    { value: "mouse", label: "Mouse", isUnset: true },
+    { value: "touch", label: "Touch" }
+  ]
+});
+
+/** The ready-made switches a catalogue may turn off (`controls: { direction: false }`). */
+export type ReadySwitchesOff = Readonly<Partial<Record<"direction" | "touch", false>>>;
+
+/**
  * The switch with a role, among a catalogue's.
  *
  * @param switches - the switches.
@@ -212,29 +239,30 @@ export const switchControl = (each: ViewSwitch): "segments" | "list" =>
 
 /**
  * A catalogue's switches: the ones it declares (the theme and the contrast when it declares none), then, when it or a
- * source offers languages, the language switch over all of them, then the ready-made direction switch, unless the
- * catalogue declares its own (the `direction` role) or turned it off.
+ * source offers languages, the language switch over all of them, then the ready-made direction and touch switches,
+ * each unless the catalogue declares its own (the `direction` or `touch` role) or turned it off.
  *
  * @param declared - the switches the catalogue declares; none for the default ones.
  * @param languages - every language the catalogue and its sources offer, by id and name; the first of an id wins.
- * @param hasDirection - whether the ready-made direction switch is offered (`controls: { direction: false }` turns it
- *   off); `true` by default.
+ * @param turnedOff - the ready-made switches the catalogue turned off (its `controls`); none by default.
  * @throws when the switches cannot be used (`switchesProblem`): a catalogue's configuration error, shown at once.
  */
 export const catalogueSwitches = (
   declared: readonly ViewSwitch[] | undefined,
   languages: readonly { readonly id: string; readonly label: string; readonly dir?: "rtl" }[],
-  hasDirection = true
+  turnedOff: ReadySwitchesOff = {}
 ): readonly ViewSwitch[] => {
   const unique = languages.filter(
     (language, index) => languages.findIndex((other) => other.id === language.id) === index
   );
   const own = declared ?? DEFAULT_SWITCHES;
-  const isDirectionOffered = hasDirection && switchWithRole(own, "direction") === undefined;
+  const isOffered = (role: "direction" | "touch"): boolean =>
+    turnedOff[role] !== false && switchWithRole(own, role) === undefined;
   const switches = [
     ...own,
     ...(unique.length > 0 ? [languageSwitch(unique)] : []),
-    ...(isDirectionOffered ? [directionSwitch()] : [])
+    ...(isOffered("direction") ? [directionSwitch()] : []),
+    ...(isOffered("touch") ? [touchSwitch()] : [])
   ];
   const problem = switchesProblem(switches);
   if (problem !== undefined) throw new Error(`Forgebook's switches: ${problem}`);

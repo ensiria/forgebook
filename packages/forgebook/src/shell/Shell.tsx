@@ -666,12 +666,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
 export const Shell = (props: ShellConfig): ReactNode => {
   const { title, switches, languages = NO_LANGUAGES, lists } = props;
   const catalogue = useMemo(
-    () =>
-      catalogueSettings(
-        title,
-        catalogueSwitches(switches, languages, lists?.controls?.direction !== false),
-        lists
-      ),
+    () => catalogueSettings(title, catalogueSwitches(switches, languages, lists?.controls), lists),
     [title, switches, languages, lists]
   );
   return (

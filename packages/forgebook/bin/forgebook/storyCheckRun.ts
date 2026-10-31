@@ -73,14 +73,15 @@ const queriesOf = (views: readonly string[], switches: readonly ViewSwitch[]): s
 };
 
 /**
- * A function the testing package exports, resolved from the catalogue's folder as the project's own code would.
+ * A function the testing package exports, resolved from the catalogue's folder as the project's own code would: the
+ * check, the pictures, the touch window.
  *
  * @param dir - the catalogue's folder.
  * @param specifier - its module (`@forgebook/testing/check`).
  * @param name - its name (`checkStories`).
  * @returns the function, or why it cannot be had.
  */
-const testingFunction = async (
+export const testingFunction = async (
   dir: string,
   specifier: string,
   name: string
@@ -134,11 +135,7 @@ const runOnStories = async (
 ): Promise<unknown> => {
   const call = await testingFunction(config.dir, run.specifier, run.name);
   if (typeof call === "string") return call;
-  const switches = catalogueSwitches(
-    config.switches,
-    config.languages,
-    config.lists.controls?.direction !== false
-  );
+  const switches = catalogueSwitches(config.switches, config.languages, config.lists.controls);
   const views = queriesOf(input.views, switches);
   if (typeof views === "string") return views;
   const served = await servedCatalogue(config, url);

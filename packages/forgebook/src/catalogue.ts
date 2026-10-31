@@ -50,8 +50,8 @@ export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width"] as const;
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
 
-/** What `controls` turns off: one of Forgebook's own controls, or its ready-made direction switch. */
-export type TurnedOffControl = OwnControlId | "direction";
+/** What `controls` turns off: one of Forgebook's own controls, or its ready-made direction or touch switch. */
+export type TurnedOffControl = OwnControlId | "direction" | "touch";
 
 /** The accessibility rules the Accessibility tab and the generated tests check. */
 export type A11ySettings = {
@@ -93,7 +93,7 @@ export type CatalogueLists = {
   /**
    * Forgebook's own controls turned off (`{ sheets: false }`): shown nowhere, and the background, the style sheets
    * and the text size keep their default; the stage's width is still set by the stage's handle. `direction: false`
-   * drops the ready-made direction switch.
+   * and `touch: false` drop the ready-made direction and touch switches.
    */
   readonly controls?: Readonly<Partial<Record<TurnedOffControl, false>>>;
   /**
