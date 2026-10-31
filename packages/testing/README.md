@@ -11,8 +11,7 @@ tests:
 - **on the server** (Vitest), each story rendered to a string, so no component reads `window` or `document` while it
   renders, and its controls checked against its args.
 
-**Requirements:** `forgebook` · Vite 8 · `@playwright/test` 1.64+ · Vitest 5 · pnpm for the browser tests, Docker for
-the visual ones ·
+**Requirements:** `forgebook` · Vite 8 · `@playwright/test` 1.64+ · Vitest 5 · Docker for the visual tests ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/testing/LICENSE)
 
 ```sh
@@ -110,7 +109,8 @@ export default storyTestViteConfig(import.meta.dirname, react());
 
 Then `npx playwright install chromium` once, and `playwright test -c test/stories/playwright.config.ts` starts the
 frame page and runs one test per story and variant (light, dark, both with more contrast, a narrow width, and the
-structure view). A story that breaks a rule fails all its variants; `storyBrowserTests` also takes `check`, a rule of
+structure view), starting Vite through the package manager that runs them (`vite` in `testServer.ts` names
+another command). A story that breaks a rule fails all its variants; `storyBrowserTests` also takes `check`, a rule of
 the package's own run on every frame.
 
 ### On the server
@@ -143,7 +143,6 @@ translation catalogue), its HTML checked.
 
 ### Limits today
 
-- The browser tests start the frame page with `pnpm exec vite`, so they need pnpm.
 - The visual tests (`visual.spec.ts`, `visualTestConfig`, `startVisualBrowser`) compare the frames with reference
   images in the Playwright container, so they need Docker; this guide does not cover them yet, their modules' TSDoc
   does.

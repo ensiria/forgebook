@@ -25,6 +25,30 @@ export type StoryTestServer = {
   readonly browserPort: number;
   /** How many tests run at once; every core when left out or not a positive number. */
   readonly workers?: number;
+  /**
+   * The command that runs Vite (`node ./node_modules/vite/bin/vite.js`); by default the package manager that runs
+   * the tests runs it (`frameServerCommand`).
+   */
+  readonly vite?: string;
+};
+
+/** The command each package manager runs a dependency's binary with, by the name its user agent starts with. */
+const RUNNERS: Readonly<Record<string, string>> = {
+  pnpm: "pnpm exec vite",
+  yarn: "yarn vite",
+  bun: "bunx vite",
+  npm: "npx vite"
+};
+
+/**
+ * The command that runs Vite, through the package manager that runs the tests: the one its user agent names
+ * (`npm_config_user_agent`, which every package manager sets for the scripts it runs), npx when none does.
+ *
+ * @param userAgent - the package manager's user agent (`pnpm/10.19.0 npm/? node/v24.15.0 darwin arm64`), if any.
+ */
+export const frameServerCommand = (userAgent: string | undefined): string => {
+  const manager = userAgent?.split("/")[0] ?? "npm";
+  return RUNNERS[manager] ?? "npx vite";
 };
 
 /** The workers to use. */
@@ -32,8 +56,8 @@ const workersOf = ({ workers }: StoryTestServer): number =>
   workers !== undefined && workers > 0 ? workers : availableParallelism();
 
 /** The test instance of the frame page, started by Playwright and stopped after the run. */
-const webServer = ({ dir, port }: StoryTestServer): NonNullable<PlaywrightTestConfig["webServer"]> => ({
-  command: `pnpm exec vite --config ${dir}/vite.config.ts --host 127.0.0.1 --port ${port} --strictPort`,
+const webServer = ({ dir, port, vite }: StoryTestServer): NonNullable<PlaywrightTestConfig["webServer"]> => ({
+  command: `${vite ?? frameServerCommand(process.env["npm_config_user_agent"])} --config ${dir}/vite.config.ts --host 127.0.0.1 --port ${port} --strictPort`,
   url: `http://127.0.0.1:${port}/frame.html`,
   reuseExistingServer: false
 });
