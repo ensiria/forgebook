@@ -84,22 +84,51 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 ## What a catalogue gives you
 
 - **One frame per story**, so a story's styles and globals never leak into another, and its address opens it alone.
-- **Switches** in the toolbar for theme, contrast and motion, and the languages you declare; a library adds its own
-  (density, brand) through a preset.
+- **Switches** for theme, contrast and motion, and the languages you declare; a library adds its own (density, brand)
+  through a preset.
+- **A toolbar each reader arranges**: whoever uses the catalogue pins the controls they use to the toolbar, orders
+  them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
 - **Widths** to draw a story at, and a **compare** view that draws the same story once per value of one or two
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
   their TSDoc, nothing written twice.
+- **Examples that fill the page**: on a component's page, any story's box opens over the page, at a width of its own,
+  without loading its story again.
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
   own, each with its name, logo and texts.
-- **`CATALOG.md`** for coding agents: `forgebook-docs` writes one dense line per component, hook and helper of a
+- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook and helper of a
   package, from its exports, their TSDoc and its stories.
 - **Tests from the stories**, with [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing): every
   story in the browser with axe, spills and overlays, screenshots, and every story rendered on the server.
 
 It adds about a dozen packages to a React and Vite project.
+
+## The toolbar
+
+The View menu holds every control: the catalogue's switches, and Forgebook's own (the background, the style sheets, the
+text size, the story's width). The catalogue says which start on the toolbar and which it does without; each reader
+then pins, orders and hides them, and that arrangement stays in their browser, per catalogue, never in the address
+(a link shares the values, not someone's toolbar).
+
+```ts
+// forgebook.config.ts
+export default defineConfig({
+  framework: react(),
+  title: "My components",
+  stories: ["src/**/*.stories.tsx"],
+  // what starts on the toolbar, in this order: a switch's id, or "backdrop", "sheets", "text", "width"
+  toolbar: ["theme", "contrast", "width", "text"],
+  // Forgebook's own controls this catalogue does without
+  controls: { sheets: false }
+});
+```
+
+Without `toolbar`, the colour scheme, the contrast and the width start there. A control turned off in `controls`
+shows nowhere, not even on the toolbar, and keeps its default (the width can still be dragged on the stage). A preset
+may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
+that is no control at all stops the catalogue with an error saying which.
 
 ## Coming from Storybook
 
