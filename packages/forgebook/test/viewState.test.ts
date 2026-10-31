@@ -84,11 +84,15 @@ describe("the view in the address", () => {
     expect(parseView(viewParams(view, SWITCHES).toString(), CATALOGUE)).toEqual(view);
   });
 
-  it("marks the View menu when a menu switch, the style sheets or the text size changed, not the theme or contrast", () => {
-    expect(hasViewChanges(withSwitches({ theme: "dark", contrast: "more" }), SWITCHES)).toBe(false);
-    expect(hasViewChanges(withSwitches({ speed: "slow" }), SWITCHES)).toBe(true);
-    expect(hasViewChanges(withSwitches({}, { sheets: "restyled" }), SWITCHES)).toBe(true);
-    expect(hasViewChanges(withSwitches({ lang: "pseudo" }), SWITCHES)).toBe(true);
+  it("marks the View menu when one of its controls changed, not a control on the toolbar, nor the width", () => {
+    const inMenu = ["motion", "speed", "press", "lang", "backdrop", "sheets", "text"];
+    expect(hasViewChanges(withSwitches({ theme: "dark", contrast: "more" }), SWITCHES, inMenu)).toBe(false);
+    expect(hasViewChanges(withSwitches({ speed: "slow" }), SWITCHES, inMenu)).toBe(true);
+    expect(hasViewChanges(withSwitches({}, { sheets: "restyled" }), SWITCHES, inMenu)).toBe(true);
+    expect(hasViewChanges(withSwitches({ lang: "pseudo" }), SWITCHES, inMenu)).toBe(true);
+    expect(hasViewChanges(withSwitches({}, { width: 360 }), SWITCHES, [...inMenu, "width"])).toBe(false);
+    // the theme moved into View: its change now marks it
+    expect(hasViewChanges(withSwitches({ theme: "dark" }), SWITCHES, ["theme"])).toBe(true);
   });
 
   it("gives a frame the story and the view, never what only the shell reads", () => {
@@ -139,6 +143,15 @@ describe("the view in the address", () => {
     expect(parseView("?compare=language", CATALOGUE).compare).toEqual(["lang"]);
     expect(parseView("?compare=sideways", CATALOGUE).compare).toEqual([]);
     expect(viewParams(withSwitches({}, { compare: ["sheets"] }), SWITCHES).toString()).toBe("compare=sheets");
+  });
+
+  it("keeps a control the catalogue turned off at its default, and never compares across it", () => {
+    const catalogue = catalogueSettings("Fixture", SWITCHES, { controls: { sheets: false, text: false } });
+    const view = parseView("?sheets=structure&text=150&backdrop=checkerboard&compare=text", catalogue);
+    expect(view.sheets).toBe("full");
+    expect(view.text).toBe(100);
+    expect(view.backdrop).toBe("checkerboard");
+    expect(view.compare).toEqual([]);
   });
 
   it("keeps the zoom and the tools, in the tools' order, leaving out unknown ones", () => {

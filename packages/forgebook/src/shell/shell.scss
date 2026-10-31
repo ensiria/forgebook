@@ -533,6 +533,36 @@
     box-shadow: $line-bottom;
   }
 
+  // the pinned controls, in the room the rest of the bar leaves them
+  .forgebook-toolbar__pinned-list {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+  }
+
+  // the person asked the bar to wrap: its pinned controls go onto more lines instead of into the View menu, and the
+  // rest stays on the first line
+  // one line keeps the bar's own height: the controls are 1.625rem high, centred in its 2.75rem
+  .forgebook-toolbar.forgebook-toolbar--wrap {
+    box-sizing: border-box;
+    align-items: flex-start;
+    height: auto;
+    min-height: 2.75rem;
+    padding-block: calc((2.75rem - 1.625rem) / 2);
+
+    .forgebook-toolbar__pinned-list {
+      flex-wrap: wrap;
+      row-gap: $space-2;
+    }
+
+    .forgebook-toolbar__divider {
+      align-self: stretch;
+      margin: 0;
+    }
+  }
+
   .forgebook-toolbar__group {
     display: flex;
     align-items: center;
@@ -543,10 +573,6 @@
     align-self: stretch;
     margin: $space-3 0;
     border-inline-start: 1px solid $separator;
-  }
-
-  .forgebook-toolbar__spacer {
-    flex: 1;
   }
 
   // a narrow toolbar keeps the width's field and leaves the presets to it and the stage's handles
@@ -775,6 +801,10 @@
     font: $text-control;
     color: $accent-text;
     @include mixins.focus-ring;
+
+    &:disabled {
+      color: $text-tertiary;
+    }
   }
 
   .forgebook-dot {
@@ -837,10 +867,13 @@
     background: $surface;
     box-shadow: $shadow-popover;
     white-space: nowrap;
+    // it grows from its button's corner (`usePopover.ts`)
+    transform-origin: top left;
   }
 
   .forgebook-popover.forgebook-popover--end {
     inset-inline: auto 0;
+    transform-origin: top right;
   }
 
   .forgebook-choices {
@@ -872,15 +905,149 @@
     }
   }
 
-  .forgebook-popover__row {
-    display: grid;
-    grid-template-columns: 4rem auto;
-    align-items: center;
-    gap: $space-3;
+  // the View menu takes its rows' whole width: its cells may scroll, so their least width says nothing of it; a
+  // narrow window caps it (`ViewMenu.tsx`)
+  .forgebook-popover--arrange {
+    width: max-content;
   }
 
-  .forgebook-popover__row .forgebook-segmented {
+  // the View menu's rows: a handle, the name, the value, the pin and the hide button
+  .forgebook-arrange-list {
+    display: grid;
+    gap: $space-1;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .forgebook-arrange {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 4.5rem 1fr auto auto;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-0-5 0;
+    border-radius: $radius-control;
+    background: $surface;
+
+    &[data-dragged] {
+      z-index: 1;
+      box-shadow: $shadow-card;
+    }
+  }
+
+  // a value too wide for a narrow window's menu scrolls within its cell
+  .forgebook-arrange__control {
     justify-self: start;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .forgebook-arrange__handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.625rem;
+    padding: 0;
+    border: 0;
+    border-radius: $radius-control-small;
+    background: none;
+    color: $text-tertiary;
+    cursor: grab;
+    touch-action: none;
+    @include mixins.focus-ring;
+
+    &:hover {
+      background: $hover;
+      color: $text;
+    }
+  }
+
+  .forgebook-arrange-list[data-dragging] {
+    user-select: none;
+
+    .forgebook-arrange__handle {
+      cursor: grabbing;
+    }
+  }
+
+  .forgebook-arrange .forgebook-icon-button[aria-pressed="true"] {
+    background: $selected;
+    color: $accent-text;
+  }
+
+  .forgebook-hidden-controls {
+    display: grid;
+    gap: $space-1-5;
+    justify-items: stretch;
+
+    > .forgebook-text-button {
+      display: inline-flex;
+      justify-self: start;
+      align-items: center;
+      gap: $space-1;
+    }
+  }
+
+  // a hidden control's row keeps the handle's column, so its name lines up with the others'
+  .forgebook-arrange__no-handle {
+    width: 1.25rem;
+  }
+
+  .forgebook-arrange[data-hidden] .forgebook-popover__label {
+    color: $text-tertiary;
+  }
+
+  // a pinned control on the toolbar: its name before a choice that needs one
+  .forgebook-toolbar__pinned {
+    flex: none;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .forgebook-toolbar__control {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  .forgebook-toolbar__label {
+    font: $text-caption;
+    color: $text-secondary;
+    white-space: nowrap;
+  }
+
+  // a pinned control's right-click menu, where the pointer pressed
+  .forgebook-context-menu {
+    position: fixed;
+    z-index: 3;
+    display: grid;
+    min-width: 10rem;
+    padding: $space-1;
+    border-radius: $radius-card;
+    background: $surface;
+    box-shadow: $shadow-popover;
+  }
+
+  .forgebook-context-menu__item {
+    padding: $space-1 $space-2;
+    border: 0;
+    border-radius: $radius-control-small;
+    background: none;
+    font: $text-control;
+    color: $text;
+    text-align: start;
+    cursor: pointer;
+    @include mixins.focus-ring;
+
+    &:hover,
+    &:focus-visible {
+      background: $hover;
+    }
   }
 
   // a native select for a list too long for a segmented control (the source's languages)
@@ -919,6 +1086,55 @@
   .forgebook-popover__label {
     font: $text-caption;
     color: $text-secondary;
+  }
+
+  // a native checkbox drawn as a small switch: its keys, its form semantics and screen readers stay the checkbox's
+  .forgebook-switch {
+    position: relative;
+    flex: none;
+    width: 1.75rem;
+    height: 1rem;
+    margin: 0;
+    border-radius: 999px;
+    background: $fill;
+    box-shadow: $ring;
+    appearance: none;
+    cursor: pointer;
+    transition:
+      background-color $duration-quick ease-out,
+      box-shadow $duration-quick ease-out;
+    @include mixins.focus-ring($shadow: $ring);
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0.125rem;
+      left: 0.125rem;
+      width: 0.75rem;
+      height: 0.75rem;
+      border-radius: 50%;
+      background: $surface;
+      box-shadow: 0 1px 2px #0003;
+      transition: transform $duration-quick $ease-out;
+    }
+
+    &:checked {
+      background: $accent;
+      box-shadow: none;
+    }
+
+    &:checked::before {
+      transform: translateX(0.75rem);
+    }
+  }
+
+  .forgebook-wrap-choice {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font: $text-control;
+    color: $text;
+    cursor: pointer;
   }
 
   .forgebook-popover__foot {
@@ -1932,7 +2148,9 @@
 
     .forgebook-example__toggle svg,
     .forgebook-example__open svg,
-    .forgebook-example__code {
+    .forgebook-example__code,
+    .forgebook-switch,
+    .forgebook-switch::before {
       transition: none;
     }
   }

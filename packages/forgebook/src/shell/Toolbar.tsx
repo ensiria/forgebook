@@ -1,33 +1,28 @@
 /**
- * The catalogue's toolbar: the colour scheme and the contrast switches, the View menu (every other declared switch,
- * the background, the style sheets, the text size), the stage's width, the panel, and Compare; every value kept in the
- * address.
+ * The catalogue's toolbar: the View menu first, then the controls the person pinned, in their order, then the panel
+ * and Compare; every value kept in the address, the arrangement in the person's browser.
+ *
+ * @remarks
+ * The controls are the catalogue's switches and Forgebook's own (the background, the style sheets, the text size, the
+ * stage's width); which start pinned is the catalogue's choice, where each sits is the person's (`toolbarLayout.ts`).
+ * The panel and Compare belong to the page, not to the view: they stay at the end.
  *
  * @module
  */
-import { type ChangeEvent, type ReactNode, useId } from "react";
+import { type MouseEvent, type ReactNode, useId, useRef } from "react";
 
+import type { CatalogueSettings } from "../catalogue.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
-import { switchControl, switchWithRole, type ViewSwitch } from "../switches.ts";
-import {
-  DEFAULT_VIEW,
-  hasViewChanges,
-  isComparing,
-  isMenuSwitch,
-  PLAIN_BACKDROP,
-  SHEETS_CHOICES,
-  type SheetsChoice,
-  type StageWidth,
-  type ViewState
-} from "../viewState.ts";
+import { switchWithRole } from "../switches.ts";
+import { isComparing, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
-import { SchemeSwitches } from "./SchemeSwitches.tsx";
-import { Segmented } from "./Segmented.tsx";
+import { PinnedControl } from "./PinnedControl.tsx";
 import { STRINGS } from "./strings.ts";
-import { switchValueIn, withSwitch } from "./switchView.ts";
 import { usePopover } from "./usePopover.ts";
-import { WidthField } from "./WidthField.tsx";
+import { useToolbarLayout } from "./useToolbarLayout.ts";
+import { useToolbarOverflow } from "./useToolbarOverflow.ts";
+import { ViewMenu } from "./ViewMenu.tsx";
 
 /** The toolbar's props. */
 export type ToolbarProps = {
@@ -45,193 +40,6 @@ export type ToolbarProps = {
   readonly fixed?: FixedView;
 };
 
-/**
- * One switch's row in the View menu: segments, or a list for many values.
- *
- * @param props - the switch, the view and its setter.
- */
-const SwitchRow = ({
-  each,
-  view,
-  onViewChange,
-  isFixed
-}: {
-  readonly each: ViewSwitch;
-  readonly view: ViewState;
-  readonly onViewChange: (view: ViewState) => void;
-  /** Whether the story sets the switch. */
-  readonly isFixed: boolean;
-}): ReactNode => {
-  const listId = useId();
-  const isCompared = view.compare.includes(each.id) || isFixed;
-  if (switchControl(each) === "list") {
-    return (
-      <div className="forgebook-popover__row">
-        <label className="forgebook-popover__label" htmlFor={listId}>
-          {each.label}
-        </label>
-        <select
-          id={listId}
-          className="forgebook-select"
-          value={switchValueIn(view, each)}
-          disabled={isCompared}
-          title={isFixed ? STRINGS.setByStory : undefined}
-          onChange={(event: ChangeEvent<HTMLSelectElement>): void =>
-            onViewChange(withSwitch(view, each, event.currentTarget.value))
-          }
-        >
-          {each.values.map((value) => (
-            <option key={value.value} value={value.value}>
-              {value.label}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
-  return (
-    <div className="forgebook-popover__row">
-      <span className="forgebook-popover__label">{each.label}</span>
-      <Segmented
-        label={each.label}
-        options={each.values.map((value) => ({ value: value.value, label: value.label }))}
-        value={switchValueIn(view, each)}
-        isDisabled={isCompared}
-        disabledNote={isFixed ? STRINGS.setByStory : undefined}
-        onValueChange={(value: string): void => onViewChange(withSwitch(view, each, value))}
-      />
-    </div>
-  );
-};
-
-/**
- * The View menu: every declared switch the toolbar does not show itself, the background, the style sheets and the
- * text size, with a dot on its button when one is changed. The background is a list: its six names are too long for
- * a row of segments.
- *
- * @param props - the view and its setter.
- */
-const ViewMenu = ({
-  view,
-  onViewChange,
-  fixed = NOT_FIXED,
-  hasOwnChanges
-}: ToolbarProps & {
-  /** Whether the user changed the view: a value the story fixes is not a change of theirs. */
-  readonly hasOwnChanges: boolean;
-}): ReactNode => {
-  const { isOpen, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
-  const catalogue = useCatalogue();
-  const { switches } = catalogue;
-  const backdropId = useId();
-  const menuSwitches = switches.filter(isMenuSwitch);
-
-  return (
-    <div className="forgebook-view-menu">
-      <button
-        ref={buttonRef}
-        type="button"
-        className="forgebook-button"
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-        onClick={(): void => setIsOpen(!isOpen)}
-      >
-        <Icon name="sliders" size={14} />
-        {STRINGS.view}
-        {hasOwnChanges ? (
-          <span className="forgebook-dot" role="img" aria-label={STRINGS.viewChanged} />
-        ) : null}
-        <Icon name="chevronDown" size={12} />
-      </button>
-      {isOpen ? (
-        <div
-          ref={panelRef}
-          id={panelId}
-          className="forgebook-popover"
-          role="dialog"
-          aria-label={STRINGS.view}
-        >
-          {menuSwitches.map((each) => (
-            <SwitchRow
-              key={each.id}
-              each={each}
-              view={view}
-              onViewChange={onViewChange}
-              isFixed={fixed.switches[each.id] !== undefined}
-            />
-          ))}
-          <div className="forgebook-popover__row">
-            <label className="forgebook-popover__label" htmlFor={backdropId}>
-              {STRINGS.backdrop}
-            </label>
-            <select
-              id={backdropId}
-              className="forgebook-select"
-              value={view.backdrop}
-              disabled={fixed.backdrop !== undefined}
-              title={fixed.backdrop === undefined ? undefined : STRINGS.setByStory}
-              onChange={(event: ChangeEvent<HTMLSelectElement>): void =>
-                onViewChange({ ...view, backdrop: event.currentTarget.value })
-              }
-            >
-              <option value={PLAIN_BACKDROP}>{STRINGS.backdropPlain}</option>
-              {catalogue.backdrops.map((backdrop) => (
-                <option key={backdrop.id} value={backdrop.id}>
-                  {backdrop.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="forgebook-popover__row">
-            <span className="forgebook-popover__label">{STRINGS.sheets}</span>
-            <Segmented
-              label={STRINGS.sheets}
-              options={SHEETS_CHOICES.map((sheets) => ({
-                value: sheets,
-                label: STRINGS.sheetChoices[sheets]
-              }))}
-              value={view.sheets}
-              isDisabled={view.compare.includes("sheets")}
-              onValueChange={(sheets: SheetsChoice): void => onViewChange({ ...view, sheets })}
-            />
-          </div>
-          <div className="forgebook-popover__row">
-            <span className="forgebook-popover__label">{STRINGS.text}</span>
-            <Segmented
-              label={STRINGS.text}
-              options={catalogue.textSizes.map((text) => ({ value: text, label: STRINGS.textScale(text) }))}
-              value={view.text}
-              isDisabled={view.compare.includes("text")}
-              onValueChange={(text: number): void => onViewChange({ ...view, text })}
-            />
-          </div>
-          <div className="forgebook-popover__foot">
-            <button
-              type="button"
-              className="forgebook-text-button"
-              onClick={(): void =>
-                onViewChange({
-                  ...view,
-                  switches: {
-                    ...view.switches,
-                    ...Object.fromEntries(menuSwitches.map((each) => [each.id, each.default]))
-                  },
-                  backdrop: DEFAULT_VIEW.backdrop,
-                  sheets: DEFAULT_VIEW.sheets,
-                  text: DEFAULT_VIEW.text
-                })
-              }
-            >
-              {STRINGS.resetView}
-            </button>
-            <span className="forgebook-popover__note">{STRINGS.viewInAddress}</span>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-};
-
 /** One choice of the Compare menu: what it sets side by side, and its name. */
 type CompareChoice = {
   /** The compared axes; none for Off. */
@@ -241,12 +49,13 @@ type CompareChoice = {
 };
 
 /**
- * The Compare menu's choices: Off, the colour scheme at both contrasts when the catalogue has both, each switch of
- * the View menu, the text sizes and the style sheets.
+ * The Compare menu's choices: Off, the colour scheme at both contrasts when the catalogue has both, each other switch,
+ * and the text sizes and the style sheets when the catalogue shows them.
  *
- * @param switches - the catalogue's switches.
+ * @param catalogue - the catalogue's switches and controls.
  */
-const compareChoices = (switches: readonly ViewSwitch[]): CompareChoice[] => {
+const compareChoices = (catalogue: Pick<CatalogueSettings, "switches" | "ownControls">): CompareChoice[] => {
+  const { switches, ownControls } = catalogue;
   const scheme = switchWithRole(switches, "colorScheme");
   const contrast = switchWithRole(switches, "contrast");
   const schemes: CompareChoice[] =
@@ -260,9 +69,11 @@ const compareChoices = (switches: readonly ViewSwitch[]): CompareChoice[] => {
   return [
     { axes: [], label: STRINGS.compareOff },
     ...schemes,
-    ...switches.filter(isMenuSwitch).map((each) => ({ axes: [each.id], label: each.label })),
-    { axes: ["text"], label: STRINGS.compareText },
-    { axes: ["sheets"], label: STRINGS.compareSheets }
+    ...switches
+      .filter((each) => each !== scheme && each !== contrast)
+      .map((each) => ({ axes: [each.id], label: each.label })),
+    ...(ownControls.includes("text") ? [{ axes: ["text"], label: STRINGS.compareText }] : []),
+    ...(ownControls.includes("sheets") ? [{ axes: ["sheets"], label: STRINGS.compareSheets }] : [])
   ];
 };
 
@@ -277,8 +88,8 @@ const CompareMenu = ({
   isDisabled,
   fixed = NOT_FIXED
 }: ToolbarProps & { readonly isDisabled: boolean }): ReactNode => {
-  const { isOpen, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
-  const switches = useCatalogue().switches;
+  const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
+  const catalogue = useCatalogue();
   const name = useId();
   return (
     <div className="forgebook-view-menu">
@@ -291,13 +102,13 @@ const CompareMenu = ({
         aria-expanded={isOpen}
         aria-controls={panelId}
         disabled={isDisabled}
-        onClick={(): void => setIsOpen(!isOpen)}
+        onClick={(event: MouseEvent<HTMLButtonElement>): void => setIsOpen(!isOpen, event)}
       >
         <Icon name="compare" size={14} />
         <span className="forgebook-button__label">{STRINGS.compare}</span>
         <Icon name="chevronDown" size={12} />
       </button>
-      {isOpen ? (
+      {isDrawn ? (
         <div
           ref={panelRef}
           id={panelId}
@@ -307,7 +118,7 @@ const CompareMenu = ({
         >
           <fieldset className="forgebook-choices">
             <legend className="forgebook-visually-hidden">{STRINGS.compare}</legend>
-            {compareChoices(switches).map((choice) => (
+            {compareChoices(catalogue).map((choice) => (
               <label key={choice.axes.join(",")} className="forgebook-choice">
                 <input
                   type="radio"
@@ -360,49 +171,36 @@ export const Toolbar = ({
   shownWidth,
   fixed = NOT_FIXED
 }: ToolbarProps): ReactNode => {
-  const { widths, switches } = useCatalogue();
+  const layout = useToolbarLayout();
   // the story's fixed values are shown, and a change of anything else keeps the user's own in the address
   const view = withFixed(ownView, fixed);
   const onViewChange = (changed: ViewState): void => onOwnViewChange(withOwnFixed(changed, ownView, fixed));
+  const context = { view, onViewChange, isStoryPage, fixed, shownWidth };
+  const pinnedRef = useRef<HTMLDivElement>(null);
+  const pinned = layout.placed.filter((each) => each.isPinned);
+  const moved = useToolbarOverflow(
+    pinnedRef,
+    pinned.map((each) => each.control.id)
+  );
+  // a bar that wraps has room for every pinned control
+  const onBar = layout.isWrapped ? pinned : pinned.filter((each) => !moved.includes(each.control.id));
   return (
-    <div className="forgebook-toolbar">
+    <div className={layout.isWrapped ? "forgebook-toolbar forgebook-toolbar--wrap" : "forgebook-toolbar"}>
       {onShowSidebar === undefined ? null : <ShowSidebarButton onShowSidebar={onShowSidebar} />}
-      <SchemeSwitches view={view} onViewChange={onViewChange} isStoryPage={isStoryPage} fixed={fixed} />
-      <span className="forgebook-toolbar__divider" />
-      <ViewMenu
-        view={view}
-        onViewChange={onViewChange}
-        fixed={fixed}
-        hasOwnChanges={hasViewChanges(ownView, switches)}
-      />
-      <span className="forgebook-toolbar__divider" />
-      <div className="forgebook-toolbar__width">
-        <span className="forgebook-toolbar__icon" title={STRINGS.width}>
-          <Icon name="width" size={14} />
-        </span>
-        <Segmented
-          label={STRINGS.width}
-          isDisabled={(isStoryPage && isComparing(view)) || fixed.width !== undefined}
-          disabledNote={fixed.width === undefined ? undefined : STRINGS.setByStory}
-          options={[
-            { value: "fill", label: STRINGS.widthFill },
-            ...widths.map((preset) => ({
-              value: preset.width,
-              label: preset.label ?? STRINGS.widthPx(preset.width)
-            }))
-          ]}
-          value={view.width}
-          onValueChange={(width: StageWidth): void => onViewChange({ ...view, width })}
-          after={
-            <WidthField
-              width={view.width}
-              shownWidth={shownWidth}
-              onWidthChange={(width: StageWidth): void => onViewChange({ ...view, width })}
-            />
-          }
-        />
+      <ViewMenu layout={layout} ownView={ownView} movedIds={layout.isWrapped ? [] : moved} {...context} />
+      {onBar.length === 0 ? null : <span className="forgebook-toolbar__divider" />}
+      {/* the pinned controls take the room View, the panel and Compare leave; a bar that wraps wraps only them */}
+      <div ref={pinnedRef} className="forgebook-toolbar__pinned-list">
+        {onBar.map((each) => (
+          <PinnedControl
+            key={each.control.id}
+            control={each.control}
+            isHidden={each.isHidden}
+            layout={layout}
+            {...context}
+          />
+        ))}
       </div>
-      <span className="forgebook-toolbar__spacer" />
       <button
         type="button"
         className="forgebook-button"

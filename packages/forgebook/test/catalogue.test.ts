@@ -80,6 +80,17 @@ describe("mergedLists", () => {
     expect(merged.a11y).toEqual({ tags: ["wcag2a"], disabledRules: ["region", "color-contrast"] });
     expect(merged.strings).toEqual({ props: "Controls", events: "Actions" });
   });
+
+  it("turns off a control any of them turns off, and takes the last toolbar named", () => {
+    const merged = mergedLists([
+      { controls: { sheets: false }, toolbar: ["theme"] },
+      { controls: { width: false } },
+      { toolbar: ["contrast", "theme"] }
+    ]);
+    expect(merged.controls).toEqual({ sheets: false, width: false });
+    expect(merged.toolbar).toEqual(["contrast", "theme"]);
+    expect(mergedLists([{ toolbar: ["theme"] }, {}]).toolbar).toEqual(["theme"]);
+  });
 });
 
 describe("story groups", () => {

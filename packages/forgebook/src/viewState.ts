@@ -12,7 +12,7 @@
  * @module
  */
 
-import type { CatalogueSettings, PanelTabId } from "./catalogue.ts";
+import type { CatalogueSettings, OwnControlId, PanelTabId } from "./catalogue.ts";
 import { switchValueOf, switchWithRole, type ViewSwitch } from "./switches.ts";
 
 /**
@@ -124,7 +124,7 @@ const toolsOf = (value: string | null): MeasureTool[] => {
 /** What the view reads of a catalogue: its switches and the lists its values are checked against. */
 export type ViewCatalogue = Pick<
   CatalogueSettings,
-  "switches" | "widthRange" | "zooms" | "textSizes" | "backdrops" | "tabs"
+  "switches" | "widthRange" | "zooms" | "textSizes" | "backdrops" | "tabs" | "ownControls"
 >;
 
 /**
@@ -191,7 +191,8 @@ const switchValuesOf = (
  * @param value - the parameter.
  * @param switches - the declared switches.
  */
-const compareAxesOf = (value: string | null, switches: readonly ViewSwitch[]): CompareAxes => {
+const compareAxesOf = (value: string | null, catalogue: ViewCatalogue): CompareAxes => {
+  const { switches, ownControls } = catalogue;
   if (value === null || value === "") return [];
   const scheme = switchWithRole(switches, "colorScheme");
   const contrast = switchWithRole(switches, "contrast");
@@ -201,7 +202,10 @@ const compareAxesOf = (value: string | null, switches: readonly ViewSwitch[]): C
     language: [switchWithRole(switches, "language")?.id]
   };
   const named = legacy[value] ?? value.split(",");
-  const known = [...switches.map((each) => each.id), ...OWN_COMPARE_AXES];
+  const known = [
+    ...switches.map((each) => each.id),
+    ...OWN_COMPARE_AXES.filter((axis) => ownControls.includes(axis))
+  ];
   return named.filter((axis): axis is string => axis !== undefined && known.includes(axis)).slice(0, 2);
 };
 
@@ -213,16 +217,19 @@ const compareAxesOf = (value: string | null, switches: readonly ViewSwitch[]): C
  */
 export const parseView = (search: string, catalogue: ViewCatalogue): ViewState => {
   const params = new URLSearchParams(search);
+  // a control the catalogue turned off keeps its default, whatever the address says
+  const shown = (control: OwnControlId): string | null =>
+    catalogue.ownControls.includes(control) ? params.get(control) : null;
   return {
     switches: switchValuesOf(params, catalogue.switches),
     backdrop: choice(
-      params.get("backdrop"),
+      shown("backdrop"),
       catalogue.backdrops.map((backdrop) => backdrop.id),
       DEFAULT_VIEW.backdrop
     ),
-    sheets: choice(params.get("sheets"), SHEETS_CHOICES, DEFAULT_VIEW.sheets),
-    text: choice(params.get("text"), catalogue.textSizes, DEFAULT_VIEW.text),
-    compare: compareAxesOf(params.get("compare"), catalogue.switches),
+    sheets: choice(shown("sheets"), SHEETS_CHOICES, DEFAULT_VIEW.sheets),
+    text: choice(shown("text"), catalogue.textSizes, DEFAULT_VIEW.text),
+    compare: compareAxesOf(params.get("compare"), catalogue),
     width: stageWidth(params.get("width"), catalogue.widthRange),
     height: stageHeight(params.get("height")),
     isPanelOpen: params.get("panel") !== "closed",
@@ -286,25 +293,23 @@ export const viewParams = (view: ViewState, switches: readonly ViewSwitch[]): UR
 };
 
 /**
- * Whether one of the View menu's settings is changed (a switch the toolbar does not show itself, the background,
- * the style sheets, the text size): the menu button then shows a dot, so a view is never left changed by mistake.
+ * Whether one of the given controls' values is changed (a switch, the background, the style sheets, the text size;
+ * the stage's width is not a view setting): the View menu's button shows a dot for the controls it holds, so a view
+ * is never left changed by mistake, even by a control the person hid.
  *
  * @param view - the view.
  * @param switches - the catalogue's switches.
+ * @param ids - the controls' ids.
  */
-export const hasViewChanges = (view: ViewState, switches: readonly ViewSwitch[]): boolean =>
-  switches.some((each) => isMenuSwitch(each) && !isDefault(view, each)) ||
-  view.backdrop !== DEFAULT_VIEW.backdrop ||
-  view.sheets !== DEFAULT_VIEW.sheets ||
-  view.text !== DEFAULT_VIEW.text;
-
-/**
- * Whether a switch sits in the View menu: every one but the colour scheme and the contrast, which the toolbar shows.
- *
- * @param each - the switch.
- */
-export const isMenuSwitch = (each: ViewSwitch): boolean =>
-  each.role !== "colorScheme" && each.role !== "contrast";
+export const hasViewChanges = (
+  view: ViewState,
+  switches: readonly ViewSwitch[],
+  ids: readonly string[]
+): boolean =>
+  switches.some((each) => ids.includes(each.id) && !isDefault(view, each)) ||
+  (ids.includes("backdrop") && view.backdrop !== DEFAULT_VIEW.backdrop) ||
+  (ids.includes("sheets") && view.sheets !== DEFAULT_VIEW.sheets) ||
+  (ids.includes("text") && view.text !== DEFAULT_VIEW.text);
 
 /**
  * The address of a story's frame.

@@ -16,7 +16,7 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
-import type { CatalogueLists, PanelTabId } from "../catalogue.ts";
+import type { CatalogueLists, OwnControlId, PanelTabId } from "../catalogue.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
@@ -110,28 +110,39 @@ const mergedById = <TEntry extends { readonly id: string }>(
 };
 
 /**
+ * The single values a list gives (an id, a width range, the grid's step, the toolbar…), without those it leaves out,
+ * so a later list replaces only what it gives.
+ *
+ * @param lists - one list.
+ */
+const singleValues = (lists: CatalogueLists): CatalogueLists => ({
+  ...(lists.id === undefined ? {} : { id: lists.id }),
+  ...(lists.widths === undefined ? {} : { widths: lists.widths }),
+  ...(lists.widthRange === undefined ? {} : { widthRange: lists.widthRange }),
+  ...(lists.zooms === undefined ? {} : { zooms: lists.zooms }),
+  ...(lists.textSizes === undefined ? {} : { textSizes: lists.textSizes }),
+  ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
+  ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar })
+});
+
+/**
  * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
  * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
- * earlier one with the same id or name; the tabs turned off and the rules turned off by any.
+ * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar the last
+ * that names one.
  *
  * @param all - the presets' lists, then the catalogue's.
  */
 export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   const tabs: Partial<Record<PanelTabId, false>> = {};
+  const controls: Partial<Record<OwnControlId, false>> = {};
   const strings: Record<string, string> = {};
   let merged: CatalogueLists = {};
   for (const lists of all) {
     Object.assign(tabs, lists.tabs);
+    Object.assign(controls, lists.controls);
     Object.assign(strings, lists.strings);
-    merged = {
-      ...merged,
-      ...(lists.id === undefined ? {} : { id: lists.id }),
-      ...(lists.widths === undefined ? {} : { widths: lists.widths }),
-      ...(lists.widthRange === undefined ? {} : { widthRange: lists.widthRange }),
-      ...(lists.zooms === undefined ? {} : { zooms: lists.zooms }),
-      ...(lists.textSizes === undefined ? {} : { textSizes: lists.textSizes }),
-      ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep })
-    };
+    merged = { ...merged, ...singleValues(lists) };
   }
   const builtIn = all.findLast((lists) => lists.backgrounds?.builtIn !== undefined)?.backgrounds?.builtIn;
   const tags = all.findLast((lists) => lists.a11y?.tags !== undefined)?.a11y?.tags;
@@ -143,6 +154,7 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
     },
     storyGroups: mergedById(all.map((lists) => lists.storyGroups)),
     tabs,
+    controls,
     a11y: {
       ...(tags === undefined ? {} : { tags }),
       disabledRules: [...new Set(all.flatMap((lists) => lists.a11y?.disabledRules ?? []))]

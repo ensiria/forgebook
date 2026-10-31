@@ -19,6 +19,16 @@ const sidebarLinks = (page: Page): Locator => page.getByRole("navigation", { nam
 /** The shown story's frame. */
 const frameOf = (page: Page): FrameLocator => page.frameLocator("iframe.forgebook-frame-view");
 
+/** Waits until what a locator finds has finished moving in: a press with `force` would land on a moving part. */
+const settled = async (parts: Locator): Promise<void> => {
+  await parts.evaluateAll((elements) =>
+    Promise.all(elements.flatMap((element) => element.getAnimations().map((each) => each.finished)))
+  );
+};
+
+/** Waits until the open popovers have finished growing in. */
+const popoversSettled = (page: Page): Promise<void> => settled(page.locator(".forgebook-popover"));
+
 /** Waits until the shown story's frame says it is ready (or failed). */
 const frameStatus = async (page: Page): Promise<string | null> => {
   const html = page.locator("iframe.forgebook-frame-view");
@@ -474,6 +484,7 @@ test.describe("the stage", () => {
       .locator("html")
       .evaluate((root) => root.setAttribute("data-test-mark", "kept"));
     await page.getByRole("button", { name: "View", exact: true }).click();
+    await popoversSettled(page);
     const motion = page.getByRole("group", { name: "Motion" });
     await expect(motion.getByRole("radio")).toHaveCount(6);
     await motion.getByRole("radio", { name: "Reduced" }).check({ force: true });
@@ -493,7 +504,7 @@ test.describe("the stage", () => {
     await page.getByRole("radio", { name: "Phone L" }).check({ force: true });
     await expect(page).toHaveURL(/width=412/);
     await page.getByRole("button", { name: "View", exact: true }).click();
-    await page.getByLabel("Background").selectOption("paper");
+    await page.getByLabel("Background", { exact: true }).selectOption("paper");
     await expect(page).toHaveURL(/backdrop=paper/);
     // a style element's text is not shown text: its content is read as is
     await expect
@@ -596,6 +607,231 @@ test.describe("the component's page", () => {
   });
 });
 
+test.describe("the toolbar each person arranges", () => {
+  // wide enough for the default bar and two more controls
+  test.use({ viewport: { width: 1600, height: 900 } });
+
+  /** The controls on the bar, by id, in their order. */
+  const barControls = (page: Page): Promise<string[]> =>
+    page
+      .locator(".forgebook-toolbar__pinned")
+      .evaluateAll((pinned) => pinned.map((each) => (each as HTMLElement).dataset["control"] ?? ""));
+
+  /** The View menu's rows, by id, in their order. */
+  const menuRows = (page: Page): Promise<string[]> =>
+    page
+      .locator(".forgebook-arrange")
+      .evaluateAll((rows) => rows.map((each) => (each as HTMLElement).dataset["control"] ?? ""));
+
+  // the button's name takes its dot's when a value it holds is changed
+  const openView = async (page: Page): Promise<void> => {
+    await page.getByRole("button", { name: /^View/ }).click();
+    await popoversSettled(page);
+  };
+
+  test("starts with View first, then the colour scheme, the contrast and the width, the panel and Compare last", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const toolbar = page.locator(".forgebook-toolbar");
+    await expect(toolbar.locator("> *").first()).toHaveClass(/forgebook-view-menu/);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width"]);
+    await expect(toolbar.locator("> *").last()).toHaveClass(/forgebook-view-menu/);
+    await expect(toolbar.locator("> *").last().getByRole("button")).toHaveAccessibleName("Compare");
+    await openView(page);
+    expect(await menuRows(page)).toEqual([
+      "theme",
+      "contrast",
+      "width",
+      "motion",
+      "speed",
+      "press",
+      "lang",
+      "backdrop",
+      "sheets",
+      "text"
+    ]);
+    await expect(page.getByRole("button", { name: "Reset toolbar" })).toBeDisabled();
+  });
+
+  test("a control pinned from View works on the bar, stays after a reload, and Reset toolbar takes it back", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await openView(page);
+    await page.getByRole("button", { name: "Pin Speed to the toolbar" }).click();
+    await expect(page.getByRole("button", { name: "Pin Speed to the toolbar" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await page.keyboard.press("Escape");
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "speed"]);
+    const onBar = page.locator('.forgebook-toolbar__pinned[data-control="speed"]');
+    await onBar.getByRole("radio", { name: "Fast" }).check({ force: true });
+    await expect(page).toHaveURL(/speed=fast/);
+    // a value on the bar is not the View menu's: its dot stays off
+    await expect(page.getByRole("img", { name: "A view setting is changed" })).toHaveCount(0);
+    await page.reload();
+    await frameStatus(page);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "speed"]);
+    await openView(page);
+    await page.getByRole("button", { name: "Reset toolbar" }).click();
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width"]);
+  });
+
+  test("a hidden control leaves View and the bar, still applies, and comes back where it was", async ({
+    page
+  }) => {
+    await page.goto(story("overview", "press=shrink"));
+    await frameStatus(page);
+    await openView(page);
+    await page.getByRole("button", { name: "Hide Press in View" }).click();
+    expect(await menuRows(page)).not.toContain("press");
+    // hidden, its value still applies, and the View menu's dot says something it holds is changed
+    await expect(frameOf(page).locator("html")).toHaveAttribute("data-press", "shrink");
+    await expect(page.getByRole("img", { name: "A view setting is changed" })).toBeVisible();
+    // opened, the hidden controls are rows like the others, still usable
+    await page.getByRole("button", { name: "1 hidden" }).click();
+    const hiddenRow = page.locator('.forgebook-arrange[data-hidden][data-control="press"]');
+    await hiddenRow.getByRole("radio", { name: "Darken", exact: true }).check({ force: true });
+    await expect(page).toHaveURL(/press=darken/);
+    await page.getByRole("button", { name: "Show Press" }).click();
+    expect((await menuRows(page)).slice(4, 7)).toEqual(["speed", "press", "lang"]);
+  });
+
+  test("the rows move by keyboard and by pointer, and the bar follows their order", async ({ page }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await openView(page);
+    await page.getByRole("button", { name: "Pin Motion to the toolbar" }).click();
+    // by keyboard: Motion above the width, announced
+    const handle = page.getByRole("button", { name: "Move Motion" });
+    await handle.focus();
+    await page.keyboard.press("ArrowUp");
+    await expect(handle).toBeFocused();
+    expect((await menuRows(page)).slice(0, 4)).toEqual(["theme", "contrast", "motion", "width"]);
+    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 10");
+    expect(await barControls(page)).toEqual(["theme", "contrast", "motion", "width"]);
+    // by pointer: the theme dragged below the contrast
+    const grip = page.getByRole("button", { name: "Move Theme" });
+    const from = await grip.boundingBox();
+    const to = await page.getByRole("button", { name: "Move More contrast" }).boundingBox();
+    if (from === null || to === null) throw new Error("the handles are not drawn");
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, to.y + to.height, { steps: 8 });
+    await page.mouse.up();
+    expect((await menuRows(page)).slice(0, 2)).toEqual(["contrast", "theme"]);
+    expect(await barControls(page)).toEqual(["contrast", "theme", "motion", "width"]);
+    // drags one after another leave every row in its place: none still shifted, none on another
+    for (const [name, rows] of [
+      ["Text", -6],
+      ["Speed", 3],
+      ["Styles", -5]
+    ] as const) {
+      const box = await page.getByRole("button", { name: `Move ${name}` }).boundingBox();
+      if (box === null) throw new Error(`the handle of ${name} is not drawn`);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + rows * box.height, { steps: 20 });
+      await page.mouse.up();
+    }
+    const rowsDrawn = page.locator(".forgebook-arrange");
+    await expect
+      .poll(() =>
+        rowsDrawn.evaluateAll((rows) => {
+          const tops = rows.map((row) => row.getBoundingClientRect().top);
+          const steps = new Set(tops.slice(1).map((top, index) => Math.round(top - (tops[index] ?? 0))));
+          const shifted = rows.filter((row) => (row as HTMLElement).style.transform !== "").length;
+          return { steps: steps.size, shifted };
+        })
+      )
+      .toEqual({ steps: 1, shifted: 0 });
+  });
+
+  test("a right-click on a control of the bar takes it off, or hides it in View while it stays on the bar", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await page.locator('.forgebook-toolbar__pinned[data-control="contrast"]').click({ button: "right" });
+    const menu = page.getByRole("menu", { name: "More contrast on the toolbar" });
+    await expect(menu.getByRole("menuitem").first()).toBeFocused();
+    await menu.getByRole("menuitem", { name: "Remove from the toolbar" }).click();
+    expect(await barControls(page)).toEqual(["theme", "width"]);
+    // hidden in View, the theme stays on the bar and takes no row in the menu
+    await page.locator('.forgebook-toolbar__pinned[data-control="theme"]').click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Hide in View" }).click();
+    expect(await barControls(page)).toEqual(["theme", "width"]);
+    await openView(page);
+    expect(await menuRows(page)).not.toContain("theme");
+    await page.getByRole("button", { name: "1 hidden" }).click();
+    await expect(page.getByRole("button", { name: "Pin Theme to the toolbar" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
+  test("a narrow window keeps in View the pinned controls the bar has no room for, and gives them back", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await openView(page);
+    await page.getByRole("button", { name: "Pin Motion to the toolbar" }).click();
+    await page.keyboard.press("Escape");
+    expect(await barControls(page)).toContain("motion");
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await expect.poll(() => barControls(page)).not.toContain("motion");
+    // the bar stays one line: no control squeezed or wrapped
+    await expect(page.locator(".forgebook-toolbar")).toHaveCSS("height", "44px");
+    await openView(page);
+    await expect(page.locator('.forgebook-arrange[data-control="motion"]')).toHaveAttribute("data-moved", "");
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await expect.poll(() => barControls(page)).toContain("motion");
+  });
+
+  test("the View menu grows in and out, and a press on its button while it closes opens it again", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const button = page.getByRole("button", { name: /^View/ });
+    await openView(page);
+    await page.keyboard.press("Escape");
+    // still drawn while it closes, but closed for its button and a press on it
+    await expect(button).toHaveAttribute("aria-expanded", "false");
+    await button.click();
+    await expect(button).toHaveAttribute("aria-expanded", "true");
+    await popoversSettled(page);
+    await expect(page.locator(".forgebook-popover--arrange")).toHaveCSS("opacity", "1");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".forgebook-popover--arrange")).toHaveCount(0);
+  });
+
+  test("a bar the person lets wrap keeps every pinned control, on more lines", async ({ page }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await openView(page);
+    await page.getByRole("button", { name: "Pin Motion to the toolbar" }).click();
+    await page.getByRole("switch", { name: "Wrap the toolbar onto more lines when it is full" }).check();
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await expect.poll(() => barControls(page)).toEqual(["theme", "contrast", "width", "motion"]);
+    const height = await page
+      .locator(".forgebook-toolbar")
+      .evaluate((bar) => bar.getBoundingClientRect().height);
+    expect(height).toBeGreaterThan(44);
+    // kept for the next visit
+    await page.reload();
+    await frameStatus(page);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "motion"]);
+  });
+});
+
 test.describe("the stories' texts", () => {
   test("are drawn in the chosen language, English where it lacks a key, and pseudo-translated", async ({
     page
@@ -619,7 +855,7 @@ test.describe("the stories' texts", () => {
       .locator("html")
       .evaluate((root) => root.setAttribute("data-test-mark", "kept"));
     await page.getByRole("button", { name: "View", exact: true }).click();
-    await page.getByLabel("Language").selectOption("it");
+    await page.getByLabel("Language", { exact: true }).selectOption("it");
     await expect(page).toHaveURL(/lang=it/);
     await expect(frameOf(page).locator("span").first()).toHaveText("Periodo di fatturazione");
     await expect(frameOf(page).locator("html")).toHaveAttribute("data-test-mark", "kept");

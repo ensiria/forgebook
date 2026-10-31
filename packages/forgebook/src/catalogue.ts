@@ -1,7 +1,8 @@
 /**
  * The lists a catalogue sets besides its switches (its widths, zoom steps, text sizes, backgrounds, story groups,
- * panel tabs, accessibility rules, grid step, storage name and shell texts), as its configuration writes them, and
- * as the shell and the frame read them, today's defaults filled in.
+ * panel tabs, accessibility rules, grid step, storage name, shell texts, Forgebook's own controls and what starts on
+ * the toolbar), as its configuration writes them, and as the shell and the frame read them, today's defaults filled
+ * in.
  *
  * @remarks
  * Every list is optional: a catalogue that sets none looks as Forgebook always did. 100 % stays a zoom step and a text
@@ -12,7 +13,7 @@
  */
 
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
-import type { ViewSwitch } from "./switches.ts";
+import { switchWithRole, type ViewSwitch } from "./switches.ts";
 
 /** A preset width of the toolbar. */
 export type StageWidthPreset = {
@@ -35,6 +36,16 @@ export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y"
 
 /** A tab of the panel under a story. */
 export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
+
+/**
+ * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the background, the
+ * style sheets, the text size and the stage's width. Their ids are the address's own parameters, so no switch takes
+ * one.
+ */
+export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width"] as const;
+
+/** One of Forgebook's own controls. */
+export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
 
 /** The accessibility rules the Accessibility tab and the generated tests check. */
 export type A11ySettings = {
@@ -73,6 +84,17 @@ export type CatalogueLists = {
   readonly gridStep?: number;
   /** Texts of the shell replaced, by their name in `STRINGS` (a translation, another word). */
   readonly strings?: Readonly<Record<string, string>>;
+  /**
+   * Forgebook's own controls turned off (`{ sheets: false }`): shown nowhere, and the background, the style sheets
+   * and the text size keep their default; the stage's width is still set by the stage's handle.
+   */
+  readonly controls?: Readonly<Partial<Record<OwnControlId, false>>>;
+  /**
+   * The controls that start on the toolbar, in their order, by id (a switch's id or one of `OWN_CONTROL_IDS`); the
+   * colour scheme, the contrast and the width by default. A control turned off in `controls` (here or by a preset) is
+   * left out. A person's own arrangement replaces it.
+   */
+  readonly toolbar?: readonly string[];
 };
 
 /** A catalogue's lists with the defaults filled in, and its switches: what the shell and the frame read. */
@@ -101,6 +123,10 @@ export type CatalogueSettings = {
   readonly gridStep: number;
   /** The shell's texts replaced, by name. */
   readonly strings: Readonly<Record<string, string>>;
+  /** Forgebook's own controls shown, in their order. */
+  readonly ownControls: readonly OwnControlId[];
+  /** The controls that start on the toolbar, in their order, by id. */
+  readonly toolbar: readonly string[];
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -136,11 +162,43 @@ const withHundred = (list: readonly number[] | undefined, fallback: readonly num
   list?.includes(100) ? [...list].sort((first, second) => first - second) : fallback;
 
 /**
+ * The controls that start on the toolbar when the configuration names none: the colour scheme, the contrast and the
+ * width, those the catalogue has.
+ *
+ * @param switches - the catalogue's switches.
+ * @param ownControls - Forgebook's own controls shown.
+ */
+const defaultToolbar = (switches: readonly ViewSwitch[], ownControls: readonly OwnControlId[]): string[] => [
+  ...[switchWithRole(switches, "colorScheme"), switchWithRole(switches, "contrast")].flatMap((each) =>
+    each === undefined ? [] : [each.id]
+  ),
+  ...(ownControls.includes("width") ? ["width"] : [])
+];
+
+/**
+ * Why the toolbar a configuration names cannot be used, or none: every id a control there is (a switch, or one of
+ * Forgebook's own, shown or turned off), once. A name that is no control at all is a mistake to say; a control turned
+ * off is only left out, since a preset and the catalogue may each set one of the two.
+ *
+ * @param toolbar - the ids it names.
+ * @param switches - the catalogue's switches.
+ */
+const toolbarProblem = (toolbar: readonly string[], switches: readonly ViewSwitch[]): string | undefined => {
+  const known = new Set<string>([...switches.map((each) => each.id), ...OWN_CONTROL_IDS]);
+  const unknown = toolbar.find((id) => !known.has(id));
+  if (unknown !== undefined) return `The toolbar names "${unknown}", which is no control of the catalogue`;
+  const twice = toolbar.find((id, index) => toolbar.indexOf(id) !== index);
+  if (twice !== undefined) return `The toolbar names "${twice}" twice`;
+  return undefined;
+};
+
+/**
  * A catalogue's settings, its lists' defaults filled in.
  *
  * @param title - the catalogue's title, for its storage's id.
  * @param switches - its switches.
  * @param lists - the lists its configuration sets.
+ * @throws when the toolbar it names holds an id that is no control at all, or one twice.
  */
 export const catalogueSettings = (
   title: string,
@@ -153,6 +211,14 @@ export const catalogueSettings = (
       ? []
       : BUILT_IN_BACKDROPS.filter((backdrop) => builtIn === undefined || builtIn.includes(backdrop.id));
   const tabsOff = lists.tabs ?? {};
+  const controlsOff = lists.controls ?? {};
+  const ownControls = OWN_CONTROL_IDS.filter((control) => controlsOff[control] !== false);
+  const named = lists.toolbar ?? defaultToolbar(switches, ownControls);
+  const problem = toolbarProblem(named, switches);
+  if (problem !== undefined) throw new Error(`Forgebook's toolbar: ${problem}`);
+  const toolbar = named.filter(
+    (id) => !OWN_CONTROL_IDS.some((own) => own === id && !ownControls.includes(own))
+  );
   return {
     id: lists.id ?? idOf(title),
     switches,
@@ -168,7 +234,9 @@ export const catalogueSettings = (
       disabledRules: lists.a11y?.disabledRules ?? []
     },
     gridStep: lists.gridStep ?? 8,
-    strings: lists.strings ?? {}
+    strings: lists.strings ?? {},
+    ownControls,
+    toolbar
   };
 };
 

@@ -8,7 +8,7 @@
  *
  * @module
  */
-import { useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import { useCatalogue } from "./catalogueContext.ts";
 
@@ -57,13 +57,13 @@ const movedStored = (name: string, key: string): string | null => {
  *   catalogues on one origin keep their own.
  * @param read - the value a stored text holds, or the default when it holds none.
  * @param write - the text a value is stored as.
- * @returns the value and its setter.
+ * @returns the value and its setter, which also takes a function of the current value.
  */
 export const useStored = <TValue>(
   name: string,
   read: (stored: string | null) => TValue,
   write: (value: TValue) => string
-): [TValue, (value: TValue) => void] => {
+): [TValue, Dispatch<SetStateAction<TValue>>] => {
   const key = `${useCatalogue().id}:${name}`;
   const [value, setValue] = useState(() => read(readStored(key) ?? movedStored(name, key)));
   const text = write(value);
