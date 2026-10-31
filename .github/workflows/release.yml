@@ -1,9 +1,10 @@
 # Releases the packages when develop is merged into main, each with its own version: from the conventional commits
 # that touch it since its last release (in 0.x a breaking change bumps the minor, a feature or a fix the patch; a package
 # whose dependency was released gets a patch), its changelog, the release commit and a tag per package, a GitHub release
-# per package, then npm with provenance through trusted publishing (no token). The release commit then goes back to
-# develop. The first release is published by hand (npm cannot trust a workflow for a package that does not exist yet):
-# see the README; this workflow takes every release after it.
+# per package, then each released package staged on npm with provenance through trusted publishing (no token). A staged
+# version is public only once a maintainer approves it with 2FA (`npm stage approve`), so this workflow alone cannot put
+# a version in front of users. The release commit then goes back to develop. The first release is published by hand
+# (npm cannot trust a workflow for a package that does not exist yet): see CONTRIBUTING.md.
 name: release
 
 on:
@@ -31,12 +32,14 @@ jobs:
     # the release commit itself, pushed to main by this job, releases nothing
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
+    # npm trusts this environment only, which runs from main only: no other job or branch can publish
+    environment: npm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: pnpm
@@ -45,19 +48,40 @@ jobs:
       - run: npm install --global npm@latest
       - run: pnpm install --frozen-lockfile
       - run: pnpm checks
+      # the versions, the changelogs, the release commit, the tags and the GitHub releases; npm is the next step
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "true"
           VERSION: ${{ inputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ -n "$VERSION" ]; then
-            pnpm nx release "$VERSION" --yes
+            pnpm nx release "$VERSION" --skip-publish
           else
-            pnpm nx release --yes
+            pnpm nx release --skip-publish
           fi
+      # each package released by this run, from the tags on HEAD (`<package>@<version>`); commits that release nothing
+      # (docs, ci, chore) leave HEAD untagged
+      - name: Find the released packages
+        id: released
+        run: echo "tags=$(git tag --points-at HEAD | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+      # packed by pnpm, which applies publishConfig and turns workspace: ranges into versions (npm does neither), then
+      # staged in dependency order, so the approvals can follow it; the trust relationship allows staging only
+      - name: Stage on npm
+        if: ${{ steps.released.outputs.tags != '' }}
+        env:
+          TAGS: ${{ steps.released.outputs.tags }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/packages"
+          for name in @forgebook/story-format forgebook @forgebook/react @forgebook/testing; do
+            for tag in $TAGS; do
+              if [ "${tag%@*}" = "$name" ]; then
+                tarball=$(pnpm --filter "$name" pack --pack-destination "$RUNNER_TEMP/packages" | tail -n 1)
+                npm stage publish "$tarball" --provenance
+              fi
+            done
+          done
       - name: Bring the release commit back to develop
         run: |
           git fetch origin develop

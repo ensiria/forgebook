@@ -19,5 +19,6 @@
     "git": {
       "commitMessage": "chore(release): publish"
     }
-  }
+  },
+  "analytics": false
 }
