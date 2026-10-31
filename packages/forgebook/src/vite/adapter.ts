@@ -64,15 +64,28 @@ export type FrameworkAdapter = {
   readonly vitePlugins?: () => Promise<readonly PluginOption[]>;
 };
 
+/** Reads the component a file exports (`forgebook new`): the export named, or the file's only component. */
+export type ExtractFileComponent = (file: string, exportName?: string) => StoryComponentResult;
+
+/** A framework's docs module, as the plugin and the commands load it. */
+export type DocsModule = {
+  /** Reads a story file's component. */
+  readonly extractStoryComponent: ExtractStoryComponent;
+  /** Reads a component a file exports; none in a framework package that does not offer it yet. */
+  readonly extractFileComponent?: ExtractFileComponent;
+  /** The module a story file imports its types from (`@forgebook/react`); none when not given. */
+  readonly storyTypesModule?: string;
+};
+
 /**
- * Whether a loaded module is a docs module: it exports an `extractStoryComponent` function.
+ * Whether a module is a framework's docs module.
  *
  * @param module - the module, as `import()` gave it.
  */
-export const isDocsModule = (
-  module: unknown
-): module is { readonly extractStoryComponent: ExtractStoryComponent } =>
+export const isDocsModule = (module: unknown): module is DocsModule =>
   typeof module === "object" &&
   module !== null &&
   "extractStoryComponent" in module &&
-  typeof module.extractStoryComponent === "function";
+  typeof module.extractStoryComponent === "function" &&
+  (!("extractFileComponent" in module) || typeof module.extractFileComponent === "function") &&
+  (!("storyTypesModule" in module) || typeof module.storyTypesModule === "string");

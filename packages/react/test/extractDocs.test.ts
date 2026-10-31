@@ -9,7 +9,11 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { extractComponentDocs, extractStoryComponent } from "../src/vite/extractDocs.ts";
+import {
+  extractComponentDocs,
+  extractFileComponent,
+  extractStoryComponent
+} from "../src/vite/extractDocs.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
 /** The fixture package's components, a workspace package of the core's tests. */
@@ -140,5 +144,25 @@ describe("a story file no tsconfig.json holds", () => {
         ? []
         : component.docs.props.map((prop) => prop.name)
     ).toEqual(["label"]);
+  });
+});
+
+describe("extractFileComponent", () => {
+  it("reads the component a file exports, with the same props as through a story's meta", () => {
+    const fromFile = extractFileComponent(join(KIT, "Select.tsx"));
+    const fromStory = extractStoryComponent(join(KIT, "Select.stories.tsx"));
+    if (typeof fromFile === "string" || !("file" in fromFile)) throw new Error(String(fromFile));
+    if (typeof fromStory === "string" || !("file" in fromStory)) throw new Error(String(fromStory));
+    expect(fromFile.docs.name).toBe("Select");
+    expect(fromFile.docs.props.map((prop) => prop.name)).toEqual(
+      fromStory.docs.props.map((prop) => prop.name)
+    );
+  });
+
+  it("says when a file exports no component, or not the one named", () => {
+    expect(extractFileComponent(join(KIT, "formatSize.ts"))).toContain("exports no component");
+    expect(extractFileComponent(join(KIT, "Select.tsx"), "Missing")).toContain(
+      "exports no component Missing"
+    );
   });
 });

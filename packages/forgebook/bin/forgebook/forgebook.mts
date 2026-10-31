@@ -6,7 +6,8 @@
  *
  * @module
  */
-import { resolve } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
+import { relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
@@ -33,6 +34,7 @@ import { catalogueClient } from "./agentClient.ts";
 import { storiesText, storyText } from "./agentText.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 import { catalogueTools } from "./mcpTools.ts";
+import { newStoriesFile } from "./newStoriesFile.ts";
 
 /** The command, as the hints print it. */
 const COMMAND = "forgebook";
@@ -269,6 +271,51 @@ await defineCommands({
           log
         )
     }),
+    new: forgebook.command({
+      summary:
+        "Write a component's first stories from its props: the main story, one per choice, the worst case.",
+      options: {
+        export: {
+          type: "string",
+          valueName: "name",
+          description: "The component to read; the file's only one by default."
+        },
+        framework: {
+          type: "string",
+          default: "react",
+          valueName: "name",
+          description:
+            "The framework the stories are written for: its package, @forgebook/<name>, reads the props."
+        },
+        print: { type: "boolean", description: "Print the file instead of writing it." },
+        force: { type: "boolean", description: "Replace a stories file that exists." }
+      },
+      positionals: [{ name: "file", description: "The component's file.", required: true }],
+      examples: [
+        { command: `${COMMAND} new src/Badge.tsx`, description: "Write src/Badge.stories.tsx." },
+        {
+          command: `${COMMAND} new src/menu.tsx --export Menu --print`,
+          description: "One of several, printed."
+        }
+      ],
+      run: async ({ args, options, io, log }): Promise<void> => {
+        const written = await newStoriesFile(resolve(args.file), options.export, options.framework);
+        if (options.print) {
+          io.stdout.write(written.text);
+          return;
+        }
+        const shown = relative(process.cwd(), written.file);
+        if (existsSync(written.file) && options.force !== true)
+          throw new ScriptError(`${shown} exists`, {
+            hint: "Give --force to replace it, or --print to see it"
+          });
+        writeFileSync(written.file, written.text);
+        log.success(`${shown} written`);
+        log.info(
+          `${COMMAND} stories --component ${written.text.match(/title: "([^"]*)"/)?.[1] ?? ""} lists them`
+        );
+      }
+    }),
     mcp: forgebook.command({
       summary:
         "Serve the catalogue's stories to an agent over the Model Context Protocol, on stdin and stdout.",
@@ -297,7 +344,9 @@ await defineCommands({
         const server = {
           info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
           instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
-          tools: catalogueTools(client.ask)
+          tools: catalogueTools(client.ask, (file, exportName) =>
+            newStoriesFile(resolve(config.dir, file), exportName, config.framework.name)
+          )
         };
         let session = NEW_SESSION;
         // stdout carries only the protocol's messages, one per line, answered in the order they came

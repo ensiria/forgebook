@@ -7,6 +7,7 @@
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
+import type { NewStoriesFile } from "./newStoriesFile.ts";
 
 /** Asks the catalogue one of its answers. */
 type Ask = (route: string, params: URLSearchParams) => Promise<AgentAnswer>;
@@ -30,12 +31,16 @@ const resultOf = (answer: AgentAnswer): McpToolResult => ({
   isError: answer.status !== 200
 });
 
+/** Writes a component's first stories, as `forgebook new --print` does. */
+type NewStories = (file: string, exportName: string | undefined) => Promise<NewStoriesFile>;
+
 /**
  * The tools, asking the catalogue through `ask`.
  *
  * @param ask - asks the catalogue (the running dev server, or the server `forgebook mcp` keeps).
+ * @param writeNew - writes a component's first stories, the file relative to the catalogue's folder.
  */
-export const catalogueTools = (ask: Ask): readonly McpTool[] => [
+export const catalogueTools = (ask: Ask, writeNew: NewStories): readonly McpTool[] => [
   {
     name: "list_stories",
     description:
@@ -100,6 +105,34 @@ export const catalogueTools = (ask: Ask): readonly McpTool[] => [
       return story === undefined
         ? { structured: { error: `No story "${id}"` }, isError: true }
         : { structured: { id, links: story.links }, isError: false };
+    }
+  },
+  {
+    name: "new_stories",
+    description:
+      "Write a component's first stories from its typed props (the main story with its required props, one story per value of its first choice prop, the worst case) and answer the file's text and where it would go; writes nothing.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: {
+          type: "string",
+          description: "The component's file, relative to the catalogue's folder or absolute."
+        },
+        export: { type: "string", description: "The component to read, when the file exports several." }
+      },
+      required: ["file"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
+      try {
+        const written = await writeNew(textOf(args, "file") ?? "", textOf(args, "export"));
+        return { structured: { file: written.file, text: written.text }, isError: false };
+      } catch (error) {
+        return {
+          structured: { error: error instanceof Error ? error.message : String(error) },
+          isError: true
+        };
+      }
     }
   }
 ];

@@ -118,6 +118,7 @@ its name.
 | `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
+| `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
@@ -134,7 +135,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers three tools: `list_stories`, `get_story` and `story_address`. Run from the catalogue's folder (or give
+It offers four tools: `list_stories`, `get_story`, `story_address`, and `new_stories`, which writes a component's first stories from its props and answers the text without writing a file. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.

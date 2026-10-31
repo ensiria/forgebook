@@ -156,3 +156,20 @@ describe("forgebook docs", () => {
     expect(run.stderr).toContain("forgebook docs");
   }, 60_000);
 });
+
+describe("forgebook new", () => {
+  it("prints a component's first stories, read from its file", () => {
+    const run = runScriptProcess(ENTRY, ["new", join(KIT_DIR, "src", "Select.tsx"), "--print"]);
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout).toContain('import { Select } from "./Select";');
+    expect(run.stdout).toContain("args: { options: [] },");
+    expect(run.stdout).toContain("export const SizeLg: Story<typeof Select>");
+  }, 60_000);
+
+  it("refuses to replace a stories file that exists", () => {
+    // Select.stories.tsx exists beside Select.tsx: nothing is written
+    const run = runScriptProcess(ENTRY, ["new", join(KIT_DIR, "src", "Select.tsx")]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain("Select.stories.tsx exists");
+  }, 60_000);
+});

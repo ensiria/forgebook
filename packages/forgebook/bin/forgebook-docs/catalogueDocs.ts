@@ -4,16 +4,14 @@
  *
  * @module
  */
-import { createRequire } from "node:module";
 import { join, relative } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { readFileSafe, readJson, writeIfChanged } from "@ensiria/cli-kit/files";
 import { plural } from "@ensiria/cli-kit/format";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import { type ExtractStoryComponent, isDocsModule } from "../../src/vite/adapter.ts";
+import { frameworkDocsModule } from "../frameworkDocs.ts";
 import type { CatalogueDocsReport } from "./catalogueDocs.types.ts";
 import { catalogueMarkdown } from "./catalogueMarkdown.ts";
 import { catalogueOptionsOf } from "./catalogueOptions.ts";
@@ -22,29 +20,6 @@ import { llmsText } from "./llmsText.ts";
 
 /** The file an agent reads first, beside the catalogue. */
 const LLMS_FILE = "llms.txt";
-
-/**
- * The framework's reading of a story file's component: the docs module of `@forgebook/<framework>`, resolved from the
- * package, which declares that framework package.
- *
- * @param packageDir - the package's folder.
- * @param framework - the framework's name (`react`).
- * @throws a `ScriptError` when the package cannot resolve it or the module is not a docs module.
- */
-const extractorOf = async (packageDir: string, framework: string): Promise<ExtractStoryComponent> => {
-  const specifier = `@forgebook/${framework}/docs`;
-  let file: string;
-  try {
-    file = createRequire(join(packageDir, "package.json")).resolve(specifier);
-  } catch {
-    throw new ScriptError(`${specifier} is not installed in this package`, {
-      hint: `Add @forgebook/${framework} to its devDependencies`
-    });
-  }
-  const module: unknown = await import(pathToFileURL(file).href);
-  if (!isDocsModule(module)) throw new ScriptError(`${specifier} exports no extractStoryComponent`);
-  return module.extractStoryComponent;
-};
 
 /** What `catalogueDocs` is asked. */
 export type CatalogueDocsRequest = {
@@ -84,7 +59,7 @@ export const catalogueDocs = async (
   const shown = (path: string): string => relative(process.cwd(), path);
   const { data, problems } = collectDocs(
     packageDir,
-    await extractorOf(packageDir, request.framework),
+    (await frameworkDocsModule(packageDir, request.framework)).extractStoryComponent,
     options
   );
   for (const problem of problems) log.error(problem);

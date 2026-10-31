@@ -25,6 +25,9 @@ import { moduleSummaryOf, programFor, summaryOf, tagOf } from "forgebook/vite/do
 import { metaComponent, metaField } from "forgebook/vite/story-meta";
 import ts from "typescript-6";
 
+/** The module a React story file imports its types from (`Meta`, `Story`), for the stories `forgebook new` writes. */
+export const storyTypesModule = "@forgebook/react";
+
 /** The props whose keys are the component's parts. */
 const PART_MAPS = ["classNames", "styles", "refs"];
 
@@ -477,6 +480,50 @@ const subcomponentsOf = (
 };
 
 /**
+ * A component's docs and the files they come from, read at the expression that names it.
+ *
+ * @param symbol - the component's declared symbol.
+ * @param expression - where the code names it (the meta's `component`, or the export's own name).
+ * @param checker - the program's checker.
+ * @param file - the file read, the folder when the component has no declaration.
+ * @param subcomponents - the subcomponents' docs and files; none outside a story file.
+ */
+const componentOf = (
+  symbol: ts.Symbol,
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+  file: string,
+  subcomponents: { readonly docs: SubcomponentDocs[]; readonly sources: string[] }
+): StoryComponentResult => {
+  const { propsType, ownProps } = componentProps(symbol, expression, checker, file);
+  const props = ownProps.map((prop) => propDocs(prop, checker, expression));
+  const parts = [
+    ...new Set(
+      (propsType?.getProperties() ?? [])
+        .filter((prop) => PART_MAPS.includes(prop.getName()))
+        .flatMap((prop) =>
+          checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(prop, expression)).getProperties()
+        )
+        .map((part) => part.getName())
+    )
+  ];
+  const declarationFile = symbol.declarations?.[0]?.getSourceFile();
+  const sources = docsSources(symbol, ownProps, file);
+  return {
+    docs: {
+      name: symbol.getName(),
+      description: summaryOf(symbol, checker),
+      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile),
+      props,
+      parts,
+      subcomponents: subcomponents.docs
+    },
+    file: sources[0] ?? file,
+    sources: [...new Set([...sources, ...subcomponents.sources])]
+  };
+};
+
+/**
  * A story file's component with the file that declares it.
  *
  * @param storyFile - the story file's absolute path.
@@ -495,30 +542,58 @@ export const extractStoryComponent = (storyFile: string): StoryComponentResult =
   if (symbol === undefined) return `${storyFile}: the meta's component cannot be resolved`;
   const subcomponents = subcomponentsOf(source, checker);
   if (typeof subcomponents === "string") return subcomponents;
-  const { propsType, ownProps } = componentProps(symbol, expression, checker, storyFile);
-  const props = ownProps.map((prop) => propDocs(prop, checker, expression));
-  const parts = [
-    ...new Set(
-      (propsType?.getProperties() ?? [])
-        .filter((prop) => PART_MAPS.includes(prop.getName()))
-        .flatMap((prop) =>
-          checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(prop, expression)).getProperties()
-        )
-        .map((part) => part.getName())
-    )
-  ];
-  const declarationFile = symbol.declarations?.[0]?.getSourceFile();
-  const sources = docsSources(symbol, ownProps, storyFile);
-  return {
-    docs: {
-      name: symbol.getName(),
-      description: summaryOf(symbol, checker),
-      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile),
-      props,
-      parts,
-      subcomponents: subcomponents.docs
-    },
-    file: sources[0] ?? storyFile,
-    sources: [...new Set([...sources, ...subcomponents.sources])]
-  };
+  return componentOf(symbol, expression, checker, storyFile, subcomponents);
+};
+
+/** Whether an export is a component: a name in PascalCase whose value can be called. */
+const isComponentExport = (symbol: ts.Symbol, checker: ts.TypeChecker, node: ts.Node): boolean =>
+  /^[A-Z]/.test(symbol.getName()) &&
+  checker.getTypeOfSymbolAtLocation(symbol, node).getCallSignatures().length > 0;
+
+/**
+ * The component asked for among a file's: the one named, or the only one.
+ *
+ * @returns the export, or a message naming the components when there is none or several.
+ */
+const chosenComponent = (
+  components: readonly ts.Symbol[],
+  exportName: string | undefined,
+  file: string
+): ts.Symbol | string => {
+  const chosen =
+    exportName === undefined ? components : components.filter((each) => each.getName() === exportName);
+  const [only] = chosen;
+  if (only !== undefined && chosen.length === 1) return only;
+  const names = components.map((each) => each.getName()).join(", ") || "none";
+  return exportName === undefined
+    ? `${file} exports ${components.length === 0 ? "no component" : `several components (${names})`}: name one`
+    : `${file} exports no component ${exportName} (its components: ${names})`;
+};
+
+/**
+ * A component a file exports, read from its types, for writing its first stories (`forgebook new`).
+ *
+ * @param file - the component's file, absolute.
+ * @param exportName - the export to read; the file's only component when none.
+ * @returns the component, or a message saying why it cannot be read (no component, several, a name not exported).
+ */
+export const extractFileComponent = (file: string, exportName?: string): StoryComponentResult => {
+  const program = programFor(file);
+  if (typeof program === "string") return program;
+  const { checker } = program;
+  const source = program.program.getSourceFile(file);
+  if (source === undefined) return `${file} is not in its program`;
+  const moduleSymbol = checker.getSymbolAtLocation(source);
+  if (moduleSymbol === undefined) return `${file} exports nothing`;
+  const components = checker
+    .getExportsOfModule(moduleSymbol)
+    .filter((each) => isComponentExport(declaredSymbol(each, checker) ?? each, checker, source));
+  const export_ = chosenComponent(components, exportName, file);
+  if (typeof export_ === "string") return export_;
+  const symbol = declaredSymbol(export_, checker) ?? export_;
+  const declaration = symbol.declarations?.[0];
+  const name = declaration === undefined ? undefined : ts.getNameOfDeclaration(declaration);
+  if (name === undefined || !ts.isIdentifier(name))
+    return `${file}: ${export_.getName()} has no name to read it at`;
+  return componentOf(symbol, name, checker, file, { docs: [], sources: [] });
 };
