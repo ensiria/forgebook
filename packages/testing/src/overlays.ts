@@ -26,7 +26,7 @@ import type { ViewState } from "forgebook/view-state";
 
 /** A shown fixed element's box, in CSS px from the window's top. */
 export type FixedBox = {
-  /** The element, as a short CSS path (`div.kaji-menu`), with its order among the elements of that path (`#0`). */
+  /** The element, as a short CSS path (`div.menu`), with its order among the elements of that path (`#0`). */
   readonly key: string;
   /** Its top edge. */
   readonly top: number;

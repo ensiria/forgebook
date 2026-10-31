@@ -19,7 +19,7 @@ import type { FrameworkAdapter } from "./adapter.ts";
 
 /** What a library's preset gives a catalogue. */
 export type ForgebookPreset = CatalogueLists & {
-  /** The preset's name, in a problem's message (`kaji-ui`). */
+  /** The preset's name, in a problem's message (`acme-ui`). */
   readonly name: string;
   /** The switches it declares, before the catalogue's. */
   readonly switches?: readonly ViewSwitch[];

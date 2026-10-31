@@ -21,7 +21,7 @@ import type { ShotStatus, StoryShot } from "./storyShot.types.ts";
 export type ShotRequest = {
   /** The catalogue's address (`http://localhost:5310/`). */
   readonly catalogue: string;
-  /** The story's id (`kaji-ui:feedback-markers-counter--plain`). */
+  /** The story's id (`acme-ui:feedback-counter--plain`). */
   readonly story: string;
   /** The view, as the catalogue's address writes it (`theme=dark&lang=it`); empty for the defaults. */
   readonly view: string;

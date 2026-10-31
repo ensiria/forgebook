@@ -1,5 +1,5 @@
 /**
- * The switches of a Kaji-like library, for the core's tests: the theme and the contrast, the library's motion, speed
+ * The switches of a design system's library, for the core's tests: the theme and the contrast, the library's motion, speed
  * and press feedback, and a language. The fixture catalogue declares the same (`fixtures/app/src/switches.ts`).
  *
  * @module

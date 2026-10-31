@@ -1,5 +1,5 @@
 /**
- * Tests for the view in the address, over a Kaji-like library's switches.
+ * Tests for the view in the address, over a design system's switches.
  *
  * @module
  */

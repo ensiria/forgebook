@@ -22,7 +22,7 @@ import {
   testedStoryLocations
 } from "../src/storyTree.ts";
 
-/** The story groups a Kaji-like catalogue names, in their order. */
+/** The story groups a design system's catalogue names, in their order. */
 const GROUPS = ["states", "motion", "in-context", "showcase", "worst-case", "behaviour"];
 
 /** A source with the given files, no style sheets. */

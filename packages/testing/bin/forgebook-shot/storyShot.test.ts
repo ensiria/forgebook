@@ -10,10 +10,8 @@ import { shotAddress } from "./storyShot.ts";
 describe("shotAddress", () => {
   it("opens the catalogue's frame page with the story and the view", () => {
     expect(
-      shotAddress("http://localhost:5310/", "kaji-ui:feedback-markers-counter--plain", "theme=dark&lang=it")
-    ).toBe(
-      "http://localhost:5310/frame.html?theme=dark&lang=it&story=kaji-ui%3Afeedback-markers-counter--plain"
-    );
+      shotAddress("http://localhost:5310/", "acme-ui:feedback-counter--plain", "theme=dark&lang=it")
+    ).toBe("http://localhost:5310/frame.html?theme=dark&lang=it&story=acme-ui%3Afeedback-counter--plain");
   });
 
   it("leaves out what only the shell reads, and takes a catalogue address without its final slash", () => {

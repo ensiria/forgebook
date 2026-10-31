@@ -143,7 +143,7 @@ export type StoryMarkdown = {
 export type StorySource = {
   /** A stable id, part of every story id's URL (`acme-ui`). */
   readonly id: string;
-  /** The name in the sidebar (`Kaji UI`). */
+  /** The name in the sidebar (`Acme UI`). */
   readonly name: string;
   /**
    * The package's logo, shown beside its name in the sidebar and on the home: the URL of a square image, drawn for a

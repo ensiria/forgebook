@@ -1,5 +1,5 @@
 /**
- * The fixture kit's preset for Forgebook, as a library ships one (Kaji UI's `./forgebook`): the theme and the
+ * The fixture kit's preset for Forgebook, as a library ships one (its `./forgebook` export): the theme and the
  * contrast, the kit's motion, speed and press feedback, and its story groups, with their values and names, so a
  * catalogue that shows the kit gets its View menu and its groups with `presets: [kitPreset()]`.
  *
