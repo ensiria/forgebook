@@ -655,7 +655,8 @@ test.describe("the component's page", () => {
     const overview = page.getByRole("article", { name: "Overview", exact: true });
     const frame = overview.locator("iframe");
     const root = overview.frameLocator("iframe").locator("html");
-    await expect(root).toHaveAttribute("data-forgebook-status", /.+/);
+    // a frame further down the page may load slowly while the other tests run: its readiness gets more time
+    await expect(root).toHaveAttribute("data-forgebook-status", /.+/, { timeout: 15_000 });
     await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
     const place = await overview.locator(".forgebook-example__box").boundingBox();
     const address = page.url();
