@@ -422,3 +422,19 @@ export const frameAddressOf = (frameUrl: string, id: string, search: string): st
   params.set("story", id);
   return `${frameUrl}?${params.toString()}`;
 };
+
+/**
+ * The address of a story's page in the catalogue from a catalogue's address query, for a tool that does not know the
+ * catalogue's switches: the story selected, the view kept as written.
+ *
+ * @param pageUrl - the catalogue's page (`http://localhost:5173/`).
+ * @param id - the story's id.
+ * @param search - the view's query (`theme=dark&lang=it`), with or without `?`.
+ */
+export const storyAddressOf = (pageUrl: string, id: string, search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("component");
+  params.delete("story");
+  params.set("story", id);
+  return `${pageUrl}?${params.toString()}`;
+};

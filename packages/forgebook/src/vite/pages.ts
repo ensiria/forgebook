@@ -38,6 +38,12 @@ export const PAGE_ENTRIES: Readonly<Record<PageFile, string>> = {
 /** The file name, in the configuration's folder, of the project's own stories' source (never written to disk). */
 export const STORIES_SOURCE_FILE = ".forgebook-stories.ts";
 
+/**
+ * The file name, in the configuration's folder, of the module the dev server loads to answer tools and agents: the
+ * sources and the previews, as the frame gets them (never written to disk).
+ */
+export const AGENT_SOURCES_FILE = ".forgebook-agent.ts";
+
 /** The project's own stories' source id. */
 export const OWN_SOURCE_ID = "stories";
 
@@ -171,6 +177,23 @@ export const frameEntry = (config: ResolvedConfig): string => {
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
+    ""
+  ].join("\n");
+};
+
+/**
+ * The module the dev server loads to answer tools and agents: the sources and the previews the frame mounts, as
+ * values (`sources`, `previews`), loaded on the server with the same imports the pages use.
+ *
+ * @param config - the configuration.
+ */
+export const agentSourcesModule = (config: ResolvedConfig): string => {
+  const sources = sourcesCode(config);
+  return [
+    ...sources.imports,
+    ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
+    `export const sources = ${sources.list};`,
+    `export const previews = [${config.previews.map((_file, index) => `preview${index}`).join(", ")}];`,
     ""
   ].join("\n");
 };

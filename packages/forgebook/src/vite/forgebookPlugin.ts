@@ -27,6 +27,7 @@ import ts from "typescript-6";
 import type { Plugin, UserConfig, ViteDevServer } from "vite";
 
 import type { FrameworkAdapter } from "./adapter.ts";
+import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { componentPage, markdownHtml } from "./componentPage.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
@@ -35,6 +36,8 @@ import { moduleSummaryOf } from "./docsProgram.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { highlightCode } from "./highlightCode.ts";
 import {
+  AGENT_SOURCES_FILE,
+  agentSourcesModule,
   CONFIG_MODULE,
   configModule,
   frameEntry,
@@ -286,6 +289,8 @@ const generatedModule = (
     return { code: frameEntry(config), moduleType: "js" };
   if (id === join(config.dir, STORIES_SOURCE_FILE))
     return { code: storiesSourceModule(config), moduleType: "js" };
+  if (id === join(config.dir, AGENT_SOURCES_FILE))
+    return { code: agentSourcesModule(config), moduleType: "js" };
   const page = PAGE_FILES.find((candidate) => id === join(config.dir, candidate));
   return page !== undefined && !existsSync(id) ? pageHtml(page, config) : undefined;
 };
@@ -318,6 +323,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     config === undefined ? undefined : join(config.dir, PAGE_ENTRIES[page]);
   const storiesSource = (): string | undefined =>
     config === undefined ? undefined : join(config.dir, STORIES_SOURCE_FILE);
+  const agentSources = (): string | undefined =>
+    config === undefined ? undefined : join(config.dir, AGENT_SOURCES_FILE);
   /**
    * A module a story file's query asks for (`?forgebook-docs`, `-code`, `-page`, `-markdown`), when the id is one.
    *
@@ -382,7 +389,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         (page) => source === `/${PAGE_ENTRIES[page]}` || source === entryPath(page)
       );
       if (entry !== undefined) return entryPath(entry) ?? null;
-      if (source === storiesSource()) return source;
+      if (source === storiesSource() || source === agentSources()) return source;
       const page = PAGE_FILES.find(
         (candidate) => source === pagePath(candidate) || source === `/${candidate}`
       );
@@ -396,6 +403,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       server.watcher.on("change", (file: string): void => {
         if (SOURCE_FILE.test(file)) docs?.changed();
       });
+      // the answers to tools and agents (`forgebook stories`, `forgebook mcp`), from the same sources as the pages
+      if (config !== undefined) server.middlewares.use(agentMiddleware(server, config));
       // the catalogue's pages, made here: no HTML file is written
       server.middlewares.use((request, response, next): void => {
         const page = requestedPage(request.url ?? "/");

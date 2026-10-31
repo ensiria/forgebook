@@ -34,6 +34,7 @@
   },
   "exports": {
     ".": "./src/vite/config.ts",
+    "./agent": "./src/vite/agent.types.ts",
     "./story-tree": "./src/storyTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./frame": "./src/frame/mountFrame.ts",
@@ -119,6 +120,10 @@
       ".": {
         "types": "./dist/src/vite/config.d.ts",
         "default": "./dist/src/vite/config.js"
+      },
+      "./agent": {
+        "types": "./dist/src/vite/agent.types.d.ts",
+        "default": "./dist/src/vite/agent.types.js"
       },
       "./story-tree": {
         "types": "./dist/src/storyTree.d.ts",
