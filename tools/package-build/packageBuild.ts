@@ -115,3 +115,15 @@ export const isPublished = (file: string): boolean =>
   !file.split("/").some((segment) => segment === "test" || segment === "__fixtures__") &&
   !/(^|\/)tsconfig[^/]*\.json$/.test(file) &&
   !/(^|\/)_[^/]+\.scss$/.test(file);
+
+/**
+ * Whether the tool packing a package is pnpm, from the user agent a package manager gives its scripts
+ * (`npm_config_user_agent`). Only pnpm publishes these packages right: it applies `publishConfig.exports` and `bin`
+ * and turns `workspace:*` into versions, where npm keeps the workspace's TypeScript sources and the `workspace:`
+ * ranges, a package no one can install or run.
+ *
+ * @param userAgent - the user agent (`pnpm/10.19.0 npm/? node/v24.15.0 darwin arm64`); none outside a script.
+ * @returns whether it is pnpm's.
+ */
+export const isPackedByPnpm = (userAgent: string | undefined): boolean =>
+  userAgent?.startsWith("pnpm/") === true;

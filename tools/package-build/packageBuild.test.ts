@@ -5,7 +5,14 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { distPath, isCompiled, isPublished, publishConfigOf, withCompiledStyles } from "./packageBuild.ts";
+import {
+  distPath,
+  isCompiled,
+  isPackedByPnpm,
+  isPublished,
+  publishConfigOf,
+  withCompiledStyles
+} from "./packageBuild.ts";
 
 describe("distPath", () => {
   it("lands TypeScript as JavaScript, a style sheet compiled, any other file as it is", () => {
@@ -63,5 +70,14 @@ describe("which sources the build takes", () => {
     expect(isPublished("src/vite/tsconfig.json")).toBe(false);
     expect(isPublished("src/styles/_tokens.scss")).toBe(false);
     expect(isPublished("src/fonts/Inter-latin.woff2")).toBe(true);
+  });
+});
+
+describe("isPackedByPnpm", () => {
+  it("accepts pnpm's user agent and refuses npm's, yarn's and none", () => {
+    expect(isPackedByPnpm("pnpm/10.19.0 npm/? node/v24.15.0 darwin arm64")).toBe(true);
+    expect(isPackedByPnpm("npm/11.9.0 node/v24.14.0 darwin arm64 workspaces/false")).toBe(false);
+    expect(isPackedByPnpm("yarn/4.9.1 npm/? node/v24.15.0 darwin arm64")).toBe(false);
+    expect(isPackedByPnpm(undefined)).toBe(false);
   });
 });

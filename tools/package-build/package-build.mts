@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * The `package-build` command: builds a package for npm (`build`: its JavaScript, declarations and compiled style
- * sheets in `dist/`), or writes and checks its published manifest (`manifest`: pnpm's `publishConfig`, made from its
- * workspace `exports` and `bin`).
+ * sheets in `dist/`), writes and checks its published manifest (`manifest`: pnpm's `publishConfig`, made from its
+ * workspace `exports` and `bin`), or gets it ready to pack (`prepack`: only under pnpm, the manifest checked, then
+ * built).
  *
  * @module
  */
@@ -18,6 +19,7 @@ import {
   DIST,
   distPath,
   isCompiled,
+  isPackedByPnpm,
   isPublished,
   publishConfigOf,
   withCompiledStyles
@@ -140,10 +142,10 @@ const build = (packageDir: string, manifest: Manifest): number => {
 await defineScript({
   name: COMMAND,
   command: COMMAND,
-  summary: "Build a package for npm, or write and check its published manifest.",
+  summary: "Build a package for npm, write and check its published manifest, or get it ready to pack.",
   icon: "package",
   description:
-    "build: runs tsc with the package's tsconfig.build.json into dist/, compiles its style sheets, copies its other files and points the emitted style imports at the compiled sheets. manifest: writes the package's publishConfig (the exports and bin npm installs) from its workspace exports and bin; --check fails when it is not up to date.",
+    "build: runs tsc with the package's tsconfig.build.json into dist/, compiles its style sheets, copies its other files and points the emitted style imports at the compiled sheets. manifest: writes the package's publishConfig (the exports and bin npm installs) from its workspace exports and bin; --check fails when it is not up to date. prepack: the package's prepack script; refuses any packer but pnpm (npm would publish the TypeScript sources and the workspace: ranges), checks the manifest, then builds.",
   options: {
     package: {
       type: "string",
@@ -158,7 +160,7 @@ await defineScript({
     }
   },
   positionals: [
-    { name: "command", description: "What to do.", required: true, choices: ["build", "manifest"] }
+    { name: "command", description: "What to do.", required: true, choices: ["build", "manifest", "prepack"] }
   ],
   examples: [
     { command: `${COMMAND} build`, description: "Build the package of the folder you are in." },
@@ -166,13 +168,24 @@ await defineScript({
       command: `${COMMAND} manifest --package packages/react`,
       description: "Write a package's publishConfig."
     },
-    { command: `${COMMAND} manifest --check`, description: "Check it in CI." }
+    { command: `${COMMAND} manifest --check`, description: "Check it in CI." },
+    { command: `${COMMAND} prepack`, description: "The prepack script of a package." }
   ],
-  run: ({ args, options, log }): void => {
+  run: ({ args, options, io, log }): void => {
     const packageDir = resolve(options.package);
     const manifest = readManifest(packageDir);
     const { name } = manifest;
-    if (args.command === "build") {
+    if (args.command === "prepack") {
+      if (!isPackedByPnpm(io.env["npm_config_user_agent"]))
+        throw new ScriptError(`${name} is packed by pnpm only`, {
+          hint: "Run pnpm pack or pnpm publish: npm keeps the TypeScript sources and the workspace: ranges"
+        });
+      if (JSON.stringify(manifest.fields["publishConfig"]) !== JSON.stringify(publishConfigFor(manifest)))
+        throw new ScriptError(`${name}'s publishConfig is not up to date`, {
+          hint: `Run ${COMMAND} manifest --package ${options.package}`
+        });
+    }
+    if (args.command === "build" || args.command === "prepack") {
       const written = build(packageDir, manifest);
       log.success(`${name} built into ${DIST}/, ${plural(written, "file")} besides tsc's`);
       return;

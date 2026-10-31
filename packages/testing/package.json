@@ -35,7 +35,7 @@
   "scripts": {
     "build": "package-build build",
     "manifest": "package-build manifest",
-    "prepack": "package-build manifest --check && package-build build",
+    "prepack": "package-build prepack",
     "test": "vitest run",
     "typecheck": "tsc -p src && tsc -p bin && tsc -p test"
   },
