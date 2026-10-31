@@ -24,9 +24,11 @@ import {
   type StoryTree,
   sidebarStoryIds,
   storyTree,
+  type TreeComponent,
   type TreeStory
 } from "../storyTree.ts";
 import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
+import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
 import { ComponentPage } from "./ComponentPage.tsx";
 import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
@@ -37,6 +39,7 @@ import { Stage } from "./Stage.tsx";
 import { StoryPicker } from "./StoryPicker.tsx";
 import { STRINGS } from "./strings.ts";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
+import type { UsedInProps } from "./UsedIn.tsx";
 import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
 import { useSidebarLayout } from "./useSidebarLayout.ts";
@@ -260,6 +263,35 @@ const componentPage = (sourceId: string, title: string): Page => ({
   kind: "component",
   id: componentId(sourceId, title)
 });
+
+/**
+ * What "Used in" reads and opens on a source's component pages: its usage, its components by title, and their pages;
+ * none without a source (the catalogue turned it off, or no component is shown).
+ *
+ * @param source - the shown component's source.
+ * @param isOffered - whether the catalogue offers "Used in".
+ * @param tree - the tree.
+ * @param pages - a page's address and how it opens.
+ */
+const usedInLinks = (
+  source: StorySource | undefined,
+  isOffered: boolean,
+  tree: StoryTree,
+  pages: { readonly hrefOf: (page: Page) => string; readonly onOpen: (page: Page) => void }
+): Omit<UsedInProps, "title"> | undefined =>
+  source === undefined || !isOffered
+    ? undefined
+    : {
+        load: usageLoader(source),
+        componentOf: (title: string): TreeComponent | undefined =>
+          findComponent(tree, componentId(source.id, title))?.component,
+        componentHrefOf: (component: TreeComponent): string =>
+          pages.hrefOf(componentPage(source.id, component.title)),
+        onOpenComponent: (component: TreeComponent): void =>
+          pages.onOpen(componentPage(source.id, component.title)),
+        storyHrefOf: (story: TreeStory): string => pages.hrefOf(storyPage(story)),
+        onOpenStory: (story: TreeStory): void => pages.onOpen(storyPage(story))
+      };
 
 /** A component the header links to: its page and its name. */
 type LinkedComponent = { readonly page: Page; readonly name: string };
@@ -579,6 +611,10 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
             }
             header={header}
             scroll={scroll}
+            usedIn={usedInLinks(source, catalogue.hasUsedIn, tree, {
+              hrefOf: (page: Page): string => addressQuery(pageAddress(page), switches),
+              onOpen: openPage
+            })}
           />
         ) : null}
         {shown.kind === "story" ? (

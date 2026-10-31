@@ -51,8 +51,9 @@ import {
 } from "./pages.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import { storyCode } from "./storyCode.ts";
-import { storyFilesModule } from "./storyFilesModule.ts";
+import { indexedStoryFiles, storyFilesModule, USAGE_PREFIX, USAGE_SEPARATOR } from "./storyFilesModule.ts";
 import { componentImport } from "./storyMeta.ts";
+import { joinedUsage } from "./usageModule.ts";
 
 /**
  * A file's text, or none when it cannot be read.
@@ -224,21 +225,76 @@ const markdownModule = (file: string, watch: (file: string) => void): { code: st
  * @param id - the module's id (`FILES_PREFIX`, the importer's folder, `FILES_SEPARATOR`, the pattern).
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks.
+ * @param hasUsage - whether the group offers its "Used in" loader.
  * @throws when a story file cannot be indexed.
  */
 const patternModule = (
   id: string,
   watch: (file: string) => void,
-  warm: (storyFile: string) => void
+  warm: (storyFile: string) => void,
+  hasUsage: boolean
 ): { code: string; moduleType: "js" } => {
   const [root = "", pattern = ""] = id.slice(FILES_PREFIX.length).split(FILES_SEPARATOR);
   let first: string | undefined;
-  const code = storyFilesModule(root, pattern, (file: string): void => {
-    first ??= file;
-    watch(file);
-  });
+  const code = storyFilesModule(
+    root,
+    pattern,
+    (file: string): void => {
+      first ??= file;
+      watch(file);
+    },
+    hasUsage
+  );
   if (first !== undefined) warm(first);
   return { code, moduleType: "js" };
+};
+
+/** The resolved id of a group's "Used in" module: Rollup's mark of a virtual module, then its import's specifier. */
+const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
+
+/**
+ * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in"), when the import names
+ * one.
+ *
+ * @param source - the import's specifier.
+ */
+const virtualId = (source: string): string | undefined => {
+  if (source === CONFIG_MODULE) return CONFIG_ID;
+  return source.startsWith(USAGE_PREFIX) ? `\0${source}` : undefined;
+};
+
+/**
+ * A group's "Used in" module: its story files indexed, what their stories render read in the docs worker, joined.
+ *
+ * @param id - the module's id (`USAGE_ID_PREFIX`, the pattern's folder, `USAGE_SEPARATOR`, the pattern).
+ * @param watch - adds a file whose edit renews the module (each story file).
+ * @param usage - reads the facts in the docs worker.
+ */
+const usageModule = async (
+  id: string,
+  watch: (file: string) => void,
+  usage: DocsExtractor["usage"]
+): Promise<{ code: string; moduleType: "js" }> => {
+  const [root = "", pattern = ""] = id.slice(USAGE_ID_PREFIX.length).split(USAGE_SEPARATOR);
+  const files = indexedStoryFiles(root, pattern, watch);
+  const graph = await usage(
+    files.map((file) => ({
+      storyFile: file.file,
+      exports: file.index.stories.map((story) => story.exportName)
+    }))
+  );
+  const answer =
+    typeof graph === "string"
+      ? { error: graph }
+      : joinedUsage(
+          graph,
+          files.map((file) => ({
+            storyFile: file.file,
+            title: file.index.title,
+            related: file.index.related ?? []
+          }))
+        );
+  return { code: `export default ${JSON.stringify(answer)};`, moduleType: "js" };
 };
 
 /** The resolved id of the configuration's data module. */
@@ -306,6 +362,8 @@ const generatedModule = (
 export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin => {
   /** The modules of the patterns, renewed when a story file is added or removed. */
   const filesModules = new Set<string>();
+  /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
+  const usageModules = new Set<string>();
   let config = options.config;
   // the docs are read in a worker, made once the framework is known: a package's TypeScript program takes seconds to
   // build and would hold every other answer of the dev server meanwhile
@@ -316,6 +374,40 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       throw new Error("Forgebook has no framework: add forgebook.config.ts, or give the plugin `framework`");
     docs ??= createDocsExtractor(framework.docsModule);
     return docs;
+  };
+  /**
+   * Renews what an edited source file may change: the docs' programs, and every group's "Used in".
+   *
+   * @param server - the dev server.
+   * @param file - the edited file.
+   */
+  const renewOnChange = (server: ViteDevServer, file: string): void => {
+    if (!SOURCE_FILE.test(file)) return;
+    docs?.changed();
+    const graph = server.environments.client.moduleGraph;
+    for (const id of usageModules) {
+      const module = graph.getModuleById(id);
+      if (module !== undefined) graph.invalidateModule(module);
+    }
+  };
+  /**
+   * A pattern's module or a group's "Used in" module, when the id is one.
+   *
+   * @param id - the module's id.
+   * @param watch - adds a file whose edit renews the module.
+   * @throws when a story file cannot be indexed.
+   */
+  const storiesModule = async (
+    id: string,
+    watch: (file: string) => void
+  ): Promise<{ code: string; moduleType: "js" } | undefined> => {
+    if (id.startsWith(USAGE_ID_PREFIX)) {
+      usageModules.add(id);
+      return usageModule(id, watch, extractor().usage);
+    }
+    if (!id.startsWith(FILES_PREFIX)) return undefined;
+    filesModules.add(id);
+    return patternModule(id, watch, extractor().warm, config?.lists.usedIn !== false);
   };
   const pagePath = (page: PageFile): string | undefined =>
     config === undefined ? undefined : join(config.dir, page);
@@ -384,7 +476,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       };
     },
     resolveId(source: string, importer: string | undefined): string | null {
-      if (source === CONFIG_MODULE) return CONFIG_ID;
+      const virtual = virtualId(source);
+      if (virtual !== undefined) return virtual;
       const entry = PAGE_FILES.find(
         (page) => source === `/${PAGE_ENTRIES[page]}` || source === entryPath(page)
       );
@@ -400,9 +493,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     configureServer: (server: ViteDevServer): void => {
       server.httpServer?.on("close", (): void => void docs?.close());
       // an edited component or type file changes its docs: the worker renews its programs on their next read
-      server.watcher.on("change", (file: string): void => {
-        if (SOURCE_FILE.test(file)) docs?.changed();
-      });
+      server.watcher.on("change", (file: string): void => renewOnChange(server, file));
       // the answers to tools and agents (`forgebook stories`, `forgebook mcp`), from the same sources as the pages
       if (config !== undefined) server.middlewares.use(agentMiddleware(server, config));
       // the catalogue's pages, made here: no HTML file is written
@@ -426,7 +517,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const refresh = (file: string): void => {
         if (!STORY_FILE.test(file)) return;
         const graph = server.environments.client.moduleGraph;
-        for (const id of filesModules) {
+        // the patterns' modules list the files; the groups' "Used in" read them
+        for (const id of [...filesModules, ...usageModules]) {
           const module = graph.getModuleById(id);
           if (module !== undefined) graph.invalidateModule(module);
         }
@@ -447,10 +539,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         return resolved?.id;
       });
       if (answered !== undefined) return answered;
-      if (!id.startsWith(FILES_PREFIX)) return null;
-      filesModules.add(id);
       try {
-        return patternModule(id, watch, extractor().warm);
+        return (await storiesModule(id, watch)) ?? null;
       } catch (error) {
         this.error(error instanceof Error ? error.message : String(error));
       }

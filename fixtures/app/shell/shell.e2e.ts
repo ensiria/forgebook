@@ -708,6 +708,32 @@ test.describe("the component's page", () => {
     await expect(box.getByRole("radio", { name: "Fill" })).toBeChecked();
   });
 
+  test("Used in lists the components whose stories use it, opens them, and folds away for the next visit", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const usedIn = page.getByRole("region", { name: "Used in" });
+    // the kit's Form renders a Select; Page is in Select's related, so it is left out
+    const form = usedIn.getByRole("link", { name: "Form", exact: true });
+    await expect(form).toBeVisible();
+    await expect(usedIn).toContainText("1 story");
+    await expect(usedIn.getByRole("link", { name: "Page", exact: true })).toHaveCount(0);
+    await usedIn.getByRole("link", { name: "Signup" }).click();
+    await expect(page).toHaveURL(/story=kit%3Alayouts-form--signup/);
+    await page.goBack();
+    // folded, its usage is no longer drawn, and the browser keeps it folded
+    const toggle = page.getByRole("button", { name: "Used in" });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(usedIn.getByRole("link", { name: "Form", exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Used in" })).toHaveAttribute("aria-expanded", "false");
+    await page.getByRole("button", { name: "Used in" }).click();
+    await expect(
+      page.getByRole("region", { name: "Used in" }).getByRole("link", { name: "Form", exact: true })
+    ).toBeVisible();
+  });
+
   test("every example opens its story from its bar, not only the demo", async ({ page }) => {
     await page.goto("/?component=kit:inputs-selection-select");
     const overview = page.getByRole("article", { name: "Overview", exact: true });

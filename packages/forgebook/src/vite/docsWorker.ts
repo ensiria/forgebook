@@ -6,7 +6,8 @@
  * @remarks
  * Started by `docsExtractor.ts` with the framework's docs module (`adapter.ts`), which it loads once; it keeps the
  * programs of `docsProgram.ts` between requests, so only a package's first
- * read builds one, and a changed source file (`{ kind: "changed" }`) renews them on their next read. A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
+ * read builds one, and a changed source file (`{ kind: "changed" }`) renews them on their next read. A usage request
+ * (`{ kind: "usage", id, files }`) is answered from the same programs (`usageGraph.ts`). A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
  * it is (plain data); a warm-up is a request whose answer nobody reads.
  *
  * @module
@@ -14,8 +15,9 @@
 import { parentPort, workerData } from "node:worker_threads";
 
 import { type ExtractStoryComponent, isDocsModule } from "./adapter.ts";
-import type { DocsRequest, DocsResponse, DocsWorkerData } from "./docsExtractor.ts";
+import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
 import { markSourcesChanged } from "./docsProgram.ts";
+import { usageGraph } from "./usageGraph.ts";
 
 /** Whether the worker's data names a docs module. */
 const isWorkerData = (value: unknown): value is DocsWorkerData =>
@@ -40,7 +42,7 @@ const loadExtractor = async (): Promise<ExtractStoryComponent | string> => {
 const extractor = loadExtractor();
 
 /** The extractor's result, or why it threw: a throw would end the worker and every request waiting on it. */
-const extracted = async (storyFile: string): Promise<DocsResponse["result"]> => {
+const extracted = async (storyFile: string): Promise<DocsResult> => {
   const extract = await extractor;
   if (typeof extract === "string") return extract;
   try {
@@ -50,13 +52,27 @@ const extracted = async (storyFile: string): Promise<DocsResponse["result"]> => 
   }
 };
 
+/** A group of story files' usage, or why it threw: a throw would end the worker and every request waiting on it. */
+const usage = (files: Parameters<typeof usageGraph>[0]): ReturnType<typeof usageGraph> => {
+  try {
+    return usageGraph(files);
+  } catch (error) {
+    return `The stories' usage could not be read: ${error instanceof Error ? error.message : String(error)}`;
+  }
+};
+
 parentPort?.on("message", (request: DocsRequest): void => {
   if (request.kind === "changed") {
     markSourcesChanged();
     return;
   }
+  if (request.kind === "usage") {
+    const response: DocsResponse = { kind: "usage", id: request.id, result: usage(request.files) };
+    parentPort?.postMessage(response);
+    return;
+  }
   void extracted(request.storyFile).then((result) => {
-    const response: DocsResponse = { id: request.id, result };
+    const response: DocsResponse = { kind: "extract", id: request.id, result };
     parentPort?.postMessage(response);
   });
 });

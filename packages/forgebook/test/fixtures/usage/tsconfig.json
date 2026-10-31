@@ -1,0 +1,6 @@
+// A small package for "Used in": components that render one another, and story files that render them.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "include": ["."]
+}

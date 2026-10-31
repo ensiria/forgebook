@@ -1,6 +1,6 @@
 /**
- * The story files' component docs, read in a worker thread (`docsWorker.ts`) so the dev server keeps answering while
- * a package's TypeScript program is built.
+ * The story files' component docs, and the facts "Used in" is joined from (`usageGraph.ts`), read in a worker thread
+ * (`docsWorker.ts`) so the dev server keeps answering while a package's TypeScript program is built.
  *
  * @remarks
  * One worker per plugin, started on the first request and kept: its programs make every later read quick, until a
@@ -16,11 +16,18 @@ import { extname } from "node:path";
 import { Worker } from "node:worker_threads";
 
 import type { StoryComponentResult } from "./adapter.ts";
+import type { UsageGraph, UsageRequestFile } from "./usageGraph.ts";
 
 /** What the extractor answers for a story file: its component's docs, none, or why it cannot be read. */
 export type DocsResult = StoryComponentResult;
 
-/** A message to the worker: a story file's docs to read, or the news that a source file changed. */
+/** What the worker answers for a group of story files' usage: its facts, or why they cannot be read. */
+export type UsageResult = UsageGraph | string;
+
+/**
+ * A message to the worker: a story file's docs to read, a group of story files' usage to read, or the news that a
+ * source file changed.
+ */
 export type DocsRequest =
   | {
       /** Read a story file's docs. */
@@ -31,22 +38,43 @@ export type DocsRequest =
       readonly storyFile: string;
     }
   | {
+      /** Read what a group of story files' stories render, and the import graph they reach. */
+      readonly kind: "usage";
+      /** The request's number, repeated in its answer. */
+      readonly id: number;
+      /** The story files and their stories' exports. */
+      readonly files: readonly UsageRequestFile[];
+    }
+  | {
       /** A source file changed: the programs are renewed on their next read. */
       readonly kind: "changed";
     };
 
-/** The worker's answer to a request. */
-export type DocsResponse = {
-  /** The request's number. */
-  readonly id: number;
-  /** The extractor's result. */
-  readonly result: DocsResult;
-};
+/** The worker's answer to a request, of the request's kind. */
+export type DocsResponse =
+  | {
+      /** A story file's docs. */
+      readonly kind: "extract";
+      /** The request's number. */
+      readonly id: number;
+      /** The extractor's result. */
+      readonly result: DocsResult;
+    }
+  | {
+      /** A group of story files' usage. */
+      readonly kind: "usage";
+      /** The request's number. */
+      readonly id: number;
+      /** The facts, or why they cannot be read. */
+      readonly result: UsageResult;
+    };
 
 /** The docs, read off the dev server's thread. */
 export type DocsExtractor = {
   /** The component docs of a story file. */
   readonly extract: (storyFile: string) => Promise<DocsResult>;
+  /** What a group of story files' stories render, and the import graph they reach. */
+  readonly usage: (files: readonly UsageRequestFile[]) => Promise<UsageResult>;
   /** Builds the program that holds a story file, ahead of its first read. */
   readonly warm: (storyFile: string) => void;
   /** Tells the worker a source file changed, so the next read sees it. */
@@ -77,7 +105,7 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
   let worker: Worker | undefined;
   let nextId = 0;
   // every request sent and not answered yet, a warm-up's answer included (none reads it)
-  const pending = new Map<number, (result: DocsResult) => void>();
+  const pending = new Map<number, (response: DocsResponse | string) => void>();
   // the warm-ups not sent yet: one goes out only when nothing is pending
   const warmUps: string[] = [];
   const started = (): Worker => {
@@ -86,7 +114,7 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
     const created = new Worker(WORKER_URL, { workerData });
     created.unref();
     created.on("message", (response: DocsResponse): void => {
-      pending.get(response.id)?.(response.result);
+      pending.get(response.id)?.(response);
       pending.delete(response.id);
       sendWarmUp();
     });
@@ -99,19 +127,34 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
     worker = created;
     return created;
   };
-  const send = (storyFile: string, resolve: (result: DocsResult) => void): void => {
-    const id = nextId++;
-    pending.set(id, resolve);
-    const request: DocsRequest = { kind: "extract", id, storyFile };
+  // a request's answer, or why the worker stopped before giving it
+  const send = (request: DocsRequest, resolve: (response: DocsResponse | string) => void): void => {
+    if (request.kind === "changed") return;
+    pending.set(request.id, resolve);
     started().postMessage(request);
   };
+  const extract = (storyFile: string, resolve: (result: DocsResult) => void): void =>
+    send({ kind: "extract", id: nextId++, storyFile }, (response) =>
+      resolve(
+        typeof response === "string" || response.kind !== "extract" ? String(response) : response.result
+      )
+    );
   const sendWarmUp = (): void => {
     if (pending.size > 0) return;
     const storyFile = warmUps.shift();
-    if (storyFile !== undefined) send(storyFile, () => undefined);
+    if (storyFile !== undefined) extract(storyFile, () => undefined);
   };
   return {
-    extract: (storyFile: string): Promise<DocsResult> => new Promise((resolve) => send(storyFile, resolve)),
+    extract: (storyFile: string): Promise<DocsResult> =>
+      new Promise((resolve) => extract(storyFile, resolve)),
+    usage: (files: readonly UsageRequestFile[]): Promise<UsageResult> =>
+      new Promise((resolve) =>
+        send({ kind: "usage", id: nextId++, files }, (response) =>
+          resolve(
+            typeof response === "string" || response.kind !== "usage" ? String(response) : response.result
+          )
+        )
+      ),
     warm: (storyFile: string): void => {
       warmUps.push(storyFile);
       sendWarmUp();

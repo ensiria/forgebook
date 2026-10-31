@@ -12,6 +12,7 @@ import {
   type CataloguePages,
   filteredStories,
   jsonValue,
+  type LoadedStoryParts,
   storiesDocument,
   storyDocument,
   storyLinks
@@ -143,5 +144,49 @@ describe("filteredStories", () => {
   it("keeps one source's components", () => {
     expect(filteredStories(document, { source: "other" }).components).toEqual([]);
     expect(filteredStories(document, { source: "kit" }).components).toHaveLength(document.components.length);
+  });
+});
+
+describe("Used in, for agents", () => {
+  const usage = new Map([
+    [
+      "kit",
+      {
+        "Foundations/Colour": [
+          { title: "Actions/Button", isDirect: true, stories: ["Primary", "Internal"] },
+          // a component the tree no longer has is left out
+          { title: "Gone/Away", isDirect: false, stories: ["Any"] }
+        ]
+      }
+    ]
+  ]);
+
+  it("gives each component its users by id, with their stories' ids, only when asked for", () => {
+    const colour = storiesDocument("Kit", TREE, PAGES, "", usage).components.find(
+      (component) => component.title === "Foundations/Colour"
+    );
+    expect(colour?.usedIn).toEqual([
+      {
+        id: "kit:actions-button",
+        title: "Actions/Button",
+        isDirect: true,
+        stories: ["kit:actions-button--primary", "kit:actions-button--internal"]
+      }
+    ]);
+    expect(
+      storiesDocument("Kit", TREE, PAGES, "").components.some((component) => "usedIn" in component)
+    ).toBe(false);
+  });
+
+  it("gives a story's component its users when the catalogue offers them", () => {
+    const location = findStory(TREE, "kit:foundations-colour--scales");
+    if (location === undefined) throw new Error("no story");
+    const index = usage.get("kit");
+    if (index === undefined) throw new Error("no usage");
+    const parts: LoadedStoryParts = { module: { value: {} }, docs: { value: { name: null } } };
+    expect(storyDocument(location, parts, PAGES, "", { tree: TREE, index }).component.usedIn?.[0]?.id).toBe(
+      "kit:actions-button"
+    );
+    expect(storyDocument(location, parts, PAGES, "").component).not.toHaveProperty("usedIn");
   });
 });

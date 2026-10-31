@@ -24,6 +24,7 @@ import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext } from "./Example.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
 import { STRINGS } from "./strings.ts";
+import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
 import { useComponentDocs } from "./useComponentDocs.ts";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
 import { useFrameQueue } from "./useFrameQueue.ts";
@@ -59,6 +60,8 @@ export type ComponentPageProps = {
   readonly header: ReactNode;
   /** Where its scrolling part starts: the shell's visit of the page and every page's last position. */
   readonly scroll: PageScroll;
+  /** What "Used in" reads and opens; none when the catalogue turned it off. */
+  readonly usedIn?: Omit<UsedInProps, "title"> | undefined;
 };
 
 /**
@@ -117,7 +120,8 @@ export const ComponentPage = ({
   heightOf,
   background,
   header,
-  scroll
+  scroll,
+  usedIn
 }: ComponentPageProps): ReactNode => {
   const pageRef = useRef<HTMLDivElement>(null);
   const docs = useComponentDocs(loadDocs);
@@ -209,6 +213,7 @@ export const ComponentPage = ({
               ))}
             </section>
           )}
+          {usedIn === undefined ? null : <UsedIn title={component.title} {...usedIn} />}
         </div>
       </div>
     </div>

@@ -94,6 +94,9 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   their TSDoc, nothing written twice.
 - **Examples that fill the page**: on a component's page, any story's box opens over the page, at a width of its own,
   without loading its story again.
+- **Used in**: a component's page lists the other components whose stories use it, directly or through another
+  component (Tree renders Row, Row renders DropLine), each with the stories to open; read from the types, never kept
+  by hand. A reader folds it away; `usedIn: false` in the configuration turns it off.
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
@@ -164,7 +167,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers four tools: `list_stories`, `get_story`, `story_address`, and `new_stories`, which writes a component's first stories from its props and answers the text without writing a file. Run from the catalogue's folder (or give
+It offers four tools: `list_stories`, `get_story`, `story_address`, and `new_stories`, which writes a component's first stories from its props and answers the text without writing a file. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.

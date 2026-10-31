@@ -95,6 +95,11 @@ export type CatalogueLists = {
    * left out. A person's own arrangement replaces it.
    */
   readonly toolbar?: readonly string[];
+  /**
+   * Whether a component's page offers "Used in", the other components whose stories use it; `true` by default.
+   * `false` builds nothing for it (no import graph is read) and leaves it out of the agents' answers.
+   */
+  readonly usedIn?: boolean;
 };
 
 /** A catalogue's lists with the defaults filled in, and its switches: what the shell and the frame read. */
@@ -127,6 +132,8 @@ export type CatalogueSettings = {
   readonly ownControls: readonly OwnControlId[];
   /** The controls that start on the toolbar, in their order, by id. */
   readonly toolbar: readonly string[];
+  /** Whether a component's page offers "Used in". */
+  readonly hasUsedIn: boolean;
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -236,7 +243,8 @@ export const catalogueSettings = (
     gridStep: lists.gridStep ?? 8,
     strings: lists.strings ?? {},
     ownControls,
-    toolbar
+    toolbar,
+    hasUsedIn: lists.usedIn !== false
   };
 };
 

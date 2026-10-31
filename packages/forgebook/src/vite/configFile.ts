@@ -122,7 +122,8 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.zooms === undefined ? {} : { zooms: lists.zooms }),
   ...(lists.textSizes === undefined ? {} : { textSizes: lists.textSizes }),
   ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
-  ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar })
+  ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar }),
+  ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn })
 });
 
 /**

@@ -8,11 +8,19 @@
 
 import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
 import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
-import { componentId, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
+import {
+  componentId,
+  findComponent,
+  type StoryLocation,
+  type StoryTree,
+  type TreeStory
+} from "../storyTree.ts";
+import type { UsageIndex } from "../usedIn.ts";
 import { frameAddressOf, storyAddressOf } from "../viewState.ts";
 import type {
   AgentComponent,
   AgentStory,
+  AgentUsingComponent,
   StoriesDocument,
   StoryDocument,
   StoryLinks
@@ -54,11 +62,36 @@ const agentStory = (
   links: storyLinks(pages, story.id, view)
 });
 
-/** A component of the tree as the documents give it, its listed stories first. */
+/**
+ * A component's "Used in" as the documents give it: the users the tree still has, by their ids and their stories' ids.
+ *
+ * @param tree - the story tree.
+ * @param sourceId - the component's source.
+ * @param usage - the source's usage.
+ * @param title - the component's title.
+ */
+const agentUsers = (
+  tree: StoryTree,
+  sourceId: string,
+  usage: UsageIndex,
+  title: string
+): AgentUsingComponent[] =>
+  (usage[title] ?? []).flatMap((user) => {
+    const id = componentId(sourceId, user.title);
+    const found = findComponent(tree, id)?.component;
+    if (found === undefined) return [];
+    const stories = [...found.stories, ...found.unlisted]
+      .filter((story) => user.stories.includes(story.exportName))
+      .map((story) => story.id);
+    return [{ id, title: user.title, isDirect: user.isDirect, stories }];
+  });
+
+/** A component of the tree as the documents give it, its listed stories first, its "Used in" when given. */
 const agentComponent = (
   location: Omit<StoryLocation, "story">,
   pages: CataloguePages,
-  view: string
+  view: string,
+  usage?: { readonly tree: StoryTree; readonly index: UsageIndex }
 ): AgentComponent => {
   const { source, component } = location;
   return {
@@ -69,7 +102,10 @@ const agentComponent = (
     stories: [
       ...component.stories.map((story) => agentStory(story, false, pages, view)),
       ...component.unlisted.map((story) => agentStory(story, true, pages, view))
-    ]
+    ],
+    ...(usage === undefined
+      ? {}
+      : { usedIn: agentUsers(usage.tree, source.id, usage.index, component.title) })
   };
 };
 
@@ -80,12 +116,14 @@ const agentComponent = (
  * @param tree - its story tree.
  * @param pages - where it is served, for the links.
  * @param view - the view the links open in; empty for the default view.
+ * @param usage - each source's "Used in", by source id, when asked for.
  */
 export const storiesDocument = (
   title: string,
   tree: StoryTree,
   pages: CataloguePages,
-  view: string
+  view: string,
+  usage?: ReadonlyMap<string, UsageIndex>
 ): StoriesDocument => ({
   schema: 1,
   title,
@@ -93,7 +131,15 @@ export const storiesDocument = (
   components: tree.sources.flatMap((source) =>
     source.families.flatMap((family) =>
       family.groups.flatMap((group) =>
-        group.components.map((component) => agentComponent({ source, family, group, component }, pages, view))
+        group.components.map((component) => {
+          const index = usage?.get(source.id);
+          return agentComponent(
+            { source, family, group, component },
+            pages,
+            view,
+            index === undefined ? undefined : { tree, index }
+          );
+        })
       )
     )
   ),
@@ -152,14 +198,16 @@ const docsOf = (
  * @param parts - its module and its docs, as the dev server loaded them.
  * @param pages - where the catalogue is served, for the links.
  * @param view - the view the links open in; empty for the default view.
+ * @param usage - the tree and the story's source's "Used in", when the catalogue offers it.
  */
 export const storyDocument = (
   location: StoryLocation,
   parts: LoadedStoryParts,
   pages: CataloguePages,
-  view: string
+  view: string,
+  usage?: { readonly tree: StoryTree; readonly index: UsageIndex }
 ): StoryDocument => {
-  const component = agentComponent(location, pages, view);
+  const component = agentComponent(location, pages, view, usage);
   const story =
     component.stories.find((each) => each.id === location.story.id) ??
     agentStory(location.story, false, pages, view);
@@ -179,7 +227,13 @@ export const storyDocument = (
   return {
     schema: 1,
     story,
-    component: { id: component.id, title: component.title, source: component.source, file: component.file },
+    component: {
+      id: component.id,
+      title: component.title,
+      source: component.source,
+      file: component.file,
+      ...(component.usedIn === undefined ? {} : { usedIn: component.usedIn })
+    },
     docs,
     args,
     problems

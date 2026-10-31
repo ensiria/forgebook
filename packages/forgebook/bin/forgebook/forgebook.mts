@@ -209,6 +209,11 @@ await defineCommands({
           description:
             "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it)."
         },
+        "used-in": {
+          type: "boolean",
+          description:
+            "Add each component's \"Used in\": the components whose stories use it (reads the package's import graph)."
+        },
         url: {
           type: "string",
           env: "FORGEBOOK_URL",
@@ -218,11 +223,18 @@ await defineCommands({
       },
       examples: [
         { command: `${COMMAND} stories`, description: "Every story." },
+        {
+          command: `${COMMAND} stories --component select --used-in --json`,
+          description: "The selects, with the components whose stories use them."
+        },
         { command: `${COMMAND} stories --component button --json`, description: "The buttons, as JSON." }
       ],
       run: async ({ options, io, log, isJson, style }): Promise<void> => {
         const config = await configOf(options.config);
-        const params = new URLSearchParams({ view: options.view ?? "" });
+        const params = new URLSearchParams({
+          view: options.view ?? "",
+          usedIn: String(options["used-in"] === true)
+        });
         const body = await askCatalogue(config, options.url, "stories", params, log);
         if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
         const document = filteredStories(body, { source: options.source, component: options.component });

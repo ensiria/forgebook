@@ -50,12 +50,20 @@ export const catalogueTools = (ask: Ask, writeNew: NewStories): readonly McpTool
       properties: {
         source: { type: "string", description: "Only this source's stories (its id)." },
         component: { type: "string", description: "Only components whose title holds this text, any case." },
+        usedIn: {
+          type: "boolean",
+          description:
+            "Add each component's usedIn: the components whose stories use it, directly or through another. Reads the package's import graph, so the first call takes longer."
+        },
         view: VIEW
       },
       additionalProperties: false
     },
     call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
-      const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
+      const answer = await ask(
+        "stories",
+        new URLSearchParams({ view: textOf(args, "view") ?? "", usedIn: String(args["usedIn"] === true) })
+      );
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
       const filter = { source: textOf(args, "source"), component: textOf(args, "component") };
       return { structured: filteredStories(answer.body, filter), isError: false };
@@ -64,7 +72,7 @@ export const catalogueTools = (ask: Ask, writeNew: NewStories): readonly McpTool
   {
     name: "get_story",
     description:
-      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {

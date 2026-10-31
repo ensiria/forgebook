@@ -19,6 +19,7 @@ import type { ViteDevServer } from "vite";
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { findStory, storyTree } from "../storyTree.ts";
+import { sourceUsage, type UsageIndex } from "../usedIn.ts";
 import { type CataloguePages, type LoadedStoryParts, storiesDocument, storyDocument } from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
@@ -63,6 +64,22 @@ const settled = async (load: (() => Promise<unknown>) | undefined): Promise<Load
   }
 };
 
+/**
+ * Each source's "Used in", by source id; a source whose usage cannot be read is left out.
+ *
+ * @param sources - the sources.
+ */
+const usageBySource = async (sources: readonly StorySource[]): Promise<Map<string, UsageIndex>> => {
+  const answers = await Promise.all(
+    sources.map(
+      async (source): Promise<[string, UsageIndex | string]> => [source.id, await sourceUsage(source)]
+    )
+  );
+  return new Map(
+    answers.flatMap(([id, index]): [string, UsageIndex][] => (typeof index === "string" ? [] : [[id, index]]))
+  );
+};
+
 /** An answer: its HTTP status and its JSON body. */
 export type AgentAnswer = {
   /** 200, 404 for a story or a path that does not exist, 500 when the sources fail to load. */
@@ -80,7 +97,8 @@ export const ROOT_HEADER = "forgebook-root";
  * @param load - loads a module on the server (the dev server's `ssrLoadModule`).
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
- * @param params - the query: `id` for a story, `view` for the links.
+ * @param params - the query: `id` for a story, `view` for the links, `usedIn=true` for the list's "Used in" (a
+ *   story's comes with it when the catalogue offers it).
  * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
  */
 export const agentAnswer = async (
@@ -95,7 +113,12 @@ export const agentAnswer = async (
   try {
     const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
     const tree = storyTree(loaded.sources);
-    if (route === "stories") return { status: 200, body: storiesDocument(config.title, tree, pages, view) };
+    const isUsedIn = config.lists.usedIn !== false;
+    if (route === "stories") {
+      const usage =
+        isUsedIn && params.get("usedIn") === "true" ? await usageBySource(loaded.sources) : undefined;
+      return { status: 200, body: storiesDocument(config.title, tree, pages, view, usage) };
+    }
     if (route !== "story") return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
     const id = params.get("id") ?? "";
     const location = findStory(tree, id);
@@ -109,7 +132,10 @@ export const agentAnswer = async (
       docs: await settled(files.docs[file]),
       preview: loaded.preview
     };
-    return { status: 200, body: storyDocument(location, parts, pages, view) };
+    const index = isUsedIn ? await sourceUsage(source) : undefined;
+    // a usage that cannot be read leaves "Used in" out, never the story
+    const usage = index === undefined || typeof index === "string" ? undefined : { tree, index };
+    return { status: 200, body: storyDocument(location, parts, pages, view, usage) };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
   }

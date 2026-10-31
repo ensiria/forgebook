@@ -1728,6 +1728,63 @@
 
   }
 
+  // "Used in": its heading folds it, as a sidebar family folds (`UsedIn.tsx`)
+  .forgebook-used-in__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    @include mixins.focus-ring;
+  }
+
+  .forgebook-used-in__list {
+    display: grid;
+    gap: $space-2-5;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .forgebook-used-in__user {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: $space-1 $space-2;
+  }
+
+  .forgebook-used-in__component {
+    font-weight: 600;
+  }
+
+  .forgebook-used-in__note {
+    margin: 0;
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  .forgebook-used-in__stories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1 $space-2;
+    flex-basis: 100%;
+  }
+
+  .forgebook-used-in__story {
+    font: $text-caption;
+    color: $text-secondary;
+    text-decoration: none;
+
+    &:hover {
+      color: $accent-text;
+      text-decoration: underline;
+    }
+  }
+
   .forgebook-doc__section {
     display: grid;
     gap: $space-4;

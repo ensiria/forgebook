@@ -40,6 +40,18 @@ export type AgentStory = {
   readonly links: StoryLinks;
 };
 
+/** A component whose stories use another ("Used in"). */
+export type AgentUsingComponent = {
+  /** Its id, as `AgentComponent.id`. */
+  readonly id: string;
+  /** Its title. */
+  readonly title: string;
+  /** Whether one of its stories renders the component itself, not only through another component. */
+  readonly isDirect: boolean;
+  /** The ids of its stories that use the component. */
+  readonly stories: readonly string[];
+};
+
 /** A component (a story file) and its stories. */
 export type AgentComponent = {
   /** `<source>:<title>` in kebab case. */
@@ -52,6 +64,11 @@ export type AgentComponent = {
   readonly file: string;
   /** Its stories: the listed ones in the catalogue's order, then the unlisted ones. */
   readonly stories: readonly AgentStory[];
+  /**
+   * The other components of its source whose stories use it, direct users first; only when asked for (it reads the
+   * package's import graph) and the catalogue offers it.
+   */
+  readonly usedIn?: readonly AgentUsingComponent[];
 };
 
 /** A source of stories: a package's, or the project's own. */
@@ -82,8 +99,8 @@ export type StoryDocument = {
   readonly schema: AgentSchema;
   /** The story, with its links in the view asked for. */
   readonly story: AgentStory;
-  /** Its component's id and title. */
-  readonly component: Pick<AgentComponent, "id" | "title" | "source" | "file">;
+  /** Its component's id and title, and its "Used in" when the catalogue offers it. */
+  readonly component: Pick<AgentComponent, "id" | "title" | "source" | "file" | "usedIn">;
   /**
    * The component's docs as the props panel reads them (its props, their types, defaults and TSDoc); none when the
    * story file names no component, or its docs could not be read (the reason is then in `problems`).
