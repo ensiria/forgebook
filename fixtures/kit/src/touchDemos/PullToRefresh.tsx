@@ -100,7 +100,12 @@ export const PullToRefresh = ({ title }: PullToRefreshProps): ReactNode => {
           Refresh
         </button>
       </header>
-      <div className="pull-feed__indicator" style={{ height: isRefreshing ? 48 : pull }} aria-live="polite">
+      <div
+        className="pull-feed__indicator"
+        data-pulling={pull > 0 && !isRefreshing ? "" : undefined}
+        style={{ height: isRefreshing ? 48 : pull }}
+        aria-live="polite"
+      >
         {isRefreshing ? (
           <>
             <span className="pull-feed__spinner" aria-hidden="true" />

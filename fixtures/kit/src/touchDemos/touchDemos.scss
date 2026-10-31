@@ -392,7 +392,13 @@
   overflow: hidden;
   color: #6a6a71;
   font-size: 13px;
+  // animated only on its way back or to the spinner: while pulled it follows the finger, or each move would restart
+  // the transition and the pull would lag behind
   transition: height 200ms ease-out;
+
+  &[data-pulling] {
+    transition: none;
+  }
 }
 
 .pull-feed__spinner {
