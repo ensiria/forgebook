@@ -204,7 +204,13 @@
       }
     },
     {
-      "includes": ["**/*.config.ts", "**/*.config.mts", "**/*.config.js"],
+      "includes": [
+        "**/*.config.ts",
+        "**/*.config.mts",
+        "**/*.config.js",
+        "**/.storybook/main.ts",
+        "**/.storybook/preview.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {

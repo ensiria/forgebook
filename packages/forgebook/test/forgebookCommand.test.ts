@@ -1,11 +1,11 @@
 /**
  * Tests for the `forgebook` commands as a person, a CI step or an agent runs them: a process on a small catalogue with
- * no dev server running, so each answers from a server of its own; `agents` in a project folder of its own.
+ * no dev server running, so each answers from a server of its own; `agents` and `init` in a project folder of their own.
  *
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,7 +13,7 @@ import { runScriptProcess } from "@ensiria/cli-kit/testing";
 import type { ScriptProcessRun } from "@ensiria/cli-kit/testing.types";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { KIT_DIR } from "./fixturePaths.ts";
+import { KIT_DIR, STORYBOOK_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** The command's entry. */
@@ -197,4 +197,30 @@ describe("forgebook agents", () => {
       "name: forgebook"
     );
   });
+});
+
+describe("forgebook init", () => {
+  it("writes forgebook.config.ts from a project's Storybook files, and refuses to replace it without --force", () => {
+    const project = join(root, "on-storybook");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+    writeFileSync(join(project, "package.json"), '{ "name": "on-storybook", "type": "module" }\n');
+    const init = (...extra: readonly string[]): ReturnType<typeof spawnSync> =>
+      spawnSync(process.execPath, [ENTRY, "init", "--from", "storybook", ...extra], {
+        cwd: project,
+        encoding: "utf8"
+      });
+    const first = init();
+    expect(first.status).toBe(0);
+    const config = readFileSync(join(project, "forgebook.config.ts"), "utf8");
+    expect(config).toContain('  title: "on-storybook",');
+    expect(config).toContain('"src/**/*.stories.tsx"');
+    expect(config).toContain('  preview: ".storybook/preview.tsx",');
+    expect(config).toContain('id: "density"');
+    expect(first.stdout).toContain("forgebook dev");
+    expect(first.stderr).toContain("The MDX pages are left out");
+    const again = init();
+    expect(again.status).toBe(1);
+    expect(again.stderr).toContain("forgebook.config.ts is already there");
+    expect(init("--force").status).toBe(0);
+  }, 60_000);
 });

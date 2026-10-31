@@ -24,6 +24,7 @@ import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite } from "./catalogueVite.ts";
+import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
@@ -231,6 +232,7 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...initCommands(forgebook),
     mcp: forgebook.command({
       summary:
         "Serve the catalogue's stories to an agent over the Model Context Protocol, on stdin and stdout.",

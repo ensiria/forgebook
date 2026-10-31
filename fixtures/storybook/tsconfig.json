@@ -7,5 +7,5 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src", "stories.ts"]
+  "include": ["src", "stories.ts", ".storybook"]
 }

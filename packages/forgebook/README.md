@@ -147,6 +147,13 @@ titles from the file's path, `args` and `argTypes` (with their controls), action
 It does not read MDX, doc blocks or addons. Actions are explicit only: an `on*` prop is not turned into an action by
 its name.
 
+To try it on a Storybook project, run `npx forgebook init --from storybook` in the folder that holds `.storybook`. It
+writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
+and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
+computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
+become switches. It reads React on Vite (`@storybook/react-vite`) only, never replaces a configuration without
+`--force`, and lists what it left out.
+
 ## Commands
 
 | Command | What it does |
@@ -154,6 +161,7 @@ its name.
 | `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
+| `forgebook init --from storybook` | Writes `forgebook.config.ts` from a project's `.storybook` folder: its story globs, preview and toolbar globals |
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
