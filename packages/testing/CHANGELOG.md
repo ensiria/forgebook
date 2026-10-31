@@ -1,3 +1,18 @@
+## 0.1.2 (2026-10-31)
+
+### 🩹 Fixes
+
+- point the repository URLs at the ensiria organisation ([8d0b3e2](https://github.com/ensiria/forgebook/commit/8d0b3e2))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.2
+- Updated forgebook to 0.1.2
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.1 (2026-10-31)
 
 ### 🩹 Fixes
