@@ -5,7 +5,7 @@
  * @remarks
  * Each test opens the frame for a story in a variant (the theme, the contrast, the style sheets), waits for the
  * frame to say the story is shown (`data-forgebook-status`), its story clock held at its start, and fails on an error in the console or the page, or on
- * an axe violation of WCAG 2.2 A and AA, on an element that spills out of its parent (`spills.ts`: what overlaps a
+ * an axe violation of WCAG 2.2 A and AA, on an element that spills out of its parent (`forgebook/spills`: what overlaps a
  * neighbour when the story is narrower than it was drawn for), on an overlay its play leaves open past the frame the
  * catalogue would give it (`overlays.ts`: the story then declares `parameters.height`), or on the source's own
  * `check`. The variants include a

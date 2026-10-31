@@ -18,7 +18,9 @@ export default defineConfig({
   sources: ["@fixture/kit/stories", "@fixture/storybook/stories"],
   languages: [
     { id: "it", label: "Italiano" },
-    { id: "pseudo", label: "Pseudo", isPseudo: true }
+    { id: "pseudo", label: "Pseudo", isPseudo: true },
+    // read right to left, with no texts of its own: it draws the stories right to left, in English
+    { id: "ar", label: "العربية", dir: "rtl" }
   ],
   presets: [kitPreset()],
   // lists of its own, so the shell's tests see each set by a catalogue

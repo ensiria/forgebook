@@ -179,6 +179,13 @@ const shellStrings = {
   setByStory: "Set by the story",
   required: "Required",
   resetArgs: "Reset",
+  worstCase: "Worst case",
+  worstCaseHint:
+    "Long texts with a word too long to break, huge numbers: the elements that spill are outlined",
+  spills: (count: number): string => {
+    if (count === 0) return "Nothing spills";
+    return count === 1 ? "1 element spills" : `${count} elements spill`;
+  },
   events: "Events",
   calls: "Calls",
   noCalls: "No call yet",

@@ -85,13 +85,17 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 
 - **One frame per story**, so a story's styles and globals never leak into another, and its address opens it alone.
 - **Switches** for theme, contrast and motion, and the languages you declare; a library adds its own (density, brand)
-  through a preset.
+  through a preset. A direction switch draws every story right to left, and a language declared `dir: "rtl"` does
+  it by itself.
 - **A toolbar each reader arranges**: whoever uses the catalogue pins the controls they use to the toolbar, orders
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
 - **Widths** to draw a story at, and a **compare** view that draws the same story once per value of one or two
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
   their TSDoc, nothing written twice.
+- **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
+  long to break and every number a huge one, kept in the address; the elements that then spill out of their parents
+  are outlined and counted, as the browser tests find them. Reset undoes it.
 - **Examples that fill the page**: on a component's page, any story's box opens over the page, at a width of its own,
   without loading its story again.
 - **Used in**: a component's page lists the other components whose stories use it, directly or through another
@@ -123,7 +127,7 @@ export default defineConfig({
   stories: ["src/**/*.stories.tsx"],
   // what starts on the toolbar, in this order: a switch's id, or "backdrop", "sheets", "text", "width"
   toolbar: ["theme", "contrast", "width", "text"],
-  // Forgebook's own controls this catalogue does without
+  // Forgebook's own controls this catalogue does without (direction: false drops the direction switch)
   controls: { sheets: false }
 });
 ```

@@ -784,6 +784,7 @@ test.describe("the toolbar each person arranges", () => {
       "speed",
       "press",
       "lang",
+      "dir",
       "backdrop",
       "sheets",
       "text"
@@ -848,7 +849,7 @@ test.describe("the toolbar each person arranges", () => {
     await page.keyboard.press("ArrowUp");
     await expect(handle).toBeFocused();
     expect((await menuRows(page)).slice(0, 4)).toEqual(["theme", "contrast", "motion", "width"]);
-    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 10");
+    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 11");
     expect(await barControls(page)).toEqual(["theme", "contrast", "motion", "width"]);
     // by pointer: the theme dragged below the contrast
     const grip = page.getByRole("button", { name: "Move Theme" });
@@ -984,6 +985,27 @@ test.describe("the stories' texts", () => {
     await expect(frameOf(page).locator("span").first()).toHaveText(/^\[Bîllîñg pérîöd·+\]$/);
   });
 
+  test("right to left: the direction switch and a language read so set dir on the story's root, live", async ({
+    page
+  }) => {
+    await page.goto(story("in-row", "dir=rtl"));
+    await frameStatus(page);
+    const root = frameOf(page).locator("html");
+    await expect(root).toHaveAttribute("dir", "rtl");
+    await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
+    await page.getByRole("button", { name: /^View/ }).click();
+    await popoversSettled(page);
+    await page.getByRole("group", { name: "Direction" }).getByRole("radio", { name: "Left to right" }).check({
+      force: true
+    });
+    // left to right is the root's own: no attribute, and the frame kept its story
+    await expect(root).not.toHaveAttribute("dir");
+    await expect(root).toHaveAttribute("data-test-mark", "kept");
+    await page.goto(story("in-row", "lang=ar"));
+    await frameStatus(page);
+    await expect(frameOf(page).locator("html")).toHaveAttribute("dir", "rtl");
+  });
+
   test("another language draws the story without loading its frame again", async ({ page }) => {
     await page.goto(story("in-row"));
     await frameStatus(page);
@@ -1025,6 +1047,30 @@ test.describe("the panel", () => {
     await page.reload();
     await frameStatus(page);
     await expect(frameOf(page).locator("select")).toHaveAttribute("data-size", "lg");
+  });
+
+  test("Worst case fills the props with long texts and huge numbers, outlines the spills, and Reset undoes it", async ({
+    page
+  }) => {
+    // narrow enough that the unbreakable word cannot fit
+    await page.goto(story("overview", "width=320"));
+    await frameStatus(page);
+    const worst = page.getByRole("button", { name: "Worst case" });
+    await worst.click();
+    await expect(page).toHaveURL(/args=/);
+    await expect(worst).toBeDisabled();
+    // the hint takes a text: the long one, whose unbreakable word runs out of the story's root
+    await expect(frameOf(page).locator("small")).toContainText("Supercalifragilisticexpialidocious");
+    await expect(page.locator(".forgebook-tab-foot__note")).toHaveText(/^\d+ elements? spills?$/);
+    await expect(frameOf(page).locator("[data-forgebook-spill]").first()).toBeAttached();
+    await page.reload();
+    await frameStatus(page);
+    await expect(frameOf(page).locator("[data-forgebook-spill]").first()).toBeAttached();
+    await page.getByRole("button", { name: "Reset", exact: true }).click();
+    await expect(page).not.toHaveURL(/args=/);
+    await expect(worst).toBeEnabled();
+    await expect(page.locator(".forgebook-tab-foot__note")).toHaveCount(0);
+    await expect(frameOf(page).locator("[data-forgebook-spill]")).toHaveCount(0);
   });
 
   test("Code shows a story's render as written, and the JSX of a story drawn from its args", async ({

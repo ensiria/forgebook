@@ -13,10 +13,10 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import type { A11ySettings } from "forgebook/catalogue";
+import { findSpills } from "forgebook/spills";
 import type { StoryProblem } from "forgebook/story-check";
 
 import { findOverlaysPastFrame } from "./overlays.ts";
-import { findSpills } from "./spills.ts";
 
 /**
  * The page's errors from now on: uncaught ones and the console's, in the order they come.

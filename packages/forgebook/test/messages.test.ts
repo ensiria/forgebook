@@ -83,6 +83,10 @@ describe("messages", () => {
     expect(isShellMessage({ type: "forgebook:play-again" })).toBe(true);
     expect(isShellMessage({ type: "forgebook:tools", tools: ["outline", "measure"] })).toBe(true);
     expect(isShellMessage({ type: "forgebook:tools", tools: ["ruler"] })).toBe(false);
+    expect(isShellMessage({ type: "forgebook:spills", isOn: true })).toBe(true);
+    expect(isShellMessage({ type: "forgebook:spills" })).toBe(false);
+    expect(isFrameMessage({ type: "forgebook:spills", storyId: "a", count: 2 })).toBe(true);
+    expect(isFrameMessage({ type: "forgebook:spills", storyId: "a", count: "2" })).toBe(false);
     const trace = {
       status: "failed",
       steps: [{ label: "open", status: "failed", ms: 3, error: "x" }],

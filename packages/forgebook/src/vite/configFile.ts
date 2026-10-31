@@ -16,7 +16,7 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
-import type { CatalogueLists, OwnControlId, PanelTabId } from "../catalogue.ts";
+import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
@@ -136,7 +136,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
  */
 export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   const tabs: Partial<Record<PanelTabId, false>> = {};
-  const controls: Partial<Record<OwnControlId, false>> = {};
+  const controls: Partial<Record<TurnedOffControl, false>> = {};
   const strings: Record<string, string> = {};
   let merged: CatalogueLists = {};
   for (const lists of all) {

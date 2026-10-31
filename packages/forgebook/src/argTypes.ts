@@ -16,6 +16,7 @@
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
 import type { PropDocs } from "./componentDocs.ts";
+import type { NamedValues } from "./namedValues.ts";
 
 /** A control as the panel draws it; `none` for an arg the panel lists without a control. */
 export type PanelControl =
@@ -71,6 +72,46 @@ export type PanelProp = PropDocs & {
   /** A range's or a number's step. */
   readonly step?: number;
 };
+
+/**
+ * Whether a prop is a colour: named so by its `argTypes`, or by the name convention (`color`, `accentColor`).
+ *
+ * @param prop - the prop.
+ */
+export const isColorProp = (prop: PanelProp): boolean =>
+  prop.control === "color" ||
+  (prop.control === undefined &&
+    prop.kind === "text" &&
+    (prop.name === "color" || prop.name.endsWith("Color")));
+
+/**
+ * Whether a prop is chosen among the values the source names for its type (`IconComponent`).
+ *
+ * @param prop - the prop.
+ * @param namedValues - the source's named values.
+ */
+export const isNamedProp = (prop: PanelProp, namedValues: NamedValues): boolean =>
+  prop.kind === "other" && prop.control === undefined && namedValues[prop.type] !== undefined;
+
+/**
+ * The props the panel can set: a prop of a type the source names values for is chosen among them, a node that takes a
+ * text is set as one; any other `other` prop, and an event, cannot be set; nor a prop the story's controls leave out.
+ *
+ * @param props - the component's props, with the story's `argTypes` laid over them.
+ * @param controls - the props the story lets the panel set.
+ * @param namedValues - the source's named values.
+ */
+export const settableProps = (
+  props: readonly PanelProp[],
+  controls: StoryControlsSetting,
+  namedValues: NamedValues
+): PanelProp[] =>
+  props.filter(
+    (prop) =>
+      (prop.kind !== "other" || prop.canTakeText === true || isNamedProp(prop, namedValues)) &&
+      prop.kind !== "event" &&
+      (controls === "all" || controls.includes(prop.name))
+  );
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>

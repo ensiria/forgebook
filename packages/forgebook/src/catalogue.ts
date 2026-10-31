@@ -47,6 +47,9 @@ export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width"] as const;
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
 
+/** What `controls` turns off: one of Forgebook's own controls, or its ready-made direction switch. */
+export type TurnedOffControl = OwnControlId | "direction";
+
 /** The accessibility rules the Accessibility tab and the generated tests check. */
 export type A11ySettings = {
   /** The axe tags whose rules apply. */
@@ -86,9 +89,10 @@ export type CatalogueLists = {
   readonly strings?: Readonly<Record<string, string>>;
   /**
    * Forgebook's own controls turned off (`{ sheets: false }`): shown nowhere, and the background, the style sheets
-   * and the text size keep their default; the stage's width is still set by the stage's handle.
+   * and the text size keep their default; the stage's width is still set by the stage's handle. `direction: false`
+   * drops the ready-made direction switch.
    */
-  readonly controls?: Readonly<Partial<Record<OwnControlId, false>>>;
+  readonly controls?: Readonly<Partial<Record<TurnedOffControl, false>>>;
   /**
    * The controls that start on the toolbar, in their order, by id (a switch's id or one of `OWN_CONTROL_IDS`); the
    * colour scheme, the contrast and the width by default. A control turned off in `controls` (here or by a preset) is

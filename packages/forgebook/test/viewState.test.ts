@@ -73,7 +73,8 @@ describe("the view in the address", () => {
       motion: "system",
       speed: "normal",
       press: "default",
-      lang: ""
+      lang: "",
+      dir: "ltr"
     });
   });
 

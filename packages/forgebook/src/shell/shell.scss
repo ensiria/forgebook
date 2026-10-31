@@ -553,8 +553,22 @@
   }
 
   .forgebook-tab-foot {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
     padding: $space-2-5 $space-3-5;
     box-shadow: $line-top;
+  }
+
+  // what the worst case found: the spills read as a problem, none as a plain note
+  .forgebook-tab-foot__note {
+    margin-inline-start: auto;
+    font: $text-caption;
+    color: $text-secondary;
+
+    &[data-has-spills="true"] {
+      color: $danger-text;
+    }
   }
 
   // a container: on a narrow page the buttons keep only their icons

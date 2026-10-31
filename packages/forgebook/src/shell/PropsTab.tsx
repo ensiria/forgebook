@@ -11,11 +11,12 @@
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
-import type { PanelProp } from "../argTypes.ts";
+import { isColorProp, isNamedProp, type PanelProp, settableProps } from "../argTypes.ts";
 import { type ArgValue, isNamedArg, type PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import { ChoiceControl, NumberField, textOf } from "./PropFields.tsx";
 import { STRINGS } from "./strings.ts";
+import type { WorstCaseState } from "./worstArgs.ts";
 
 /** A prop the story gives a text by its key (`storyText("key")`): the key, and whether the panel wrote over it. */
 export type TextArgNote = {
@@ -37,18 +38,13 @@ export type PropsTabProps = {
   readonly onValueChange: (name: string, value: ArgValue | undefined) => void;
   /** Removes every value the panel set. */
   readonly onReset: () => void;
+  /** The worst case the tab's button sets, and the spills counted while it is on; none hides the button. */
+  readonly worstCase?: WorstCaseState | undefined;
   /** The values the source offers by name for a type the panel cannot write (`IconComponent`); none by default. */
   readonly namedValues?: NamedValues | undefined;
   /** The props the story gives a text by its key, by name; none by default. */
   readonly textArgs?: Readonly<Record<string, TextArgNote>>;
 };
-
-/** A colour prop: named so by its `argTypes`, or by the name convention (`color`, `accentColor`). */
-const isColorProp = (prop: PanelProp): boolean =>
-  prop.control === "color" ||
-  (prop.control === undefined &&
-    prop.kind === "text" &&
-    (prop.name === "color" || prop.name.endsWith("Color")));
 
 /** A CSS colour as the colour picker takes it (`#rrggbb`), or black when the value is not one. */
 const pickerColor = (value: ArgValue | undefined): string =>
@@ -255,6 +251,31 @@ const Toggle = ({
 };
 
 /**
+ * The worst case's button, and once it is on, how many elements spill (the frame outlines them).
+ *
+ * @param props - the worst case.
+ */
+const WorstCaseControl = ({ worstCase }: { readonly worstCase: WorstCaseState }): ReactNode => (
+  <>
+    <button
+      type="button"
+      className="forgebook-text-button"
+      aria-pressed={worstCase.isOn}
+      disabled={worstCase.isOn}
+      title={STRINGS.worstCaseHint}
+      onClick={worstCase.onApply}
+    >
+      {STRINGS.worstCase}
+    </button>
+    {worstCase.isOn && worstCase.spillCount !== undefined ? (
+      <output className="forgebook-tab-foot__note" data-has-spills={worstCase.spillCount > 0}>
+        {STRINGS.spills(worstCase.spillCount)}
+      </output>
+    ) : null}
+  </>
+);
+
+/**
  * The Props tab.
  *
  * @param props - the props, the values, which props the story lets the panel set, and the setters.
@@ -265,18 +286,12 @@ export const PropsTab = ({
   controls,
   onValueChange,
   onReset,
+  worstCase,
   namedValues = {},
   textArgs = NO_TEXT_ARGS
 }: PropsTabProps): ReactNode => {
-  // a prop of a type the source names values for is chosen among them, a node that takes a text is set as one; any
-  // other `other` prop cannot be set from the panel
-  const isNamed = (prop: PanelProp): boolean =>
-    prop.kind === "other" && prop.control === undefined && namedValues[prop.type] !== undefined;
-  const isSettable = (prop: PanelProp): boolean =>
-    (prop.kind !== "other" || prop.canTakeText === true || isNamed(prop)) &&
-    prop.kind !== "event" &&
-    (controls === "all" || controls.includes(prop.name));
-  const settable = props.filter(isSettable);
+  const isNamed = (prop: PanelProp): boolean => isNamedProp(prop, namedValues);
+  const settable = settableProps(props, controls, namedValues);
   const groups = [
     {
       title: STRINGS.propGroups.choice,
@@ -288,7 +303,7 @@ export const PropsTab = ({
     }
   ].filter((group) => group.props.length > 0);
   const toggles = settable.filter((prop) => prop.kind === "toggle");
-  const others = props.filter((prop) => prop.kind !== "event" && !isSettable(prop));
+  const others = props.filter((prop) => prop.kind !== "event" && !settable.includes(prop));
   const hasControls = controls === "all" || controls.length > 0;
   return (
     <div className="forgebook-tab-props">
@@ -340,6 +355,7 @@ export const PropsTab = ({
           <button type="button" className="forgebook-text-button" onClick={onReset}>
             {STRINGS.resetArgs}
           </button>
+          {worstCase?.canApply === true ? <WorstCaseControl worstCase={worstCase} /> : null}
         </div>
       ) : null}
     </div>

@@ -116,6 +116,14 @@ export type FrameMessage =
       readonly storyId: string;
       /** What went wrong. */
       readonly message: string;
+    }
+  | {
+      /** The spills were measured again, while the shell asks for them (`forgebook:spills`). */
+      readonly type: "forgebook:spills";
+      /** The story's id. */
+      readonly storyId: string;
+      /** How many elements spill out of their parents. */
+      readonly count: number;
     };
 
 /** From the shell to a frame. */
@@ -165,6 +173,12 @@ export type ShellMessage =
   | {
       /** Bring the story clock back to its start and mount the story again. */
       readonly type: "forgebook:clock-restart";
+    }
+  | {
+      /** Outline the elements that spill out of their parents and count them, or stop. */
+      readonly type: "forgebook:spills";
+      /** Whether the frame measures the spills. */
+      readonly isOn: boolean;
     }
   | {
       /** The view's live part changed: the frame applies it on its root, without loading again. */
@@ -251,6 +265,8 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
       );
     case "forgebook:size":
       return typeof value["height"] === "number";
+    case "forgebook:spills":
+      return typeof value["count"] === "number";
     case "forgebook:call":
       return (
         typeof value["name"] === "string" &&
@@ -288,6 +304,7 @@ export const isShellMessage = (value: unknown): value is ShellMessage => {
   if (value["type"] === "forgebook:args") return isPanelArgs(value["args"]);
   if (value["type"] === "forgebook:view") return isLiveView(value["view"]);
   if (value["type"] === "forgebook:clock") return isClockState(value["state"]);
+  if (value["type"] === "forgebook:spills") return typeof value["isOn"] === "boolean";
   if (value["type"] === "forgebook:tools") {
     const tools = value["tools"];
     return Array.isArray(tools) && tools.every((tool) => MEASURE_TOOLS.some((known) => known === tool));

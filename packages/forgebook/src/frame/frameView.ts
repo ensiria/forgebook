@@ -9,7 +9,7 @@ import type { StorySheets } from "@forgebook/story-format/source";
 
 import { backdropSheet } from "../backdrops.ts";
 import type { CatalogueSettings } from "../catalogue.ts";
-import { switchValueOf, type ViewSwitch } from "../switches.ts";
+import { switchValueOf, switchWithRole, type ViewSwitch } from "../switches.ts";
 import { type LiveView, schemeOf, type ViewState } from "../viewState.ts";
 
 /** The id of the style sheet that draws the backdrop. */
@@ -89,8 +89,8 @@ const applySwitch = (root: HTMLElement, each: ViewSwitch, value: string | undefi
 };
 
 /**
- * Applies the view's live part on a document's root: each declared switch that applies there, the font size, and the
- * backdrop behind the story in the view's scheme.
+ * Applies the view's live part on a document's root: each declared switch that applies there, right to left for a
+ * language read so, the font size, and the backdrop behind the story in the view's scheme.
  *
  * @param root - the document's root element.
  * @param view - the view's live part: the frame applies it again whenever the shell sends a change.
@@ -102,6 +102,10 @@ export const applyView = (
   catalogue: Pick<CatalogueSettings, "switches" | "backdrops">
 ): void => {
   for (const each of catalogue.switches) applySwitch(root, each, view.switches[each.id]);
+  // a language read right to left draws the story right to left, whatever the direction switch says
+  const language = switchWithRole(catalogue.switches, "language");
+  if (language !== undefined && switchValueOf(language, view.switches[language.id])?.isRightToLeft === true)
+    root.setAttribute("dir", "rtl");
   root.style.fontSize = `${view.text}%`;
   const backdrop = catalogue.backdrops.find((each) => each.id === view.backdrop);
   applyBackdrop(root.ownerDocument, backdropSheet(backdrop, schemeOf(view, catalogue.switches)));

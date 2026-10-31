@@ -44,6 +44,7 @@ import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import { applyTools } from "./measureTools.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
+import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import { mergedPreviews, readPreview, readStory } from "./storyModule.ts";
 import { runStory, type StoryControls } from "./storyRun.ts";
@@ -129,7 +130,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const params = new URLSearchParams(window.location.search);
   const storyId = params.get("story") ?? "";
   const languages = config.languages ?? [];
-  const switches = catalogueSwitches(config.switches, languages);
+  const switches = catalogueSwitches(config.switches, languages, config.lists?.controls?.direction !== false);
   const catalogue = catalogueSettings("", switches, config.lists);
   const preview = mergedPreviews((config.previews ?? []).map(readPreview));
   const view = parseView(window.location.search, catalogue);
@@ -140,9 +141,13 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   let changeShown: ((live: LiveView) => void) | undefined;
   // the shell sends the live part of a changed view: applied on the root, and kept in the address so a reload (an
   // edit, a stale module) shows the same view
+  const showSpills = spillOutline(document, ".forgebook-frame", (count) =>
+    tellShell({ type: "forgebook:spills", storyId, count })
+  );
   window.addEventListener("message", (event: MessageEvent): void => {
     if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
     if (event.data.type === "forgebook:tools") applyTools(document, event.data.tools, catalogue.gridStep);
+    if (event.data.type === "forgebook:spills") showSpills(event.data.isOn);
     if (event.data.type !== "forgebook:view") return;
     applyView(document.documentElement, withFixed(event.data.view, fixed), catalogue);
     changeShown?.(event.data.view);

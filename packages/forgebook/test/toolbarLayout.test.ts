@@ -38,6 +38,7 @@ describe("placedControls", () => {
       "speed:-",
       "press:-",
       "lang:-",
+      "dir:-",
       "backdrop:-",
       "sheets:-",
       "text:-"
@@ -56,6 +57,7 @@ describe("placedControls", () => {
       "motion:-",
       "speed:-",
       "press:-",
+      "dir:-",
       "backdrop:-",
       "text:-"
     ]);
@@ -98,7 +100,8 @@ describe("placedControls", () => {
       "sheets:-",
       "text:-",
       // not in the arrangement: the language switch came after it was made
-      "lang:-"
+      "lang:-",
+      "dir:-"
     ]);
   });
 });

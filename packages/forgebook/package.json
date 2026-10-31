@@ -64,7 +64,8 @@
     "./vite/story-files-module": "./src/vite/storyFilesModule.ts",
     "./switches": "./src/switches.ts",
     "./catalogue": "./src/catalogue.ts",
-    "./story-check": "./src/storyCheck.ts"
+    "./story-check": "./src/storyCheck.ts",
+    "./spills": "./src/spills.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -246,6 +247,10 @@
       "./story-check": {
         "types": "./dist/src/storyCheck.d.ts",
         "default": "./dist/src/storyCheck.js"
+      },
+      "./spills": {
+        "types": "./dist/src/spills.d.ts",
+        "default": "./dist/src/spills.js"
       }
     },
     "bin": {

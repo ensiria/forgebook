@@ -6,7 +6,9 @@
  * Runs in the story's page (`page.evaluate`), so it takes no import. An element spills when its box reaches past its
  * parent's box by more than a pixel, sideways, and the parent shows its overflow: a parent that clips or scrolls
  * (`overflow` other than `visible`) and an element taken out of the flow (`absolute`, `fixed`) are left out, as is
- * anything inside a frame-level layer (`data-forgebook-allow-spill`, for a story that shows a spill on purpose).
+ * anything inside a frame-level layer (`data-forgebook-allow-spill`, for a story that shows a spill on purpose). The
+ * same finder serves the browser tests (`@forgebook/testing`) and the frame's outline of a worst case, so both find the
+ * same spills; the frame passes an attribute to mark the elements with, which a style sheet outlines.
  *
  * @module
  */
@@ -25,8 +27,9 @@ export type Spill = {
  * The spills inside a root, measured in the page.
  *
  * @param rootSelector - the story's root (`.forgebook-frame`).
+ * @param markAttribute - an attribute set on each element that spills, taken off the others first; none marks nothing.
  */
-export const findSpills = (rootSelector: string): Spill[] => {
+export const findSpills = (rootSelector: string, markAttribute?: string): Spill[] => {
   const pathOf = (element: Element): string => {
     const classes = [...element.classList].slice(0, 2).join(".");
     return classes === "" ? element.tagName.toLowerCase() : `${element.tagName.toLowerCase()}.${classes}`;
@@ -52,10 +55,15 @@ export const findSpills = (rootSelector: string): Spill[] => {
   };
   const root = document.querySelector(rootSelector);
   if (root === null) return [];
-  return [...root.querySelectorAll("*")].flatMap((element) => {
+  const elements = [...root.querySelectorAll("*")];
+  // the marks of the last measure come off first, so an element that no longer spills loses its outline
+  if (markAttribute !== undefined) for (const element of elements) element.removeAttribute(markAttribute);
+  return elements.flatMap((element) => {
     const parent = element.parentElement;
     if (parent === null || !isMeasured(element, parent)) return [];
     const by = overreach(element, parent);
-    return by > 1 ? [{ element: pathOf(element), parent: pathOf(parent), by: Math.round(by) }] : [];
+    if (by <= 1) return [];
+    if (markAttribute !== undefined) element.setAttribute(markAttribute, "");
+    return [{ element: pathOf(element), parent: pathOf(parent), by: Math.round(by) }];
   });
 };

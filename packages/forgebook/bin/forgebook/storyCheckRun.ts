@@ -134,7 +134,11 @@ const runOnStories = async (
 ): Promise<unknown> => {
   const call = await testingFunction(config.dir, run.specifier, run.name);
   if (typeof call === "string") return call;
-  const switches = catalogueSwitches(config.switches, config.languages);
+  const switches = catalogueSwitches(
+    config.switches,
+    config.languages,
+    config.lists.controls?.direction !== false
+  );
   const views = queriesOf(input.views, switches);
   if (typeof views === "string") return views;
   const served = await servedCatalogue(config, url);

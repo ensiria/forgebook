@@ -13,7 +13,7 @@
 
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
-import type { PanelArgTypes } from "../argTypes.ts";
+import { type PanelArgTypes, panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
 import type { ArgValue, PanelArgs, ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
@@ -49,6 +49,7 @@ import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages }
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCode } from "./useStoryCode.ts";
+import { useWorstCase } from "./useWorstCase.ts";
 
 /** The `argTypes` of a story before its frame reported them. */
 const NO_ARG_TYPES: PanelArgTypes = {};
@@ -251,6 +252,23 @@ export const Stage = ({
     [docs, matrixAxes]
   );
 
+  const values = { ...storyArgs.get(story.id), ...panelArgs };
+  const settable = useMemo(
+    () =>
+      docs.status === "ready"
+        ? settableProps(panelProps(docs.value.props, panel.argTypes), panel.controls, namedValues ?? {})
+        : [],
+    [docs, panel.argTypes, panel.controls, namedValues]
+  );
+  const worstCase = useWorstCase({
+    storyRef,
+    storyId: story.id,
+    settable,
+    values,
+    panelArgs,
+    onPanelArgsChange
+  });
+
   const clockControls = useStoryClockControls(frameRef, story.id);
   const { replayable, clocked, heights, settled } = useFrameMessages({
     onReady: (frame: Window, message: ReadyMessage): void => {
@@ -273,6 +291,7 @@ export const Stage = ({
       // the view may have changed while the frame loaded
       if (!isComparing(view)) send({ type: "forgebook:view", view: liveView(view) });
       send({ type: "forgebook:tools", tools: view.tools });
+      worstCase.sendTo(frame);
       if (message.hasClock && !isComparing(view)) clockControls.sendTo(frame);
     },
     onCall: (call: EventCall): void => setCalls((current) => [call, ...current].slice(0, MAX_CALLS)),
@@ -280,7 +299,8 @@ export const Stage = ({
       setTraces((current) => new Map(current).set(storyId, trace)),
     onChecked: (result: CheckResult): void => {
       if (result.storyId === story.id) storyCheck.receive(result);
-    }
+    },
+    onSpills: worstCase.receive
   });
 
   // the docs may arrive after the frames: they learn the events then
@@ -331,9 +351,10 @@ export const Stage = ({
     argTypes: panel.argTypes,
     controls: panel.controls,
     actions: panel.actions,
-    values: { ...storyArgs.get(story.id), ...panelArgs },
+    values,
     onValueChange: changeValue,
     onReset: (): void => onPanelArgsChange({}),
+    worstCase: worstCase.state,
     namedValues,
     textArgs: Object.fromEntries(
       Object.entries(storyTextKeys.get(story.id) ?? {}).map(([name, key]) => [

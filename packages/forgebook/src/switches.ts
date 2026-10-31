@@ -25,6 +25,8 @@ export type SwitchValue = {
   readonly scheme?: "light" | "dark" | "system";
   /** For a `contrast` switch: whether the value is the higher contrast. */
   readonly isMore?: boolean;
+  /** For a `language` switch: whether the language reads right to left, which draws the story right to left. */
+  readonly isRightToLeft?: boolean;
 };
 
 /** Where a switch applies. */
@@ -43,9 +45,9 @@ export type SwitchApply =
 /**
  * What the catalogue itself reads of a switch: the colour scheme (the loading boxes' and backgrounds' colours, the
  * tests' themes), the contrast (the source's more-contrast colours, the tests' variants), the language (the stories'
- * texts and the language's provider).
+ * texts and the language's provider), the direction (a catalogue's own switch in place of the ready-made one).
  */
-export type SwitchRole = "colorScheme" | "contrast" | "language";
+export type SwitchRole = "colorScheme" | "contrast" | "language" | "direction";
 
 /** A switch of the toolbar or the View menu. */
 export type ViewSwitch = {
@@ -148,7 +150,7 @@ export const LANGUAGE_SWITCH_ID = "lang";
  * @param languages - the languages, by id and name.
  */
 export const languageSwitch = (
-  languages: readonly { readonly id: string; readonly label: string }[]
+  languages: readonly { readonly id: string; readonly label: string; readonly dir?: "rtl" }[]
 ): ViewSwitch => ({
   id: LANGUAGE_SWITCH_ID,
   label: "Language",
@@ -158,7 +160,27 @@ export const languageSwitch = (
   default: "",
   values: [
     { value: "", label: "Stories' own", isUnset: true },
-    ...languages.map((language) => ({ value: language.id, label: language.label }))
+    ...languages.map((language) => ({
+      value: language.id,
+      label: language.label,
+      ...(language.dir === "rtl" ? { isRightToLeft: true } : {})
+    }))
+  ]
+});
+
+/**
+ * The direction the stories are drawn in: left to right (the root's own, no attribute) or right to left, as `dir` on
+ * the frame's root, so a library sees every component mirrored as a right-to-left page shows it.
+ */
+export const directionSwitch = (): ViewSwitch => ({
+  id: "dir",
+  label: "Direction",
+  role: "direction",
+  apply: { kind: "attribute", name: "dir" },
+  default: "ltr",
+  values: [
+    { value: "ltr", label: "Left to right", isUnset: true },
+    { value: "rtl", label: "Right to left" }
   ]
 });
 
@@ -190,22 +212,29 @@ export const switchControl = (each: ViewSwitch): "segments" | "list" =>
 
 /**
  * A catalogue's switches: the ones it declares (the theme and the contrast when it declares none), then, when it or a
- * source offers languages, the language switch over all of them.
+ * source offers languages, the language switch over all of them, then the ready-made direction switch, unless the
+ * catalogue declares its own (the `direction` role) or turned it off.
  *
  * @param declared - the switches the catalogue declares; none for the default ones.
  * @param languages - every language the catalogue and its sources offer, by id and name; the first of an id wins.
+ * @param hasDirection - whether the ready-made direction switch is offered (`controls: { direction: false }` turns it
+ *   off); `true` by default.
  * @throws when the switches cannot be used (`switchesProblem`): a catalogue's configuration error, shown at once.
  */
 export const catalogueSwitches = (
   declared: readonly ViewSwitch[] | undefined,
-  languages: readonly { readonly id: string; readonly label: string }[]
+  languages: readonly { readonly id: string; readonly label: string; readonly dir?: "rtl" }[],
+  hasDirection = true
 ): readonly ViewSwitch[] => {
   const unique = languages.filter(
     (language, index) => languages.findIndex((other) => other.id === language.id) === index
   );
+  const own = declared ?? DEFAULT_SWITCHES;
+  const isDirectionOffered = hasDirection && switchWithRole(own, "direction") === undefined;
   const switches = [
-    ...(declared ?? DEFAULT_SWITCHES),
-    ...(unique.length > 0 ? [languageSwitch(unique)] : [])
+    ...own,
+    ...(unique.length > 0 ? [languageSwitch(unique)] : []),
+    ...(isDirectionOffered ? [directionSwitch()] : [])
   ];
   const problem = switchesProblem(switches);
   if (problem !== undefined) throw new Error(`Forgebook's switches: ${problem}`);

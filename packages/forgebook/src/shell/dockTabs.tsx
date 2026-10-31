@@ -23,6 +23,7 @@ import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
 import { STRINGS } from "./strings.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
+import type { WorstCaseState } from "./worstArgs.ts";
 
 /** What the tabs are built from. */
 export type DockTabsInput = {
@@ -46,6 +47,8 @@ export type DockTabsInput = {
   readonly onValueChange: (name: string, value: ArgValue | undefined) => void;
   /** Removes every value the panel set. */
   readonly onReset: () => void;
+  /** The worst case: whether it can be set, whether it is on, and the spills the frame counts. */
+  readonly worstCase: WorstCaseState;
   /** The values the source names for types the panel cannot write. */
   readonly namedValues: NamedValues | undefined;
   /** The props the story gives a text by its key, by name. */
@@ -93,6 +96,7 @@ const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] 
               controls={input.controls}
               onValueChange={input.onValueChange}
               onReset={input.onReset}
+              worstCase={input.worstCase}
               namedValues={input.namedValues}
               textArgs={input.textArgs}
             />
