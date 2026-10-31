@@ -1,3 +1,13 @@
+## 0.1.3 (2026-10-31)
+
+### 🩹 Fixes
+
+- **testing:** start the frame page with the package manager in use ([44a61bb](https://github.com/ensiria/forgebook/commit/44a61bb))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.2 (2026-10-31)
 
 ### 🩹 Fixes
