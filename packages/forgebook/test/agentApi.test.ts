@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { findStory, storyTree } from "../src/storyTree.ts";
 import {
   type CataloguePages,
+  filteredStories,
   jsonValue,
   storiesDocument,
   storyDocument,
@@ -127,5 +128,20 @@ describe("jsonValue", () => {
     const looped: { name: string; self?: unknown; run: () => void } = { name: "a", run: () => undefined };
     looped.self = looped;
     expect(jsonValue(looped)).toEqual({ name: "a" });
+  });
+});
+
+describe("filteredStories", () => {
+  const document = storiesDocument("Kit catalogue", TREE, PAGES, "");
+
+  it("keeps the components whose title holds the text, any case, and the problems whole", () => {
+    const kept = filteredStories(document, { component: "BUTTON" });
+    expect(kept.components.map((component) => component.title)).toEqual(["Actions/Button"]);
+    expect(kept.problems).toEqual(document.problems);
+  });
+
+  it("keeps one source's components", () => {
+    expect(filteredStories(document, { source: "other" }).components).toEqual([]);
+    expect(filteredStories(document, { source: "kit" }).components).toHaveLength(document.components.length);
   });
 });

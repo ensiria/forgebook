@@ -1,21 +1,32 @@
 #!/usr/bin/env node
 /**
  * The `forgebook` command: runs a catalogue from its `forgebook.config.ts` (`dev`, the dev server) or builds it into
- * static files (`build`), with no page or Vite configuration of the app's own.
+ * static files (`build`), with no page or Vite configuration of the app's own; and answers tools and agents
+ * (`stories`, `story`) with what the catalogue shows.
  *
  * @module
  */
 import { resolve } from "node:path";
 
-import { defineScript, ScriptError } from "@ensiria/cli-kit/script";
+import { defineCommands } from "@ensiria/cli-kit/commands";
+import { EXIT } from "@ensiria/cli-kit/constants";
+import { formatJson } from "@ensiria/cli-kit/files";
+import type { ScriptIo } from "@ensiria/cli-kit/io.types";
+import type { Logger } from "@ensiria/cli-kit/log.types";
+import { ScriptError } from "@ensiria/cli-kit/script";
 import { build, createServer } from "vite";
 
+import type { StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
+import { filteredStories } from "../../src/vite/agentApi.ts";
+import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import {
   CONFIG_FILES,
   findConfigFile,
   loadConfigFile,
   type ResolvedConfig
 } from "../../src/vite/configFile.ts";
+import { catalogueClient } from "./agentClient.ts";
+import { storiesText, storyText } from "./agentText.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 
 /** The command, as the hints print it. */
@@ -40,66 +51,223 @@ const configOf = async (file: string | undefined): Promise<ResolvedConfig> => {
   }
 };
 
-await defineScript({
+/**
+ * Asks the catalogue one of its answers, from its running dev server or one started for the answer.
+ *
+ * @param config - the catalogue's configuration.
+ * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param route - the answer (`stories`, `story`).
+ * @param params - its query.
+ * @param log - where to say where the answer comes from.
+ * @throws a `ScriptError` when the catalogue answers with an error.
+ */
+const askCatalogue = async (
+  config: ResolvedConfig,
+  url: string | undefined,
+  route: string,
+  params: URLSearchParams,
+  log: Logger
+): Promise<unknown> => {
+  const client = await catalogueClient(config, url);
+  log.debug(
+    client.runningAt === undefined
+      ? "No catalogue running: answered by a server of its own"
+      : `Asked ${client.runningAt}`
+  );
+  let answer: AgentAnswer;
+  try {
+    answer = await client.ask(route, params);
+  } finally {
+    await client.close();
+  }
+  if (answer.status !== 200) {
+    const { body } = answer;
+    const message =
+      typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+        ? body.error
+        : `The catalogue answered ${answer.status}`;
+    throw new ScriptError(message);
+  }
+  return answer.body;
+};
+
+/**
+ * Prints an answer, its JSON with `--json`, its problems as warnings, and ends with a failure when it has problems,
+ * so a CI step fails on a broken story file.
+ *
+ * @param text - the answer as text for a terminal.
+ * @param document - the answer as data.
+ * @param problems - what is wrong in it.
+ * @param context - the run's io, logger and `--json` mode.
+ * @throws a reported `ScriptError` when there are problems.
+ */
+const printAnswer = (
+  text: string,
+  document: StoriesDocument | StoryDocument,
+  problems: readonly string[],
+  context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
+): void => {
+  context.io.stdout.write(context.isJson ? formatJson(document) : `${text}\n`);
+  for (const problem of problems) context.log.warn(problem);
+  if (problems.length > 0)
+    throw new ScriptError(`${problems.length} problems`, { exitCode: EXIT.failure, isReported: true });
+};
+
+/** Whether a value is the stories document the catalogue answers. */
+const isStoriesDocument = (value: unknown): value is StoriesDocument =>
+  typeof value === "object" &&
+  value !== null &&
+  "schema" in value &&
+  value.schema === 1 &&
+  "components" in value;
+
+/** Whether a value is the story document the catalogue answers. */
+const isStoryDocument = (value: unknown): value is StoryDocument =>
+  typeof value === "object" && value !== null && "schema" in value && value.schema === 1 && "story" in value;
+
+await defineCommands({
   name: "forgebook",
   command: COMMAND,
-  summary: "Run a catalogue of stories from its forgebook.config.ts, or build it into static files.",
+  summary:
+    "Run a catalogue of stories from its forgebook.config.ts, build it, or answer tools and agents about it.",
   icon: "docs",
   options: {
     config: {
       type: "string",
       valueName: "file",
       description: "The configuration file; forgebook.config.ts in the current folder by default."
-    },
-    port: {
-      type: "string",
-      valueName: "number",
-      description: "dev: the port to listen on; Vite's by default."
-    },
-    host: {
-      type: "string",
-      valueName: "address",
-      description: "dev: the address to listen on; localhost by default."
-    },
-    out: { type: "string", valueName: "folder", description: "build: the folder to write; dist by default." },
-    force: {
-      type: "boolean",
-      description: "dev: pre-bundle the dependencies again, ignoring Vite's cache (as a first start does)."
     }
   },
-  positionals: [{ name: "command", description: "What to do.", required: true, choices: ["dev", "build"] }],
-  examples: [
-    { command: `${COMMAND} dev`, description: "Run the catalogue of the folder you are in." },
-    { command: `${COMMAND} dev --port 6006`, description: "On a given port." },
-    { command: `${COMMAND} build --out site`, description: "Build it into static files." }
-  ],
-  run: async ({ args, options, log, onInterrupt }): Promise<void> => {
-    const config = await configOf(options.config);
-    if (args.command === "build") {
-      await build(
-        await catalogueVite(config, { build: { outDir: resolve(config.dir, options.out ?? "dist") } })
-      );
-      log.success(`${config.title} built`);
-      return;
-    }
-    const port = options.port === undefined ? undefined : Number(options.port);
-    if (port !== undefined && !Number.isInteger(port))
-      throw new ScriptError(`--port ${options.port} is not a port`);
-    const server = await createServer(
-      await catalogueVite(config, {
-        server: {
-          ...(port === undefined ? {} : { port, strictPort: true }),
-          ...(options.host === undefined ? {} : { host: options.host })
+  commands: (forgebook) => ({
+    dev: forgebook.command({
+      summary: "Run the catalogue's dev server.",
+      options: {
+        port: {
+          type: "string",
+          valueName: "number",
+          description: "The port to listen on; Vite's by default."
         },
-        ...(options.force === true ? { optimizeDeps: { force: true } } : {})
-      })
-    );
-    await server.listen();
-    server.printUrls();
-    await new Promise<void>((done) => {
-      onInterrupt(() => {
-        void server.close().then(done);
-      });
-    });
-  }
+        host: {
+          type: "string",
+          valueName: "address",
+          description: "The address to listen on; localhost by default."
+        },
+        force: {
+          type: "boolean",
+          description: "Pre-bundle the dependencies again, ignoring Vite's cache (as a first start does)."
+        }
+      },
+      examples: [
+        { command: `${COMMAND} dev`, description: "Run the catalogue of the folder you are in." },
+        { command: `${COMMAND} dev --port 6006`, description: "On a given port." }
+      ],
+      run: async ({ options, onInterrupt }): Promise<void> => {
+        const config = await configOf(options.config);
+        const port = options.port === undefined ? undefined : Number(options.port);
+        if (port !== undefined && !Number.isInteger(port))
+          throw new ScriptError(`--port ${options.port} is not a port`);
+        const server = await createServer(
+          await catalogueVite(config, {
+            server: {
+              ...(port === undefined ? {} : { port, strictPort: true }),
+              ...(options.host === undefined ? {} : { host: options.host })
+            },
+            ...(options.force === true ? { optimizeDeps: { force: true } } : {})
+          })
+        );
+        await server.listen();
+        server.printUrls();
+        await new Promise<void>((done) => {
+          onInterrupt(() => {
+            void server.close().then(done);
+          });
+        });
+      }
+    }),
+    build: forgebook.command({
+      summary: "Build the catalogue into static files.",
+      options: {
+        out: { type: "string", valueName: "folder", description: "The folder to write; dist by default." }
+      },
+      examples: [{ command: `${COMMAND} build --out site`, description: "Build it into static files." }],
+      run: async ({ options, log }): Promise<void> => {
+        const config = await configOf(options.config);
+        await build(
+          await catalogueVite(config, { build: { outDir: resolve(config.dir, options.out ?? "dist") } })
+        );
+        log.success(`${config.title} built`);
+      }
+    }),
+    stories: forgebook.command({
+      summary: "List the catalogue's stories, with their ids and links; fail when the index has problems.",
+      json: true,
+      options: {
+        source: { type: "string", valueName: "id", description: "Only this source's stories." },
+        component: {
+          type: "string",
+          valueName: "text",
+          description: "Only components whose title holds this text."
+        },
+        view: {
+          type: "string",
+          valueName: "query",
+          description:
+            "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it)."
+        },
+        url: {
+          type: "string",
+          env: "FORGEBOOK_URL",
+          valueName: "address",
+          description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+        }
+      },
+      examples: [
+        { command: `${COMMAND} stories`, description: "Every story." },
+        { command: `${COMMAND} stories --component button --json`, description: "The buttons, as JSON." }
+      ],
+      run: async ({ options, io, log, isJson, style }): Promise<void> => {
+        const config = await configOf(options.config);
+        const params = new URLSearchParams({ view: options.view ?? "" });
+        const body = await askCatalogue(config, options.url, "stories", params, log);
+        if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
+        const document = filteredStories(body, { source: options.source, component: options.component });
+        printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
+      }
+    }),
+    story: forgebook.command({
+      summary:
+        "One story in detail: its args, its component's props, its links; fail when it cannot be read.",
+      json: true,
+      options: {
+        view: {
+          type: "string",
+          valueName: "query",
+          description:
+            "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it)."
+        },
+        url: {
+          type: "string",
+          env: "FORGEBOOK_URL",
+          valueName: "address",
+          description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+        }
+      },
+      positionals: [
+        { name: "id", description: "The story's id, as forgebook stories lists it.", required: true }
+      ],
+      examples: [
+        {
+          command: `${COMMAND} story kit:actions-button--primary --view theme=dark --json`,
+          description: "A story, its links in the dark theme, as JSON."
+        }
+      ],
+      run: async ({ args, options, io, log, isJson, style }): Promise<void> => {
+        const config = await configOf(options.config);
+        const params = new URLSearchParams({ id: args.id, view: options.view ?? "" });
+        const body = await askCatalogue(config, options.url, "story", params, log);
+        if (!isStoryDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
+        printAnswer(storyText(body, style), body, body.problems, { io, log, isJson });
+      }
+    })
+  })
 }).run();

@@ -63,11 +63,56 @@ const settled = async (load: (() => Promise<unknown>) | undefined): Promise<Load
   }
 };
 
-/** Writes a JSON answer. */
-const answer = (response: ServerResponse, status: number, body: unknown): void => {
-  response.statusCode = status;
-  response.setHeader("Content-Type", "application/json");
-  response.end(`${JSON.stringify(body)}\n`);
+/** An answer: its HTTP status and its JSON body. */
+export type AgentAnswer = {
+  /** 200, 404 for a story or a path that does not exist, 500 when the sources fail to load. */
+  readonly status: number;
+  /** The document, or `{ error }`. */
+  readonly body: unknown;
+};
+
+/** The header that names the catalogue's folder, so a client knows the server it found serves its catalogue. */
+export const ROOT_HEADER = "forgebook-root";
+
+/**
+ * Answers one of the API's paths.
+ *
+ * @param load - loads a module on the server (the dev server's `ssrLoadModule`).
+ * @param config - the catalogue's configuration.
+ * @param route - the path under `AGENT_API` (`stories`, `story`).
+ * @param params - the query: `id` for a story, `view` for the links.
+ * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
+ */
+export const agentAnswer = async (
+  load: (id: string) => Promise<unknown>,
+  config: ResolvedConfig,
+  route: string,
+  params: URLSearchParams,
+  origin: string
+): Promise<AgentAnswer> => {
+  const view = params.get("view") ?? "";
+  const pages: CataloguePages = { page: `${origin}/`, frame: `${origin}/frame.html` };
+  try {
+    const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
+    const tree = storyTree(loaded.sources);
+    if (route === "stories") return { status: 200, body: storiesDocument(config.title, tree, pages, view) };
+    if (route !== "story") return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
+    const id = params.get("id") ?? "";
+    const location = findStory(tree, id);
+    const source = loaded.sources.find((each) => each.id === location?.source.id);
+    if (location === undefined || source === undefined)
+      return { status: 404, body: { error: `No story "${id}"` } };
+    const files = sourceFiles(source);
+    const file = location.component.file;
+    const parts: LoadedStoryParts = {
+      module: await settled(files.stories[file]),
+      docs: await settled(files.docs[file]),
+      preview: loaded.preview
+    };
+    return { status: 200, body: storyDocument(location, parts, pages, view) };
+  } catch (error) {
+    return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
+  }
 };
 
 /**
@@ -86,36 +131,12 @@ export const agentMiddleware =
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
-    const view = url.searchParams.get("view") ?? "";
-    const pages: CataloguePages = { page: `${url.origin}/`, frame: `${url.origin}/frame.html` };
-    const reply = async (): Promise<void> => {
-      const loaded = agentModuleOf(await server.ssrLoadModule(join(config.dir, AGENT_SOURCES_FILE)));
-      const tree = storyTree(loaded.sources);
-      if (route === "stories") {
-        answer(response, 200, storiesDocument(config.title, tree, pages, view));
-        return;
+    void agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, url.origin).then(
+      ({ status, body }) => {
+        response.statusCode = status;
+        response.setHeader("Content-Type", "application/json");
+        response.setHeader(ROOT_HEADER, config.dir);
+        response.end(`${JSON.stringify(body)}\n`);
       }
-      if (route === "story") {
-        const id = url.searchParams.get("id") ?? "";
-        const location = findStory(tree, id);
-        const source = loaded.sources.find((each) => each.id === location?.source.id);
-        if (location === undefined || source === undefined) {
-          answer(response, 404, { error: `No story "${id}"` });
-          return;
-        }
-        const files = sourceFiles(source);
-        const file = location.component.file;
-        const parts: LoadedStoryParts = {
-          module: await settled(files.stories[file]),
-          docs: await settled(files.docs[file]),
-          preview: loaded.preview
-        };
-        answer(response, 200, storyDocument(location, parts, pages, view));
-        return;
-      }
-      answer(response, 404, { error: `No answer at ${url.pathname}` });
-    };
-    reply().catch((error: unknown) => {
-      answer(response, 500, { error: error instanceof Error ? error.message : String(error) });
-    });
+    );
   };

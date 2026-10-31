@@ -185,3 +185,29 @@ export const storyDocument = (
     problems
   };
 };
+
+/** Which part of the catalogue a list keeps. */
+export type StoriesFilter = {
+  /** A source's id; every source when none. */
+  readonly source?: string | undefined;
+  /** Text a component's title holds, any case (`button`); every component when none. */
+  readonly component?: string | undefined;
+};
+
+/**
+ * The stories document cut to the components a filter keeps; its sources and problems kept whole.
+ *
+ * @param document - the stories document.
+ * @param filter - the source and the text to keep.
+ */
+export const filteredStories = (document: StoriesDocument, filter: StoriesFilter): StoriesDocument => {
+  const text = filter.component?.toLowerCase();
+  return {
+    ...document,
+    components: document.components.filter(
+      (component) =>
+        (filter.source === undefined || component.source === filter.source) &&
+        (text === undefined || component.title.toLowerCase().includes(text))
+    )
+  };
+};
