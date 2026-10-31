@@ -1,6 +1,6 @@
 /**
  * The story clock for React components inside a story: the clock the catalogue runs, held at the Unix epoch outside a
- * catalogue (D-504).
+ * catalogue.
  *
  * @remarks
  * The clock itself is the format's (`@forgebook/story-format/clock`); this module is how a React component reads it.

@@ -6,7 +6,7 @@
  * The format's types (`@forgebook/story-format/csf`) are generic over a framework; these name them for React, so a
  * meta writes `satisfies Meta<typeof Button>` and its stories' args are the component's props, a prop that takes a
  * text also as `storyText("key")`. Types only: a library that writes stories depends on this package, never on the
- * catalogue that shows them (D-438).
+ * catalogue that shows them.
  *
  * @module
  */
