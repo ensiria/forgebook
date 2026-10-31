@@ -115,6 +115,21 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
     expect(hooks.watched).toContain(join(KIT, "src", "Select.stories.tsx"));
   });
 
+  it("names a pattern that climbs out of its folder without a `..` in the id, which a URL path would collapse", async () => {
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
+    const id = String(
+      hooks.resolveId(
+        "./../kit/src/*.stories.tsx?forgebook-files",
+        join(KIT, "..", "app", "forgebook.config.ts")
+      )
+    );
+    expect(id.split(/[/:]/)).not.toContain("..");
+    const loaded = await hooks.load(id);
+    await hooks.closeBundle();
+    const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
+    expect(code).toContain('"./kit/src/Select.stories.tsx":{"title":"Inputs/Selection/Select"');
+  });
+
   it("leaves every other import to Vite", () => {
     const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
     expect(hooks.resolveId("./src/Select.tsx", join(KIT, "stories.ts"))).toBeNull();

@@ -221,6 +221,23 @@ const markdownModule = (file: string, watch: (file: string) => void): { code: st
 };
 
 /**
+ * The id of a `?forgebook-files` module: the folder, then the pattern. The pattern's leading `./` and `../` move into
+ * the folder, so no `..` is left in the id: Vite serves a virtual module under a URL path, whose normalisation would
+ * let a `..` remove the segment before it (`app::./..`), folder and separator with it, and the module would match
+ * nothing. The files' keys and titles stay as they were: both are read relative to the folder and the pattern's base.
+ *
+ * @param folder - the importing module's folder.
+ * @param pattern - the pattern as the import writes it.
+ */
+const filesId = (folder: string, pattern: string): string => {
+  const segments = pattern.split("/");
+  const firstOwn = segments.findIndex((segment) => segment !== "." && segment !== "..");
+  const climbed = firstOwn === -1 ? segments : segments.slice(0, firstOwn);
+  const own = firstOwn === -1 ? [] : segments.slice(firstOwn);
+  return `${FILES_PREFIX}${resolve(folder, ...climbed)}${FILES_SEPARATOR}${own.join("/")}`;
+};
+
+/**
  * The module of a `?forgebook-files` pattern: every matched story file's index and loaders.
  *
  * @param id - the module's id (`FILES_PREFIX`, the importer's folder, `FILES_SEPARATOR`, the pattern).
@@ -491,7 +508,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       );
       if (page !== undefined) return pagePath(page) ?? null;
       if (!source.endsWith(FILES_QUERY) || importer === undefined) return null;
-      return `${FILES_PREFIX}${dirname(importer)}${FILES_SEPARATOR}${source.slice(0, -FILES_QUERY.length)}`;
+      return filesId(dirname(importer), source.slice(0, -FILES_QUERY.length));
     },
     configureServer: (server: ViteDevServer): void => {
       server.httpServer?.on("close", (): void => void docs?.close());
