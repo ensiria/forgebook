@@ -1100,9 +1100,15 @@ test.describe("touch", () => {
     const drawing = await centreOf(frameOf(page).getByRole("img", { name: "Drawing area" }));
     await page.mouse.move(drawing.x, drawing.y);
     await page.keyboard.down("Shift");
-    // close to Shift's centre: the fingers are spread apart, and the second one does not jump when the press comes
-    await page.mouse.move(drawing.x + 10, drawing.y);
+    // the second finger moves mirrored as the mouse moves, near Shift's centre as far from it, and stays put at the press
     const secondDot = frameOf(page).locator(".forgebook-touch-dot").nth(1);
+    const secondX = async (): Promise<number> =>
+      secondDot.evaluate((dot) => Number.parseFloat(dot.style.translate.split(" ")[0] ?? ""));
+    await page.mouse.move(drawing.x + 10, drawing.y);
+    const near = await secondX();
+    await page.mouse.move(drawing.x + 20, drawing.y);
+    expect(Math.round((await secondX()) - near)).toBe(-10);
+    await page.mouse.move(drawing.x + 10, drawing.y);
     const before = await secondDot.evaluate((dot) => dot.style.translate);
     await page.mouse.down();
     expect(await secondDot.evaluate((dot) => dot.style.translate)).toBe(before);

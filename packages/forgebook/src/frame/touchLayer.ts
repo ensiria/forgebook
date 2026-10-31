@@ -7,7 +7,7 @@
  * starts scrolling, when the pointer is cancelled as the browser cancels it (`touchScroll.ts`); a lift sends
  * `pointerup` and `touchend`. A tap then sends the mouse's compatibility events and its own click of the `touch` type
  * in place of the real one, so a button, a link or a checkbox reacts as it would; a press held half a second sends `contextmenu`. A moving mouse with
- * no button down sends nothing: a finger does not hover. Shift fixes a centre where the mouse is; a press then puts a
+ * no button down sends nothing: a finger does not hover. Shift fixes a centre beside the mouse (the second finger shows 80 px to its left); a press then puts a
  * second finger mirrored around it, so dragging pinches and rotates. The real cursor is hidden and the fingers are
  * dots (`touchDots.ts`). While it is on, `navigator.maxTouchPoints` and `ontouchstart` say touch, and capturing a
  * simulated pointer works. A simulation: the events are not trusted, so the browser's own scrolling, focus from a
@@ -18,7 +18,7 @@
 import { isRealTouchWindow } from "../realTouch.ts";
 import { type TouchDots, touchDots } from "./touchDots.ts";
 import { type Finger, sendClick, sendMouse, sendPointer, sendTouch } from "./touchEvents.ts";
-import { distance, dragAxis, isDragging, LONG_PRESS_MS, mirroredFinger, type Point } from "./touchGesture.ts";
+import { dragAxis, isDragging, LONG_PRESS_MS, mirroredFinger, type Point } from "./touchGesture.ts";
 import { endPan, type Pan, panBy, panOf } from "./touchScroll.ts";
 
 /** The root's attribute that turns the simulation on. */
@@ -27,8 +27,8 @@ const TOUCH_ATTRIBUTE = "data-forgebook-touch";
 /** The simulated pointers' ids: apart from the real mouse's, so the browser never confuses them. */
 const FINGER_IDS = [100, 101] as const;
 
-/** The least distance between two fingers, in CSS px: a centre right under the mouse moves aside by half of it. */
-const LEAST_SPREAD_PX = 80;
+/** How far apart two fingers start, in CSS px: Shift fixes the centre half of it to the left of the mouse. */
+const START_SPREAD_PX = 80;
 
 /** The real events that never reach the story while touch is simulated (the hover a finger does not have). */
 const SWALLOWED = ["mousedown", "mouseup", "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave"];
@@ -79,13 +79,12 @@ type LayerState = {
 };
 
 /**
- * The two-finger centre for a press at a point: Shift's, moved aside when it is right under the mouse.
+ * The two-finger centre Shift fixes when it goes down with the mouse at a point: half the fingers' spread to its left,
+ * so the second finger shows at once beside the first, and moves mirrored from then on.
  *
- * @param center - where Shift fixed it.
- * @param point - where the press is.
+ * @param point - where the mouse is.
  */
-const spreadCenter = (center: Point, point: Point): Point =>
-  distance(center, point) * 2 >= LEAST_SPREAD_PX ? center : { x: point.x - LEAST_SPREAD_PX / 2, y: point.y };
+const shiftCenter = (point: Point): Point => ({ x: point.x - START_SPREAD_PX / 2, y: point.y });
 
 /**
  * The fingers' dots: the fingers of a press, or the mouse (and the second finger to come, with Shift) between presses.
@@ -102,11 +101,8 @@ const drawDots = (state: LayerState): void => {
     state.dots.draw([]);
     return;
   }
-  // the second finger where a press will put it: the same centre the press takes, moved aside as it will be
-  const second =
-    center === undefined
-      ? []
-      : [{ point: mirroredFinger(spreadCenter(center, mouse), mouse), isPressed: false }];
+  // the second finger where a press will put it: mirrored around Shift's centre
+  const second = center === undefined ? [] : [{ point: mirroredFinger(center, mouse), isPressed: false }];
   state.dots.draw([{ point: mouse, isPressed: false }, ...second]);
 };
 
@@ -133,8 +129,7 @@ const pressDown = (state: LayerState, event: PointerEvent): void => {
   state.stopFling();
   const point = { x: event.clientX, y: event.clientY };
   const target = event.target instanceof Element ? event.target : state.document.documentElement;
-  const shiftCenter = event.shiftKey ? (state.center ?? point) : undefined;
-  const center = shiftCenter === undefined ? undefined : spreadCenter(shiftCenter, point);
+  const center = event.shiftKey ? (state.center ?? shiftCenter(point)) : undefined;
   // the first finger goes down where the real press did, on the element the browser found under it
   const fingers: Finger[] = [
     { id: FINGER_IDS[0], isPrimary: true, point, startTarget: target, captureTarget: target }
@@ -295,7 +290,7 @@ const pointerInput = (state: LayerState, event: PointerEvent): void => {
     // Shift read from the pointer, which carries it even when the frame has no focus (the shell usually does): held,
     // it fixes the two-finger centre where the mouse was
     if (!event.shiftKey) state.center = undefined;
-    else state.center ??= state.mouse ?? { x: event.clientX, y: event.clientY };
+    else state.center ??= shiftCenter(state.mouse ?? { x: event.clientX, y: event.clientY });
     state.mouse = { x: event.clientX, y: event.clientY };
     drawDots(state);
   } else if ((event.type === "pointerup" || event.type === "pointercancel") && press !== undefined) {
@@ -401,7 +396,8 @@ const startTouch = (document: Document): (() => void) => {
   // Shift fixes the two-finger centre where the mouse is, and shows where the second finger will be
   const onKey = (event: KeyboardEvent): void => {
     if (event.key !== "Shift" || state.press !== undefined) return;
-    state.center = event.type === "keydown" ? state.mouse : undefined;
+    state.center =
+      event.type === "keydown" && state.mouse !== undefined ? shiftCenter(state.mouse) : undefined;
     drawDots(state);
   };
   const view: Window | null = document.defaultView;
