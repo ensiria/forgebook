@@ -9,8 +9,12 @@
  * @module
  */
 
+/** The inputs that take no text: a key pressed on one is the page's, not the field's. */
+const NOT_TEXT_INPUTS = ["checkbox", "radio", "button", "submit", "reset", "range", "color", "file"];
+
 /**
- * Whether a key event happens while the user types: in a field, a select or editable content.
+ * Whether a key event happens while the user types: in a field that takes text, a select or editable content. A
+ * toolbar's segment (a radio) or a toggle keeps the page's keys, so they work right after a press on one.
  *
  * @param target - the event's target.
  */
@@ -18,7 +22,7 @@ export const isTyping = (target: EventTarget | null): boolean =>
   typeof HTMLElement !== "undefined" &&
   target instanceof HTMLElement &&
   (target.isContentEditable ||
-    target instanceof HTMLInputElement ||
+    (target instanceof HTMLInputElement && !NOT_TEXT_INPUTS.includes(target.type)) ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement);
 

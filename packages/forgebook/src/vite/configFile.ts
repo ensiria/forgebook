@@ -123,7 +123,8 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.textSizes === undefined ? {} : { textSizes: lists.textSizes }),
   ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
   ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar }),
-  ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn })
+  ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn }),
+  ...(lists.appearance === undefined ? {} : { appearance: lists.appearance })
 });
 
 /**
@@ -138,11 +139,13 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   const tabs: Partial<Record<PanelTabId, false>> = {};
   const controls: Partial<Record<TurnedOffControl, false>> = {};
   const strings: Record<string, string> = {};
+  const keys: Record<string, string | false> = {};
   let merged: CatalogueLists = {};
   for (const lists of all) {
     Object.assign(tabs, lists.tabs);
     Object.assign(controls, lists.controls);
     Object.assign(strings, lists.strings);
+    Object.assign(keys, lists.keys);
     merged = { ...merged, ...singleValues(lists) };
   }
   const builtIn = all.findLast((lists) => lists.backgrounds?.builtIn !== undefined)?.backgrounds?.builtIn;
@@ -160,7 +163,10 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
       ...(tags === undefined ? {} : { tags }),
       disabledRules: [...new Set(all.flatMap((lists) => lists.a11y?.disabledRules ?? []))]
     },
-    strings
+    strings,
+    keys,
+    // a later list's view of the same name replaces an earlier one's, where it was
+    views: [...new Map(all.flatMap((lists) => lists.views ?? []).map((view) => [view.name, view])).values()]
   };
 };
 

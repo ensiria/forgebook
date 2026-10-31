@@ -36,3 +36,11 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/// A palette written as the custom properties the colour tokens read (`--forgebook-text`…).
+/// @param {Map} $palette - `$light` or `$dark` of `_tokens.scss`.
+@mixin palette($palette) {
+  @each $name, $value in $palette {
+    --forgebook-#{$name}: #{$value};
+  }
+}

@@ -29,6 +29,17 @@ const shellStrings = {
   related: "Related",
   view: "View",
   viewChanged: "A view setting is changed",
+  controlChanged: (control: string): string => `${control}: changed`,
+  controlKey: (control: string, key: string | undefined): string =>
+    key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
+  cycleKey: (control: string, key: string): string =>
+    `${control}: press ${key} for the next value, Shift+${key} for the one before`,
+  changeKey: "Change the key: press it, then the new key; Backspace takes it away",
+  pressAKey: "Press a key",
+  namedViews: "Views",
+  saveView: "Save view…",
+  viewName: "View name",
+  removeView: (name: string): string => `Remove the view ${name}`,
   backdrop: "Background",
   backdropPlain: "Plain",
   sheets: "Styles",
@@ -179,6 +190,9 @@ const shellStrings = {
   setByStory: "Set by the story",
   required: "Required",
   resetArgs: "Reset",
+  appearance: "Appearance",
+  appearanceOf: (name: string): string => `Appearance: ${name}`,
+  appearances: { light: "Light", dark: "Dark", system: "System" },
   worstCase: "Worst case",
   worstCaseHint:
     "Long texts with a word too long to break, huge numbers: the elements that spill are outlined",

@@ -1,33 +1,101 @@
-// The catalogue's own look, at build time: it depends on no library it shows, so a defect in one never breaks the
-// tool used to find it. The shell is always light at standard contrast; the switches act on the frames only,
-// so these are Sass values, not custom properties. Every text colour reaches 4.5:1 on the surface it is used on
-// (`test/styleTokens.test.ts` checks the code palette).
+// The catalogue's own look: it depends on no library it shows, so a defect in one never breaks the tool used to find
+// it. Its colours come in two palettes, light and dark, written as custom properties on the page's root (`palette` in
+// `_mixins.scss`): the reader picks the shell's appearance, which never touches the frames, whose look follows the
+// view's switches. The Sass names read the custom properties, so a rule writes `$text` in either appearance. Every
+// text colour reaches 4.5:1 on the surfaces it is used on, in both palettes (`test/styleTokens.test.ts`).
+
+// the light palette
+$light: (
+  window: #f6f6f8,
+  sidebar: #ebebef,
+  surface: #fff,
+  fill: #1d1d1f14,
+  fill-quiet: #1d1d1f0d,
+  hover: #1d1d1f0a,
+  separator: #1d1d1f17,
+  text: #1d1d1f,
+  text-secondary: #56565d,
+  text-tertiary: #6a6a71,
+  accent: #0a6cf0,
+  accent-text: #0059d2,
+  on-accent: #fff,
+  danger-text: #bc1f16,
+  code-keyword: #7036c4,
+  code-type: #0059d2,
+  code-string: #077229,
+  code-number: #935200,
+  code-punctuation: #6a6a71,
+  code-name: #1d1d1f,
+  edge: #1d1d1f25,
+  edge-hover: #1d1d1f3d,
+  edge-field: #1d1d1f2e,
+  card-edge: #0000000f,
+  card-edge-hover: #0000001a,
+  shadow-soft: #0000000d,
+  shadow-lift: #00000012,
+  shadow-deep: #0003,
+  shade: #1d1d1f33
+);
+
+// the dark palette: the same roles, the fills and edges light on dark
+$dark: (
+  window: #161618,
+  sidebar: #1e1e21,
+  surface: #252529,
+  fill: #ffffff1f,
+  fill-quiet: #ffffff12,
+  hover: #ffffff0f,
+  separator: #ffffff1a,
+  text: #f2f2f4,
+  text-secondary: #b6b6bd,
+  text-tertiary: #9d9da5,
+  accent: #1f6fe5,
+  accent-text: #7ab3ff,
+  on-accent: #fff,
+  danger-text: #ff8a80,
+  code-keyword: #c9a8ff,
+  code-type: #7ab3ff,
+  code-string: #7fdc8f,
+  code-number: #f2b46b,
+  code-punctuation: #9d9da5,
+  code-name: #f2f2f4,
+  edge: #ffffff26,
+  edge-hover: #ffffff40,
+  edge-field: #ffffff2e,
+  card-edge: #ffffff17,
+  card-edge-hover: #ffffff26,
+  shadow-soft: #0000004d,
+  shadow-lift: #00000066,
+  shadow-deep: #00000080,
+  shade: #00000073
+);
 
 // colours
-$window: #f6f6f8;
-$sidebar: #ebebef;
-$surface: #fff;
-$fill: #1d1d1f14;
-$fill-quiet: #1d1d1f0d;
-$hover: #1d1d1f0a;
-$separator: #1d1d1f17;
-$text: #1d1d1f;
-$text-secondary: #56565d;
-$text-tertiary: #6a6a71;
-$accent: #0a6cf0;
-$accent-text: #0059d2;
-$on-accent: #fff;
-$danger-text: #bc1f16;
+$window: var(--forgebook-window);
+$sidebar: var(--forgebook-sidebar);
+$surface: var(--forgebook-surface);
+$fill: var(--forgebook-fill);
+$fill-quiet: var(--forgebook-fill-quiet);
+$hover: var(--forgebook-hover);
+$separator: var(--forgebook-separator);
+$text: var(--forgebook-text);
+$text-secondary: var(--forgebook-text-secondary);
+$text-tertiary: var(--forgebook-text-tertiary);
+$accent: var(--forgebook-accent);
+$accent-text: var(--forgebook-accent-text);
+$on-accent: var(--forgebook-on-accent);
+$danger-text: var(--forgebook-danger-text);
+$shade: var(--forgebook-shade);
 $selected: color-mix(in srgb, $accent 12%, transparent);
 $disabled-opacity: 0.45;
 
 // the code in the panel: signatures and calls, on $fill-quiet over $surface
-$code-keyword: #7036c4;
-$code-type: #0059d2;
-$code-string: #077229;
-$code-number: #935200;
-$code-punctuation: #6a6a71;
-$code-name: #1d1d1f;
+$code-keyword: var(--forgebook-code-keyword);
+$code-type: var(--forgebook-code-type);
+$code-string: var(--forgebook-code-string);
+$code-number: var(--forgebook-code-number);
+$code-punctuation: var(--forgebook-code-punctuation);
+$code-name: var(--forgebook-code-name);
 
 // motion: short, decelerating; the shell's style sheet turns it off for a reduced-motion preference
 $duration-quick: 150ms;
@@ -38,14 +106,16 @@ $duration-slide: 320ms;
 $ease-slide: cubic-bezier(0.32, 0.72, 0, 1);
 
 // edges, rings and shadows
-$ring: inset 0 0 0 1px #1d1d1f25;
-$ring-hover: inset 0 0 0 1px #1d1d1f3d;
-$ring-field: inset 0 0 0 1px #1d1d1f2e;
+$ring: inset 0 0 0 1px var(--forgebook-edge);
+$ring-hover: inset 0 0 0 1px var(--forgebook-edge-hover);
+$ring-field: inset 0 0 0 1px var(--forgebook-edge-field);
 $ring-quiet: inset 0 0 0 1px $separator;
 $line-top: inset 0 1px 0 $separator;
 $line-bottom: inset 0 -1px 0 $separator;
-$shadow-card: 0 0 0 1px #0000000f, 0 1px 3px #0000000d;
-$shadow-popover: 0 0 0 1px #1d1d1f25, 0 18px 48px #0003, 0 4px 12px #0000000f;
+$shadow-card: 0 0 0 1px var(--forgebook-card-edge), 0 1px 3px var(--forgebook-shadow-soft);
+$shadow-card-hover: 0 0 0 1px var(--forgebook-card-edge-hover), 0 4px 14px var(--forgebook-shadow-lift);
+$shadow-popover: 0 0 0 1px var(--forgebook-edge), 0 18px 48px var(--forgebook-shadow-deep), 0 4px 12px var(--forgebook-shadow-lift);
+$shadow-knob: 0 1px 2px var(--forgebook-shadow-deep);
 $focus-edge: inset 0 0 0 1px $accent;
 $focus-halo: color-mix(in srgb, $accent 35%, transparent);
 $focus-width: 2px;

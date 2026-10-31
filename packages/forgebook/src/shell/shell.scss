@@ -1,10 +1,30 @@
-// The catalogue's page, with its own look (`../styles/_tokens.scss`): it depends on no library it shows. The
-// page is always light at standard contrast: the switches act on the frames.
+// The catalogue's page, with its own look (`../styles/_tokens.scss`): it depends on no library it shows. Its
+// appearance is the reader's (light, dark or the system's, `useAppearance.ts`), written on the root; the switches act
+// on the frames only.
 
 @use "../styles/tokens" as *;
 @use "../styles/mixins";
 
 @layer catalogue {
+  // light until the page says otherwise; before the script sets the appearance, the system's preference decides, so a
+  // dark system never sees a light page flash first
+  :root {
+    @include mixins.palette($light);
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-forgebook-appearance]) {
+      @include mixins.palette($dark);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-forgebook-appearance="dark"] {
+    @include mixins.palette($dark);
+    color-scheme: dark;
+  }
+
   body {
     margin: 0;
     font: $text-body;
@@ -49,6 +69,15 @@
     border-inline-end: 1px solid $separator;
     // hiding and showing slide it by its own width; only the margin moves, so a drag of the handle stays immediate
     transition: margin-inline-start $duration-slide $ease-slide;
+  }
+
+  // the sidebar's foot: the shell's appearance, below the tree, which scrolls above it
+  .forgebook-appearance {
+    position: relative;
+    flex: none;
+    margin: 0 (-$space-3);
+    padding: $space-2 $space-3 $space-3;
+    box-shadow: $line-top;
   }
 
   // the sidebar's right edge: dragged to set its width
@@ -587,6 +616,19 @@
   }
 
   // the pinned controls, in the room the rest of the bar leaves them
+  // a pinned control's own place, for the dot that marks a changed value at its corner
+  .forgebook-toolbar__pinned {
+    position: relative;
+    flex: none;
+  }
+
+  .forgebook-toolbar__changed {
+    position: absolute;
+    top: -0.125rem;
+    right: -0.125rem;
+    pointer-events: none;
+  }
+
   .forgebook-toolbar__pinned-list {
     flex: 1;
     min-width: 0;
@@ -823,6 +865,18 @@
     }
   }
 
+  // a button without its ring, for a quiet place (the sidebar's foot): the ring shows under the pointer
+  .forgebook-button.forgebook-button--quiet {
+    background: transparent;
+    box-shadow: none;
+    color: $text-secondary;
+
+    &:hover {
+      background: $hover;
+      color: $text;
+    }
+  }
+
   // a Live story's clock controls: one group beside Replay
   .forgebook-clock {
     display: inline-flex;
@@ -924,6 +978,14 @@
     transform-origin: top left;
   }
 
+  // a popover at the window's foot opens above its button
+  .forgebook-popover.forgebook-popover--up {
+    top: auto;
+    bottom: calc(100% - $space-1);
+    left: $space-3;
+    transform-origin: bottom left;
+  }
+
   .forgebook-popover.forgebook-popover--end {
     inset-inline: auto 0;
     transform-origin: top right;
@@ -964,7 +1026,123 @@
     width: max-content;
   }
 
-  // the View menu's rows: a handle, the name, the value, the pin and the hide button
+  // the named views at the top of the View menu: a row of chips that wraps, the save button last
+  .forgebook-named-views {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-1-5;
+    // the menu's rows set its width: the chips fill it and wrap, never widen it
+    width: 0;
+    min-width: 100%;
+    padding-block-end: $space-3;
+    box-shadow: $line-bottom;
+    white-space: normal;
+  }
+
+  .forgebook-named-view {
+    display: inline-flex;
+    align-items: center;
+    border-radius: $radius-control;
+    box-shadow: $ring;
+
+    &:hover {
+      box-shadow: $ring-hover;
+    }
+  }
+
+  .forgebook-named-view__pick {
+    height: 1.5rem;
+    padding: 0 $space-2;
+    border: 0;
+    border-radius: $radius-control;
+    background: transparent;
+    font: $text-control;
+    color: $text;
+    @include mixins.focus-ring;
+
+    &[aria-pressed="true"] {
+      background: $selected;
+      color: $accent-text;
+    }
+  }
+
+  .forgebook-named-view__remove {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: $radius-control;
+    background: transparent;
+    color: $text-tertiary;
+    @include mixins.focus-ring;
+
+    &:hover {
+      color: $text;
+    }
+  }
+
+  .forgebook-named-views__form input {
+    height: 1.5rem;
+    padding: 0 $space-2;
+    border: 0;
+    border-radius: $radius-control;
+    background: $surface;
+    box-shadow: $ring-field;
+    font: $text-control;
+    color: $text;
+    @include mixins.focus-ring($shadow: $ring-field);
+  }
+
+  // a control's key in its View row: the key as a key cap, a press records another; a refusal reads beside it
+  .forgebook-key-field {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .forgebook-key-field__button {
+    min-width: 1.5rem;
+    height: 1.375rem;
+    padding: 0 $space-1;
+    border: 0;
+    border-radius: $radius-control-small;
+    background: transparent;
+    font: $text-caption;
+    color: $text-secondary;
+    @include mixins.focus-ring;
+
+    &:hover {
+      background: $hover;
+    }
+
+    &[aria-pressed="true"] {
+      background: $selected;
+      color: $accent-text;
+    }
+
+    kbd {
+      font: $text-mono-small;
+    }
+  }
+
+  .forgebook-key-field__problem {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1;
+    font: $text-caption;
+    color: $danger-text;
+    white-space: nowrap;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  // the View menu's rows: a handle, the name, the value, the key, the pin and the hide button
   .forgebook-arrange-list {
     display: grid;
     gap: $space-1;
@@ -976,7 +1154,7 @@
   .forgebook-arrange {
     position: relative;
     display: grid;
-    grid-template-columns: auto 4.5rem 1fr auto auto;
+    grid-template-columns: auto 4.5rem 1fr auto auto auto;
     align-items: center;
     gap: $space-2;
     padding: $space-0-5 0;
@@ -1137,6 +1315,9 @@
   }
 
   .forgebook-popover__label {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
     font: $text-caption;
     color: $text-secondary;
   }
@@ -1167,7 +1348,7 @@
       height: 0.75rem;
       border-radius: 50%;
       background: $surface;
-      box-shadow: 0 1px 2px #0003;
+      box-shadow: $shadow-knob;
       transition: transform $duration-quick $ease-out;
     }
 
@@ -1670,9 +1851,7 @@
     transition: box-shadow $duration-medium $ease-out;
 
     &:hover {
-      box-shadow:
-        0 0 0 1px #0000001a,
-        0 4px 14px #00000012;
+      box-shadow: $shadow-card-hover;
     }
 
     &:focus-visible {
@@ -1875,9 +2054,7 @@
     transition: box-shadow $duration-medium $ease-out;
 
     &:hover {
-      box-shadow:
-        0 0 0 1px #0000001a,
-        0 4px 14px #00000012;
+      box-shadow: $shadow-card-hover;
     }
   }
 
@@ -1970,7 +2147,7 @@
     position: fixed;
     inset: 0;
     z-index: 19;
-    background: #1d1d1f33;
+    background: $shade;
   }
 
   .forgebook-example__full {

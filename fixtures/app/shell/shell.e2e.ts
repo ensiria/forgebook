@@ -1049,6 +1049,95 @@ test.describe("the panel", () => {
     await expect(frameOf(page).locator("select")).toHaveAttribute("data-size", "lg");
   });
 
+  test("named views: the catalogue's picked, a reader's saved, kept after a reload, and removed", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const openView = async (): Promise<void> => {
+      await page.getByRole("button", { name: /^View/ }).click();
+      await popoversSettled(page);
+    };
+    await openView();
+    const views = page.getByRole("region", { name: "Views" });
+    await views.getByRole("button", { name: "Dark phone" }).click();
+    await expect(page).toHaveURL(/theme=dark/);
+    await expect(page).toHaveURL(/width=360/);
+    await expect(views.getByRole("button", { name: "Dark phone" })).toHaveAttribute("aria-pressed", "true");
+    await views.getByRole("button", { name: "Save view…" }).click();
+    await views.getByRole("textbox", { name: "View name" }).fill("Mine");
+    await page.keyboard.press("Enter");
+    await expect(views.getByRole("button", { name: "Mine", exact: true })).toBeVisible();
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await openView();
+    await views.getByRole("button", { name: "Mine", exact: true }).click();
+    await expect(page).toHaveURL(/width=360/);
+    await views.getByRole("button", { name: "Remove the view Mine" }).click();
+    await expect(views.getByRole("button", { name: "Mine", exact: true })).toHaveCount(0);
+  });
+
+  test("a control's key cycles its values, and a reader gives it another in the View menu", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await page.keyboard.press("t");
+    await expect(page).toHaveURL(/theme=/);
+    const afterT = new URL(page.url()).searchParams.get("theme");
+    await page.keyboard.press("Shift+T");
+    await expect(page).not.toHaveURL(new RegExp(`theme=${afterT}`));
+    await page.getByRole("button", { name: /^View/ }).click();
+    await popoversSettled(page);
+    await page.getByRole("button", { name: "Theme: key T" }).click();
+    await page.keyboard.press("c");
+    // contrast has c: refused, said in place
+    await expect(page.getByRole("status").filter({ hasText: "contrast's already" })).toBeVisible();
+    await page.keyboard.press("y");
+    await expect(page.getByRole("button", { name: "Theme: key Y" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await popoversSettled(page);
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await page.keyboard.press("y");
+    await expect(page).toHaveURL(/theme=/);
+  });
+
+  test("a dot marks a pinned control and a View row whose value is not the default", async ({ page }) => {
+    await page.goto(story("overview", "theme=dark"));
+    await frameStatus(page);
+    await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(1);
+    await page.getByRole("button", { name: /^View/ }).click();
+    await popoversSettled(page);
+    await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(2);
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(0);
+  });
+
+  test("the shell's appearance follows the system, a reader's choice stays after a reload, and the frames keep theirs", async ({
+    page
+  }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const root = page.locator("html");
+    await expect(root).toHaveAttribute("data-forgebook-appearance", "dark");
+    await page.getByRole("button", { name: "Appearance: System" }).click();
+    await popoversSettled(page);
+    await page
+      .getByRole("dialog", { name: "Appearance" })
+      .getByRole("radio", { name: "Light" })
+      .check({ force: true });
+    await expect(root).toHaveAttribute("data-forgebook-appearance", "light");
+    await expect(page.getByRole("button", { name: "Appearance: Light" })).toBeVisible();
+    await page.reload();
+    await frameStatus(page);
+    await expect(root).toHaveAttribute("data-forgebook-appearance", "light");
+    // the story's look is the view's switches', never the shell's appearance
+    await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-appearance");
+  });
+
   test("Worst case fills the props with long texts and huge numbers, outlines the spills, and Reset undoes it", async ({
     page
   }) => {

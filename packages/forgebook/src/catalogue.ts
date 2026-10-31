@@ -13,7 +13,10 @@
  */
 
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
+import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
+import type { CatalogueView } from "./namedViews.ts";
 import { switchWithRole, type ViewSwitch } from "./switches.ts";
+import { viewQuery } from "./viewWords.ts";
 
 /** A preset width of the toolbar. */
 export type StageWidthPreset = {
@@ -104,7 +107,29 @@ export type CatalogueLists = {
    * `false` builds nothing for it (no import graph is read) and leaves it out of the agents' answers.
    */
   readonly usedIn?: boolean;
+  /**
+   * The shell's appearance before a reader picks one: `system` (the default) follows the system's light or dark. A
+   * reader's choice, kept in their browser, wins over it; the frames follow the view's switches, never this.
+   */
+  readonly appearance?: Appearance;
+  /**
+   * The keys that cycle the controls, by control id (a switch's id or one of `OWN_CONTROL_IDS`): one character,
+   * pressed without a modifier; `false` takes a key away. The ready-made switches have one by default (`DEFAULT_KEYS`
+   * of `controlKeys.ts`). A reader may change them for themself.
+   */
+  readonly keys?: Readonly<Record<string, string | false>>;
+  /**
+   * Views offered to every reader at the top of the View menu, each a name and its values in the address's form
+   * (`theme=dark&width=360`) or as words (`"dark it 360"`); a reader saves their own beside them.
+   */
+  readonly views?: readonly CatalogueView[];
 };
+
+/** The shell's own appearance: light, dark, or the system's. */
+export type Appearance = "light" | "dark" | "system";
+
+/** The appearances, in the order the reader is offered them. */
+export const APPEARANCES: readonly Appearance[] = ["light", "dark", "system"];
 
 /** A catalogue's lists with the defaults filled in, and its switches: what the shell and the frame read. */
 export type CatalogueSettings = {
@@ -138,6 +163,12 @@ export type CatalogueSettings = {
   readonly toolbar: readonly string[];
   /** Whether a component's page offers "Used in". */
   readonly hasUsedIn: boolean;
+  /** The shell's appearance before a reader picks one. */
+  readonly appearance: Appearance;
+  /** The keys that cycle the controls, by control id. */
+  readonly keys: ControlKeys;
+  /** The catalogue's named views, their values in the address's form. */
+  readonly views: readonly { readonly name: string; readonly query: string }[];
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -204,12 +235,43 @@ const toolbarProblem = (toolbar: readonly string[], switches: readonly ViewSwitc
 };
 
 /**
+ * The catalogue's keys.
+ *
+ * @param controlIds - the ids of its controls.
+ * @param set - the keys its configuration sets.
+ * @throws when a key cannot be used.
+ */
+const usableKeys = (controlIds: readonly string[], set: CatalogueLists["keys"]): ControlKeys => {
+  const keys = catalogueKeys(controlIds, set);
+  if (typeof keys === "string") throw new Error(`Forgebook's keys: ${keys}`);
+  return keys;
+};
+
+/**
+ * The catalogue's named views, their values in the address's form.
+ *
+ * @param switches - its switches, for the views written as words.
+ * @param views - the views its configuration names; none by default.
+ * @throws when a view cannot be read.
+ */
+const catalogueViews = (
+  switches: readonly ViewSwitch[],
+  views: readonly CatalogueView[] = []
+): { readonly name: string; readonly query: string }[] =>
+  views.map((each) => {
+    const read = viewQuery(each.view, switches);
+    if ("error" in read) throw new Error(`Forgebook's view "${each.name}": ${read.error}`);
+    return { name: each.name, query: read.query };
+  });
+
+/**
  * A catalogue's settings, its lists' defaults filled in.
  *
  * @param title - the catalogue's title, for its storage's id.
  * @param switches - its switches.
  * @param lists - the lists its configuration sets.
- * @throws when the toolbar it names holds an id that is no control at all, or one twice.
+ * @throws when the toolbar it names holds an id that is no control at all, or one twice; or a key it sets cannot be
+ *   used; or a view it names cannot be read.
  */
 export const catalogueSettings = (
   title: string,
@@ -248,7 +310,10 @@ export const catalogueSettings = (
     strings: lists.strings ?? {},
     ownControls,
     toolbar,
-    hasUsedIn: lists.usedIn !== false
+    hasUsedIn: lists.usedIn !== false,
+    appearance: lists.appearance ?? "system",
+    keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
+    views: catalogueViews(switches, lists.views)
   };
 };
 

@@ -40,6 +40,7 @@ import { StoryPicker } from "./StoryPicker.tsx";
 import { STRINGS } from "./strings.ts";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
 import type { UsedInProps } from "./UsedIn.tsx";
+import { useAppearance } from "./useAppearance.ts";
 import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
 import { useSidebarLayout } from "./useSidebarLayout.ts";
@@ -490,6 +491,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
   const [fixedViews, setFixedViews] = useState<ReadonlyMap<string, FixedView>>(new Map());
   const storyHeights = useStoryHeights(heights);
   const isSystemDark = useSystemDark();
+  const appearance = useAppearance();
   useStoryIdsElement(
     useMemo(
       () =>
@@ -554,6 +556,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
         width={sidebarWidth}
         isOpen={isSidebarOpen}
         onHide={(): void => setIsSidebarOpen(false)}
+        appearance={appearance}
         title={title}
         logo={logo}
         tree={tree}

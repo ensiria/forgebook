@@ -14,11 +14,12 @@ import { type MouseEvent, type ReactNode, useId, useRef } from "react";
 import type { CatalogueSettings } from "../catalogue.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import { switchWithRole } from "../switches.ts";
-import { isComparing, type ViewState } from "../viewState.ts";
+import { hasViewChanges, isComparing, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
 import { PinnedControl } from "./PinnedControl.tsx";
 import { STRINGS } from "./strings.ts";
+import { useControlKeys } from "./useControlKeys.ts";
 import { usePopover } from "./usePopover.ts";
 import { useToolbarLayout } from "./useToolbarLayout.ts";
 import { useToolbarOverflow } from "./useToolbarOverflow.ts";
@@ -172,10 +173,12 @@ export const Toolbar = ({
   fixed = NOT_FIXED
 }: ToolbarProps): ReactNode => {
   const layout = useToolbarLayout();
+  const catalogue = useCatalogue();
   // the story's fixed values are shown, and a change of anything else keeps the user's own in the address
   const view = withFixed(ownView, fixed);
   const onViewChange = (changed: ViewState): void => onOwnViewChange(withOwnFixed(changed, ownView, fixed));
   const context = { view, onViewChange, isStoryPage, fixed, shownWidth };
+  useControlKeys({ keys: layout.keys, view, onViewChange, fixed, isStoryPage });
   const pinnedRef = useRef<HTMLDivElement>(null);
   const pinned = layout.placed.filter((each) => each.isPinned);
   const moved = useToolbarOverflow(
@@ -196,6 +199,7 @@ export const Toolbar = ({
             key={each.control.id}
             control={each.control}
             isHidden={each.isHidden}
+            isChanged={hasViewChanges(ownView, catalogue.switches, [each.control.id])}
             layout={layout}
             {...context}
           />

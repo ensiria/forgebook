@@ -21,11 +21,13 @@ import {
 } from "react";
 
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
+import { AppearanceMenu } from "./AppearanceMenu.tsx";
 import { Icon } from "./icons.tsx";
 import { isTyping } from "./keyboard.ts";
 import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
 import { STRINGS } from "./strings.ts";
 import { foundFamily, searchWords } from "./treeSearch.ts";
+import type { AppearanceState } from "./useAppearance.ts";
 
 /** The sidebar's props. */
 export type SidebarProps = {
@@ -56,6 +58,8 @@ export type SidebarProps = {
   readonly isOpen: boolean;
   /** Hides the sidebar. */
   readonly onHide: () => void;
+  /** The shell's appearance and its setter, for the menu at the foot. */
+  readonly appearance: AppearanceState;
 };
 
 /** A family's key, unique across sources. */
@@ -114,6 +118,7 @@ export const Sidebar = ({
   width,
   isOpen,
   onHide,
+  appearance,
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
@@ -311,6 +316,7 @@ export const Sidebar = ({
           )
         )}
       </nav>
+      <AppearanceMenu {...appearance} />
     </aside>
   );
 };

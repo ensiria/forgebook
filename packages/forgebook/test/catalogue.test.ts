@@ -28,6 +28,7 @@ describe("catalogueSettings", () => {
     ]);
     expect(settings.tabs).toEqual(["props", "events", "play", "parts", "code", "a11y"]);
     expect(settings.gridStep).toBe(8);
+    expect(settings.appearance).toBe("system");
   });
 
   it("keeps the built-in backgrounds it names, adds its own, turns tabs off, and keeps 100 % among the steps", () => {
@@ -72,6 +73,8 @@ describe("mergedLists", () => {
       }
     ]);
     expect(merged.gridStep).toBe(10);
+    expect(mergedLists([{ appearance: "dark" }, {}]).appearance).toBe("dark");
+    expect(mergedLists([{ appearance: "dark" }, { appearance: "light" }]).appearance).toBe("light");
     expect(merged.storyGroups).toEqual([
       { id: "states", label: "States" },
       { id: "motion", label: "Animation" }

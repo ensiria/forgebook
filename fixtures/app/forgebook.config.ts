@@ -28,5 +28,7 @@ export default defineConfig({
   widths: [{ width: 360 }, { width: 412, label: "Phone L" }, { width: 560 }, { width: 768 }, { width: 1024 }],
   backgrounds: { custom: [{ id: "paper", label: "Paper", light: { color: "#f5efe0" } }] },
   strings: { "tabs.parts": "Parts and hooks" },
-  gridStep: 4
+  gridStep: 4,
+  // a view offered to every reader, so the shell's tests pick one the catalogue declares
+  views: [{ name: "Dark phone", view: "theme=dark&width=360" }]
 });

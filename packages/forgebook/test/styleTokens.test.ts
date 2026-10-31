@@ -1,5 +1,6 @@
 /**
- * The shell's code palette reaches 4.5:1 on the code background (WCAG 2.1 AA for text), read from the shell's tokens.
+ * The shell's palettes, light and dark, read from its tokens: every text colour reaches 4.5:1 (WCAG 2.1 AA for text) on
+ * the surfaces it is used on, and the code colours on the code background.
  *
  * @module
  */
@@ -10,10 +11,14 @@ import { describe, expect, it } from "vitest";
 
 const TOKENS = readFileSync(join(import.meta.dirname, "..", "src", "styles", "_tokens.scss"), "utf8");
 
-/** A token's hex value. */
-const tokenHex = (name: string): string => {
-  const value = new RegExp(`^\\$${name}:\\s*(#[0-9a-f]{3,8});`, "m").exec(TOKENS)?.[1];
-  if (value === undefined) throw new Error(`No hex value for $${name}`);
+/** The palettes of the tokens file. */
+type PaletteName = "light" | "dark";
+
+/** A palette colour's hex value. */
+const tokenHex = (palette: PaletteName, name: string): string => {
+  const block = new RegExp(`^\\$${palette}: \\(([^)]*)\\);`, "m").exec(TOKENS)?.[1] ?? "";
+  const value = new RegExp(`^\\s*${name}: (#[0-9a-f]{3,8}),?$`, "m").exec(block)?.[1];
+  if (value === undefined) throw new Error(`No hex value for ${name} in $${palette}`);
   return value;
 };
 
@@ -45,15 +50,40 @@ const contrast = (first: readonly number[], second: readonly number[]): number =
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
 };
 
-describe("the shell's code palette", () => {
-  const background = over(tokenHex("fill-quiet"), tokenHex("surface"));
+/** The text colours, and the grounds each is read on. */
+const TEXTS = ["text", "text-secondary", "text-tertiary", "accent-text", "danger-text"];
+const GROUNDS = ["window", "sidebar", "surface"];
 
-  it.each(["keyword", "type", "string", "number", "punctuation", "name"])(
-    "$code-%s reaches 4.5:1",
-    (name) => {
+describe.each<PaletteName>(["light", "dark"])("the shell's %s palette", (palette) => {
+  const hex = (name: string): string => tokenHex(palette, name);
+
+  it.each(TEXTS.flatMap((text) => GROUNDS.map((ground) => [text, ground])))(
+    "%s reaches 4.5:1 on %s",
+    (text, ground) => {
       expect(
-        contrast(over(tokenHex(`code-${name}`), tokenHex("surface")), background)
+        contrast(over(hex(text), hex(ground)), over(hex(ground), hex("surface")))
       ).toBeGreaterThanOrEqual(4.5);
     }
   );
+
+  it("on-accent reaches 4.5:1 on the accent", () => {
+    expect(
+      contrast(over(hex("on-accent"), hex("accent")), over(hex("accent"), hex("surface")))
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(["keyword", "type", "string", "number", "punctuation", "name"])("code-%s reaches 4.5:1", (name) => {
+    const background = over(hex("fill-quiet"), hex("surface"));
+    expect(contrast(over(hex(`code-${name}`), hex("surface")), background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("names the same roles as the other palette", () => {
+    const names = (name: PaletteName): string[] =>
+      [
+        ...(new RegExp(`^\\$${name}: \\(([^)]*)\\);`, "m").exec(TOKENS)?.[1] ?? "").matchAll(
+          /^\s*([a-z-]+):/gm
+        )
+      ].map((match) => match[1] ?? "");
+    expect(names(palette)).toEqual(names(palette === "light" ? "dark" : "light"));
+  });
 });

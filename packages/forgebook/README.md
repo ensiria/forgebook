@@ -89,6 +89,12 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   it by itself.
 - **A toolbar each reader arranges**: whoever uses the catalogue pins the controls they use to the toolbar, orders
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
+- **A light and a dark catalogue**: the reader picks Light, Dark or System at the sidebar's foot (their browser keeps
+  it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
+- **Keys and named views**: a key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
+  key of any control (`keys: { width: "w" }`), a reader changes theirs in the View menu. The View menu's values are
+  saved under a name and picked again; `views` in the configuration offers some to every reader. A dot marks each
+  control whose value is not its default.
 - **Widths** to draw a story at, and a **compare** view that draws the same story once per value of one or two
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and

@@ -3,8 +3,15 @@
 // spacing and its own error message.
 
 @use "../styles/tokens" as *;
+@use "../styles/mixins";
 
 @layer catalogue {
+  // the catalogue's own colours (its error message) in the light palette: the frame's look is the view's, never the
+  // shell's appearance
+  :root {
+    @include mixins.palette($light);
+  }
+
   body {
     margin: 0;
   }

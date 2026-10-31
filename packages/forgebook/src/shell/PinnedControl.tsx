@@ -106,14 +106,18 @@ const ControlMenu = ({
 export const PinnedControl = ({
   control,
   isHidden,
+  isChanged,
   layout,
   ...context
 }: ControlContext & {
   readonly control: Control;
   /** Whether it takes no row in the View menu. */
   readonly isHidden: boolean;
+  /** Whether the person set a value that is not its default: a dot marks it, as View's button marks its own. */
+  readonly isChanged: boolean;
   readonly layout: ToolbarLayout;
 }): ReactNode => {
+  const shortcut = layout.keys[control.id];
   const [menuAt, setMenuAt] = useState<MenuPoint | undefined>(undefined);
   // one function for the menu's life: it focuses its first item once, when it opens
   const close = useCallback((): void => setMenuAt(undefined), []);
@@ -126,8 +130,23 @@ export const PinnedControl = ({
   };
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: the menu opens from the controls inside, which keep their own roles; the keyboard's menu key reaches it from them
-    <div className="forgebook-toolbar__pinned" data-control={control.id} onContextMenu={open}>
+    <div
+      className="forgebook-toolbar__pinned"
+      data-control={control.id}
+      // the key that cycles it, in the tooltip of every part that has no tooltip of its own
+      title={
+        shortcut === undefined ? undefined : STRINGS.cycleKey(controlLabel(control), shortcut.toUpperCase())
+      }
+      onContextMenu={open}
+    >
       <ToolbarControl control={control} form="bar" {...context} />
+      {isChanged ? (
+        <span
+          className="forgebook-dot forgebook-toolbar__changed"
+          role="img"
+          aria-label={STRINGS.controlChanged(controlLabel(control))}
+        />
+      ) : null}
       {menuAt === undefined ? null : (
         <ControlMenu control={control} isHidden={isHidden} at={menuAt} layout={layout} onClose={close} />
       )}

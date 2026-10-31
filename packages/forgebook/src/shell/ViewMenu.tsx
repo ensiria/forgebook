@@ -12,7 +12,6 @@
  */
 import {
   type ChangeEvent,
-  type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
@@ -27,8 +26,10 @@ import {
 import type { ViewSwitch } from "../switches.ts";
 import type { PlacedControl } from "../toolbarLayout.ts";
 import { DEFAULT_VIEW, hasViewChanges, type ViewState } from "../viewState.ts";
+import { ControlRow } from "./ControlRow.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
+import { NamedViews } from "./NamedViews.tsx";
 import { STRINGS } from "./strings.ts";
 import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
 import { usePopover } from "./usePopover.ts";
@@ -36,9 +37,6 @@ import type { ToolbarLayout } from "./useToolbarLayout.ts";
 
 /** The room the menu keeps from the window's right edge, in CSS px. */
 const EDGE_PX = 12;
-
-/** How far each arrow key moves a row. */
-const ARROW_STEPS: Readonly<Record<string, number>> = { ArrowUp: -1, ArrowDown: 1 };
 
 /** How long the rows take to move out of a dragged row's way, in ms: the shell's `$duration-quick`. */
 const SHIFT_MS = 150;
@@ -121,89 +119,6 @@ const useShiftedRows = (
       });
     }
   }, [order]);
-};
-
-/**
- * One control's row: its handle, its name, its value, its pin and its hide button.
- *
- * @param props - the placed control, its position, what moving and placing it do, and what every control shares.
- */
-const ControlRow = ({
-  each,
-  index,
-  count,
-  isDragged,
-  isMoved,
-  layout,
-  hintId,
-  onGrab,
-  onAnnounce,
-  ...context
-}: ControlContext & {
-  readonly each: PlacedControl;
-  readonly index: number;
-  readonly count: number;
-  readonly isDragged: boolean;
-  /** Whether it is pinned but the bar has no room for it now. */
-  readonly isMoved: boolean;
-  readonly layout: ToolbarLayout;
-  readonly hintId: string;
-  readonly onGrab: (event: PointerEvent<HTMLButtonElement>, id: string) => void;
-  readonly onAnnounce: (text: string) => void;
-}): ReactNode => {
-  const { control, isPinned } = each;
-  const label = controlLabel(control);
-  const step = (event: KeyboardEvent<HTMLButtonElement>): void => {
-    const offset = ARROW_STEPS[event.key] ?? 0;
-    const target = index + offset;
-    if (offset === 0 || target < 0 || target >= count) return;
-    event.preventDefault();
-    layout.move(control.id, target);
-    onAnnounce(STRINGS.controlMoved(label, target + 1, count));
-  };
-  return (
-    <li
-      className="forgebook-arrange"
-      data-control={control.id}
-      data-pinned={isPinned ? "" : undefined}
-      data-dragged={isDragged ? "" : undefined}
-      data-moved={isMoved ? "" : undefined}
-    >
-      <button
-        type="button"
-        className="forgebook-arrange__handle"
-        aria-label={STRINGS.moveControl(label)}
-        aria-describedby={hintId}
-        onPointerDown={(event: PointerEvent<HTMLButtonElement>): void => onGrab(event, control.id)}
-        onKeyDown={step}
-      >
-        <Icon name="grip" size={14} />
-      </button>
-      <span className="forgebook-popover__label">{label}</span>
-      <div className="forgebook-arrange__control">
-        <ToolbarControl control={control} form="row" {...context} />
-      </div>
-      <button
-        type="button"
-        className="forgebook-icon-button"
-        aria-label={STRINGS.pinControl(label)}
-        title={isMoved ? STRINGS.pinnedNoRoom : STRINGS.pinControl(label)}
-        aria-pressed={isPinned}
-        onClick={(): void => layout.pin(control.id, !isPinned)}
-      >
-        <Icon name="pin" size={14} />
-      </button>
-      <button
-        type="button"
-        className="forgebook-icon-button"
-        aria-label={STRINGS.hideControl(label)}
-        title={STRINGS.hideControl(label)}
-        onClick={(): void => layout.hide(control.id, true)}
-      >
-        <Icon name="eyeOff" size={14} />
-      </button>
-    </li>
-  );
 };
 
 /**
@@ -421,6 +336,7 @@ export const ViewMenu = ({
           role="dialog"
           aria-label={STRINGS.view}
         >
+          <NamedViews view={context.view} ownView={ownView} onViewChange={context.onViewChange} />
           <ol
             ref={listRef}
             className="forgebook-arrange-list"
@@ -434,6 +350,7 @@ export const ViewMenu = ({
                 count={shown.length}
                 isDragged={each.control.id === draggedId}
                 isMoved={movedIds.includes(each.control.id)}
+                isChanged={hasViewChanges(ownView, switches, [each.control.id])}
                 layout={layout}
                 hintId={hintId}
                 onGrab={grab}
