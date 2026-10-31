@@ -11,12 +11,144 @@ tests:
 - **on the server** (Vitest), each story rendered to a string, so no component reads `window` or `document` while it
   renders, and its controls checked against its args.
 
-**Requirements:** `forgebook` · Vite 8 · `@playwright/test` 1.64+ · Vitest 5 ·
+**Requirements:** `forgebook` · Vite 8 · `@playwright/test` 1.64+ · Vitest 5 · pnpm for the browser tests, Docker for
+the visual ones ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/testing/LICENSE)
 
 ```sh
 npm install --save-dev @forgebook/testing @playwright/test vitest
 ```
+
+## Setting up the tests
+
+The tests run on the package's own **story source** (the `StorySource` its catalogue lists), in a folder of their
+own. The example below is a package whose stories are `src/*.stories.tsx` and whose source is `stories/index.ts`:
+
+```ts
+// stories/index.ts
+/// <reference types="@forgebook/story-format/client" />
+import type { StorySource } from "@forgebook/story-format/source";
+
+import files from "../src/*.stories.tsx?forgebook-files";
+
+export const source: StorySource = {
+  id: "acme-ui",
+  name: "Acme UI",
+  files: [files],
+  sheets: { required: [], theme: [], restyled: [] }
+};
+```
+
+### In the browser
+
+Six files in `test/stories/`. Where the stories are, with the same patterns as the source:
+
+```ts
+// test/stories/storyFiles.ts
+import { join } from "node:path";
+
+import type { StoryFilesOptions } from "@forgebook/testing/story-files";
+
+export const STORY_FILES: StoryFilesOptions = {
+  sourceId: "acme-ui",
+  name: "Acme UI",
+  root: join(import.meta.dirname, "..", "..", "stories"),
+  patterns: ["../src/*.stories.tsx"]
+};
+```
+
+The folder and the ports, then the Playwright configuration and the spec:
+
+```ts
+// test/stories/testServer.ts
+import type { StoryTestServer } from "@forgebook/testing/playwright";
+
+export const STORY_SERVER: StoryTestServer = { dir: import.meta.dirname, port: 41831, browserPort: 41832 };
+
+// test/stories/playwright.config.ts
+import { storyTestConfig } from "@forgebook/testing/playwright";
+
+import { STORY_SERVER } from "./testServer";
+
+export default storyTestConfig(STORY_SERVER);
+
+// test/stories/stories.spec.ts
+import { storyBrowserTests } from "@forgebook/testing/browser";
+
+import { STORY_FILES } from "./storyFiles";
+
+storyBrowserTests(STORY_FILES);
+```
+
+The frame page the tests open, and the Vite configuration that serves it:
+
+```html
+<!-- test/stories/frame.html -->
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Stories</title></head>
+  <body><div id="root"></div><script type="module" src="./frame.tsx"></script></body>
+</html>
+```
+
+```tsx
+// test/stories/frame.tsx
+import "@forgebook/testing/fonts.css";
+import { mountFrame } from "@forgebook/react/frame";
+
+import { source } from "../../stories/index";
+
+const root = document.getElementById("root");
+if (root !== null) void mountFrame(root, { sources: [source] });
+
+// test/stories/vite.config.ts
+import { react } from "@forgebook/react/vite";
+import { storyTestViteConfig } from "@forgebook/testing/vite";
+
+export default storyTestViteConfig(import.meta.dirname, react());
+```
+
+Then `npx playwright install chromium` once, and `playwright test -c test/stories/playwright.config.ts` starts the
+frame page and runs one test per story and variant (light, dark, both with more contrast, a narrow width, and the
+structure view). A story that breaks a rule fails all its variants; `storyBrowserTests` also takes `check`, a rule of
+the package's own run on every frame.
+
+### On the server
+
+One test file and a Vitest configuration with the catalogue's plugin, which reads the source's
+`?forgebook-files` imports:
+
+```tsx
+// test/stories/stories.server.test.tsx
+import { reactRenderer } from "@forgebook/react/renderer";
+import { storyServerTests } from "@forgebook/testing/server";
+
+import { source } from "../../stories/index";
+
+storyServerTests(source, { renderer: reactRenderer });
+
+// vitest.config.ts
+import { react } from "@forgebook/react/vite";
+import { forgebookPlugin } from "forgebook/vite";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [forgebookPlugin({ framework: react() })],
+  test: { include: ["test/**/*.test.tsx"] }
+});
+```
+
+`storyServerTests` also takes `wrap`: a second pass with every story inside a decorator (a provider with a partial
+translation catalogue), its HTML checked.
+
+### Limits today
+
+- The browser tests start the frame page with `pnpm exec vite`, so they need pnpm.
+- The visual tests (`visual.spec.ts`, `visualTestConfig`, `startVisualBrowser`) compare the frames with reference
+  images in the Playwright container, so they need Docker; this guide does not cover them yet, their modules' TSDoc
+  does.
+
+## Imports and commands
 
 | Import or command | What it is |
 |---|---|
@@ -26,5 +158,4 @@ npm install --save-dev @forgebook/testing @playwright/test vitest
 | `forgebook-heights` | Measures every story's height at a few widths, for the catalogue's loading boxes |
 | `forgebook-shot` | Opens one story of a running catalogue and reports it with a picture |
 
-Each module's TSDoc describes its setup; a step-by-step guide is still to be written. More:
-[Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).
+More: [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).
