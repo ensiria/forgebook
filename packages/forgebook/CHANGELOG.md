@@ -1,3 +1,17 @@
+## 0.1.5 (2026-10-31)
+
+### 🚀 Features
+
+- **forgebook:** touch, simulated in the catalogue and real in Chromium ([ad5f603](https://github.com/ensiria/forgebook/commit/ad5f603))
+
+### 🩹 Fixes
+
+- **testing:** key story files as the catalogue's plugin does ([ffbcc80](https://github.com/ensiria/forgebook/commit/ffbcc80))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.4 (2026-10-31)
 
 ### 🚀 Features
