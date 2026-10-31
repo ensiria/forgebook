@@ -1,7 +1,9 @@
 /**
- * The sidebar: a search field and the tree, by source, family (opens and closes), group and component, one line per
- * component that never opens: a component's link opens its page, and its stories are picked in the page's header, so
- * nothing in the list folds under the pointer. A family stays open once opened; a search finds a component by its
+ * The sidebar: a search field and the tree, by source, family and named group (each folds open and shut, animated; a
+ * group starts shut unless it holds the shown component) and component, one line per component that never opens: a
+ * component's link opens its page, and its stories are picked in the page's header, so nothing in the list folds under
+ * the pointer. A family or a group stays open once opened; a search opens every one it finds something in, and finds a
+ * component by its
  * name, its place, its meta's search words or its stories' names and descriptions. A component listed in other places too (`alsoIn`) has an
  * alias entry in each, beside the components that live there, which says where it lives and opens its page.
  *
@@ -18,9 +20,10 @@ import {
   useState
 } from "react";
 
-import type { StoryTree, TreeAlias, TreeComponent, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
+import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { Icon } from "./icons.tsx";
 import { isTyping } from "./keyboard.ts";
+import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
 import { STRINGS } from "./strings.ts";
 import { foundFamily, searchWords } from "./treeSearch.ts";
 
@@ -42,9 +45,7 @@ export type SidebarProps = {
    * The shown component's source and title, to mark it and keep its family open, and the shown story's id; none on the
    * home.
    */
-  readonly current:
-    | { readonly sourceId: string; readonly title: string; readonly storyId: string | undefined }
-    | undefined;
+  readonly current: ShownComponent | undefined;
   /** The address of a component's page, by its title, for its link. */
   readonly componentHref: (sourceId: string, title: string) => string;
   /** Opens a component's page, by its title. */
@@ -60,6 +61,19 @@ export type SidebarProps = {
 /** A family's key, unique across sources. */
 const familyKey = (source: TreeSource, family: TreeFamily): string => `${source.id}/${family.name}`;
 
+/** A named group's key, unique across sources and families. */
+const groupKey = (family: string, group: TreeGroup): string => `${family}/${group.name ?? ""}`;
+
+/**
+ * Whether a group holds the shown component.
+ *
+ * @param sourceId - the group's source.
+ * @param group - the group.
+ * @param current - the shown component, if one is.
+ */
+const holdsCurrent = (sourceId: string, group: TreeGroup, current: SidebarProps["current"]): boolean =>
+  current?.sourceId === sourceId && group.components.some((component) => component.title === current.title);
+
 /** The key of the family the shown component is in; none when no component is shown. */
 const currentFamilyOf = (tree: StoryTree, current: SidebarProps["current"]): string | undefined => {
   if (current === undefined) return undefined;
@@ -70,119 +84,19 @@ const currentFamilyOf = (tree: StoryTree, current: SidebarProps["current"]): str
   return source === undefined || family === undefined ? undefined : familyKey(source, family);
 };
 
-/** A link that opens a page in place, keeping a real address for a new tab. */
-const PageLink = ({
-  href,
-  className,
-  current,
-  onOpen,
-  children
-}: {
-  readonly href: string;
-  readonly className: string;
-  /** What the link is when current: the shown page, or the place the shown page is in; none when not current. */
-  readonly current: "page" | "location" | undefined;
-  readonly onOpen: () => void;
-  readonly children: ReactNode;
-}): ReactNode => (
-  <a
-    className={className}
-    href={href}
-    aria-current={current}
-    onClick={(event: MouseEvent<HTMLAnchorElement>): void => {
-      event.preventDefault();
-      onOpen();
-    }}
-  >
-    {children}
-  </a>
-);
+/** The key of the named group the shown component is in; none when no component is shown or its group is unnamed. */
+const currentGroupOf = (tree: StoryTree, current: SidebarProps["current"]): string | undefined => {
+  const family = currentFamilyOf(tree, current);
+  const source = tree.sources.find((candidate) => candidate.id === current?.sourceId);
+  const group = source?.families
+    .flatMap((each) => each.groups)
+    .find((candidate) => candidate.name !== undefined && holdsCurrent(source.id, candidate, current));
+  return family === undefined || group === undefined ? undefined : groupKey(family, group);
+};
 
 /** How many components a family holds. */
 const componentCount = (family: TreeFamily): number =>
   family.groups.reduce((count, group) => count + group.components.length, 0);
-
-/** What the shown component's link is: the page itself on the component's page, where the page is on a story's. */
-const currentKind = (currentStoryId: string | undefined): "page" | "location" =>
-  currentStoryId === undefined ? "page" : "location";
-
-/** A component's link: its page, where its stories are picked from the header. */
-const ComponentEntry = ({
-  sourceId,
-  component,
-  isCurrent,
-  currentStoryId,
-  links
-}: {
-  readonly sourceId: string;
-  readonly component: TreeComponent;
-  readonly isCurrent: boolean;
-  readonly currentStoryId: string | undefined;
-  readonly links: Pick<SidebarProps, "componentHref" | "onOpenComponent">;
-}): ReactNode => {
-  const current = isCurrent ? currentKind(currentStoryId) : undefined;
-  return (
-    <div className="forgebook-tree__component">
-      <PageLink
-        href={links.componentHref(sourceId, component.title)}
-        className="forgebook-tree__item"
-        current={current}
-        onOpen={(): void => links.onOpenComponent(sourceId, component.title)}
-      >
-        <span className="forgebook-tree__item-name">{component.name}</span>
-        <span className="forgebook-tree__count">{component.stories.length}</span>
-      </PageLink>
-    </div>
-  );
-};
-
-/** The family a title places a component in: its first segment. */
-const familyOf = (title: string): string => title.split("/")[0]?.trim() ?? title;
-
-/**
- * An alias entry: the name of a component that lives elsewhere, marked with the family it lives in, opening its page.
- * It is never marked as the shown page: the entry where the component lives is, so the sidebar says where
- * it sits.
- */
-const AliasEntry = ({
-  sourceId,
-  alias,
-  links
-}: {
-  readonly sourceId: string;
-  readonly alias: TreeAlias;
-  readonly links: Pick<SidebarProps, "componentHref" | "onOpenComponent">;
-}): ReactNode => (
-  <div className="forgebook-tree__component" title={STRINGS.aliasHint(alias.title.split("/").join(" › "))}>
-    <PageLink
-      href={links.componentHref(sourceId, alias.title)}
-      className="forgebook-tree__item"
-      current={undefined}
-      onOpen={(): void => links.onOpenComponent(sourceId, alias.title)}
-    >
-      <span className="forgebook-tree__item-name">{alias.name}</span>
-      <span className="forgebook-tree__alias">
-        <Icon name="external" size={10} />
-        {STRINGS.aliasPlace(familyOf(alias.title))}
-      </span>
-    </PageLink>
-  </div>
-);
-
-/** A group's entries in name order: its own components and the aliases of components that live elsewhere. */
-const groupEntries = (
-  group: TreeGroup
-): readonly (
-  | { readonly kind: "component"; readonly component: TreeComponent }
-  | {
-      readonly kind: "alias";
-      readonly alias: TreeAlias;
-    }
-)[] =>
-  [
-    ...group.components.map((component) => ({ kind: "component" as const, component, name: component.name })),
-    ...group.aliases.map((alias) => ({ kind: "alias" as const, alias, name: alias.name }))
-  ].sort((left, right) => left.name.localeCompare(right.name));
 
 /**
  * The sidebar.
@@ -226,23 +140,29 @@ export const Sidebar = ({
     document.addEventListener("keydown", focusSearch);
     return (): void => document.removeEventListener("keydown", focusSearch);
   }, [isOpen]);
-  // the families the user opened or closed, and the ones a shown component opened: once open, a family stays open
-  // until the user closes it, so opening a component elsewhere never folds the list under the pointer
-  const [familyChoices, setFamilyChoices] = useState<ReadonlyMap<string, boolean>>(new Map());
+  // the families and groups the user opened or closed, and the ones a shown component opened: once open, one stays
+  // open until the user closes it, so opening a component elsewhere never folds the list under the pointer
+  const [foldChoices, setFoldChoices] = useState<ReadonlyMap<string, boolean>>(new Map());
   const currentFamilyKey = currentFamilyOf(tree, current);
+  const currentGroupKey = currentGroupOf(tree, current);
   useEffect(() => {
-    if (currentFamilyKey === undefined) return;
-    setFamilyChoices((choices) =>
-      choices.has(currentFamilyKey) ? choices : new Map(choices).set(currentFamilyKey, true)
+    const opened = [currentFamilyKey, currentGroupKey].filter((key): key is string => key !== undefined);
+    setFoldChoices((choices) =>
+      opened.every((key) => choices.has(key))
+        ? choices
+        : new Map([
+            ...choices,
+            ...opened.filter((key) => !choices.has(key)).map((key): [string, boolean] => [key, true])
+          ])
     );
-  }, [currentFamilyKey]);
+  }, [currentFamilyKey, currentGroupKey]);
   const words = searchWords(query);
   const isSearching = words.length > 0;
   const isCurrentFamily = (source: TreeSource, family: TreeFamily): boolean =>
     current?.sourceId === source.id &&
     family.groups.some((group) => group.components.some((component) => component.title === current.title));
-  const setFamilyOpen = (key: string, isOpen: boolean): void =>
-    setFamilyChoices((choices) => new Map(choices).set(key, isOpen));
+  const setFoldOpen = (key: string, isOpen: boolean): void =>
+    setFoldChoices((choices) => new Map(choices).set(key, isOpen));
 
   const sources = tree.sources.map((source) => ({
     source,
@@ -345,49 +265,45 @@ export const Sidebar = ({
               {families.map((family) => {
                 const key = familyKey(source, family);
                 // a search opens every family it finds something in
-                const isOpen = isSearching || (familyChoices.get(key) ?? isCurrentFamily(source, family));
+                const isOpen = isSearching || (foldChoices.get(key) ?? isCurrentFamily(source, family));
                 return (
                   <div key={key} className="forgebook-tree__family">
                     <button
                       type="button"
                       className="forgebook-tree__family-button"
                       aria-expanded={isOpen}
-                      onClick={(): void => setFamilyOpen(key, !isOpen)}
+                      onClick={(): void => setFoldOpen(key, !isOpen)}
                     >
-                      <Icon name={isOpen ? "chevronDown" : "chevronRight"} size={12} />
+                      <span className="forgebook-tree__chevron" data-open={isOpen ? "" : undefined}>
+                        <Icon name="chevronRight" size={12} />
+                      </span>
                       <span className="forgebook-tree__family-name">{family.name}</span>
                       <span className="forgebook-tree__count">{componentCount(family)}</span>
                     </button>
-                    {isOpen
-                      ? family.groups.map((group) => (
-                          <div key={group.name ?? ""} className="forgebook-tree__group">
-                            {group.name === undefined ? null : (
-                              <h3 className="forgebook-tree__group-name">{group.name}</h3>
-                            )}
-                            {groupEntries(group).map((entry) =>
-                              entry.kind === "component" ? (
-                                <ComponentEntry
-                                  key={entry.component.title}
-                                  sourceId={source.id}
-                                  component={entry.component}
-                                  isCurrent={
-                                    current?.sourceId === source.id && current.title === entry.component.title
-                                  }
-                                  currentStoryId={current?.storyId}
-                                  links={links}
-                                />
-                              ) : (
-                                <AliasEntry
-                                  key={`alias:${entry.alias.title}`}
-                                  sourceId={source.id}
-                                  alias={entry.alias}
-                                  links={links}
-                                />
-                              )
-                            )}
-                          </div>
-                        ))
-                      : null}
+                    <TreeFold
+                      isOpen={isOpen}
+                      isInstant={isSearching}
+                      content={(): ReactNode =>
+                        family.groups.map((group) => {
+                          const key = groupKey(familyKey(source, family), group);
+                          // shut by default; a search opens every group it finds something in
+                          const isGroupOpen =
+                            isSearching || (foldChoices.get(key) ?? holdsCurrent(source.id, group, current));
+                          return (
+                            <FamilyGroup
+                              key={group.name ?? ""}
+                              sourceId={source.id}
+                              group={group}
+                              isOpen={isGroupOpen}
+                              isInstant={isSearching}
+                              onToggle={(): void => setFoldOpen(key, !isGroupOpen)}
+                              current={current}
+                              links={links}
+                            />
+                          );
+                        })
+                      }
+                    />
                   </div>
                 );
               })}

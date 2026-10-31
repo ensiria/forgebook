@@ -213,6 +213,44 @@ test.describe("the sidebar", () => {
     await expect(page).toHaveURL(/component=kit%3Afoundations-page/);
     await expect(page.getByRole("button", { name: /^Inputs/ })).toHaveAttribute("aria-expanded", "true");
   });
+
+  test("a named group starts shut unless it holds the shown component, folds animated, and a search opens it", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    const tree = sidebarLinks(page);
+    // the shown component's group is open
+    await expect(tree.getByRole("button", { name: /^Selection/ })).toHaveAttribute("aria-expanded", "true");
+    await tree.getByRole("button", { name: /^Forms/ }).click();
+    const fields = tree.getByRole("button", { name: /^Fields/ });
+    await expect(fields).toHaveAttribute("aria-expanded", "false");
+    await expect(tree.getByRole("link", { name: "Select in Inputs" })).toHaveCount(0);
+    // it grows open: drawn at once, its height moving to its content's, frame by frame
+    const heights = await fields.evaluate(
+      (button) =>
+        new Promise<number[]>((resolve) => {
+          const fold = button.closest(".forgebook-tree__group")?.querySelector(".forgebook-tree__fold");
+          const seen: number[] = [];
+          const tick = (): void => {
+            seen.push(Math.round(fold?.getBoundingClientRect().height ?? -1));
+            if (seen.length < 30) requestAnimationFrame(tick);
+            else resolve(seen);
+          };
+          requestAnimationFrame(tick);
+          (button as HTMLButtonElement).click();
+        })
+    );
+    const full = heights.at(-1) ?? 0;
+    expect(full).toBeGreaterThan(0);
+    expect(heights.some((height) => height > 0 && height < full)).toBe(true);
+    await expect(tree.getByRole("link", { name: "Select in Inputs" })).toBeVisible();
+    // shut again, its entries leave once the fold has played
+    await fields.click();
+    await expect(tree.getByRole("link", { name: "Select in Inputs" })).toHaveCount(0);
+    // a search opens every group it finds something in
+    await page.getByRole("searchbox").fill("select");
+    await expect(fields).toHaveAttribute("aria-expanded", "true");
+  });
 });
 
 test.describe("aliases and related pages (D-492)", () => {
@@ -222,6 +260,10 @@ test.describe("aliases and related pages (D-492)", () => {
     await page.goto("/?component=kit:foundations-page");
     const tree = page.getByRole("navigation", { name: "Components" });
     await tree.getByRole("button", { name: /^Forms/ }).click();
+    // a named group starts shut: its button opens it
+    const fields = tree.getByRole("button", { name: /^Fields/ });
+    await expect(fields).toHaveAttribute("aria-expanded", "false");
+    await fields.click();
     const alias = tree.getByRole("link", { name: "Select in Inputs" });
     await expect(alias.locator("xpath=..")).toHaveAttribute("title", /Lives in Inputs › Selection › Select/);
     // the alias is not counted as one of the family's components

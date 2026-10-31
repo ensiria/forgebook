@@ -262,6 +262,16 @@
     flex: 1;
   }
 
+  // the family's arrow turns as it opens (`useFold.ts` moves its components' height)
+  .forgebook-tree__chevron {
+    display: inline-flex;
+    transition: transform $duration-quick $ease-out;
+
+    &[data-open] {
+      transform: rotate(90deg);
+    }
+  }
+
   .forgebook-tree__group {
     display: flex;
     flex-direction: column;
@@ -269,10 +279,39 @@
   }
 
   .forgebook-tree__group-name {
-    margin: $space-1-5 0 $space-0-5;
-    padding: 0 $space-2;
-    font: $text-caption;
-    color: $text-tertiary;
+    margin: $space-0-5 0 0;
+    font: inherit;
+  }
+
+  // a named group's components sit one step in, under its name past its arrow (the arrow, 12px, and its gap)
+  .forgebook-tree__group > .forgebook-tree__fold {
+    padding-inline-start: calc(0.75rem + #{$space-1-5});
+  }
+
+  // a named group folds its components under it, as its family does: as large as the entries, since it is pressed,
+  // and told apart by its weight and colour
+  .forgebook-tree__group-button {
+    display: flex;
+    align-items: center;
+    gap: $space-1-5;
+    box-sizing: border-box;
+    width: 100%;
+    padding: $space-1 $space-2;
+    border: 0;
+    border-radius: $radius-control-small;
+    background: none;
+    min-height: 1.625rem;
+    font: $text-row-label;
+    font-weight: 500;
+    color: $text-secondary;
+    text-align: start;
+    cursor: pointer;
+    @include mixins.focus-ring;
+
+    &:hover {
+      background: $hover;
+      color: $text;
+    }
   }
 
   .forgebook-tree__item {
@@ -2149,6 +2188,7 @@
     .forgebook-example__toggle svg,
     .forgebook-example__open svg,
     .forgebook-example__code,
+    .forgebook-tree__chevron,
     .forgebook-switch,
     .forgebook-switch::before {
       transition: none;
