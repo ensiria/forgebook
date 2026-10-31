@@ -13,6 +13,7 @@ import { runScriptProcess } from "@ensiria/cli-kit/testing";
 import type { ScriptProcessRun } from "@ensiria/cli-kit/testing.types";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { KIT_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** The command's entry. */
@@ -144,5 +145,14 @@ describe("forgebook mcp", () => {
       { id: 1, result: { protocolVersion: "2025-11-25", serverInfo: { name: "forgebook" } } },
       { id: 2, result: { isError: false, structuredContent: { args: { size: "md", label: "Save" } } } }
     ]);
+  }, 60_000);
+});
+
+describe("forgebook docs", () => {
+  it("fails a check when the package's CATALOG.md is missing, and names the command that writes it", () => {
+    const run = runScriptProcess(ENTRY, ["docs", "--package", KIT_DIR, "--check"]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain("CATALOG.md is stale");
+    expect(run.stderr).toContain("forgebook docs");
   }, 60_000);
 });

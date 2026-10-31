@@ -49,6 +49,7 @@
     "./vite/story-meta": "./src/vite/storyMeta.ts",
     "./catalogue-docs": "./bin/forgebook-docs/collectDocs.ts",
     "./catalogue-markdown": "./bin/forgebook-docs/catalogueMarkdown.ts",
+    "./catalogue-options": "./bin/forgebook-docs/catalogueOptions.ts",
     "./a11y": "./src/a11y.ts",
     "./frame-status": "./src/frame/frameStatus.ts",
     "./story-heights": "./src/storyHeights.ts",
@@ -180,6 +181,10 @@
       "./catalogue-markdown": {
         "types": "./dist/bin/forgebook-docs/catalogueMarkdown.d.ts",
         "default": "./dist/bin/forgebook-docs/catalogueMarkdown.js"
+      },
+      "./catalogue-options": {
+        "types": "./dist/bin/forgebook-docs/catalogueOptions.d.ts",
+        "default": "./dist/bin/forgebook-docs/catalogueOptions.js"
       },
       "./a11y": {
         "types": "./dist/src/a11y.d.ts",

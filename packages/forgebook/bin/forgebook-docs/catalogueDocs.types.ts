@@ -63,12 +63,18 @@ export type CatalogueComponent = {
   readonly docs: ComponentDocs;
   /** Its stories' names. */
   readonly stories: readonly string[];
+  /** The export name of its main story (`parameters.main`, else its first); none without stories. */
+  readonly mainStory: string | undefined;
 };
 
 /** Everything `CATALOG.md` lists. */
 export type CatalogueData = {
   /** The package's name (`@acme/ui`). */
   readonly packageName: string;
+  /** The package's description, from its manifest; none when it has none. */
+  readonly description: string | undefined;
+  /** The id its stories carry in a catalogue, read from its `./stories` export; none when not written plainly. */
+  readonly sourceId: string | undefined;
   /** The components with stories, by title. */
   readonly components: readonly CatalogueComponent[];
   /** The other exported modules. */
@@ -85,6 +91,8 @@ export type CatalogueDocsReport = {
   readonly status: "written" | "up-to-date" | "valid";
   /** The file, relative to the working directory. */
   readonly file: string;
+  /** `llms.txt`, beside it, relative to the folder the command runs in. */
+  readonly llmsFile: string;
   /** How many components, modules, Sass modules and style sheets it lists. */
   readonly counts: {
     readonly components: number;

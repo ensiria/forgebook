@@ -1,5 +1,5 @@
 /**
- * Tests for `forgebook-docs` on React components: the fixture package's CATALOG.md, its components read by the React
+ * Tests for `forgebook docs` on React components: the fixture package's CATALOG.md, its components read by the React
  * docs module.
  *
  * @module
@@ -7,6 +7,7 @@
 
 import { collectDocs } from "forgebook/catalogue-docs";
 import { catalogueMarkdown } from "forgebook/catalogue-markdown";
+import { CATALOGUE_SECTIONS } from "forgebook/catalogue-options";
 import { describe, expect, it } from "vitest";
 
 import { extractStoryComponent } from "../src/vite/extractDocs.ts";
@@ -16,8 +17,8 @@ import { KIT_DIR } from "./fixturePaths.ts";
 const KIT: string = KIT_DIR;
 
 describe("collectDocs and catalogueMarkdown", () => {
-  const { data, problems } = collectDocs(KIT, extractStoryComponent);
-  const text = catalogueMarkdown(data);
+  const { data, problems } = collectDocs(KIT, extractStoryComponent, { exclude: [] });
+  const text = catalogueMarkdown(data, CATALOGUE_SECTIONS);
 
   it("reads the components with stories, the modules, the Sass modules and the style sheets, not the stories export", () => {
     expect(problems).toEqual([]);
@@ -33,7 +34,7 @@ describe("collectDocs and catalogueMarkdown", () => {
   it("writes one dense line per entry", () => {
     expect(text).toContain("### Inputs › Selection");
     expect(text).toContain(
-      "- **Select** `@fixture/kit/select`: Lets the user pick one value from a list. value:string size=sm|md*|lg rows:number isDisabled onValueChange(value) options!:readonly string[] hint:ReactNode · parts: root, trigger, list"
+      "- **Select** `@fixture/kit/select`: Lets the user pick one value from a list. value:string size=sm|md*|lg rows:number isDisabled onValueChange(value) options!:readonly string[] hint:ReactNode · parts: root, trigger, list · story: `kit:inputs-selection-select--in-row`"
     );
     expect(text).toContain(
       "- `@fixture/kit/utils/format-size` formatSize(value, unit?): A size written with its unit. Also: formatSizeOf(size), SIZES, types SizeUnit"
@@ -51,9 +52,24 @@ describe("collectDocs and catalogueMarkdown", () => {
     const titled = ["Data/Lists/List", "Data/Value", "Data/Code/Diff", "Data/Board", "Actions/Button"].map(
       (title) => ({ ...select, title, name: title.split("/").at(-1) ?? title })
     );
-    const headings = catalogueMarkdown({ ...data, components: titled })
+    const headings = catalogueMarkdown({ ...data, components: titled }, CATALOGUE_SECTIONS)
       .split("\n")
       .filter((line) => line.startsWith("### "));
     expect(headings).toEqual(["### Actions", "### Data", "### Data › Code", "### Data › Lists"]);
+  });
+
+  it("reads the source's id from the stories export, and each component's main story", () => {
+    expect(data.sourceId).toBe("kit");
+    expect(data.components[0]?.mainStory).toBe("InRow");
+  });
+
+  it("leaves out the excluded subpaths and writes the sections asked for, in their order", () => {
+    const excluded = collectDocs(KIT, extractStoryComponent, { exclude: ["./utils/*", "./select"] }).data;
+    expect(excluded.components).toEqual([]);
+    expect(excluded.modules.map((module) => module.subpath)).toEqual(["./forgebook"]);
+    const headings = catalogueMarkdown(data, ["styleSheets", "components"])
+      .split("\n")
+      .filter((line) => line.startsWith("## "));
+    expect(headings).toEqual(["## Style sheets", "## Components"]);
   });
 });

@@ -31,8 +31,12 @@ export type IndexOptions = {
 /** A story's or a meta's fields by name: an object's properties, or a function story's assigned properties. */
 type Fields = (name: string) => ESTree.Expression | undefined;
 
-/** An expression without the TypeScript wrappers a meta is often written with (`satisfies Meta<…>`, `as Meta`). */
-const unwrapped = (expression: ESTree.Expression): ESTree.Expression => {
+/**
+ * An expression without the TypeScript wrappers a meta is often written with (`satisfies Meta<…>`, `as Meta`).
+ *
+ * @param expression - the expression.
+ */
+export const unwrapped = (expression: ESTree.Expression): ESTree.Expression => {
   if (
     expression.type === "TSSatisfiesExpression" ||
     expression.type === "TSAsExpression" ||
@@ -49,8 +53,16 @@ const keyName = (key: ESTree.PropertyKey): string | undefined => {
   return key.type === "Literal" ? String(key.value) : undefined;
 };
 
-/** A property's value expression, by the property's name (an identifier or a string key). */
-const propertyValue = (object: ESTree.ObjectExpression, name: string): ESTree.Expression | undefined => {
+/**
+ * The value of an object's property written plainly (a name or a string as its key), its TypeScript wrappers removed.
+ *
+ * @param object - the object.
+ * @param name - the property's name.
+ */
+export const propertyValue = (
+  object: ESTree.ObjectExpression,
+  name: string
+): ESTree.Expression | undefined => {
   for (const property of object.properties) {
     if (property.type !== "Property" || property.computed) continue;
     if (keyName(property.key) === name) return unwrapped(property.value);

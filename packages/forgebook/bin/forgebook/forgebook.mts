@@ -27,6 +27,8 @@ import {
   type ResolvedConfig
 } from "../../src/vite/configFile.ts";
 import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
+import { catalogueDocs } from "../forgebook-docs/catalogueDocs.ts";
+import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { storiesText, storyText } from "./agentText.ts";
 import { catalogueVite } from "./catalogueVite.ts";
@@ -224,6 +226,48 @@ await defineCommands({
         const document = filteredStories(body, { source: options.source, component: options.component });
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
       }
+    }),
+    docs: forgebook.command({
+      summary:
+        "Write a package's CATALOG.md and llms.txt, for agents writing code with it; --check fails when stale.",
+      json: true,
+      options: {
+        package: {
+          type: "string",
+          default: ".",
+          valueName: "folder",
+          description: "The package's folder; the current folder by default."
+        },
+        framework: {
+          type: "string",
+          default: "react",
+          valueName: "name",
+          description:
+            "The framework the stories are written for: its package, @forgebook/<name>, reads the props."
+        },
+        check: {
+          type: "boolean",
+          short: "c",
+          description: "Change nothing; fail when a file is stale or a file cannot be read (CI)."
+        }
+      },
+      examples: [
+        {
+          command: `${COMMAND} docs`,
+          description: "Rewrite the CATALOG.md and llms.txt of the package you are in."
+        },
+        { command: `${COMMAND} docs --check`, description: "Check them in CI." }
+      ],
+      run: ({ options, log }): Promise<CatalogueDocsReport> =>
+        catalogueDocs(
+          {
+            packageDir: resolve(options.package),
+            framework: options.framework,
+            isCheck: options.check,
+            fixCommand: `${COMMAND} docs`
+          },
+          log
+        )
     }),
     mcp: forgebook.command({
       summary:

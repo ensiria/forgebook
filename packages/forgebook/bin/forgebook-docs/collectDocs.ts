@@ -24,8 +24,10 @@ import type {
   SassModuleDocs,
   StyleSheetDocs
 } from "./catalogueDocs.types.ts";
+import { type CatalogueOptions, isExcluded } from "./catalogueOptions.ts";
 import { moduleDocs } from "./moduleDocs.ts";
 import { sassMembers, styleSheetSummary } from "./sassDocs.ts";
+import { sourceIdOf } from "./sourceId.ts";
 
 /** What was read, and what could not be. */
 export type CollectedDocs = {
@@ -53,7 +55,8 @@ const collectComponents = (
   packageDir: string,
   exports: Readonly<Record<string, string>>,
   problems: string[],
-  extractStoryComponent: ExtractStoryComponent
+  extractStoryComponent: ExtractStoryComponent,
+  exclude: readonly string[]
 ): { components: CatalogueComponent[]; componentFiles: Set<string> } => {
   const components: CatalogueComponent[] = [];
   const componentFiles = new Set<string>();
@@ -77,13 +80,14 @@ const collectComponents = (
       ([, source]) => resolve(packageDir, source) === component.file
     )?.[0];
     // a component no subpath exports is a story's own (a foundations page), not part of the package
-    if (subpath === undefined) continue;
+    if (subpath === undefined || isExcluded(subpath, exclude)) continue;
     componentFiles.add(component.file);
     components.push({
       title: index.title,
       subpath,
       docs: component.docs,
-      stories: index.stories.map((story) => story.name ?? story.exportName)
+      stories: index.stories.map((story) => story.name ?? story.exportName),
+      mainStory: (index.stories.find((story) => story.isMain === true) ?? index.stories[0])?.exportName
     });
   }
   return { components, componentFiles };
@@ -112,43 +116,65 @@ const readExport = (subpath: string, source: string, file: string): ReadExport =
     : { kind: "module", docs: { subpath, exports: docs } };
 };
 
+/** A text field of the package's manifest (`name`, `description`), or none. */
+const manifestText = (manifest: unknown, key: string): string | undefined => {
+  if (typeof manifest !== "object" || manifest === null || !(key in manifest)) return undefined;
+  const value: unknown = Reflect.get(manifest, key);
+  return typeof value === "string" ? value : undefined;
+};
+
+/** The id the package's stories carry, from its `./stories` export's module, when it writes it plainly. */
+const sourceIdIn = (packageDir: string, exports: Readonly<Record<string, string>>): string | undefined => {
+  const source = exports[STORIES_SUBPATH];
+  if (source === undefined) return undefined;
+  const file = resolve(packageDir, source);
+  try {
+    return sourceIdOf(file, readFileSync(file, "utf8"));
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Reads a package for its catalogue.
  *
  * @param packageDir - the package's folder.
  * @param extractStoryComponent - the framework's reading of a story file's component (its docs module).
+ * @param options - the package's catalogue options: the subpaths it leaves out.
  */
 export const collectDocs = (
   packageDir: string,
-  extractStoryComponent: ExtractStoryComponent
+  extractStoryComponent: ExtractStoryComponent,
+  options: Pick<CatalogueOptions, "exclude">
 ): CollectedDocs => {
   const manifest: unknown = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
-  const packageName =
-    typeof manifest === "object" &&
-    manifest !== null &&
-    "name" in manifest &&
-    typeof manifest.name === "string"
-      ? manifest.name
-      : packageDir;
+  const packageName = manifestText(manifest, "name") ?? packageDir;
   const exports = sourceExports(manifest);
   const problems: string[] = [];
   const { components, componentFiles } = collectComponents(
     packageDir,
     exports,
     problems,
-    extractStoryComponent
+    extractStoryComponent,
+    options.exclude
   );
   const modules: ModuleDocs[] = [];
   const sassModules: SassModuleDocs[] = [];
   const styleSheets: StyleSheetDocs[] = [];
   for (const [subpath, source] of Object.entries(exports)) {
     const file = resolve(packageDir, source);
-    if (subpath === STORIES_SUBPATH || componentFiles.has(file)) continue;
+    if (subpath === STORIES_SUBPATH || componentFiles.has(file) || isExcluded(subpath, options.exclude))
+      continue;
     const entry = readExport(subpath, source, file);
     if (entry.kind === "sass") sassModules.push(entry.docs);
     if (entry.kind === "sheet") styleSheets.push(entry.docs);
     if (entry.kind === "module") modules.push(entry.docs);
     if (entry.kind === "problem") problems.push(entry.message);
   }
-  return { data: { packageName, components, modules, sassModules, styleSheets }, problems };
+  const description = manifestText(manifest, "description");
+  const sourceId = sourceIdIn(packageDir, exports);
+  return {
+    data: { packageName, description, sourceId, components, modules, sassModules, styleSheets },
+    problems
+  };
 };

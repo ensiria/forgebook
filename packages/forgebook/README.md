@@ -119,7 +119,7 @@ its name.
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
-| `forgebook-docs` | Writes a package's `CATALOG.md` from its exports, their TSDoc and its stories |
+| `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
@@ -139,7 +139,16 @@ It offers three tools: `list_stories`, `get_story` and `story_address`. Run from
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
 
-In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed),
+A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
+component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),
+and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the
+package's `package.json`:
+
+```json
+{ "forgebook": { "catalog": { "file": "CATALOG.md", "sections": ["components", "modules"], "exclude": ["./internal/*"] } } }
+```
+
+`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed),
 and its JSON lists every story for a script.
 
 ## Packages
