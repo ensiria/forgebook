@@ -115,6 +115,11 @@ export type StoryFiles = {
   readonly code: Readonly<Record<string, () => Promise<unknown>>>;
   /** Each file's component page: its Markdown documentation, beside the story file, as HTML (`{ none: true }` without). */
   readonly pages: Readonly<Record<string, () => Promise<unknown>>>;
+  /**
+   * The group's "Used in": for each of its components, the other components whose stories use it (`{ error }` when it
+   * cannot be read). None when the catalogue turned it off, or for files indexed before it existed.
+   */
+  readonly usage?: () => Promise<unknown>;
 };
 
 /**
