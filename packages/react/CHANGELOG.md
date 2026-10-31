@@ -1,3 +1,19 @@
+## 0.1.4 (2026-10-31)
+
+### 🚀 Features
+
+- **forgebook:** forgebook new, a component's first stories from its props ([6925a49](https://github.com/ensiria/forgebook/commit/6925a49))
+- **forgebook:** forgebook docs, with llms.txt and a story per component ([184c939](https://github.com/ensiria/forgebook/commit/184c939))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.3
+- Updated forgebook to 0.1.4
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.3 (2026-10-31)
 
 ### 🧱 Updated Dependencies

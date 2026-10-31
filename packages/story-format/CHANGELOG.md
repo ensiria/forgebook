@@ -1,3 +1,14 @@
+## 0.1.3 (2026-10-31)
+
+### 🚀 Features
+
+- **story-format:** a language that reads right to left ([b12e5c8](https://github.com/ensiria/forgebook/commit/b12e5c8))
+- **story-format:** a files group's usage loader ([99d1e35](https://github.com/ensiria/forgebook/commit/99d1e35))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.2 (2026-10-31)
 
 ### 🩹 Fixes

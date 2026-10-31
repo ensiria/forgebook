@@ -1,3 +1,19 @@
+## 0.1.5 (2026-10-31)
+
+### 🚀 Features
+
+- **forgebook:** right to left, and the worst case with its spills ([4255c7d](https://github.com/ensiria/forgebook/commit/4255c7d))
+- **testing:** checks as problems, and check and shot runs for the CLI ([fc33305](https://github.com/ensiria/forgebook/commit/fc33305))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.3
+- Updated forgebook to 0.1.4
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.4 (2026-10-31)
 
 ### 🧱 Updated Dependencies
