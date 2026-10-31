@@ -30,6 +30,8 @@
     "./vite": "./src/testViteConfig.ts",
     "./visual-browser": "./src/visualBrowser.ts",
     "./overlays": "./src/overlays.ts",
+    "./check": "./src/checkStories.ts",
+    "./shot": "./src/shotStories.ts",
     "./fonts.css": "./src/fonts/fonts.css"
   },
   "scripts": {
@@ -91,6 +93,14 @@
       "./overlays": {
         "types": "./dist/src/overlays.d.ts",
         "default": "./dist/src/overlays.js"
+      },
+      "./check": {
+        "types": "./dist/src/checkStories.d.ts",
+        "default": "./dist/src/checkStories.js"
+      },
+      "./shot": {
+        "types": "./dist/src/shotStories.d.ts",
+        "default": "./dist/src/shotStories.js"
       },
       "./fonts.css": "./dist/src/fonts/fonts.css"
     },

@@ -14,17 +14,17 @@
  *
  * @module
  */
-import { AxeBuilder } from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import { type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
+import type { StoryProblem } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
 import { storyTree, testedStoryLocations } from "forgebook/story-tree";
 import { DEFAULT_SWITCHES, switchWithRole, type ViewSwitch } from "forgebook/switches";
 import { defaultView, frameAddress, type ViewState } from "forgebook/view-state";
 
-import { findOverlaysPastFrame, isOverlayChecked } from "./overlays.ts";
-import { findSpills } from "./spills.ts";
+import { isOverlayChecked } from "./overlays.ts";
+import { axeProblems, overlayProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
 import { indexedSource, type StoryFilesOptions } from "./storyFiles.ts";
 
 /** One way of showing every story. */
@@ -98,28 +98,6 @@ export type StoryBrowserTestsOptions = StoryFilesOptions & {
 };
 
 /**
- * The overlays a story's play leaves open past its frame, as the test's messages; none in a view that is not checked
- * (`isOverlayChecked`).
- *
- * @param page - the story's frame page, its play over.
- * @param variant - the variant the test shows the story in.
- * @param sceneHeight - the height the story declares, in CSS px, if any.
- * @returns one message per overlay past the frame.
- */
-const overlayProblems = async (
-  page: Page,
-  variant: StoryVariant,
-  sceneHeight: number | undefined
-): Promise<string[]> => {
-  if (!isOverlayChecked(variant.view)) return [];
-  const overlays = await findOverlaysPastFrame(page, sceneHeight);
-  return overlays.map(
-    (overlay) =>
-      `${overlay.element} ends ${overlay.by}px below the frame's ${overlay.frameHeight}px: declare parameters.height`
-  );
-};
-
-/**
  * Declares the tests, one `describe` per component and one test per story and variant.
  *
  * @param options - where the stories are, the frame page, the variants, whether to compare screenshots, and a check of
@@ -137,11 +115,7 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
       for (const { story } of locations) {
         for (const variant of variants) {
           test(`${story.name} · ${variant.name}`, async ({ page }) => {
-            const errors: string[] = [];
-            page.on("pageerror", (error) => errors.push(error.message));
-            page.on("console", (message) => {
-              if (message.type() === "error") errors.push(message.text());
-            });
+            const errors = watchedErrors(page);
             if (variant.width !== undefined)
               await page.setViewportSize({ width: variant.width, height: 800 });
             // a Live story is checked and pictured at its start: its clock held, so its image never changes;
@@ -161,18 +135,15 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
               });
               return;
             }
-            const { violations } = await new AxeBuilder({ page })
-              .withTags([...catalogue.a11y.tags])
-              .disableRules([...catalogue.a11y.disabledRules])
-              .analyze();
-            expect(violations.map((violation) => `${violation.id}: ${violation.help}`)).toEqual([]);
-            const spills = await page.evaluate(findSpills, ".forgebook-frame");
-            expect(
-              spills.map((spill) => `${spill.element} spills out of ${spill.parent} by ${spill.by}px`)
-            ).toEqual([]);
+            const messages = (problems: readonly StoryProblem[]): string[] =>
+              problems.map((problem) => problem.message);
+            expect(messages(await axeProblems(page, catalogue.a11y))).toEqual([]);
+            expect(messages(await spillProblems(page))).toEqual([]);
             await check?.(page);
             // last: it resizes the window, which may close what the story left open
-            expect(await overlayProblems(page, variant, story.height)).toEqual([]);
+            expect(
+              messages(await overlayProblems(page, isOverlayChecked(variant.view), story.height))
+            ).toEqual([]);
             expect(errors).toEqual([]);
           });
         }
