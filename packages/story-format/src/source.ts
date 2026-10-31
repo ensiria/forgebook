@@ -3,10 +3,10 @@
  *
  * @remarks
  * Every package with stories exports one `StorySource` from a development-only `./stories` subpath, never published;
- * an app lists the sources it shows (D-57). A source names its story files once per pattern, with an import the
+ * an app lists the sources it shows. A source names its story files once per pattern, with an import the
  * catalogue's Vite plugin answers (`import files from "../src/**\/*.stories.tsx?forgebook-files"`, typed by
  * `@forgebook/story-format/client`): one module with every file's index (read without running the files), and the loaders
- * of its stories, its component's docs and its code (D-438). The style sheets are the URLs the frame loads for each
+ * of its stories, its component's docs and its code. The style sheets are the URLs the frame loads for each
  * Styles setting.
  *
  * @module
@@ -26,7 +26,7 @@ export type StoryIndexEntry = {
   readonly controls?: StoryControlsSetting;
   /** The story's `parameters.group`, when it sets one. */
   readonly group?: StoryGroup;
-  /** The story's own `parameters.height`, when it sets one, in CSS px (D-469). */
+  /** The story's own `parameters.height`, when it sets one, in CSS px. */
   readonly height?: number;
   /** Whether the story sets `parameters.main: true`: the component's demo. */
   readonly isMain?: boolean;
@@ -45,13 +45,13 @@ export type StoryFileIndex = {
   readonly title: string;
   /** The meta's `parameters.controls`, when it sets one: `[]` for `false`. */
   readonly controls?: StoryControlsSetting;
-  /** The meta's `parameters.height`, when it sets one: every story's frame height, in CSS px (D-469). */
+  /** The meta's `parameters.height`, when it sets one: every story's frame height, in CSS px. */
   readonly height?: number;
-  /** The meta's `alsoIn`, when it sets one: the other places the component is listed in (D-492). */
+  /** The meta's `alsoIn`, when it sets one: the other places the component is listed in. */
   readonly alsoIn?: readonly string[];
-  /** The meta's `related`, when it sets one: the titles of the components its page names at its top (D-492). */
+  /** The meta's `related`, when it sets one: the titles of the components its page names at its top. */
   readonly related?: readonly string[];
-  /** The meta's `keywords`, when it sets one: other words the search finds the component by (D-603). */
+  /** The meta's `keywords`, when it sets one: other words the search finds the component by. */
   readonly keywords?: readonly string[];
   /** The meta's `parameters.docs.description.component`, when written plainly. */
   readonly description?: string;

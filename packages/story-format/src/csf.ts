@@ -1,13 +1,13 @@
 /**
- * The story format: Component Story Format 3, the subset the Ensiria catalogue reads.
+ * The story format: Component Story Format 3, the subset Forgebook reads.
  *
  * @remarks
  * A story file exports its meta as the default export and each story as a named export, as CSF requires, so
- * Storybook or Ladle could read the same files (D-54). The types cover only what the catalogue reads; anything else
+ * Storybook or Ladle could read the same files. The types cover only what the catalogue reads; anything else
  * in a story file is left alone. The format is its own package so the packages that write stories depend on it, not
  * on the catalogue that shows them. Parameters the catalogue adds (`forceState`, `replay`) sit under `parameters`, where CSF
  * keeps tool-specific settings.
- * A Live story (`parameters.clock`) reads the story clock the catalogue runs (`./clock`, D-504).
+ * A Live story (`parameters.clock`) reads the story clock the catalogue runs (`./clock`).
  *
  * The types are generic over a renderer, as Storybook's are: what a framework's component is and what a render
  * returns. A framework's package names them for its own (`Meta<typeof Button>` in `@forgebook/react`), and story
@@ -146,13 +146,13 @@ export type StoryParameters = {
   /**
    * The height the story's scene needs, in CSS px: the frame has it from the start, so an overlay the story opens is
    * placed once, as in a window of that size, instead of flipping or scrolling in a frame only as tall as the story's
-   * own content. The frame still grows past it with its content (D-469). Written plainly (`height: 320`, the index
+   * own content. The frame still grows past it with its content. Written plainly (`height: 320`, the index
    * reads it).
    */
   readonly height?: number;
   /**
    * The story reads the story clock (`context.clock`, `useStoryNow`): a Live story, which starts at this moment and
-   * then runs; the catalogue shows pause, resume, restart and the speed, and the tests hold it at its start (D-504).
+   * then runs; the catalogue shows pause, resume, restart and the speed, and the tests hold it at its start.
    * None by default: the clock is held at the Unix epoch and the catalogue shows no clock controls.
    */
   readonly clock?: StoryClockSetting;
@@ -180,7 +180,7 @@ export type StoryContext<TArgs> = {
   readonly text: StoryTextFunction;
   /**
    * The story clock: the time a Live story reads, and what its play function advances instead of waiting; held at
-   * the Unix epoch when the story declares no `parameters.clock` (D-504).
+   * the Unix epoch when the story declares no `parameters.clock`.
    */
   readonly clock: StoryClock;
   /**
@@ -285,17 +285,17 @@ export type CsfMeta<TRenderer extends Renderer, TComponent, TArgs, TWrittenArgs>
    * Other places the catalogue lists the component in, besides its title's, as `Family` or `Family/Group`
    * (`["Data/Tables"]`): a component that belongs to one family but is looked for in another. Each place shows an
    * entry marked as living elsewhere that opens the same page, so nothing is duplicated: no second story, test or
-   * image (D-492). Written plainly, a list of string literals: the catalogue reads it without running the file.
+   * image. Written plainly, a list of string literals: the catalogue reads it without running the file.
    */
   readonly alsoIn?: readonly string[];
   /**
    * The titles of related components of the same source (`["Layout/Inline"]`): each page names the other at its top,
-   * both ways, so writing the link in one meta is enough (D-492). Written plainly, a list of string literals.
+   * both ways, so writing the link in one meta is enough. Written plainly, a list of string literals.
    */
   readonly related?: readonly string[];
   /**
    * Other words the catalogue's search finds the component by, besides its name and title: the names other libraries
-   * give it (`["horizontal", "row", "hstack"]` for `Inline`). Written plainly, a list of string literals (D-603).
+   * give it (`["horizontal", "row", "hstack"]` for `Inline`). Written plainly, a list of string literals.
    */
   readonly keywords?: readonly string[];
   /** Settings for every story of the file. */

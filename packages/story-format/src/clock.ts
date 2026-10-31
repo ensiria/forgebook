@@ -1,6 +1,6 @@
 /**
  * The story clock: the time a Live story reads, which the catalogue starts at a fixed moment and then runs, holds,
- * restarts and speeds up (D-504).
+ * restarts and speeds up.
  *
  * @remarks
  * A component that counts (a countdown, a stream, a toast's wait) never reads the time itself: it takes a clock from
@@ -8,7 +8,7 @@
  * or a play function; a framework's package gives components their own access (`useStoryClock()`, `useStoryNow()` in
  * `@forgebook/react/clock`). The catalogue
  * provides the clock; the library shown converts its milliseconds into its own time type, so this package names no
- * date library and the catalogue none of the libraries it shows (D-67).
+ * date library and the catalogue none of the libraries it shows.
  *
  * The clock is stepped: `now()` is the moment of its last tick, the same value until the next one, so a render reads
  * one moment throughout and a component can subscribe to it. A story that reads the clock declares

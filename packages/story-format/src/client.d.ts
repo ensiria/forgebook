@@ -4,7 +4,7 @@
  *
  * @remarks
  * A script, not a module (no top-level import or export), so the wildcard declaration is global; the catalogue's Vite
- * plugin answers each import with one module (D-438).
+ * plugin answers each import with one module.
  *
  * @module
  */
