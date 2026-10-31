@@ -9,6 +9,8 @@ on:
     branches: [develop, main]
   pull_request:
     branches: [develop, main]
+  # by hand, to run the checks on a branch without a new commit
+  workflow_dispatch:
 
 permissions:
   contents: read
