@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Ensiria/forgebook.git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
     "directory": "packages/testing"
   },
   "type": "module",

@@ -7,7 +7,7 @@ see [SECURITY.md](SECURITY.md).
 
 ## Questions, bugs and proposals
 
-- **A question** (how do I…, can a story…): [Discussions](https://github.com/Ensiria/forgebook/discussions).
+- **A question** (how do I…, can a story…): [Discussions](https://github.com/ensiria/forgebook/discussions).
 - **A bug**: an issue with the bug form. The package and its version, the Node version, the package manager, the
   browser and a story that shows it are what make it fixable.
 - **A new feature**: an issue with the proposal form, before any code. Forgebook stays light on purpose (no new
@@ -101,5 +101,5 @@ The first release is published by hand, since npm can trust a workflow only for 
 `main`, signed in to npm (`npm login`, with 2FA) and to GitHub (`GITHUB_TOKEN=$(gh auth token)`), run
 `pnpm nx release 0.1.0 --first-release --skip-publish`, then `pnpm -r --filter "./packages/*" publish` in a terminal (in dependency order; each
 package asks for 2FA). Then, on npmjs.com, each package's settings add the trusted publisher (GitHub Actions,
-`Ensiria/forgebook`, workflow `release.yml`, environment `npm`, `npm publish` not allowed, so it can only stage) and
+`ensiria/forgebook`, workflow `release.yml`, environment `npm`, `npm publish` not allowed, so it can only stage) and
 require 2FA with tokens disallowed.

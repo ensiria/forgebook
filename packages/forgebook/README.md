@@ -5,12 +5,12 @@ per story, switches for theme, contrast, motion and language, and a props table 
 
 > **Status:** 0.x, early. Its author's design system runs on it; the API may still change between minor versions,
 > and every change is in the
-> [changelog](https://github.com/Ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
+> [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
 **Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 today, through
 [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react); other frameworks plug in through the same
 adapter (the catalogue's own interface is React either way) · npm, pnpm, yarn or bun ·
-[MIT licence](https://github.com/Ensiria/forgebook/blob/develop/packages/forgebook/LICENSE)
+[MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/LICENSE)
 
 ## Install
 
@@ -133,5 +133,5 @@ Each command prints its options with `--help`.
 ## Contributing
 
 Bugs, proposals and pull requests:
-[CONTRIBUTING.md](https://github.com/Ensiria/forgebook/blob/develop/CONTRIBUTING.md). Security problems:
-[SECURITY.md](https://github.com/Ensiria/forgebook/blob/develop/SECURITY.md).
+[CONTRIBUTING.md](https://github.com/ensiria/forgebook/blob/develop/CONTRIBUTING.md). Security problems:
+[SECURITY.md](https://github.com/ensiria/forgebook/blob/develop/SECURITY.md).

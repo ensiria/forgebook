@@ -5,7 +5,7 @@ over a framework, and the `StorySource` a package hands a catalogue. It has no d
 stories depend on it and never on the catalogue that shows them.
 
 **Requirements:** none: no dependencies, types and a few small helpers ·
-[MIT licence](https://github.com/Ensiria/forgebook/blob/develop/packages/story-format/LICENSE)
+[MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/story-format/LICENSE)
 
 Most projects never install it themselves: `@forgebook/react` brings it, and its `Meta` and `Story` are this format
 typed for React. A library installs it to publish its stories for other catalogues:
@@ -36,4 +36,4 @@ An app's `forgebook.config.ts` then lists it: `sources: ["@acme/ui/stories"]`.
 | `@forgebook/story-format/clock` | The story clock a live story reads |
 | `@forgebook/story-format/testing-library` | `canvas` and `userEvent` in every `play`, once Testing Library is installed |
 
-More: [Forgebook's README](https://github.com/Ensiria/forgebook/blob/develop/packages/forgebook/README.md).
+More: [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).

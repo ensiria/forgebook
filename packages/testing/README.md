@@ -12,7 +12,7 @@ tests:
   renders, and its controls checked against its args.
 
 **Requirements:** `forgebook` · Vite 8 · `@playwright/test` 1.64+ · Vitest 5 ·
-[MIT licence](https://github.com/Ensiria/forgebook/blob/develop/packages/testing/LICENSE)
+[MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/testing/LICENSE)
 
 ```sh
 npm install --save-dev @forgebook/testing @playwright/test vitest
@@ -27,4 +27,4 @@ npm install --save-dev @forgebook/testing @playwright/test vitest
 | `forgebook-shot` | Opens one story of a running catalogue and reports it with a picture |
 
 Each module's TSDoc describes its setup; a step-by-step guide is still to be written. More:
-[Forgebook's README](https://github.com/Ensiria/forgebook/blob/develop/packages/forgebook/README.md).
+[Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).
