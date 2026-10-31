@@ -18,6 +18,30 @@ import type { StoryFileIndex } from "@forgebook/story-format/source";
 import { autoTitle, patternBase } from "./autoTitle.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
 
+/** A pattern of story files and the folder it is read from. */
+export type StoryFilesGroup = {
+  /** The folder, absolute. */
+  readonly root: string;
+  /** The pattern, relative to it, without a leading `./` or `../`. */
+  readonly pattern: string;
+};
+
+/**
+ * The folder and the pattern a `?forgebook-files` import is read from: the pattern's leading `./` and `../` move into
+ * the folder. The catalogue's plugin keys the files this way (its modules' ids hold no `..`, which a URL path would
+ * collapse), and so does the testing package, so both list the same keys (`./src/x.stories.tsx`).
+ *
+ * @param folder - the importing module's folder.
+ * @param pattern - the pattern as the import writes it (`../src/**\/*.stories.tsx`).
+ */
+export const storyFilesGroup = (folder: string, pattern: string): StoryFilesGroup => {
+  const segments = pattern.split("/");
+  const firstOwn = segments.findIndex((segment) => segment !== "." && segment !== "..");
+  const climbed = firstOwn === -1 ? segments : segments.slice(0, firstOwn);
+  const own = firstOwn === -1 ? [] : segments.slice(firstOwn);
+  return { root: resolve(folder, ...climbed), pattern: own.join("/") };
+};
+
 /**
  * The story files patterns match, as paths relative to `root` starting with `./` or `../`, sorted.
  *

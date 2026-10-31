@@ -52,7 +52,13 @@ import {
 } from "./pages.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import { storyCode } from "./storyCode.ts";
-import { indexedStoryFiles, storyFilesModule, USAGE_PREFIX, USAGE_SEPARATOR } from "./storyFilesModule.ts";
+import {
+  indexedStoryFiles,
+  storyFilesGroup,
+  storyFilesModule,
+  USAGE_PREFIX,
+  USAGE_SEPARATOR
+} from "./storyFilesModule.ts";
 import { componentImport } from "./storyMeta.ts";
 import { joinedUsage } from "./usageModule.ts";
 
@@ -221,20 +227,15 @@ const markdownModule = (file: string, watch: (file: string) => void): { code: st
 };
 
 /**
- * The id of a `?forgebook-files` module: the folder, then the pattern. The pattern's leading `./` and `../` move into
- * the folder, so no `..` is left in the id: Vite serves a virtual module under a URL path, whose normalisation would
- * let a `..` remove the segment before it (`app::./..`), folder and separator with it, and the module would match
- * nothing. The files' keys and titles stay as they were: both are read relative to the folder and the pattern's base.
+ * The id of a `?forgebook-files` module: its group's folder, then its pattern (`storyFilesGroup`), so no `..` is left
+ * in the id.
  *
  * @param folder - the importing module's folder.
  * @param pattern - the pattern as the import writes it.
  */
 const filesId = (folder: string, pattern: string): string => {
-  const segments = pattern.split("/");
-  const firstOwn = segments.findIndex((segment) => segment !== "." && segment !== "..");
-  const climbed = firstOwn === -1 ? segments : segments.slice(0, firstOwn);
-  const own = firstOwn === -1 ? [] : segments.slice(firstOwn);
-  return `${FILES_PREFIX}${resolve(folder, ...climbed)}${FILES_SEPARATOR}${own.join("/")}`;
+  const group = storyFilesGroup(folder, pattern);
+  return `${FILES_PREFIX}${group.root}${FILES_SEPARATOR}${group.pattern}`;
 };
 
 /**

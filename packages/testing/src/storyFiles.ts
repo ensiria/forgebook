@@ -16,7 +16,7 @@ import type { StoryFileIndex, StorySource } from "@forgebook/story-format/source
 import { sourceFiles } from "forgebook/source-files";
 import { autoTitle, patternBase } from "forgebook/vite/auto-title";
 import { indexStoryFile } from "forgebook/vite/index-story-file";
-import { storyFileKeys } from "forgebook/vite/story-files-module";
+import { type StoryFilesGroup, storyFileKeys, storyFilesGroup } from "forgebook/vite/story-files-module";
 
 /** Where a package's story files are. */
 export type StoryFilesOptions = {
@@ -31,12 +31,21 @@ export type StoryFilesOptions = {
 };
 
 /**
- * The story files the patterns match, as the source's keys (`./x` or `../x`, relative to `root`), sorted.
+ * The groups the patterns make, each read as the catalogue's plugin reads it (`storyFilesGroup`): one per pattern.
+ *
+ * @param options - where the files are.
+ */
+const groupsOf = (options: StoryFilesOptions): StoryFilesGroup[] =>
+  options.patterns.map((pattern) => storyFilesGroup(options.root, pattern));
+
+/**
+ * The story files the patterns match, as the source's keys (the plugin's: relative to each pattern's folder once its
+ * leading `../` moved into it, `./src/x.stories.tsx`), sorted.
  *
  * @param options - where the files are.
  */
 export const storyFiles = (options: StoryFilesOptions): string[] =>
-  storyFileKeys(options.root, options.patterns);
+  [...new Set(groupsOf(options).flatMap((group) => storyFileKeys(group.root, [group.pattern])))].sort();
 
 /**
  * A source with its index read from the disk and no loaders: enough for the story tree, the ids and the tests.
@@ -46,16 +55,16 @@ export const storyFiles = (options: StoryFilesOptions): string[] =>
  */
 export const indexedSource = (options: StoryFilesOptions): StorySource => {
   const index: Record<string, StoryFileIndex> = {};
-  for (const file of storyFiles(options)) {
-    // the title the plugin gives: from the first pattern that matches the file, as each pattern is one module
-    const pattern = options.patterns.find((candidate) =>
-      storyFileKeys(options.root, [candidate]).includes(file)
-    );
-    const title = pattern === undefined ? undefined : autoTitle(patternBase(pattern), file);
-    const text = readFileSync(join(options.root, file), "utf8");
-    const entry = indexStoryFile(file, text, title === undefined ? {} : { autoTitle: title });
-    if (typeof entry === "string") throw new Error(entry);
-    index[file] = entry;
+  // as the plugin does: each pattern is one group, and a file's title comes from the first group that matches it
+  for (const group of groupsOf(options)) {
+    for (const file of storyFileKeys(group.root, [group.pattern])) {
+      if (index[file] !== undefined) continue;
+      const title = autoTitle(patternBase(group.pattern), file);
+      const text = readFileSync(join(group.root, file), "utf8");
+      const entry = indexStoryFile(file, text, title === undefined ? {} : { autoTitle: title });
+      if (typeof entry === "string") throw new Error(entry);
+      index[file] = entry;
+    }
   }
   return {
     id: options.sourceId,
