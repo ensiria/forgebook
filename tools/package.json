@@ -12,7 +12,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "@ensiria/cli-kit": "0.1.0",
+    "@ensiria/cli-kit": "^0.1.1",
     "sass-embedded": "1.106.1"
   },
   "devDependencies": {

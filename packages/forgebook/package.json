@@ -71,7 +71,7 @@
     "typecheck": "tsc -p src && tsc -p src/vite && tsc -p bin && tsc -p test"
   },
   "dependencies": {
-    "@ensiria/cli-kit": "0.1.0",
+    "@ensiria/cli-kit": "^0.1.1",
     "@forgebook/story-format": "workspace:*",
     "axe-core": "4.14.0",
     "highlight.js": "11.12.0",
