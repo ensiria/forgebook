@@ -535,9 +535,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
           })
           .catch(next);
       });
+      // folders outside the configuration's are watched only when named; a story file added or removed anywhere the
+      // server watches (its own folder, a story file it loaded) renews the lists either way
       const watched = [...(config?.watch ?? []), ...(options.watch ?? [])];
-      if (watched.length === 0) return;
-      server.watcher.add(watched);
+      if (watched.length > 0) server.watcher.add(watched);
       const refresh = (file: string): void => {
         if (!STORY_FILE.test(file)) return;
         const graph = server.environments.client.moduleGraph;

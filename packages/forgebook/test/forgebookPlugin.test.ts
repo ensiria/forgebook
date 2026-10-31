@@ -158,4 +158,18 @@ describe("forgebookPlugin in the dev server", () => {
     expect(fake.invalidated).toEqual([id, id]);
     expect(fake.reloads).toBe(2);
   });
+
+  it("renews them too in a catalogue that watches no folder of its own: a story file renamed in its own folder", async () => {
+    const fake = fakeServer();
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
+    const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(KIT, "stories.ts")));
+    await hooks.load(id);
+    await hooks.closeBundle();
+    hooks.configureServer(fake.server);
+    fake.emit("unlink", join(KIT, "src", "Old.stories.tsx"));
+    fake.emit("add", join(KIT, "src", "New.stories.tsx"));
+    expect(fake.added).toEqual([]);
+    expect(fake.invalidated).toEqual([id, id]);
+    expect(fake.reloads).toBe(2);
+  });
 });
