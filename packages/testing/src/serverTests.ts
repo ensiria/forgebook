@@ -1,6 +1,6 @@
 /**
  * One Vitest test per story: the framework renders it to a string without errors (`renderToString` of its renderer),
- * so no component reads `window` or `document` while rendering (D-71), and its controls tell the truth
+ * so no component reads `window` or `document` while rendering, and its controls tell the truth
  * (`storyControlsProblem`).
  *
  * @remarks
@@ -75,7 +75,7 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
           // the stories' own texts: what the catalogue shows when no language is chosen
           const texts = source.texts?.[BASE_LANGUAGE] ?? {};
           const args = withStoryTexts(loaded.args, storyTextOf(texts));
-          // a Live story renders at its start, as the frame's tests picture it (D-504)
+          // a Live story renders at its start, as the frame's tests picture it
           const clock = heldFrameClock(loaded.clockStart ?? 0);
           // the loaders and set-ups run as in the frame, so a story drawn from what they load renders here too
           const identity = { id: story.id, name: story.name, title: component.title };

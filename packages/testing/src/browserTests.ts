@@ -1,13 +1,13 @@
 /**
  * One Playwright test per story and variant, on the catalogue's frame pages: the address the catalogue shows is the
- * address the tests open (D-56, D-69).
+ * address the tests open.
  *
  * @remarks
  * Each test opens the frame for a story in a variant (the theme, the contrast, the style sheets), waits for the
- * frame to say the story is shown (`data-forgebook-status`), its story clock held at its start (D-504), and fails on an error in the console or the page, or on
+ * frame to say the story is shown (`data-forgebook-status`), its story clock held at its start, and fails on an error in the console or the page, or on
  * an axe violation of WCAG 2.2 A and AA, on an element that spills out of its parent (`spills.ts`: what overlaps a
  * neighbour when the story is narrower than it was drawn for), on an overlay its play leaves open past the frame the
- * catalogue would give it (`overlays.ts`: the story then declares `parameters.height`, D-469), or on the source's own
+ * catalogue would give it (`overlays.ts`: the story then declares `parameters.height`), or on the source's own
  * `check`. The variants include a
  * narrow frame, as wide as the catalogue's stage beside the props panel. With `screenshot` it compares the frame with its reference image instead,
  * for the visual tests, which run in the Playwright container so fonts and rendering are the same everywhere.
@@ -144,8 +144,8 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
             });
             if (variant.width !== undefined)
               await page.setViewportSize({ width: variant.width, height: 800 });
-            // a Live story is checked and pictured at its start: its clock held, so its image never changes (D-504);
-            // always on its page's own colour, whatever a variant names: a backdrop is for looking (D-644, D-653)
+            // a Live story is checked and pictured at its start: its clock held, so its image never changes;
+            // always on its page's own colour, whatever a variant names: a backdrop is for looking
             const view: ViewState = {
               ...defaults,
               ...variant.view,

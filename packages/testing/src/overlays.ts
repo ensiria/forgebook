@@ -1,13 +1,13 @@
 /**
  * The overlays a story leaves open past its frame: what a frame as tall as the story would cut or push to the other
- * side, so the story needs `parameters.height` (D-469).
+ * side, so the story needs `parameters.height`.
  *
  * @remarks
  * The catalogue sizes a story's frame to its document's body, and the window of the frame is the overlays' window;
  * the tests open the frame in a window taller than that, where an overlay opened near the story's foot still fits. So
  * after the play an overlay is measured against the frame the shell would give it: the body's height, or the height
  * the story declares when that is more. Without knowing
- * the library (D-67), an overlay is any element with `position: fixed` that shows (a box, not hidden, not
+ * the library, an overlay is any element with `position: fixed` that shows (a box, not hidden, not
  * transparent) and whose box ends more than a pixel below the body. A fixed element placed against the window rather
  * than against what opened it (a full-window layer, a toast region pinned to the window's foot, a drawer) is told
  * apart by covering the window's whole height, or by growing the window: it moves or grows with it, an anchored

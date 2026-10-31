@@ -3,7 +3,7 @@
  * are the same as in CI, where the tests run inside that image.
  *
  * @remarks
- * Published (`forgebook/testing/visual-browser`; D-167). A package's `visualBrowser.ts` beside its specs
+ * Published (`forgebook/testing/visual-browser`). A package's `visualBrowser.ts` beside its specs
  * exports a global setup that calls `startVisualBrowser` with its own port and container name and returns the
  * teardown. Needs Docker (OrbStack or Docker Desktop).
  *

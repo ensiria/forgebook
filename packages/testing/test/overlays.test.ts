@@ -1,5 +1,5 @@
 /**
- * Tests for the check of the overlays a story leaves open past its frame (D-469).
+ * Tests for the check of the overlays a story leaves open past its frame.
  *
  * @module
  */

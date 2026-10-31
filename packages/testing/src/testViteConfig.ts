@@ -3,7 +3,7 @@
  * container's browser asks for.
  *
  * @remarks
- * Published (`forgebook/testing/vite`; D-167). The package's `vite.config.ts` beside its specs exports it.
+ * Published (`forgebook/testing/vite`). The package's `vite.config.ts` beside its specs exports it.
  * Vite serves files up to its workspace root (the monorepo's, or the package's alone), which covers the package's
  * sources, the libraries it builds on and this kit's fonts.
  *

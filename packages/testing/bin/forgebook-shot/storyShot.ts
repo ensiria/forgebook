@@ -3,7 +3,7 @@
  * waits for its story and reports.
  *
  * @remarks
- * The frame page is the address the catalogue and the generated tests open (D-56, D-69): what an agent sees is what a
+ * The frame page is the address the catalogue and the generated tests open: what an agent sees is what a
  * person sees in the stage. `shotAddress` is pure; `takeShot` drives Chromium through Playwright.
  *
  * @module

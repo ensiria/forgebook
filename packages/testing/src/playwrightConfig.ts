@@ -3,7 +3,7 @@
  * visual tests in the Playwright container's browser, both on the package's own test instance of the frame page.
  *
  * @remarks
- * Published (`forgebook/testing/playwright`; D-167). The package keeps a folder with its specs
+ * Published (`forgebook/testing/playwright`). The package keeps a folder with its specs
  * (`stories.spec.ts`, `visual.spec.ts`), its frame page (`frame.html`), the Vite config that serves it
  * (`vite.config.ts`, from `storyTestViteConfig`) and the visual tests' global setup (`visualBrowser.ts`, from
  * `startVisualBrowser`); each package names its own ports, so two packages' tests run side by side. In CI the visual

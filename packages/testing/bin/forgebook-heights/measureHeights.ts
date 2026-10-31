@@ -3,7 +3,7 @@
  * opens every story's frame and measures it at each width.
  *
  * @remarks
- * The frame page is the one the catalogue's stage opens (D-56, D-69), and its height is read as the frame reports it to
+ * The frame page is the one the catalogue's stage opens, and its height is read as the frame reports it to
  * the shell (the body's own height), so a measured height is the one the stage would get. A story loads once at the
  * first width and is then resized through the others: a reload per width would multiply the run by them. `--serve`
  * serves a built catalogue with Vite's preview server, where a frame loads in one request per chunk instead of the
