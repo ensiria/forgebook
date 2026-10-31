@@ -61,27 +61,29 @@ jobs:
           else
             pnpm nx release --skip-publish
           fi
-      # each package released by this run, from the tags on HEAD (`<package>@<version>`); commits that release nothing
-      # (docs, ci, chore) leave HEAD untagged
-      - name: Find the released packages
-        id: released
-        run: echo "tags=$(git tag --points-at HEAD | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
-      # packed by pnpm, which applies publishConfig and turns workspace: ranges into versions (npm does neither), then
-      # staged in dependency order, so the approvals can follow it; the trust relationship allows staging only
+      # every package whose version is not on npm yet, packed by pnpm (it applies publishConfig and turns workspace:
+      # ranges into versions; npm does neither) and staged in dependency order, so the approvals can follow it; a
+      # failed stage is retried by running the workflow again. The trust relationship allows staging only
       - name: Stage on npm
-        if: ${{ steps.released.outputs.tags != '' }}
-        env:
-          TAGS: ${{ steps.released.outputs.tags }}
         run: |
           mkdir -p "$RUNNER_TEMP/packages"
-          for name in @forgebook/story-format forgebook @forgebook/react @forgebook/testing; do
-            for tag in $TAGS; do
-              if [ "${tag%@*}" = "$name" ]; then
-                tarball=$(pnpm --filter "$name" pack --pack-destination "$RUNNER_TEMP/packages" | tail -n 1)
-                npm stage publish "$tarball" --provenance
-              fi
-            done
+          for folder in story-format forgebook react testing; do
+            name=$(node -p "require('./packages/$folder/package.json').name")
+            version=$(node -p "require('./packages/$folder/package.json').version")
+            if [ -n "$(npm view "$name@$version" version 2>/dev/null)" ]; then
+              echo "$name@$version is on npm already"
+              continue
+            fi
+            tarball=$(pnpm --filter "./packages/$folder" pack --pack-destination "$RUNNER_TEMP/packages" | tail -n 1)
+            npm stage publish "$tarball" --provenance
           done
+      # npm prints why a trusted-publishing exchange failed only in its full log
+      - name: Keep npm's logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-logs
+          path: ~/.npm/_logs
       - name: Bring the release commit back to develop
         run: |
           git fetch origin develop
