@@ -37,4 +37,10 @@ describe("storyJsx", () => {
       '<IconTile\n  accessibleLabel="A tile for the settings category"\n  color="violet"\n  tone="accent"\n/>'
     );
   });
+
+  it("writes a list as an array literal, its texts quoted", () => {
+    expect(storyJsx("Select", { options: ["weekly", "monthly"], counts: [1, 2] })).toBe(
+      '<Select options={["weekly", "monthly"]} counts={[1, 2]} />'
+    );
+  });
 });

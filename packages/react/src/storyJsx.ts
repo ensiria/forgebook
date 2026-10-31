@@ -4,9 +4,10 @@
  *
  * @remarks
  * A text is an attribute in quotes (in braces when it holds a quote), a number or `null` in braces, `true` the bare
- * name, `false` in braces, a named value by its name (`icon={IconFolder}`); `children` goes between the tags. Only the
- * values that cross from the frame are known (texts, numbers, booleans, `null`, named values): a function or an
- * element the story passes is left out. Pure.
+ * name, `false` in braces, a named value by its name (`icon={IconFolder}`), a list as an array literal
+ * (`options={["weekly", "monthly"]}`); `children` goes between the tags. Only the values that cross from the frame are
+ * known (texts, numbers, booleans, `null`, lists of texts and numbers, named values): a function or an element the
+ * story passes is left out. Pure.
  *
  * @module
  */
@@ -20,6 +21,8 @@ const attribute = (name: string, value: ArgValue): string => {
     return value.includes('"') ? `${name}={${JSON.stringify(value)}}` : `${name}="${value}"`;
   // a named value is written by its name, as the source's module exports it (`icon={IconFolder}`)
   if (isNamedArg(value)) return `${name}={${value.named}}`;
+  // a multiple choice's values, as the source writes a list
+  if (Array.isArray(value)) return `${name}={[${value.map((item) => JSON.stringify(item)).join(", ")}]}`;
   return `${name}={${String(value)}}`;
 };
 
