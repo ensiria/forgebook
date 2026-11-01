@@ -15,6 +15,7 @@ import type {
   CsfMeta,
   CsfPreview,
   CsfStory,
+  StoryParameters,
   WrittenArg
 } from "@forgebook/story-format/csf";
 import type { ReactNode } from "react";
@@ -69,24 +70,25 @@ export type Story<TComponent extends AnyComponent = NoComponent> = CsfStory<
 /** Any hook or function a story about logic documents; its parameter is `never` so any signature is assignable. */
 export type AnyFunction = (...parameters: never[]) => unknown;
 
-/**
- * The default export of a story file about logic (`parameters: { logic: true }`), written
- * `satisfies LogicMeta<typeof useUndo>`. Its component is the hook or the function, whose signature the catalogue
- * documents; the stories draw a scene that uses it (`render`), so they take no args.
- */
-export type LogicMeta<TFunction extends AnyFunction> = CsfMeta<
-  ReactRenderer,
-  TFunction,
-  Readonly<Record<string, never>>,
-  Readonly<Record<string, never>>
->;
+/** No args: a story about logic draws a scene of its own, which takes none. */
+type NoArgs = Readonly<Record<string, never>>;
 
-/** A story about logic: a `render` that draws a scene using the hook, and a `play` that tries it. */
-export type LogicStory = CsfStory<
-  ReactRenderer,
-  Readonly<Record<string, never>>,
-  Readonly<Record<string, never>>
->;
+/**
+ * The default export of a story file about logic, written `satisfies LogicMeta<typeof useUndo>`: `parameters` must say
+ * `logic: true`, so a hook's file is never taken for a component's. Its component is the hook or the function, whose
+ * signature the catalogue documents.
+ */
+export type LogicMeta<TFunction extends AnyFunction> = CsfMeta<ReactRenderer, TFunction, NoArgs, NoArgs> & {
+  /** The catalogue's settings, `logic: true` among them. */
+  readonly parameters: StoryParameters & { readonly logic: true };
+};
+
+/**
+ * A story about logic: a `render` that draws a scene using the hook, required (without one, the catalogue would draw
+ * the hook as a component), and a `play` that tries it.
+ */
+export type LogicStory = CsfStory<ReactRenderer, NoArgs, NoArgs> &
+  Required<Pick<CsfStory<ReactRenderer, NoArgs, NoArgs>, "render">>;
 
 /** Wraps a React story: a provider, a container of a given width. */
 export type Decorator<TArgs> = CsfDecorator<ReactRenderer, TArgs>;

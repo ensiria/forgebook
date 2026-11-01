@@ -185,6 +185,15 @@ const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
 };
 
 /**
+ * Whether a story's args change what it draws: not for a story of fixed examples, nor for one about logic, whose scene
+ * takes none.
+ *
+ * @param story - the story.
+ */
+const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
+  !story.isLogic && (story.controls === "all" || story.controls.length > 0);
+
+/**
  * The stage.
  *
  * @param props - the component, the story, the view, the panel's values, the frame page and the loaders.
@@ -242,14 +251,14 @@ export const Stage = ({
     [docs]
   );
 
-  // a story of fixed examples ignores its args, so a matrix of them would repeat one drawing
-  const axisProps =
-    docs.status === "ready" && (story.controls === "all" || story.controls.length > 0)
-      ? matrixProps(docs.value.props)
-      : [];
+  // a story of fixed examples, or about logic (its scene takes no args), ignores its args, so a matrix of them would
+  // repeat one drawing
+  const axisProps = docs.status === "ready" && takesArgs(story) ? matrixProps(docs.value.props) : [];
   const matrix = useMemo(
-    () => (docs.status === "ready" ? matrixOf(docs.value.props, matrixAxes) : undefined) ?? null,
-    [docs, matrixAxes]
+    () =>
+      (docs.status === "ready" && !story.isLogic ? matrixOf(docs.value.props, matrixAxes) : undefined) ??
+      null,
+    [docs, matrixAxes, story.isLogic]
   );
 
   const values = { ...storyArgs.get(story.id), ...panelArgs };

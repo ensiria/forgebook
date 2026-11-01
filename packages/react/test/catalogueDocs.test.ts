@@ -23,7 +23,8 @@ describe("collectDocs and catalogueMarkdown", () => {
   it("reads the components with stories, the modules, the Sass modules and the style sheets, not the stories export", () => {
     expect(problems).toEqual([]);
     expect(data.components.map((component) => [component.title, component.subpath])).toEqual([
-      ["Inputs/Selection/Select", "./select"]
+      ["Inputs/Selection/Select", "./select"],
+      ["Hooks/useUndo", "./use-undo"]
     ]);
     // the kit's preset is one of its modules too, as a library's `./forgebook` is
     expect(data.modules.map((module) => module.subpath)).toEqual(["./utils/format-size", "./forgebook"]);
@@ -43,6 +44,10 @@ describe("collectDocs and catalogueMarkdown", () => {
       "- `ring`: ring($color, $width): A ring around a part, drawn as a box shadow, in the given colour; double($length): Twice a length"
     );
     expect(text).toContain("- `@fixture/kit/kit.css`: The fixture kit's style sheet.");
+    // a hook with stories about logic: its call, not its options as props
+    expect(text).toContain(
+      "- **useUndo** `@fixture/kit/use-undo`: Keeps a value with its history. useUndo<TValue>(initial, limit?): UndoState<TValue> · story: `kit:hooks-use-undo--history`"
+    );
     expect(text).not.toContain("Page");
   });
 
@@ -65,7 +70,7 @@ describe("collectDocs and catalogueMarkdown", () => {
 
   it("leaves out the excluded subpaths and writes the sections asked for, in their order", () => {
     const excluded = collectDocs(KIT, extractStoryComponent, { exclude: ["./utils/*", "./select"] }).data;
-    expect(excluded.components).toEqual([]);
+    expect(excluded.components.map((component) => component.subpath)).toEqual(["./use-undo"]);
     expect(excluded.modules.map((module) => module.subpath)).toEqual(["./forgebook"]);
     const headings = catalogueMarkdown(data, ["styleSheets", "components"])
       .split("\n")

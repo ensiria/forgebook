@@ -9,9 +9,9 @@
  * `A.parameters`), named exports and re-exports (`export { A as B }`), `includeStories`, `excludeStories`,
  * `__namedExportsOrder`, the meta's and the stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
  *
- * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, `touch`, `logic`, the meta's `alsoIn`,
+ * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
- * the story loads. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
+ * the story loads. `touch` and `logic` are read by the index only, so written by code they are a problem. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
  * written by code is also noted, since the author meant another. A value written plainly but wrongly
  * (`controls: true`) is a problem. Pure: text in, index or problem out.
  *
@@ -135,14 +135,33 @@ const groupOf = (fields: Fields): StoryGroup | undefined | Error => {
 };
 
 /**
- * A boolean parameter (`touch`, `logic`): `true` or `false` when written as one, `undefined` otherwise.
+ * A boolean parameter only the index reads (`touch`, `logic`): `true` or `false` written plainly, `undefined` when
+ * none, or a problem otherwise. Written by code it would be lost, since the frame does not read it.
  *
  * @param fields - the story's or the meta's fields.
  * @param name - the parameter's name.
  */
-const booleanParameter = (fields: Fields, name: string): boolean | undefined => {
+const booleanParameter = (fields: Fields, name: string): boolean | undefined | Error => {
   const value = parameter(fields, name);
-  return value?.type === "Literal" && typeof value.value === "boolean" ? value.value : undefined;
+  if (value === undefined) return undefined;
+  if (value.type === "Literal" && typeof value.value === "boolean") return value.value;
+  return new Error(`\`parameters.${name}\` must be written as a plain \`true\` or \`false\``);
+};
+
+/**
+ * The flags a meta or a story sets (`touch`, `logic`), as the index keeps them: each only when written, or a problem.
+ *
+ * @param fields - the story's or the meta's fields.
+ */
+const flagsOf = (fields: Fields): Pick<StoryIndexEntry, "isTouch" | "isLogic"> | Error => {
+  const touch = booleanParameter(fields, "touch");
+  if (touch instanceof Error) return touch;
+  const logic = booleanParameter(fields, "logic");
+  if (logic instanceof Error) return logic;
+  return {
+    ...(touch === undefined ? {} : { isTouch: touch }),
+    ...(logic === undefined ? {} : { isLogic: logic })
+  };
 };
 
 /** `parameters.height`: `undefined` when none or written by code, the height in CSS px, or a problem when wrong. */
@@ -245,16 +264,15 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   if (ownTags instanceof Error) return ownTags;
   const tags = combinedTags([metaTags, ownTags]);
   const main = parameter(fields, "main");
-  const touch = booleanParameter(fields, "touch");
-  const logic = booleanParameter(fields, "logic");
+  const flags = flagsOf(fields);
+  if (flags instanceof Error) return flags;
   return {
     ...(name === undefined ? {} : { name }),
     ...(controls === undefined ? {} : { controls }),
     ...(group === undefined ? {} : { group }),
     ...(height === undefined ? {} : { height }),
     ...(main?.type === "Literal" && main.value === true ? { isMain: true } : {}),
-    ...(touch === undefined ? {} : { isTouch: touch }),
-    ...(logic === undefined ? {} : { isLogic: logic }),
+    ...flags,
     ...(tags.length > 0 ? { tags } : {})
   };
 };
@@ -518,13 +536,12 @@ const metaFieldsOf = (meta: Fields): MetaFields | Error => {
   const lists = metaListsOf(meta);
   if (lists instanceof Error) return lists;
   const description = docsDescription(meta, "component");
-  const touch = booleanParameter(meta, "touch");
-  const logic = booleanParameter(meta, "logic");
+  const flags = flagsOf(meta);
+  if (flags instanceof Error) return flags;
   return {
     ...(controls === undefined ? {} : { controls }),
     ...(height === undefined ? {} : { height }),
-    ...(touch === undefined ? {} : { isTouch: touch }),
-    ...(logic === undefined ? {} : { isLogic: logic }),
+    ...flags,
     ...lists,
     ...(description === undefined ? {} : { description })
   };

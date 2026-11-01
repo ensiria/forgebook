@@ -240,11 +240,11 @@ describe("indexStoryFile", () => {
     const text = `export default { title: "A/B", parameters: { touch: true } };
       export const Swipe = {};
       export const Desk = { parameters: { touch: false } };
-      export const Some = { parameters: { touch: IS_TOUCH } };`;
+`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
       title: "A/B",
       isTouch: true,
-      stories: [{ exportName: "Swipe" }, { exportName: "Desk", isTouch: false }, { exportName: "Some" }]
+      stories: [{ exportName: "Swipe" }, { exportName: "Desk", isTouch: false }]
     });
   });
 
@@ -252,12 +252,27 @@ describe("indexStoryFile", () => {
     const text = `export default { title: "Hooks/useUndo", parameters: { logic: true } };
       export const History = {};
       export const Looks = { parameters: { logic: false } };
-      export const Some = { parameters: { logic: IS_LOGIC } };`;
+`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
       title: "Hooks/useUndo",
       isLogic: true,
-      stories: [{ exportName: "History" }, { exportName: "Looks", isLogic: false }, { exportName: "Some" }]
+      stories: [{ exportName: "History" }, { exportName: "Looks", isLogic: false }]
     });
+  });
+
+  it("refuses touch and logic written by code: only the index reads them, so they must be plain", () => {
+    expect(
+      indexStoryFile(
+        "A.stories.tsx",
+        'export default { title: "A/B" };\nexport const X = { parameters: { logic: IS_LOGIC } };'
+      )
+    ).toBe("A.stories.tsx: story X: `parameters.logic` must be written as a plain `true` or `false`");
+    expect(
+      indexStoryFile(
+        "A.stories.tsx",
+        'export default { title: "A/B", parameters: { touch: "yes" } };\nexport const X = {};'
+      )
+    ).toBe("A.stories.tsx: the meta's `parameters.touch` must be written as a plain `true` or `false`");
   });
 
   it("refuses controls written plainly but wrongly, and leaves controls written by code to the frame", () => {

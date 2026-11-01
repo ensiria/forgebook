@@ -66,6 +66,16 @@ describe("the tabs of a story's panel", () => {
     expect(dockTabs(inputOf(true)).map((tab) => tab.id)).toEqual(["signature", "a11y"]);
   });
 
+  it("names the tab of a story about logic Signature while its docs load or fail", () => {
+    const loading = dockTabs({ ...inputOf(true), docs: { status: "loading" } });
+    expect(loading.map((tab) => [tab.id, tab.label])).toEqual([
+      ["signature", "Signature"],
+      ["a11y", "Accessibility"]
+    ]);
+    const failed = dockTabs({ ...inputOf(true), docs: { status: "error", message: "no program" } });
+    expect(failed[0]?.id).toBe("signature");
+  });
+
   it("gives a story about its looks its props and events, and no signature", () => {
     expect(dockTabs(inputOf(false)).map((tab) => tab.id)).toEqual(["props", "events", "a11y"]);
   });

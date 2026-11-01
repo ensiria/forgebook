@@ -40,10 +40,16 @@ export const signatureDocs = (
   if (signature === undefined) return undefined;
   // a signature the checker made (a mapped or an intersected type) has no declaration
   const declaration: ts.SignatureDeclaration | undefined = signature.getDeclaration();
+  // a hook typed through an alias (`const useX: UseX = …`) has its comment on its own declaration, not the alias's
+  const ownTags = (symbol.declarations ?? []).flatMap((each) => [...ts.getJSDocTags(each)]);
+  const ownParameterTag = (name: string): ts.JSDocParameterTag | undefined =>
+    ownTags.filter(ts.isJSDocParameterTag).find((tag) => tag.name.getText() === name);
   const parameters = signature.parameters.map((parameter) => {
     const node = parameter.valueDeclaration;
     const written = node !== undefined && ts.isParameter(node) ? node : undefined;
-    const tag = written === undefined ? undefined : ts.getJSDocParameterTags(written)[0];
+    const tag =
+      (written === undefined ? undefined : ts.getJSDocParameterTags(written)[0]) ??
+      ownParameterTag(parameter.getName());
     return {
       // a destructured parameter has no name of its own: the checker calls it `__0`
       name:
@@ -65,6 +71,11 @@ export const signatureDocs = (
     parameters,
     returns:
       returnType === undefined ? checker.typeToString(signature.getReturnType()) : writtenText(returnType),
-    returnsDescription: declaration === undefined ? "" : tagText(ts.getJSDocReturnTag(declaration)?.comment)
+    returnsDescription: tagText(
+      (
+        (declaration === undefined ? undefined : ts.getJSDocReturnTag(declaration)) ??
+        ownTags.find(ts.isJSDocReturnTag)
+      )?.comment
+    )
   };
 };

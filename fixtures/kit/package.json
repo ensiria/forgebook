@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./select": "./src/Select.tsx",
+    "./use-undo": "./src/useUndo.ts",
     "./utils/format-size": "./src/formatSize.ts",
     "./scss/ring": "./src/scss/_ring.scss",
     "./kit.css": "./src/kit.scss",

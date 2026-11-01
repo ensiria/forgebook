@@ -9,7 +9,7 @@
  *
  * @module
  */
-import type { PropDocs } from "../../src/componentDocs.ts";
+import type { FunctionSignatureDocs, PropDocs } from "../../src/componentDocs.ts";
 import { storyId } from "../../src/storyTree.ts";
 import type { CatalogueComponent, CatalogueData, ExportDocs, ModuleDocs } from "./catalogueDocs.types.ts";
 import type { CatalogueSection } from "./catalogueOptions.ts";
@@ -44,6 +44,21 @@ const sentence = (text: string): string => text.replace(/\.$/, "");
 /** The import of a subpath. */
 const importOf = (packageName: string, subpath: string): string => `${packageName}${subpath.slice(1)}`;
 
+/**
+ * A hook's or a function's call, short: its type parameters, its parameters' names (`?` when optional, `...` for the
+ * rest) and its return type.
+ *
+ * @param name - its name.
+ * @param signature - its signature.
+ */
+const shortCall = (name: string, signature: FunctionSignatureDocs): string => {
+  const types = signature.typeParameters.length === 0 ? "" : `<${signature.typeParameters.join(", ")}>`;
+  const parameters = signature.parameters
+    .map((parameter) => `${parameter.isRest ? "..." : ""}${parameter.name}${parameter.isOptional ? "?" : ""}`)
+    .join(", ");
+  return `${name}${types}(${parameters}): ${signature.returns}`;
+};
+
 /** One component's line, ending with its main story's id when the package's source id is known. */
 const componentLine = (
   packageName: string,
@@ -52,11 +67,14 @@ const componentLine = (
 ): string => {
   const { docs } = component;
   const where = ` \`${importOf(packageName, component.subpath)}\``;
-  // the part maps are summed up by the parts at the end of the line
-  const props = docs.props
-    .filter((prop) => !PART_MAPS.includes(prop.name))
-    .map(shortProp)
-    .join(" ");
+  // the part maps are summed up by the parts at the end of the line; a hook is listed by its call, not by props
+  const props =
+    component.isLogic && docs.signature !== undefined
+      ? shortCall(docs.name, docs.signature)
+      : docs.props
+          .filter((prop) => !PART_MAPS.includes(prop.name))
+          .map(shortProp)
+          .join(" ");
   const parts = docs.parts.length === 0 ? "" : ` · parts: ${docs.parts.join(", ")}`;
   const story =
     sourceId === undefined || component.mainStory === undefined

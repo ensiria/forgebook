@@ -155,17 +155,13 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
       ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)])
     ];
   }
-  if (docs.status === "loading") {
-    return [{ id: "props", label: STRINGS.tabs.props, content: notice(STRINGS.docsLoading, false) }];
-  }
+  // the docs' place while they load or fail: the tab the story opens on once they are read
+  const docsTab: Pick<DockTab, "id" | "label"> = input.isLogic
+    ? { id: "signature", label: STRINGS.tabs.signature }
+    : { id: "props", label: STRINGS.tabs.props };
+  if (docs.status === "loading") return [{ ...docsTab, content: notice(STRINGS.docsLoading, false) }];
   if (docs.status === "error") {
-    return [
-      {
-        id: "props",
-        label: STRINGS.tabs.props,
-        content: notice(`${STRINGS.docsError}: ${docs.message}`, true)
-      }
-    ];
+    return [{ ...docsTab, content: notice(`${STRINGS.docsError}: ${docs.message}`, true) }];
   }
   const component = docs.value;
   const events = eventsOf(component.props, input.actions);

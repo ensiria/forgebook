@@ -180,7 +180,8 @@ Chromium window with Chromium's own touch emulation (it needs `@forgebook/testin
 
 A story can be about logic, not looks: a small scene that uses a hook or a function, there to document and try what it
 does. It says so with `parameters: { logic: true }`, on the meta for every story of the file (a story's own `false`
-leaves it out), and its meta's `component` is the hook or the function. In React, `LogicMeta` and `LogicStory` type
+leaves it out), written plainly: only the index reads it, so one written by code is a problem. Its meta's `component`
+is the hook or the function, and each story has a `render` that draws its scene. In React, `LogicMeta` and `LogicStory` type
 it (`@forgebook/react`):
 
 ```tsx

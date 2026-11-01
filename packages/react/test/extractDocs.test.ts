@@ -92,6 +92,39 @@ describe("a signature's parameters, as the call writes them", () => {
   });
 });
 
+describe("a hook typed through an alias", () => {
+  it("reads its @param and @returns texts from the comment on its declaration", () => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-alias-"));
+    writeFileSync(
+      join(dir, "useTyped.ts"),
+      [
+        "/** A hook's type. */",
+        "export type UseTyped = (count: number) => string;",
+        "/**",
+        " * Writes a count.",
+        " *",
+        " * @param count - how many.",
+        " * @returns the text.",
+        " */",
+        "export const useTyped: UseTyped = (count) => String(count);",
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      join(dir, "useTyped.stories.ts"),
+      'import { useTyped } from "./useTyped";\nexport default { title: "Hooks/useTyped", component: useTyped };\nexport const Shown = {};\n'
+    );
+    const docs = extractComponentDocs(join(dir, "useTyped.stories.ts"));
+    if (typeof docs === "string" || docs.name === null) throw new Error(String(docs));
+    expect(docs.signature?.parameters[0]).toMatchObject({
+      name: "count",
+      type: "number",
+      description: "how many."
+    });
+    expect(docs.signature?.returnsDescription).toBe("the text.");
+  });
+});
+
 describe("extractComponentDocs", () => {
   const docs = extractComponentDocs(join(KIT, "Select.stories.tsx"));
 

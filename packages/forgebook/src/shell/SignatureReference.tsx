@@ -73,7 +73,8 @@ export const SignatureReference = ({
                     {parameter.isRest ? "..." : ""}
                     {parameter.name}
                   </code>
-                  {parameter.isOptional ? null : (
+                  {/* a rest parameter may always be left out */}
+                  {parameter.isOptional || parameter.isRest ? null : (
                     <span className="forgebook-prop__required" title={STRINGS.required}>
                       *
                     </span>
