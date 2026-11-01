@@ -270,6 +270,28 @@ const holdsScope = (rules: readonly Rule[]): boolean =>
   rules.some((rule) => rule.type === "scope" || holdsScope(groupedRules(rule) ?? []));
 
 /**
+ * A value of Lightning CSS's tree without its `null` fields, as the visitor must hand it back.
+ *
+ * @remarks
+ * Lightning CSS gives an empty optional value as `null` (a `var()`'s `from` and `fallback`, an `env()`'s indices) but
+ * reads a returned rule back only with the field left out: a rule that holds one fails the whole build. Fields only:
+ * a `null` inside a list is a value. Written as an overload, the only way to say the tree keeps its type without a
+ * cast: the fields its types call nullable are left out instead.
+ *
+ * @param value - the value.
+ */
+function withoutNulls<Value>(value: Value): Value;
+function withoutNulls(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutNulls);
+  if (typeof value !== "object" || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, field]) => field !== null)
+      .map(([key, field]) => [key, withoutNulls(field)])
+  );
+}
+
+/**
  * A media rule as the computer and as a simulated phone read it: the rule for the computer, its rules scoped to a
  * root without the attribute, then, when a phone can match it, its copy with the pointer answered as a phone's, its
  * rules scoped to a root with the attribute. A media rule that asks nothing of the pointer is left as it is.
@@ -287,14 +309,14 @@ export const touchMediaRules = (rule: Extract<Rule, { type: "media" }>): Rule[] 
   if (holdsScope(rule.value.rules)) return undefined;
   const computer: Rule = { ...rule, value: { ...rule.value, rules: scopedRules(rule.value.rules, false) } };
   const phone = phoneQueries(queries);
-  if (phone.length === 0) return [computer];
-  return [
+  if (phone.length === 0) return withoutNulls([computer]);
+  return withoutNulls([
     computer,
     {
       ...rule,
       value: { ...rule.value, query: { mediaQueries: phone }, rules: scopedRules(rule.value.rules, true) }
     }
-  ];
+  ]);
 };
 
 /**
