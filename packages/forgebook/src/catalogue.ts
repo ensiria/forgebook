@@ -15,7 +15,7 @@
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
 import type { CatalogueView } from "./namedViews.ts";
-import { switchWithRole, type ViewSwitch } from "./switches.ts";
+import { switchWithRole, type TouchChoice, touchChoiceOf, type ViewSwitch } from "./switches.ts";
 import { viewQuery } from "./viewWords.ts";
 
 /** A preset width of the toolbar. */
@@ -137,6 +137,8 @@ export type CatalogueSettings = {
   readonly id: string;
   /** The switches of the toolbar and the View menu. */
   readonly switches: readonly ViewSwitch[];
+  /** The touch switch the stories marked for a phone are drawn with; none when there is none to draw them with. */
+  readonly touch: TouchChoice | undefined;
   /** The toolbar's preset widths. */
   readonly widths: readonly StageWidthPreset[];
   /** The narrowest and widest a story may be set, in CSS px. */
@@ -295,6 +297,7 @@ export const catalogueSettings = (
   return {
     id: lists.id ?? idOf(title),
     switches,
+    touch: touchChoiceOf(switches),
     widths: lists.widths ?? DEFAULT_WIDTHS,
     widthRange: lists.widthRange ?? { min: 240, max: 2560 },
     zooms: withHundred(lists.zooms, [50, 75, 100, 125, 150, 200]),

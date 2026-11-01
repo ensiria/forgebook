@@ -9,6 +9,7 @@ import { PullToRefresh } from "./touchDemos/PullToRefresh";
 
 export default {
   title: "Touch demos/Pull to refresh",
+  parameters: { touch: true },
   component: PullToRefresh,
   args: { title: "Friends" }
 } satisfies Meta<typeof PullToRefresh>;

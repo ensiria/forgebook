@@ -161,6 +161,11 @@ The Touch switch (in View, `m` by default) lets a story be tried as on a phone, 
 A story reads the switch in its globals (`context.globals.touch`, `"mouse"` or `"touch"`) to draw only the version
 that fits the pointer, and follows the switch live; a story fixes it with `globals: { touch: "touch" }`.
 
+A story meant for a phone says so with `parameters: { touch: true }` (on the meta, for every story of the file; a
+story's own `false` leaves it out). It starts touched with a finger whatever the switch says, and a Touch toggle on
+its example's bar turns that off for it; on its own page, the Touch switch is the story's. The choice lasts while the
+catalogue is open, and the address keeps the switch the other stories follow.
+
 **It is a simulation.** Events made by a page are not trusted, so the browser's own reactions do not follow them:
 its native scrolling (the drag's scrolling is an approximation, without the rubber band), focus and selection from a
 touch, and `touch-action` applied by the browser. In Safari and Firefox the stories get pointer events only (only

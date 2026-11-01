@@ -13,7 +13,7 @@
  */
 
 import type { CatalogueSettings, OwnControlId, PanelTabId } from "./catalogue.ts";
-import { switchValueOf, switchWithRole, type ViewSwitch } from "./switches.ts";
+import { switchValueOf, switchWithRole, type TouchChoice, type ViewSwitch } from "./switches.ts";
 
 /**
  * What Forgebook draws behind the story, in place of its page's colour: `plain`, the page's colour itself,
@@ -380,6 +380,49 @@ export const isMoreContrastOf = (
 export const languageOf = (view: Pick<ViewState, "switches">, switches: readonly ViewSwitch[]): string => {
   const language = switchWithRole(switches, "language");
   return language === undefined ? "" : (view.switches[language.id] ?? language.default);
+};
+
+/**
+ * Whether a view simulates a finger.
+ *
+ * @param view - the view's switches.
+ * @param choice - the touch switch.
+ */
+export const isTouchView = (view: Pick<ViewState, "switches">, choice: TouchChoice): boolean =>
+  view.switches[choice.id] === choice.touch;
+
+/**
+ * A view with a finger simulated or not; the same view when it already is.
+ *
+ * @param view - the view.
+ * @param choice - the touch switch.
+ * @param isTouch - whether it simulates a finger.
+ */
+export const withTouch = <View extends Pick<ViewState, "switches">>(
+  view: View,
+  choice: TouchChoice,
+  isTouch: boolean
+): View =>
+  isTouchView(view, choice) === isTouch
+    ? view
+    : { ...view, switches: { ...view.switches, [choice.id]: isTouch ? choice.touch : choice.mouse } };
+
+/**
+ * A view with the touch switch as another view has it: what a story's own touch leaves of the address.
+ *
+ * @param view - the view.
+ * @param from - the view whose touch value it takes.
+ * @param choice - the touch switch.
+ */
+export const withTouchOf = <View extends Pick<ViewState, "switches">>(
+  view: View,
+  from: Pick<ViewState, "switches">,
+  choice: TouchChoice
+): View => {
+  const value = from.switches[choice.id];
+  if (view.switches[choice.id] === value) return view;
+  const { [choice.id]: _replaced, ...others } = view.switches;
+  return { ...view, switches: value === undefined ? others : { ...others, [choice.id]: value } };
 };
 
 /**

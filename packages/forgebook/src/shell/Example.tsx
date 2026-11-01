@@ -5,7 +5,7 @@
  * @module
  */
 import type { StoryFileCode } from "@forgebook/story-format/source";
-import { type MouseEvent, type ReactNode, useId, useState } from "react";
+import { type ChangeEvent, type MouseEvent, type ReactNode, useId, useState } from "react";
 
 import type { PanelArgs } from "../messages.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
@@ -13,14 +13,17 @@ import type { ViewSwitch } from "../switches.ts";
 import { frameAddress, type ViewState } from "../viewState.ts";
 import { type BoxWidth, BoxWidthControl, useBoxWidth } from "./BoxWidth.tsx";
 import { CodeText } from "./CodeText.tsx";
+import { useCatalogue } from "./catalogueContext.ts";
 import { useCodeWriter } from "./codeWriter.ts";
 import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
+import { type StoryTouches, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { useCopy } from "./useCopy.ts";
 import { type FullPage, useFullPage } from "./useFullPage.ts";
+import { useLoadedView } from "./useLiveView.ts";
 import type { Loaded } from "./useLoaded.ts";
 
 /** The height of a frame before its story reports its own, in CSS px. */
@@ -45,6 +48,10 @@ export type ExampleContext = {
   readonly frameView: ViewState;
   /** The catalogue's switches, for the frames' addresses. */
   readonly switches: readonly ViewSwitch[];
+  /** The stories marked for a phone, each with its own finger. */
+  readonly touches: StoryTouches;
+  /** Called when the user turns a story's finger on or off. */
+  readonly onTouchChange: (storyId: string, isTouch: boolean) => void;
   /** Each frame's reported height, by its address. */
   readonly heights: ReadonlyMap<string, number>;
   /** The addresses of the frames that finished loading. */
@@ -180,6 +187,37 @@ const FullPageSlot = ({ full }: { readonly full: FullPage }): ReactNode => (
 );
 
 /**
+ * The Touch toggle of a story marked for a phone: on, the story is touched with a simulated finger whatever the
+ * toolbar's Touch switch says.
+ *
+ * @param props - the story, whether its finger is on, and how to change it.
+ */
+const TouchToggle = ({
+  story,
+  isTouch,
+  onTouchChange
+}: {
+  readonly story: TreeStory;
+  readonly isTouch: boolean;
+  readonly onTouchChange: (storyId: string, isTouch: boolean) => void;
+}): ReactNode => (
+  <label className="forgebook-example__touch">
+    <input
+      type="checkbox"
+      role="switch"
+      aria-checked={isTouch}
+      aria-label={STRINGS.touchNamed(story.name)}
+      className="forgebook-switch"
+      checked={isTouch}
+      onChange={(event: ChangeEvent<HTMLInputElement>): void =>
+        onTouchChange(story.id, event.currentTarget.checked)
+      }
+    />
+    {STRINGS.touch}
+  </label>
+);
+
+/**
  * An example's bar: its code shown or hidden, the story's width while its box fills the page, its box filling the page
  * or back in its place, and its story opened on its own page.
  *
@@ -196,49 +234,55 @@ const ExampleBar = ({
   boxWidth
 }: {
   readonly story: TreeStory;
-  readonly context: Pick<ExampleContext, "hrefOf" | "onOpen">;
+  readonly context: Pick<ExampleContext, "hrefOf" | "onOpen" | "touches" | "onTouchChange">;
   readonly hasCode: boolean;
   readonly isCodeShown: boolean;
   readonly onCodeShownChange: (isShown: boolean) => void;
   readonly codeId: string;
   readonly full: FullPage;
   readonly boxWidth: BoxWidth;
-}): ReactNode => (
-  <div className="forgebook-example__bar">
-    {hasCode ? (
+}): ReactNode => {
+  const isTouch = context.touches.get(story.id);
+  return (
+    <div className="forgebook-example__bar">
+      {hasCode ? (
+        <button
+          type="button"
+          className="forgebook-example__toggle"
+          aria-expanded={isCodeShown}
+          aria-controls={codeId}
+          onClick={(): void => onCodeShownChange(!isCodeShown)}
+        >
+          <Icon name="chevronRight" size={12} />
+          {isCodeShown ? STRINGS.hideCode : STRINGS.showCode}
+        </button>
+      ) : null}
+      {isTouch === undefined ? null : (
+        <TouchToggle story={story} isTouch={isTouch} onTouchChange={context.onTouchChange} />
+      )}
+      <BoxWidthControl boxWidth={boxWidth} />
       <button
         type="button"
-        className="forgebook-example__toggle"
-        aria-expanded={isCodeShown}
-        aria-controls={codeId}
-        onClick={(): void => onCodeShownChange(!isCodeShown)}
+        className="forgebook-example__full"
+        aria-label={full.isFull ? STRINGS.backToPlaceNamed(story.name) : STRINGS.fillPageNamed(story.name)}
+        onClick={(event: MouseEvent<HTMLButtonElement>): void => full.toggle(event)}
       >
-        <Icon name="chevronRight" size={12} />
-        {isCodeShown ? STRINGS.hideCode : STRINGS.showCode}
+        <Icon name={full.isFull ? "collapse" : "expand"} size={12} />
+        {full.isFull ? STRINGS.backToPlace : STRINGS.fillPage}
       </button>
-    ) : null}
-    <BoxWidthControl boxWidth={boxWidth} />
-    <button
-      type="button"
-      className="forgebook-example__full"
-      aria-label={full.isFull ? STRINGS.backToPlaceNamed(story.name) : STRINGS.fillPageNamed(story.name)}
-      onClick={(event: MouseEvent<HTMLButtonElement>): void => full.toggle(event)}
-    >
-      <Icon name={full.isFull ? "collapse" : "expand"} size={12} />
-      {full.isFull ? STRINGS.backToPlace : STRINGS.fillPage}
-    </button>
-    <StoryLink
-      story={story}
-      hrefOf={context.hrefOf}
-      onOpen={context.onOpen}
-      className="forgebook-example__open"
-      label={STRINGS.openStoryNamed(story.name)}
-    >
-      {STRINGS.openStory}
-      <Icon name="external" size={12} />
-    </StoryLink>
-  </div>
-);
+      <StoryLink
+        story={story}
+        hrefOf={context.hrefOf}
+        onOpen={context.onOpen}
+        className="forgebook-example__open"
+        label={STRINGS.openStoryNamed(story.name)}
+      >
+        {STRINGS.openStory}
+        <Icon name="external" size={12} />
+      </StoryLink>
+    </div>
+  );
+};
 
 /**
  * One example: its title and description (the demo has none: it opens the page), its story in a frame, and a bar
@@ -262,6 +306,12 @@ export const Example = ({
   const [isCodeShown, setIsCodeShown] = useState(false);
   const codeId = useId();
   const full = useFullPage();
+  const { touch } = useCatalogue();
+  // the frame loads with the story's finger as it is then; a change after reaches it live, keeping the story's state
+  const loadedView = useLoadedView(
+    context.frameView.sheets,
+    touchedView(context.frameView, story.id, context.touches, touch)
+  );
   const boxWidth = useBoxWidth(full.isOver, context.view.width);
   // the story's measured height when there is one; a guess otherwise, larger for the demo; never below the height its
   // scene needs, which its frame has from the start
@@ -304,7 +354,7 @@ export const Example = ({
             {isMounted ? (
               <FrameView
                 title={STRINGS.frameTitle(context.component.name, story.name)}
-                address={frameAddress(context.frameUrl, story.id, context.frameView, context.switches)}
+                address={frameAddress(context.frameUrl, story.id, loadedView, context.switches)}
                 heights={context.heights}
                 settled={context.settled}
                 fallbackHeight={fallbackHeight}

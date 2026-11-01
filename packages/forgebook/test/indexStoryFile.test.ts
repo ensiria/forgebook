@@ -236,6 +236,18 @@ describe("indexStoryFile", () => {
     });
   });
 
+  it("reads a story meant for a phone from the meta and the story, written plainly", () => {
+    const text = `export default { title: "A/B", parameters: { touch: true } };
+      export const Swipe = {};
+      export const Desk = { parameters: { touch: false } };
+      export const Some = { parameters: { touch: IS_TOUCH } };`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      isTouch: true,
+      stories: [{ exportName: "Swipe" }, { exportName: "Desk", isTouch: false }, { exportName: "Some" }]
+    });
+  });
+
   it("refuses controls written plainly but wrongly, and leaves controls written by code to the frame", () => {
     const wrong = `export default { title: "A/B" };
       export const X = { parameters: { controls: true } };`;

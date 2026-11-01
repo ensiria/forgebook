@@ -31,6 +31,11 @@ export type StoryIndexEntry = {
   /** Whether the story sets `parameters.main: true`: the component's demo. */
   readonly isMain?: boolean;
   /**
+   * The story's own `parameters.touch`, when it sets one: `true` for a story meant for a phone, which starts in the
+   * catalogue's simulated touch and offers a toggle to turn it off; `false` to leave the meta's out.
+   */
+  readonly isTouch?: boolean;
+  /**
    * The first sentence of the story's TSDoc, or its `parameters.docs.description.story`: what it shows and what to
    * notice.
    */
@@ -47,6 +52,8 @@ export type StoryFileIndex = {
   readonly controls?: StoryControlsSetting;
   /** The meta's `parameters.height`, when it sets one: every story's frame height, in CSS px. */
   readonly height?: number;
+  /** The meta's `parameters.touch`, when it sets one: every story starts in touch unless it says otherwise. */
+  readonly isTouch?: boolean;
   /** The meta's `alsoIn`, when it sets one: the other places the component is listed in. */
   readonly alsoIn?: readonly string[];
   /** The meta's `related`, when it sets one: the titles of the components its page names at its top. */

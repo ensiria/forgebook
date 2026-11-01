@@ -9,6 +9,7 @@ import { PhotoViewer } from "./touchDemos/PhotoViewer";
 
 export default {
   title: "Touch demos/Photo viewer",
+  parameters: { touch: true },
   component: PhotoViewer,
   args: { caption: "Sunset over the bay" }
 } satisfies Meta<typeof PhotoViewer>;

@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type CatalogueSettings, catalogueSettings } from "../src/catalogue.ts";
-import type { ViewSwitch } from "../src/switches.ts";
+import { touchChoiceOf, type ViewSwitch } from "../src/switches.ts";
 import {
   codeGlobalsOf,
   DEFAULT_VIEW,
@@ -14,11 +14,14 @@ import {
   frameAddress,
   hasViewChanges,
   isMoreContrastOf,
+  isTouchView,
   languageOf,
   parseView,
   schemeOf,
   type ViewState,
-  viewParams
+  viewParams,
+  withTouch,
+  withTouchOf
 } from "../src/viewState.ts";
 import { FIXTURE_SWITCHES } from "./fixtureSwitches.ts";
 
@@ -187,5 +190,40 @@ describe("what the catalogue reads of the switches", () => {
       touch: "mouse"
     });
     expect(codeGlobalsOf(withSwitches({ touch: "touch" }), SWITCHES)["touch"]).toBe("touch");
+  });
+});
+
+describe("the touch a story marked for a phone is drawn with", () => {
+  const choice = touchChoiceOf(SWITCHES);
+
+  it("finds the touch switch with a finger's value, and none without one", () => {
+    expect(choice).toEqual({ id: "touch", touch: "touch", mouse: "mouse" });
+    expect(touchChoiceOf([])).toBeUndefined();
+    const own: ViewSwitch = {
+      id: "input",
+      label: "Input",
+      role: "touch",
+      apply: { kind: "code" },
+      default: "pen",
+      values: [{ value: "pen", label: "Pen" }]
+    };
+    expect(touchChoiceOf([own])).toBeUndefined();
+  });
+
+  it("turns a finger on and off, and keeps a view that already is", () => {
+    if (choice === undefined) throw new Error("the fixture has a touch switch");
+    const touched = withTouch(DEFAULTS, choice, true);
+    expect(touched.switches["touch"]).toBe("touch");
+    expect(isTouchView(touched, choice)).toBe(true);
+    expect(withTouch(touched, choice, true)).toBe(touched);
+    expect(withTouch(touched, choice, false).switches).toEqual(DEFAULTS.switches);
+    expect(withTouch(DEFAULTS, choice, false)).toBe(DEFAULTS);
+  });
+
+  it("puts back the touch value another view has", () => {
+    if (choice === undefined) throw new Error("the fixture has a touch switch");
+    const changed = withSwitches({ touch: "touch", theme: "dark" });
+    expect(withTouchOf(changed, DEFAULTS, choice).switches).toEqual(withSwitches({ theme: "dark" }).switches);
+    expect(withTouchOf(changed, changed, choice)).toBe(changed);
   });
 });

@@ -9,7 +9,7 @@
  * `A.parameters`), named exports and re-exports (`export { A as B }`), `includeStories`, `excludeStories`,
  * `__namedExportsOrder`, the meta's and the stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
  *
- * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
+ * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, `touch`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
  * the story loads. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
  * written by code is also noted, since the author meant another. A value written plainly but wrongly
@@ -134,6 +134,16 @@ const groupOf = (fields: Fields): StoryGroup | undefined | Error => {
   return new Error("`parameters.group` must be written as a plain string");
 };
 
+/**
+ * `parameters.touch`: `true` or `false` when written as one, `undefined` otherwise.
+ *
+ * @param fields - the story's or the meta's fields.
+ */
+const touchOf = (fields: Fields): boolean | undefined => {
+  const touch = parameter(fields, "touch");
+  return touch?.type === "Literal" && typeof touch.value === "boolean" ? touch.value : undefined;
+};
+
 /** `parameters.height`: `undefined` when none or written by code, the height in CSS px, or a problem when wrong. */
 const heightOf = (fields: Fields): number | undefined | Error => {
   const height = parameter(fields, "height");
@@ -210,7 +220,10 @@ const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readon
 };
 
 /** What the index reads of one story besides its export. */
-type StoryFields = Pick<StoryIndexEntry, "name" | "controls" | "group" | "height" | "isMain" | "tags">;
+type StoryFields = Pick<
+  StoryIndexEntry,
+  "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "tags"
+>;
 
 /**
  * What the index reads of one story: its name (`name`, or CSF 2's `storyName`), controls, group, height, whether it is
@@ -231,12 +244,14 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   if (ownTags instanceof Error) return ownTags;
   const tags = combinedTags([metaTags, ownTags]);
   const main = parameter(fields, "main");
+  const touch = touchOf(fields);
   return {
     ...(name === undefined ? {} : { name }),
     ...(controls === undefined ? {} : { controls }),
     ...(group === undefined ? {} : { group }),
     ...(height === undefined ? {} : { height }),
     ...(main?.type === "Literal" && main.value === true ? { isMain: true } : {}),
+    ...(touch === undefined ? {} : { isTouch: touch }),
     ...(tags.length > 0 ? { tags } : {})
   };
 };
@@ -500,9 +515,11 @@ const metaFieldsOf = (meta: Fields): MetaFields | Error => {
   const lists = metaListsOf(meta);
   if (lists instanceof Error) return lists;
   const description = docsDescription(meta, "component");
+  const touch = touchOf(meta);
   return {
     ...(controls === undefined ? {} : { controls }),
     ...(height === undefined ? {} : { height }),
+    ...(touch === undefined ? {} : { isTouch: touch }),
     ...lists,
     ...(description === undefined ? {} : { description })
   };

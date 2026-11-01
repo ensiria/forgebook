@@ -85,3 +85,19 @@ export const tellFrames = (container: HTMLElement | null, message: ShellMessage)
     frame.contentWindow?.postMessage(message, window.location.origin);
   }
 };
+
+/**
+ * Sends each frame inside an element its own message, made from the story it shows.
+ *
+ * @param container - the element that holds the frames.
+ * @param messageOf - the message for a frame's story (the address's `story`; none when it names none).
+ */
+export const tellEachFrame = (
+  container: HTMLElement | null,
+  messageOf: (storyId: string | undefined) => ShellMessage
+): void => {
+  for (const frame of container?.querySelectorAll("iframe") ?? []) {
+    const storyId = new URL(frame.src, window.location.href).searchParams.get("story") ?? undefined;
+    frame.contentWindow?.postMessage(messageOf(storyId), window.location.origin);
+  }
+};

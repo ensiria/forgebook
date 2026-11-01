@@ -37,6 +37,7 @@ import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
 import { StoryPicker } from "./StoryPicker.tsx";
+import { storyTouchesOf, storyViewChange, type TouchOverrides, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
 import type { UsedInProps } from "./UsedIn.tsx";
@@ -490,6 +491,10 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
   // what each story fixes of the view, as its frame reported it: the toolbar shows it for the shown story
   const [fixedViews, setFixedViews] = useState<ReadonlyMap<string, FixedView>>(new Map());
   const storyHeights = useStoryHeights(heights);
+  // what the user chose for each story marked for a phone, while the catalogue is open
+  const [touchOverrides, setTouchOverrides] = useState<TouchOverrides>(new Map());
+  const setTouchOverride = (storyId: string, isTouch: boolean): void =>
+    setTouchOverrides((current) => new Map(current).set(storyId, isTouch));
   const isSystemDark = useSystemDark();
   const appearance = useAppearance();
   useStoryIdsElement(
@@ -513,6 +518,28 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
 
   const changeView = (view: ViewState): void => replaceAddress({ ...address, view });
   const shownStoryId = shown.kind === "story" ? shown.location.story.id : undefined;
+  // a story marked for a phone has its own Touch on its page: the toolbar and the stage show it and change it
+  // kept while nothing it is made of changes: a new switches' object would send the frame the view again
+  const shownStory = shown.kind === "story" ? shown.location.story : undefined;
+  const shownView = useMemo(
+    () =>
+      touchedView(
+        address.view,
+        shownStory?.id,
+        storyTouchesOf(shownStory === undefined ? [] : [shownStory], touchOverrides),
+        catalogue.touch
+      ),
+    [address.view, shownStory, touchOverrides, catalogue.touch]
+  );
+  const changeShownView = (view: ViewState): void => {
+    if (shown.kind !== "story") {
+      changeView(view);
+      return;
+    }
+    const change = storyViewChange(view, address.view, shown.location.story, catalogue.touch);
+    if (change.isTouch !== undefined) setTouchOverride(shown.location.story.id, change.isTouch);
+    changeView(change.view);
+  };
 
   useStoryKeys(
     tree,
@@ -575,8 +602,8 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
       <main className="forgebook-main">
         <ShellBar
           isHome={shown.kind === "home"}
-          view={address.view}
-          onViewChange={changeView}
+          view={shownView}
+          onViewChange={changeShownView}
           isStoryPage={shown.kind === "story"}
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
@@ -597,6 +624,8 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           <ComponentPage
             component={shown.location.component}
             view={address.view}
+            touchOverrides={touchOverrides}
+            onTouchChange={setTouchOverride}
             frameUrl={frameUrl}
             hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches)}
             onOpen={(story: TreeStory): void => openPage(storyPage(story))}
@@ -624,8 +653,8 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           <Stage
             component={shown.location.component}
             story={shown.location.story}
-            view={address.view}
-            onViewChange={changeView}
+            view={shownView}
+            onViewChange={changeShownView}
             onFixedChange={(storyId: string, fixed: FixedView): void =>
               setFixedViews((current) => new Map(current).set(storyId, fixed))
             }

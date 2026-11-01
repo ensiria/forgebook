@@ -2171,6 +2171,16 @@
     }
   }
 
+  // a story marked for a phone: its own Touch, beside its code
+  .forgebook-example__touch {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1-5;
+    font-weight: 500;
+    color: $text-secondary;
+    cursor: pointer;
+  }
+
   // an example's box over the page: fixed (never moved, so its frame keeps its story), its stage taking the room
   // its bar and code leave; the slot keeps its place in the list (`useFullPage.ts`)
   .forgebook-example__box[data-full] {

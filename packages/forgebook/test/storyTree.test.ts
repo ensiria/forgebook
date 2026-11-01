@@ -133,6 +133,26 @@ describe("storyTree", () => {
     expect(findStory(tall, "kit:overlays-tip--plain")?.story.height).toBeUndefined();
   });
 
+  it("marks a story meant for a phone: its own setting, else the meta's", () => {
+    const phone = storyTree([
+      source({
+        "./t.stories.tsx": {
+          title: "Touch/List",
+          isTouch: true,
+          stories: [{ exportName: "Swipe" }, { exportName: "Desk", isTouch: false }]
+        },
+        "./d.stories.tsx": {
+          title: "Touch/Plain",
+          stories: [{ exportName: "Plain", isTouch: true }, { exportName: "Other" }]
+        }
+      })
+    ]);
+    expect(findStory(phone, "kit:touch-list--swipe")?.story.isTouch).toBe(true);
+    expect(findStory(phone, "kit:touch-list--desk")?.story.isTouch).toBe(false);
+    expect(findStory(phone, "kit:touch-plain--plain")?.story.isTouch).toBe(true);
+    expect(findStory(phone, "kit:touch-plain--other")?.story.isTouch).toBe(false);
+  });
+
   it("takes as the component's demo the story marked main, else Overview, else the first", () => {
     const demos = storyTree([
       source({

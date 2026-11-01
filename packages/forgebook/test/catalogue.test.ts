@@ -113,7 +113,8 @@ describe("story groups", () => {
         description: undefined,
         height: undefined,
         tags: [],
-        isMain: false
+        isMain: false,
+        isTouch: false
       })),
       ["states", "behaviour"]
     );

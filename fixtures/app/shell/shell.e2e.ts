@@ -1241,6 +1241,37 @@ test.describe("touch", () => {
     await expect(frameOf(page).locator("html")).toHaveAttribute("data-forgebook-touch", "touch");
   });
 
+  test("a story marked for a phone starts in touch, with its own toggle on its example and its page", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:touch-demos-swipe-list");
+    const toggle = page.getByRole("switch", { name: "Touch Inbox with a finger", exact: true });
+    await expect(toggle).toBeChecked();
+    const demoFrame = page.locator("article", { has: toggle }).frameLocator("iframe.forgebook-frame-view");
+    await expect(demoFrame.locator("html")).toHaveAttribute("data-forgebook-touch", "touch");
+    // turned off in place: the frame keeps its story, and the address keeps the Touch switch the others follow
+    await toggle.uncheck({ force: true });
+    await expect(demoFrame.locator("html")).not.toHaveAttribute("data-forgebook-touch");
+    await expect(page).not.toHaveURL(/touch=/);
+    // its page follows the choice, and the Touch switch there is the story's own
+    await page.getByRole("link", { name: "Open the story Inbox", exact: true }).click();
+    await frameStatus(page);
+    await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-touch");
+    await page.getByRole("button", { name: /^View/ }).click();
+    await popoversSettled(page);
+    await page
+      .getByRole("dialog", { name: "View" })
+      .getByRole("group", { name: "Touch" })
+      .getByRole("radio", { name: "Touch" })
+      .check({ force: true });
+    await expect(frameOf(page).locator("html")).toHaveAttribute("data-forgebook-touch", "touch");
+    await expect(page).not.toHaveURL(/touch=/);
+    // a story not marked follows the address: the mouse
+    await page.goto("/?story=kit:interaction-touch-pad--by-pointer");
+    await frameStatus(page);
+    await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-touch");
+  });
+
   test("the Touch switch says what is simulated, and the mouse comes back when it is off", async ({
     page
   }) => {

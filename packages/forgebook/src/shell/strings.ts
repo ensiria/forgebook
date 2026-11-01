@@ -158,6 +158,8 @@ const shellStrings = {
   usedInMore: (count: number): string => `and ${count} more`,
   usedInStories: (count: number): string => (count === 1 ? "1 story" : `${count} stories`),
   openStoryNamed: (name: string): string => `Open the story ${name}`,
+  touch: "Touch",
+  touchNamed: (name: string): string => `Touch ${name} with a finger`,
   fillPage: "Fill the page",
   fillPageNamed: (name: string): string => `Fill the page with ${name}`,
   backToPlace: "Back to its place",

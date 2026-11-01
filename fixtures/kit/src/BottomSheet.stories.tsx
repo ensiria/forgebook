@@ -9,6 +9,7 @@ import { BottomSheet } from "./touchDemos/BottomSheet";
 
 export default {
   title: "Touch demos/Bottom sheet",
+  parameters: { touch: true },
   component: BottomSheet,
   args: { title: "Nearby" }
 } satisfies Meta<typeof BottomSheet>;

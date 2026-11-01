@@ -11,8 +11,13 @@
  */
 import { type RefObject, useEffect, useState } from "react";
 
+import type { TouchChoice } from "../switches.ts";
 import { MEASURE_TOOLS, type MeasureTool, type ViewState } from "../viewState.ts";
-import { tellFrames } from "./FrameView.tsx";
+import { tellEachFrame, tellFrames } from "./FrameView.tsx";
+import { type StoryTouches, touchedView } from "./storyTouch.ts";
+
+/** No story marked for a phone. */
+const NO_TOUCHES: StoryTouches = new Map();
 
 /** The tools a joined list names, back as a list (the effect depends on the text, not on a new list each render). */
 const toolsOf = (joined: string): MeasureTool[] =>
@@ -37,18 +42,26 @@ export const useLoadedView = (loadKey: string, view: ViewState): ViewState => {
  * @param container - the element that holds the frames.
  * @param view - the current view.
  * @param isEnabled - whether the frames follow the view (the compare view's frames fix their own theme).
+ * @param touch - the stories marked for a phone, each with its own finger, and the catalogue's touch switch; none by
+ * default.
  */
 export const useLiveView = (
   container: RefObject<HTMLElement | null>,
   view: ViewState,
-  isEnabled: boolean
+  isEnabled: boolean,
+  touch?: { readonly touches: StoryTouches; readonly choice: TouchChoice | undefined }
 ): void => {
   // a view changed elsewhere (the width, the panel) keeps its switches' object, so it sends nothing
   const { switches, backdrop, text } = view;
+  const touches = touch?.touches ?? NO_TOUCHES;
+  const choice = touch?.choice;
   useEffect(() => {
     if (!isEnabled) return;
-    tellFrames(container.current, { type: "forgebook:view", view: { switches, backdrop, text } });
-  }, [container, switches, backdrop, text, isEnabled]);
+    tellEachFrame(container.current, (storyId: string | undefined) => ({
+      type: "forgebook:view",
+      view: touchedView({ switches, backdrop, text }, storyId, touches, choice)
+    }));
+  }, [container, switches, backdrop, text, isEnabled, touches, choice]);
   // the tools draw over every frame, the compare view's too
   const tools = view.tools.join(",");
   useEffect(() => {

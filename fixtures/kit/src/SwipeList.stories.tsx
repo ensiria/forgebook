@@ -10,6 +10,7 @@ import { SwipeList } from "./touchDemos/SwipeList";
 
 export default {
   title: "Touch demos/Swipe list",
+  parameters: { touch: true },
   component: SwipeList,
   args: { title: "Inbox" }
 } satisfies Meta<typeof SwipeList>;

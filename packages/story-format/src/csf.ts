@@ -151,6 +151,12 @@ export type StoryParameters = {
    */
   readonly height?: number;
   /**
+   * Whether the story is meant for a phone: it starts touched with the catalogue's simulated finger, whatever the
+   * toolbar's Touch switch says, and its example and its page offer to turn that off for it. On a meta, for every
+   * story of the file; a story's own `false` leaves it out. Written plainly (`touch: true`, the index reads it).
+   */
+  readonly touch?: boolean;
+  /**
    * The story reads the story clock (`context.clock`, `useStoryNow`): a Live story, which starts at this moment and
    * then runs; the catalogue shows pause, resume, restart and the speed, and the tests hold it at its start.
    * None by default: the clock is held at the Unix epoch and the catalogue shows no clock controls.

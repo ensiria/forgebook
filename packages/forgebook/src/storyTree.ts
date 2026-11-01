@@ -37,6 +37,8 @@ export type TreeStory = {
   readonly description: string | undefined;
   /** Whether it is the component's demo (`parameters.main`). */
   readonly isMain: boolean;
+  /** Whether it is meant for a phone (`parameters.touch`, its own or the meta's): it starts in touch. */
+  readonly isTouch: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
@@ -351,6 +353,7 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       group: story.group,
       description: story.description,
       isMain: story.isMain === true,
+      isTouch: story.isTouch ?? entry.isTouch ?? false,
       height: story.height ?? entry.height,
       tags: story.tags ?? []
     }));

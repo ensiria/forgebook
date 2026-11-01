@@ -23,6 +23,7 @@ import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext } from "./Example.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
+import { storyTouchesOf, type TouchOverrides, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
 import { useComponentDocs } from "./useComponentDocs.ts";
@@ -40,6 +41,10 @@ export type ComponentPageProps = {
   readonly component: TreeComponent;
   /** The view. */
   readonly view: ViewState;
+  /** What the user chose for each story marked for a phone. */
+  readonly touchOverrides: TouchOverrides;
+  /** Called when the user turns a story's finger on or off. */
+  readonly onTouchChange: (storyId: string, isTouch: boolean) => void;
   /** The frame page's address. */
   readonly frameUrl: string;
   /** The address of a story's page, for its link. */
@@ -111,6 +116,8 @@ const Prose = ({ page }: { readonly page: Loaded<PageDoc> }): ReactNode => {
 export const ComponentPage = ({
   component,
   view,
+  touchOverrides,
+  onTouchChange,
   frameUrl,
   hrefOf,
   onOpen,
@@ -139,6 +146,11 @@ export const ComponentPage = ({
   const frameView = useLoadedView(view.sheets, view);
   const catalogue = useCatalogue();
   const { switches } = catalogue;
+  // each story marked for a phone with its own finger: its frame gets it in place of the toolbar's Touch
+  const touches = useMemo(
+    () => storyTouchesOf(component.stories, touchOverrides),
+    [component, touchOverrides]
+  );
   const exampleIds = useMemo(() => examples.map((story) => story.id), [examples]);
   const queue = useFrameQueue(exampleIds, pageRef);
   const { heights, settled } = useFrameMessages({
@@ -147,14 +159,17 @@ export const ComponentPage = ({
       setStoryArgs((current) => new Map(current).set(message.storyId, message.args));
       const send = (shellMessage: ShellMessage): void =>
         frame.postMessage(shellMessage, window.location.origin);
-      send({ type: "forgebook:view", view: liveView(view) });
+      send({
+        type: "forgebook:view",
+        view: touchedView(liveView(view), message.storyId, touches, catalogue.touch)
+      });
       send({ type: "forgebook:tools", tools: view.tools });
     },
     onCall: (): void => undefined,
     // a frame that failed is over too: its place in the queue goes to the next one
     onFailed: queue.markReady
   });
-  useLiveView(pageRef, view, true);
+  useLiveView(pageRef, view, true, { touches, choice: catalogue.touch });
   useScrollMemory(pageRef, scroll);
   const componentDocs = docs.status === "ready" ? docs.value : undefined;
   const context: ExampleContext = {
@@ -165,6 +180,8 @@ export const ComponentPage = ({
     onOpen,
     frameView,
     switches,
+    touches,
+    onTouchChange,
     heights,
     settled,
     code,

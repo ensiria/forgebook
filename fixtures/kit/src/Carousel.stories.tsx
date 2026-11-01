@@ -9,6 +9,7 @@ import { Carousel } from "./touchDemos/Carousel";
 
 export default {
   title: "Touch demos/Carousel",
+  parameters: { touch: true },
   component: Carousel,
   args: { label: "Places" }
 } satisfies Meta<typeof Carousel>;

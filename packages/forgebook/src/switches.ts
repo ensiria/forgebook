@@ -220,6 +220,30 @@ export type ReadySwitchesOff = Readonly<Partial<Record<"direction" | "touch", fa
 export const switchWithRole = (switches: readonly ViewSwitch[], role: SwitchRole): ViewSwitch | undefined =>
   switches.find((each) => each.role === role);
 
+/** The touch switch and its two values: a finger and the mouse. */
+export type TouchChoice = {
+  /** The switch's id. */
+  readonly id: string;
+  /** Its value for a finger (`touch`). */
+  readonly touch: string;
+  /** Its value for the mouse: its default, or its first other value when the default is the finger. */
+  readonly mouse: string;
+};
+
+/**
+ * The touch switch a story marked for a phone (`parameters.touch`) is drawn with, or none when the catalogue has no
+ * touch switch with a `touch` value (turned off, or a catalogue's own with other values).
+ *
+ * @param switches - the catalogue's switches.
+ */
+export const touchChoiceOf = (switches: readonly ViewSwitch[]): TouchChoice | undefined => {
+  const touch = switchWithRole(switches, "touch");
+  if (touch === undefined || !touch.values.some((value) => value.value === "touch")) return undefined;
+  const mouse =
+    touch.default === "touch" ? touch.values.find((value) => value.value !== "touch")?.value : touch.default;
+  return mouse === undefined ? undefined : { id: touch.id, touch: "touch", mouse };
+};
+
 /**
  * A switch's value as declared, for a value an address or a message gives.
  *

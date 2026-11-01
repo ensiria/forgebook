@@ -30,11 +30,12 @@ in JSON with `--json`, and every answer carries the links that open a story for 
   sends the story a finger's events and a phone's hover and pointer media. It is a simulation: native scrolling, the
   virtual keyboard and real Safari still need a device, or `forgebook dev --touch` (Chromium's real touch).
   A story reads it as `context.globals.touch` (`"mouse"` or `"touch"`) or fixes it with
-  `globals: { touch: "touch" }`.
+  `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
+  catalogue draws it with a finger and offers a toggle to turn that off.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.
-- Write `title`, `parameters.main`, `group` and `height` as plain values: the catalogue reads them without running
+- Write `title`, `parameters.main`, `group`, `height` and `touch` as plain values: the catalogue reads them without running
   the file.
 
 ### Commands
