@@ -1,3 +1,23 @@
+## 0.1.8 (2026-11-01)
+
+### 🚀 Features
+
+- **react:** document a hook's signature, and type stories about logic ([7dd90db](https://github.com/ensiria/forgebook/commit/7dd90db))
+
+### 🩹 Fixes
+
+- **forgebook:** logic stories from the second self-review ([604682b](https://github.com/ensiria/forgebook/commit/604682b))
+- **forgebook:** logic stories from the self-review ([195c3f9](https://github.com/ensiria/forgebook/commit/195c3f9))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.5
+- Updated forgebook to 0.1.8
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.7 (2026-11-01)
 
 ### 🧱 Updated Dependencies

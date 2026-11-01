@@ -1,3 +1,22 @@
+## 0.1.9 (2026-11-01)
+
+### 🚀 Features
+
+- **testing:** test a story about logic once, without its looks ([4b9aca9](https://github.com/ensiria/forgebook/commit/4b9aca9))
+
+### 🩹 Fixes
+
+- **forgebook:** logic stories from the self-review ([195c3f9](https://github.com/ensiria/forgebook/commit/195c3f9))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.5
+- Updated forgebook to 0.1.8
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.8 (2026-11-01)
 
 ### 🧱 Updated Dependencies

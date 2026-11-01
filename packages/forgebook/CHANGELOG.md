@@ -1,3 +1,28 @@
+## 0.1.8 (2026-11-01)
+
+### 🚀 Features
+
+- **forgebook:** show stories about logic by their signature ([fd0de0a](https://github.com/ensiria/forgebook/commit/fd0de0a))
+- **react:** document a hook's signature, and type stories about logic ([7dd90db](https://github.com/ensiria/forgebook/commit/7dd90db))
+- **testing:** test a story about logic once, without its looks ([4b9aca9](https://github.com/ensiria/forgebook/commit/4b9aca9))
+- **story-format:** mark stories about logic with parameters.logic ([b27ed9e](https://github.com/ensiria/forgebook/commit/b27ed9e))
+
+### 🩹 Fixes
+
+- **forgebook:** logic stories from the second self-review ([604682b](https://github.com/ensiria/forgebook/commit/604682b))
+- **forgebook:** logic stories from the self-review ([195c3f9](https://github.com/ensiria/forgebook/commit/195c3f9))
+- **forgebook:** give the Touch switch its key, m ([0218d0f](https://github.com/ensiria/forgebook/commit/0218d0f))
+- **forgebook:** answer the unmeasured heights file without a 404 ([9a71e49](https://github.com/ensiria/forgebook/commit/9a71e49))
+- **forgebook:** draw every value in Compare, its default too ([6b250aa](https://github.com/ensiria/forgebook/commit/6b250aa))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.5
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.7 (2026-11-01)
 
 ### 🩹 Fixes

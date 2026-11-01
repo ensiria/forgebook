@@ -1,3 +1,13 @@
+## 0.1.5 (2026-11-01)
+
+### 🚀 Features
+
+- **story-format:** mark stories about logic with parameters.logic ([b27ed9e](https://github.com/ensiria/forgebook/commit/b27ed9e))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.4 (2026-11-01)
 
 ### 🚀 Features
