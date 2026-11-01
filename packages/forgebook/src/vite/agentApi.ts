@@ -23,6 +23,7 @@ import type {
   AgentStory,
   AgentUsingComponent,
   ErrorsDocument,
+  FoundComponentsDocument,
   StoriesDocument,
   StoryDocument,
   StoryLinks
@@ -313,3 +314,14 @@ export const isStoriesDocument = (value: unknown): value is StoriesDocument =>
  */
 export const isStoryDocument = (value: unknown): value is StoryDocument =>
   isRecord(value) && value["schema"] === 1 && isRecord(value["story"]) && Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is an intent search's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isFoundComponentsDocument = (value: unknown): value is FoundComponentsDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  typeof value["query"] === "string" &&
+  Array.isArray(value["components"]);

@@ -1,6 +1,6 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors` and `story_shot`.
+ * `find_component`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors` and `story_shot`.
  *
  * @module
  */
@@ -80,6 +80,19 @@ export type CatalogueReach = {
  * @param reach - what they reach the catalogue through.
  */
 export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): readonly McpTool[] => [
+  {
+    name: "find_component",
+    description:
+      'The components a description fits, best first, in your own words ("modal", "radio tile group"): call it before writing a component that may already exist. Each with the words it matched and missed, when to use it, and its first story.',
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", description: "What you are looking for, in any words." } },
+      required: ["query"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("find", new URLSearchParams({ query: textOf(args, "query") ?? "" })))
+  },
   {
     name: "list_stories",
     description:

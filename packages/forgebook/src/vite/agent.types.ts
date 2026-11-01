@@ -9,8 +9,9 @@
  *
  * @module
  */
-import type { ComponentDocs } from "../componentDocs.ts";
+import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
 import type { LiveError } from "../liveErrors.ts";
+import type { FoundComponent } from "./findComponent.ts";
 
 /** The version of the documents' shape. */
 export type AgentSchema = 1;
@@ -115,6 +116,26 @@ export type StoryDocument = {
   readonly args: Readonly<Record<string, unknown>>;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
   readonly problems: readonly string[];
+};
+
+/** A component an intent search found, with what a next step needs. */
+export type AgentFoundComponent = FoundComponent & {
+  /** Its first story's id, to pass to `story`. */
+  readonly story: string | undefined;
+  /** The links that open that story. */
+  readonly links: StoryLinks | undefined;
+  /** When to use it and when not, when its TSDoc says. */
+  readonly guidance?: UsageGuidance;
+};
+
+/** The components a query describes. */
+export type FoundComponentsDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The query. */
+  readonly query: string;
+  /** Up to five, best first; none means nothing in the catalogue holds those words. */
+  readonly components: readonly AgentFoundComponent[];
 };
 
 /** What the open frames reported while someone edited, and the story index's problems. */

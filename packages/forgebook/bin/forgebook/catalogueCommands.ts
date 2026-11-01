@@ -12,7 +12,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import type { StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
+import type { FoundComponentsDocument, StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import {
   CONFIG_FILES,
@@ -111,7 +111,7 @@ export const askCatalogue = async (
  */
 export const printAnswer = (
   text: string,
-  document: StoriesDocument | StoryDocument,
+  document: StoriesDocument | StoryDocument | FoundComponentsDocument,
   problems: readonly string[],
   context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
 ): void => {

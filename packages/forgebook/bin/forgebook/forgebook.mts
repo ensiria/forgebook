@@ -15,13 +15,18 @@ import { readPackageVersion } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 import { build, createServer } from "vite";
 
-import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
+import {
+  filteredStories,
+  isFoundComponentsDocument,
+  isStoriesDocument,
+  isStoryDocument
+} from "../../src/vite/agentApi.ts";
 import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
 import { catalogueDocs } from "../forgebook-docs/catalogueDocs.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
-import { storiesText, storyText } from "./agentText.ts";
+import { foundComponentsText, storiesText, storyText } from "./agentText.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
@@ -152,6 +157,31 @@ await defineCommands({
         if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
         const document = filteredStories(body, { source: options.source, component: options.component });
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
+      }
+    }),
+    find: forgebook.command({
+      summary: "Find components by what they are for, in your own words.",
+      json: true,
+      positionals: [{ name: "query", description: "What you are looking for.", required: true }],
+      options: {
+        url: {
+          type: "string",
+          env: "FORGEBOOK_URL",
+          valueName: "address",
+          description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+        }
+      },
+      examples: [
+        { command: `${COMMAND} find modal`, description: "Whatever this catalogue calls a modal." },
+        { command: `${COMMAND} find "radio tile group" --json`, description: "As an agent asks." }
+      ],
+      run: async ({ options, args, io, log, isJson }): Promise<void> => {
+        const config = await configOf(options.config);
+        const params = new URLSearchParams({ query: args.query });
+        const body = await askCatalogue(config, options.url, "find", params, log);
+        if (!isFoundComponentsDocument(body))
+          throw new ScriptError("The catalogue's answer has an unexpected shape");
+        printAnswer(foundComponentsText(body), body, [], { io, log, isJson });
       }
     }),
     docs: forgebook.command({
