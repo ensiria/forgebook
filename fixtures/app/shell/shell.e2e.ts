@@ -253,7 +253,7 @@ test.describe("the sidebar", () => {
   });
 });
 
-test.describe("aliases and related pages (D-492)", () => {
+test.describe("aliases and related pages", () => {
   test("an alias entry in another place opens the same page, which says where the component lives", async ({
     page
   }) => {
@@ -291,7 +291,7 @@ test.describe("aliases and related pages (D-492)", () => {
   });
 });
 
-test.describe("a story's declared height (D-469)", () => {
+test.describe("a story's declared height", () => {
   test("the frame has the declared height from the start, before the story reports its own", async ({
     page
   }) => {
@@ -375,7 +375,7 @@ test.describe("the stage", () => {
     await expect(page).not.toHaveURL(/width=/);
   });
 
-  test("the handle at the story's foot sets its height from the declared one, and a double click gives it back (note 142)", async ({
+  test("the handle at the story's foot sets its height from the declared one, and a double click gives it back", async ({
     page
   }) => {
     await page.goto(story("overlay-in-room"));

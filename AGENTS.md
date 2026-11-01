@@ -53,6 +53,10 @@ case, with the reason (`// biome-ignore lint/…: the protocol names this field`
 - TSDoc on every module (a block first: what it does, `@remarks` for the why, `@module`) and on everything exported:
   what it is, its defaults and units, in TSDoc syntax (code in backticks).
 - Comments explain why the code is as it is, never its history: no dates, no names, no account of what was tried.
+- No reference to notes outside this repository, in a file or a commit message: no decision ids (a `D` and a
+  number), no numbered notes (`note` and a number), no private repository. A reader of this public repository cannot
+  open them, so the comment or the message says the reason itself. `pnpm refs:check` (part of `pnpm checks`) and `check-commits` fail
+  on them.
 - Look for what exists before writing: a helper two places need exists once (`storyTree.ts`, `viewState.ts`,
   `storyModule.ts` hold most of what the pages and the tools share).
 - Commands are built on `@ensiria/cli-kit` (definitions, help, output, exit codes), never `console.log` or a
