@@ -1081,6 +1081,38 @@ test.describe("touch", () => {
     await expect(frameOf(page).locator(".forgebook-touch-dot:not([hidden])")).toHaveCount(1);
   });
 
+  test("the keyboard still clicks, a captured pointer is released on the lift, and turning touch off ends a press", async ({
+    page
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(touchPad());
+    await frameStatus(page);
+    // a finger changes nothing of the keyboard: Enter on a button still clicks it
+    await frameOf(page).getByRole("button", { name: "Press me" }).focus();
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(async () => (await eventLog(page)).some((entry) => entry.startsWith("click")))
+      .toBe(true);
+    // the drawing area captures its pointer on the press and releases it on the lift
+    const drawing = await centreOf(frameOf(page).getByRole("img", { name: "Drawing area" }));
+    await page.mouse.move(drawing.x, drawing.y);
+    await page.mouse.down();
+    await page.mouse.move(drawing.x + 30, drawing.y);
+    await page.mouse.up();
+    // a press under way when touch goes off is cancelled: its long press never opens the menu
+    const button = await centreOf(frameOf(page).getByRole("button", { name: "Press me" }));
+    await page.mouse.move(button.x, button.y);
+    await page.mouse.down();
+    await frameOf(page)
+      .locator("html")
+      .evaluate((root) => root.removeAttribute("data-forgebook-touch"));
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    expect(await eventLog(page)).not.toContain("contextmenu");
+    expect(errors).toEqual([]);
+  });
+
   test("a drag scrolls a list, not a part that keeps its moves, and Shift puts two fingers down", async ({
     page
   }) => {

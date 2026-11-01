@@ -34,9 +34,16 @@ const SNAP_AIM_MS = 250;
  * @param axis - the axis.
  */
 const scrollsOn = (element: Element, axis: "x" | "y"): boolean => {
-  const isDocument = element === element.ownerDocument.scrollingElement;
-  const overflow = getComputedStyle(element)[axis === "x" ? "overflowX" : "overflowY"];
-  const isScrollable = isDocument || overflow === "auto" || overflow === "scroll";
+  const property = axis === "x" ? "overflowX" : "overflowY";
+  const document = element.ownerDocument;
+  const overflow = getComputedStyle(element)[property];
+  // the document scrolls unless its root or its body hides its overflow (a story that locks it behind a dialog)
+  const isDocument = element === document.scrollingElement;
+  const isDocumentLocked = [document.documentElement, document.body].some((each) => {
+    const value = getComputedStyle(each)[property];
+    return value === "hidden" || value === "clip";
+  });
+  const isScrollable = isDocument ? !isDocumentLocked : overflow === "auto" || overflow === "scroll";
   const size =
     axis === "x" ? element.scrollWidth - element.clientWidth : element.scrollHeight - element.clientHeight;
   return isScrollable && size > 0;
@@ -101,7 +108,8 @@ const fling = (pan: Pan, speed: Point): (() => void) => {
   let last = view.performance.now();
   let frame = 0;
   const step = (now: number): void => {
-    const ms = now - last;
+    // a frame's time may come before the time the fling started at
+    const ms = Math.max(0, now - last);
     last = now;
     pan.scroller.scrollBy({ left: -current.x * ms, top: -current.y * ms, behavior: "instant" });
     current = { x: flungSpeed(current.x, ms), y: flungSpeed(current.y, ms) };
@@ -112,21 +120,27 @@ const fling = (pan: Pan, speed: Point): (() => void) => {
 };
 
 /**
- * Where a snapping container's items start along an axis, in its scroll coordinates: its children that snap.
+ * Where a snapping container's items snap along an axis, in its scroll coordinates: its children that snap, each by
+ * its `scroll-snap-align` (start, center or end; the container's `scroll-padding` is not read).
  *
  * @param scroller - the container.
  * @param axis - the axis.
  */
 const snapPoints = (scroller: HTMLElement, axis: "x" | "y"): number[] => {
   const box = scroller.getBoundingClientRect();
-  return [...scroller.children]
-    .filter((child) => getComputedStyle(child).scrollSnapAlign !== "none")
-    .map((child) => {
-      const childBox = child.getBoundingClientRect();
-      return axis === "x"
-        ? childBox.left - box.left + scroller.scrollLeft
-        : childBox.top - box.top + scroller.scrollTop;
-    });
+  const room = axis === "x" ? scroller.clientWidth : scroller.clientHeight;
+  const scrolled = axis === "x" ? scroller.scrollLeft : scroller.scrollTop;
+  return [...scroller.children].flatMap((child) => {
+    const aligns = getComputedStyle(child).scrollSnapAlign.split(/\s+/);
+    // one value aligns both axes; two give the block axis (y) then the inline one (x)
+    const align = (axis === "x" ? aligns[1] : aligns[0]) ?? aligns[0] ?? "none";
+    if (align === "none") return [];
+    const childBox = child.getBoundingClientRect();
+    const start = (axis === "x" ? childBox.left - box.left : childBox.top - box.top) + scrolled;
+    const size = axis === "x" ? childBox.width : childBox.height;
+    if (align === "center") return [start + size / 2 - room / 2];
+    return [align === "end" ? start + size - room : start];
+  });
 };
 
 /**
@@ -153,5 +167,7 @@ export const endPan = (pan: Pan, speed: Point): (() => void) => {
   // snapping comes back only now: back on, it would snap the place the finger left before the target is read
   scroller.style.scrollSnapType = pan.pausedSnap;
   scroller.scrollTo({ [axis === "x" ? "left" : "top"]: target, behavior: "smooth" });
-  return (): void => undefined;
+  // a new touch stops the smooth scroll where it is, as a finger stops a scrolling list
+  return (): void =>
+    scroller.scrollTo({ left: scroller.scrollLeft, top: scroller.scrollTop, behavior: "instant" });
 };

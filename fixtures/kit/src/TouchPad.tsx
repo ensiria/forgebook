@@ -69,6 +69,9 @@ export const TouchPad = ({ label }: TouchPadProps): ReactNode => {
         role="img"
         aria-label="Drawing area"
         onTouchStart={note}
+        // captured from the press to the lift, as a drawing surface does: the release in pointerup must not throw
+        onPointerDown={(event): void => event.currentTarget.setPointerCapture(event.pointerId)}
+        onPointerUp={(event): void => event.currentTarget.releasePointerCapture(event.pointerId)}
         onPointerMove={(event): void => {
           if (event.buttons > 0) note(event);
         }}

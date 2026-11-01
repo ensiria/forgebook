@@ -24,5 +24,10 @@ export const openTouchWindow = async (dir: string, url: string | undefined, log:
   if (typeof open === "string") throw new ScriptError(open);
   const request: TouchWindowRequest = { url };
   log.info("Touch window open: the mouse makes real touch events there (Chromium's emulation)");
-  void open(request).then((): void => log.info("Touch window closed; the dev server keeps running"));
+  // a window that cannot open (no Chromium installed) is said, and the dev server keeps running
+  open(request).then(
+    (): void => log.info("Touch window closed; the dev server keeps running"),
+    (error: unknown): void =>
+      log.error(`The touch window could not open: ${error instanceof Error ? error.message : String(error)}`)
+  );
 };

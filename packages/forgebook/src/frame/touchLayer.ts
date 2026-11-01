@@ -30,6 +30,9 @@ const FINGER_IDS = [100, 101] as const;
 /** How far apart two fingers start, in CSS px: Shift fixes the centre half of it to the left of the mouse. */
 const START_SPREAD_PX = 80;
 
+/** A finger held still longer than this before it lifts, in ms, lifts without a fling. */
+const STILL_MS = 80;
+
 /** The real events that never reach the story while touch is simulated (the hover a finger does not have). */
 const SWALLOWED = ["mousedown", "mouseup", "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave"];
 
@@ -74,6 +77,8 @@ type LayerState = {
   press: Press | undefined;
   /** The finger of a tap whose click is to come: the real click is then sent again as its; none otherwise. */
   tapper: Finger | undefined;
+  /** The timer of a tap's click about to be sent; none when none is. */
+  clickTimer: number | undefined;
   /** Stops a fling under way. */
   stopFling: () => void;
 };
@@ -215,18 +220,24 @@ const pressMove = (state: LayerState, press: Press, event: PointerEvent): void =
  *
  * @param state - the simulation's state.
  * @param press - the press.
- * @param isCancel - whether the browser cancelled the real pointer.
+ * @param isCancel - whether the browser cancelled the real pointer, or the layer stops mid-press.
+ * @param time - when, as the events' `timeStamp`.
  */
-const pressUp = (state: LayerState, press: Press, isCancel: boolean): void => {
+const pressUp = (state: LayerState, press: Press, isCancel: boolean, time: number): void => {
   window.clearTimeout(press.timer);
-  state.press = undefined;
+  // a finger that stopped before it lifted throws nothing
+  if (time - press.last.time > STILL_MS) press.speed = { x: 0, y: 0 };
   if (press.pan === undefined) {
+    // the press is still the layer's while its pointer ends: a story's pointerup may release its capture
     for (const finger of press.fingers) {
       sendPointer(isCancel ? "pointercancel" : "pointerup", finger, false);
+      // a touch pointer is captured from its press on (by its target, or where the story moved it), and lost here
+      sendPointer("lostpointercapture", finger, false);
       sendPointer("pointerout", finger, false);
       sendPointer("pointerleave", finger, false);
     }
   }
+  state.press = undefined;
   const isEndCancelled = !sendTouch(
     isCancel ? "touchcancel" : "touchend",
     [],
@@ -246,29 +257,63 @@ const pressUp = (state: LayerState, press: Press, isCancel: boolean): void => {
 };
 
 /**
- * A real event the story never receives in place of a finger's: the click (a tap's is sent again as a finger's, a
- * drag's or a long press's is none), a text selection or an image dragged by the finger, the right button's menu.
+ * A real event the layer handles apart from the pointer's, before the story: the mouse's click (a tap's is sent again as
+ * a finger's, a drag's or a long press's is none), a text selection or an image dragged by the finger, the right
+ * button's menu. A click from the keyboard (Enter or Space on a button, Enter in a form) and the keyboard's menu key
+ * reach the story as they are: a finger changes nothing of the keyboard.
  *
  * @param state - the simulation's state.
  * @param event - the real event.
- * @returns whether it was one of them.
+ * @returns whether the event was one of them, handled here.
  */
-const blockedDefault = (state: LayerState, event: Event): boolean => {
+const handledApart = (state: LayerState, event: Event): boolean => {
+  const isMouseEvent = event instanceof MouseEvent;
   if (event.type === "click") {
+    // a click the keyboard made has no press behind it (`detail` 0) and no tap waiting for it
+    if (state.tapper === undefined && isMouseEvent && event.detail === 0) return true;
     event.preventDefault();
     event.stopImmediatePropagation();
     const finger = state.tapper;
     state.tapper = undefined;
     // after the real click's dispatch: cancelling it undoes a checkbox's toggle at its end, a click sent inside it too
     const { target } = event;
-    if (finger !== undefined && target !== null) window.setTimeout((): void => sendClick(target, finger), 0);
+    if (finger !== undefined && target !== null)
+      state.clickTimer = window.setTimeout((): void => {
+        state.clickTimer = undefined;
+        sendClick(target, finger);
+      }, 0);
     return true;
   }
+  if (event.type === "contextmenu" && !(isMouseEvent && event.button === 2)) return true;
   if (event.type !== "selectstart" && event.type !== "dragstart" && event.type !== "contextmenu")
     return false;
   event.preventDefault();
   event.stopImmediatePropagation();
   return true;
+};
+
+/**
+ * The mouse moves: a press under way follows it (or lifts, when its button came up out of sight), the dots follow it
+ * between presses, and Shift held fixes the two-finger centre.
+ *
+ * @param state - the simulation's state.
+ * @param event - the real pointer's move.
+ */
+const pointerMove = (state: LayerState, event: PointerEvent): void => {
+  const { press } = state;
+  if (press !== undefined && (event.buttons & 1) === 0) {
+    // the button came up where the frame could not see it (outside the window): the finger lifts here
+    state.mouse = { x: event.clientX, y: event.clientY };
+    pressUp(state, press, false, event.timeStamp);
+  } else if (press !== undefined) pressMove(state, press, event);
+  else {
+    // Shift read from the pointer, which carries it even when the frame has no focus (the shell usually does): held,
+    // it fixes the two-finger centre beside the mouse
+    if (!event.shiftKey) state.center = undefined;
+    else state.center ??= shiftCenter(state.mouse ?? { x: event.clientX, y: event.clientY });
+    state.mouse = { x: event.clientX, y: event.clientY };
+    drawDots(state);
+  }
 };
 
 /**
@@ -280,22 +325,15 @@ const blockedDefault = (state: LayerState, event: Event): boolean => {
  */
 const pointerInput = (state: LayerState, event: PointerEvent): void => {
   const { press } = state;
-  if (event.type === "pointerout" && event.relatedTarget === null && press === undefined) {
+  if (event.type === "pointermove") pointerMove(state, event);
+  else if (event.type === "pointerout" && event.relatedTarget === null && press === undefined) {
     state.mouse = undefined;
     drawDots(state);
   } else if (event.type === "pointerdown" && event.button === 0 && press === undefined)
     pressDown(state, event);
-  else if (event.type === "pointermove" && press !== undefined) pressMove(state, press, event);
-  else if (event.type === "pointermove") {
-    // Shift read from the pointer, which carries it even when the frame has no focus (the shell usually does): held,
-    // it fixes the two-finger centre where the mouse was
-    if (!event.shiftKey) state.center = undefined;
-    else state.center ??= shiftCenter(state.mouse ?? { x: event.clientX, y: event.clientY });
+  else if ((event.type === "pointerup" || event.type === "pointercancel") && press !== undefined) {
     state.mouse = { x: event.clientX, y: event.clientY };
-    drawDots(state);
-  } else if ((event.type === "pointerup" || event.type === "pointercancel") && press !== undefined) {
-    state.mouse = { x: event.clientX, y: event.clientY };
-    pressUp(state, press, event.type === "pointercancel");
+    pressUp(state, press, event.type === "pointercancel", event.timeStamp);
   }
 };
 
@@ -306,7 +344,7 @@ const pointerInput = (state: LayerState, event: PointerEvent): void => {
  * @param event - the real event (the story's own dispatched events are left alone).
  */
 const intercept = (state: LayerState, event: Event): void => {
-  if (!event.isTrusted || blockedDefault(state, event)) return;
+  if (!event.isTrusted || handledApart(state, event)) return;
   event.stopImmediatePropagation();
   if (event instanceof PointerEvent) pointerInput(state, event);
 };
@@ -330,8 +368,13 @@ const pretendTouch = (state: LayerState): (() => void) => {
   };
   const fingerOf = (id: number): Finger | undefined =>
     state.press?.fingers.find((finger) => finger.id === id);
+  // a simulated pointer's id never reaches the browser, which knows no such pointer: once its finger lifted, setting its
+  // capture fails as the browser fails it, releasing it does nothing
+  const isSimulated = (id: number): boolean => FINGER_IDS.some((each) => each === id);
   proto.setPointerCapture = function setPointerCapture(this: Element, id: number): void {
     const finger = fingerOf(id);
+    if (finger === undefined && isSimulated(id))
+      throw new DOMException("No active pointer with the given id is found.", "NotFoundError");
     if (finger === undefined) {
       native.set.call(this, id);
       return;
@@ -342,7 +385,7 @@ const pretendTouch = (state: LayerState): (() => void) => {
   proto.releasePointerCapture = function releasePointerCapture(this: Element, id: number): void {
     const finger = fingerOf(id);
     if (finger === undefined) {
-      native.release.call(this, id);
+      if (!isSimulated(id)) native.release.call(this, id);
       return;
     }
     sendPointer("lostpointercapture", finger, true);
@@ -350,7 +393,8 @@ const pretendTouch = (state: LayerState): (() => void) => {
   };
   proto.hasPointerCapture = function hasPointerCapture(this: Element, id: number): boolean {
     const finger = fingerOf(id);
-    return finger === undefined ? native.has.call(this, id) : finger.captureTarget === this;
+    if (finger === undefined) return isSimulated(id) ? false : native.has.call(this, id);
+    return finger.captureTarget === this;
   };
   return (): void => {
     Reflect.deleteProperty(view.navigator, "maxTouchPoints");
@@ -389,6 +433,7 @@ const startTouch = (document: Document): (() => void) => {
     center: undefined,
     press: undefined,
     tapper: undefined,
+    clickTimer: undefined,
     stopFling: (): void => undefined
   };
   const restore = pretendTouch(state);
@@ -405,6 +450,11 @@ const startTouch = (document: Document): (() => void) => {
   view?.addEventListener("keydown", onKey);
   view?.addEventListener("keyup", onKey);
   return (): void => {
+    // a press under way is cancelled, as the browser cancels a touch it takes over: its timers, its scroll's snapping
+    // and a tap's click to come end with it
+    if (state.press !== undefined) pressUp(state, state.press, true, performance.now());
+    window.clearTimeout(state.clickTimer);
+    state.tapper = undefined;
     for (const type of CAUGHT) view?.removeEventListener(type, onEvent, { capture: true });
     view?.removeEventListener("keydown", onKey);
     view?.removeEventListener("keyup", onKey);
