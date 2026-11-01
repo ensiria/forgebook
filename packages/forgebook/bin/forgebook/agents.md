@@ -50,6 +50,8 @@ in JSON with `--json`, and every answer carries the links that open a story for 
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, errors, a failed play |
+| `npx forgebook changed --json` | The stories your change touches, through what they import |
+| `npx forgebook verify --json` | The checks on all of them, with one exit code: run it before you say a change is done |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`) |
 

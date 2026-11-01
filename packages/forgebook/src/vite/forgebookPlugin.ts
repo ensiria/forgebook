@@ -24,7 +24,7 @@ import { dirname, join, resolve } from "node:path";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 import ts from "typescript-6";
-import type { Plugin, UserConfig, ViteDevServer } from "vite";
+import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
@@ -61,6 +61,7 @@ import {
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { componentImport } from "./storyMeta.ts";
+import { storyReach } from "./storyReach.ts";
 import { joinedUsage } from "./usageModule.ts";
 
 /**
@@ -287,7 +288,8 @@ const virtualId = (source: string): string | undefined => {
 const usageModule = async (
   id: string,
   watch: (file: string) => void,
-  usage: DocsExtractor["usage"]
+  usage: DocsExtractor["usage"],
+  isServing: boolean
 ): Promise<{ code: string; moduleType: "js" }> => {
   const { root, pattern } = storyFilesGroupOf(id.slice(USAGE_ID_PREFIX.length));
   const files = indexedStoryFiles(root, pattern, watch);
@@ -308,7 +310,16 @@ const usageModule = async (
             related: file.index.related ?? []
           }))
         );
-  return { code: `export default ${JSON.stringify(answer)};`, moduleType: "js" };
+  // on the dev server only: a static build has no tools to ask, and this would ship every story's files to the reader
+  const reach =
+    isServing && typeof graph !== "string"
+      ? storyReach(
+          graph,
+          files.map((file) => ({ storyFile: file.file, title: file.index.title }))
+        )
+      : [];
+  const code = `export default ${JSON.stringify(answer)};\nexport const reach = ${JSON.stringify(reach)};`;
+  return { code, moduleType: "js" };
 };
 
 /** The resolved id of the configuration's data module. */
@@ -381,6 +392,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
   let config = options.config;
+  /** Whether a dev server runs, or a build: tools ask only the former. */
+  let command: ConfigEnv["command"] = "serve";
+  const isServing = (): boolean => command === "serve";
   // the docs are read in a worker, made once the framework is known: a package's TypeScript program takes seconds to
   // build and would hold every other answer of the dev server meanwhile
   let docs: DocsExtractor | undefined;
@@ -419,7 +433,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
-      return usageModule(id, watch, extractor().usage);
+      return usageModule(id, watch, extractor().usage, isServing());
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
@@ -460,7 +474,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   return {
     name: "forgebook",
     enforce: "pre",
-    config: async (userConfig: UserConfig): Promise<UserConfig> => {
+    config: async (userConfig: UserConfig, environment: ConfigEnv): Promise<UserConfig> => {
+      command = environment.command;
       if (config === undefined && options.framework === undefined) {
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);

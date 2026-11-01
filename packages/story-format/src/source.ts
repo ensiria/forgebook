@@ -139,6 +139,8 @@ export type StoryFiles = {
    * cannot be read). None when the catalogue turned it off, or for files indexed before it existed.
    */
   readonly usage?: () => Promise<unknown>;
+  /** Each of the group's stories with the files it reaches, for tools on the dev server; none in a static build. */
+  readonly reach?: () => Promise<unknown>;
 };
 
 /**

@@ -10,8 +10,11 @@
  *
  * @module
  */
+import { execFile } from "node:child_process";
+import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { promisify } from "node:util";
 
 import type { StorySource } from "@forgebook/story-format/source";
 import type { ViteDevServer } from "vite";
@@ -19,12 +22,19 @@ import type { ViteDevServer } from "vite";
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
+import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
-import type { ErrorsDocument } from "./agent.types.ts";
-import { type CataloguePages, type LoadedStoryParts, storiesDocument, storyDocument } from "./agentApi.ts";
+import type { AgentChangedStory, ChangedStoriesDocument, ErrorsDocument } from "./agent.types.ts";
+import {
+  type CataloguePages,
+  type LoadedStoryParts,
+  storiesDocument,
+  storyDocument,
+  storyLinks
+} from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
+import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
 /** The path the answers live under. */
 export const AGENT_API = "/__forgebook/api/";
@@ -101,6 +111,9 @@ export const ROOT_HEADER = "forgebook-root";
  */
 export const rootHeaderValue = (dir: string): string => encodeURIComponent(dir);
 
+/** Runs a program, for git. */
+const run = promisify(execFile);
+
 /** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
 type RouteContext = {
   /** The sources and the preview, as the dev server loaded them. */
@@ -173,6 +186,61 @@ const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   return { status: 200, body: storyDocument(location, parts, pages, view, usage) };
 };
 
+/** The files git says changed since a commit, tracked or new, absolute, and relative to the repository. */
+const changedFiles = async (
+  dir: string,
+  since: string
+): Promise<{ readonly root: string; readonly files: readonly string[] }> => {
+  const git = async (...args: readonly string[]): Promise<string> =>
+    (await run("git", [...args], { cwd: dir })).stdout.trim();
+  const root = await git("rev-parse", "--show-toplevel");
+  const tracked = await git("diff", "--name-only", since);
+  const untracked = await git("ls-files", "--others", "--exclude-standard", "--full-name");
+  const files = [...tracked.split("\n"), ...untracked.split("\n")].filter((file) => file !== "");
+  return { root, files: [...new Set(files)] };
+};
+
+/** Whether a value is a list of stories with what they reach. */
+const isReach = (value: unknown): value is readonly ReachedStory[] => Array.isArray(value);
+
+/**
+ * The stories a change touches, read from the files git names and the import graph "Used in" reads.
+ *
+ * @param context - what the routes read.
+ */
+const changedAnswer = async ({
+  config,
+  loaded,
+  tree,
+  params,
+  pages,
+  view
+}: RouteContext): Promise<AgentAnswer> => {
+  const since = params.get("since") || "HEAD";
+  const { root, files } = await changedFiles(config.dir, since);
+  const reaches = await Promise.all(
+    loaded.sources.flatMap((source) =>
+      source.files.map(async (group) => {
+        const reach = await group.reach?.();
+        return { source: source.id, reach: isReach(reach) ? reach : [] };
+      })
+    )
+  );
+  // git names real paths and the graph the catalogue's own, which differ in a folder reached through a link
+  const realDir = await realpath(config.dir);
+  const changed = files.map((file) => join(config.dir, relative(realDir, join(root, file))));
+  const stories = reaches.flatMap(({ source, reach }) =>
+    affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
+      const id = `${componentId(source, story.title)}--${kebab(story.exportName)}`;
+      return findStory(tree, id) === undefined
+        ? []
+        : [{ id, title: story.title, links: storyLinks(pages, id, view) }];
+    })
+  );
+  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems: [] };
+  return { status: 200, body };
+};
+
 /**
  * Answers one of the API's paths.
  *
@@ -206,6 +274,7 @@ export const agentAnswer = async (
     if (route === "errors") return errorsAnswer(context, live);
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
+    if (route === "changed") return await changedAnswer(context);
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };

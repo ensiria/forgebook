@@ -117,6 +117,30 @@ export type StoryDocument = {
   readonly problems: readonly string[];
 };
 
+/** A story a change touches. */
+export type AgentChangedStory = {
+  /** Its id. */
+  readonly id: string;
+  /** Its component's title. */
+  readonly title: string;
+  /** The links that open it. */
+  readonly links: StoryLinks;
+};
+
+/** The stories a change touches. */
+export type ChangedStoriesDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** What the change is measured from. */
+  readonly since: string;
+  /** The files changed, relative to the repository. */
+  readonly files: readonly string[];
+  /** The stories that reach them. */
+  readonly stories: readonly AgentChangedStory[];
+  /** What could not be read: a group whose usage failed. */
+  readonly problems: readonly string[];
+};
+
 /** What the open frames reported while someone edited, and the story index's problems. */
 export type ErrorsDocument = {
   /** The shape's version. */
