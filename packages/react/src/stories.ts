@@ -66,6 +66,28 @@ export type Story<TComponent extends AnyComponent = NoComponent> = CsfStory<
   WrittenArgsOf<TComponent>
 >;
 
+/** Any hook or function a story about logic documents; its parameter is `never` so any signature is assignable. */
+export type AnyFunction = (...parameters: never[]) => unknown;
+
+/**
+ * The default export of a story file about logic (`parameters: { logic: true }`), written
+ * `satisfies LogicMeta<typeof useUndo>`. Its component is the hook or the function, whose signature the catalogue
+ * documents; the stories draw a scene that uses it (`render`), so they take no args.
+ */
+export type LogicMeta<TFunction extends AnyFunction> = CsfMeta<
+  ReactRenderer,
+  TFunction,
+  Readonly<Record<string, never>>,
+  Readonly<Record<string, never>>
+>;
+
+/** A story about logic: a `render` that draws a scene using the hook, and a `play` that tries it. */
+export type LogicStory = CsfStory<
+  ReactRenderer,
+  Readonly<Record<string, never>>,
+  Readonly<Record<string, never>>
+>;
+
 /** Wraps a React story: a provider, a container of a given width. */
 export type Decorator<TArgs> = CsfDecorator<ReactRenderer, TArgs>;
 

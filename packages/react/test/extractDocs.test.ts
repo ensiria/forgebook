@@ -19,6 +19,22 @@ import { KIT_DIR } from "./fixturePaths.ts";
 /** The fixture package's components, a workspace package of the core's tests. */
 const KIT = join(KIT_DIR, "src");
 
+describe("a hook's signature", () => {
+  it("reads each parameter with its type, its @param text and whether it is optional, and the return value", () => {
+    const docs = extractComponentDocs(join(KIT, "useUndo.stories.tsx"));
+    if (typeof docs === "string" || docs.name === null) throw new Error(String(docs));
+    expect(docs.name).toBe("useUndo");
+    expect(docs.signature).toEqual({
+      parameters: [
+        { name: "initial", type: "TValue", description: "the first value.", isOptional: false },
+        { name: "limit", type: "number", description: "how many values back it keeps.", isOptional: true }
+      ],
+      returns: "UndoState<TValue>",
+      returnsDescription: "the value now, and how to set, undo and redo it."
+    });
+  });
+});
+
 describe("extractComponentDocs", () => {
   const docs = extractComponentDocs(join(KIT, "Select.stories.tsx"));
 
