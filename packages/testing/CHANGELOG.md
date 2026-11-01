@@ -1,3 +1,18 @@
+## 0.1.7 (2026-11-01)
+
+### 🩹 Fixes
+
+- **forgebook:** key story files relative to their module again ([5ebc170](https://github.com/ensiria/forgebook/commit/5ebc170))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.4
+- Updated forgebook to 0.1.6
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.6 (2026-10-31)
 
 ### 🚀 Features

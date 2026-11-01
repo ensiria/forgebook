@@ -1,3 +1,28 @@
+## 0.1.6 (2026-11-01)
+
+### 🚀 Features
+
+- **forgebook:** touch stories with their own Touch toggle ([e363a2e](https://github.com/ensiria/forgebook/commit/e363a2e))
+- **forgebook:** show Used in only when another component uses it ([4a248c6](https://github.com/ensiria/forgebook/commit/4a248c6))
+
+### 🩹 Fixes
+
+- **forgebook:** the shell's direction, keys, views and spills ([76c9884](https://github.com/ensiria/forgebook/commit/76c9884))
+- **forgebook:** the agent commands, init and Used in, from the self-review ([23c3765](https://github.com/ensiria/forgebook/commit/23c3765))
+- **forgebook:** key story files relative to their module again ([5ebc170](https://github.com/ensiria/forgebook/commit/5ebc170))
+- **forgebook:** the touch CSS rewrite's nested and negated rules ([ae6256b](https://github.com/ensiria/forgebook/commit/ae6256b))
+- **forgebook:** the touch layer's lift, keyboard, stop and scroll ([92f22c2](https://github.com/ensiria/forgebook/commit/92f22c2))
+- **forgebook:** keep Shift's second finger mirrored, without a jump ([17d5b1c](https://github.com/ensiria/forgebook/commit/17d5b1c))
+- **forgebook:** renew the story files in a catalogue that watches no folder ([8b5cd9a](https://github.com/ensiria/forgebook/commit/8b5cd9a))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.4
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.5 (2026-10-31)
 
 ### 🚀 Features

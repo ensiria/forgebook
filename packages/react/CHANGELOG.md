@@ -1,3 +1,18 @@
+## 0.1.6 (2026-11-01)
+
+### 🩹 Fixes
+
+- **react:** write a list arg as an array literal in a story's code ([32e82d6](https://github.com/ensiria/forgebook/commit/32e82d6))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.1.4
+- Updated forgebook to 0.1.6
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.5 (2026-10-31)
 
 ### 🧱 Updated Dependencies

@@ -1,3 +1,13 @@
+## 0.1.4 (2026-11-01)
+
+### 🚀 Features
+
+- **forgebook:** touch stories with their own Touch toggle ([e363a2e](https://github.com/ensiria/forgebook/commit/e363a2e))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.3 (2026-10-31)
 
 ### 🚀 Features
