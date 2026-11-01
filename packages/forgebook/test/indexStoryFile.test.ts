@@ -248,6 +248,18 @@ describe("indexStoryFile", () => {
     });
   });
 
+  it("reads a story about logic from the meta and the story, written plainly", () => {
+    const text = `export default { title: "Hooks/useUndo", parameters: { logic: true } };
+      export const History = {};
+      export const Looks = { parameters: { logic: false } };
+      export const Some = { parameters: { logic: IS_LOGIC } };`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "Hooks/useUndo",
+      isLogic: true,
+      stories: [{ exportName: "History" }, { exportName: "Looks", isLogic: false }, { exportName: "Some" }]
+    });
+  });
+
   it("refuses controls written plainly but wrongly, and leaves controls written by code to the frame", () => {
     const wrong = `export default { title: "A/B" };
       export const X = { parameters: { controls: true } };`;

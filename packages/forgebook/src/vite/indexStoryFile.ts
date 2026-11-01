@@ -9,7 +9,7 @@
  * `A.parameters`), named exports and re-exports (`export { A as B }`), `includeStories`, `excludeStories`,
  * `__namedExportsOrder`, the meta's and the stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
  *
- * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, `touch`, the meta's `alsoIn`,
+ * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, `touch`, `logic`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
  * the story loads. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
  * written by code is also noted, since the author meant another. A value written plainly but wrongly
@@ -135,13 +135,14 @@ const groupOf = (fields: Fields): StoryGroup | undefined | Error => {
 };
 
 /**
- * `parameters.touch`: `true` or `false` when written as one, `undefined` otherwise.
+ * A boolean parameter (`touch`, `logic`): `true` or `false` when written as one, `undefined` otherwise.
  *
  * @param fields - the story's or the meta's fields.
+ * @param name - the parameter's name.
  */
-const touchOf = (fields: Fields): boolean | undefined => {
-  const touch = parameter(fields, "touch");
-  return touch?.type === "Literal" && typeof touch.value === "boolean" ? touch.value : undefined;
+const booleanParameter = (fields: Fields, name: string): boolean | undefined => {
+  const value = parameter(fields, name);
+  return value?.type === "Literal" && typeof value.value === "boolean" ? value.value : undefined;
 };
 
 /** `parameters.height`: `undefined` when none or written by code, the height in CSS px, or a problem when wrong. */
@@ -222,7 +223,7 @@ const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readon
 /** What the index reads of one story besides its export. */
 type StoryFields = Pick<
   StoryIndexEntry,
-  "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "tags"
+  "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "isLogic" | "tags"
 >;
 
 /**
@@ -244,7 +245,8 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   if (ownTags instanceof Error) return ownTags;
   const tags = combinedTags([metaTags, ownTags]);
   const main = parameter(fields, "main");
-  const touch = touchOf(fields);
+  const touch = booleanParameter(fields, "touch");
+  const logic = booleanParameter(fields, "logic");
   return {
     ...(name === undefined ? {} : { name }),
     ...(controls === undefined ? {} : { controls }),
@@ -252,6 +254,7 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
     ...(height === undefined ? {} : { height }),
     ...(main?.type === "Literal" && main.value === true ? { isMain: true } : {}),
     ...(touch === undefined ? {} : { isTouch: touch }),
+    ...(logic === undefined ? {} : { isLogic: logic }),
     ...(tags.length > 0 ? { tags } : {})
   };
 };
@@ -515,11 +518,13 @@ const metaFieldsOf = (meta: Fields): MetaFields | Error => {
   const lists = metaListsOf(meta);
   if (lists instanceof Error) return lists;
   const description = docsDescription(meta, "component");
-  const touch = touchOf(meta);
+  const touch = booleanParameter(meta, "touch");
+  const logic = booleanParameter(meta, "logic");
   return {
     ...(controls === undefined ? {} : { controls }),
     ...(height === undefined ? {} : { height }),
     ...(touch === undefined ? {} : { isTouch: touch }),
+    ...(logic === undefined ? {} : { isLogic: logic }),
     ...lists,
     ...(description === undefined ? {} : { description })
   };
