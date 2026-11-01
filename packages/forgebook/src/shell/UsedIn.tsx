@@ -3,9 +3,10 @@
  * with the stories that use it, direct users first; a reader folds it away and their browser keeps that.
  *
  * @remarks
- * The usage is loaded only while the block is open, so a reader who keeps it shut never makes the catalogue read its
- * import graph. Twelve components show at first, then "and N more" shows the rest. A component used only through
- * another (Tree renders Row, Row renders it) says so.
+ * The block shows only when another component's stories use the component: an empty "Used in" says nothing, so the
+ * usage is loaded with the page (once per source, then kept) and the block waits until it is known. Twelve components
+ * show at first, then "and N more" shows the rest. A component used only through another (Tree renders Row, Row
+ * renders it) says so.
  *
  * @module
  */
@@ -107,7 +108,6 @@ const UserList = ({
   readonly users: readonly ShownUser[];
 }): ReactNode => {
   const [isAll, setIsAll] = useState(false);
-  if (users.length === 0) return <p className="forgebook-used-in__note">{STRINGS.usedInNone}</p>;
   const shown = isAll ? users : users.slice(0, USED_IN_SHOWN);
   return (
     <>
@@ -167,10 +167,14 @@ export const UsedIn = ({ title, load, componentOf, ...links }: UsedInProps): Rea
     (stored: string | null): boolean => stored !== "closed",
     (open: boolean): string => (open ? "open" : "closed")
   );
-  const usage = useLoaded(isOpen ? load : undefined, usageState);
+  // read even while folded: a component no other story uses gets no block at all, and the block waits until that is
+  // known, so it never shows to go away again
+  const usage = useLoaded(load, usageState);
   const fold = useFold(isOpen, false);
   const headingId = useId();
   const bodyId = useId();
+  const users = usage.status === "ready" ? shownUsers(usage.value[title] ?? [], componentOf) : [];
+  if (usage.status === "loading" || (usage.status === "ready" && users.length === 0)) return null;
   return (
     <section className="forgebook-doc__section forgebook-used-in" aria-labelledby={headingId}>
       <h2 id={headingId} className="forgebook-used-in__heading">
@@ -190,13 +194,8 @@ export const UsedIn = ({ title, load, componentOf, ...links }: UsedInProps): Rea
       <div ref={fold.ref} id={bodyId} className="forgebook-used-in__body">
         {fold.isDrawn ? (
           <>
-            {usage.status === "loading" ? (
-              <p className="forgebook-used-in__note">{STRINGS.usedInLoading}</p>
-            ) : null}
             {usage.status === "error" ? <p className="forgebook-used-in__note">{usage.message}</p> : null}
-            {usage.status === "ready" ? (
-              <UserList users={shownUsers(usage.value[title] ?? [], componentOf)} {...links} />
-            ) : null}
+            {usage.status === "ready" ? <UserList users={users} {...links} /> : null}
           </>
         ) : null}
       </div>

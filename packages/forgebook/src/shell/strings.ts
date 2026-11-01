@@ -154,8 +154,6 @@ const shellStrings = {
   hideCode: "Hide code",
   openStory: "Open the story",
   usedIn: "Used in",
-  usedInLoading: "Looking for the stories that use it…",
-  usedInNone: "No other component's stories use it.",
   usedInThrough: "through another component",
   usedInMore: (count: number): string => `and ${count} more`,
   usedInStories: (count: number): string => (count === 1 ? "1 story" : `${count} stories`),

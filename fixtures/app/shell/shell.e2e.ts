@@ -733,6 +733,11 @@ test.describe("the component's page", () => {
     await expect(
       page.getByRole("region", { name: "Used in" }).getByRole("link", { name: "Form", exact: true })
     ).toBeVisible();
+    // a component no other component's stories use gets no block: there is nothing to say
+    await page.goto("/?component=kit:interaction-touch-pad");
+    await expect(page.getByRole("heading", { name: "API reference" })).toBeVisible();
+    await page.waitForTimeout(1500);
+    await expect(page.getByRole("region", { name: "Used in" })).toHaveCount(0);
   });
 
   test("every example opens its story from its bar, not only the demo", async ({ page }) => {
