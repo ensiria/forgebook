@@ -34,6 +34,7 @@ await defineScript({
   summary:
     "Measure Forgebook as installed: start, HMR, pages, memory, build and install, on a generated library.",
   icon: "check",
+  json: true,
   options: {
     compare: { type: "boolean", description: "Also measure Storybook and Ladle on the same library." },
     components: { type: "number", default: 100, description: "Components of the generated library." },
@@ -103,6 +104,7 @@ await defineScript({
         log.info(`${step.tool} · ${step.metric} · ${step.run}/${step.runs}`);
       }
     });
+    write({ state: "finished", warnings: report.warnings.length });
     writeFileSync(join(work, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
     for (const warning of report.warnings) log.warn(`not a quiet machine: ${warning}`);
     if (!isJson) {

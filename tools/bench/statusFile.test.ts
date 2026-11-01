@@ -30,6 +30,12 @@ describe("statusWriter", () => {
     });
   });
 
+  it("ends with a line that says the run is over, so a reader does not wait for a next step", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "bench-status-")), "status.jsonl");
+    statusWriter(file, (): number => 2000)({ state: "finished", warnings: 1 });
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ at: 2000, state: "finished", warnings: 1 });
+  });
+
   it("writes nothing without a file", () => {
     expect(() =>
       statusWriter(

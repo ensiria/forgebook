@@ -28,6 +28,14 @@ export type RunStep = {
   readonly total: number;
 };
 
+/** The last line of a run. */
+export type RunEnd = {
+  /** That the run is over, whatever came of it. */
+  readonly state: "finished";
+  /** How many warnings about the machine it ended with. */
+  readonly warnings: number;
+};
+
 /**
  * A writer of steps.
  *
@@ -36,7 +44,7 @@ export type RunStep = {
  */
 export const statusWriter =
   (file: string | undefined, now: () => number) =>
-  (step: RunStep): void => {
+  (step: RunStep | RunEnd): void => {
     if (file === undefined) return;
     appendFileSync(file, `${JSON.stringify({ at: now(), ...step })}\n`);
   };
