@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/ensiria/forgebook/main/assets/forgebook-logo.svg" alt="" width="64" height="64">
+<a href="https://forgebook.dev"><img src="https://forgebook.dev/logo.svg" alt="Forgebook" width="64" height="64"></a>
 
 # Forgebook
 
