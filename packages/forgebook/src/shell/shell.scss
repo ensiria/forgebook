@@ -372,6 +372,41 @@
     color: $text-tertiary;
   }
 
+  // a hook's or a function's entry: its stories are about logic
+  .forgebook-tree__logic {
+    display: inline-flex;
+    color: $text-tertiary;
+  }
+
+  // beside the title, the picker still at the row's end
+  .forgebook-logic-mark {
+    display: inline-flex;
+    margin-inline-end: auto;
+    align-items: center;
+    gap: $space-1;
+    padding: 0 $space-1-5;
+    border-radius: 999px;
+    box-shadow: $ring;
+    font: $text-caption;
+    font-weight: 500;
+    color: $text-secondary;
+  }
+
+  .forgebook-signature-tab {
+    padding: $space-3 $space-3-5;
+  }
+
+  .forgebook-signature__call {
+    margin: 0 0 $space-3;
+    font: $text-mono;
+    white-space: pre-wrap;
+  }
+
+  .forgebook-signature__returns {
+    margin: $space-4 0 $space-1;
+    font: $text-label;
+  }
+
   .forgebook-tree__count {
     font: $text-caption;
     font-variant-numeric: tabular-nums;

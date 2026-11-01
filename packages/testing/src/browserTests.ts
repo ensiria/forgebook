@@ -11,11 +11,13 @@
  * `check`. The variants include a
  * narrow frame, as wide as the catalogue's stage beside the props panel. With `screenshot` it compares the frame with its reference image instead,
  * for the visual tests, which run in the Playwright container so fonts and rendering are the same everywhere.
+ * A story about logic (`parameters.logic`) is tested once, in the default view, without the layout checks, and never
+ * pictured (`storyTestPlan.ts`).
  *
  * @module
  */
 import { expect, type Page, test } from "@playwright/test";
-import { type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
+import { type A11ySettings, type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryProblem } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
@@ -26,6 +28,7 @@ import { defaultView, frameAddress, type ViewState } from "forgebook/view-state"
 import { isOverlayChecked } from "./overlays.ts";
 import { axeProblems, overlayProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
 import { indexedSource, type StoryFilesOptions } from "./storyFiles.ts";
+import { type PlannedStoryTest, plannedStoryTests } from "./storyTestPlan.ts";
 
 /** One way of showing every story. */
 export type StoryVariant = {
@@ -97,6 +100,34 @@ export type StoryBrowserTestsOptions = StoryFilesOptions & {
   readonly check?: (page: Page) => Promise<void>;
 };
 
+/** A problem list's messages, so a failing test names each problem. */
+const messages = (problems: readonly StoryProblem[]): string[] => problems.map((problem) => problem.message);
+
+/**
+ * Runs the checks of one planned test on a shown story: axe, then for a story about its looks the spills, the
+ * source's own check, and the overlays last (it resizes the window, which may close what the story left open). A story
+ * about logic gets axe only.
+ *
+ * @param page - the story's frame, ready.
+ * @param planned - the story, its variant and whether its layout is checked.
+ * @param a11y - the catalogue's accessibility rules.
+ * @param check - the source's own check, if any.
+ */
+const expectChecksPass = async (
+  page: Page,
+  planned: PlannedStoryTest,
+  a11y: A11ySettings,
+  check: ((page: Page) => Promise<void>) | undefined
+): Promise<void> => {
+  expect(messages(await axeProblems(page, a11y))).toEqual([]);
+  if (!planned.hasLookChecks) return;
+  expect(messages(await spillProblems(page))).toEqual([]);
+  await check?.(page);
+  expect(
+    messages(await overlayProblems(page, isOverlayChecked(planned.variant.view), planned.story.height))
+  ).toEqual([]);
+};
+
 /**
  * Declares the tests, one `describe` per component and one test per story and variant.
  *
@@ -111,42 +142,38 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
   const tree = storyTree([indexedSource(options)]);
   const groups = Map.groupBy(testedStoryLocations(tree), (location) => location.component.title);
   for (const [title, locations] of groups) {
+    const planned = plannedStoryTests(
+      locations.map((location) => location.story),
+      variants,
+      screenshot
+    );
+    // a component whose stories are all about logic has nothing to picture
+    if (planned.length === 0) continue;
     test.describe(title, () => {
-      for (const { story } of locations) {
-        for (const variant of variants) {
-          test(`${story.name} · ${variant.name}`, async ({ page }) => {
-            const errors = watchedErrors(page);
-            if (variant.width !== undefined)
-              await page.setViewportSize({ width: variant.width, height: 800 });
-            // a Live story is checked and pictured at its start: its clock held, so its image never changes;
-            // always on its page's own colour, whatever a variant names: a backdrop is for looking
-            const view: ViewState = {
-              ...defaults,
-              ...variant.view,
-              switches: { ...defaults.switches, ...variant.view.switches },
-              backdrop: "plain"
-            };
-            await page.goto(heldClockAddress(frameAddress(frameUrl, story.id, view, switches)));
-            await expect(page.locator("html")).toHaveAttribute(STATUS_ATTRIBUTE, "ready");
-            if (screenshot) {
-              await expect(page).toHaveScreenshot(`${story.id.replace(":", "--")}--${variant.name}.png`, {
-                fullPage: true,
-                animations: "disabled"
-              });
-              return;
-            }
-            const messages = (problems: readonly StoryProblem[]): string[] =>
-              problems.map((problem) => problem.message);
-            expect(messages(await axeProblems(page, catalogue.a11y))).toEqual([]);
-            expect(messages(await spillProblems(page))).toEqual([]);
-            await check?.(page);
-            // last: it resizes the window, which may close what the story left open
-            expect(
-              messages(await overlayProblems(page, isOverlayChecked(variant.view), story.height))
-            ).toEqual([]);
-            expect(errors).toEqual([]);
-          });
-        }
+      for (const { story, variant, hasLookChecks } of planned) {
+        test(`${story.name} · ${variant.name}`, async ({ page }) => {
+          const errors = watchedErrors(page);
+          if (variant.width !== undefined) await page.setViewportSize({ width: variant.width, height: 800 });
+          // a Live story is checked and pictured at its start: its clock held, so its image never changes;
+          // always on its page's own colour, whatever a variant names: a backdrop is for looking
+          const view: ViewState = {
+            ...defaults,
+            ...variant.view,
+            switches: { ...defaults.switches, ...variant.view.switches },
+            backdrop: "plain"
+          };
+          await page.goto(heldClockAddress(frameAddress(frameUrl, story.id, view, switches)));
+          await expect(page.locator("html")).toHaveAttribute(STATUS_ATTRIBUTE, "ready");
+          if (screenshot) {
+            await expect(page).toHaveScreenshot(`${story.id.replace(":", "--")}--${variant.name}.png`, {
+              fullPage: true,
+              animations: "disabled"
+            });
+            return;
+          }
+          await expectChecksPass(page, { story, variant, hasLookChecks }, catalogue.a11y, check);
+          expect(errors).toEqual([]);
+        });
       }
     });
   }

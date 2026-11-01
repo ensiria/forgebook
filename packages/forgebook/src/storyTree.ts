@@ -39,6 +39,8 @@ export type TreeStory = {
   readonly isMain: boolean;
   /** Whether it is meant for a phone (`parameters.touch`, its own or the meta's): it starts in touch. */
   readonly isTouch: boolean;
+  /** Whether it is about logic, not looks (`parameters.logic`, its own or the meta's): a hook's or a function's scene. */
+  readonly isLogic: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
@@ -354,6 +356,7 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       description: story.description,
       isMain: story.isMain === true,
       isTouch: story.isTouch ?? entry.isTouch ?? false,
+      isLogic: story.isLogic ?? entry.isLogic ?? false,
       height: story.height ?? entry.height,
       tags: story.tags ?? []
     }));
@@ -405,6 +408,16 @@ export const storyTree = (sources: readonly StorySource[]): StoryTree => {
   }));
   return { sources: tree.filter((source) => source.families.length > 0), problems };
 };
+
+/**
+ * Whether a component is about logic: it lists a story, and every story of its file is (`parameters.logic`), the
+ * unlisted ones too, so its page documents a hook's or a function's signature and the sidebar marks it.
+ *
+ * @param component - the component.
+ */
+export const isLogicComponent = (component: Pick<TreeComponent, "stories" | "unlisted">): boolean =>
+  component.stories.length > 0 &&
+  [...component.stories, ...component.unlisted].every((story) => story.isLogic);
 
 /** Where a story sits: its source, family, group and component. */
 export type StoryLocation = {

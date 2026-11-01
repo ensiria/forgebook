@@ -31,6 +31,7 @@ const DOCUMENT: StoriesDocument = {
           description: undefined,
           tags: [],
           isUnlisted: true,
+          isLogic: false,
           links: {
             address: "http://localhost:5173/?story=x",
             frame: "http://localhost:5173/frame.html?story=x"

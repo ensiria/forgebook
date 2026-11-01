@@ -1,6 +1,7 @@
 /**
  * The tabs a story's panel shows: Props, Events and Parts and styling from its component's docs, Code from its file,
- * Accessibility always; a tab the story has nothing for is left out.
+ * Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
+ * and shows no tab of args (`logicTabs`).
  *
  * @module
  */
@@ -20,6 +21,7 @@ import { EventsTab } from "./EventsTab.tsx";
 import { InteractionsTab, interactionsHint } from "./InteractionsTab.tsx";
 import { PartsTab, styleHooks } from "./PartsTab.tsx";
 import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
+import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
@@ -33,6 +35,8 @@ export type DockTabsInput = {
   readonly code: Loaded<StoryFileCode>;
   /** The story's export name. */
   readonly exportName: string;
+  /** Whether the story is about logic: its hook's signature comes first. */
+  readonly isLogic: boolean;
   /** The component's name from the sidebar, for the JSX when the docs have none. */
   readonly componentName: string;
   /** The props the story lets the panel set. */
@@ -151,20 +155,17 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
       ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)])
     ];
   }
-  if (docs.status === "loading") {
-    return [{ id: "props", label: STRINGS.tabs.props, content: notice(STRINGS.docsLoading, false) }];
-  }
+  // the docs' place while they load or fail: the tab the story opens on once they are read
+  const docsTab: Pick<DockTab, "id" | "label"> = input.isLogic
+    ? { id: "signature", label: STRINGS.tabs.signature }
+    : { id: "props", label: STRINGS.tabs.props };
+  if (docs.status === "loading") return [{ ...docsTab, content: notice(STRINGS.docsLoading, false) }];
   if (docs.status === "error") {
-    return [
-      {
-        id: "props",
-        label: STRINGS.tabs.props,
-        content: notice(`${STRINGS.docsError}: ${docs.message}`, true)
-      }
-    ];
+    return [{ ...docsTab, content: notice(`${STRINGS.docsError}: ${docs.message}`, true) }];
   }
   const component = docs.value;
   const events = eventsOf(component.props, input.actions);
+  if (input.isLogic) return logicTabs(input, component);
   const tabs: DockTab[] = [];
   tabs.push(...propsTab(input, panelProps(component.props, input.argTypes)));
   tabs.push(...eventsTab(input, events));
@@ -177,6 +178,31 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
       content: <PartsTab docs={component} />
     });
   }
+  return tabs;
+};
+
+/**
+ * The tabs of a story about logic: its hook's signature, then its play's trace. Its scene takes no args, so the tabs
+ * that set or list them (Props, Events) and the component's parts are left out, even when the hook's options look like
+ * props.
+ *
+ * @param input - what the tabs are built from.
+ * @param component - the hook's docs.
+ */
+const logicTabs = (input: DockTabsInput, component: ComponentDocs): DockTab[] => {
+  const tabs: DockTab[] = [];
+  if (component.signature !== undefined) {
+    tabs.push({
+      id: "signature",
+      label: STRINGS.tabs.signature,
+      content: (
+        <div className="forgebook-signature-tab">
+          <SignatureReference name={component.name} signature={component.signature} />
+        </div>
+      )
+    });
+  }
+  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
   return tabs;
 };
 

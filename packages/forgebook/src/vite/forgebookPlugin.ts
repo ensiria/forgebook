@@ -35,6 +35,7 @@ import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } 
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { moduleSummaryOf } from "./docsProgram.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
+import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { highlightCode } from "./highlightCode.ts";
 import {
   AGENT_SOURCES_FILE,
@@ -511,6 +512,14 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       server.watcher.on("change", (file: string): void => renewOnChange(server, file));
       // the answers to tools and agents (`forgebook stories`, `forgebook mcp`), from the same sources as the pages
       if (config !== undefined) server.middlewares.use(agentMiddleware(server, config, live));
+      if (config?.heights !== undefined) {
+        const file = {
+          heights: config.heights,
+          base: server.config.base,
+          publicDir: server.config.publicDir
+        };
+        server.middlewares.use(missingHeightsMiddleware(file));
+      }
       server.ws.on(LIVE_ERROR_EVENT, (report: unknown): void => {
         if (isLiveErrorReport(report)) live.add(report, new Date());
       });

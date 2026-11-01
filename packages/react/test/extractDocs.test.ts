@@ -19,6 +19,112 @@ import { KIT_DIR } from "./fixturePaths.ts";
 /** The fixture package's components, a workspace package of the core's tests. */
 const KIT = join(KIT_DIR, "src");
 
+describe("a hook's signature", () => {
+  it("reads each parameter with its type, its @param text and whether it is optional, and the return value", () => {
+    const docs = extractComponentDocs(join(KIT, "useUndo.stories.tsx"));
+    if (typeof docs === "string" || docs.name === null) throw new Error(String(docs));
+    expect(docs.name).toBe("useUndo");
+    expect(docs.signature).toEqual({
+      typeParameters: ["TValue"],
+      parameters: [
+        {
+          name: "initial",
+          type: "TValue",
+          description: "the first value.",
+          isOptional: false,
+          isRest: false
+        },
+        {
+          name: "limit",
+          type: "number",
+          description: "how many values back it keeps.",
+          isOptional: true,
+          isRest: false
+        }
+      ],
+      returns: "UndoState<TValue>",
+      returnsDescription: "the value now, and how to set, undo and redo it."
+    });
+  });
+});
+
+describe("a signature's parameters, as the call writes them", () => {
+  it("names a destructured parameter by its pattern, marks a rest one, and lists the type parameters", () => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-signature-"));
+    writeFileSync(
+      join(dir, "useTotal.ts"),
+      [
+        "/** Options. */",
+        "export type Options = { readonly start: number };",
+        "/**",
+        " * Adds numbers.",
+        " *",
+        " * @param options - where it starts.",
+        " * @param values - the numbers.",
+        " * @returns the total.",
+        " */",
+        "export const useTotal = <TUnit extends string>({ start }: Options, ...values: number[]): TUnit | number =>",
+        "  values.reduce((total, value) => total + value, start);",
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      join(dir, "useTotal.stories.ts"),
+      'import { useTotal } from "./useTotal";\nexport default { title: "Hooks/useTotal", component: useTotal };\nexport const Shown = {};\n'
+    );
+    const docs = extractComponentDocs(join(dir, "useTotal.stories.ts"));
+    if (typeof docs === "string" || docs.name === null) throw new Error(String(docs));
+    expect(docs.signature).toEqual({
+      typeParameters: ["TUnit extends string"],
+      parameters: [
+        {
+          name: "{ start }",
+          type: "Options",
+          description: "where it starts.",
+          isOptional: false,
+          isRest: false
+        },
+        { name: "values", type: "number[]", description: "the numbers.", isOptional: false, isRest: true }
+      ],
+      returns: "TUnit | number",
+      returnsDescription: "the total."
+    });
+  });
+});
+
+describe("a hook typed through an alias", () => {
+  it("reads its @param and @returns texts from the comment on its declaration", () => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-alias-"));
+    writeFileSync(
+      join(dir, "useTyped.ts"),
+      [
+        "/** A hook's type. */",
+        "export type UseTyped = (count: number) => string;",
+        "/**",
+        " * Writes a count.",
+        " *",
+        " * @param count - how many.",
+        " * @returns the text.",
+        " */",
+        "export const useTyped: UseTyped = (count) => String(count);",
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      join(dir, "useTyped.stories.ts"),
+      'import { useTyped } from "./useTyped";\nexport default { title: "Hooks/useTyped", component: useTyped };\nexport const Shown = {};\n'
+    );
+    const docs = extractComponentDocs(join(dir, "useTyped.stories.ts"));
+    if (typeof docs === "string" || docs.name === null) throw new Error(String(docs));
+    expect(docs.signature?.parameters[0]).toMatchObject({
+      name: "count",
+      type: "number",
+      description: "how many."
+    });
+    expect(docs.signature?.returnsDescription).toBe("the text.");
+  });
+});
+
 describe("extractComponentDocs", () => {
   const docs = extractComponentDocs(join(KIT, "Select.stories.tsx"));
 

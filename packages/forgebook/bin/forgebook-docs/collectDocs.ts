@@ -50,6 +50,14 @@ const sourceExports = (manifest: unknown): Readonly<Record<string, string>> => {
   );
 };
 
+/**
+ * Whether every story of a file is about logic (`parameters.logic`, its own or the meta's): a hook's or a function's.
+ *
+ * @param index - the file's index.
+ */
+const isLogicFile = (index: StoryFileIndex): boolean =>
+  index.stories.length > 0 && index.stories.every((story) => (story.isLogic ?? index.isLogic) === true);
+
 /** The components of the package's story files, read by the framework's extractor. */
 const collectComponents = (
   packageDir: string,
@@ -87,7 +95,8 @@ const collectComponents = (
       subpath,
       docs: component.docs,
       stories: index.stories.map((story) => story.name ?? story.exportName),
-      mainStory: (index.stories.find((story) => story.isMain === true) ?? index.stories[0])?.exportName
+      mainStory: (index.stories.find((story) => story.isMain === true) ?? index.stories[0])?.exportName,
+      isLogic: isLogicFile(index)
     });
   }
   return { components, componentFiles };

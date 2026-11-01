@@ -6,7 +6,7 @@
  */
 import type { MouseEvent, ReactNode } from "react";
 
-import type { TreeAlias, TreeComponent, TreeGroup } from "../storyTree.ts";
+import { isLogicComponent, type TreeAlias, type TreeComponent, type TreeGroup } from "../storyTree.ts";
 import { Icon } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
 import { useFold } from "./useFold.ts";
@@ -172,6 +172,12 @@ const ComponentEntry = ({
         onOpen={(): void => links.onOpenComponent(sourceId, component.title)}
       >
         <span className="forgebook-tree__item-name">{component.name}</span>
+        {isLogicComponent(component) ? (
+          <span className="forgebook-tree__logic" title={STRINGS.logicHint}>
+            <Icon name="function" size={12} />
+            <span className="forgebook-visually-hidden">{STRINGS.logic}</span>
+          </span>
+        ) : null}
         <span className="forgebook-tree__count">{component.stories.length}</span>
       </PageLink>
     </div>

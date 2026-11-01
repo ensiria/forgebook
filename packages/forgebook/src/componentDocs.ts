@@ -30,6 +30,32 @@ export type EventSignature = {
   readonly returns: string;
 };
 
+/** One parameter of a hook's or a function's signature. */
+export type FunctionParameterDocs = {
+  /** The parameter's name; a destructured one's pattern as written (`{ start }`). */
+  readonly name: string;
+  /** Its type, as the source writes it. */
+  readonly type: string;
+  /** Its `@param` text; empty when it has none. */
+  readonly description: string;
+  /** Whether it may be left out (a `?` or a default). */
+  readonly isOptional: boolean;
+  /** Whether it takes the rest of the arguments (`...values`). */
+  readonly isRest: boolean;
+};
+
+/** A hook's or a function's signature: what a story about logic documents first. */
+export type FunctionSignatureDocs = {
+  /** Its type parameters as written (`TValue`, `TUnit extends string`); empty when it has none. */
+  readonly typeParameters: readonly string[];
+  /** The parameters, in order. */
+  readonly parameters: readonly FunctionParameterDocs[];
+  /** The return type, as the source writes it. */
+  readonly returns: string;
+  /** Its `@returns` text; empty when it has none. */
+  readonly returnsDescription: string;
+};
+
 /** One prop of a component. */
 export type PropDocs = {
   /** The prop's name. */
@@ -89,6 +115,11 @@ export type ComponentDocs = {
   readonly parts: readonly string[];
   /** The parts the meta names in `subcomponents`, in the order it writes them; empty when it names none. */
   readonly subcomponents: readonly SubcomponentDocs[];
+  /**
+   * Its call signature, when it has one: the parameters and the return value a story about logic shows first (the
+   * meta's `component` is then the hook or the function).
+   */
+  readonly signature?: FunctionSignatureDocs;
 };
 
 /** What the plugin answers for a story file whose meta names no component (a foundations page). */
@@ -126,6 +157,23 @@ const isSubcomponentDocs = (value: unknown): value is SubcomponentDocs =>
   Array.isArray(value["props"]) &&
   value["props"].every(isPropDocs);
 
+/** Whether a value is a signature's docs. */
+const isFunctionSignatureDocs = (value: unknown): value is FunctionSignatureDocs =>
+  isRecord(value) &&
+  typeof value["returns"] === "string" &&
+  typeof value["returnsDescription"] === "string" &&
+  isStringList(value["typeParameters"]) &&
+  Array.isArray(value["parameters"]) &&
+  value["parameters"].every(
+    (parameter: unknown) =>
+      isRecord(parameter) &&
+      typeof parameter["name"] === "string" &&
+      typeof parameter["type"] === "string" &&
+      typeof parameter["description"] === "string" &&
+      typeof parameter["isOptional"] === "boolean" &&
+      typeof parameter["isRest"] === "boolean"
+  );
+
 /**
  * Whether a value received from the plugin is a component's docs.
  *
@@ -140,4 +188,5 @@ export const isComponentDocs = (value: unknown): value is ComponentDocs =>
   value["props"].every(isPropDocs) &&
   isStringList(value["parts"]) &&
   Array.isArray(value["subcomponents"]) &&
-  value["subcomponents"].every(isSubcomponentDocs);
+  value["subcomponents"].every(isSubcomponentDocs) &&
+  (value["signature"] === undefined || isFunctionSignatureDocs(value["signature"]));
