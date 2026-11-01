@@ -17,7 +17,8 @@ export const DEFAULT_KEYS: Readonly<Record<string, string>> = {
   theme: "t",
   contrast: "c",
   lang: "l",
-  dir: "d"
+  dir: "d",
+  touch: "m"
 };
 
 /** The keys of the controls, by control id. */

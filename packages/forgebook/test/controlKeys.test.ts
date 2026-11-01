@@ -34,6 +34,16 @@ describe("catalogueKeys", () => {
     expect(catalogueKeys(IDS, { text: "1" })).toBe('The key of text: "1" is not one letter in lower case');
   });
 
+  it("gives the ready-made direction and touch switches their keys, as the README says", () => {
+    expect(catalogueKeys([...IDS, "lang", "dir", "touch"])).toEqual({
+      theme: "t",
+      contrast: "c",
+      lang: "l",
+      dir: "d",
+      touch: "m"
+    });
+  });
+
   it("gives the catalogue's keys first: a default steps aside for one, instead of clashing with it", () => {
     expect(catalogueKeys(IDS, { width: "t" })).toEqual({ width: "t", contrast: "c" });
   });
