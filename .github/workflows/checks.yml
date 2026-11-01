@@ -60,6 +60,11 @@ jobs:
           node tools/bench/bench.mts --markdown --work "$RUNNER_TEMP/bench" --budget tools/bench/budget.json
           --components 20 --stories 100 --runs 3 --metric install --metric start --metric build
           >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: budget-report
+          path: ${{ runner.temp }}/bench/report.json
 
   commits:
     runs-on: ubuntu-latest
