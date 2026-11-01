@@ -36,6 +36,8 @@ export type StoryCheckStory = {
   readonly id: string;
   /** Its `parameters.height`, in CSS px, when it declares one: an overlay inside it is not a problem. */
   readonly height?: number;
+  /** Whether it is about logic, not looks (`parameters.logic`): every variant then means its default view only. */
+  readonly isLogic?: boolean;
 };
 
 /** What a check is asked to do. */

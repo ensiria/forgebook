@@ -16,7 +16,13 @@ import { type ReactNode, useMemo, useRef, useState } from "react";
 import { groupLabel } from "../catalogue.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
 import type { PanelArgs, ShellMessage } from "../messages.ts";
-import { groupedStories, mainStory, type TreeComponent, type TreeStory } from "../storyTree.ts";
+import {
+  groupedStories,
+  isLogicComponent,
+  mainStory,
+  type TreeComponent,
+  type TreeStory
+} from "../storyTree.ts";
 import { liveView, type ViewState } from "../viewState.ts";
 import { ApiReference } from "./ApiReference.tsx";
 import { CodeText } from "./CodeText.tsx";
@@ -172,6 +178,7 @@ export const ComponentPage = ({
   useLiveView(pageRef, view, true, { touches, choice: catalogue.touch });
   useScrollMemory(pageRef, scroll);
   const componentDocs = docs.status === "ready" ? docs.value : undefined;
+  const isLogic = isLogicComponent(component);
   const context: ExampleContext = {
     component,
     view,
@@ -200,8 +207,9 @@ export const ComponentPage = ({
           <Lead page={page} docs={componentDocs} />
           {demo === undefined ? null : <Example {...context} story={demo} isDemo={true} isMounted={true} />}
           <Prose page={page} />
-          {componentDocs === undefined || componentDocs.props.length === 0 ? null : (
-            <ApiReference docs={componentDocs} />
+          {componentDocs === undefined ||
+          (componentDocs.props.length === 0 && !(isLogic && componentDocs.signature !== undefined)) ? null : (
+            <ApiReference docs={componentDocs} isLogic={isLogic} />
           )}
           {examples.length === 0 ? null : (
             <section className="forgebook-doc__section" aria-labelledby="forgebook-examples">

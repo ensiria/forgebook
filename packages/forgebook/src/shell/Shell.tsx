@@ -20,6 +20,7 @@ import {
   componentId,
   findComponent,
   findStory,
+  isLogicComponent,
   type StoryLocation,
   type StoryTree,
   sidebarStoryIds,
@@ -33,17 +34,19 @@ import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewPar
 import { ComponentPage } from "./ComponentPage.tsx";
 import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
 import { HomePage } from "./HomePage.tsx";
+import { LogicMark } from "./LogicMark.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
 import { StoryPicker } from "./StoryPicker.tsx";
-import { storyTouchesOf, storyViewChange, type TouchOverrides, touchedView } from "./storyTouch.ts";
+import type { TouchOverrides } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
 import type { UsedInProps } from "./UsedIn.tsx";
 import { useAppearance } from "./useAppearance.ts";
 import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
+import { useShownView } from "./useShownView.ts";
 import { useSidebarLayout } from "./useSidebarLayout.ts";
 import { useStoryHeights } from "./useStoryHeights.ts";
 import { useStoryIdsElement } from "./useStoryIdsElement.ts";
@@ -225,6 +228,16 @@ const recentPageOf = (shown: Shown): RecentPage | undefined => {
   return undefined;
 };
 
+/**
+ * Whether the shown page is about logic: a story about logic, or a component whose stories all are.
+ *
+ * @param shown - the shown page.
+ */
+const isLogicPage = (shown: Shown): boolean => {
+  if (shown.kind === "story") return shown.location.story.isLogic;
+  return shown.kind === "component" && isLogicComponent(shown.location.component);
+};
+
 /** What the sidebar marks: the shown component and story; none on the home or a missing page. */
 const sidebarCurrent = (
   location: ComponentLocation | undefined,
@@ -362,13 +375,16 @@ const ShellHeader = ({
   location,
   message,
   picker,
-  related
+  related,
+  isLogic
 }: {
   readonly problems: readonly string[];
   readonly location: ComponentLocation | undefined;
   readonly message: string | undefined;
   readonly picker: ReactNode;
   readonly related: ReactNode;
+  /** Whether the page is about logic (the story, or every story of the component): marked beside the title. */
+  readonly isLogic: boolean;
 }): ReactNode => (
   <>
     {problems.length > 0 ? (
@@ -403,6 +419,7 @@ const ShellHeader = ({
         </p>
         <div className="forgebook-header__row">
           <h1 className="forgebook-header__title">{location.component.name}</h1>
+          {isLogic ? <LogicMark /> : null}
           {picker}
         </div>
         {related}
@@ -518,28 +535,16 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
 
   const changeView = (view: ViewState): void => replaceAddress({ ...address, view });
   const shownStoryId = shown.kind === "story" ? shown.location.story.id : undefined;
-  // a story marked for a phone has its own Touch on its page: the toolbar and the stage show it and change it
-  // kept while nothing it is made of changes: a new switches' object would send the frame the view again
+  // a story marked for a phone has its own Touch on its page, and a story about logic is never compared
   const shownStory = shown.kind === "story" ? shown.location.story : undefined;
-  const shownView = useMemo(
-    () =>
-      touchedView(
-        address.view,
-        shownStory?.id,
-        storyTouchesOf(shownStory === undefined ? [] : [shownStory], touchOverrides),
-        catalogue.touch
-      ),
-    [address.view, shownStory, touchOverrides, catalogue.touch]
-  );
-  const changeShownView = (view: ViewState): void => {
-    if (shown.kind !== "story") {
-      changeView(view);
-      return;
-    }
-    const change = storyViewChange(view, address.view, shown.location.story, catalogue.touch);
-    if (change.isTouch !== undefined) setTouchOverride(shown.location.story.id, change.isTouch);
-    changeView(change.view);
-  };
+  const { view: shownView, onViewChange: changeShownView } = useShownView({
+    addressView: address.view,
+    story: shownStory,
+    touchOverrides,
+    onTouchChange: setTouchOverride,
+    touch: catalogue.touch,
+    onAddressViewChange: changeView
+  });
 
   useStoryKeys(
     tree,
@@ -554,6 +559,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
     <ShellHeader
       problems={tree.problems}
       location={location}
+      isLogic={isLogicPage(shown)}
       message={shown.kind === "missing" ? shown.message : undefined}
       picker={
         location === undefined ? null : (
@@ -605,6 +611,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           view={shownView}
           onViewChange={changeShownView}
           isStoryPage={shown.kind === "story"}
+          isLogic={isLogicPage(shown)}
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}

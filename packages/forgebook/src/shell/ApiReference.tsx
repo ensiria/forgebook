@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import type { ComponentDocs, PropDocs, SubcomponentDocs } from "../componentDocs.ts";
 import { Code } from "./Code.tsx";
 import { CodeText } from "./CodeText.tsx";
+import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 
 /** A prop's or an event's type as one line of TypeScript: an event's signature as an arrow. */
@@ -127,12 +128,23 @@ const SubcomponentReference = ({ docs }: { readonly docs: SubcomponentDocs }): R
 /**
  * The API reference.
  *
- * @param props - the component's docs.
+ * @param props - the component's docs, and whether it is a hook's or a function's (its stories are about logic).
  */
-export const ApiReference = ({ docs }: { readonly docs: ComponentDocs }): ReactNode => (
+export const ApiReference = ({
+  docs,
+  isLogic
+}: {
+  readonly docs: ComponentDocs;
+  readonly isLogic: boolean;
+}): ReactNode => (
   <section className="forgebook-doc__section" aria-labelledby="forgebook-api">
     <h2 id="forgebook-api">{STRINGS.apiReference}</h2>
-    <PropsAndEvents props={docs.props} eventsLevel={3} />
+    {/* a hook's or a function's page documents its call, not the props of a component */}
+    {isLogic && docs.signature !== undefined ? (
+      <SignatureReference name={docs.name} signature={docs.signature} />
+    ) : (
+      <PropsAndEvents props={docs.props} eventsLevel={3} />
+    )}
     {docs.subcomponents.map((subcomponent) => (
       <SubcomponentReference key={subcomponent.name} docs={subcomponent} />
     ))}

@@ -157,6 +157,13 @@ export type StoryParameters = {
    */
   readonly touch?: boolean;
   /**
+   * Whether the story is about logic, not looks: a small scene that uses a hook or a function, there to document and
+   * try what it does. The catalogue marks it, puts the signature of the meta's `component` (the hook) first, and tests
+   * it once instead of in every look; it leaves out its reference images. On a meta, for every story of the file; a
+   * story's own `false` leaves it out. Written plainly (`logic: true`, the index reads it).
+   */
+  readonly logic?: boolean;
+  /**
    * The story reads the story clock (`context.clock`, `useStoryNow`): a Live story, which starts at this moment and
    * then runs; the catalogue shows pause, resume, restart and the speed, and the tests hold it at its start.
    * None by default: the clock is held at the Unix epoch and the catalogue shows no clock controls.

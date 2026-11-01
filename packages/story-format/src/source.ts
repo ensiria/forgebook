@@ -36,6 +36,11 @@ export type StoryIndexEntry = {
    */
   readonly isTouch?: boolean;
   /**
+   * The story's own `parameters.logic`, when it sets one: `true` for a story about logic, not looks (a hook's scene),
+   * `false` to leave the meta's out.
+   */
+  readonly isLogic?: boolean;
+  /**
    * The first sentence of the story's TSDoc, or its `parameters.docs.description.story`: what it shows and what to
    * notice.
    */
@@ -54,6 +59,8 @@ export type StoryFileIndex = {
   readonly height?: number;
   /** The meta's `parameters.touch`, when it sets one: every story starts in touch unless it says otherwise. */
   readonly isTouch?: boolean;
+  /** The meta's `parameters.logic`, when it sets one: every story is about logic unless it says otherwise. */
+  readonly isLogic?: boolean;
   /** The meta's `alsoIn`, when it sets one: the other places the component is listed in. */
   readonly alsoIn?: readonly string[];
   /** The meta's `related`, when it sets one: the titles of the components its page names at its top. */

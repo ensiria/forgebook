@@ -39,6 +39,8 @@ export type AgentStory = {
   readonly isUnlisted: boolean;
   /** The height its scene declares (`parameters.height`), in CSS px, when it declares one. */
   readonly height?: number;
+  /** Whether it is about logic, not looks (`parameters.logic`): a hook's or a function's scene. */
+  readonly isLogic: boolean;
   /** Where it opens. */
   readonly links: StoryLinks;
 };

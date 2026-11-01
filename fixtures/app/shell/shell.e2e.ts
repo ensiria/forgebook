@@ -1308,6 +1308,43 @@ test.describe("touch", () => {
   });
 });
 
+test.describe("stories about logic", () => {
+  test("a title's first segment makes a section, and a hook's entry and page are marked", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:hooks-use-undo");
+    await expect(page.getByRole("button", { name: /^Hooks/ })).toHaveAttribute("aria-expanded", "true");
+    await expect(sidebarLinks(page).getByRole("link", { name: /^useUndo/ })).toContainText("Logic");
+    await expect(page.locator(".forgebook-header .forgebook-logic-mark")).toHaveText("Logic");
+    // its reference is the hook's call, not a props table
+    const reference = page.getByRole("region", { name: "API reference" });
+    await expect(reference.locator(".forgebook-signature__call")).toHaveText(
+      "useUndo<TValue>(initial: TValue, limit?: number): UndoState<TValue>"
+    );
+    await expect(reference.locator("tbody th")).toContainText(["initial", "limit"]);
+    await expect(reference).toContainText("the value now, and how to set, undo and redo it.");
+  });
+
+  test("its page opens on the signature, its play passes, and the bar keeps only what is not about looks", async ({
+    page
+  }) => {
+    await page.goto("/?story=kit:hooks-use-undo--history&compare=theme");
+    await frameStatus(page);
+    // never compared, whatever the address says
+    await expect(page.locator(".forgebook-compare")).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Signature" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
+    // its scene takes no args: no tab sets or lists them
+    await expect(page.getByRole("tab", { name: "Props" })).toHaveCount(0);
+    const toolbar = page.locator(".forgebook-toolbar");
+    await expect(toolbar.getByRole("button", { name: "Compare" })).toHaveCount(0);
+    await expect(toolbar.locator('.forgebook-toolbar__pinned[data-control="theme"]')).toHaveCount(0);
+    await expect(toolbar.locator('.forgebook-toolbar__pinned[data-control="width"]')).toHaveCount(1);
+    // the address keeps its compare for the other stories
+    await expect(page).toHaveURL(/compare=theme/);
+  });
+});
+
 test.describe("the panel", () => {
   test("a value set in Props reaches the frame and stays in the address", async ({ page }) => {
     await page.goto(story("overview"));

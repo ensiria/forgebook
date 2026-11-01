@@ -24,6 +24,7 @@ const BUTTON: TreeComponent = {
       description: undefined,
       isMain: false,
       isTouch: false,
+      isLogic: false,
       height: undefined,
       tags: []
     },
@@ -36,6 +37,7 @@ const BUTTON: TreeComponent = {
       description: "A destructive action.",
       isMain: false,
       isTouch: false,
+      isLogic: false,
       height: undefined,
       tags: []
     },
@@ -48,6 +50,7 @@ const BUTTON: TreeComponent = {
       description: "Ünbreakable text.",
       isMain: false,
       isTouch: false,
+      isLogic: false,
       height: undefined,
       tags: []
     }

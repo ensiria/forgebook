@@ -18,6 +18,7 @@ import { heldClockAddress } from "forgebook/story-clock";
 import { defaultView, frameAddress, parseView, type ViewState } from "forgebook/view-state";
 
 import { storyVariants } from "./browserTests.ts";
+import { LOGIC_VARIANT } from "./storyTestPlan.ts";
 
 /** The window's size when a view sets no width, in CSS px: the browser tests' own. */
 const WINDOW = { width: 1280, height: 800 };
@@ -72,8 +73,13 @@ const viewsOf = (
  */
 export const storyPagesOf = (request: StoryCheckRequest): StoryPage[] => {
   const views = viewsOf(request);
+  const catalogue = catalogueSettings("", request.switches, request.lists);
+  // a story about logic has one look worth checking: every variant is its default view (`storyTestPlan.ts`)
+  const logicViews = request.isAllVariants
+    ? [{ name: LOGIC_VARIANT.name, view: defaultView(catalogue), width: undefined }]
+    : views;
   return request.stories.flatMap((story) =>
-    views.map(({ name, view, width }) => {
+    (story.isLogic === true ? logicViews : views).map(({ name, view, width }) => {
       const shown: ViewState = { ...view, backdrop: "plain" };
       return {
         story,

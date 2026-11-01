@@ -153,6 +153,20 @@ describe("storyTree", () => {
     expect(findStory(phone, "kit:touch-plain--other")?.story.isTouch).toBe(false);
   });
 
+  it("marks a story about logic: its own setting, else the meta's", () => {
+    const logic = storyTree([
+      source({
+        "./u.stories.tsx": {
+          title: "Hooks/useUndo",
+          isLogic: true,
+          stories: [{ exportName: "History" }, { exportName: "Looks", isLogic: false }]
+        }
+      })
+    ]);
+    expect(findStory(logic, "kit:hooks-use-undo--history")?.story.isLogic).toBe(true);
+    expect(findStory(logic, "kit:hooks-use-undo--looks")?.story.isLogic).toBe(false);
+  });
+
   it("takes as the component's demo the story marked main, else Overview, else the first", () => {
     const demos = storyTree([
       source({

@@ -62,6 +62,7 @@ const agentStory = (
   tags: story.tags,
   isUnlisted,
   ...(story.height === undefined ? {} : { height: story.height }),
+  isLogic: story.isLogic,
   links: storyLinks(pages, story.id, view)
 });
 
