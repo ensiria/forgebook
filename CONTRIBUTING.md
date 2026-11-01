@@ -19,7 +19,9 @@ see [SECURITY.md](SECURITY.md).
 Small fixes (a typo, a wrong message, an obvious bug with its test) can go straight to a pull request. Anything
 larger starts from an issue where the shape was agreed.
 
-- Branch from `develop` and open the pull request against `develop`; `main` is what is released.
+- Branch from `develop` and open the pull request against `develop`; `main` is what is released. Neither takes a
+  direct push or a force push: every change is a pull request, merged once the checks pass and a maintainer approved
+  it.
 - One change per pull request, with its tests.
 - `pnpm checks` passes locally, and the shell's browser tests when the change touches the catalogue's interface.
 
@@ -78,12 +80,14 @@ gets a patch.
 
 ## Releases
 
-Merging `develop` into `main` releases the packages (`.github/workflows/release.yml`, with
+Merging `develop` into `main` (a pull request, like any other change) releases the packages (`.github/workflows/release.yml`, with
 [Nx release](https://nx.dev/features/manage-releases)): the checks run, each package's version comes from its commits
 since its last release (while 0.x, a breaking change bumps the minor and a feature or a fix the patch), its
 `CHANGELOG.md` and GitHub release are written, the release commit and a `<package>@<version>` tag per package go to
 `main`, each released package is packed with pnpm and staged on npm with provenance through trusted publishing (no
-token), and the release commit goes back to `develop`.
+token), and the release commit goes back to `develop`. Those two pushes are the only direct ones the branches take: they
+come from the organisation's release app (a GitHub App with write access to the contents, the rules' one exemption),
+whose token the workflow makes for each run from the `RELEASE_APP_KEY` secret of the `npm` environment.
 
 A staged version is not public yet: npm trusts the workflow to stage only, so a maintainer approves each version with
 2FA, in the order they were staged (`@forgebook/story-format`, `forgebook`, `@forgebook/react`,

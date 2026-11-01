@@ -53,6 +53,18 @@ describe("the pointer's media under simulated touch", () => {
     );
   });
 
+  it("rewrites a rule whose values hold var() and env()", () => {
+    expect(rewrite("@media (hover: hover) { .a { color: var(--x); } }")).toBe(
+      `@media (hover:hover){${COMPUTER} .a{color:var(--x)}}`
+    );
+    expect(rewrite("@media (hover: none) { .b { margin: var(--m, 4px) 0; } }")).toBe(
+      `@media (hover:none){${COMPUTER} .b{margin:var(--m,4px) 0}}${PHONE} .b{margin:var(--m,4px) 0}`
+    );
+    expect(rewrite("@media (pointer: fine) { .c { top: env(safe-area-inset-top, 0px); } }")).toBe(
+      `@media (pointer:fine){${COMPUTER} .c{top:env(safe-area-inset-top,0px)}}`
+    );
+  });
+
   it("leaves a query that asks nothing of the pointer as it is", () => {
     expect(rewrite("@media (min-width: 600px) { .f { top: 1px } }")).toBe(
       "@media (width>=600px){.f{top:1px}}"
