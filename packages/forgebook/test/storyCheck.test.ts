@@ -31,6 +31,7 @@ const DOCUMENT: StoriesDocument = {
           description: undefined,
           tags: [],
           isUnlisted: false,
+          isLogic: false,
           links: LINKS,
           height: 120
         },
@@ -41,6 +42,7 @@ const DOCUMENT: StoriesDocument = {
           description: undefined,
           tags: ["!dev"],
           isUnlisted: true,
+          isLogic: false,
           links: LINKS
         }
       ]

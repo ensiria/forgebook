@@ -148,7 +148,8 @@ const runOnStories = async (
       frameUrl: `${served.origin}/frame.html`,
       stories: stories.map((story) => ({
         id: story.id,
-        ...(story.height === undefined ? {} : { height: story.height })
+        ...(story.height === undefined ? {} : { height: story.height }),
+        ...(story.isLogic ? { isLogic: true } : {})
       })),
       switches,
       lists: config.lists,
