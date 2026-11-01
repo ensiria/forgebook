@@ -54,10 +54,10 @@ import { prebundled, scannedEntries } from "./prebundled.ts";
 import { storyCode } from "./storyCode.ts";
 import {
   indexedStoryFiles,
-  storyFilesGroup,
+  storyFilesGroupOf,
+  storyFilesGroupText,
   storyFilesModule,
-  USAGE_PREFIX,
-  USAGE_SEPARATOR
+  USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { componentImport } from "./storyMeta.ts";
 import { joinedUsage } from "./usageModule.ts";
@@ -93,9 +93,6 @@ const FILES_QUERY = "?forgebook-files";
 
 /** The id of a pattern's module: virtual, with the declaring module's folder and the pattern after it. */
 const FILES_PREFIX = "\0forgebook-files:";
-
-/** Between the folder and the pattern in a pattern module's id: no path or pattern holds it. */
-const FILES_SEPARATOR = "::";
 
 /** The query that asks for a story file's code: each story's `render` as written. */
 const CODE_QUERY = "?forgebook-code";
@@ -227,21 +224,18 @@ const markdownModule = (file: string, watch: (file: string) => void): { code: st
 };
 
 /**
- * The id of a `?forgebook-files` module: its group's folder, then its pattern (`storyFilesGroup`), so no `..` is left
- * in the id.
+ * The id of a `?forgebook-files` module: its prefix, then its group (`storyFilesGroupText`), which holds no `..`.
  *
  * @param folder - the importing module's folder.
  * @param pattern - the pattern as the import writes it.
  */
-const filesId = (folder: string, pattern: string): string => {
-  const group = storyFilesGroup(folder, pattern);
-  return `${FILES_PREFIX}${group.root}${FILES_SEPARATOR}${group.pattern}`;
-};
+const filesId = (folder: string, pattern: string): string =>
+  `${FILES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
 
 /**
  * The module of a `?forgebook-files` pattern: every matched story file's index and loaders.
  *
- * @param id - the module's id (`FILES_PREFIX`, the importer's folder, `FILES_SEPARATOR`, the pattern).
+ * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks.
  * @param hasUsage - whether the group offers its "Used in" loader.
@@ -253,7 +247,7 @@ const patternModule = (
   warm: (storyFile: string) => void,
   hasUsage: boolean
 ): { code: string; moduleType: "js" } => {
-  const [root = "", pattern = ""] = id.slice(FILES_PREFIX.length).split(FILES_SEPARATOR);
+  const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
   let first: string | undefined;
   const code = storyFilesModule(
     root,
@@ -285,7 +279,7 @@ const virtualId = (source: string): string | undefined => {
 /**
  * A group's "Used in" module: its story files indexed, what their stories render read in the docs worker, joined.
  *
- * @param id - the module's id (`USAGE_ID_PREFIX`, the pattern's folder, `USAGE_SEPARATOR`, the pattern).
+ * @param id - the module's id (`USAGE_ID_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param usage - reads the facts in the docs worker.
  */
@@ -294,7 +288,7 @@ const usageModule = async (
   watch: (file: string) => void,
   usage: DocsExtractor["usage"]
 ): Promise<{ code: string; moduleType: "js" }> => {
-  const [root = "", pattern = ""] = id.slice(USAGE_ID_PREFIX.length).split(USAGE_SEPARATOR);
+  const { root, pattern } = storyFilesGroupOf(id.slice(USAGE_ID_PREFIX.length));
   const files = indexedStoryFiles(root, pattern, watch);
   const graph = await usage(
     files.map((file) => ({

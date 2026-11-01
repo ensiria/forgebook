@@ -127,7 +127,8 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
     const loaded = await hooks.load(id);
     await hooks.closeBundle();
     const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
-    expect(code).toContain('"./kit/src/Select.stories.tsx":{"title":"Inputs/Selection/Select"');
+    // keys stay relative to the declaring module, so two patterns of one source never share one
+    expect(code).toContain('"../kit/src/Select.stories.tsx":{"title":"Inputs/Selection/Select"');
   });
 
   it("leaves every other import to Vite", () => {

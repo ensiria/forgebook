@@ -18,28 +18,44 @@ import type { StoryFileIndex } from "@forgebook/story-format/source";
 import { autoTitle, patternBase } from "./autoTitle.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
 
-/** A pattern of story files and the folder it is read from. */
+/** A pattern of story files and the folder it is read from: the declaring module's folder, the import's pattern. */
 export type StoryFilesGroup = {
-  /** The folder, absolute. */
+  /** The declaring module's folder, absolute: the files' keys are relative to it. */
   readonly root: string;
-  /** The pattern, relative to it, without a leading `./` or `../`. */
+  /** The pattern relative to it, its leading `./` dropped (`../src/**\/*.stories.tsx`). */
   readonly pattern: string;
 };
 
+/** Between a group's parts in a module's id: no path or pattern holds it. */
+const GROUP_SEPARATOR = "::";
+
 /**
- * The folder and the pattern a `?forgebook-files` import is read from: the pattern's leading `./` and `../` move into
- * the folder. The catalogue's plugin keys the files this way (its modules' ids hold no `..`, which a URL path would
- * collapse), and so does the testing package, so both list the same keys (`./src/x.stories.tsx`).
+ * A `?forgebook-files` group written for a module's id: the folder, how many folders the pattern climbs, and the rest
+ * of the pattern. A Vite module's id is served under a URL path, whose normalisation would let a `..` remove the part
+ * before it (`app::../storybook`: the folder and the separator), so the pattern's leading `../` are counted, never
+ * written. The files keep their keys relative to the declaring module (`../src/x.stories.tsx`), unique in a source and
+ * the testing package's too.
  *
- * @param folder - the importing module's folder.
+ * @param folder - the declaring module's folder.
  * @param pattern - the pattern as the import writes it (`../src/**\/*.stories.tsx`).
  */
-export const storyFilesGroup = (folder: string, pattern: string): StoryFilesGroup => {
+export const storyFilesGroupText = (folder: string, pattern: string): string => {
   const segments = pattern.split("/");
   const firstOwn = segments.findIndex((segment) => segment !== "." && segment !== "..");
   const climbed = firstOwn === -1 ? segments : segments.slice(0, firstOwn);
   const own = firstOwn === -1 ? [] : segments.slice(firstOwn);
-  return { root: resolve(folder, ...climbed), pattern: own.join("/") };
+  const up = climbed.filter((segment) => segment === "..").length;
+  return [folder, String(up), own.join("/")].join(GROUP_SEPARATOR);
+};
+
+/**
+ * A group read back from a module's id (`storyFilesGroupText`).
+ *
+ * @param text - the id's group part.
+ */
+export const storyFilesGroupOf = (text: string): StoryFilesGroup => {
+  const [root = "", up = "0", own = ""] = text.split(GROUP_SEPARATOR);
+  return { root, pattern: `${"../".repeat(Number(up))}${own}` };
 };
 
 /**
@@ -58,13 +74,10 @@ export const storyFileKeys = (root: string, patterns: readonly string[]): string
     .sort();
 
 /**
- * The id prefix of a group's "Used in" module: the pattern's folder and the pattern follow, as in a `?forgebook-files`
+ * The id prefix of a group's "Used in" module: the group follows (`storyFilesGroupText`), as in a `?forgebook-files`
  * module's id. The plugin answers it (`usageModule.ts`) only when a page asks.
  */
 export const USAGE_PREFIX = "virtual:forgebook-usage:";
-
-/** Between the folder and the pattern in a usage module's id: no path or pattern holds it. */
-export const USAGE_SEPARATOR = "::";
 
 /** A story file a pattern matches, with its key and its index. */
 export type IndexedStoryFile = {
@@ -126,7 +139,7 @@ export const storyFilesModule = (
   const index: Record<string, StoryFileIndex> = Object.fromEntries(
     files.map((file) => [file.key, file.index])
   );
-  const usage = JSON.stringify(`${USAGE_PREFIX}${root}${USAGE_SEPARATOR}${pattern}`);
+  const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(root, pattern)}`);
   // absolute paths: the module has no folder of its own; Vite serves them under /@fs/ in development
   const path = (key: string): string => JSON.stringify(resolve(root, key));
   const query = (key: string, name: string): string => JSON.stringify(`${resolve(root, key)}?${name}`);
