@@ -262,6 +262,9 @@ It offers seven tools: `list_stories`, `get_story`, `story_address`, `new_storie
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
 
+A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
+`@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
+
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
 component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),
 and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the

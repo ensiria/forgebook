@@ -42,6 +42,10 @@ in JSON with `--json`, and every answer carries the links that open a story for 
 - Write `title`, `parameters.main`, `group`, `height`, `touch` and `logic` as plain values: the catalogue reads them without running
   the file.
 
+- Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
+  `@replacedBy`. `forgebook story` returns them as `docs.guidance`: read them before using a component, and never use a
+  deprecated one.
+
 ### Commands
 
 | Command | What it is for |

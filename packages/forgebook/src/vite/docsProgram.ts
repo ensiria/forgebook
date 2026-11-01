@@ -142,6 +142,20 @@ export const moduleSummaryOf = (sourceFile: ts.SourceFile): string => {
 };
 
 /**
+ * Each of a TSDoc tag's texts, for a tag that can be written more than once.
+ *
+ * @param symbol - a declared symbol.
+ * @param checker - the program's type checker.
+ * @param name - the tag (`useWhen`).
+ */
+export const tagsOf = (symbol: ts.Symbol, checker: ts.TypeChecker, name: string): string[] =>
+  symbol
+    .getJsDocTags(checker)
+    .filter((candidate) => candidate.name === name)
+    .map((tag) => ts.displayPartsToString(tag.text).trim())
+    .filter((text) => text !== "");
+
+/**
  * A TSDoc tag's text, without the backticks it is often written in.
  *
  * @param symbol - a declared symbol.
