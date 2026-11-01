@@ -6,16 +6,18 @@
 import { describe, expect, it } from "vitest";
 
 import type { BenchReport } from "./bench.types.ts";
-import { parseReport, reportRows, timeMedians } from "./reportTable.ts";
+import { parseReport, reportMismatches, reportProblems, reportRows, timeMedians } from "./reportTable.ts";
 
 const REPORT: BenchReport = {
   version: 1,
   startedAt: "2026-11-01T00:00:00.000Z",
   forgebook: "abc123",
   corpus: { components: 10, stories: 50 },
+  measured: "Widget7",
+  runs: 5,
   throttle: 1,
   machine: { platform: "darwin-arm64", system: "25", cpu: "M4", cpus: 16, memory: 1, node: "v24" },
-  readings: {},
+  readings: [],
   warnings: [],
   tools: {
     forgebook: {
@@ -52,6 +54,44 @@ describe("reportRows", () => {
 describe("timeMedians", () => {
   it("keeps only the times, since sizes are exact", () => {
     expect(timeMedians(REPORT)).toEqual({ "forgebook coldStart": 1200 });
+  });
+});
+
+describe("reportMismatches", () => {
+  const later = { ...REPORT, startedAt: "2026-11-02T00:00:00.000Z" };
+
+  it("has nothing against a later run of the same thing", () => {
+    expect(reportMismatches(REPORT, later)).toEqual([]);
+  });
+
+  it("refuses a run compared with itself, which would prove nothing", () => {
+    expect(reportMismatches(REPORT, REPORT)).toEqual(["startedAt differs"]);
+  });
+
+  it("refuses another corpus", () => {
+    expect(reportMismatches(REPORT, { ...later, corpus: { components: 1, stories: 1 } })).toEqual([
+      "corpus differs"
+    ]);
+  });
+});
+
+describe("reportProblems", () => {
+  const later = { ...REPORT, startedAt: "2026-11-02T00:00:00.000Z" };
+  const failed: BenchReport = {
+    ...later,
+    tools: { ladle: { versions: {}, metrics: { build: { kind: "failed", reason: "crashed" } } } }
+  };
+
+  it("has nothing to say about a clean run", () => {
+    expect(reportProblems(later, REPORT, 0.1)).toEqual([]);
+  });
+
+  it("names a metric that failed", () => {
+    expect(reportProblems(failed, undefined, 0.1)).toEqual(["ladle build failed: crashed"]);
+  });
+
+  it("names a time the second run lost", () => {
+    expect(reportProblems(failed, REPORT, 0.1)).toContain("forgebook coldStart: 1200 → 0 ms");
   });
 });
 

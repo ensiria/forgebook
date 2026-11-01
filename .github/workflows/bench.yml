@@ -1,5 +1,6 @@
-# Once a week, and by hand: the benchmark on Forgebook alone, on a modest real machine. It watches the trend and fails
-# nothing: a number never blocks a pull request from here. By hand it can compare the three tools. The report stays as
+# Once a week, and by hand: the benchmark on Forgebook alone, on a modest real machine. It watches the trend: no number
+# fails it, and it blocks no pull request; only a metric that could not be measured does. By hand it can compare the
+# three tools. The report stays as
 # an artefact and in the job's summary, since the branches take no direct push to keep a history in.
 name: bench
 

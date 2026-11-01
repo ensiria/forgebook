@@ -3,8 +3,10 @@
  *
  * @remarks
  * Generated, so its size is a parameter, and deterministic (no clock, no random numbers), so two machines measure the
- * same files. Each component has typed, documented props, a style sheet, a shared helper and a neighbour it renders,
- * so a story pulls a small graph as a real one does. Plain CSS: Sass is an optional peer of Forgebook, and would weigh
+ * same files. It is a TypeScript project, with a `tsconfig.json`, as Forgebook's README describes one. Each component has
+ * typed, documented props, a style sheet and a shared helper, and most render a neighbour, in chains of at most
+ * `CHAIN_LENGTH`, so a story pulls a small graph as a real one does: a chain as long as the library would make every
+ * story load every component. Plain CSS: Sass is an optional peer of Forgebook, and would weigh
  * on the tool that installs it. The stories are the only difference between the two forms: `csf3` is what Forgebook and
  * Storybook users write, `functions` is the only form Ladle draws.
  *
@@ -13,6 +15,9 @@
 
 /** How many shared images the components use. */
 const IMAGES = 10;
+
+/** How many components a chain of neighbours holds: a story imports at most this many components. */
+const CHAIN_LENGTH = 4;
 
 /** One story in every this many has a play function. */
 const PLAY_EVERY = 10;
@@ -51,6 +56,11 @@ export type CorpusComponent = {
 export type Corpus = {
   /** Its components, in order. */
   readonly components: readonly CorpusComponent[];
+  /**
+   * The component measured: in the middle of the library and at the end of a chain, so it is neither the cheapest
+   * component nor a special one.
+   */
+  readonly measured: CorpusComponent;
 };
 
 /** How big a corpus is. */
@@ -75,22 +85,25 @@ export const buildCorpus = ({ components, stories }: CorpusSize): Corpus => {
   const perComponent = Math.floor(stories / components);
   const extra = stories % components;
   let index = 0;
-  return {
-    components: Array.from({ length: components }, (_, position) => ({
-      name: `Widget${position}`,
-      group: GROUPS[position % GROUPS.length] ?? "Actions",
-      image: position % IMAGES,
-      stories: Array.from({ length: perComponent + (position < extra ? 1 : 0) }, (_, storyIndex) => {
-        index += 1;
-        return {
-          name: `Story${storyIndex}`,
-          label: `Widget${position} story ${storyIndex}`,
-          tone: TONES[storyIndex % TONES.length] ?? "neutral",
-          hasPlay: storyIndex > 0 && index % PLAY_EVERY === 0
-        };
-      })
-    }))
-  };
+  const all: CorpusComponent[] = Array.from({ length: components }, (_, position) => ({
+    name: `Widget${position}`,
+    group: GROUPS[position % GROUPS.length] ?? "Actions",
+    image: position % IMAGES,
+    stories: Array.from({ length: perComponent + (position < extra ? 1 : 0) }, (_, storyIndex) => {
+      index += 1;
+      return {
+        name: `Story${storyIndex}`,
+        label: `Widget${position} story ${storyIndex}`,
+        tone: TONES[storyIndex % TONES.length] ?? "neutral",
+        hasPlay: storyIndex > 0 && index % PLAY_EVERY === 0
+      };
+    })
+  }));
+  const middle = Math.floor(components / 2);
+  const chainEnd = Math.min(middle - (middle % CHAIN_LENGTH) + CHAIN_LENGTH - 1, components - 1);
+  const measured = all[chainEnd];
+  if (measured === undefined) throw new Error("the corpus has no component");
+  return { components: all, measured };
 };
 
 /**
@@ -215,6 +228,26 @@ const THEME_FILE = `:root {
 }
 `;
 
+/** The project's TypeScript configuration, as Vite's React template writes it. */
+const TSCONFIG_FILE = `${JSON.stringify(
+  {
+    compilerOptions: {
+      target: "ES2022",
+      lib: ["ES2022", "DOM", "DOM.Iterable"],
+      module: "ESNext",
+      moduleResolution: "bundler",
+      jsx: "react-jsx",
+      strict: false,
+      skipLibCheck: true,
+      noEmit: true,
+      types: ["vite/client"]
+    },
+    include: ["src"]
+  },
+  null,
+  2
+)}\n`;
+
 /** The helper every component imports. */
 const CLASSES_FILE = `/** Joins class names. */
 export const classes = (...names: readonly string[]): string => names.join(" ");
@@ -229,14 +262,16 @@ export const classes = (...names: readonly string[]): string => names.join(" ");
 export const projectFiles = (corpus: Corpus, form: StoryForm): Readonly<Record<string, string>> => {
   const files: Record<string, string> = {
     "src/shared/theme.css": THEME_FILE,
-    "src/shared/classes.ts": CLASSES_FILE
+    "src/shared/classes.ts": CLASSES_FILE,
+    "tsconfig.json": TSCONFIG_FILE
   };
   for (let image = 0; image < IMAGES; image += 1) {
     files[`src/assets/image${image}.svg`] = imageFile(image);
   }
   corpus.components.forEach((component, index) => {
     const path = `src/components/${component.name}`;
-    files[`${path}.tsx`] = componentFile(component, corpus.components[index - 1]);
+    const neighbour = index % CHAIN_LENGTH === 0 ? undefined : corpus.components[index - 1];
+    files[`${path}.tsx`] = componentFile(component, neighbour);
     files[`${path}.css`] = styleFile(component);
     files[`${path}.stories.tsx`] = storiesFile(component, form);
   });

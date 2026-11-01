@@ -136,6 +136,67 @@ export const installTarget = async (
   };
 };
 
+/** What `installOnBare` needs besides the folders. */
+export type OnBareOptions = {
+  /** Packages to add, Forgebook's. */
+  readonly packages: Readonly<Record<string, string>> | undefined;
+  /** The bare project's size, in bytes. */
+  readonly bareSize: number;
+  /** The script's streams. */
+  readonly io: ScriptIo;
+};
+
+/** A package manifest's dependencies. */
+const dependenciesOf = (manifest: unknown): Readonly<Record<string, unknown>> => {
+  if (typeof manifest !== "object" || manifest === null || !("dependencies" in manifest)) return {};
+  const { dependencies } = manifest;
+  return typeof dependencies === "object" && dependencies !== null ? { ...dependencies } : {};
+};
+
+/**
+ * What a tool adds to a project that already has Vite and React: installed there, not subtracted, since a tool with
+ * its own Vite keeps both.
+ *
+ * @param source - the tool's folder in the repository.
+ * @param bare - the bare project's folder in the repository.
+ * @param directory - where to install; removed afterwards.
+ * @param options - what else it needs.
+ * @returns the bytes added, and the packages of the project.
+ */
+export const installOnBare = async (
+  source: string,
+  bare: string,
+  directory: string,
+  { packages, bareSize, io }: OnBareOptions
+): Promise<InstallResult> => {
+  await rm(directory, { recursive: true, force: true });
+  await mkdir(directory, { recursive: true });
+  const read = async (folder: string): Promise<unknown> =>
+    JSON.parse(await readFile(join(folder, "package.json"), "utf8"));
+  const story = packages?.["@forgebook/story-format"];
+  await writeFile(
+    join(directory, "package.json"),
+    JSON.stringify({
+      name: "bench-on-bare",
+      private: true,
+      dependencies: {
+        ...dependenciesOf(await read(bare)),
+        ...dependenciesOf(await read(source)),
+        ...packages
+      },
+      ...(story === undefined ? {} : { overrides: { "@forgebook/story-format": story } })
+    })
+  );
+  await exec("npm", ["install", "--no-audit", "--no-fund", "--loglevel=error"], {
+    cwd: directory,
+    io,
+    output: "capture"
+  });
+  const size = await diskUsage(join(directory, "node_modules"));
+  await rm(directory, { recursive: true, force: true });
+  return { size: size - bareSize, packages: 0 };
+};
+
 /**
  * Writes the generated project and the tool's configuration into an installed target.
  *

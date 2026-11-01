@@ -19,7 +19,7 @@ export type MovedMetric = {
   readonly first: number;
   /** Its median in the second run. */
   readonly second: number;
-  /** The change, relative to the first run (0.2 for 20 %). */
+  /** The change, relative to the first run (0.2 for 20 %); 1 for a metric the second run lost. */
   readonly change: number;
 };
 
@@ -44,7 +44,8 @@ export const summary = (values: readonly number[]): Summary => {
 };
 
 /**
- * The metrics that moved more than a tolerance between two runs, for the "reproducible within 10 %" check.
+ * The metrics that moved more than a tolerance between two runs, or that the second lost, for the "reproducible within
+ * 10 %" check.
  *
  * @param first - the first run's medians, by metric.
  * @param second - the second run's.
@@ -57,7 +58,8 @@ export const comparedMedians = (
 ): MovedMetric[] =>
   Object.entries(first).flatMap(([metric, before]) => {
     const after = second[metric];
-    if (after === undefined) return [];
+    // a metric that disappeared is no agreement: a check that skipped it would pass by losing the numbers
+    if (after === undefined) return [{ metric, first: before, second: 0, change: 1 }];
     const change = Math.abs(after - before) / before;
     return change > tolerance ? [{ metric, first: before, second: after, change }] : [];
   });

@@ -2,21 +2,24 @@
  * One benchmark: every metric asked for, for every tool asked for, with the machine's state beside the numbers.
  *
  * @remarks
- * A metric that fails is recorded and the run goes on, so one tool's problem does not lose the others' hours. Metrics a
- * tool cannot have are `absent`, with the reason, and never a zero. The status file is written before each sample.
+ * The tools take turns, sample by sample and with the order rotating, so a machine that gets busier halfway does not
+ * land on one tool. A group that fails for one tool is recorded and the others go on, so one tool's problem does not
+ * lose the others' hours; a tool that will not even install fails alone too. Metrics a tool cannot have are `absent`,
+ * with the reason, and never a zero. The status file is written before each sample.
  *
  * @module
  */
 import { join } from "node:path";
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
-import { type Browser, chromium } from "@playwright/test";
+import { chromium } from "@playwright/test";
 
-import type { BenchReport, MachineReadings, MetricResult, ToolName, ToolResult } from "./bench.types.ts";
+import type { BenchReport, MachineReading, MetricResult, ToolName } from "./bench.types.ts";
 import { summary } from "./benchStats.ts";
-import { buildCorpus, type CorpusComponent, type CorpusSize } from "./corpus.ts";
+import { buildCorpus, type CorpusSize } from "./corpus.ts";
 import { machineInfo, noiseWarnings, readMachine } from "./machine.ts";
 import {
+  baseOf,
   type MeasureContext,
   measureBuild,
   measureComponentPage,
@@ -30,6 +33,7 @@ import {
   directDependencies,
   type InstallResult,
   installedVersion,
+  installOnBare,
   installTarget,
   targetSource,
   writeProject
@@ -43,7 +47,7 @@ export const METRIC_GROUPS = ["install", "start", "hmr", "page", "memory", "buil
 /** A group of metrics. */
 export type MetricGroup = (typeof METRIC_GROUPS)[number];
 
-/** Runs of the memory metric: it is a peak, steadier than a time. */
+/** Runs of the memory metrics: a peak is steadier than a time. */
 const MEMORY_RUNS = 3;
 
 /** The first port of a run; each tool takes the next, so a server that lingers cannot answer for another. */
@@ -75,162 +79,229 @@ export type BenchRequest = {
   readonly onStep: (step: RunStep) => void;
 };
 
-/** How many samples each group takes, for the status's progress. */
+/** How many samples a group takes per tool, for the status's progress. */
 const groupSteps = (group: MetricGroup, runs: number): number => {
   if (group === "install") return 1;
   if (group === "start") return runs * 2 + 1;
   if (group === "hmr") return 2;
-  if (group === "page") return runs;
-  if (group === "memory") return MEMORY_RUNS;
+  if (group === "page") return runs + 1;
+  if (group === "memory") return MEMORY_RUNS * 2 + 1;
   return runs + 1;
 };
 
-/** Samples a value, in order, reporting each. */
-const sampled = async <TSample>(
+/** A measured result of a unit, from its samples. */
+const measured = (unit: "ms" | "bytes" | "count", values: readonly number[]): MetricResult => ({
+  kind: "measured",
+  unit,
+  summary: summary(values)
+});
+
+/** A tool's state during a run. */
+type ToolRun = {
+  /** How it is measured. */
+  readonly context: MeasureContext;
+  /** Its metrics so far. */
+  readonly metrics: Record<string, MetricResult>;
+  /** Its install, measured. */
+  readonly install: InstallResult;
+  /** Its size on a project with Vite and React. */
+  readonly onBare: InstallResult;
+};
+
+/** The steps a group goes through: a sample taken of each tool in turn. */
+type Turns = {
+  /** Reports a step. */
+  readonly step: (tool: ToolRun, metric: string, run: number, runs: number) => void;
+};
+
+/**
+ * Takes samples of every tool in turns, the order rotating each round. A tool that fails drops out of the group and
+ * has the failure recorded; the others go on.
+ *
+ * @param tools - the tools.
+ * @param failedGroup - the group, the name a failure is recorded under.
+ * @param metric - the metric, for the status.
+ * @param runs - how many rounds.
+ * @param turns - how steps are reported.
+ * @param take - takes one sample.
+ * @returns each tool's samples, for those that did not fail.
+ */
+const inTurns = async <TSample>(
+  tools: readonly ToolRun[],
+  failedGroup: string,
+  metric: string,
   runs: number,
-  onSample: (run: number) => void,
-  take: () => Promise<TSample>
-): Promise<TSample[]> => {
-  const samples: TSample[] = [];
+  turns: Turns,
+  take: (tool: ToolRun) => Promise<TSample>
+): Promise<Map<ToolRun, TSample[]>> => {
+  const samples = new Map<ToolRun, TSample[]>(tools.map((tool) => [tool, []]));
   for (let run = 1; run <= runs; run += 1) {
-    onSample(run);
-    samples.push(await take());
+    for (let turn = 0; turn < tools.length; turn += 1) {
+      const tool = tools[(turn + run) % tools.length];
+      if (tool === undefined || !samples.has(tool)) continue;
+      turns.step(tool, metric, run, runs);
+      try {
+        samples.get(tool)?.push(await take(tool));
+      } catch (error) {
+        tool.metrics[failedGroup] = {
+          kind: "failed",
+          reason: error instanceof Error ? error.message : String(error)
+        };
+        samples.delete(tool);
+      }
+    }
   }
   return samples;
 };
 
-/** A measured time. */
-const timeResult = (values: readonly number[]): MetricResult => ({
-  kind: "measured",
-  unit: "ms",
-  summary: summary(values)
-});
-
-/** A measured size. */
-const sizeResult = (values: readonly number[]): MetricResult => ({
-  kind: "measured",
-  unit: "bytes",
-  summary: summary(values)
-});
-
-/** A measured count. */
-const countResult = (value: number): MetricResult => ({
-  kind: "measured",
-  unit: "count",
-  summary: summary([value])
-});
-
 /**
- * The metrics of one tool's groups, each group failing on its own.
+ * Writes a metric from samples, for each tool that has them.
  *
- * @param request - the benchmark.
- * @param target - the tool.
- * @param context - the measurement's context.
- * @param install - the tool's install, and the bare project's.
- * @param step - reports a step.
+ * @param samples - the samples by tool.
+ * @param name - the metric.
+ * @param unit - its unit.
+ * @param value - what a sample contributes; none where the sample has no such thing.
  */
-const toolMetrics = async (
-  request: BenchRequest,
-  target: Target,
-  context: MeasureContext,
-  install: { readonly tool: InstallResult; readonly bare: InstallResult },
-  step: (metric: string, run: number, runs: number) => void
-): Promise<Record<string, MetricResult>> => {
-  const { runs, edits } = request;
-  const { component, directory } = context;
-  const componentAddress = target.componentUrl?.(`http://127.0.0.1:${context.port}/`, component);
-  const groups: Readonly<Record<MetricGroup, () => Promise<Record<string, MetricResult>>>> = {
-    install: async () => ({
-      installSize: sizeResult([install.tool.size]),
-      installAdded: sizeResult([install.tool.size - install.bare.size]),
-      packages: countResult(install.tool.packages),
-      directDependencies: countResult(await directDependencies(directory, target.mainPackage))
-    }),
-    start: async () => {
-      const cold = await sampled(
-        runs,
-        (run) => step("coldStart", run, runs),
-        () => measureStart(context, true)
-      );
-      step("warmStart", 0, runs);
-      await measureStart(context, false);
-      const warm = await sampled(
-        runs,
-        (run) => step("warmStart", run, runs),
-        () => measureStart(context, false)
-      );
-      return {
-        coldStart: timeResult(cold.map((sample) => sample.story)),
-        sidebarReady: timeResult(cold.map((sample) => sample.sidebar)),
-        warmStart: timeResult(warm.map((sample) => sample.story))
-      };
-    },
-    hmr: async () => {
-      step("hmrStory", 1, 1);
-      const story = await measureEdits(context, "story", edits);
-      step("hmrComponent", 1, 1);
-      const edited = await measureEdits(context, "component", edits);
-      return { hmrStory: timeResult(story), hmrComponent: timeResult(edited) };
-    },
-    page: async () => {
-      if (componentAddress === undefined) {
-        const absent: MetricResult = {
-          kind: "absent",
-          reason: `${target.name} has no page of a component's stories`
-        };
-        return {
-          componentPage: absent,
-          firstPropsTable: { kind: "absent", reason: `${target.name} has no props table` }
-        };
-      }
-      const visits = await sampled(
-        runs,
-        (run) => step("componentPage", run, runs),
-        () => measureComponentPage(context, componentAddress)
-      );
-      const tables = visits.flatMap((visit) => (visit.props === undefined ? [] : [visit.props]));
-      return {
-        componentPage: timeResult(visits.map((visit) => visit.stories)),
-        firstPropsTable: timeResult(tables)
-      };
-    },
-    memory: async () => {
-      const address = componentAddress ?? target.storyUrl(`http://127.0.0.1:${context.port}/`, component);
-      const peaks = await sampled(
-        MEMORY_RUNS,
-        (run) => step("serverMemory", run, MEMORY_RUNS),
-        () => measureMemory(context, address)
-      );
-      return { serverMemory: sizeResult(peaks) };
-    },
-    build: async () => {
-      const builds = await sampled(
-        runs,
-        (run) => step("build", run, runs),
-        () => measureBuild(context)
-      );
-      step("firstLoad", 1, 1);
-      const load = await measureFirstLoad(context);
-      return {
-        build: timeResult(builds.map((sample) => sample.time)),
-        buildSize: sizeResult(builds.map((sample) => sample.size)),
-        shellJs: sizeResult([load.shell]),
-        frameJs:
-          load.frame === undefined
-            ? { kind: "absent", reason: `${target.name} draws stories in its own page` }
-            : sizeResult([load.frame])
-      };
-    }
-  };
-  const metrics: Record<string, MetricResult> = {};
-  for (const group of request.groups) {
-    try {
-      Object.assign(metrics, await groups[group]());
-    } catch (error) {
-      metrics[group] = { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
+const record = <TSample>(
+  samples: ReadonlyMap<ToolRun, readonly TSample[]>,
+  name: string,
+  unit: "ms" | "bytes",
+  value: (sample: TSample) => number | undefined
+): void => {
+  for (const [tool, values] of samples) {
+    const numbers = values.flatMap((sample) => {
+      const number = value(sample);
+      return number === undefined ? [] : [number];
+    });
+    if (numbers.length > 0) tool.metrics[name] = measured(unit, numbers);
+  }
+};
+
+/** What a group of metrics works with. */
+type GroupRun = {
+  /** The tools. */
+  readonly tools: readonly ToolRun[];
+  /** The benchmark. */
+  readonly request: BenchRequest;
+  /** How steps are reported. */
+  readonly turns: Turns;
+};
+
+/** A server started once on a warm cache, so a group means the same alone and after the others. */
+const warmUp = (
+  group: MetricGroup,
+  tools: readonly ToolRun[],
+  metric: string,
+  turns: Turns
+): Promise<unknown> => inTurns(tools, group, metric, 1, turns, (tool) => measureStart(tool.context, false));
+
+/** The address of a tool's component page. */
+const pageAddress = ({ context }: ToolRun): string =>
+  context.target.componentUrl?.(baseOf(context), context.component) ?? "";
+
+/** Records why the tools without a page of a component's stories have none of a group's metrics. */
+const markPageless = (tools: readonly ToolRun[], metrics: readonly string[]): readonly ToolRun[] => {
+  const paged = tools.filter((tool) => tool.context.target.componentUrl !== undefined);
+  for (const tool of tools.filter((each) => !paged.includes(each))) {
+    for (const metric of metrics) {
+      const { name } = tool.context.target;
+      tool.metrics[metric] = { kind: "absent", reason: `${name} has no page of a component's stories` };
     }
   }
-  return metrics;
+  return paged;
+};
+
+/** The install metrics, already measured when the tool was installed. */
+const installGroup = async ({ tools, turns }: GroupRun): Promise<void> => {
+  for (const tool of tools) {
+    turns.step(tool, "install", 1, 1);
+    const { target, directory } = tool.context;
+    tool.metrics["installSize"] = measured("bytes", [tool.install.size]);
+    tool.metrics["installAdded"] = measured("bytes", [tool.onBare.size]);
+    tool.metrics["packages"] = measured("count", [tool.install.packages]);
+    tool.metrics["directDependencies"] = measured("count", [
+      await directDependencies(directory, target.mainPackage)
+    ]);
+  }
+};
+
+/** Cold and warm starts. */
+const startGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promise<void> => {
+  const cold = await inTurns(tools, "start", "coldStart", runs, turns, (tool) =>
+    measureStart(tool.context, true)
+  );
+  record(cold, "coldStart", "ms", (sample) => sample.story);
+  record(cold, "sidebarReady", "ms", (sample) => sample.sidebar);
+  await warmUp("start", tools, "warmStart", turns);
+  const warm = await inTurns(tools, "start", "warmStart", runs, turns, (tool) =>
+    measureStart(tool.context, false)
+  );
+  record(warm, "warmStart", "ms", (sample) => sample.story);
+};
+
+/** Edits of a story and of a component. */
+const hmrGroup = async ({ tools, request: { edits }, turns }: GroupRun): Promise<void> => {
+  const story = await inTurns(tools, "hmr", "hmrStory", 1, turns, (tool) =>
+    measureEdits(tool.context, "story", edits)
+  );
+  for (const [tool, samples] of story) tool.metrics["hmrStory"] = measured("ms", samples.flat());
+  const component = await inTurns(tools, "hmr", "hmrComponent", 1, turns, (tool) =>
+    measureEdits(tool.context, "component", edits)
+  );
+  for (const [tool, samples] of component) tool.metrics["hmrComponent"] = measured("ms", samples.flat());
+};
+
+/** A component's page and its table of props. */
+const pageGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promise<void> => {
+  const paged = markPageless(tools, ["componentPage", "firstPropsTable"]);
+  await warmUp("page", paged, "componentPage", turns);
+  const visits = await inTurns(paged, "page", "componentPage", runs, turns, (tool) =>
+    measureComponentPage(tool.context, pageAddress(tool))
+  );
+  record(visits, "componentPage", "ms", (sample) => sample.stories);
+  record(visits, "firstPropsTable", "ms", (sample) => sample.props);
+};
+
+/** The server's memory, on a story's page, which every tool has, and on a component's. */
+const memoryGroup = async ({ tools, turns }: GroupRun): Promise<void> => {
+  await warmUp("memory", tools, "serverMemory", turns);
+  const story = await inTurns(tools, "memory", "serverMemory", MEMORY_RUNS, turns, (tool) =>
+    measureMemory(tool.context, tool.context.target.storyUrl(baseOf(tool.context), tool.context.component))
+  );
+  record(story, "serverMemory", "bytes", (sample) => sample);
+  const paged = markPageless(tools, ["serverMemoryDocs"]);
+  const docs = await inTurns(paged, "memory", "serverMemoryDocs", MEMORY_RUNS, turns, (tool) =>
+    measureMemory(tool.context, pageAddress(tool))
+  );
+  record(docs, "serverMemoryDocs", "bytes", (sample) => sample);
+};
+
+/** The build, and what a first load of it fetches. */
+const buildGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promise<void> => {
+  const builds = await inTurns(tools, "build", "build", runs, turns, (tool) => measureBuild(tool.context));
+  record(builds, "build", "ms", (sample) => sample.time);
+  record(builds, "buildSize", "bytes", (sample) => sample.size);
+  const loads = await inTurns([...builds.keys()], "build", "firstLoad", 1, turns, (tool) =>
+    measureFirstLoad(tool.context)
+  );
+  record(loads, "shellJs", "bytes", (sample) => sample.shell);
+  record(loads, "frameJs", "bytes", (sample) => sample.frame);
+  record(loads, "firstLoadJs", "bytes", (sample) => sample.total);
+  for (const [tool, samples] of loads) {
+    if (samples[0]?.frame !== undefined) continue;
+    const { name } = tool.context.target;
+    tool.metrics["frameJs"] = { kind: "absent", reason: `${name} draws stories in its own page` };
+  }
+};
+
+/** Each group's work. */
+const GROUPS: Readonly<Record<MetricGroup, (run: GroupRun) => Promise<void>>> = {
+  install: installGroup,
+  start: startGroup,
+  hmr: hmrGroup,
+  page: pageGroup,
+  memory: memoryGroup,
+  build: buildGroup
 };
 
 /**
@@ -243,54 +314,73 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
   const { folders, targets, size, io, groups, runs } = request;
   const startedAt = new Date().toISOString();
   const corpus = buildCorpus(size);
-  const measured: CorpusComponent | undefined = corpus.components[0];
-  if (measured === undefined) throw new Error("the corpus has no component");
-  const total = targets.length * groups.reduce((sum, group) => sum + groupSteps(group, runs), 0);
-  const bare = await installTarget(
-    targetSource(folders.repository, "bare"),
-    join(folders.work, "bare"),
-    undefined,
-    io
-  );
-  const browser: Browser = await chromium.launch();
-  const tools: Partial<Record<ToolName, ToolResult>> = {};
-  const readings: Partial<Record<ToolName, MachineReadings>> = {};
-  const warnings: string[] = [];
-  let done = 0;
-  try {
-    for (const [index, target] of targets.entries()) {
-      const directory = join(folders.work, target.name);
-      const tool = await installTarget(
-        targetSource(folders.repository, target.name),
-        directory,
-        target.name === "forgebook" ? request.forgebookPackages : undefined,
+  const bareSource = targetSource(folders.repository, "bare");
+  const bare = await installTarget(bareSource, join(folders.work, "bare"), undefined, io);
+  const forgebookOnly = (target: Target): Readonly<Record<string, string>> | undefined =>
+    target.name === "forgebook" ? request.forgebookPackages : undefined;
+
+  const browser = await chromium.launch();
+  const report: Partial<Record<ToolName, Record<string, MetricResult>>> = {};
+  const versions: Partial<Record<ToolName, Record<string, string>>> = {};
+  const tools: ToolRun[] = [];
+  for (const [index, target] of targets.entries()) {
+    const directory = join(folders.work, target.name);
+    const metrics: Record<string, MetricResult> = {};
+    report[target.name] = metrics;
+    try {
+      const source = targetSource(folders.repository, target.name);
+      const install = await installTarget(source, directory, forgebookOnly(target), io);
+      const onBare = await installOnBare(source, bareSource, join(folders.work, `${target.name}-on-bare`), {
+        packages: forgebookOnly(target),
+        bareSize: bare.size,
         io
-      );
+      });
       await writeProject(target, corpus, directory);
-      const reading = await readMachine(folders.work, io);
-      if (reading !== undefined) {
-        readings[target.name] = reading;
-        warnings.push(...noiseWarnings(reading).map((warning) => `${target.name}: ${warning}`));
-      }
-      const context: MeasureContext = {
-        target,
-        directory,
-        browser,
-        port: FIRST_PORT + index,
-        component: measured,
-        throttle: request.throttle,
-        io
-      };
-      const step = (metric: string, run: number, stepRuns: number): void => {
-        request.onStep({ tool: target.name, metric, run, runs: stepRuns, done, total });
-        done += 1;
-      };
-      const metrics = await toolMetrics(request, target, context, { tool, bare }, step);
-      const versions = await Promise.all(
+      const named = await Promise.all(
         target.packages.map(async (name) => [name, await installedVersion(directory, name)] as const)
       );
-      tools[target.name] = { versions: Object.fromEntries(versions), metrics };
+      versions[target.name] = Object.fromEntries(named);
+      tools.push({
+        context: {
+          target,
+          directory,
+          browser,
+          port: FIRST_PORT + index,
+          component: corpus.measured,
+          throttle: request.throttle,
+          io
+        },
+        metrics,
+        install,
+        onBare
+      });
+    } catch (error) {
+      metrics["install"] = { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
     }
+  }
+
+  const total = tools.length * groups.reduce((sum, group) => sum + groupSteps(group, runs), 0);
+  let done = 0;
+  const turns: Turns = {
+    step: (tool, metric, run, stepRuns) => {
+      request.onStep({ tool: tool.context.target.name, metric, run, runs: stepRuns, done, total });
+      done += 1;
+    }
+  };
+  const readings: MachineReading[] = [];
+  const warnings: string[] = [];
+  const readNow = async (moment: string): Promise<void> => {
+    const reading = await readMachine(folders.work, io);
+    if (reading === undefined) return;
+    readings.push({ moment, reading });
+    warnings.push(...noiseWarnings(reading).map((warning) => `${moment}: ${warning}`));
+  };
+  try {
+    for (const group of groups) {
+      await readNow(group);
+      await GROUPS[group]({ tools, request, turns });
+    }
+    await readNow("end");
   } finally {
     await browser.close();
   }
@@ -299,10 +389,17 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
     startedAt,
     forgebook: request.forgebookLabel,
     corpus: size,
+    measured: corpus.measured.name,
+    runs,
     throttle: request.throttle,
     machine: machineInfo(process.version),
     readings,
     warnings,
-    tools
+    tools: Object.fromEntries(
+      targets.map((target) => [
+        target.name,
+        { versions: versions[target.name] ?? {}, metrics: report[target.name] ?? {} }
+      ])
+    )
   };
 };

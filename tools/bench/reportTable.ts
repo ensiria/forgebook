@@ -6,6 +6,7 @@
 import { formatBytes } from "@ensiria/cli-kit/format";
 
 import type { BenchReport, MetricResult, ToolName } from "./bench.types.ts";
+import { comparedMedians } from "./benchStats.ts";
 
 /** A metric's cell. */
 const cell = (result: MetricResult | undefined): string => {
@@ -56,6 +57,24 @@ export const parseReport = (text: string): BenchReport => {
 };
 
 /**
+ * What makes two reports not comparable, empty when they are.
+ *
+ * @param first - the earlier report.
+ * @param second - the later one.
+ */
+export const reportMismatches = (first: BenchReport, second: BenchReport): string[] => {
+  const differs = (name: string, a: unknown, b: unknown): string[] =>
+    JSON.stringify(a) === JSON.stringify(b) ? [] : [`${name} differs`];
+  return [
+    ...differs("corpus", first.corpus, second.corpus),
+    ...differs("throttle", first.throttle, second.throttle),
+    ...differs("machine", first.machine, second.machine),
+    ...differs("forgebook", first.forgebook, second.forgebook),
+    ...differs("startedAt", first.startedAt === second.startedAt ? "same run" : "", "")
+  ];
+};
+
+/**
  * Every timing's median, as `tool metric` → milliseconds; sizes are left out, since they are exact.
  *
  * @param report - the report.
@@ -69,4 +88,29 @@ export const timeMedians = (report: BenchReport): Record<string, number> => {
     }
   }
   return medians;
+};
+
+/**
+ * Everything wrong with a finished run: metrics that failed, a comparison that cannot be made, medians that moved.
+ *
+ * @param report - the run's report.
+ * @param earlier - the report it is compared with, if any.
+ * @param tolerance - the change allowed in a median, as a share.
+ * @returns one line per problem, empty for a clean run.
+ */
+export const reportProblems = (
+  report: BenchReport,
+  earlier: BenchReport | undefined,
+  tolerance: number
+): string[] => {
+  const failures = Object.entries(report.tools).flatMap(([tool, result]) =>
+    Object.entries(result.metrics).flatMap(([metric, value]) =>
+      value.kind === "failed" ? [`${tool} ${metric} failed: ${value.reason}`] : []
+    )
+  );
+  if (earlier === undefined) return failures;
+  const mismatches = reportMismatches(earlier, report);
+  if (mismatches.length > 0) return [...failures, ...mismatches.map((each) => `not comparable: ${each}`)];
+  const moved = comparedMedians(timeMedians(earlier), timeMedians(report), tolerance);
+  return [...failures, ...moved.map((each) => `${each.metric}: ${each.first} → ${each.second} ms`)];
 };

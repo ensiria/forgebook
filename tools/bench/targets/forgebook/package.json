@@ -3,8 +3,11 @@
   "private": true,
   "description": "The peers of the Forgebook measured; the packages themselves are added as packed tarballs or a published version.",
   "dependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "typescript": "6.0.3",
     "vite": "8.3.5"
   }
 }

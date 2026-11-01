@@ -9,8 +9,6 @@
  *
  * @module
  */
-import type { Locator, Page } from "@playwright/test";
-
 import type { ToolName } from "./bench.types.ts";
 import type { CorpusComponent, StoryForm } from "./corpus.ts";
 
@@ -44,10 +42,8 @@ export type Target = {
   readonly storyUrl: (base: string, component: CorpusComponent) => string;
   /** The page of a component's stories, when the tool has one. */
   readonly componentUrl?: (base: string, component: CorpusComponent) => string;
-  /** An element of the story on a story's page. */
-  readonly inStory: (page: Page, selector: string) => Locator;
-  /** The table of props on a component's page, when the tool has one. */
-  readonly propsTable?: (page: Page) => Locator;
+  /** The table of props on a component's page, when the tool has one, in whichever document it draws. */
+  readonly propsTable?: string;
   /** The package whose direct dependencies a report counts. */
   readonly mainPackage: string;
 };
@@ -123,12 +119,6 @@ const titleId = (component: CorpusComponent): string => `${component.group}-${co
 const forgebookComponent = (component: CorpusComponent): string =>
   encodeURIComponent(`stories:${titleId(component)}`);
 
-/** The frame a story draws in on Forgebook's page. */
-const FORGEBOOK_FRAME = "iframe.forgebook-frame-view";
-
-/** The frame a story draws in on Storybook's page. */
-const STORYBOOK_FRAME = "#storybook-preview-iframe";
-
 /** Forgebook, from the packages under test. */
 export const FORGEBOOK: Target = {
   name: "forgebook",
@@ -142,8 +132,7 @@ export const FORGEBOOK: Target = {
   storyUrl: (base, component) =>
     `${base}?story=${forgebookComponent(component)}--${firstStory(component).toLowerCase()}`,
   componentUrl: (base, component) => `${base}?component=${forgebookComponent(component)}`,
-  inStory: (page, selector) => page.frameLocator(FORGEBOOK_FRAME).first().locator(selector).first(),
-  propsTable: (page) => page.locator(".forgebook-api__table").first()
+  propsTable: ".forgebook-api__table"
 };
 
 /** Storybook, on React and Vite. Its id spells a number as a word of its own. */
@@ -157,7 +146,17 @@ export const STORYBOOK: Target = {
   caches: ["node_modules/.vite", "node_modules/.cache"],
   dev: (port) => ({
     bin: "storybook",
-    args: ["dev", "--port", String(port), "--host", HOST, "--ci", "--disable-telemetry", "--quiet"],
+    args: [
+      "dev",
+      "--port",
+      String(port),
+      "--host",
+      HOST,
+      "--exact-port",
+      "--ci",
+      "--disable-telemetry",
+      "--quiet"
+    ],
     env: { STORYBOOK_DISABLE_TELEMETRY: "1" }
   }),
   build: (out) => ({
@@ -170,8 +169,7 @@ export const STORYBOOK: Target = {
       .replace(/(\d+)$/, "-$1")
       .toLowerCase()}`,
   componentUrl: (base, component) => `${base}?path=/docs/${titleId(component)}--docs`,
-  inStory: (page, selector) => page.frameLocator(STORYBOOK_FRAME).locator(selector).first(),
-  propsTable: (page) => page.frameLocator(STORYBOOK_FRAME).locator(".docblock-argstable").first()
+  propsTable: ".docblock-argstable"
 };
 
 /** Ladle. No page of a component's stories and no props table: those metrics are absent, not zero. */
@@ -185,8 +183,7 @@ export const LADLE: Target = {
   dev: (port) => ({ bin: "ladle", args: ["serve", "--port", String(port), "--host", HOST] }),
   build: (out) => ({ bin: "ladle", args: ["build", "--outDir", out] }),
   storyUrl: (base, component) =>
-    `${base}?story=${component.group.toLowerCase()}--${component.name.toLowerCase()}--${firstStory(component).toLowerCase()}`,
-  inStory: (page, selector) => page.locator(selector).first()
+    `${base}?story=${component.group.toLowerCase()}--${component.name.toLowerCase()}--${firstStory(component).toLowerCase()}`
 };
 
 /** Every tool, in report order. */

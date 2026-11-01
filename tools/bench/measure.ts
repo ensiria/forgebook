@@ -3,22 +3,23 @@
  *
  * @remarks
  * A browser decides every time, since "server ready" is not "usable": a tool can print its address and then rebuild
- * its dependencies and reload the page. Every sample starts a new browser context, with nothing cached. Status lines
- * are written by the caller between samples, never during one.
+ * its dependencies and reload the page. The times come from the page itself (`stamps.ts`). Every sample starts a new
+ * browser context, with nothing cached. Status lines are written by the caller between samples, never during one.
  *
  * @module
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
+import { connect } from "node:net";
 import { join } from "node:path";
-import { performance } from "node:perf_hooks";
 
 import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import type { CorpusComponent } from "./corpus.ts";
-import { diskUsage } from "./diskUsage.ts";
+import { contentSize } from "./diskUsage.ts";
+import { stampScript, waitForStamps } from "./stamps.ts";
 import { serveStatic } from "./staticServer.ts";
 import { HOST, type Target, type TargetCommand } from "./targets.ts";
 
@@ -31,6 +32,9 @@ const POLL_INTERVAL = 25;
 /** The pause between two edits, so one update does not land on the last, in milliseconds. */
 const EDIT_PAUSE = 150;
 
+/** How long a page is left after the story shows, for a reload to replace it, in milliseconds. */
+const SETTLE = 1000;
+
 /** How often the server's memory is read, in milliseconds. */
 const MEMORY_INTERVAL = 250;
 
@@ -42,6 +46,9 @@ const VIEWPORT = { width: 1280, height: 900 };
 
 /** The sidebar's last group, in the order every tool sorts them: seen when the whole index arrived. */
 const LAST_GROUP = "Overlays";
+
+/** The servers alive now, so an interrupted run leaves none behind to answer for the next. */
+const liveServers = new Set<ChildProcess>();
 
 /** What a measurement works with. */
 export type MeasureContext = {
@@ -68,33 +75,46 @@ const environment = (io: ScriptIo, command: TargetCommand): NodeJS.ProcessEnv =>
   ...command.env
 });
 
-/** Runs a target's command to its end. */
-const runCommand = async (context: MeasureContext, command: TargetCommand): Promise<void> => {
-  const program = join(context.directory, "node_modules", ".bin", command.bin);
-  await exec(program, [...command.args], {
-    cwd: context.directory,
-    env: environment(context.io, command),
-    io: context.io,
-    output: "capture",
-    timeoutMs: SAMPLE_TIMEOUT * 3
-  });
-};
+/** The story's text, what a measurement waits for. */
+const storyLabel = (component: CorpusComponent): string => component.stories[0]?.label ?? "";
 
-/** A dev server, in a process group of its own, so stopping it stops whatever it started. */
-const startServer = (context: MeasureContext): ChildProcess => {
+/** Whether something already listens on a port. */
+const isPortTaken = (port: number): Promise<boolean> =>
+  new Promise((resolve) => {
+    const socket = connect({ host: HOST, port });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("error", () => resolve(false));
+  });
+
+/**
+ * A dev server, in a process group of its own, so stopping it stops whatever it started.
+ *
+ * @throws when the port is taken: what answered there would pass for this server, with a time near zero.
+ */
+const startServer = async (context: MeasureContext): Promise<ChildProcess> => {
+  if (await isPortTaken(context.port)) throw new Error(`port ${context.port} is already taken`);
   const command = context.target.dev(context.port);
-  return spawn(join(context.directory, "node_modules", ".bin", command.bin), [...command.args], {
+  const server = spawn(join(context.directory, "node_modules", ".bin", command.bin), [...command.args], {
     cwd: context.directory,
     detached: true,
-    stdio: ["ignore", "ignore", "ignore"],
+    stdio: "ignore",
     env: environment(context.io, command)
   });
+  liveServers.add(server);
+  return server;
 };
+
+/** Whether a server's process has ended, by its own exit or a signal. */
+const hasEnded = (server: ChildProcess): boolean => server.exitCode !== null || server.signalCode !== null;
 
 /** Stops a server and waits for it to be gone, so the next one finds the port free. */
 const stopServer = (server: ChildProcess): Promise<void> =>
   new Promise((resolve) => {
-    if (server.exitCode !== null || server.pid === undefined) {
+    liveServers.delete(server);
+    if (hasEnded(server) || server.pid === undefined) {
       resolve();
       return;
     }
@@ -102,11 +122,19 @@ const stopServer = (server: ChildProcess): Promise<void> =>
     process.kill(-server.pid, "SIGKILL");
   });
 
+/** Stops every server alive, when a run is interrupted. */
+export const stopAllServers = async (): Promise<void> => {
+  await Promise.all([...liveServers].map(stopServer));
+};
+
+/** The address of a server of this context. */
+export const baseOf = (context: Pick<MeasureContext, "port">): string => `http://${HOST}:${context.port}/`;
+
 /** Waits until a server answers, however it answers; one that dies fails at once, with no timeout to sit through. */
 const waitForServer = async (server: ChildProcess, address: string): Promise<void> => {
-  const deadline = performance.now() + SAMPLE_TIMEOUT;
-  while (performance.now() < deadline) {
-    if (server.exitCode !== null) throw new Error(`the server stopped with code ${server.exitCode}`);
+  const deadline = Date.now() + SAMPLE_TIMEOUT;
+  while (Date.now() < deadline) {
+    if (hasEnded(server)) throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})`);
     const hasAnswered = await fetch(address).then(
       () => true,
       () => false
@@ -117,12 +145,18 @@ const waitForServer = async (server: ChildProcess, address: string): Promise<voi
   throw new Error(`nothing answered at ${address}`);
 };
 
-/** A clean browser context with its page, throttled when asked. */
+/** A clean browser context with its page, stamping, throttled when asked. */
 const openPage = async (
   context: MeasureContext,
   viewport: { readonly width: number; readonly height: number }
 ): Promise<{ readonly browserContext: BrowserContext; readonly page: Page }> => {
   const browserContext = await context.browser.newContext({ viewport });
+  await browserContext.addInitScript({
+    content: stampScript({
+      texts: [LAST_GROUP],
+      selectors: context.target.propsTable === undefined ? [] : [context.target.propsTable]
+    })
+  });
   const page = await browserContext.newPage();
   page.setDefaultTimeout(SAMPLE_TIMEOUT);
   if (context.throttle > 1) {
@@ -131,9 +165,6 @@ const openPage = async (
   }
   return { browserContext, page };
 };
-
-/** The address of a server of this context. */
-const baseOf = (context: MeasureContext): string => `http://${HOST}:${context.port}/`;
 
 /** Removes the tool's caches, as a first start finds them. */
 const removeCaches = async ({ target, directory }: MeasureContext): Promise<void> => {
@@ -144,9 +175,9 @@ const removeCaches = async ({ target, directory }: MeasureContext): Promise<void
 
 /** One start of the dev server: spawned → the story on screen, and → the sidebar's last group. */
 export type StartSample = {
-  /** Spawned → the first story visible, in milliseconds. */
+  /** Spawned → the first story drawn, in milliseconds. */
   readonly story: number;
-  /** Spawned → the sidebar's last group visible, in milliseconds. */
+  /** Spawned → the sidebar's last group drawn, in milliseconds. */
   readonly sidebar: number;
 };
 
@@ -159,21 +190,16 @@ export type StartSample = {
 export const measureStart = async (context: MeasureContext, isCold: boolean): Promise<StartSample> => {
   if (isCold) await removeCaches(context);
   const { browserContext, page } = await openPage(context, VIEWPORT);
-  const start = performance.now();
-  const server = startServer(context);
+  const start = Date.now();
+  const server = await startServer(context);
   try {
     await waitForServer(server, baseOf(context));
-    const seen = async (wait: Promise<void>): Promise<number> => {
-      await wait;
-      return performance.now() - start;
-    };
-    const navigation = page.goto(context.target.storyUrl(baseOf(context), context.component));
-    const [story, sidebar] = await Promise.all([
-      seen(context.target.inStory(page, '[data-bench="label"]').waitFor({ state: "visible" })),
-      seen(page.getByText(LAST_GROUP, { exact: true }).first().waitFor({ state: "visible" })),
-      navigation
-    ]);
-    return { story, sidebar };
+    await page.goto(context.target.storyUrl(baseOf(context), context.component));
+    const keys = [storyLabel(context.component), LAST_GROUP];
+    await waitForStamps(page, keys, start + SAMPLE_TIMEOUT);
+    await new Promise((resolve) => setTimeout(resolve, SETTLE));
+    const [story = 0, sidebar = 0] = await waitForStamps(page, keys, start + SAMPLE_TIMEOUT);
+    return { story: story - start, sidebar: sidebar - start };
   } finally {
     await browserContext.close();
     await stopServer(server);
@@ -204,21 +230,21 @@ export const measureEdits = async (
   );
   const original = await readFile(file, "utf8");
   const before = kind === "story" ? /label: "[^"]*"/ : /const BUILD = "[^"]*"/;
-  const selector = kind === "story" ? '[data-bench="label"]' : '[data-bench="build"]';
-  const server = startServer(context);
+  const server = await startServer(context);
   const { browserContext, page } = await openPage(context, VIEWPORT);
   try {
     await waitForServer(server, baseOf(context));
     await page.goto(context.target.storyUrl(baseOf(context), context.component));
-    await context.target.inStory(page, selector).waitFor({ state: "visible" });
+    await waitForStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
+    await new Promise((resolve) => setTimeout(resolve, SETTLE));
     const samples: number[] = [];
     for (let edit = 0; edit < edits; edit += 1) {
       const text = `edit ${edit}`;
       const replacement = kind === "story" ? `label: "${text}"` : `const BUILD = "${text}"`;
-      const start = performance.now();
+      const start = Date.now();
       await writeFile(file, original.replace(before, replacement));
-      await context.target.inStory(page, `${selector}:text-is("${text}")`).waitFor();
-      samples.push(performance.now() - start);
+      const [drawn = 0] = await waitForStamps(page, [text], start + SAMPLE_TIMEOUT);
+      samples.push(drawn - start);
       await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE));
     }
     return samples;
@@ -229,24 +255,11 @@ export const measureEdits = async (
   }
 };
 
-/** How many of the corpus's stories are drawn in the page, in all its frames. */
-const drawnStories = async (page: Page): Promise<number> => {
-  const counts = await Promise.all(
-    page.frames().map((frame) =>
-      frame
-        .locator('[data-bench="label"]')
-        .count()
-        .catch(() => 0)
-    )
-  );
-  return counts.reduce((sum, count) => sum + count, 0);
-};
-
 /** One visit to a component's page. */
 export type PageSample = {
   /** Opened → every story drawn, in milliseconds. */
   readonly stories: number;
-  /** Opened → the table of props visible, in milliseconds; none where the tool has none. */
+  /** Opened → the table of props drawn, in milliseconds; none where the tool has none. */
   readonly props: number | undefined;
 };
 
@@ -257,23 +270,18 @@ export type PageSample = {
  * @param address - the page's address.
  */
 export const measureComponentPage = async (context: MeasureContext, address: string): Promise<PageSample> => {
-  const server = startServer(context);
+  const server = await startServer(context);
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
   try {
     await waitForServer(server, baseOf(context));
-    const start = performance.now();
-    const navigation = page.goto(address);
-    const allDrawn = (async (): Promise<number> => {
-      while ((await drawnStories(page)) < context.component.stories.length) {
-        if (performance.now() - start > SAMPLE_TIMEOUT) throw new Error("the stories were never all drawn");
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
-      }
-      return performance.now() - start;
-    })();
-    const table = context.target.propsTable?.(page);
-    const props = table?.waitFor({ state: "visible" }).then(() => performance.now() - start);
-    const [stories, propsTime] = await Promise.all([allDrawn, props, navigation]);
-    return { stories, props: propsTime };
+    const start = Date.now();
+    await page.goto(address);
+    // by text and not by count: a tool may draw a story twice, which must not stand in for one still missing
+    const labels = context.component.stories.map((story) => story.label);
+    const drawn = await waitForStamps(page, labels, start + SAMPLE_TIMEOUT);
+    const table = context.target.propsTable;
+    const [props] = table === undefined ? [] : await waitForStamps(page, [table], start + SAMPLE_TIMEOUT);
+    return { stories: Math.max(...drawn) - start, props: props === undefined ? undefined : props - start };
   } finally {
     await browserContext.close();
     await stopServer(server);
@@ -310,14 +318,15 @@ const treeMemory = async (rootPid: number, io: ScriptIo): Promise<number> => {
  * The dev server's peak memory across a start and a visit to a page.
  *
  * @remarks
- * A run of its own, since reading `ps` in a loop would disturb a timing.
+ * A run of its own, since reading `ps` in a loop would disturb a timing. Resident memory summed over the process tree,
+ * so pages shared between processes count more than once: a tool of several processes reads a little high.
  *
  * @param context - the measurement's context.
  * @param address - the page visited.
- * @returns the peak resident memory of the server's tree, in bytes.
+ * @returns the peak, in bytes.
  */
 export const measureMemory = async (context: MeasureContext, address: string): Promise<number> => {
-  const server = startServer(context);
+  const server = await startServer(context);
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
   let peak = 0;
   let isDone = false;
@@ -333,7 +342,7 @@ export const measureMemory = async (context: MeasureContext, address: string): P
     await waitForServer(server, baseOf(context));
     await page.goto(address);
     await page.waitForLoadState("networkidle");
-    await new Promise((resolve) => setTimeout(resolve, MEMORY_INTERVAL * 4));
+    await new Promise((resolve) => setTimeout(resolve, SETTLE * 2));
     return peak;
   } finally {
     isDone = true;
@@ -347,7 +356,7 @@ export const measureMemory = async (context: MeasureContext, address: string): P
 export type BuildSample = {
   /** Its time, in milliseconds. */
   readonly time: number;
-  /** The size of its output on disk, in bytes. */
+  /** The bytes of its output. */
   readonly size: number;
 };
 
@@ -355,17 +364,24 @@ export type BuildSample = {
 const BUILD_FOLDER = "bench-build";
 
 /**
- * Builds the catalogue from nothing.
+ * Builds the catalogue from nothing: no output and no cache.
  *
  * @param context - the measurement's context.
  */
 export const measureBuild = async (context: MeasureContext): Promise<BuildSample> => {
   const out = join(context.directory, BUILD_FOLDER);
   await rm(out, { recursive: true, force: true });
-  const start = performance.now();
-  await runCommand(context, context.target.build(BUILD_FOLDER));
-  const time = performance.now() - start;
-  return { time, size: await diskUsage(out) };
+  await removeCaches(context);
+  const command = context.target.build(BUILD_FOLDER);
+  const start = Date.now();
+  await exec(join(context.directory, "node_modules", ".bin", command.bin), [...command.args], {
+    cwd: context.directory,
+    env: environment(context.io, command),
+    io: context.io,
+    output: "capture",
+    timeoutMs: SAMPLE_TIMEOUT * 3
+  });
+  return { time: Date.now() - start, size: await contentSize(out) };
 };
 
 /** The script a first load fetched, gzipped. */
@@ -374,10 +390,12 @@ export type LoadSample = {
   readonly shell: number;
   /** JavaScript fetched by the frames, in bytes; none where stories draw in the page itself. */
   readonly frame: number | undefined;
+  /** JavaScript fetched in all, each file once, in bytes: a file both sides fetch counts in both columns. */
+  readonly total: number;
 };
 
 /**
- * Serves the last build and counts the JavaScript a first load fetches until the story is on screen.
+ * Serves the last build and counts the JavaScript a first load fetches once the network went quiet.
  *
  * @param context - the measurement's context.
  */
@@ -386,20 +404,22 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
   const { browserContext, page } = await openPage(context, VIEWPORT);
   const main = new Set<string>();
   const frames = new Set<string>();
-  let hasFrame = false;
   page.on("request", (request) => {
-    if (request.frame() !== page.mainFrame()) hasFrame = true;
     if (request.resourceType() !== "script") return;
     const path = new URL(request.url()).pathname;
     (request.frame() === page.mainFrame() ? main : frames).add(path);
   });
   try {
     await page.goto(context.target.storyUrl(server.base, context.component));
-    await context.target.inStory(page, '[data-bench="label"]').waitFor({ state: "visible" });
-    await page.waitForLoadState("load");
+    await waitForStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
+    await page.waitForLoadState("networkidle");
     const total = (paths: ReadonlySet<string>): number =>
       [...paths].reduce((sum, path) => sum + server.gzippedSize(path), 0);
-    return { shell: total(main), frame: hasFrame ? total(frames) : undefined };
+    return {
+      shell: total(main),
+      frame: page.frames().length > 1 ? total(frames) : undefined,
+      total: total(new Set([...main, ...frames]))
+    };
   } finally {
     await browserContext.close();
     await server.close();

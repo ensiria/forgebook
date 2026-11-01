@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { buildCorpus } from "./corpus.ts";
 import { FORGEBOOK, LADLE, STORYBOOK, TARGETS } from "./targets.ts";
 
-const COMPONENT = buildCorpus({ components: 2, stories: 4 }).components[0];
+const COMPONENT = buildCorpus({ components: 8, stories: 16 }).components[0];
 const BASE = "http://127.0.0.1:1/";
 
 describe("targets", () => {

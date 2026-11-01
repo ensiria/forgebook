@@ -26,6 +26,11 @@ describe("buildCorpus", () => {
     expect(CORPUS.components.every((component) => component.stories[0]?.hasPlay === false)).toBe(true);
   });
 
+  it("measures a component in the middle, at the end of a chain, with no play function", () => {
+    expect(CORPUS.measured.name).toBe("Widget7");
+    expect(CORPUS.measured.stories[0]?.hasPlay).toBe(false);
+  });
+
   it("refuses fewer stories than components, which would leave a file empty", () => {
     expect(() => buildCorpus({ components: 10, stories: 9 })).toThrow("at least one story");
   });
@@ -71,6 +76,15 @@ describe("projectFiles", () => {
     const second = CORPUS.components[1];
     const text = csf[`src/components/${second?.name}.tsx`];
     expect(text).toContain(`from "./${first}"`);
+  });
+
+  it("keeps chains short, or every story would load the whole library", () => {
+    const fifth = CORPUS.components[4];
+    expect(csf[`src/components/${fifth?.name}.tsx`]).not.toContain('from "./Widget3"');
+  });
+
+  it("is a TypeScript project, as the README describes one", () => {
+    expect(JSON.parse(csf["tsconfig.json"] ?? "{}").include).toEqual(["src"]);
   });
 
   it("types and documents the props, so a props table has something to read", () => {

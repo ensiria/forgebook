@@ -25,7 +25,7 @@ export type RawReadings = {
   readonly thermal: string;
   /** `tmutil status`. */
   readonly backup: string;
-  /** `mdutil -s` on the volume. */
+  /** `mdutil -s` on the volume, which answers for a mount point and not for a folder in it. */
   readonly indexing: string;
   /** `top -l 3 -n 0`. */
   readonly processes: string;
@@ -81,6 +81,12 @@ export const machineInfo = (node: string): MachineInfo => ({
   node
 });
 
+/** The mount point of a folder's volume. */
+const mountPoint = async (directory: string, io: ScriptIo): Promise<string> => {
+  const { stdout } = await exec("df", [directory], { io, output: "capture" });
+  return stdout.trim().split("\n").at(-1)?.split(/\s+/).at(-1) ?? directory;
+};
+
 /**
  * The machine's load now, on macOS.
  *
@@ -91,14 +97,14 @@ export const machineInfo = (node: string): MachineInfo => ({
 export const readMachine = async (directory: string, io: ScriptIo): Promise<MachineReadings | undefined> => {
   if (platform() !== "darwin") return undefined;
   const read = async (command: string, args: readonly string[]): Promise<string> => {
-    const { stdout } = await exec(command, [...args], { io, check: false });
+    const { stdout } = await exec(command, [...args], { io, check: false, output: "capture" });
     return stdout;
   };
   return parseReadings({
     battery: await read("pmset", ["-g", "batt"]),
     thermal: await read("pmset", ["-g", "therm"]),
     backup: await read("tmutil", ["status"]),
-    indexing: await read("mdutil", ["-s", directory]),
+    indexing: await read("mdutil", ["-s", await mountPoint(directory, io)]),
     processes: await read("top", ["-l", "3", "-n", "0"])
   });
 };

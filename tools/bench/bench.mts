@@ -12,9 +12,9 @@ import { exec } from "@ensiria/cli-kit/exec";
 import { table } from "@ensiria/cli-kit/layout";
 import { defineScript, ScriptError } from "@ensiria/cli-kit/script";
 
-import { comparedMedians } from "./benchStats.ts";
+import { stopAllServers } from "./measure.ts";
 import { packForgebook, publishedForgebook } from "./prepare.ts";
-import { parseReport, reportRows, timeMedians } from "./reportTable.ts";
+import { parseReport, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
 import { statusWriter } from "./statusFile.ts";
 import { FORGEBOOK, TARGETS } from "./targets.ts";
@@ -60,7 +60,8 @@ await defineScript({
     against: {
       type: "string",
       valueName: "report",
-      description: "Fail when a time's median moved more than 10 % from this report."
+      description:
+        "Fail when a time's median moved more than 10 % from this report of the same corpus, machine and commit."
     },
     "forgebook-version": {
       type: "string",
@@ -73,12 +74,16 @@ await defineScript({
     { command: "bench --compare --json", description: "The three tools, as a report." },
     { command: "bench --metric hmr --runs 3", description: "Only the edits." }
   ],
-  run: async ({ options, io, log, style, isJson }) => {
+  run: async ({ options, io, log, style, isJson, onExit }) => {
+    onExit(stopAllServers);
     const unknown = options.metric.filter((word) => !isGroup(word));
     if (unknown.length > 0) {
       throw new ScriptError(`unknown --metric: ${unknown.join(", ")}`, { hint: METRIC_GROUPS.join(", ") });
     }
     const groups = options.metric.length === 0 ? [...METRIC_GROUPS] : options.metric.filter(isGroup);
+    // read first: this run overwrites the last report, which could otherwise be compared with itself
+    const earlier =
+      options.against === undefined ? undefined : parseReport(readFileSync(options.against, "utf8"));
     const work = join(REPOSITORY, ".bench");
     mkdirSync(work, { recursive: true });
     const folders = { repository: REPOSITORY, work };
@@ -87,12 +92,13 @@ await defineScript({
     const forgebookPackages =
       version === undefined ? await packForgebook(folders, io) : publishedForgebook(version);
     const { stdout: commit } = await exec("git", ["rev-parse", "--short", "HEAD"], { cwd: REPOSITORY, io });
+    const { stdout: changes } = await exec("git", ["status", "--porcelain"], { cwd: REPOSITORY, io });
     const write = statusWriter(options.status, Date.now);
     const report = await runBench({
       folders,
       targets: options.compare ? TARGETS : [FORGEBOOK],
       forgebookPackages,
-      forgebookLabel: version ?? commit.trim(),
+      forgebookLabel: version ?? `${commit.trim()}${changes.trim() === "" ? "" : "-dirty"}`,
       size: { components: options.components, stories: options.stories },
       runs: options.runs,
       edits: options.edits,
@@ -113,24 +119,10 @@ await defineScript({
         `${table(rows, { columns: ["metric", ...tools].map((header) => ({ header })) }, style)}\n`
       );
     }
-    const failures = Object.values(report.tools).flatMap((tool) =>
-      Object.entries(tool.metrics).flatMap(([metric, result]) =>
-        result.kind === "failed" ? [`${metric}: ${result.reason}`] : []
-      )
-    );
-    const earlier = options.against;
-    const moved =
-      earlier === undefined
-        ? []
-        : comparedMedians(
-            timeMedians(parseReport(readFileSync(earlier, "utf8"))),
-            timeMedians(report),
-            REPRODUCIBLE_WITHIN
-          );
-    for (const each of moved) log.error(`${each.metric}: ${each.first} → ${each.second} ms`);
-    for (const failure of failures) log.error(failure);
-    if (failures.length > 0 || moved.length > 0) {
-      throw new ScriptError(`${failures.length} metrics failed, ${moved.length} moved more than 10 %`, {
+    const problems = reportProblems(report, earlier, REPRODUCIBLE_WITHIN);
+    for (const problem of problems) log.error(problem);
+    if (problems.length > 0) {
+      throw new ScriptError(`${problems.length} problems with this run`, {
         hint: `The report is in ${join(work, "report.json")}`
       });
     }

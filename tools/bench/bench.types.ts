@@ -53,6 +53,14 @@ export type MachineReadings = {
   readonly load: number | undefined;
 };
 
+/** The machine's load at a moment of the run. */
+export type MachineReading = {
+  /** When: the group about to start, or `end`. */
+  readonly moment: string;
+  /** What it read. */
+  readonly reading: MachineReadings;
+};
+
 /** The machine a run took place on. */
 export type MachineInfo = {
   /** `process.platform` and `process.arch`. */
@@ -79,12 +87,16 @@ export type BenchReport = {
   readonly forgebook: string;
   /** The corpus measured. */
   readonly corpus: { readonly components: number; readonly stories: number };
+  /** The component the story metrics were taken on. */
+  readonly measured: string;
+  /** The runs of each time. */
+  readonly runs: number;
   /** The CPU throttle of the browser, 1 for none. */
   readonly throttle: number;
   /** The machine. */
   readonly machine: MachineInfo;
-  /** Its load before each tool, where it can be read. */
-  readonly readings: Readonly<Partial<Record<ToolName, MachineReadings>>>;
+  /** Its load before each group and at the end, where it can be read. */
+  readonly readings: readonly MachineReading[];
   /** What may have disturbed the run; empty for a quiet machine. */
   readonly warnings: readonly string[];
   /** The results by tool. */

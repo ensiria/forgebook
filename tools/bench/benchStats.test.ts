@@ -36,7 +36,13 @@ describe("comparedMedians", () => {
     ]);
   });
 
-  it("ignores a metric only one side has", () => {
-    expect(comparedMedians({ build: 1 }, { coldStart: 2 }, 0.1)).toEqual([]);
+  it("lists a metric the second run lost, which is no agreement", () => {
+    expect(comparedMedians({ build: 100 }, {}, 0.1)).toEqual([
+      { metric: "build", first: 100, second: 0, change: 1 }
+    ]);
+  });
+
+  it("ignores a metric only the second run has", () => {
+    expect(comparedMedians({}, { coldStart: 2 }, 0.1)).toEqual([]);
   });
 });
