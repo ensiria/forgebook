@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/ensiria/forgebook/main/assets/forgebook-logo.svg" alt="" width="64" height="64">
+
 # Forgebook
 
 See every component in every theme, contrast, language and width. Write CSF stories, run `forgebook dev`: one frame
