@@ -1,3 +1,13 @@
+## 0.1.7 (2026-11-01)
+
+### 🩹 Fixes
+
+- **forgebook:** build style sheets with var() in pointer media rules ([affc2c9](https://github.com/ensiria/forgebook/commit/affc2c9))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.6 (2026-11-01)
 
 ### 🚀 Features
