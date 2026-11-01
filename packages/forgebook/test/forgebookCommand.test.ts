@@ -22,6 +22,9 @@ const ENTRY = join(import.meta.dirname, "..", "bin", "forgebook", "forgebook.mts
 /** No catalogue answers there, so the command starts a server of its own. */
 const NO_SERVER = "http://127.0.0.1:9";
 
+/** How long a test may take that starts a server of its own, on a slow runner, in milliseconds. */
+const SERVER_TIMEOUT = 60_000;
+
 /** A catalogue folder with its configuration and story files. */
 const catalogue = (root: string, name: string, files: Readonly<Record<string, string>>): string => {
   const dir = join(root, name);
@@ -172,6 +175,153 @@ describe("forgebook new", () => {
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain("Select.stories.tsx exists");
   }, 60_000);
+});
+
+describe("forgebook tokens", { timeout: SERVER_TIMEOUT }, () => {
+  const withTokens = (): string => {
+    const project = join(root, "with-tokens");
+    const config = catalogue(root, "with-tokens", { "A.stories.tsx": "export default { title: 'A/B' };\n" });
+    writeFileSync(
+      join(project, "tokens.json"),
+      readFileSync(join(import.meta.dirname, "fixtures", "tokens.json"))
+    );
+    writeFileSync(
+      join(project, "dark.json"),
+      JSON.stringify({
+        color: {
+          brand: {
+            primary: Object.fromEntries([
+              ["$type", "color"],
+              ["$value", "#ffaa88"]
+            ])
+          }
+        }
+      })
+    );
+    const written: unknown = JSON.parse(
+      readFileSync(config, "utf8")
+        .replace(/^export default /, "")
+        .replace(/;\s*$/, "")
+    );
+    const tokens = ["tokens.json", { file: "dark.json", mode: "dark" }];
+    writeFileSync(config, `export default ${JSON.stringify({ ...Object(written), tokens })};\n`);
+    return config;
+  };
+
+  /** Runs the command on the catalogue and reads its JSON. */
+  const tokensOf = (config: string, ...args: readonly string[]): { status: number | null; body: unknown } => {
+    const run = runScriptProcess(ENTRY, [
+      "tokens",
+      ...args,
+      "--config",
+      config,
+      "--url",
+      NO_SERVER,
+      "--json"
+    ]);
+    return { status: run.exitCode, body: run.exitCode === 0 ? JSON.parse(run.stdout) : run.stderr };
+  };
+
+  /** The exit of a command that is meant to fail. */
+  const failing = (config: string, ...args: readonly string[]): string => {
+    const run = runScriptProcess(ENTRY, [
+      "tokens",
+      ...args,
+      "--config",
+      config,
+      "--url",
+      NO_SERVER,
+      "--json"
+    ]);
+    expect(run.exitCode).not.toBe(0);
+    return run.stderr;
+  };
+
+  it("answers an agent: how many, one token, and what to write instead of a raw value", () => {
+    const config = withTokens();
+    const list = tokensOf(config, "--category", "space");
+    expect(list.status).toBe(0);
+    expect(list.body).toMatchObject({ schema: 1, isConfigured: true, total: 2, types: { dimension: 2 } });
+    expect(tokensOf(config, "--limit", "1").body).toMatchObject({
+      tokens: [{ name: "color.brand.primary" }]
+    });
+    expect(tokensOf(config, "color.brand.primary").body).toMatchObject({
+      token: { value: "#e8501c", description: "The accent.", modes: { dark: "#ffaa88" } }
+    });
+    expect(tokensOf(config, "--nearest", "#1c1b1b").body).toMatchObject({
+      type: "color",
+      matches: [
+        expect.objectContaining({ name: "color.brand.ink", isClose: true, isExact: false }),
+        expect.anything(),
+        expect.anything()
+      ]
+    });
+    expect(tokensOf(config, "--nearest", "12px", "--type", "padding").body).toMatchObject({
+      type: "dimension",
+      matches: [expect.objectContaining({ name: "space.small", distance: 4 }), expect.anything()]
+    });
+  });
+
+  it("fails on what it cannot answer, with why, so an agent does not read it as no token", () => {
+    const config = withTokens();
+    expect(failing(config, "color.nope")).toContain('No token "color.nope"');
+    expect(failing(config, "--nearest", "not a value", "--type", "color")).toContain("Cannot read");
+    expect(failing(config, "--nearest", "#000", "--type", "nonsense")).toContain("Cannot compare");
+  });
+
+  it("says a catalogue names no tokens file, not that there is no such token", () => {
+    const config = catalogue(root, "no-tokens", { "A.stories.tsx": "export default { title: 'A/B' };\n" });
+    expect(tokensOf(config).body).toMatchObject({ isConfigured: false, total: 0 });
+    expect(failing(config, "--nearest", "#000")).toContain("names no tokens file");
+  });
+
+  it("answers while a story file is broken: tokens have nothing to do with stories", () => {
+    const config = withTokens();
+    writeFileSync(join(root, "with-tokens", "src", "Broken.stories.tsx"), "export const = ;\n");
+    expect(tokensOf(config, "--nearest", "#e8501c").status).toBe(0);
+    rmSync(join(root, "with-tokens", "src", "Broken.stories.tsx"));
+  });
+
+  it("keeps a good answer when something else in the files is broken, and fails the whole list", () => {
+    const config = withTokens();
+    const project = join(root, "with-tokens");
+    writeFileSync(
+      join(project, "dark.json"),
+      JSON.stringify({
+        broken: Object.fromEntries([
+          ["$type", "color"],
+          ["$value", "{nowhere}"]
+        ])
+      })
+    );
+    expect(tokensOf(config, "--nearest", "#e8501c").status).toBe(0);
+    expect(tokensOf(config, "--category", "color").status).not.toBe(0);
+  });
+
+  it("is what an agent's session gets through forgebook mcp, from a raw value to a token", () => {
+    const config = withTokens();
+    const session = (name: string, args: unknown): string =>
+      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } });
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", config, "--url", NO_SERVER], {
+      input: [
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 0,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "test", version: "1" }
+          }
+        }),
+        session("nearest_token", { value: "#1c1b1b" })
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 30_000
+    });
+    expect(run.stdout).toContain("color.brand.ink");
+    expect(run.stdout).toContain("isClose");
+  });
 });
 
 describe("forgebook agents", () => {

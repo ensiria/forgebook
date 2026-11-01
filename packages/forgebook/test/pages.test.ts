@@ -23,6 +23,7 @@ const CONFIG: ResolvedConfig = {
   languages: [{ id: "it", label: "Italiano" }],
   previews: ["/catalogue/forgebook.preview.tsx"],
   head: '<link rel="stylesheet" href="/fonts.css" />',
+  tokens: [],
   watch: [],
   lists: {},
   hasPlayTools: false
