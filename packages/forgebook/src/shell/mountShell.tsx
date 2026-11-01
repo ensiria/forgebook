@@ -10,6 +10,7 @@ import { createRoot } from "react-dom/client";
 
 import type { StoryCodeWriter } from "../frame/renderer.ts";
 import { CodeWriterContext } from "./codeWriter.ts";
+import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Shell, type ShellConfig } from "./Shell.tsx";
 import { configureStrings } from "./strings.ts";
 
@@ -20,15 +21,18 @@ export type MountShellConfig = ShellConfig & {
 };
 
 /**
- * The page's icon: the catalogue's logo, replacing any the page declares.
+ * The page's icon: the catalogue's logo, replacing any the page declares; without a logo, Forgebook's mark, unless the
+ * page declares an icon of its own.
  *
- * @param logo - the logo's URL.
+ * @param logo - the logo's URL; none for Forgebook's mark.
  */
-const setPageIcon = (logo: string): void => {
-  for (const link of document.querySelectorAll('link[rel~="icon"]')) link.remove();
+const setPageIcon = (logo: string | undefined): void => {
+  const declared = document.querySelectorAll('link[rel~="icon"]');
+  if (logo === undefined && declared.length > 0) return;
+  for (const link of declared) link.remove();
   const icon = document.createElement("link");
   icon.rel = "icon";
-  icon.href = logo;
+  icon.href = logo ?? FORGEBOOK_MARK_URL;
   document.head.append(icon);
 };
 
@@ -39,7 +43,7 @@ const setPageIcon = (logo: string): void => {
  * @param config - the catalogue's name, its logo, its sources, its frame page and the framework's code writer.
  */
 export const mountShell = (container: HTMLElement, config: MountShellConfig): void => {
-  if (config.logo !== undefined) setPageIcon(config.logo);
+  setPageIcon(config.logo);
   configureStrings(config.lists?.strings ?? {});
   const { codeOf, ...shell } = config;
   createRoot(container).render(

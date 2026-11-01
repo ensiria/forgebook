@@ -22,6 +22,7 @@ import {
 
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
+import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
 import { isTyping } from "./keyboard.ts";
 import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
@@ -200,14 +201,14 @@ export const Sidebar = ({
             onOpenHome();
           }}
         >
-          {logo === undefined ? (
-            <span className="forgebook-brand__mark">
-              <Icon name="compare" size={14} />
-            </span>
-          ) : (
-            // decorative: the name beside it says what it is
-            <img className="forgebook-brand__logo" src={logo} alt="" width={28} height={28} />
-          )}
+          {/* decorative: the name beside it says what it is */}
+          <img
+            className="forgebook-brand__logo"
+            src={logo ?? FORGEBOOK_MARK_URL}
+            alt=""
+            width={28}
+            height={28}
+          />
           <span className="forgebook-brand__name">{title}</span>
         </a>
         <button

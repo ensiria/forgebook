@@ -109,16 +109,6 @@
     padding: $space-0-5 $space-1;
   }
 
-  .forgebook-brand__mark {
-    display: grid;
-    place-items: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: $radius-control;
-    background: $accent;
-    color: $on-accent;
-  }
-
   .forgebook-brand__logo {
     flex: none;
     display: block;
