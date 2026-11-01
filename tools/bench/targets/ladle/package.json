@@ -1,0 +1,10 @@
+{
+  "name": "bench-target-ladle",
+  "private": true,
+  "description": "The Ladle measured. It brings its own Vite, which a project cannot change.",
+  "dependencies": {
+    "@ladle/react": "5.1.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "bench-target-bare",
+  "private": true,
+  "description": "A project with Vite and React and no catalogue: what each tool's install is measured against.",
+  "dependencies": {
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "8.3.5"
+  }
+}

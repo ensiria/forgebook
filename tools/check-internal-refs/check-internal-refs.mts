@@ -17,7 +17,7 @@ import { internalReferences } from "./internalRefs.ts";
  * out what they look for (its patterns, its README, the commit check's tests).
  */
 const SKIPPED =
-  /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|zip|gz)$|(^|\/)pnpm-lock\.yaml$|^tools\/check-internal-refs\/|^tools\/check-commits\/commitMessages\.test\.ts$/;
+  /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|zip|gz)$|(^|\/)(pnpm-lock\.yaml|package-lock\.json)$|^tools\/check-internal-refs\/|^tools\/check-commits\/commitMessages\.test\.ts$/;
 
 await defineScript({
   name: "check-internal-refs",

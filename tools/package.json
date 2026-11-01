@@ -2,7 +2,7 @@
   "name": "@forgebook/tools",
   "version": "0.0.0",
   "private": true,
-  "description": "The repository's own commands: the build of each package for npm, and the check of its published manifest.",
+  "description": "The repository's own commands: the build of each package for npm, the check of its published manifest, and the benchmark.",
   "type": "module",
   "bin": {
     "package-build": "./package-build/package-build.mts"
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@forgebook/typescript-config": "workspace:*",
+    "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
     "vitest": "5.0.5"
   }
