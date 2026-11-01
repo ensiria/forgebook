@@ -228,7 +228,7 @@ const THEME_FILE = `:root {
 }
 `;
 
-/** The project's TypeScript configuration, as Vite's React template writes it. */
+/** The project's TypeScript configuration, an ordinary one for Vite and React. */
 const TSCONFIG_FILE = `${JSON.stringify(
   {
     compilerOptions: {
@@ -237,7 +237,7 @@ const TSCONFIG_FILE = `${JSON.stringify(
       module: "ESNext",
       moduleResolution: "bundler",
       jsx: "react-jsx",
-      strict: false,
+      strict: true,
       skipLibCheck: true,
       noEmit: true,
       types: ["vite/client"]

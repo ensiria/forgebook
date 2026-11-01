@@ -4,8 +4,8 @@
  * @remarks
  * Waiting from outside would measure the waiter: Playwright's `waitFor` retries at 0, 20, 70, 170, 270 and 770 ms and
  * every 500 ms after that, so a time read when it returns lands on that grid. So the top page looks, once per animation
- * frame, at its own document and at the frames' documents, and notes the clock one frame after an element shows up, by
- * then painted. The harness only asks for the stamp afterwards, so how often it asks does not matter.
+ * frame, at its own document and at the frames' documents, and notes the clock one frame after an element is fully
+ * shown (laid out, and neither fading nor hidden through any ancestor, across the frame), by then painted. The harness only asks for the stamp afterwards, so how often it asks does not matter.
  *
  * It runs in the top page alone: an observer inside a frame can stay attached to the frame's first blank document, since
  * a browser reuses that window when the frame navigates and the script is not run again. Stamps belong to a document, so
@@ -55,14 +55,22 @@ export const stampScript = (watch: StampWatch): string => `(() => {
     }
     return found;
   };
-  const isDrawn = (element) => element.getClientRects().length > 0;
+  // up through the frame into the top document: a fade on any ancestor means the element cannot be read yet
+  const isOpaque = (element) => {
+    for (let each = element; each !== null; each = each.parentElement ?? each.ownerDocument.defaultView?.frameElement ?? null) {
+      const style = each.ownerDocument.defaultView.getComputedStyle(each);
+      if (style.opacity !== "1" || style.visibility !== "visible") return false;
+    }
+    return true;
+  };
+  const isDrawn = (element) => element.getClientRects().length > 0 && isOpaque(element);
   const look = (target) => {
     const { seen, times } = stampsOf(target);
     const see = (key) => {
       if (!(key in seen)) seen[key] = frame;
     };
     for (const element of target.querySelectorAll('[data-bench="label"],[data-bench="build"]')) {
-      if (isDrawn(element)) see(element.textContent);
+      if (!(element.textContent in seen) && isDrawn(element)) see(element.textContent);
     }
     for (const selector of watch.selectors) {
       if (selector in seen) continue;

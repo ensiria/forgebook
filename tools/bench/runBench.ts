@@ -80,12 +80,12 @@ export type BenchRequest = {
 };
 
 /** How many samples a group takes per tool, for the status's progress. */
-const groupSteps = (group: MetricGroup, runs: number): number => {
+const groupSteps = (group: MetricGroup, runs: number, hasPage: boolean): number => {
   if (group === "install") return 1;
   if (group === "start") return runs * 2 + 1;
-  if (group === "hmr") return 2;
-  if (group === "page") return runs + 1;
-  if (group === "memory") return MEMORY_RUNS * 2 + 1;
+  if (group === "hmr") return 3;
+  if (group === "page") return hasPage ? runs + 2 : 0;
+  if (group === "memory") return MEMORY_RUNS * (hasPage ? 2 : 1) + 1;
   return runs + 1;
 };
 
@@ -104,14 +104,27 @@ type ToolRun = {
   readonly metrics: Record<string, MetricResult>;
   /** Its install, measured. */
   readonly install: InstallResult;
-  /** Its size on a project with Vite and React. */
-  readonly onBare: InstallResult;
+  /** The bytes it adds to a project with Vite and React. */
+  readonly onBare: number;
 };
 
 /** The steps a group goes through: a sample taken of each tool in turn. */
 type Turns = {
   /** Reports a step. */
   readonly step: (tool: ToolRun, metric: string, run: number, runs: number) => void;
+};
+
+/**
+ * The order of a round: rotated by one each round, so each tool leads in turn, and reversed every other round, so no
+ * tool always follows the same one.
+ *
+ * @param items - the tools, or anything taking turns.
+ * @param run - the round, from 1.
+ */
+export const roundOrder = <TItem>(items: readonly TItem[], run: number): TItem[] => {
+  const rotation = run % items.length;
+  const rotated = [...items.slice(rotation), ...items.slice(0, rotation)];
+  return run % 2 === 0 ? rotated : rotated.toReversed();
 };
 
 /**
@@ -136,9 +149,8 @@ const inTurns = async <TSample>(
 ): Promise<Map<ToolRun, TSample[]>> => {
   const samples = new Map<ToolRun, TSample[]>(tools.map((tool) => [tool, []]));
   for (let run = 1; run <= runs; run += 1) {
-    for (let turn = 0; turn < tools.length; turn += 1) {
-      const tool = tools[(turn + run) % tools.length];
-      if (tool === undefined || !samples.has(tool)) continue;
+    for (const tool of roundOrder(tools, run)) {
+      if (!samples.has(tool)) continue;
       turns.step(tool, metric, run, runs);
       try {
         samples.get(tool)?.push(await take(tool));
@@ -217,7 +229,7 @@ const installGroup = async ({ tools, turns }: GroupRun): Promise<void> => {
     turns.step(tool, "install", 1, 1);
     const { target, directory } = tool.context;
     tool.metrics["installSize"] = measured("bytes", [tool.install.size]);
-    tool.metrics["installAdded"] = measured("bytes", [tool.onBare.size]);
+    tool.metrics["installAdded"] = measured("bytes", [tool.onBare]);
     tool.metrics["packages"] = measured("count", [tool.install.packages]);
     tool.metrics["directDependencies"] = measured("count", [
       await directDependencies(directory, target.mainPackage)
@@ -241,6 +253,7 @@ const startGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promis
 
 /** Edits of a story and of a component. */
 const hmrGroup = async ({ tools, request: { edits }, turns }: GroupRun): Promise<void> => {
+  await warmUp("hmr", tools, "hmrStory", turns);
   const story = await inTurns(tools, "hmr", "hmrStory", 1, turns, (tool) =>
     measureEdits(tool.context, "story", edits)
   );
@@ -255,6 +268,10 @@ const hmrGroup = async ({ tools, request: { edits }, turns }: GroupRun): Promise
 const pageGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promise<void> => {
   const paged = markPageless(tools, ["componentPage", "firstPropsTable"]);
   await warmUp("page", paged, "componentPage", turns);
+  // the page's own dependencies, which a story's page does not load, before anything is timed
+  await inTurns(paged, "page", "componentPage", 1, turns, (tool) =>
+    measureComponentPage(tool.context, pageAddress(tool))
+  );
   const visits = await inTurns(paged, "page", "componentPage", runs, turns, (tool) =>
     measureComponentPage(tool.context, pageAddress(tool))
   );
@@ -359,7 +376,10 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
     }
   }
 
-  const total = tools.length * groups.reduce((sum, group) => sum + groupSteps(group, runs), 0);
+  const total = tools.reduce((all, tool) => {
+    const hasPage = tool.context.target.componentUrl !== undefined;
+    return all + groups.reduce((sum, group) => sum + groupSteps(group, runs, hasPage), 0);
+  }, 0);
   let done = 0;
   const turns: Turns = {
     step: (tool, metric, run, stepRuns) => {

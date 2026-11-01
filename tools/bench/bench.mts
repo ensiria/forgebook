@@ -14,7 +14,7 @@ import { defineScript, ScriptError } from "@ensiria/cli-kit/script";
 
 import { stopAllServers } from "./measure.ts";
 import { packForgebook, publishedForgebook } from "./prepare.ts";
-import { parseReport, reportProblems, reportRows } from "./reportTable.ts";
+import { parseReport, reportMarkdown, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
 import { statusWriter } from "./statusFile.ts";
 import { FORGEBOOK, TARGETS } from "./targets.ts";
@@ -40,7 +40,13 @@ await defineScript({
     components: { type: "number", default: 100, description: "Components of the generated library." },
     stories: { type: "number", default: 500, description: "Stories of the generated library." },
     runs: { type: "number", default: 5, description: "Runs of each time." },
-    edits: { type: "number", default: 30, description: "Edits of each file, for HMR." },
+    edits: { type: "number", default: 60, description: "Edits of each file, for HMR." },
+    markdown: { type: "boolean", description: "Print the results as a Markdown table." },
+    work: {
+      type: "string",
+      valueName: "folder",
+      description: "Where to install and generate, outside the repository; beside it by default."
+    },
     metric: {
       type: "string",
       multiple: true,
@@ -84,7 +90,7 @@ await defineScript({
     // read first: this run overwrites the last report, which could otherwise be compared with itself
     const earlier =
       options.against === undefined ? undefined : parseReport(readFileSync(options.against, "utf8"));
-    const work = join(REPOSITORY, ".bench");
+    const work = resolve(options.work ?? join(REPOSITORY, "..", "forgebook-bench"));
     mkdirSync(work, { recursive: true });
     const folders = { repository: REPOSITORY, work };
     const version = options["forgebook-version"];
@@ -94,6 +100,8 @@ await defineScript({
     const { stdout: commit } = await exec("git", ["rev-parse", "--short", "HEAD"], { cwd: REPOSITORY, io });
     const { stdout: changes } = await exec("git", ["status", "--porcelain"], { cwd: REPOSITORY, io });
     const write = statusWriter(options.status, Date.now);
+    // also when the run dies: a reader must not wait for a step that will not come
+    const removeEnd = onExit(() => write({ state: "finished", warnings: 0 }));
     const report = await runBench({
       folders,
       targets: options.compare ? TARGETS : [FORGEBOOK],
@@ -110,10 +118,12 @@ await defineScript({
         log.info(`${step.tool} · ${step.metric} · ${step.run}/${step.runs}`);
       }
     });
+    removeEnd();
     write({ state: "finished", warnings: report.warnings.length });
     writeFileSync(join(work, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
     for (const warning of report.warnings) log.warn(`not a quiet machine: ${warning}`);
-    if (!isJson) {
+    if (options.markdown) io.stdout.write(`${reportMarkdown(report)}\n`);
+    if (!isJson && !options.markdown) {
       const { tools, rows } = reportRows(report);
       io.stdout.write(
         `${table(rows, { columns: ["metric", ...tools].map((header) => ({ header })) }, style)}\n`

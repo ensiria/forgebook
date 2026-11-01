@@ -4,8 +4,9 @@
  * @remarks
  * Every difference between the tools lives here, and the measurements in `measure.ts` read none of them directly, so
  * the same definition of a metric holds for all three. Each tool gets what its documentation asks for and the switch
- * every catalogue has (a theme); nothing is tuned for speed. Telemetry and opened browsers are turned off, since
- * neither is part of what a person waits for.
+ * every catalogue has (a theme); nothing is tuned for speed. Telemetry, opened browsers and Storybook's version check
+ * are turned off: the check would cost a network call on every cold start here, since removing the caches forgets its
+ * daily answer, and a person pays it once a day.
  *
  * @module
  */
@@ -63,7 +64,7 @@ const LADLE_PROVIDER = `import "../src/shared/theme.css";
 export const Provider = ({ children }) => children;
 `;
 
-/** Storybook's main file, as `storybook init` writes it for React and Vite, with its docs addon. */
+/** Storybook's main file: the framework for React and Vite, and its docs addon for the pages compared. */
 const STORYBOOK_MAIN = `export default {
   framework: "@storybook/react-vite",
   stories: ["../src/components/*.stories.tsx"],
@@ -155,6 +156,7 @@ export const STORYBOOK: Target = {
       "--exact-port",
       "--ci",
       "--disable-telemetry",
+      "--no-version-updates",
       "--quiet"
     ],
     env: { STORYBOOK_DISABLE_TELEMETRY: "1" }

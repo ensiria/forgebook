@@ -8,6 +8,3 @@ playwright-report/
 
 # Nx release's cache
 .nx/
-
-# the benchmark's installs, generated projects and reports
-.bench/

@@ -32,8 +32,8 @@ const POLL_INTERVAL = 25;
 /** The pause between two edits, so one update does not land on the last, in milliseconds. */
 const EDIT_PAUSE = 150;
 
-/** How long a page is left after the story shows, for a reload to replace it, in milliseconds. */
-const SETTLE = 1000;
+/** How long a page has to stay unchanged after a story shows, or a reload could replace it, in milliseconds. */
+const SETTLE = 1500;
 
 /** How often the server's memory is read, in milliseconds. */
 const MEMORY_INTERVAL = 250;
@@ -44,7 +44,7 @@ const TALL_VIEWPORT = { width: 1280, height: 2600 };
 /** The size of an ordinary window. */
 const VIEWPORT = { width: 1280, height: 900 };
 
-/** The sidebar's last group, in the order every tool sorts them: seen when the whole index arrived. */
+/** A group of the sidebar, taken from the generated titles: seen when the index arrived. */
 const LAST_GROUP = "Overlays";
 
 /** The servers alive now, so an interrupted run leaves none behind to answer for the next. */
@@ -166,6 +166,20 @@ const openPage = async (
   return { browserContext, page };
 };
 
+/**
+ * The stamps of keys once the page stopped replacing itself: a document that reloads later starts them over, and the
+ * draw a person keeps is the last one.
+ */
+const settledStamps = async (page: Page, keys: readonly string[], deadline: number): Promise<number[]> => {
+  let times = await waitForStamps(page, keys, deadline);
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, SETTLE));
+    const again = await waitForStamps(page, keys, deadline);
+    if (again.join() === times.join()) return times;
+    times = again;
+  }
+};
+
 /** Removes the tool's caches, as a first start finds them. */
 const removeCaches = async ({ target, directory }: MeasureContext): Promise<void> => {
   await Promise.all(
@@ -196,9 +210,7 @@ export const measureStart = async (context: MeasureContext, isCold: boolean): Pr
     await waitForServer(server, baseOf(context));
     await page.goto(context.target.storyUrl(baseOf(context), context.component));
     const keys = [storyLabel(context.component), LAST_GROUP];
-    await waitForStamps(page, keys, start + SAMPLE_TIMEOUT);
-    await new Promise((resolve) => setTimeout(resolve, SETTLE));
-    const [story = 0, sidebar = 0] = await waitForStamps(page, keys, start + SAMPLE_TIMEOUT);
+    const [story = 0, sidebar = 0] = await settledStamps(page, keys, start + SAMPLE_TIMEOUT);
     return { story: story - start, sidebar: sidebar - start };
   } finally {
     await browserContext.close();
@@ -230,13 +242,12 @@ export const measureEdits = async (
   );
   const original = await readFile(file, "utf8");
   const before = kind === "story" ? /label: "[^"]*"/ : /const BUILD = "[^"]*"/;
-  const server = await startServer(context);
   const { browserContext, page } = await openPage(context, VIEWPORT);
+  const server = await startServer(context);
   try {
     await waitForServer(server, baseOf(context));
     await page.goto(context.target.storyUrl(baseOf(context), context.component));
-    await waitForStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
-    await new Promise((resolve) => setTimeout(resolve, SETTLE));
+    await settledStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
     const samples: number[] = [];
     for (let edit = 0; edit < edits; edit += 1) {
       const text = `edit ${edit}`;
@@ -270,18 +281,22 @@ export type PageSample = {
  * @param address - the page's address.
  */
 export const measureComponentPage = async (context: MeasureContext, address: string): Promise<PageSample> => {
-  const server = await startServer(context);
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
+  const server = await startServer(context);
   try {
     await waitForServer(server, baseOf(context));
     const start = Date.now();
     await page.goto(address);
     // by text and not by count: a tool may draw a story twice, which must not stand in for one still missing
     const labels = context.component.stories.map((story) => story.label);
-    const drawn = await waitForStamps(page, labels, start + SAMPLE_TIMEOUT);
     const table = context.target.propsTable;
-    const [props] = table === undefined ? [] : await waitForStamps(page, [table], start + SAMPLE_TIMEOUT);
-    return { stories: Math.max(...drawn) - start, props: props === undefined ? undefined : props - start };
+    const keys = table === undefined ? labels : [...labels, table];
+    const times = await settledStamps(page, keys, start + SAMPLE_TIMEOUT);
+    const props = table === undefined ? undefined : times.at(-1);
+    return {
+      stories: Math.max(...times.slice(0, labels.length)) - start,
+      props: props === undefined ? undefined : props - start
+    };
   } finally {
     await browserContext.close();
     await stopServer(server);
@@ -326,8 +341,8 @@ const treeMemory = async (rootPid: number, io: ScriptIo): Promise<number> => {
  * @returns the peak, in bytes.
  */
 export const measureMemory = async (context: MeasureContext, address: string): Promise<number> => {
-  const server = await startServer(context);
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
+  const server = await startServer(context);
   let peak = 0;
   let isDone = false;
   const pid = server.pid;

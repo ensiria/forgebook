@@ -36,6 +36,17 @@ export const reportRows = (
   };
 };
 
+/**
+ * The report as a Markdown table, for a file or a job summary: nothing cut, whatever the width.
+ *
+ * @param report - the report.
+ */
+export const reportMarkdown = (report: BenchReport): string => {
+  const { tools, rows } = reportRows(report);
+  const line = (cells: readonly string[]): string => `| ${cells.join(" | ")} |`;
+  return [line(["metric", ...tools]), line(["---", ...tools.map(() => "---")]), ...rows.map(line)].join("\n");
+};
+
 /** Whether a parsed value is a report of the shape this benchmark writes. */
 const isReport = (value: unknown): value is BenchReport =>
   typeof value === "object" &&

@@ -6,7 +6,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { BenchReport } from "./bench.types.ts";
-import { parseReport, reportMismatches, reportProblems, reportRows, timeMedians } from "./reportTable.ts";
+import {
+  parseReport,
+  reportMarkdown,
+  reportMismatches,
+  reportProblems,
+  reportRows,
+  timeMedians
+} from "./reportTable.ts";
 
 const REPORT: BenchReport = {
   version: 1,
@@ -48,6 +55,15 @@ describe("reportRows", () => {
     expect(tools).toEqual(["forgebook", "ladle"]);
     expect(rows).toContainEqual(["coldStart", "1200 ms (1100–1300)", "–"]);
     expect(rows).toContainEqual(["componentPage", "–", "n/a"]);
+  });
+});
+
+describe("reportMarkdown", () => {
+  it("writes a table a job summary can draw, with nothing cut", () => {
+    const lines = reportMarkdown(REPORT).split("\n");
+    expect(lines[0]).toBe("| metric | forgebook | ladle |");
+    expect(lines[1]).toBe("| --- | --- | --- |");
+    expect(lines).toContain("| coldStart | 1200 ms (1100–1300) | – |");
   });
 });
 

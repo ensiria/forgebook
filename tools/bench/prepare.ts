@@ -4,7 +4,8 @@
  * @remarks
  * Forgebook is measured as packed and installed, never from the workspace: there its packages are sources served
  * module by module, which is not the program users run. Each target is installed with npm, as the README tells people
- * to, with the versions its folder pins. Everything lands in `.bench/`, outside the workspace.
+ * to, with the versions its folder pins. Everything lands in a work folder outside the repository, so nothing the
+ * repository installs can resolve in its place and hide a dependency missing from a package.
  *
  * @module
  */
@@ -34,7 +35,7 @@ export type InstallResult = {
 export type BenchFolders = {
   /** The repository's root. */
   readonly repository: string;
-  /** `.bench/` in it. */
+  /** The work folder, outside it. */
   readonly work: string;
 };
 
@@ -161,16 +162,17 @@ const dependenciesOf = (manifest: unknown): Readonly<Record<string, unknown>> =>
  * @param bare - the bare project's folder in the repository.
  * @param directory - where to install; removed afterwards.
  * @param options - what else it needs.
- * @returns the bytes added, and the packages of the project.
+ * @returns the bytes added. The bare project's part stays locked; the tool's own additions float, as a user's would.
  */
 export const installOnBare = async (
   source: string,
   bare: string,
   directory: string,
   { packages, bareSize, io }: OnBareOptions
-): Promise<InstallResult> => {
+): Promise<number> => {
   await rm(directory, { recursive: true, force: true });
   await mkdir(directory, { recursive: true });
+  await cp(join(bare, "package-lock.json"), join(directory, "package-lock.json"));
   const read = async (folder: string): Promise<unknown> =>
     JSON.parse(await readFile(join(folder, "package.json"), "utf8"));
   const story = packages?.["@forgebook/story-format"];
@@ -194,7 +196,7 @@ export const installOnBare = async (
   });
   const size = await diskUsage(join(directory, "node_modules"));
   await rm(directory, { recursive: true, force: true });
-  return { size: size - bareSize, packages: 0 };
+  return size - bareSize;
 };
 
 /**
