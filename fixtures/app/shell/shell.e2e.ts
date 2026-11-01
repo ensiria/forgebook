@@ -655,6 +655,8 @@ test.describe("the component's page", () => {
     const overview = page.getByRole("article", { name: "Overview", exact: true });
     const frame = overview.locator("iframe");
     const root = overview.frameLocator("iframe").locator("html");
+    // a frame loads only near the visible part: the API table may push the example past it, so it is brought in view
+    await overview.scrollIntoViewIfNeeded();
     // a frame further down the page may load slowly while the other tests run: its readiness gets more time
     await expect(root).toHaveAttribute("data-forgebook-status", /.+/, { timeout: 15_000 });
     await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
@@ -691,6 +693,8 @@ test.describe("the component's page", () => {
     await page.goto("/?component=kit:inputs-selection-select");
     const overview = page.getByRole("article", { name: "Overview", exact: true });
     const frame = overview.locator("iframe");
+    // a frame loads only near the visible part: the API table may push the example past it, so it is brought in view
+    await overview.scrollIntoViewIfNeeded();
     const pageWidth = (await frame.boundingBox())?.width;
     const address = page.url();
     // in the list the stage has no handles: the width is the page's
