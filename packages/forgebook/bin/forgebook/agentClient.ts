@@ -12,7 +12,13 @@
  */
 import { createServer, type ViteDevServer } from "vite";
 
-import { AGENT_API, type AgentAnswer, agentAnswer, ROOT_HEADER } from "../../src/vite/agentRoutes.ts";
+import {
+  AGENT_API,
+  type AgentAnswer,
+  agentAnswer,
+  ROOT_HEADER,
+  rootHeaderValue
+} from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 
@@ -46,7 +52,7 @@ const runningClient = async (
   };
   try {
     const probe = await fetch(`${origin}${AGENT_API}stories`, { signal: AbortSignal.timeout(2000) });
-    if (probe.headers.get(ROOT_HEADER) !== config.dir) return undefined;
+    if (probe.headers.get(ROOT_HEADER) !== rootHeaderValue(config.dir)) return undefined;
     await probe.body?.cancel();
   } catch {
     return undefined;

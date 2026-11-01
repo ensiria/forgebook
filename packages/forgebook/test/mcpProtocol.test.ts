@@ -29,6 +29,14 @@ const SERVER: McpServer = {
         isError: args["fail"] === true,
         ...(args["picture"] === true ? { images: [{ data: "iVBORw0KGgo=", mimeType: "image/png" }] } : {})
       })
+    },
+    {
+      name: "broken",
+      description: "Throws.",
+      inputSchema: { type: "object" },
+      call: async (): Promise<McpToolResult> => {
+        throw new Error("no browser installed");
+      }
     }
   ]
 };
@@ -74,7 +82,24 @@ describe("the handshake era", () => {
     expect(listed.answer).toEqual({
       jsonrpc: "2.0",
       id: 2,
-      result: { tools: [{ name: "echo", description: "Echoes.", inputSchema: { type: "object" } }] }
+      result: {
+        tools: [
+          { name: "echo", description: "Echoes.", inputSchema: { type: "object" } },
+          { name: "broken", description: "Throws.", inputSchema: { type: "object" } }
+        ]
+      }
+    });
+  });
+
+  it("answers a tool that throws with its error, and the session goes on", async () => {
+    const answer = await send({
+      jsonrpc: "2.0",
+      id: 9,
+      method: "tools/call",
+      params: withMeta({ name: "broken", arguments: {} })
+    });
+    expect(answer).toMatchObject({
+      answer: { result: { structuredContent: { error: "no browser installed" }, isError: true } }
     });
   });
 

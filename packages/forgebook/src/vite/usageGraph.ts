@@ -248,6 +248,28 @@ const fileUsage = (request: UsageRequestFile, program: ts.Program): StoryFileUsa
  * @param program - its program.
  * @param cache - the program's resolution cache.
  */
+/**
+ * Whether an import or an export takes types only (`import type`, `export type`, `import { type A }`).
+ *
+ * @param statement - the statement.
+ */
+const isTypeOnly = (statement: ts.Statement): boolean => {
+  if (ts.isExportDeclaration(statement)) return statement.isTypeOnly;
+  if (!ts.isImportDeclaration(statement)) return false;
+  const clause = statement.importClause;
+  if (clause === undefined) return false;
+  if (clause.isTypeOnly) return true;
+  // `import { type A, type B }`: every name a type, and no default
+  const bindings = clause.namedBindings;
+  return (
+    clause.name === undefined &&
+    bindings !== undefined &&
+    ts.isNamedImports(bindings) &&
+    bindings.elements.length > 0 &&
+    bindings.elements.every((element) => element.isTypeOnly)
+  );
+};
+
 const importsOf = (source: ts.SourceFile, program: ts.Program, cache: ts.ModuleResolutionCache): string[] => {
   const targets: string[] = [];
   for (const statement of source.statements) {
@@ -257,7 +279,8 @@ const importsOf = (source: ts.SourceFile, program: ts.Program, cache: ts.ModuleR
       ts.isStringLiteral(statement.moduleSpecifier)
         ? statement.moduleSpecifier.text
         : undefined;
-    if (specifier === undefined) continue;
+    // a type renders nothing: a file that only takes types from another does not use its components
+    if (specifier === undefined || isTypeOnly(statement)) continue;
     const resolved = ts.resolveModuleName(
       specifier,
       source.fileName,

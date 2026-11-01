@@ -167,7 +167,14 @@ const toolResult = async (
   tool: McpTool,
   args: Readonly<Record<string, unknown>>
 ): Promise<Record<string, unknown>> => {
-  const { structured, isError, images = [] } = await tool.call(args);
+  let answer: Awaited<ReturnType<McpTool["call"]>>;
+  try {
+    answer = await tool.call(args);
+  } catch (error) {
+    // a tool that fails (no browser installed, the dev server gone) answers with its error: the session goes on
+    answer = { structured: { error: error instanceof Error ? error.message : String(error) }, isError: true };
+  }
+  const { structured, isError, images = [] } = answer;
   return {
     content: [
       { type: "text", text: JSON.stringify(structured) },

@@ -67,6 +67,18 @@ describe("storyGlobs", () => {
   });
 });
 
+describe("storyGlobs, every extension", () => {
+  it("writes `.stories.*` out as the extensions Forgebook reads", () => {
+    expect(storyGlobs(["../src/**/*.stories.*"], "/project/.storybook", "/project").globs).toEqual([
+      "src/**/*.stories.js",
+      "src/**/*.stories.jsx",
+      "src/**/*.stories.mjs",
+      "src/**/*.stories.ts",
+      "src/**/*.stories.tsx"
+    ]);
+  });
+});
+
 describe("previewSwitches", () => {
   it("makes a switch of each plain globalType with a toolbar, starting at its initial global", () => {
     const text = [
@@ -102,6 +114,11 @@ describe("previewSwitches", () => {
     );
     expect(named.switches?.map((each) => each.id)).toEqual(["tone"]);
     expect(previewSwitches("export default {};", "preview.ts")).toEqual({ switches: undefined, notes: [] });
+    const quoted = previewSwitches(
+      'export default { "globalTypes": { tone: { toolbar: { items: ["warm"] } } } };',
+      "p.ts"
+    );
+    expect(quoted.switches?.map((each) => each.id)).toEqual(["tone"]);
   });
 });
 
@@ -135,6 +152,15 @@ describe("importStorybook", () => {
       "Forgebook reads Storybook's React stories on Vite (@storybook/react-vite); this project uses @storybook/vue3-vite"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
+    // Storybook's monorepo template writes the framework as a path to its package
+    const monorepo = join(scratch, "monorepo");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(monorepo, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(monorepo, ".storybook", "main.ts"),
+      'export default { stories: ["../src/**/*.stories.tsx"], framework: { name: "/repo/node_modules/@storybook/react-vite" } };\n'
+    );
+    const imported = await importStorybook(monorepo);
+    expect(typeof imported === "string" ? imported : imported.stories).toEqual(["src/**/*.stories.tsx"]);
   });
 });
 

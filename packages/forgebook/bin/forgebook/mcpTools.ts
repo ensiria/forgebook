@@ -5,7 +5,7 @@
  * @module
  */
 
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -16,6 +16,20 @@ import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
+
+/** The session's folder for pictures; made on the first call. */
+let shotsDir: string | undefined;
+
+/**
+ * The folder a picture run writes in: one for the session, emptied before each run, so the last pictures stay to be
+ * read and none pile up.
+ */
+const shotsFolder = (): string => {
+  shotsDir ??= mkdtempSync(join(tmpdir(), "forgebook-shot-"));
+  rmSync(shotsDir, { recursive: true, force: true });
+  mkdirSync(shotsDir, { recursive: true });
+  return shotsDir;
+};
 
 /** Asks the catalogue one of its answers. */
 type Ask = (route: string, params: URLSearchParams) => Promise<AgentAnswer>;
@@ -246,7 +260,7 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
       const views = Array.isArray(args["views"])
         ? args["views"].filter((view): view is string => typeof view === "string")
         : [];
-      const outDir = mkdtempSync(join(tmpdir(), "forgebook-shot-"));
+      const outDir = shotsFolder();
       const report = await shot(
         { id: textOf(args, "id") ?? "", views, isAllVariants: args["allVariants"] === true },
         outDir

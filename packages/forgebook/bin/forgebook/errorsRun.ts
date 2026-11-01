@@ -34,7 +34,13 @@ export const askErrors = async (
   ask: CatalogueClient["ask"],
   since: number
 ): Promise<ErrorsDocument | string> => {
-  const answer = await ask("errors", new URLSearchParams({ since: String(since) }));
+  let answer: Awaited<ReturnType<CatalogueClient["ask"]>>;
+  try {
+    answer = await ask("errors", new URLSearchParams({ since: String(since) }));
+  } catch (error) {
+    // the dev server stopped or restarted: said, not thrown
+    return `The catalogue stopped answering: ${error instanceof Error ? error.message : String(error)}`;
+  }
   return answer.status === 200 && isErrorsDocument(answer.body)
     ? answer.body
     : `The catalogue answered ${answer.status} for its errors`;
@@ -59,6 +65,12 @@ export const followErrors = async (
   while (signal?.aborted !== true) {
     const document = await askErrors(ask, last);
     if (typeof document === "string") return document;
+    // a restarted dev server numbers its errors from 1 again: asked from the old number it would hold back its new ones,
+    // so it is asked from the start once more
+    if (document.last < last) {
+      last = 0;
+      continue;
+    }
     if (document.errors.length > 0) onErrors(document);
     last = document.last;
     try {

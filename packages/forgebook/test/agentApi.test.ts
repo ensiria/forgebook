@@ -17,6 +17,7 @@ import {
   storyDocument,
   storyLinks
 } from "../src/vite/agentApi.ts";
+import { rootHeaderValue } from "../src/vite/agentRoutes.ts";
 
 /** Where the catalogue is served in these tests. */
 const PAGES: CataloguePages = { page: "http://localhost:5173/", frame: "http://localhost:5173/frame.html" };
@@ -188,5 +189,15 @@ describe("Used in, for agents", () => {
       "kit:actions-button"
     );
     expect(storyDocument(location, parts, PAGES, "").component).not.toHaveProperty("usedIn");
+  });
+});
+
+describe("the root header", () => {
+  it("carries any folder's name in Latin-1, and reads back as the folder", () => {
+    for (const dir of ["/Users/x/Progetti è", "/Users/x/プロジェクト"]) {
+      const value = rootHeaderValue(dir);
+      expect([...value].every((character) => character.charCodeAt(0) < 128)).toBe(true);
+      expect(decodeURIComponent(value)).toBe(dir);
+    }
   });
 });

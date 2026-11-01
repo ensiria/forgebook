@@ -133,7 +133,12 @@ export const storyGlobs = (
   for (const entry of entries) {
     const glob = entryGlob(entry, fromProject, notes);
     if (glob === undefined) continue;
-    for (const each of expandedGlobs(glob.split("\\").join("/"))) {
+    // `.stories.*` names every script extension: written out as the ones Forgebook reads
+    const named = glob
+      .split("\\")
+      .join("/")
+      .replace(/\.stories\.\*$/, ".stories.@(js|jsx|mjs|ts|tsx)");
+    for (const each of expandedGlobs(named)) {
       if (STORY_FILE.test(each)) globs.push(each);
       else if (!each.endsWith(".mdx")) notes.push(`${each}: not a story file Forgebook reads`);
     }
@@ -248,7 +253,9 @@ const previewObject = (source: ts.SourceFile): ts.ObjectLiteralExpression | unde
 const previewField = (source: ts.SourceFile, name: string): ts.Expression | undefined => {
   const property = previewObject(source)?.properties.find(
     (candidate): candidate is ts.PropertyAssignment =>
-      ts.isPropertyAssignment(candidate) && candidate.name.getText(source) === name
+      ts.isPropertyAssignment(candidate) &&
+      (ts.isIdentifier(candidate.name) || ts.isStringLiteral(candidate.name)) &&
+      candidate.name.text === name
   );
   return property?.initializer ?? constantDeclaration(source, name, true)?.initializer;
 };
@@ -312,6 +319,39 @@ const frameworkName = (main: Readonly<Record<string, unknown>>): string | undefi
 };
 
 /**
+ * Storybook's `main`, loaded as Node loads a module.
+ *
+ * @param mainFile - its file.
+ * @param projectDir - the project's folder, for the messages.
+ * @returns its configuration, or why it cannot be had.
+ */
+const loadedMain = async (
+  mainFile: string,
+  projectDir: string
+): Promise<Readonly<Record<string, unknown>> | string> => {
+  let loaded: unknown;
+  try {
+    loaded = await import(pathToFileURL(mainFile).href);
+  } catch (error) {
+    // Storybook loads main with a loader of its own (require works there); Node loads it as the module it is
+    const reason = error instanceof Error ? error.message : String(error);
+    return `${relative(projectDir, mainFile)} could not be loaded as Node loads a module (${reason}); Storybook loads it with a loader of its own, so a require() or a path helper in it may need an import instead`;
+  }
+  const main = isRecord(loaded) && isRecord(loaded["default"]) ? loaded["default"] : loaded;
+  return isRecord(main) ? main : `${relative(projectDir, mainFile)} exports no configuration`;
+};
+
+/**
+ * Whether `main`'s framework is React on Vite: its name, or a path to its package, as Storybook's monorepo template
+ * writes it (`getAbsolutePath("@storybook/react-vite")`).
+ *
+ * @param framework - the framework's name or path.
+ */
+const isReactVite = (framework: string | undefined): boolean =>
+  framework !== undefined &&
+  (framework === REACT_VITE || framework.split("\\").join("/").endsWith(`/${REACT_VITE}`));
+
+/**
  * Reads a project's Storybook configuration.
  *
  * @param projectDir - the project's folder, absolute.
@@ -321,11 +361,10 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   const storybookDir = join(projectDir, ".storybook");
   const mainFile = scriptFile(storybookDir, "main");
   if (mainFile === undefined) return `No .storybook/main file in ${projectDir}`;
-  const loaded: unknown = await import(pathToFileURL(mainFile).href);
-  const main = isRecord(loaded) && isRecord(loaded["default"]) ? loaded["default"] : loaded;
-  if (!isRecord(main)) return `${relative(projectDir, mainFile)} exports no configuration`;
+  const main = await loadedMain(mainFile, projectDir);
+  if (typeof main === "string") return main;
   const framework = frameworkName(main);
-  if (framework !== REACT_VITE)
+  if (!isReactVite(framework))
     return `Forgebook reads Storybook's React stories on Vite (${REACT_VITE}); this project uses ${framework ?? "no framework"}`;
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);

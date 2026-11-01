@@ -16,6 +16,7 @@ import { join, resolve } from "node:path";
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { CONFIG_FILES } from "../../src/vite/configFile.ts";
 import { COMMAND, type ForgebookOptions } from "./catalogueCommands.ts";
 import { importStorybook } from "./importers/storybook.ts";
 import { CONFIG_FILE, initConfigText } from "./initConfig.ts";
@@ -72,8 +73,10 @@ export const initCommands = (
     ],
     run: async ({ options, log }): Promise<void> => {
       const file = resolve(CONFIG_FILE);
-      if (existsSync(file) && options.force !== true)
-        throw new ScriptError(`${CONFIG_FILE} is already there`, {
+      // any configuration the catalogue would read, not only the file written: a new .ts would win over a .mts
+      const existing = CONFIG_FILES.find((name) => existsSync(resolve(name)));
+      if (existing !== undefined && options.force !== true)
+        throw new ScriptError(`${existing} is already there`, {
           hint: "Give --force to replace it with the one read from Storybook"
         });
       const imported = await importStorybook(process.cwd());

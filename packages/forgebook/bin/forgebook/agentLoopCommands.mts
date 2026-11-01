@@ -15,14 +15,43 @@ import { dirname, relative, resolve } from "node:path";
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
 import { EXIT } from "@ensiria/cli-kit/constants";
 import { formatJson } from "@ensiria/cli-kit/files";
+import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import { catalogueClient } from "./agentClient.ts";
+import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
 import { agentsSkill, withAgentsSection } from "./agentsText.ts";
 import { checkText, errorsOutput, shotText } from "./agentText.ts";
 import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+
+/**
+ * The catalogue the errors are asked of: only frames open in a browser report to a running dev server, so without one
+ * there is nothing to list (said) and nothing ever to follow (refused).
+ *
+ * @param config - the catalogue's configuration.
+ * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param isFollowing - whether the errors are followed.
+ * @param log - the command's logger.
+ */
+const errorsClient = async (
+  config: Awaited<ReturnType<typeof configOf>>,
+  url: string | undefined,
+  isFollowing: boolean,
+  log: Logger
+): Promise<CatalogueClient> => {
+  const client = await catalogueClient(config, url);
+  if (client.runningAt !== undefined) return client;
+  if (isFollowing) {
+    // nothing can ever report to a server of the command's own: following it would wait forever
+    await client.close();
+    throw new ScriptError("No catalogue running there to follow", {
+      hint: `Start ${COMMAND} dev, then follow its errors (or give --url where it runs)`
+    });
+  }
+  log.warn("No catalogue running there: only frames open in a browser report, so there is nothing to list");
+  return client;
+};
 
 /**
  * The commands.
@@ -108,11 +137,7 @@ export const agentLoopCommands = (
     ],
     run: async ({ options, io, log, isJson, style }): Promise<void> => {
       const config = await configOf(options.config);
-      const client = await catalogueClient(config, options.url);
-      if (client.runningAt === undefined)
-        log.warn(
-          "No catalogue running there: only frames open in a browser report, so there is nothing to list"
-        );
+      const client = await errorsClient(config, options.url, options.follow === true, log);
       const since = sinceOf(options.since);
       try {
         if (options.follow === true) {

@@ -93,6 +93,14 @@ export type AgentAnswer = {
 /** The header that names the catalogue's folder, so a client knows the server it found serves its catalogue. */
 export const ROOT_HEADER = "forgebook-root";
 
+/**
+ * The root header's value for a catalogue's folder: encoded, since a header holds Latin-1 only and a folder's name may
+ * hold any character (`Progetti è`, `プロジェクト`).
+ *
+ * @param dir - the catalogue's folder.
+ */
+export const rootHeaderValue = (dir: string): string => encodeURIComponent(dir);
+
 /** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
 type RouteContext = {
   /** The sources and the preview, as the dev server loaded them. */
@@ -221,17 +229,18 @@ export const agentMiddleware =
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
-    void agentAnswer(
-      (id) => server.ssrLoadModule(id),
-      config,
-      route,
-      url.searchParams,
-      url.origin,
-      live
-    ).then(({ status, body }) => {
-      response.statusCode = status;
-      response.setHeader("Content-Type", "application/json");
-      response.setHeader(ROOT_HEADER, config.dir);
-      response.end(`${JSON.stringify(body)}\n`);
-    });
+    void agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, url.origin, live)
+      .then(({ status, body }) => {
+        response.statusCode = status;
+        response.setHeader("Content-Type", "application/json");
+        response.setHeader(ROOT_HEADER, rootHeaderValue(config.dir));
+        response.end(`${JSON.stringify(body)}\n`);
+      })
+      .catch((error: unknown) => {
+        response.statusCode = 500;
+        response.setHeader("Content-Type", "application/json");
+        response.end(
+          `${JSON.stringify({ error: error instanceof Error ? error.message : String(error) })}\n`
+        );
+      });
   };

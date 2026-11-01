@@ -222,5 +222,15 @@ describe("forgebook init", () => {
     expect(again.status).toBe(1);
     expect(again.stderr).toContain("forgebook.config.ts is already there");
     expect(init("--force").status).toBe(0);
+    // a configuration of another name the catalogue would read is not shadowed either
+    const other = join(root, "on-storybook-mts");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(other, ".storybook"), { recursive: true });
+    writeFileSync(join(other, "forgebook.config.mts"), "export default {};\n");
+    const shadowing = spawnSync(process.execPath, [ENTRY, "init", "--from", "storybook"], {
+      cwd: other,
+      encoding: "utf8"
+    });
+    expect(shadowing.status).toBe(1);
+    expect(shadowing.stderr).toContain("forgebook.config.mts is already there");
   }, 60_000);
 });

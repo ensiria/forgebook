@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { errorsOutput } from "../bin/forgebook/agentText.ts";
-import { askErrors, sinceOf } from "../bin/forgebook/errorsRun.ts";
+import { askErrors, followErrors, sinceOf } from "../bin/forgebook/errorsRun.ts";
 import { createLiveErrors, isLiveErrorReport, type LiveErrorReport } from "../src/liveErrors.ts";
 import type { ErrorsDocument } from "../src/vite/agent.types.ts";
 
@@ -67,6 +67,34 @@ describe("forgebook errors' parts", () => {
     expect(await askErrors(() => Promise.resolve({ status: 500, body: { error: "down" } }), 0)).toBe(
       "The catalogue answered 500 for its errors"
     );
+  });
+
+  it("says when the catalogue stopped answering, and asks a restarted one from the start", async () => {
+    expect(await askErrors(() => Promise.reject(new Error("fetch failed")), 0)).toBe(
+      "The catalogue stopped answering: fetch failed"
+    );
+    // the first answer counts up to 5; the restarted server's counts only 1, so it is asked from 0 again
+    const asked: string[] = [];
+    const answers = [
+      { ...document, last: 5, errors: [] },
+      { ...document, last: 1, errors: [] },
+      { ...document, last: 1 }
+    ];
+    const controller = new AbortController();
+    const seen: number[] = [];
+    await followErrors(
+      (_route, params) => {
+        asked.push(params.get("since") ?? "");
+        const answer = answers.shift();
+        if (answers.length === 0) controller.abort();
+        return Promise.resolve({ status: 200, body: answer ?? document });
+      },
+      0,
+      (each) => seen.push(each.last),
+      controller.signal
+    );
+    expect(asked).toEqual(["0", "5", "0"]);
+    expect(seen).toEqual([1]);
   });
 
   it("prints one JSON line per error while following, the whole document otherwise", () => {
