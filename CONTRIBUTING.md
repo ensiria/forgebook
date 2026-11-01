@@ -55,6 +55,8 @@ Storybook-style stories and the catalogue the tests run on, `tools/` the reposit
 - **Formatting and lint**: Biome and ESLint (`pnpm lint`, `pnpm format`).
 - **Published manifests**: a package's `exports` and `bin` name its TypeScript sources; `pnpm manifest` writes the
   `publishConfig` npm installs from them, and the CI checks it is up to date.
+- **Self-contained comments.** A comment says its reason in full: it never points at a decision index, a numbered
+  note or another repository a reader cannot open (`pnpm refs:check`, part of `pnpm checks`, fails on them).
 - **A public API changes on purpose.** A renamed or removed export, option or behaviour is a breaking change: say so
   in the issue and in the commit (below).
 
@@ -73,7 +75,9 @@ Storybook-style stories and the catalogue the tests run on, `tools/` the reposit
 | `feat!` / `fix!`, or a `BREAKING CHANGE:` footer | a change that breaks existing code | major (minor while 0.x) |
 | `perf`, `refactor`, `docs`, `test`, `style`, `build`, `ci`, `chore`, `revert` | everything else | none |
 
-`node tools/check-commits/check-commits.mts --from origin/develop` checks a branch's commits; the CI checks them too.
+The message, body included, explains the change on its own: no decision ids, numbered notes or other repositories a
+reader of this history cannot open. `node tools/check-commits/check-commits.mts --from origin/develop` checks a
+branch's commits, their type and these references; the CI checks them too.
 
 Each package gets its own version, from the commits that touch its folder; a package whose dependency was released
 gets a patch.

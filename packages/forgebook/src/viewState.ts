@@ -54,7 +54,7 @@ export type StageWidth = "fill" | number;
 
 /**
  * The story's height on the stage: its own (`auto`: the story's content, at least the height it declares) or a
- * height in CSS px dragged with the handle at its foot (note 142).
+ * height in CSS px dragged with the handle at its foot.
  */
 export type StageHeight = "auto" | number;
 

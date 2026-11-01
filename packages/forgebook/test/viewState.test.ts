@@ -131,7 +131,7 @@ describe("the view in the address", () => {
     expect(parseView("?width=wide", CATALOGUE).width).toBe("fill");
   });
 
-  it("keeps the story's height from the foot handle, and reads one out of range as the story's own (note 142)", () => {
+  it("keeps the story's height from the foot handle, and reads one out of range as the story's own", () => {
     const view = withSwitches({}, { width: 560, height: 320 });
     expect(viewParams(view, SWITCHES).toString()).toBe("width=560&height=320");
     expect(parseView(viewParams(view, SWITCHES).toString(), CATALOGUE)).toEqual(view);

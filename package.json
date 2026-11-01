@@ -15,7 +15,8 @@
     "build": "pnpm --filter \"./packages/*\" build",
     "manifest": "pnpm --filter \"./packages/*\" manifest",
     "manifest:check": "pnpm --filter \"./packages/*\" manifest --check",
-    "checks": "pnpm typecheck && pnpm lint && pnpm test && pnpm manifest:check && pnpm build"
+    "refs:check": "node tools/check-internal-refs/check-internal-refs.mts",
+    "checks": "pnpm typecheck && pnpm lint && pnpm refs:check && pnpm test && pnpm manifest:check && pnpm build"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",

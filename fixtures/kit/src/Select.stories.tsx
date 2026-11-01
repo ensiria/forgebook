@@ -107,13 +107,13 @@ const OverlayScene = (args: Partial<SelectProps>): ReactNode => (
   </>
 );
 
-/** A list left open past a frame as tall as the story: the story checks flag it (D-469). */
+/** A list left open past a frame as tall as the story: the story checks flag it. */
 export const OverlayPast: Story<typeof Select> = {
   render: (args: Partial<SelectProps>): ReactNode => <OverlayScene {...args} />,
   parameters: { group: "behaviour" }
 };
 
-/** The same list, with the room its scene needs declared: the frame has it from the start (D-469). */
+/** The same list, with the room its scene needs declared: the frame has it from the start. */
 export const OverlayInRoom: Story<typeof Select> = {
   render: (args: Partial<SelectProps>): ReactNode => <OverlayScene {...args} />,
   parameters: { group: "behaviour", height: 280 }

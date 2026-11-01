@@ -26,7 +26,7 @@ export type FrameViewProps = {
    */
   readonly sceneHeight?: number | undefined;
   /**
-   * A height set on the stage (the foot handle, note 142), in CSS px: the frame takes it whatever its story's;
+   * A height set on the stage (the foot handle), in CSS px: the frame takes it whatever its story's;
    * none by default.
    */
   readonly fixedHeight?: number | undefined;
