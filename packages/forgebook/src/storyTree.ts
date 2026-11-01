@@ -410,13 +410,14 @@ export const storyTree = (sources: readonly StorySource[]): StoryTree => {
 };
 
 /**
- * Whether a component is about logic: every story it lists is (`parameters.logic`), so its page documents a hook's or
- * a function's signature and the sidebar marks it.
+ * Whether a component is about logic: it lists a story, and every story of its file is (`parameters.logic`), the
+ * unlisted ones too, so its page documents a hook's or a function's signature and the sidebar marks it.
  *
  * @param component - the component.
  */
-export const isLogicComponent = (component: Pick<TreeComponent, "stories">): boolean =>
-  component.stories.length > 0 && component.stories.every((story) => story.isLogic);
+export const isLogicComponent = (component: Pick<TreeComponent, "stories" | "unlisted">): boolean =>
+  component.stories.length > 0 &&
+  [...component.stories, ...component.unlisted].every((story) => story.isLogic);
 
 /** Where a story sits: its source, family, group and component. */
 export type StoryLocation = {

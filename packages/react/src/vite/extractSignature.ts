@@ -23,8 +23,9 @@ const tagText = (comment: string | ts.NodeArray<ts.JSDocComment> | undefined): s
   (ts.getTextOfJSDocComment(comment) ?? "").replace(/^-\s*/, "").replace(/\s+/g, " ").trim();
 
 /**
- * A hook's or a function's signature, read at the expression that names it: each parameter as the source writes its
- * type, with its `@param` text, and the return type with its `@returns` text.
+ * A hook's or a function's signature, read at the expression that names it: its type parameters, each parameter as
+ * the source writes it (a destructured one by its pattern, a rest one marked) with its `@param` text, and the return
+ * type with its `@returns` text. An overloaded function gives its first signature.
  *
  * @param symbol - the function's declared symbol.
  * @param expression - where the code names it.
@@ -44,17 +45,23 @@ export const signatureDocs = (
     const written = node !== undefined && ts.isParameter(node) ? node : undefined;
     const tag = written === undefined ? undefined : ts.getJSDocParameterTags(written)[0];
     return {
-      name: parameter.getName(),
+      // a destructured parameter has no name of its own: the checker calls it `__0`
+      name:
+        written === undefined || ts.isIdentifier(written.name)
+          ? parameter.getName()
+          : writtenText(written.name),
       type:
         written?.type === undefined
           ? checker.typeToString(checker.getTypeOfSymbolAtLocation(parameter, expression))
           : writtenText(written.type),
       description: tagText(tag?.comment),
-      isOptional: written?.questionToken !== undefined || written?.initializer !== undefined
+      isOptional: written?.questionToken !== undefined || written?.initializer !== undefined,
+      isRest: written?.dotDotDotToken !== undefined
     };
   });
   const returnType = declaration?.type;
   return {
+    typeParameters: (declaration?.typeParameters ?? []).map(writtenText),
     parameters,
     returns:
       returnType === undefined ? checker.typeToString(signature.getReturnType()) : writtenText(returnType),

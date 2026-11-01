@@ -32,7 +32,7 @@ export type EventSignature = {
 
 /** One parameter of a hook's or a function's signature. */
 export type FunctionParameterDocs = {
-  /** The parameter's name. */
+  /** The parameter's name; a destructured one's pattern as written (`{ start }`). */
   readonly name: string;
   /** Its type, as the source writes it. */
   readonly type: string;
@@ -40,10 +40,14 @@ export type FunctionParameterDocs = {
   readonly description: string;
   /** Whether it may be left out (a `?` or a default). */
   readonly isOptional: boolean;
+  /** Whether it takes the rest of the arguments (`...values`). */
+  readonly isRest: boolean;
 };
 
 /** A hook's or a function's signature: what a story about logic documents first. */
 export type FunctionSignatureDocs = {
+  /** Its type parameters as written (`TValue`, `TUnit extends string`); empty when it has none. */
+  readonly typeParameters: readonly string[];
   /** The parameters, in order. */
   readonly parameters: readonly FunctionParameterDocs[];
   /** The return type, as the source writes it. */
@@ -158,6 +162,7 @@ const isFunctionSignatureDocs = (value: unknown): value is FunctionSignatureDocs
   isRecord(value) &&
   typeof value["returns"] === "string" &&
   typeof value["returnsDescription"] === "string" &&
+  isStringList(value["typeParameters"]) &&
   Array.isArray(value["parameters"]) &&
   value["parameters"].every(
     (parameter: unknown) =>
@@ -165,7 +170,8 @@ const isFunctionSignatureDocs = (value: unknown): value is FunctionSignatureDocs
       typeof parameter["name"] === "string" &&
       typeof parameter["type"] === "string" &&
       typeof parameter["description"] === "string" &&
-      typeof parameter["isOptional"] === "boolean"
+      typeof parameter["isOptional"] === "boolean" &&
+      typeof parameter["isRest"] === "boolean"
   );
 
 /**

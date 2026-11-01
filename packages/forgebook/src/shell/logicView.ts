@@ -3,8 +3,9 @@
  *
  * @remarks
  * A logic story is a hook's or a function's scene, so the bar puts away the controls that only change how it looks
- * (the colour scheme, the contrast, the style sheets, the text size, the backdrop) and Compare; the View menu still
- * offers them all. The story is drawn once, never compared, while the address keeps its compare for the other stories.
+ * (the colour scheme, the contrast, the style sheets, the text size, the backdrop), which the View menu still offers,
+ * and Compare, which it does not: the story is drawn once, never compared, while the address keeps its compare for the
+ * other stories.
  *
  * @module
  */

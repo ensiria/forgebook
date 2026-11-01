@@ -48,9 +48,11 @@ describe("a story about logic", () => {
     expect(logicViewChange(changed, comparing, false)).toBe(changed);
   });
 
-  it("makes a component about logic only when every story it lists is", () => {
-    expect(isLogicComponent({ stories: [storyOf(true), storyOf(true)] })).toBe(true);
-    expect(isLogicComponent({ stories: [storyOf(true), storyOf(false)] })).toBe(false);
-    expect(isLogicComponent({ stories: [] })).toBe(false);
+  it("makes a component about logic only when every story of its file is", () => {
+    expect(isLogicComponent({ stories: [storyOf(true), storyOf(true)], unlisted: [] })).toBe(true);
+    expect(isLogicComponent({ stories: [storyOf(true), storyOf(false)], unlisted: [] })).toBe(false);
+    // an unlisted story about its looks keeps the component's props, and a component lists a story to be marked
+    expect(isLogicComponent({ stories: [storyOf(true)], unlisted: [storyOf(false)] })).toBe(false);
+    expect(isLogicComponent({ stories: [], unlisted: [storyOf(true)] })).toBe(false);
   });
 });

@@ -23,8 +23,6 @@ export type ShownView = {
   readonly view: ViewState;
   /** Changes it: the story's own parts to the story, the rest to the address. */
   readonly onViewChange: (view: ViewState) => void;
-  /** Whether the shown story is about logic; `false` on another page. */
-  readonly isLogic: boolean;
 };
 
 /** What the shown story's view is made of. */
@@ -73,5 +71,5 @@ export const useShownView = (input: ShownViewInput): ShownView => {
     if (change.isTouch !== undefined) input.onTouchChange(story.id, change.isTouch);
     input.onAddressViewChange(logicViewChange(change.view, addressView, isLogic));
   };
-  return { view, onViewChange, isLogic };
+  return { view, onViewChange };
 };

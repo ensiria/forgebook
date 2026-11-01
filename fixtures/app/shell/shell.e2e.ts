@@ -1319,7 +1319,7 @@ test.describe("stories about logic", () => {
     // its reference is the hook's call, not a props table
     const reference = page.getByRole("region", { name: "API reference" });
     await expect(reference.locator(".forgebook-signature__call")).toHaveText(
-      "useUndo(initial: TValue, limit?: number): UndoState<TValue>"
+      "useUndo<TValue>(initial: TValue, limit?: number): UndoState<TValue>"
     );
     await expect(reference.locator("tbody th")).toContainText(["initial", "limit"]);
     await expect(reference).toContainText("the value now, and how to set, undo and redo it.");
@@ -1334,6 +1334,8 @@ test.describe("stories about logic", () => {
     await expect(page.locator(".forgebook-compare")).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "Signature" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
+    // its scene takes no args: no tab sets or lists them
+    await expect(page.getByRole("tab", { name: "Props" })).toHaveCount(0);
     const toolbar = page.locator(".forgebook-toolbar");
     await expect(toolbar.getByRole("button", { name: "Compare" })).toHaveCount(0);
     await expect(toolbar.locator('.forgebook-toolbar__pinned[data-control="theme"]')).toHaveCount(0);

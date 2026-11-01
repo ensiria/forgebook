@@ -8,7 +8,7 @@ import type { TreeStory } from "forgebook/story-tree";
 import { describe, expect, it } from "vitest";
 
 import type { StoryVariant } from "../src/browserTests.ts";
-import { LOGIC_VARIANT, plannedStoryTests } from "../src/storyTestPlan.ts";
+import { hasLookChecks, LOGIC_VARIANT, plannedStoryTests } from "../src/storyTestPlan.ts";
 
 /** The variants of a catalogue: two themes and a narrow frame. */
 const VARIANTS: readonly StoryVariant[] = [
@@ -45,8 +45,16 @@ const storyOf = (id: string, isLogic: boolean): TreeStory => ({
  */
 const planned = (stories: readonly TreeStory[], isScreenshot: boolean): string[] =>
   plannedStoryTests(stories, VARIANTS, isScreenshot).map(
-    (each) => `${each.story.id} · ${each.variant.name}${each.isLayoutChecked ? " · layout" : ""}`
+    (each) => `${each.story.id} · ${each.variant.name}${each.hasLookChecks ? " · layout" : ""}`
   );
+
+describe("the checks about looks", () => {
+  it("run on every story but one about logic, as the tree or a check request gives it", () => {
+    expect(hasLookChecks({ isLogic: true })).toBe(false);
+    expect(hasLookChecks({ isLogic: false })).toBe(true);
+    expect(hasLookChecks({})).toBe(true);
+  });
+});
 
 describe("the tests of each story", () => {
   it("tests a story about its looks in every variant, its layout checked", () => {

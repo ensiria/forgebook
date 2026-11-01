@@ -537,11 +537,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
   const shownStoryId = shown.kind === "story" ? shown.location.story.id : undefined;
   // a story marked for a phone has its own Touch on its page, and a story about logic is never compared
   const shownStory = shown.kind === "story" ? shown.location.story : undefined;
-  const {
-    view: shownView,
-    onViewChange: changeShownView,
-    isLogic: isShownLogic
-  } = useShownView({
+  const { view: shownView, onViewChange: changeShownView } = useShownView({
     addressView: address.view,
     story: shownStory,
     touchOverrides,
@@ -615,7 +611,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           view={shownView}
           onViewChange={changeShownView}
           isStoryPage={shown.kind === "story"}
-          isLogic={isShownLogic}
+          isLogic={isLogicPage(shown)}
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}

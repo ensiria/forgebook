@@ -198,8 +198,9 @@ export const History: LogicStory = { render: () => <Counter />, play: async ({ c
 
 The catalogue marks it in the sidebar and beside its title; the component's page shows the call, a table of the
 parameters (their types and `@param` texts) and the return value (`@returns`) in place of a props table; the story's
-panel opens on Signature, and the bar puts away what only changes the looks (the colour scheme, the contrast, the style
-sheets, the text size, the backdrop) and Compare, which the View menu still offers. A section of its own is a title's
+panel opens on Signature, with no tab of args (its scene takes none), and the bar puts away what only changes the looks
+(the colour scheme, the contrast, the style sheets, the text size, the backdrop; the View menu still offers them) and
+Compare: the story is drawn once, never compared. A section of its own is a title's
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
 

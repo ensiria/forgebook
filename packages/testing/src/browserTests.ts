@@ -105,7 +105,8 @@ const messages = (problems: readonly StoryProblem[]): string[] => problems.map((
 
 /**
  * Runs the checks of one planned test on a shown story: axe, then for a story about its looks the spills, the
- * source's own check, and the overlays last (it resizes the window, which may close what the story left open).
+ * source's own check, and the overlays last (it resizes the window, which may close what the story left open). A story
+ * about logic gets axe only.
  *
  * @param page - the story's frame, ready.
  * @param planned - the story, its variant and whether its layout is checked.
@@ -119,12 +120,12 @@ const expectChecksPass = async (
   check: ((page: Page) => Promise<void>) | undefined
 ): Promise<void> => {
   expect(messages(await axeProblems(page, a11y))).toEqual([]);
-  if (planned.isLayoutChecked) expect(messages(await spillProblems(page))).toEqual([]);
+  if (!planned.hasLookChecks) return;
+  expect(messages(await spillProblems(page))).toEqual([]);
   await check?.(page);
-  if (planned.isLayoutChecked)
-    expect(
-      messages(await overlayProblems(page, isOverlayChecked(planned.variant.view), planned.story.height))
-    ).toEqual([]);
+  expect(
+    messages(await overlayProblems(page, isOverlayChecked(planned.variant.view), planned.story.height))
+  ).toEqual([]);
 };
 
 /**
@@ -149,7 +150,7 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
     // a component whose stories are all about logic has nothing to picture
     if (planned.length === 0) continue;
     test.describe(title, () => {
-      for (const { story, variant, isLayoutChecked } of planned) {
+      for (const { story, variant, hasLookChecks } of planned) {
         test(`${story.name} · ${variant.name}`, async ({ page }) => {
           const errors = watchedErrors(page);
           if (variant.width !== undefined) await page.setViewportSize({ width: variant.width, height: 800 });
@@ -170,7 +171,7 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
             });
             return;
           }
-          await expectChecksPass(page, { story, variant, isLayoutChecked }, catalogue.a11y, check);
+          await expectChecksPass(page, { story, variant, hasLookChecks }, catalogue.a11y, check);
           expect(errors).toEqual([]);
         });
       }

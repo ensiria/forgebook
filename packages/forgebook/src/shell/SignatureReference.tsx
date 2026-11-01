@@ -13,14 +13,25 @@ import { CodeText } from "./CodeText.tsx";
 import { STRINGS } from "./strings.ts";
 
 /**
- * The call as one line of TypeScript: `useUndo(initial: TValue, limit?: number): UndoState<TValue>`.
+ * The type parameters as the call writes them: `<TValue>`, or nothing.
+ *
+ * @param typeParameters - the type parameters.
+ */
+const typeParametersText = (typeParameters: readonly string[]): string =>
+  typeParameters.length === 0 ? "" : `<${typeParameters.join(", ")}>`;
+
+/**
+ * The call as one line of TypeScript: `useUndo<TValue>(initial: TValue, limit?: number): UndoState<TValue>`.
  *
  * @param name - the function's name.
  * @param signature - its signature.
  */
 export const callText = (name: string, signature: FunctionSignatureDocs): string =>
-  `${name}(${signature.parameters
-    .map((parameter) => `${parameter.name}${parameter.isOptional ? "?" : ""}: ${parameter.type}`)
+  `${name}${typeParametersText(signature.typeParameters)}(${signature.parameters
+    .map(
+      (parameter) =>
+        `${parameter.isRest ? "..." : ""}${parameter.name}${parameter.isOptional ? "?" : ""}: ${parameter.type}`
+    )
     .join(", ")}): ${signature.returns}`;
 
 /**
@@ -58,7 +69,10 @@ export const SignatureReference = ({
             {signature.parameters.map((parameter) => (
               <tr key={parameter.name}>
                 <th scope="row">
-                  <code className="forgebook-api__name">{parameter.name}</code>
+                  <code className="forgebook-api__name">
+                    {parameter.isRest ? "..." : ""}
+                    {parameter.name}
+                  </code>
                   {parameter.isOptional ? null : (
                     <span className="forgebook-prop__required" title={STRINGS.required}>
                       *

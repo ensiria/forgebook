@@ -21,6 +21,7 @@ import type {
 import { isOverlayChecked } from "./overlays.ts";
 import { axeProblems, errorProblems, overlayProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
 import { eachStoryPage, openedStory, READY_MS, type StoryPage } from "./storyPages.ts";
+import { hasLookChecks } from "./storyTestPlan.ts";
 
 /**
  * One story in one view, checked.
@@ -49,13 +50,15 @@ const checkedPage = async (
     ]);
   if (status === "error")
     return result([{ kind: "frame", message: "The story could not be shown" }, ...errorProblems(errors)]);
-  return result([
-    ...(await axeProblems(page, a11y)),
-    ...(await spillProblems(page)),
-    // last of the page's checks: it resizes the window, which may close what the story left open
-    ...(await overlayProblems(page, isOverlayChecked(storyPage.view), storyPage.story.height)),
-    ...errorProblems(errors)
-  ]);
+  // a story about logic gets the suite's checks of a scene, not those about looks (`storyTestPlan.ts`)
+  const lookProblems = hasLookChecks(storyPage.story)
+    ? [
+        ...(await spillProblems(page)),
+        // last of the page's checks: it resizes the window, which may close what the story left open
+        ...(await overlayProblems(page, isOverlayChecked(storyPage.view), storyPage.story.height))
+      ]
+    : [];
+  return result([...(await axeProblems(page, a11y)), ...lookProblems, ...errorProblems(errors)]);
 };
 
 /**

@@ -7,8 +7,9 @@
  * A logic story is a hook's or a function's scene: the variants (themes, contrast, the structure only, a narrow frame)
  * change how it looks, which is not what it is there for. Its one test still waits for the frame to be ready, so its
  * play has to pass, checks the console and the page for errors, and runs axe, since its scene is a page a person uses.
- * The spill and overlay checks are about layout at the variants' widths, so they are left out. Pure, so the suite's
- * shape is tested without a browser.
+ * The checks about looks are left out: the spills and the overlays (layout at the variants' widths) and the source's
+ * own check (a rule of its components, which a hook's scene borrows only to be usable). `forgebook check` follows the
+ * same rule (`hasLookChecks`). Pure, so the suite's shape is tested without a browser.
  *
  * @module
  */
@@ -25,9 +26,16 @@ export type PlannedStoryTest = {
   readonly story: TreeStory;
   /** The variant it is drawn in. */
   readonly variant: StoryVariant;
-  /** Whether the layout checks run (spills, overlays): only for a story about its looks. */
-  readonly isLayoutChecked: boolean;
+  /** Whether the checks about looks run (spills, overlays, the source's own check): only for a story about its looks. */
+  readonly hasLookChecks: boolean;
 };
+
+/**
+ * Whether a story gets the checks about looks: every story but one about logic.
+ *
+ * @param story - the story, as the tree or a check request gives it.
+ */
+export const hasLookChecks = (story: { readonly isLogic?: boolean }): boolean => story.isLogic !== true;
 
 /**
  * The tests of some stories, in their order, each story's variants in theirs.
@@ -42,6 +50,6 @@ export const plannedStoryTests = (
   isScreenshot: boolean
 ): PlannedStoryTest[] =>
   stories.flatMap((story): PlannedStoryTest[] => {
-    if (!story.isLogic) return variants.map((variant) => ({ story, variant, isLayoutChecked: true }));
-    return isScreenshot ? [] : [{ story, variant: LOGIC_VARIANT, isLayoutChecked: false }];
+    if (hasLookChecks(story)) return variants.map((variant) => ({ story, variant, hasLookChecks: true }));
+    return isScreenshot ? [] : [{ story, variant: LOGIC_VARIANT, hasLookChecks: false }];
   });

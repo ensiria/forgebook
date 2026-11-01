@@ -40,7 +40,7 @@ export type ToolbarProps = {
   readonly shownWidth?: number | undefined;
   /** What the shown story fixes of the view: shown, and not changeable here; nothing by default. */
   readonly fixed?: FixedView;
-  /** Whether the shown story is about logic: the bar puts away what only changes its looks, and Compare. */
+  /** Whether the shown page is about logic (a hook's story or page): the bar puts away what only changes looks. */
   readonly isLogic?: boolean;
 };
 
@@ -184,9 +184,11 @@ export const Toolbar = ({
   const context = { view, onViewChange, isStoryPage, fixed, shownWidth };
   useControlKeys({ keys: layout.keys, view, onViewChange, fixed, isStoryPage });
   const pinnedRef = useRef<HTMLDivElement>(null);
-  const pinned = layout.placed.filter(
-    (each) => each.isPinned && !(isLogic && isLookControl(each.control.id, catalogue.switches))
-  );
+  // a page about logic puts away the pinned controls that only change looks: the View menu then counts them
+  const putAway = layout.placed
+    .filter((each) => each.isPinned && isLogic && isLookControl(each.control.id, catalogue.switches))
+    .map((each) => each.control.id);
+  const pinned = layout.placed.filter((each) => each.isPinned && !putAway.includes(each.control.id));
   const moved = useToolbarOverflow(
     pinnedRef,
     pinned.map((each) => each.control.id)
@@ -196,7 +198,12 @@ export const Toolbar = ({
   return (
     <div className={layout.isWrapped ? "forgebook-toolbar forgebook-toolbar--wrap" : "forgebook-toolbar"}>
       {onShowSidebar === undefined ? null : <ShowSidebarButton onShowSidebar={onShowSidebar} />}
-      <ViewMenu layout={layout} ownView={ownView} movedIds={layout.isWrapped ? [] : moved} {...context} />
+      <ViewMenu
+        layout={layout}
+        ownView={ownView}
+        movedIds={[...(layout.isWrapped ? [] : moved), ...putAway]}
+        {...context}
+      />
       {onBar.length === 0 ? null : <span className="forgebook-toolbar__divider" />}
       {/* the pinned controls take the room View, the panel and Compare leave; a bar that wraps wraps only them */}
       <div ref={pinnedRef} className="forgebook-toolbar__pinned-list">

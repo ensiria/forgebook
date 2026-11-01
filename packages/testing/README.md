@@ -116,9 +116,10 @@ the package's own run on every frame.
 A story about logic (`parameters: { logic: true }`, a hook's or a function's scene) is tested once, in the catalogue's
 default view, named `logic`: the variants only change how it looks. Its test still waits for the frame to be ready, so
 its play has to pass, and fails on an error in the page; axe runs too, since the scene is a page a person uses and a
-demo that fails WCAG is a bad example to copy. The spill and overlay checks are left out (they are about layout at the
-variants' widths), and a screenshot run takes no reference image of it. `forgebook check --all-variants` opens it in
-the default view only; `forgebook shot` still pictures it when asked by name.
+demo that fails WCAG is a bad example to copy. The checks about looks are left out: the spills and the overlays (layout
+at the variants' widths) and the package's own `check`, and a screenshot run takes no reference image of it.
+`forgebook check` runs the same checks on it, and with `--all-variants` both it and `forgebook shot` open it once, in
+the default view.
 
 ### On the server
 

@@ -1,6 +1,7 @@
 /**
  * The tabs a story's panel shows: Props, Events and Parts and styling from its component's docs, Code from its file,
- * Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature.
+ * Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
+ * and shows no tab of args (`logicTabs`).
  *
  * @module
  */
@@ -168,14 +169,8 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   }
   const component = docs.value;
   const events = eventsOf(component.props, input.actions);
+  if (input.isLogic) return logicTabs(input, component);
   const tabs: DockTab[] = [];
-  if (input.isLogic && component.signature !== undefined) {
-    tabs.push({
-      id: "signature",
-      label: STRINGS.tabs.signature,
-      content: <SignatureReference name={component.name} signature={component.signature} />
-    });
-  }
   tabs.push(...propsTab(input, panelProps(component.props, input.argTypes)));
   tabs.push(...eventsTab(input, events));
   if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
@@ -187,6 +182,31 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
       content: <PartsTab docs={component} />
     });
   }
+  return tabs;
+};
+
+/**
+ * The tabs of a story about logic: its hook's signature, then its play's trace. Its scene takes no args, so the tabs
+ * that set or list them (Props, Events) and the component's parts are left out, even when the hook's options look like
+ * props.
+ *
+ * @param input - what the tabs are built from.
+ * @param component - the hook's docs.
+ */
+const logicTabs = (input: DockTabsInput, component: ComponentDocs): DockTab[] => {
+  const tabs: DockTab[] = [];
+  if (component.signature !== undefined) {
+    tabs.push({
+      id: "signature",
+      label: STRINGS.tabs.signature,
+      content: (
+        <div className="forgebook-signature-tab">
+          <SignatureReference name={component.name} signature={component.signature} />
+        </div>
+      )
+    });
+  }
+  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
   return tabs;
 };
 

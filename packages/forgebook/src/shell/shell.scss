@@ -378,8 +378,10 @@
     color: $text-tertiary;
   }
 
+  // beside the title, the picker still at the row's end
   .forgebook-logic-mark {
     display: inline-flex;
+    margin-inline-end: auto;
     align-items: center;
     gap: $space-1;
     padding: 0 $space-1-5;
@@ -388,6 +390,10 @@
     font: $text-caption;
     font-weight: 500;
     color: $text-secondary;
+  }
+
+  .forgebook-signature-tab {
+    padding: $space-3 $space-3-5;
   }
 
   .forgebook-signature__call {
