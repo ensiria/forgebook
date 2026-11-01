@@ -33,9 +33,13 @@ in JSON with `--json`, and every answer carries the links that open a story for 
   `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
   catalogue draws it with a finger and offers a toggle to turn that off.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
+- A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook
+  (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`
+  that tries it. The catalogue documents its signature from its types and TSDoc (`@param`, `@returns`), and the tests
+  check it once instead of in every look. A title like `Hooks/useUndo` puts it in a Hooks section.
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.
-- Write `title`, `parameters.main`, `group`, `height` and `touch` as plain values: the catalogue reads them without running
+- Write `title`, `parameters.main`, `group`, `height`, `touch` and `logic` as plain values: the catalogue reads them without running
   the file.
 
 ### Commands

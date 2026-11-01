@@ -97,6 +97,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   control whose value is not its default.
 - **Touch on the computer**: the Touch switch turns the mouse into a finger for the stories, two with Shift
   ([below](#touch)); `forgebook dev --touch` opens Chromium with its real touch emulation.
+- **Hooks and functions**: stories about logic, not looks, document a hook with its signature first
+  ([below](#hooks-and-functions)).
 - **Widths** to draw a story at, and a **compare** view that draws the same story once per value of one or two
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
@@ -173,6 +175,33 @@ Chromium lets a page build touch events). A virtual keyboard, the viewport shrin
 Safari need a device. For real touch events and native scrolling, `forgebook dev --touch` opens the catalogue in a
 Chromium window with Chromium's own touch emulation (it needs `@forgebook/testing` and Playwright, as `check` does).
 `controls: { touch: false }` takes the switch away.
+
+## Hooks and functions
+
+A story can be about logic, not looks: a small scene that uses a hook or a function, there to document and try what it
+does. It says so with `parameters: { logic: true }`, on the meta for every story of the file (a story's own `false`
+leaves it out), and its meta's `component` is the hook or the function. In React, `LogicMeta` and `LogicStory` type
+it (`@forgebook/react`):
+
+```tsx
+import type { LogicMeta, LogicStory } from "@forgebook/react";
+
+import { useUndo } from "./useUndo";
+
+export default { title: "Hooks/useUndo", component: useUndo, parameters: { logic: true } } satisfies LogicMeta<
+  typeof useUndo
+>;
+
+/** A counter whose steps can be undone and redone. */
+export const History: LogicStory = { render: () => <Counter />, play: async ({ canvasElement }) => { /* … */ } };
+```
+
+The catalogue marks it in the sidebar and beside its title; the component's page shows the call, a table of the
+parameters (their types and `@param` texts) and the return value (`@returns`) in place of a props table; the story's
+panel opens on Signature, and the bar puts away what only changes the looks (the colour scheme, the contrast, the style
+sheets, the text size, the backdrop) and Compare, which the View menu still offers. A section of its own is a title's
+first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
+`@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
 
 ## Coming from Storybook
 
