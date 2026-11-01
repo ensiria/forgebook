@@ -513,7 +513,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
   const setTouchOverride = (storyId: string, isTouch: boolean): void =>
     setTouchOverrides((current) => new Map(current).set(storyId, isTouch));
   const isSystemDark = useSystemDark();
-  const appearance = useAppearance();
+  const appearance = useAppearance(address.view, catalogue.switches);
   useStoryIdsElement(
     useMemo(
       () =>

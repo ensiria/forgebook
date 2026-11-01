@@ -142,6 +142,34 @@ test.describe("a catalogue's theme of the shell", () => {
   });
 });
 
+test.describe("the shell following the story", () => {
+  test("turns dark with the story, stays while comparing, and yields to the reader's own choice", async ({
+    page
+  }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(story("overview", "theme=dark"));
+    const appearance = (): Promise<string | null> =>
+      page.evaluate(() => document.documentElement.getAttribute("data-forgebook-appearance"));
+    await expect.poll(appearance).toBe("light");
+
+    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await page
+      .getByRole("dialog", { name: "Appearance" })
+      .getByRole("radio", { name: "Follow the story" })
+      .check();
+    await expect.poll(appearance).toBe("dark");
+
+    await page.goto(story("overview", "theme=dark&compare=theme"));
+    await expect.poll(appearance).toBe("light");
+
+    await page.goto(story("overview", "theme=dark"));
+    await expect.poll(appearance).toBe("dark");
+    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await page.getByRole("dialog", { name: "Appearance" }).getByRole("radio", { name: "Light" }).check();
+    await expect.poll(appearance).toBe("light");
+  });
+});
+
 test.describe("the scroll position", () => {
   /** The shown page's scrolling part. */
   const scroller = (page: Page): Locator => page.locator("main .forgebook-scroll");
