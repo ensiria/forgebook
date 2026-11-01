@@ -99,13 +99,56 @@ const asksPointer = (condition: Condition): boolean => {
 const phoneQueries = (queries: readonly MediaQuery[]): MediaQuery[] =>
   queries.flatMap((query): MediaQuery[] => {
     if (query.condition === null || query.condition === undefined) return [query];
-    let reading = phoneCondition(query.condition);
-    if (query.qualifier === "not" && typeof reading === "boolean") reading = !reading;
-    if (reading === false) return [];
-    return [
-      reading === true ? { ...query, qualifier: null, condition: null } : { ...query, condition: reading }
-    ];
+    const reading = phoneCondition(query.condition);
+    if (typeof reading !== "boolean") return [{ ...query, condition: reading }];
+    if (query.qualifier !== "not") return reading ? [{ ...query, qualifier: null, condition: null }] : [];
+    // `not T and C`: with C true it is `not T` (never, for every type), with C false it holds for every type
+    if (!reading) return [{ ...query, qualifier: null, mediaType: "all", condition: null }];
+    return query.mediaType === "all" ? [] : [{ ...query, condition: null }];
   });
+
+/**
+ * The rules a rule holds, for the rules that hold others (`@media`, `@supports`, `@container`, `@layer`,
+ * `@starting-style`); none for any other.
+ *
+ * @param rule - the rule.
+ */
+const groupedRules = (rule: Rule): readonly Rule[] | undefined => {
+  switch (rule.type) {
+    case "media":
+    case "supports":
+    case "container":
+    case "layer-block":
+    case "starting-style":
+      return rule.value.rules;
+    default:
+      return undefined;
+  }
+};
+
+/**
+ * A rule that holds others, with other rules in it.
+ *
+ * @param rule - the rule (one `groupedRules` reads).
+ * @param rules - its new rules.
+ */
+const withGroupedRules = (rule: Rule, rules: Rule[]): Rule => {
+  // one case each: the spread keeps each rule's own type
+  switch (rule.type) {
+    case "media":
+      return { ...rule, value: { ...rule.value, rules } };
+    case "supports":
+      return { ...rule, value: { ...rule.value, rules } };
+    case "container":
+      return { ...rule, value: { ...rule.value, rules } };
+    case "layer-block":
+      return { ...rule, value: { ...rule.value, rules } };
+    case "starting-style":
+      return { ...rule, value: { ...rule.value, rules } };
+    default:
+      return rule;
+  }
+};
 
 /** `[data-forgebook-touch]`. */
 const TOUCH: SelectorComponent = { type: "attribute", name: TOUCH_ATTRIBUTE };
@@ -119,6 +162,38 @@ const rootCondition = (isTouch: boolean): SelectorComponent =>
   isTouch ? TOUCH : { type: "pseudo-class", kind: "not", selectors: [[TOUCH]] };
 
 /**
+ * `:where(<components>)`.
+ *
+ * @param components - one compound selector.
+ */
+const whereOf = (components: Selector): SelectorComponent => ({
+  type: "pseudo-class",
+  kind: "where",
+  selectors: [components]
+});
+
+/**
+ * Whether a selector's component is a scope this rewrite wrote: a `:where()` that names the touch attribute, with no
+ * combinator in it (the `:hover` guard, `NOT_UNDER_TOUCH`, has one). Read from its structure: Lightning CSS writes a
+ * selector it visits again with fields of its own.
+ *
+ * @param component - the component.
+ */
+const isScopeComponent = (component: SelectorComponent): boolean => {
+  if (component.type !== "pseudo-class" || component.kind !== "where") return false;
+  const text = JSON.stringify(component);
+  return text.includes(TOUCH_ATTRIBUTE) && !text.includes('"combinator"');
+};
+
+/**
+ * Whether a selector starts at a shadow root's host (`:host`, `:host(.on)`).
+ *
+ * @param selector - the selector.
+ */
+const isShadowHost = (selector: Selector): boolean =>
+  selector[0]?.type === "pseudo-class" && selector[0].kind === "host";
+
+/**
  * A selector scoped to a root with touch simulated or without: the condition on the root itself when the selector
  * starts there, a descendant of such a root otherwise, in `:where()` either way.
  *
@@ -126,25 +201,27 @@ const rootCondition = (isTouch: boolean): SelectorComponent =>
  * @param isTouch - whether touch is simulated.
  */
 const scopedSelector = (selector: Selector, isTouch: boolean): Selector => {
-  const condition: SelectorComponent = {
-    type: "pseudo-class",
-    kind: "where",
-    selectors: [[rootCondition(isTouch)]]
-  };
   const firstCombinator = selector.findIndex((component) => component.type === "combinator");
   const head = firstCombinator === -1 ? selector : selector.slice(0, firstCombinator);
-  const isAtRoot = head.some(
+  // scoped already: a pointer media rule inside another
+  if (head.some(isScopeComponent)) return selector;
+  const atRoot = head.findIndex(
     (component) =>
       (component.type === "pseudo-class" && component.kind === "root") ||
       (component.type === "type" && component.name === "html")
   );
-  if (isAtRoot) return [...head, condition, ...selector.slice(head.length)];
-  const root: SelectorComponent = {
-    type: "pseudo-class",
-    kind: "where",
-    selectors: [[{ type: "pseudo-class", kind: "root" }, rootCondition(isTouch)]]
-  };
-  return [root, { type: "combinator", value: "descendant" }, ...selector];
+  // right after the root's own component, before a pseudo-element that may follow it
+  if (atRoot !== -1)
+    return [
+      ...selector.slice(0, atRoot + 1),
+      whereOf([rootCondition(isTouch)]),
+      ...selector.slice(atRoot + 1)
+    ];
+  return [
+    whereOf([{ type: "pseudo-class", kind: "root" }, rootCondition(isTouch)]),
+    { type: "combinator", value: "descendant" },
+    ...selector
+  ];
 };
 
 /**
@@ -155,22 +232,42 @@ const scopedSelector = (selector: Selector, isTouch: boolean): Selector => {
  * @param isTouch - whether touch is simulated.
  */
 const scopedRules = (rules: readonly Rule[], isTouch: boolean): Rule[] =>
-  rules.map((rule): Rule => {
+  rules.flatMap((rule): Rule[] => {
     if (rule.type === "style") {
-      return {
-        ...rule,
-        value: { ...rule.value, selectors: rule.value.selectors.map((each) => scopedSelector(each, isTouch)) }
-      };
+      // a shadow root's own selector (`:host`) has no root to scope it by: kept for the computer, under its real media,
+      // and left out of the phone's copy, where nothing would hold it to touch
+      const selectors = rule.value.selectors
+        .filter((each) => !(isTouch && isShadowHost(each)))
+        .map((each) => (isShadowHost(each) ? each : scopedSelector(each, isTouch)));
+      return selectors.length === 0 ? [] : [{ ...rule, value: { ...rule.value, selectors } }];
     }
-    if (
-      rule.type === "media" ||
-      rule.type === "supports" ||
-      rule.type === "container" ||
-      rule.type === "layer-block"
-    )
-      return { ...rule, value: { ...rule.value, rules: scopedRules(rule.value.rules, isTouch) } } as Rule;
-    return rule;
+    // declarations written straight inside a nested media rule (`.a { @media (hover: none) { color: red } }`) belong to
+    // the parent: they become a rule of the parent itself (`&`), scoped like any other
+    if (rule.type === "nested-declarations") {
+      return [
+        {
+          type: "style",
+          value: {
+            selectors: [scopedSelector([{ type: "nesting" }], isTouch)],
+            declarations: rule.value.declarations,
+            rules: [],
+            loc: rule.value.loc
+          }
+        }
+      ];
+    }
+    const inner = groupedRules(rule);
+    return [inner === undefined ? rule : withGroupedRules(rule, scopedRules(inner, isTouch))];
   });
+
+/**
+ * Whether rules hold an `@scope` rule anywhere: Lightning CSS cannot write one back after a visitor returns it, so a
+ * media rule that holds one is left as it is.
+ *
+ * @param rules - the rules.
+ */
+const holdsScope = (rules: readonly Rule[]): boolean =>
+  rules.some((rule) => rule.type === "scope" || holdsScope(groupedRules(rule) ?? []));
 
 /**
  * A media rule as the computer and as a simulated phone read it: the rule for the computer, its rules scoped to a
@@ -187,6 +284,7 @@ export const touchMediaRules = (rule: Extract<Rule, { type: "media" }>): Rule[] 
     )
   )
     return undefined;
+  if (holdsScope(rule.value.rules)) return undefined;
   const computer: Rule = { ...rule, value: { ...rule.value, rules: scopedRules(rule.value.rules, false) } };
   const phone = phoneQueries(queries);
   if (phone.length === 0) return [computer];

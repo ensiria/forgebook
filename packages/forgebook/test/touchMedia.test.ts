@@ -64,4 +64,45 @@ describe("the pointer's media under simulated touch", () => {
       ".g:is(:hover:where(:not(:root[data-forgebook-touch] *)),[data-forgebook-force~=hover],[data-forgebook-force~=hover] *){color:red}"
     );
   });
+
+  it("scopes a pointer media rule inside another once", () => {
+    expect(rewrite("@media (hover: none) { @media (pointer: coarse) { .x { top: 1px } } }")).toBe(
+      `@media (hover:none){@media (pointer:coarse){${COMPUTER} .x{top:1px}}${COMPUTER} .x{top:1px}}` +
+        `@media (pointer:coarse){${PHONE} .x{top:1px}}${PHONE} .x{top:1px}`
+    );
+  });
+
+  it("scopes declarations written straight inside a nested media rule, as a rule of their parent", () => {
+    expect(rewrite(".a { @media (hover: none) { color: red } }")).toBe(
+      `.a{@media (hover:none){${COMPUTER} &{color:red}}${PHONE} &{color:red}}`
+    );
+  });
+
+  it("reads a negated query with a media type as a phone would", () => {
+    expect(rewrite("@media not print and (hover: hover) { .b { top: 1px } }")).toBe(
+      `@media not print and (hover:hover){${COMPUTER} .b{top:1px}}${PHONE} .b{top:1px}`
+    );
+    expect(rewrite("@media not screen and (hover: none) { .c { top: 1px } }")).toBe(
+      `@media not screen and (hover:none){${COMPUTER} .c{top:1px}}@media not screen{${PHONE} .c{top:1px}}`
+    );
+  });
+
+  it("scopes @starting-style, leaves @scope as it is, keeps :host out of the phone's copy", () => {
+    expect(rewrite("@media (hover: none) { @starting-style { .s { opacity: 0 } } }")).toBe(
+      `@media (hover:none){@starting-style{${COMPUTER} .s{opacity:0}}}@starting-style{${PHONE} .s{opacity:0}}`
+    );
+    expect(rewrite("@media (hover: none) { @scope (.card) { .t { top: 1px } } }")).toBe(
+      "@media (hover:none){@scope(.card){.t{top:1px}}}"
+    );
+    expect(rewrite("@media (hover: none) { :host(.on) { top: 1px } }")).toBe(
+      "@media (hover:none){:host(.on){top:1px}}"
+    );
+  });
+
+  it("puts the root's condition before a pseudo-element", () => {
+    expect(rewrite("@media (hover: none) { :root::view-transition-old(x) { top: 1px } }")).toBe(
+      "@media (hover:none){:root:where(:not([data-forgebook-touch]))::view-transition-old(x){top:1px}}" +
+        ":root:where([data-forgebook-touch])::view-transition-old(x){top:1px}"
+    );
+  });
 });
