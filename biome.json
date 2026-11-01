@@ -237,6 +237,15 @@
     "defaultBranch": "develop"
   },
   "files": {
-    "includes": ["**", "!**/*.md", "!**/*.html", "!**/*.css", "!**/*.scss", "!**/*.svg", "!pnpm-lock.yaml"]
+    "includes": [
+      "**",
+      "!fixtures/app/public/mockServiceWorker.js",
+      "!**/*.md",
+      "!**/*.html",
+      "!**/*.css",
+      "!**/*.scss",
+      "!**/*.svg",
+      "!pnpm-lock.yaml"
+    ]
   }
 }

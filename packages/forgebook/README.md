@@ -243,6 +243,31 @@ become switches. It reads React on Vite (`@storybook/react-vite`) only, never re
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+## Mocking an API
+
+A story that fetches gets its answers from [MSW](https://mswjs.io), an optional peer. Install it and write its worker into
+the catalogue's public folder:
+
+```sh
+npm install --save-dev msw
+npx msw init public
+```
+
+```tsx
+import { http, HttpResponse } from "msw";
+
+/** The list, from a mocked API. */
+export const Loaded: Story<typeof Users> = {
+  parameters: {
+    msw: { handlers: [http.get("/api/users", () => HttpResponse.json([{ name: "Ada" }]))] }
+  }
+};
+```
+
+`parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
+on the dev server and in a static build.
+
 ## For agents
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,

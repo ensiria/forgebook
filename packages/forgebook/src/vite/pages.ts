@@ -14,7 +14,7 @@
 import { join } from "node:path";
 
 import type { PageConfig } from "../pageConfig.ts";
-import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -175,6 +175,7 @@ export const frameEntry = (config: ResolvedConfig): string => {
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
+    ...(config.hasMocks ? [`    mockTools: () => import(${JSON.stringify(MOCKS_MODULE)}),`] : []),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ""

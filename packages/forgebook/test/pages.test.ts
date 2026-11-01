@@ -25,6 +25,7 @@ const CONFIG: ResolvedConfig = {
   head: '<link rel="stylesheet" href="/fonts.css" />',
   watch: [],
   lists: {},
+  hasMocks: false,
   hasPlayTools: false
 };
 
@@ -66,5 +67,18 @@ describe("the generated pages", () => {
     const source = storiesSourceModule(CONFIG);
     expect(source).toContain('import files0 from "./src/**/*.stories.tsx?forgebook-files";');
     expect(source).toContain('name: "Acme <UI>",');
+  });
+});
+
+describe("a story's mocked API", () => {
+  it("names MSW in the frame's entry only for a project that installs it, and only as a dynamic import", () => {
+    expect(frameEntry(CONFIG)).not.toContain("msw");
+    const entry = frameEntry({ ...CONFIG, hasMocks: true });
+    expect(entry).toContain('mockTools: () => import("msw/browser"),');
+    expect(entry).not.toContain('from "msw');
+  });
+
+  it("keeps it out of the shell", () => {
+    expect(shellEntry({ ...CONFIG, hasMocks: true })).not.toContain("msw");
   });
 });

@@ -87,6 +87,7 @@
   "peerDependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/user-event": "^14.6.0",
+    "msw": "^2.0.0 || ^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sass-embedded": "^1.80.0",
@@ -112,6 +113,9 @@
       "optional": true
     },
     "@testing-library/user-event": {
+      "optional": true
+    },
+    "msw": {
       "optional": true
     },
     "sass-embedded": {
