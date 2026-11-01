@@ -243,6 +243,44 @@ become switches. It reads React on Vite (`@storybook/react-vite`) only, never re
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+## A preview for every pull request
+
+`forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
+for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
+artefact; the last step is yours, and any host works:
+
+```yaml
+# .github/workflows/catalogue-preview.yml
+name: catalogue preview
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx forgebook build --out preview --base "/pr-${{ github.event.number }}/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogue-preview
+          path: preview
+      # then publish the folder, for example:
+      # GitHub Pages:  actions/upload-pages-artifact, then actions/deploy-pages (one site, so without --base per PR)
+      # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
+      # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
+```
+
+A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+
 ## For agents
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,

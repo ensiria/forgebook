@@ -43,6 +43,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fixture/app exec playwright install --with-deps chromium
       - run: pnpm --filter @fixture/app test:shell
+      # the README's preview recipe: a build under a sub-path, kept as an artefact, its pages asked for under that path
+      - run: pnpm --filter @fixture/app exec forgebook build --out preview --base "/pr-${{ github.event.number || 0 }}/"
+      - run: grep -q "/pr-${{ github.event.number || 0 }}/assets/" fixtures/app/preview/index.html
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: catalogue-preview
+          path: fixtures/app/preview
+          retention-days: 1
 
   commits:
     runs-on: ubuntu-latest
