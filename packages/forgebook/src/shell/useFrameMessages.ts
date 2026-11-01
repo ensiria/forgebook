@@ -43,8 +43,11 @@ export type FrameHandlers = {
   readonly onPlay?: (storyId: string, trace: PlayTrace) => void;
   /** An accessibility check is over: the rules broken, or why it could not run; none where nothing asks for one. */
   readonly onChecked?: (result: CheckResult) => void;
-  /** A frame measured its spills again (while the stage asks for them); none where nothing shows them. */
-  readonly onSpills?: (storyId: string, count: number) => void;
+  /**
+   * A frame measured its spills again (while the stage asks for them), with the frame's address (the compare view has
+   * several frames of a story); none where nothing shows them.
+   */
+  readonly onSpills?: (storyId: string, count: number, frame: string) => void;
 };
 
 /** An accessibility check's result, as a frame reported it. */
@@ -107,7 +110,7 @@ const onFrameMessage = (
       handlers.onChecked?.({ storyId: message.storyId, error: message.message });
       return;
     case "forgebook:spills":
-      handlers.onSpills?.(message.storyId, message.count);
+      handlers.onSpills?.(message.storyId, message.count, address ?? "");
       return;
     case "forgebook:call":
       handlers.onCall({

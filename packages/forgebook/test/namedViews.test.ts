@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { catalogueSettings } from "../src/catalogue.ts";
 import {
+  checkedView,
   isSameView,
   namedViewsText,
   readNamedViews,
@@ -66,5 +67,19 @@ describe("the catalogue's named views", () => {
     expect(() =>
       catalogueSettings("A", DEFAULT_SWITCHES, { views: [{ name: "Odd", view: "nowhere" }] })
     ).toThrow('Forgebook\'s view "Odd"');
+  });
+
+  describe("a named view picked again", () => {
+    it("falls back to the default for what the catalogue no longer offers", () => {
+      const catalogue = catalogueSettings("A", DEFAULT_SWITCHES, { controls: { sheets: false } });
+      const picked = withViewValues(DEFAULT_VIEW, {
+        ...viewValues(DEFAULT_VIEW),
+        backdrop: "gone",
+        text: 175,
+        sheets: "structure"
+      });
+      const checked = checkedView(picked, catalogue);
+      expect([checked.backdrop, checked.text, checked.sheets]).toEqual(["plain", 100, "full"]);
+    });
   });
 });

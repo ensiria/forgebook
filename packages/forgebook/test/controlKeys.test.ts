@@ -24,15 +24,18 @@ describe("catalogueKeys", () => {
     });
   });
 
-  it("refuses an unknown control, a key twice, a key of the shell's and more than one character", () => {
+  it("refuses an unknown control, a key twice, and anything but one letter", () => {
     expect(catalogueKeys(IDS, { zoom: "z" })).toBe(
       'The keys name "zoom", which is no control of the catalogue'
     );
-    expect(catalogueKeys(IDS, { width: "t" })).toBe('The key of width: "t" is theme\'s already');
-    expect(catalogueKeys(IDS, { text: "/" })).toBe('The key of text: "/" is the shell\'s own');
-    expect(catalogueKeys(IDS, { text: "ab" })).toBe(
-      'The key of text: "ab" is not one character in lower case'
-    );
+    expect(catalogueKeys(IDS, { width: "w", text: "w" })).toBe(`The key of width: "w" is text's already`);
+    expect(catalogueKeys(IDS, { text: "/" })).toBe('The key of text: "/" is not one letter in lower case');
+    expect(catalogueKeys(IDS, { text: "ab" })).toBe('The key of text: "ab" is not one letter in lower case');
+    expect(catalogueKeys(IDS, { text: "1" })).toBe('The key of text: "1" is not one letter in lower case');
+  });
+
+  it("gives the catalogue's keys first: a default steps aside for one, instead of clashing with it", () => {
+    expect(catalogueKeys(IDS, { width: "t" })).toEqual({ width: "t", contrast: "c" });
   });
 
   it("stops a catalogue whose keys cannot be used", () => {
@@ -100,6 +103,10 @@ describe("cycledView", () => {
     ).toBeUndefined();
     expect(
       cycledView(DEFAULT_VIEW, "width", 1, catalogue, { switches: {}, width: 360 }, true)
+    ).toBeUndefined();
+    // the compare view draws each cell at its own width: its width key does nothing there
+    expect(
+      cycledView({ ...DEFAULT_VIEW, compare: ["theme"] }, "width", 1, catalogue, NOT_FIXED, true)
     ).toBeUndefined();
   });
 });

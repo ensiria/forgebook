@@ -102,10 +102,16 @@ export const applyView = (
   catalogue: Pick<CatalogueSettings, "switches" | "backdrops">
 ): void => {
   for (const each of catalogue.switches) applySwitch(root, each, view.switches[each.id]);
-  // a language read right to left draws the story right to left, whatever the direction switch says
+  // a language read right to left draws the story right to left; leaving it gives the root its own direction back,
+  // unless a switch writes `dir` itself (the direction switch, applied above)
   const language = switchWithRole(catalogue.switches, "language");
-  if (language !== undefined && switchValueOf(language, view.switches[language.id])?.isRightToLeft === true)
-    root.setAttribute("dir", "rtl");
+  const isRightToLeft =
+    language !== undefined && switchValueOf(language, view.switches[language.id])?.isRightToLeft === true;
+  const isDirWritten = catalogue.switches.some(
+    (each) => each.apply.kind === "attribute" && each.apply.name === "dir"
+  );
+  if (isRightToLeft) root.setAttribute("dir", "rtl");
+  else if (!isDirWritten) root.removeAttribute("dir");
   root.style.fontSize = `${view.text}%`;
   const backdrop = catalogue.backdrops.find((each) => each.id === view.backdrop);
   applyBackdrop(root.ownerDocument, backdropSheet(backdrop, schemeOf(view, catalogue.switches)));

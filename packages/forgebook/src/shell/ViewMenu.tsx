@@ -46,12 +46,19 @@ const SHIFT_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 /**
  * The ids of the controls whose values the View menu answers for: those not on the toolbar (in it, or hidden, whose
- * value still applies), the stage's width aside, which is not a view setting.
+ * value still applies, or pinned but moved into it for want of room), the stage's width aside, which is not a view
+ * setting.
  *
  * @param placed - the placed controls.
+ * @param movedIds - the pinned controls the bar has no room for, shown in the menu: counted with its own.
  */
-export const menuControlIds = (placed: readonly PlacedControl[]): string[] =>
-  placed.filter((each) => !each.isPinned && each.control.id !== "width").map((each) => each.control.id);
+export const menuControlIds = (
+  placed: readonly PlacedControl[],
+  movedIds: readonly string[] = []
+): string[] =>
+  placed
+    .filter((each) => (!each.isPinned || movedIds.includes(each.control.id)) && each.control.id !== "width")
+    .map((each) => each.control.id);
 
 /**
  * The view with the given controls' values back at their defaults.
@@ -217,7 +224,7 @@ export const ViewMenu = ({
   const hintId = useId();
   const shown = layout.placed.filter((each) => !each.isHidden);
   const hidden = layout.placed.filter((each) => each.isHidden);
-  const ids = menuControlIds(layout.placed);
+  const ids = menuControlIds(layout.placed, movedIds);
   const order = shown.map((each) => each.control.id).join(",");
   useShiftedRows(listRef, order, draggedId);
   // the menu never runs past the window's edges: a narrow window keeps it inside, its widest values then scroll; a

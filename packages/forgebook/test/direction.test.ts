@@ -18,6 +18,13 @@ describe("the direction switch", () => {
     expect(directionSwitch().values.find((value) => value.value === "ltr")?.isUnset).toBe(true);
   });
 
+  it("steps aside for a catalogue's switch of the same id, declared before the ready-made one existed", () => {
+    const { role: _role, ...withoutRole } = directionSwitch();
+    const own: ViewSwitch = { ...withoutRole, label: "Writing" };
+    const ids = catalogueSwitches([...DEFAULT_SWITCHES, own], []).map((each) => each.id);
+    expect(ids.filter((id) => id === "dir")).toHaveLength(1);
+  });
+
   it("is left out when the catalogue declares its own direction switch, or turns it off", () => {
     const own: ViewSwitch = { ...directionSwitch(), id: "writing", label: "Writing" };
     expect(catalogueSwitches([...DEFAULT_SWITCHES, own], []).map((each) => each.id)).toEqual([

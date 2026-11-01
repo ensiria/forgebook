@@ -256,13 +256,18 @@ export const catalogueSwitches = (
     (language, index) => languages.findIndex((other) => other.id === language.id) === index
   );
   const own = declared ?? DEFAULT_SWITCHES;
-  const isOffered = (role: "direction" | "touch"): boolean =>
-    turnedOff[role] !== false && switchWithRole(own, role) === undefined;
+  // a ready-made switch steps aside for a catalogue's own: of its role, or of its id (one declared before it existed)
+  const isOffered = (role: "direction" | "touch", ready: ViewSwitch): boolean =>
+    turnedOff[role] !== false &&
+    switchWithRole(own, role) === undefined &&
+    !own.some((each) => each.id === ready.id);
+  const direction = directionSwitch();
+  const touch = touchSwitch();
   const switches = [
     ...own,
     ...(unique.length > 0 ? [languageSwitch(unique)] : []),
-    ...(isOffered("direction") ? [directionSwitch()] : []),
-    ...(isOffered("touch") ? [touchSwitch()] : [])
+    ...(isOffered("direction", direction) ? [direction] : []),
+    ...(isOffered("touch", touch) ? [touch] : [])
   ];
   const problem = switchesProblem(switches);
   if (problem !== undefined) throw new Error(`Forgebook's switches: ${problem}`);

@@ -63,6 +63,8 @@ export const spillOutline = (
       characterData: true,
       attributeFilter: ["class", "style", "hidden"]
     });
+    // the root's direction, text size and switches (its attributes) change the story's layout without touching its body
+    mutations.observe(document.documentElement, { attributes: true });
     const resizes = new ResizeObserver(schedule);
     resizes.observe(document.body);
     schedule();

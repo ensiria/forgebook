@@ -11,7 +11,13 @@
 import type { CatalogueSettings } from "../catalogue.ts";
 import { cycledValue, switchValues } from "../controlKeys.ts";
 import type { FixedView } from "../storyGlobals.ts";
-import { PLAIN_BACKDROP, SHEETS_CHOICES, type StageWidth, type ViewState } from "../viewState.ts";
+import {
+  isComparing,
+  PLAIN_BACKDROP,
+  SHEETS_CHOICES,
+  type StageWidth,
+  type ViewState
+} from "../viewState.ts";
 import { withSwitch } from "./switchView.ts";
 
 /** What a cycle reads of the catalogue: its controls' values. */
@@ -60,7 +66,8 @@ export const cycledView = (
   fixed: FixedView,
   isStoryPage: boolean
 ): ViewState | undefined => {
-  if (isStoryPage && view.compare.includes(id)) return undefined;
+  // the compare view draws each cell at its own width: the width control is off there, its key too
+  if (isStoryPage && (view.compare.includes(id) || (id === "width" && isComparing(view)))) return undefined;
   const each = catalogue.switches.find((candidate) => candidate.id === id);
   if (each !== undefined) {
     if (fixed.switches[id] !== undefined) return undefined;

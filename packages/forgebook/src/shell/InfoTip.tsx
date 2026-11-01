@@ -56,6 +56,8 @@ export const InfoTip = ({
         className="forgebook-info-tip"
         aria-label={STRINGS.aboutControl(about)}
         aria-describedby={noteId}
+        // its own note is its tooltip: an empty title keeps a parent's (a pinned control's key) from showing over it
+        title=""
         onPointerEnter={show}
         onPointerLeave={hide}
         onFocus={show}

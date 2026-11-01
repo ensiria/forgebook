@@ -15,6 +15,7 @@ import {
 } from "react";
 
 import {
+  checkedView,
   isSameView,
   type NamedView,
   namedViewsText,
@@ -78,7 +79,7 @@ export const NamedViews = ({
         type="button"
         className="forgebook-named-view__pick"
         aria-pressed={isSameView(each.values, own, catalogue.switches)}
-        onClick={(): void => onViewChange(withViewValues(view, each.values))}
+        onClick={(): void => onViewChange(checkedView(withViewValues(view, each.values), catalogue))}
       >
         {each.name}
       </button>

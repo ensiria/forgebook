@@ -9,7 +9,7 @@
  *
  * @module
  */
-import type { ViewState } from "./viewState.ts";
+import { parseView, type ViewCatalogue, type ViewState, viewParams } from "./viewState.ts";
 
 /** The values a named view holds: the View menu's. */
 export type ViewValues = Pick<ViewState, "switches" | "backdrop" | "sheets" | "text" | "width">;
@@ -136,3 +136,16 @@ export const isSameView = (
   first.sheets === second.sheets &&
   first.text === second.text &&
   first.width === second.width;
+
+/**
+ * A view with a named view's values read back as an address is: what the catalogue no longer offers (a background, a
+ * text size, a control it turned off) falls back to its default, so a view saved before the catalogue changed never
+ * sets what the catalogue cannot show.
+ *
+ * @param view - the view with the named view's values set.
+ * @param catalogue - the catalogue's switches and lists.
+ */
+export const checkedView = (view: ViewState, catalogue: ViewCatalogue): ViewState => ({
+  ...view,
+  ...viewValues(parseView(viewParams(view, catalogue.switches).toString(), catalogue))
+});

@@ -1,12 +1,12 @@
 /**
  * The keys that cycle the toolbar's controls: one character per control, pressed without a modifier (Shift goes the
- * other way), ignored while typing, as `/` and `[` `]` are.
+ * other way), ignored while typing, as `/` and `[` `]` are; a letter, never one of the shell's own keys.
  *
  * @remarks
  * The catalogue sets the key of any control, its switches and Forgebook's own alike (`keys` in its configuration, by
  * control id; `false` takes one away); the ready-made switches have one by default. A reader changes or removes one
- * for themself (kept in their browser), over the catalogue's. A key is one character, never one the shell already
- * answers, never one another control has. Pure: keys and a view in, keys or a view out.
+ * for themself (kept in their browser), over the catalogue's. A key is one letter (the shell's own keys are not letters),
+ * never one another control has. Pure: keys and a view in, keys or a view out.
  *
  * @module
  */
@@ -20,9 +20,6 @@ export const DEFAULT_KEYS: Readonly<Record<string, string>> = {
   dir: "d"
 };
 
-/** The keys the shell answers already: the search, the previous and the next story. */
-const RESERVED_KEYS = ["/", "[", "]"];
-
 /** The keys of the controls, by control id. */
 export type ControlKeys = Readonly<Record<string, string>>;
 
@@ -30,13 +27,14 @@ export type ControlKeys = Readonly<Record<string, string>>;
 export type ReaderKeys = Readonly<Record<string, string | null>>;
 
 /**
- * A key as the shell keeps it: one character, lower case; none when the text is not one.
+ * A key as the shell keeps it: one letter, lower case; none when the text is not one.
  *
  * @param text - the key as written or pressed.
  */
 export const keyOf = (text: string): string | undefined => {
   const key = text.toLowerCase();
-  return [...key].length === 1 && key.trim() !== "" ? key : undefined;
+  // a letter only: Shift turns a digit or a sign into another character, and the cycle could not go back
+  return /^\p{L}$/u.test(key) ? key : undefined;
 };
 
 /**
@@ -47,8 +45,7 @@ export const keyOf = (text: string): string | undefined => {
  * @param keys - the other controls' keys.
  */
 const keyProblem = (key: string, id: string, keys: ControlKeys): string | undefined => {
-  if (keyOf(key) !== key) return `"${key}" is not one character in lower case`;
-  if (RESERVED_KEYS.includes(key)) return `"${key}" is the shell's own`;
+  if (keyOf(key) !== key) return `"${key}" is not one letter in lower case`;
   const holder = Object.entries(keys).find(([other, held]) => other !== id && held === key)?.[0];
   return holder === undefined ? undefined : `"${key}" is ${holder}'s already`;
 };
@@ -67,11 +64,17 @@ export const catalogueKeys = (
   const unknown = Object.keys(set).find((id) => !controlIds.includes(id));
   if (unknown !== undefined) return `The keys name "${unknown}", which is no control of the catalogue`;
   const keys: Record<string, string> = {};
+  // the keys the catalogue sets first, each checked against the others; then a default where its key is still free
   for (const id of controlIds) {
-    const key = set[id] ?? DEFAULT_KEYS[id];
+    const key = set[id];
     if (key === false || key === undefined) continue;
     const problem = keyProblem(key, id, keys);
     if (problem !== undefined) return `The key of ${id}: ${problem}`;
+    keys[id] = key;
+  }
+  for (const id of controlIds) {
+    const key = DEFAULT_KEYS[id];
+    if (set[id] !== undefined || key === undefined || keyProblem(key, id, keys) !== undefined) continue;
     keys[id] = key;
   }
   return keys;

@@ -5,7 +5,7 @@
  * @remarks
  * The frames are asked to outline their spills only while the worst case is on (`forgebook:spills`), so a story shown
  * with its own data never pays for the measure; a frame that loads again is asked again when it is ready (`sendTo`).
- * The count is kept by story: in the compare view each frame measures its own, and the last to report is shown.
+ * The count is kept by story and by frame: in the compare view each frame measures its own, and the most is shown.
  *
  * @module
  */
@@ -39,8 +39,16 @@ export type WorstCase = {
   /** Tells a frame that is ready whether to outline its spills. */
   readonly sendTo: (frame: Window) => void;
   /** Keeps the count a frame reported. */
-  readonly receive: (storyId: string, count: number) => void;
+  readonly receive: (storyId: string, count: number, frame: string) => void;
 };
+
+/**
+ * The most spills a story's frames counted: the one to fix first; none before any frame counted.
+ *
+ * @param frames - each frame's count.
+ */
+const mostOf = (frames: ReadonlyMap<string, number> | undefined): number | undefined =>
+  frames === undefined || frames.size === 0 ? undefined : Math.max(...frames.values());
 
 /**
  * The stage's worst case.
@@ -57,7 +65,8 @@ export const useWorstCase = ({
 }: WorstCaseInput): WorstCase => {
   const args = useMemo(() => worstArgs(settable), [settable]);
   const isOn = isWorstCase(args, values);
-  const [counts, setCounts] = useState<ReadonlyMap<string, number>>(new Map());
+  // each frame's count, by story then by frame: the compare view draws a story in several
+  const [counts, setCounts] = useState<ReadonlyMap<string, ReadonlyMap<string, number>>>(new Map());
   useEffect(() => {
     const message: ShellMessage = { type: "forgebook:spills", isOn };
     tellFrames(storyRef.current, message);
@@ -66,14 +75,14 @@ export const useWorstCase = ({
     state: {
       canApply: Object.keys(args).length > 0,
       isOn,
-      spillCount: isOn ? counts.get(storyId) : undefined,
+      spillCount: isOn ? mostOf(counts.get(storyId)) : undefined,
       onApply: (): void => onPanelArgsChange({ ...panelArgs, ...args })
     },
     sendTo: (frame: Window): void => {
       const message: ShellMessage = { type: "forgebook:spills", isOn };
       frame.postMessage(message, window.location.origin);
     },
-    receive: (reported: string, count: number): void =>
-      setCounts((current) => new Map(current).set(reported, count))
+    receive: (reported: string, count: number, frame: string): void =>
+      setCounts((current) => new Map(current).set(reported, new Map(current.get(reported)).set(frame, count)))
   };
 };

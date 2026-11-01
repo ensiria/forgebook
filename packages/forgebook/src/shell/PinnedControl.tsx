@@ -11,6 +11,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState
 } from "react";
@@ -20,6 +21,9 @@ import { InfoTip } from "./InfoTip.tsx";
 import { STRINGS } from "./strings.ts";
 import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
+
+/** The room the menu keeps from the window's edges, in CSS px. */
+const EDGE_PX = 8;
 
 /** Where the menu opens, in the window's px. */
 type MenuPoint = { readonly x: number; readonly y: number };
@@ -44,6 +48,14 @@ const ControlMenu = ({
   readonly onClose: () => void;
 }): ReactNode => {
   const menuRef = useRef<HTMLDivElement>(null);
+  // the menu stays inside the window: opened near its right or lower edge, it moves back by what would run past
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (menu === null) return;
+    const box = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(EDGE_PX, Math.min(at.x, window.innerWidth - box.width - EDGE_PX))}px`;
+    menu.style.top = `${Math.max(EDGE_PX, Math.min(at.y, window.innerHeight - box.height - EDGE_PX))}px`;
+  }, [at]);
   useEffect(() => {
     const before = document.activeElement;
     menuRef.current?.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus();

@@ -79,6 +79,8 @@ export const useFold = (isOpen: boolean, isInstant: boolean): Fold => {
     running.current?.cancel();
     running.current = undefined;
     if (isInstant || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // a move cancelled here never finishes: the clip it set comes off now, or focus rings inside stay cut
+      element.style.overflow = "";
       if (!isOpen) setIsDrawn(false);
       return;
     }
