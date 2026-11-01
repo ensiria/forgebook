@@ -108,8 +108,14 @@ const shellStrings = {
     play: "Interactions",
     parts: "Parts and styling",
     code: "Code",
-    a11y: "Accessibility"
+    a11y: "Accessibility",
+    signature: "Signature"
   },
+  logic: "Logic",
+  logicHint: "About logic, not looks: a scene that uses the hook or the function",
+  signatureParameter: "Parameter",
+  signatureReturns: "Returns",
+  signatureNone: "It takes no parameters.",
   playTitle: "Play function",
   playStatus: { running: "running", passed: "passed", failed: "failed" },
   playTime: (ms: number): string => `${ms} ms`,

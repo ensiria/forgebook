@@ -1,6 +1,6 @@
 /**
  * The tabs a story's panel shows: Props, Events and Parts and styling from its component's docs, Code from its file,
- * Accessibility always; a tab the story has nothing for is left out.
+ * Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature.
  *
  * @module
  */
@@ -20,6 +20,7 @@ import { EventsTab } from "./EventsTab.tsx";
 import { InteractionsTab, interactionsHint } from "./InteractionsTab.tsx";
 import { PartsTab, styleHooks } from "./PartsTab.tsx";
 import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
+import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
@@ -33,6 +34,8 @@ export type DockTabsInput = {
   readonly code: Loaded<StoryFileCode>;
   /** The story's export name. */
   readonly exportName: string;
+  /** Whether the story is about logic: its hook's signature comes first. */
+  readonly isLogic: boolean;
   /** The component's name from the sidebar, for the JSX when the docs have none. */
   readonly componentName: string;
   /** The props the story lets the panel set. */
@@ -166,6 +169,13 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   const component = docs.value;
   const events = eventsOf(component.props, input.actions);
   const tabs: DockTab[] = [];
+  if (input.isLogic && component.signature !== undefined) {
+    tabs.push({
+      id: "signature",
+      label: STRINGS.tabs.signature,
+      content: <SignatureReference name={component.name} signature={component.signature} />
+    });
+  }
   tabs.push(...propsTab(input, panelProps(component.props, input.argTypes)));
   tabs.push(...eventsTab(input, events));
   if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));

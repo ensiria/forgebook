@@ -35,7 +35,7 @@ export type StoryGroupSetting = {
 };
 
 /** The tabs of the panel under a story. */
-export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y"] as const;
+export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y", "signature"] as const;
 
 /** A tab of the panel under a story. */
 export type PanelTabId = (typeof PANEL_TAB_IDS)[number];

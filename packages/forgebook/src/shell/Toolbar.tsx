@@ -17,6 +17,7 @@ import { switchWithRole } from "../switches.ts";
 import { hasViewChanges, isComparing, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
+import { isLookControl } from "./logicView.ts";
 import { PinnedControl } from "./PinnedControl.tsx";
 import { STRINGS } from "./strings.ts";
 import { useControlKeys } from "./useControlKeys.ts";
@@ -39,6 +40,8 @@ export type ToolbarProps = {
   readonly shownWidth?: number | undefined;
   /** What the shown story fixes of the view: shown, and not changeable here; nothing by default. */
   readonly fixed?: FixedView;
+  /** Whether the shown story is about logic: the bar puts away what only changes its looks, and Compare. */
+  readonly isLogic?: boolean;
 };
 
 /** One choice of the Compare menu: what it sets side by side, and its name. */
@@ -170,7 +173,8 @@ export const Toolbar = ({
   isStoryPage = true,
   onShowSidebar,
   shownWidth,
-  fixed = NOT_FIXED
+  fixed = NOT_FIXED,
+  isLogic = false
 }: ToolbarProps): ReactNode => {
   const layout = useToolbarLayout();
   const catalogue = useCatalogue();
@@ -180,7 +184,9 @@ export const Toolbar = ({
   const context = { view, onViewChange, isStoryPage, fixed, shownWidth };
   useControlKeys({ keys: layout.keys, view, onViewChange, fixed, isStoryPage });
   const pinnedRef = useRef<HTMLDivElement>(null);
-  const pinned = layout.placed.filter((each) => each.isPinned);
+  const pinned = layout.placed.filter(
+    (each) => each.isPinned && !(isLogic && isLookControl(each.control.id, catalogue.switches))
+  );
   const moved = useToolbarOverflow(
     pinnedRef,
     pinned.map((each) => each.control.id)
@@ -216,7 +222,9 @@ export const Toolbar = ({
         <Icon name="panel" size={14} />
         <span className="forgebook-button__label">{STRINGS.panel}</span>
       </button>
-      <CompareMenu view={view} onViewChange={onViewChange} isDisabled={!isStoryPage} fixed={fixed} />
+      {isLogic ? null : (
+        <CompareMenu view={view} onViewChange={onViewChange} isDisabled={!isStoryPage} fixed={fixed} />
+      )}
     </div>
   );
 };

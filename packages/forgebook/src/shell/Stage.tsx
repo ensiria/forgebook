@@ -347,6 +347,7 @@ export const Stage = ({
     docs,
     code,
     exportName: story.exportName,
+    isLogic: story.isLogic,
     componentName: component.name,
     argTypes: panel.argTypes,
     controls: panel.controls,
