@@ -3,8 +3,9 @@
  * or per text size or style sheets, each with its label.
  *
  * @remarks
- * A switch's unset value (the system's theme, the library's own motion) is left out: it draws one of the others. In
- * a pair, a cell's label leaves out the second switch's default (`Light`, `Light · More contrast`), so the familiar
+ * Every value of a switch is drawn, its default too, so the frames show where the story starts; only the colour
+ * scheme's system value is left out, since it draws as light or as dark, one of the others. A value that writes
+ * nothing on the root (`isUnset`: the stories' own text, left to right, the mouse) is a value like the rest. In a pair, a cell's label leaves out the second switch's default (`Light`, `Light · More contrast`), so the familiar
  * value reads alone. Pure.
  *
  * @module
@@ -59,7 +60,7 @@ const axisVariants = (axis: string, catalogue: CompareCatalogue): AxisVariant[] 
   const each = catalogue.switches.find((candidate) => candidate.id === axis);
   if (each === undefined) return [];
   return each.values
-    .filter((value) => value.isUnset !== true)
+    .filter((value) => value.scheme !== "system")
     .map((value) => ({
       label: value.label,
       isDefault: value.value === each.default,
