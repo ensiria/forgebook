@@ -243,6 +243,35 @@ become switches. It reads React on Vite (`@storybook/react-vite`) only, never re
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+## Your look in the shell
+
+The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
+written into the page at build, and the frames are left alone, since they belong to your stories.
+
+```ts
+// forgebook.config.ts
+shell: {
+  theme: {
+    light: { accent: "#7036c4", "accent-text": "#5a2aa0" },
+    dark: { accent: "#b28bff" },
+    fonts: { sans: "Inter, sans-serif" },
+    radius: { control: "4px", card: "8px" }
+  }
+}
+```
+
+Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
+`window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,
+`danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
+theme too, and the catalogue's wins role by role.
+
+When the catalogue starts, a role that does not exist is named, and so is a hex colour that leaves a text or code under
+4.5:1 on its ground, or the accent, which draws the keyboard's focus, under 3:1. Other colour notations are not checked.
+
+Fonts are yours to load: a web font goes in a style sheet of your own, `shell.css`, with `@font-face`. That sheet loads
+after the shell's. It is also an escape hatch, since the shell's class names are not public API and can change in any
+release. Layout is not themable, though a font does change how wide text runs.
+
 ## For agents
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,

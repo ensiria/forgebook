@@ -108,6 +108,40 @@ test.describe("pages and the address", () => {
   });
 });
 
+test.describe("a catalogue's theme of the shell", () => {
+  test("reaches what the shell draws, each palette in its appearance, and stays out of the frames", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit%3Ainputs-selection-select");
+    await expect(page.locator("iframe.forgebook-frame-view").first()).toBeVisible();
+    const custom = (name: string): Promise<string> =>
+      page.evaluate(
+        (property) => getComputedStyle(document.documentElement).getPropertyValue(property).trim(),
+        name
+      );
+    const appearance = (value: string): Promise<void> =>
+      page.evaluate(
+        (next) => document.documentElement.setAttribute("data-forgebook-appearance", next),
+        value
+      );
+    await appearance("light");
+    await expect.poll(() => custom("--forgebook-accent-text")).toBe("#5a2aa0");
+    await expect(page.locator(".forgebook-example__box").first()).toHaveCSS("border-radius", "10px");
+
+    await appearance("dark");
+    await expect.poll(() => custom("--forgebook-accent")).toBe("#b28bff");
+    // a role only the light palette sets keeps the shell's own colour in dark
+    await expect.poll(() => custom("--forgebook-accent-text")).toBe("#7ab3ff");
+
+    const inFrame = await page
+      .frameLocator("iframe.forgebook-frame-view")
+      .first()
+      .locator(".forgebook-frame")
+      .evaluate((root) => getComputedStyle(root).getPropertyValue("--forgebook-radius-card"));
+    expect(inFrame.trim()).toBe("12px");
+  });
+});
+
 test.describe("the scroll position", () => {
   /** The shown page's scrolling part. */
   const scroller = (page: Page): Locator => page.locator("main .forgebook-scroll");
