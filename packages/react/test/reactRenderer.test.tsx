@@ -101,6 +101,26 @@ describe("reactRenderer", () => {
     expect(canvas.textContent).toBe("");
   });
 
+  it("keeps a story's state when a decorator draws it as <Story />, and the args change", async () => {
+    const canvas = document.createElement("div");
+    document.body.append(canvas);
+    const asElement = (Story: () => ReactNode): ReactNode => (
+      <section>
+        <Story />
+      </section>
+    );
+    const decorated = (name: string): StoryDrawing => ({
+      ...drawing({ name }, readPreview({ decorators: [asElement] }).decorators)
+    });
+    const mounted = reactRenderer.mount(canvas, decorated("Ada"), () => undefined);
+    await mounted.drawn;
+    canvas.querySelector("button")?.click();
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Ada 1"));
+    mounted.update(decorated("Grace"));
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Grace 1"));
+    mounted.unmount();
+  });
+
   it("calls hooks in a story's render and in a decorator, which Storybook's stories do", async () => {
     const canvas = document.createElement("div");
     document.body.append(canvas);
