@@ -12,25 +12,33 @@
  */
 import type { DeviceOrientation, StoryDeviceSetting } from "@forgebook/story-format/csf";
 
-/** The device models, by id, in the menu's order: phones first, then tablets, the generic phone last of the phones. */
-export const DEVICE_IDS = [
-  "iphone-16",
-  "iphone-16-pro-max",
-  "iphone-16e",
-  "pixel-9",
-  "galaxy-s24",
-  "phone",
-  "ipad-mini",
-  "ipad-pro-13"
-] as const;
-
-/** A device model's id. */
-export type DeviceId = (typeof DEVICE_IDS)[number];
-
 /** What a device is: a phone, or a tablet. */
 export type DeviceKind = "phone" | "tablet";
 
-/** A model as the toolbar's menu lists it: its name and its kind; its sizes and drawing are `devices.ts`'. */
+/**
+ * Every model as the menu lists it, in its order: phones first, then tablets, the generic phone last of the phones;
+ * its sizes and drawing are `devices.ts`'. The one list of the ids, so the address, the index and the menu agree.
+ */
+// biome-ignore lint/nursery/useExplicitType: the ids' type is this list's own (`DeviceId`); a written one would repeat every id
+export const DEVICE_ENTRIES = [
+  { id: "iphone-16", name: "iPhone 16", kind: "phone" },
+  { id: "iphone-16-pro-max", name: "iPhone 16 Pro Max", kind: "phone" },
+  { id: "iphone-16e", name: "iPhone 16e", kind: "phone" },
+  { id: "pixel-9", name: "Pixel 9", kind: "phone" },
+  { id: "galaxy-s24", name: "Galaxy S24", kind: "phone" },
+  { id: "phone", name: "Generic phone", kind: "phone" },
+  { id: "ipad-mini", name: "iPad mini", kind: "tablet" },
+  { id: "ipad-pro-13", name: "iPad Pro 13″", kind: "tablet" }
+] as const satisfies readonly {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: DeviceKind;
+}[];
+
+/** A device model's id. */
+export type DeviceId = (typeof DEVICE_ENTRIES)[number]["id"];
+
+/** A model as the menu lists it: its id, its name (the generic phone's is the shell's text) and its kind. */
 export type DeviceEntry = {
   /** Its id. */
   readonly id: DeviceId;
@@ -40,17 +48,8 @@ export type DeviceEntry = {
   readonly kind: DeviceKind;
 };
 
-/** Every model as the menu lists it, in `DEVICE_IDS`' order. */
-export const DEVICE_ENTRIES: readonly DeviceEntry[] = [
-  { id: "iphone-16", name: "iPhone 16", kind: "phone" },
-  { id: "iphone-16-pro-max", name: "iPhone 16 Pro Max", kind: "phone" },
-  { id: "iphone-16e", name: "iPhone 16e", kind: "phone" },
-  { id: "pixel-9", name: "Pixel 9", kind: "phone" },
-  { id: "galaxy-s24", name: "Galaxy S24", kind: "phone" },
-  { id: "phone", name: "Generic phone", kind: "phone" },
-  { id: "ipad-mini", name: "iPad mini", kind: "tablet" },
-  { id: "ipad-pro-13", name: "iPad Pro 13″", kind: "tablet" }
-];
+/** The models' ids, in the menu's order. */
+export const DEVICE_IDS: readonly DeviceId[] = DEVICE_ENTRIES.map((entry) => entry.id);
 
 /**
  * The address's parameter of the view's device. Forgebook's own parameters have plain names (`width`, `zoom`), but
