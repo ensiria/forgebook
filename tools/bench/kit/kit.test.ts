@@ -12,7 +12,7 @@ import { estimate, formatDuration, phaseTiming, profileItems, type Reference } f
 import { anonymize, HOST_PLACEHOLDER, leaks, USER_PLACEHOLDER } from "./kitResults.ts";
 import { failedMetrics } from "./kitRunner.ts";
 import { parseState } from "./kitState.ts";
-import { leftoverPids, parsePsCommands } from "./leftovers.ts";
+import { leftoverPids, parsePsCommands, programName } from "./leftovers.ts";
 import { zipArchive } from "./zipArchive.ts";
 
 describe("profileItems", () => {
@@ -130,6 +130,13 @@ describe("leftoverPids", () => {
 
   it("spares the processes named", () => {
     expect(leftoverPids(processes, folders, [10])).toEqual([11]);
+  });
+
+  it("names a program without its folder or extension, quoted or not", () => {
+    expect(programName('"C:\\Program Files\\x\\node.exe" a.js')).toBe("node");
+    expect(programName("/k/work/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.27.7")).toBe(
+      "esbuild"
+    );
   });
 
   it("reads ps's rows", () => {

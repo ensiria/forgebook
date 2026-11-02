@@ -90,7 +90,13 @@ export type BenchRequest = {
  */
 export const clearLeftovers = async (paths: KitPaths, io: ScriptIo, log: Logger): Promise<void> => {
   const stopped = await stopLeftovers([paths.work, paths.calibration, join(paths.home, "browsers")], io);
-  if (stopped > 0) log.warn(`Ho fermato ${stopped} processi rimasti da una prova interrotta.`);
+  if (stopped.length === 0) return;
+  const names = [...new Set(stopped)].join(", ");
+  log.warn(
+    stopped.length === 1
+      ? `Ho fermato un processo rimasto acceso dopo la prova (${names}).`
+      : `Ho fermato ${stopped.length} processi rimasti accesi dopo la prova (${names}).`
+  );
 };
 
 /**

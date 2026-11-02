@@ -61,6 +61,18 @@ export const parsePsCommands = (stdout: string): ProcessLine[] =>
     .filter((match) => match !== null)
     .map((match) => ({ pid: Number(match[1]), command: match[2] ?? "" }));
 
+/**
+ * A command line's program, by its file name without folder or extension: what a log may name without a path.
+ *
+ * @param command - the command line.
+ */
+export const programName = (command: string): string => {
+  const program = command.startsWith('"')
+    ? command.slice(1, command.indexOf('"', 1))
+    : (command.split(" ")[0] ?? "");
+  return (program.split(/[\\/]/).at(-1) ?? program).replace(/\.exe$/i, "");
+};
+
 /** Every process with its command line, on this system. */
 const processLines = async (io: ScriptIo): Promise<ProcessLine[]> => {
   if (process.platform !== "win32") {
@@ -94,10 +106,11 @@ const processLines = async (io: ScriptIo): Promise<ProcessLine[]> => {
  *
  * @param folders - the kit's folders.
  * @param io - the script's streams.
- * @returns how many processes were stopped.
+ * @returns the programs stopped, by name (`node`, `esbuild`), one per process.
  */
-export const stopLeftovers = async (folders: readonly string[], io: ScriptIo): Promise<number> => {
-  const pids = leftoverPids(await processLines(io), folders, [process.pid, process.ppid]);
+export const stopLeftovers = async (folders: readonly string[], io: ScriptIo): Promise<string[]> => {
+  const processes = await processLines(io);
+  const pids = leftoverPids(processes, folders, [process.pid, process.ppid]);
   for (const pid of pids) {
     if (process.platform === "win32") {
       spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
@@ -109,5 +122,5 @@ export const stopLeftovers = async (folders: readonly string[], io: ScriptIo): P
       }
     }
   }
-  return pids.length;
+  return pids.map((pid) => programName(processes.find((each) => each.pid === pid)?.command ?? ""));
 };
