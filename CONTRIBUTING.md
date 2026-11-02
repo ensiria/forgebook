@@ -38,7 +38,7 @@ pnpm --filter @fixture/app exec playwright install chromium
 pnpm --filter @fixture/app test:shell                      # the shell's browser tests on the fixture catalogue
 ```
 
-The repository is a pnpm workspace: `packages/` holds the four published packages, `fixtures/` the fixture kit, the
+The repository is a pnpm workspace: `packages/` holds the five published packages, `fixtures/` the fixture kit, the
 Storybook-style stories and the catalogue the tests run on, `tools/` the repository's own commands (`package-build`,
 `check-commits`).
 
@@ -95,7 +95,7 @@ whose token the workflow makes for each run from the `RELEASE_APP_KEY` secret of
 
 A staged version is not public yet: npm trusts the workflow to stage only, so a maintainer approves each version with
 2FA, in the order they were staged (`@forgebook/story-format`, `forgebook`, `@forgebook/react`,
-`@forgebook/testing`), so each one's dependencies are public first:
+`@forgebook/testing`, `@forgebook/vue`), so each one's dependencies are public first:
 
 ```sh
 npm stage list forgebook          # the versions waiting, with their ids (and the same for each @forgebook/ package)
@@ -111,3 +111,7 @@ The first release is published by hand, since npm can trust a workflow only for 
 package asks for 2FA). Then, on npmjs.com, each package's settings add the trusted publisher (GitHub Actions,
 `ensiria/forgebook`, workflow `release.yml`, environment `npm`, `npm publish` not allowed, so it can only stage) and
 require 2FA with tokens disallowed.
+
+A package added later goes through the first release that carries it unstaged, with a warning, since its dependencies must
+be public first. Once the staged versions are approved, publish it by hand from `main` (`pnpm --filter ./packages/<folder>
+publish`), then add its trusted publisher and 2FA rule as above: the next releases stage it.

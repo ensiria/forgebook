@@ -9,7 +9,7 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
 - `packages/forgebook`: the core (`forgebook` on npm): `src/shell` (the catalogue's page), `src/frame` (a story's
   frame), `src/vite` (the plugin, the props extractor, the answers to tools and agents), `bin/` (`forgebook`,
   `forgebook-docs`, `forgebook-texts`).
-- `packages/react` (`@forgebook/react`), `packages/story-format` (`@forgebook/story-format`, no dependencies),
+- `packages/react` (`@forgebook/react`), `packages/vue` (`@forgebook/vue`), `packages/story-format` (`@forgebook/story-format`, no dependencies),
   `packages/testing` (`@forgebook/testing`).
 - `fixtures/`: the kit, the stories written the Storybook way, and the catalogue the shell's browser tests run on.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).

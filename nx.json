@@ -12,6 +12,7 @@
       "preserveLocalDependencyProtocols": true
     },
     "changelog": {
+      "automaticFromRef": true,
       "projectChangelogs": {
         "createRelease": "github"
       }
