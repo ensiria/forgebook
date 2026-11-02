@@ -14,6 +14,7 @@ import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
 import type {
   AgentTokenSummary,
+  CheckedCodeDocument,
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
@@ -206,3 +207,18 @@ export const foundComponentsText = (document: FoundComponentsDocument): string =
           return `${each.title}${missed}${each.guidance?.deprecated === undefined ? "" : "  deprecated"}`;
         })
         .join("\n");
+
+/**
+ * What a change broke as a person reads it, a line a problem.
+ *
+ * @param document - the answer.
+ */
+export const checkedCodeText = (document: CheckedCodeDocument): string => {
+  const lines = document.problems.map(
+    (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
+  );
+  return [
+    ...(lines.length === 0 ? ["Nothing to report."] : lines),
+    ...document.skipped.map((each) => `Not checked: ${each}`)
+  ].join("\n");
+};
