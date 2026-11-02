@@ -15,6 +15,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { parseReport } from "../reportTable.ts";
 import { CALIBRATION_ARGS, formatDuration, type KitItem, type PhaseTiming, phaseTiming } from "./kitPlan.ts";
 import { BENCH, ITEM_NAMES, type KitPaths, PORT, REPOSITORY } from "./kitSession.ts";
 import type { ItemOutcome, ItemState } from "./kitState.ts";
@@ -126,6 +127,7 @@ export const runBenchmark = (request: BenchRequest, io: ScriptIo, log: Logger): 
 /** The calibration, run once per machine and commit. */
 export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Promise<PhaseTiming> => {
   log.step("Calibrazione: una prova breve per stimare quanto dura il resto (qualche minuto).");
+  const startedAt = Date.now();
   const run = await runBenchmark(
     {
       args: CALIBRATION_ARGS,
@@ -137,7 +139,9 @@ export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Pro
     io,
     log
   );
-  if (run.exitCode !== 0) {
+  const report = join(paths.calibration, "report.json");
+  // a report means the benchmark ran: a metric that failed is a result to send back, not a reason to stop here
+  if (!existsSync(report) || statSync(report).mtimeMs < startedAt) {
     throw new ScriptError(
       "La calibrazione non è riuscita: il benchmark non può girare su questo PC così com'è.",
       {
@@ -145,11 +149,30 @@ export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Pro
       }
     );
   }
+  const failed = failedMetrics(readFileSync(report, "utf8"));
+  if (failed.length > 0) {
+    log.warn(
+      `Nella calibrazione alcune misure di Forgebook non sono riuscite (${failed.join(", ")}): la stima sarà ` +
+        "poco affidabile, e il file dei risultati dirà perché."
+    );
+  }
   log.success(
     `Calibrazione fatta: preparazione ${formatDuration(run.timing.prepareMs)}, misure ${formatDuration(run.timing.measureMs)}.`
   );
   return run.timing;
 };
+
+/**
+ * The metrics of a report that failed, for any tool.
+ *
+ * @param text - the report's text.
+ */
+export const failedMetrics = (text: string): string[] =>
+  Object.values(parseReport(text).tools).flatMap((tool) =>
+    Object.entries(tool?.metrics ?? {})
+      .filter(([, result]) => result.kind === "failed")
+      .map(([name]) => name)
+  );
 
 /** How a part ended, from its exit code and whether it left a report. */
 export const outcomeOf = (exitCode: number | null, hasReport: boolean): ItemOutcome => {

@@ -51,6 +51,9 @@ export const writeResults = async (
     }
   };
   add(paths.reports, "reports");
+  const calibration = join(paths.calibration, "report.json");
+  if (existsSync(calibration))
+    files.push({ name: "reports/calibration.json", text: readFileSync(calibration, "utf8") });
   add(paths.logs, "logs");
   const cleaned = files.map(({ name, text }) => ({ name, text: anonymize(text, who) }));
   const leaking = cleaned.flatMap(({ name, text }) => leaks(text, who).map((kind) => `${name} (${kind})`));

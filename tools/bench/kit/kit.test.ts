@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { estimate, formatDuration, phaseTiming, profileItems, type Reference } from "./kitPlan.ts";
 import { anonymize, HOST_PLACEHOLDER, leaks, USER_PLACEHOLDER } from "./kitResults.ts";
+import { failedMetrics } from "./kitRunner.ts";
 import { parseState } from "./kitState.ts";
 import { zipArchive } from "./zipArchive.ts";
 
@@ -78,6 +79,25 @@ describe("estimate", () => {
       "carbon",
       "fluentui"
     ]);
+  });
+});
+
+describe("failedMetrics", () => {
+  it("names the metrics a report records as failed, for every tool", () => {
+    const report = {
+      version: 1,
+      tools: {
+        forgebook: {
+          versions: {},
+          metrics: {
+            start: { kind: "failed", reason: "never drawn" },
+            build: { kind: "measured", unit: "ms", summary: { median: 1, min: 1, max: 1, samples: 1 } }
+          }
+        },
+        ladle: { versions: {}, metrics: { componentPage: { kind: "absent", reason: "no such page" } } }
+      }
+    };
+    expect(failedMetrics(JSON.stringify(report))).toEqual(["start"]);
   });
 });
 
