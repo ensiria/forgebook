@@ -1,6 +1,6 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `find_component`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `list_tokens`, `get_token`
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `list_tokens`, `get_token`
  * and `nearest_token`.
  *
  * @module
@@ -81,6 +81,23 @@ export type CatalogueReach = {
  * @param reach - what they reach the catalogue through.
  */
 export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): readonly McpTool[] => [
+  {
+    name: "changed_stories",
+    description:
+      "The stories a change touches: every story that reaches a file git says changed, through the imports. Call it after editing, then run check_story on what it lists.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "The commit to compare with; HEAD by default, so what is not committed."
+        }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("changed", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
+  },
   {
     name: "find_component",
     description:

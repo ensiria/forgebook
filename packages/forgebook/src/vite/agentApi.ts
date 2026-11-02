@@ -22,6 +22,7 @@ import type {
   AgentComponent,
   AgentStory,
   AgentUsingComponent,
+  ChangedStoriesDocument,
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
@@ -358,3 +359,14 @@ export const isFoundComponentsDocument = (value: unknown): value is FoundCompone
   value["schema"] === 1 &&
   typeof value["query"] === "string" &&
   Array.isArray(value["components"]);
+
+/**
+ * Whether a value is the changed stories' document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isChangedStoriesDocument = (value: unknown): value is ChangedStoriesDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["stories"]) &&
+  Array.isArray(value["files"]);

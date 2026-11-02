@@ -358,6 +358,53 @@ describe("forgebook find", { timeout: SERVER_TIMEOUT }, () => {
   });
 });
 
+describe("forgebook changed", { timeout: 60_000 }, () => {
+  it("lists a story that reaches an edited file, through an import", () => {
+    const config = catalogue(root, "changing", {
+      "helper.ts": "export const label = 'one';\n",
+      "Card.tsx": "import { label } from './helper';\nexport const Card = () => <p>{label}</p>;\n",
+      "Card.stories.tsx":
+        "import { Card } from './Card';\nexport default { title: 'Layout/Card', component: Card };\nexport const Plain = {};\n",
+      "Other.stories.tsx": "export default { title: 'Layout/Other' };\nexport const Plain = {};\n"
+    });
+    const project = join(root, "changing");
+    const git = (...args: readonly string[]): void => {
+      spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
+        cwd: project
+      });
+    };
+    writeFileSync(
+      join(project, "tsconfig.json"),
+      JSON.stringify({ compilerOptions: { jsx: "react-jsx", allowJs: true }, include: ["src"] })
+    );
+    writeFileSync(join(project, ".gitignore"), "node_modules/\n.vite/\n");
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-q", "-m", "first");
+    writeFileSync(join(project, "src", "helper.ts"), "export const label = 'two';\n");
+    const run = runScriptProcess(ENTRY, ["changed", "--config", config, "--url", NO_SERVER, "--json"]);
+    expect(run.exitCode).toBe(0);
+    const body: unknown = JSON.parse(run.stdout);
+    expect(body).toMatchObject({ files: ["src/helper.ts"], stories: [{ title: "Layout/Card" }] });
+
+    // what asks is a request: an option in the place of a commit must reach git as nothing
+    const precious = join(project, "precious.txt");
+    writeFileSync(precious, "keep\n");
+    const refused = runScriptProcess(ENTRY, [
+      "changed",
+      `--since=--output=${precious}`,
+      "--config",
+      config,
+      "--url",
+      NO_SERVER,
+      "--json"
+    ]);
+    expect(refused.exitCode).not.toBe(0);
+    expect(refused.stderr).toContain("names no commit");
+    expect(readFileSync(precious, "utf8")).toBe("keep\n");
+  });
+});
+
 describe("forgebook agents", () => {
   it("prints the instructions, with the commands that check a story", () => {
     const run = runScriptProcess(ENTRY, ["agents", "--print"]);
