@@ -10,6 +10,9 @@ $ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# A short title for the window: Node reading a long one (the whole command line Windows puts there) can fail an
+# assertion in libuv and die, which made Playwright's install fail in a console window
+$Host.UI.RawUI.WindowTitle = 'Benchmark di Forgebook'
 $KitFolder = $PSScriptRoot
 $KitHome = if ($env:FORGEBOOK_BENCH_HOME) { $env:FORGEBOOK_BENCH_HOME } else { Join-Path $env:LOCALAPPDATA 'ForgebookBench' }
 $Gigabyte = 1GB
