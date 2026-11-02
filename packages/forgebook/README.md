@@ -244,6 +244,24 @@ become switches. It reads React on Vite (`@storybook/react-vite`) only, never re
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+## Mocking an API
+A story that fetches gets its answers from [MSW](https://mswjs.io), an optional peer. Install it and write its worker into
+the catalogue's public folder:
+```sh
+npm install --save-dev msw
+npx msw init public
+```
+```tsx
+import { http, HttpResponse } from "msw";
+/** The list, from a mocked API. */
+export const Loaded: Story<typeof Users> = {
+  parameters: {
+    msw: { handlers: [http.get("/api/users", () => HttpResponse.json([{ name: "Ada" }]))] }
+  }
+};
+`parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
+on the dev server and in a static build.
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
@@ -273,7 +291,6 @@ jobs:
       # GitHub Pages:  actions/upload-pages-artifact, then actions/deploy-pages (one site, so without --base per PR)
       # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
       # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
-```
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
 ## Your look in the shell
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
@@ -286,7 +303,6 @@ shell: {
     dark: { accent: "#b28bff" },
     fonts: { sans: "Inter, sans-serif" },
     radius: { control: "4px", card: "8px" }
-  }
 }
 Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
 `window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,

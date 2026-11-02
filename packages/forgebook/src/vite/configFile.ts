@@ -80,7 +80,15 @@ export type ResolvedConfig = {
   readonly lists: CatalogueLists;
   /** Whether the project installs Testing Library, whose `canvas` and `userEvent` every play then receives. */
   readonly hasPlayTools: boolean;
+  /** Whether the project installs MSW, which a story's `parameters.msw` then mocks its API with. */
+  readonly hasMocks: boolean;
 };
+
+/** MSW's browser module, for a story's mocked API. */
+export const MOCKS_MODULE = "msw/browser";
+
+/** Its package's manifest, what tells it is installed: the module itself cannot be resolved from Node. */
+const MOCKS_MANIFEST = "msw/package.json";
 
 /** The packages of the play tools: both installed, or the plays get neither. */
 export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/user-event"] as const;
@@ -274,7 +282,8 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     ),
     watch: (config.watch ?? []).map(absolute),
     lists: mergedLists([...presets, config]),
-    hasPlayTools: hasPlayToolsIn(dir)
+    hasPlayTools: hasPlayToolsIn(dir),
+    hasMocks: packageResolver(dir)(MOCKS_MANIFEST) !== undefined
   };
 };
 
