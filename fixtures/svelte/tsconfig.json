@@ -1,0 +1,11 @@
+// The Svelte fixture: components and stories checked by `svelte-check`, which reads `.svelte` files, so a story's args
+// are checked against the real component.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "stories.ts", "forgebook.preview.ts"]
+}

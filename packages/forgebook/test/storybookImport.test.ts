@@ -152,6 +152,25 @@ describe("importStorybook", () => {
     expect(typeof imported === "string" ? imported : imported.framework).toBe("vue");
   });
 
+  it("reads a Svelte project's Storybook as Svelte, SvelteKit's too, naming its Svelte CSF files", async () => {
+    for (const framework of ["@storybook/svelte-vite", "@storybook/sveltekit"]) {
+      const project = join(scratch, framework.replace(/\W/g, "-"));
+      cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+      writeFileSync(
+        join(project, ".storybook", "main.ts"),
+        `export default { stories: ["../src/**/*.stories.@(ts|svelte)"], framework: ${JSON.stringify(framework)} };\n`
+      );
+      const imported = await importStorybook(project);
+      if (typeof imported === "string") throw new Error(imported);
+      expect(imported.framework).toBe("svelte");
+      expect(imported.stories).toEqual(["src/**/*.stories.ts"]);
+      expect(imported.notes).toContain("src/**/*.stories.svelte: not a story file Forgebook reads");
+      expect(imported.notes.some((note) => note.startsWith("SvelteKit's $app modules"))).toBe(
+        framework === "@storybook/sveltekit"
+      );
+    }
+  });
+
   it("refuses a framework Forgebook does not read, saying what it reads", async () => {
     const project = join(scratch, "angular");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
@@ -160,7 +179,7 @@ describe("importStorybook", () => {
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
     );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads Storybook's stories on Vite (@storybook/react-vite, @storybook/vue3-vite); this project uses @storybook/angular"
+      "Forgebook reads Storybook's stories on Vite (@storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit); this project uses @storybook/angular"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package
