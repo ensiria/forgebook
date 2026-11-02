@@ -23,6 +23,11 @@ export type PageVisit = {
   readonly pageKey: string;
   /** Whether the history brought the page back (back or forward), rather than a link or a picker opening it. */
   readonly isReturn: boolean;
+  /**
+   * Whether a link inside the page made it, to one of its headings: the page stays where it is for the heading's own
+   * scroll, and its position so far is kept for Back. False by default.
+   */
+  readonly isInPage?: boolean;
 };
 
 /** What a page needs to know of its scroll position: its visit, and every page's last position. */
@@ -55,7 +60,7 @@ export const useScrollMemory = (
     const element = ref.current;
     shownKey.current = visit.pageKey;
     isReaching.current = false;
-    if (element === null) return;
+    if (element === null || visit.isInPage === true) return;
     const top = visit.isReturn ? (positions.get(visit.pageKey) ?? 0) : 0;
     element.scrollTop = top;
     if (top === 0) return;

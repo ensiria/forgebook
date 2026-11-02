@@ -249,4 +249,4 @@ export const pagesText = (document: PagesDocument, style: OutputStyle): string =
  * @param document - the page's document.
  */
 export const pageText = (document: PageDocument): string =>
-  [document.page.address, "", document.text].join("\n");
+  [document.page.links.address, "", document.text].join("\n");

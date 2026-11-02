@@ -14,7 +14,7 @@ import { KIT_DIR } from "./fixturePaths.ts";
 const FILE = "/kit/docs/guides/theming.md";
 
 /** The index of a text, every file a page. */
-const indexOf = (text: string): ReturnType<typeof docPageIndex> => docPageIndex(FILE, text, () => true);
+const indexOf = (text: string): ReturnType<typeof docPageIndex> => docPageIndex(FILE, text, () => "");
 
 /** A page's text around a body. */
 const withFront = (body: string): string => `---\ntitle: T\n---\n${body}`;
@@ -46,7 +46,7 @@ describe("docPageIndex", () => {
   it("titles a page by its front matter, its opening heading, then its file", () => {
     expect(indexOf("---\ntitle: Own\n---\n# Heading").title).toBe("Own");
     expect(indexOf("\n# Heading\n\nText").title).toBe("Heading");
-    expect(docPageIndex("/kit/docs/getting-started.md", "Text", () => true).title).toBe("Getting started");
+    expect(docPageIndex("/kit/docs/getting-started.md", "Text").title).toBe("Getting started");
   });
 
   it("lists the stories and the tables a page shows, in its order", () => {
@@ -63,12 +63,31 @@ describe("docPageIndex", () => {
     ]);
   });
 
-  it("reports a link to a file that is no page, and an image that is not there", () => {
+  it("reports a link to a file that is not there, and an image that is no file of its package", () => {
     const text = withFront("[a](./other.md) [b](https://example.com/x.md) ![c](./missing.png)");
-    expect(docPageIndex(FILE, text, () => false).notes).toEqual([
-      'it links to "./other.md", which is not a page of this group',
-      'its image "./missing.png" is not there'
+    expect(docPageIndex(FILE, text, () => undefined).notes).toEqual([
+      'it links to "./other.md", which is not there',
+      'its image "./missing.png" is not a file of its package'
     ]);
+  });
+
+  it("lists the slugs of the pages it links to, for the tree to check", () => {
+    const text = withFront("[a](./colour.md#red) [b](?component=kit:x)");
+    expect(docPageIndex(FILE, text, () => "---\ntitle: Guides/Colour\n---\n").links).toEqual([
+      "guides-colour"
+    ]);
+  });
+
+  it("refuses an image outside its package, a folder, and survives a stray percent sign", () => {
+    const file = join(KIT_DIR, "docs/guides/theming.md");
+    const notes = (body: string): readonly string[] | undefined => docPageIndex(file, withFront(body)).notes;
+    expect(notes("![a](../../../../package.json)")).toEqual([
+      'its image "../../../../package.json" is not a file of its package'
+    ]);
+    expect(notes("![a](./)")).toHaveLength(1);
+    expect(notes("![a](./50%.png)")).toHaveLength(1);
+    expect(notes("[a](./100%.md)")).toHaveLength(1);
+    expect(compiledDocPage(file, withFront("![a](../../../../package.json)")).images).toEqual([]);
   });
 });
 
@@ -98,19 +117,28 @@ describe("compiledDocPage", () => {
       "## Light & dark\n\n### `Code` here\n\n#### Deep\n\n## Light & dark"
     );
     expect(headings).toEqual([
-      { depth: 2, id: "light-dark", text: "Light & dark" },
-      { depth: 3, id: "code-here", text: "Code here" },
-      { depth: 2, id: "light-dark-1", text: "Light & dark" }
+      { depth: 2, anchor: "light-dark", text: "Light & dark" },
+      { depth: 3, anchor: "code-here", text: "Code here" },
+      { depth: 2, anchor: "light-dark-1", text: "Light & dark" }
     ]);
     expect(blocks[0]).toHaveProperty("html", expect.stringContaining('<h2 id="doc-light-dark">'));
     expect(blocks[0]).toHaveProperty("html", expect.stringContaining('href="#light-dark-1"'));
   });
 
   it("keeps a heading's letters whatever the language, and never an empty anchor", () => {
-    expect(compiled("## Città\n\n## ???").headings.map((heading) => heading.id)).toEqual([
+    expect(compiled("## Città\n\n## ???").headings.map((heading) => heading.anchor)).toEqual([
       "città",
       "section"
     ]);
+  });
+
+  it("never gives two headings one anchor, whatever they are called", () => {
+    const { headings } = compiled("## Tokens\n\n## Tokens\n\n## Tokens 1");
+    expect(headings.map((heading) => heading.anchor)).toEqual(["tokens", "tokens-1", "tokens-1-1"]);
+  });
+
+  it("names a heading in its words alone, without its marks or its HTML", () => {
+    expect(compiled("## Hello <b>x</b> **y**").headings[0]?.text).toBe("Hello x y");
   });
 
   it("never nests a link in a heading's own link", () => {

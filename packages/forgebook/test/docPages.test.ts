@@ -55,7 +55,7 @@ const sourceWith = (index: Readonly<Record<string, DocPageIndex>>, id = "kit"): 
           key,
           async (): Promise<unknown> => ({
             blocks: [],
-            headings: [{ depth: 2, id: "a", text: "A" }],
+            headings: [{ depth: 2, anchor: "a", text: "A" }],
             assets: []
           })
         ])
@@ -71,7 +71,8 @@ const page = (title: string, order?: number): DocPageIndex => ({
   title,
   ...(order === undefined ? {} : { order }),
   stories: [],
-  components: []
+  components: [],
+  links: []
 });
 
 describe("the page tree", () => {
@@ -101,7 +102,13 @@ describe("the page tree", () => {
   it("reports what a page gets wrong, and leaves a title taken twice or without a place out", () => {
     const tree = storyTree([
       sourceWith({
-        "./a.md": { ...page("Start"), stories: ["kit:gone--x"], components: ["kit:gone"], notes: ["a note"] },
+        "./a.md": {
+          ...page("Start"),
+          stories: ["kit:gone--x"],
+          components: ["kit:gone"],
+          links: ["gone"],
+          notes: ["a note"]
+        },
         "./b.md": page("Start"),
         "./c.md": page("Guides//Empty")
       })
@@ -111,9 +118,18 @@ describe("the page tree", () => {
       "Kit: ./a.md: a note",
       'Kit: ./b.md and ./a.md have the same title "Start"',
       'Kit: ./a.md shows the story "kit:gone--x": no such story',
-      'Kit: ./a.md shows the component "kit:gone": no such component'
+      'Kit: ./a.md shows the component "kit:gone": no such component',
+      'Kit: ./a.md links to "gone": no such page'
     ]);
     expect(tree.sources[0]?.pages).toHaveLength(1);
+  });
+
+  it("accepts a link across two groups of a source, and keeps titles in any language apart", () => {
+    const one = sourceWith({ "./a.md": { ...page("主题"), links: ["обзор"] } });
+    const two = sourceWith({ "./b.md": page("Обзор") });
+    const tree = storyTree([{ ...one, docs: [...(one.docs ?? []), ...(two.docs ?? [])] }]);
+    expect(tree.problems).toEqual([]);
+    expect(tree.sources[0]?.pages.map((each) => each.id).sort()).toEqual(["kit:обзор", "kit:主题"]);
   });
 
   it("accepts a story of another source, by its whole id", () => {
@@ -210,7 +226,9 @@ describe("isDocPage", () => {
   it("takes what the plugin answers, and refuses anything else", () => {
     expect(isDocPage({ blocks: [{ kind: "story", id: "a" }], headings: [], assets: [] })).toBe(true);
     expect(isDocPage({ blocks: [{ kind: "story" }], headings: [], assets: [] })).toBe(false);
-    expect(isDocPage({ blocks: [], headings: [{ depth: 4, id: "a", text: "b" }], assets: [] })).toBe(false);
+    expect(isDocPage({ blocks: [], headings: [{ depth: 4, anchor: "a", text: "b" }], assets: [] })).toBe(
+      false
+    );
     expect(isDocPage({ blocks: [] })).toBe(false);
   });
 });
@@ -223,7 +241,7 @@ describe("the modules", () => {
       `"./docs/getting-started.md": () => import(${JSON.stringify(`${join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
     );
     expect(code).toContain("module.text");
-    expect(watched).toHaveLength(4);
+    expect(new Set(watched).size).toBe(4);
     expect(docPagesModule(KIT_DIR, "docs/**/*.md", () => undefined, false)).not.toContain("module.text");
   });
 
@@ -266,7 +284,7 @@ describe("agents", () => {
         description: "Begin here.",
         stories: [],
         components: [],
-        address: "http://localhost:5173/?theme=dark&page=kit%3Aguides-start"
+        links: { address: "http://localhost:5173/?theme=dark&page=kit%3Aguides-start" }
       }
     ]);
   });
@@ -275,7 +293,7 @@ describe("agents", () => {
     const { status, body } = await pageAnswer(context);
     expect(status).toBe(200);
     expect(isPageDocument(body)).toBe(true);
-    expect(body).toMatchObject({ text: "# Text", headings: [{ id: "a" }], problems: [] });
+    expect(body).toMatchObject({ text: "# Text", headings: [{ anchor: "a" }], problems: [] });
   });
 
   it("answers a page that does not exist with a 404, and one that fails with its problem", async () => {
@@ -356,6 +374,8 @@ describe("CATALOG.md and llms.txt", () => {
 
   it("says nothing of pages for a package without any", () => {
     expect(catalogueMarkdown({ ...data, pages: [] }, ["pages"])).not.toContain("## Docs");
+    const { pages: _pages, ...written } = data;
+    expect(catalogueMarkdown(written, ["pages"])).not.toContain("## Docs");
   });
 
   it("links them from llms.txt", () => {

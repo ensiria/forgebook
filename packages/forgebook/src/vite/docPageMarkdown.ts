@@ -3,26 +3,49 @@
  * its blocks.
  *
  * @remarks
- * Markdown with fenced blocks instead of MDX: a page is data, read here at build time, with no compiler in the page and
- * no code to run. The top-level code fences become blocks of their own (a fence named `story <id>` draws a frame, one
+ * Markdown with fenced blocks instead of MDX: a page is read here at build time, with no compiler in the page. The top-level code fences become blocks of their own (a fence named `story <id>` draws a frame, one
  * named `props <id>` an API table, any other is code with a copy button), and what lies between them is HTML. A block
  * sits in the page's own flow, so a fence inside a list or a quote stays code and is reported. A page's files are the
- * package's, read at build time, so their HTML is trusted as the stories' code is.
+ * package's, read at build time, and Markdown lets them hold raw HTML, so a page is trusted as a story's code is: whoever
+ * can write one can run script in the catalogue.
  *
  * Reading the index never renders, so a catalogue with many pages pays for highlighting only on the pages opened.
  *
  * @module
  */
-import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
-import type { DocBlock, DocHeading, DocPage, DocPageIndex } from "@forgebook/story-format/source";
+import type { DocPageIndex } from "@forgebook/story-format/source";
 import { Marked, type Token, type Tokens } from "marked";
 
-import { ASSET_SCHEME, PAGE_LINK_SCHEME } from "../docPages.ts";
-import { kebab, storyName } from "../storyTree.ts";
+import {
+  ASSET_SCHEME,
+  type DocBlock,
+  type DocHeading,
+  type DocPage,
+  PAGE_LINK_SCHEME,
+  pageSlug
+} from "../docPages.ts";
+import { storyName } from "../storyTree.ts";
 import { codeHtml } from "./componentPage.ts";
 import { escapeHtml, highlightCode } from "./highlightCode.ts";
+
+/** Reads a linked page's text: none when it is not there. */
+export type ReadPage = (file: string) => string | undefined;
+
+/**
+ * A linked page's text from the disk.
+ *
+ * @param file - the file.
+ */
+export const readLinkedFile: ReadPage = (file: string): string | undefined => {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return undefined;
+  }
+};
 
 /** The line a front matter starts and ends with. */
 const FENCE = "---";
@@ -157,17 +180,60 @@ const titleOf = (file: string, frontMatter: FrontMatter): string => {
 /** Whether an address is outside the page's folder: it has a scheme, or starts at the root or the page's own address. */
 const isOutside = (href: string): boolean => /^([a-z][a-z0-9+.-]*:|\/|#|\?)/i.test(href);
 
+/** A path as a link writes it, its escapes read: a `%` that escapes nothing is a file's own character. */
+const decodedPath = (path: string): string => {
+  try {
+    return decodeURI(path);
+  } catch {
+    return path;
+  }
+};
+
 /** The file an address relative to a page names, and its fragment. */
 const relativeTarget = (
   file: string,
   href: string
 ): { readonly file: string; readonly fragment: string | undefined } => {
   const [path = "", fragment] = href.split("#");
-  return { file: resolve(dirname(file), decodeURI(path)), fragment };
+  return { file: resolve(dirname(file), decodedPath(path)), fragment };
+};
+
+/**
+ * The folder of the package a file belongs to: the nearest with a `package.json`, or the file's own without one.
+ *
+ * @param file - the file.
+ */
+const packageFolderOf = (file: string): string => {
+  let folder = dirname(file);
+  while (!existsSync(join(folder, "package.json"))) {
+    const parent = dirname(folder);
+    if (parent === folder) return dirname(file);
+    folder = parent;
+  }
+  return folder;
+};
+
+/**
+ * Whether a page may show a file as an image: a file of its own package. A build copies an image into the catalogue
+ * whatever it is, so a path that climbs out of the package would publish a file a reviewer took for a picture's name.
+ *
+ * @param file - the page's file.
+ * @param image - the image's file.
+ */
+const isOwnImage = (file: string, image: string): boolean => {
+  const fromPackage = relative(packageFolderOf(file), image);
+  return !fromPackage.startsWith("..") && existsSync(image) && statSync(image).isFile();
 };
 
 /** Whether a link names another page by its file. */
 const isPageLink = (href: string): boolean => !isOutside(href) && /\.md(#|$)/i.test(href);
+
+/** The slug of the page a link names; none when its file is not there. */
+const linkedSlug = (file: string, href: string, read: ReadPage): string | undefined => {
+  const target = relativeTarget(file, href);
+  const text = read(target.file);
+  return text === undefined ? undefined : pageSlug(titleOf(target.file, frontMatterOf(text)));
+};
 
 /**
  * What a page's token gets wrong.
@@ -175,23 +241,18 @@ const isPageLink = (href: string): boolean => !isOutside(href) && /\.md(#|$)/i.t
  * @param token - the token.
  * @param isBlock - whether it is a top-level block of the page.
  * @param file - the page's file.
- * @param isPage - whether a file is a page of the same group.
+ * @param read - reads a linked page's text.
  */
-const tokenNotes = (
-  token: Token,
-  isBlock: boolean,
-  file: string,
-  isPage: (file: string) => boolean
-): string[] => {
+const tokenNotes = (token: Token, isBlock: boolean, file: string, read: ReadPage): string[] => {
   if (isIdlessFence(token)) return [`a \`${fenceText(token)}\` block names no id`];
   if (fenceOf(token) !== undefined && !isBlock)
     return [`a \`${fenceText(token)}\` block inside a list or a quote is not drawn`];
   const href = hrefOf(token);
   if (href === undefined || isOutside(href)) return [];
-  if (token.type === "image" && !existsSync(relativeTarget(file, href).file))
-    return [`its image "${href}" is not there`];
-  return token.type === "link" && isPageLink(href) && !isPage(relativeTarget(file, href).file)
-    ? [`it links to "${href}", which is not a page of this group`]
+  if (token.type === "image" && !isOwnImage(file, relativeTarget(file, href).file))
+    return [`its image "${href}" is not a file of its package`];
+  return token.type === "link" && isPageLink(href) && linkedSlug(file, href, read) === undefined
+    ? [`it links to "${href}", which is not there`]
     : [];
 };
 
@@ -200,14 +261,15 @@ const tokenNotes = (
  *
  * @param file - the page's file, absolute.
  * @param text - its text.
- * @param isPage - whether a file is a page of the same group, for its links.
+ * @param read - reads a linked page's text; from the disk by default.
  */
-export const docPageIndex = (file: string, text: string, isPage: (file: string) => boolean): DocPageIndex => {
+export const docPageIndex = (file: string, text: string, read: ReadPage = readLinkedFile): DocPageIndex => {
   const frontMatter = frontMatterOf(text);
   const { order, description } = frontMatter;
   const tokens = LEXER.lexer(frontMatter.body);
   const stories: string[] = [];
   const components: string[] = [];
+  const links: string[] = [];
   const notes = [...frontMatter.notes];
   for (const token of tokens) {
     const fence = fenceOf(token);
@@ -216,7 +278,13 @@ export const docPageIndex = (file: string, text: string, isPage: (file: string) 
   }
   const blocks = new Set<Token>(tokens);
   void LEXER.walkTokens(tokens, (token: Token): void => {
-    notes.push(...tokenNotes(token, blocks.has(token), file, isPage));
+    notes.push(...tokenNotes(token, blocks.has(token), file, read));
+    const href = hrefOf(token);
+    const slug =
+      token.type === "link" && href !== undefined && isPageLink(href)
+        ? linkedSlug(file, href, read)
+        : undefined;
+    if (slug !== undefined) links.push(slug);
   });
   return {
     title: titleOf(file, frontMatter),
@@ -224,9 +292,25 @@ export const docPageIndex = (file: string, text: string, isPage: (file: string) 
     ...(description === undefined ? {} : { description }),
     stories,
     components,
+    links,
     ...(notes.length === 0 ? {} : { notes })
   };
 };
+
+/**
+ * What inline tokens say, without marks or raw HTML.
+ *
+ * @param tokens - the tokens.
+ */
+const plainText = (tokens: readonly Token[]): string =>
+  tokens
+    .map((token): string => {
+      if (token.type === "html") return "";
+      const nested: unknown = "tokens" in token ? token.tokens : undefined;
+      if (Array.isArray(nested) && nested.length > 0) return plainText(nested);
+      return "text" in token && typeof token.text === "string" ? token.text : "";
+    })
+    .join("");
 
 /**
  * The Markdown renderer of one page: it keeps the page's headings, so it is made for each page.
@@ -239,16 +323,18 @@ export const docPageIndex = (file: string, text: string, isPage: (file: string) 
  * @param headings - receives the page's second- and third-level headings.
  */
 const pageRenderer = (headings: DocHeading[]): Marked => {
-  const seen = new Map<string, number>();
+  const seen = new Set<string>();
   const anchorOf = (text: string): string => {
     const slug =
       text
         .toLowerCase()
         .replace(/[^\p{L}\p{N}]+/gu, "-")
         .replace(/^-|-$/g, "") || "section";
-    const count = seen.get(slug) ?? 0;
-    seen.set(slug, count + 1);
-    return count === 0 ? slug : `${slug}-${count}`;
+    let anchor = slug;
+    // "Tokens", "Tokens", "Tokens 1": counting alone would give the last two the same anchor
+    for (let count = 1; seen.has(anchor); count += 1) anchor = `${slug}-${count}`;
+    seen.add(anchor);
+    return anchor;
   };
   return new Marked({
     async: false,
@@ -256,9 +342,9 @@ const pageRenderer = (headings: DocHeading[]): Marked => {
     renderer: {
       code: codeHtml,
       heading({ tokens, depth }: Tokens.Heading): string {
-        const text = this.parser.parseInline(tokens, this.parser.textRenderer);
+        const text = plainText(tokens);
         const anchor = anchorOf(text);
-        if (depth === 2 || depth === 3) headings.push({ depth, id: anchor, text });
+        if (depth === 2 || depth === 3) headings.push({ depth, anchor, text });
         // a link cannot hold a link, so a heading with one in it keeps its words and loses their marks
         const hasLink = tokens.some((token) => token.type === "link");
         const words = hasLink ? escapeHtml(text) : this.parser.parseInline(tokens);
@@ -275,16 +361,11 @@ const pageRenderer = (headings: DocHeading[]): Marked => {
 };
 
 /** The address the shell fills for a link to another page, by its slug; none when the file is not there. */
-const pageAddress = (
-  file: string,
-  href: string,
-  read: (file: string) => string | undefined
-): string | undefined => {
-  const target = relativeTarget(file, href);
-  const text = read(target.file);
-  if (text === undefined) return undefined;
-  const slug = kebab(titleOf(target.file, frontMatterOf(text)));
-  return `${PAGE_LINK_SCHEME}${slug}${target.fragment === undefined ? "" : `#${target.fragment}`}`;
+const pageAddress = (file: string, href: string, read: ReadPage): string | undefined => {
+  const slug = linkedSlug(file, href, read);
+  if (slug === undefined) return undefined;
+  const { fragment } = relativeTarget(file, href);
+  return `${PAGE_LINK_SCHEME}${slug}${fragment === undefined ? "" : `#${fragment}`}`;
 };
 
 /**
@@ -296,11 +377,7 @@ const pageAddress = (
  * @param read - reads a linked page's text.
  * @returns the image files, in the order their addresses name them.
  */
-const addressTokens = (
-  file: string,
-  tokens: readonly Token[],
-  read: (file: string) => string | undefined
-): string[] => {
+const addressTokens = (file: string, tokens: readonly Token[], read: ReadPage): string[] => {
   const images: string[] = [];
   void LEXER.walkTokens([...tokens], (token: Token): void => {
     const href = hrefOf(token);
@@ -308,7 +385,7 @@ const addressTokens = (
     if (token.type === "link" && isPageLink(href)) token.href = pageAddress(file, href, read) ?? href;
     if (token.type !== "image" || isOutside(href)) return;
     const image = relativeTarget(file, href).file;
-    if (!existsSync(image)) return;
+    if (!isOwnImage(file, image)) return;
     images.push(image);
     token.href = `${ASSET_SCHEME}${images.length - 1}`;
   });
@@ -360,10 +437,6 @@ export type CompiledDocPage = Omit<DocPage, "assets"> & {
   readonly text: string;
 };
 
-/** Reads a file, or gives none when it is not there. */
-const readLinkedFile = (file: string): string | undefined =>
-  existsSync(file) ? readFileSync(file, "utf8") : undefined;
-
 /**
  * A page, rendered: its blocks, its headings and its images.
  *
@@ -374,7 +447,7 @@ const readLinkedFile = (file: string): string | undefined =>
 export const compiledDocPage = (
   file: string,
   text: string,
-  read: (file: string) => string | undefined = readLinkedFile
+  read: ReadPage = readLinkedFile
 ): CompiledDocPage => {
   const { body } = frontMatterOf(text);
   const headings: DocHeading[] = [];

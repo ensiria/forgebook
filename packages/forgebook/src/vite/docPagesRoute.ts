@@ -21,7 +21,7 @@ const agentPage = (source: TreeSource, page: TreePage, pages: CataloguePages, vi
   description: page.description,
   stories: page.stories,
   components: page.components,
-  address: docPageAddressOf(pages.page, page.id, view)
+  links: { address: docPageAddressOf(pages.page, page.id, view) }
 });
 
 /**

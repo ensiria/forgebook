@@ -4,10 +4,9 @@
  *
  * @module
  */
-import type { DocHeading } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, type RefObject, useEffect, useState } from "react";
 
-import { headingElementId } from "../docPages.ts";
+import { type DocHeading, headingElementId } from "../docPages.ts";
 import { STRINGS } from "./strings.ts";
 
 /** How far below the page's top a heading counts as being read, in CSS px. */
@@ -24,14 +23,14 @@ const END_ROOM = 2;
  */
 const readHeading = (scroller: HTMLElement, headings: readonly DocHeading[]): string | undefined => {
   if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - END_ROOM)
-    return headings.at(-1)?.id;
+    return headings.at(-1)?.anchor;
   const line = scroller.getBoundingClientRect().top + READING_LINE;
-  let current = headings[0]?.id;
+  let current = headings[0]?.anchor;
   for (const heading of headings) {
-    const element = scroller.querySelector(`[id="${CSS.escape(headingElementId(heading.id))}"]`);
+    const element = scroller.querySelector(`[id="${CSS.escape(headingElementId(heading.anchor))}"]`);
     if (element === null) continue;
     if (element.getBoundingClientRect().top > line) break;
-    current = heading.id;
+    current = heading.anchor;
   }
   return current;
 };
@@ -96,15 +95,15 @@ const ContentsList = ({
 }): ReactNode => (
   <ul className="forgebook-contents__list">
     {headings.map((heading) => (
-      <li key={heading.id} data-depth={heading.depth}>
+      <li key={heading.anchor} data-depth={heading.depth}>
         <a
           className="forgebook-contents__link"
-          href={hrefOf(heading.id)}
-          aria-current={heading.id === current ? "location" : undefined}
+          href={hrefOf(heading.anchor)}
+          aria-current={heading.anchor === current ? "location" : undefined}
           onClick={(event: MouseEvent<HTMLAnchorElement>): void => {
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
             event.preventDefault();
-            onOpen(heading.id);
+            onOpen(heading.anchor);
           }}
         >
           {heading.text}

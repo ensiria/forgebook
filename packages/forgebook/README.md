@@ -211,8 +211,8 @@ first segment, as for any component (`Hooks/useUndo` is under Hooks; the source'
 
 ## Docs pages
 
-Guides, foundations and recipes are Markdown files with a little front matter, not MDX: nothing is compiled in the
-browser and a page runs no code of its own. A project lists them in its configuration (`docs: ["docs/**/*.md"]`); a
+Guides, foundations and recipes are Markdown files with a little front matter, not MDX: a page is read at build time, and
+nothing is compiled in the browser. A project lists them in its configuration (`docs: ["docs/**/*.md"]`); a
 library gives them with its source, so every catalogue that shows it gets them:
 
 ```ts
@@ -256,7 +256,9 @@ See [the colours](./colours.md#brand), or [every state](?component=acme:actions-
 - The page gets its look from the shell's palette, so a `shell.theme` and both appearances reach it; a page with two
   headings or more lists them beside its text, or above it on a narrow page.
 - `forgebook stories` fails when a page names a story or a component that is not there, a link leads to no page, or an
-  image is missing, so a rename never breaks a page unseen.
+  image is not a file of its package, so a rename never breaks a page unseen.
+- A page is trusted as a story's code is: Markdown lets it hold raw HTML, which runs in the catalogue. Review one as you
+  review code, and do not build a catalogue from pages you did not write.
 
 ## Coming from Storybook
 

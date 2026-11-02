@@ -10,9 +10,8 @@
  * @module
  */
 
-import type { DocHeading } from "@forgebook/story-format/source";
-
 import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
+import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
@@ -124,6 +123,12 @@ export type StoryDocument = {
   readonly problems: readonly string[];
 };
 
+/** Where a docs page opens, in the view the answer describes. */
+export type PageLinks = {
+  /** Its page in the catalogue; a heading's anchor goes after it as the fragment. */
+  readonly address: string;
+};
+
 /** A docs page, as the list of pages gives it. */
 export type AgentPage = {
   /** `<source>:<title>` in kebab case: what `forgebook page` takes. */
@@ -140,8 +145,8 @@ export type AgentPage = {
   readonly stories: readonly string[];
   /** The ids of the components whose API tables it shows. */
   readonly components: readonly string[];
-  /** Where it opens, in the view the answer describes; a heading's fragment goes after it. */
-  readonly address: string;
+  /** Where it opens. */
+  readonly links: PageLinks;
 };
 
 /** The docs pages a catalogue has, in reading order, and what is wrong in the index. */

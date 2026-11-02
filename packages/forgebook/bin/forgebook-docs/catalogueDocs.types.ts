@@ -89,8 +89,8 @@ export type CatalogueData = {
   readonly sourceId: string | undefined;
   /** The components with stories, by title. */
   readonly components: readonly CatalogueComponent[];
-  /** The docs pages its source declares, in reading order. */
-  readonly pages: readonly CataloguePage[];
+  /** The docs pages its source declares, in reading order; none by default. */
+  readonly pages?: readonly CataloguePage[];
   /** The other exported modules. */
   readonly modules: readonly ModuleDocs[];
   /** The public Sass modules. */

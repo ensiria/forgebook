@@ -10,13 +10,13 @@
  */
 import type { DocPageIndex, StorySource } from "@forgebook/story-format/source";
 
-import { kebabCase } from "./kebabCase.ts";
+import { pageSlug } from "./docPages.ts";
 import { sourcePages } from "./sourceFiles.ts";
 import type { StoryTree, TreeSource } from "./storyTree.ts";
 
 /** One docs page. */
 export type TreePage = {
-  /** `<source>:<title>` in kebab case: the URL's `page` parameter. */
+  /** `<source>:<slug>`: the URL's `page` parameter. */
   readonly id: string;
   /** The part of its id after the source's: what a link between two pages of a source names. */
   readonly slug: string;
@@ -34,6 +34,8 @@ export type TreePage = {
   readonly stories: readonly string[];
   /** The ids of the components whose API tables it shows. */
   readonly components: readonly string[];
+  /** The slugs of the pages it links to. */
+  readonly links: readonly string[];
 };
 
 /**
@@ -70,7 +72,7 @@ export const treePages = (source: StorySource, problems: string[]): TreePage[] =
       problems.push(`${source.name}: ${file}: ${place}`);
       return [];
     }
-    const slug = kebabCase(entry.title);
+    const slug = pageSlug(entry.title);
     const other = seen.get(slug);
     if (other !== undefined) {
       problems.push(`${source.name}: ${file} and ${other} have the same title "${entry.title}"`);
@@ -86,7 +88,8 @@ export const treePages = (source: StorySource, problems: string[]): TreePage[] =
         file,
         description: entry.description,
         stories: entry.stories,
-        components: entry.components
+        components: entry.components,
+        links: entry.links
       }
     ];
   });
@@ -112,7 +115,10 @@ export const pageProblems = (
         .map((id) => `${source.name}: ${page.file} shows the story "${id}": no such story`),
       ...page.components
         .filter((id) => !components.has(id))
-        .map((id) => `${source.name}: ${page.file} shows the component "${id}": no such component`)
+        .map((id) => `${source.name}: ${page.file} shows the component "${id}": no such component`),
+      ...page.links
+        .filter((slug) => !source.pages.some((other) => other.slug === slug))
+        .map((slug) => `${source.name}: ${page.file} links to "${slug}": no such page`)
     ])
   );
 

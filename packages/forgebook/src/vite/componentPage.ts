@@ -17,7 +17,7 @@ import { basename, dirname, join } from "node:path";
 
 import { Marked, type Token, type Tokens } from "marked";
 
-import { highlightCode } from "./highlightCode.ts";
+import { escapeHtml, highlightCode } from "./highlightCode.ts";
 
 /**
  * A Markdown code block as HTML, coloured when its fence names a language.
@@ -26,7 +26,7 @@ import { highlightCode } from "./highlightCode.ts";
  */
 export const codeHtml = ({ text, lang }: Tokens.Code): string => {
   const language = lang?.trim().split(/\s+/)[0] || undefined;
-  const languageClass = language === undefined ? "" : ` class="language-${language}"`;
+  const languageClass = language === undefined ? "" : ` class="language-${escapeHtml(language)}"`;
   return `<pre><code${languageClass}>${highlightCode(text, language)}</code></pre>\n`;
 };
 

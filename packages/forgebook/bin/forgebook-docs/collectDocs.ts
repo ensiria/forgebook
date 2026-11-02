@@ -16,6 +16,7 @@ import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
+import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
 import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import type {
@@ -168,7 +169,9 @@ const collectPages = (
   const source = exports[STORIES_SUBPATH];
   if (source === undefined) return [];
   const file = resolve(packageDir, source);
-  const patterns = [...readFileSync(file, "utf8").matchAll(PAGES_IMPORT)].flatMap((match) => match[1] ?? []);
+  const patterns = [...(readLinkedFile(file) ?? "").matchAll(PAGES_IMPORT)].flatMap(
+    (match) => match[1] ?? []
+  );
   const pages = patterns.flatMap((pattern) => indexedDocPages(dirname(file), pattern, (): void => undefined));
   for (const page of pages)
     for (const note of page.index.notes ?? []) problems.push(`${relative(packageDir, page.file)}: ${note}`);

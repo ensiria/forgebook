@@ -11,7 +11,7 @@
  */
 import "./docPage.scss";
 
-import type { DocPage as LoadedDocPage, StorySource } from "@forgebook/story-format/source";
+import type { StorySource } from "@forgebook/story-format/source";
 import {
   type MouseEvent,
   type ReactNode,
@@ -23,7 +23,7 @@ import {
   useState
 } from "react";
 
-import { isDocPage } from "../docPages.ts";
+import { anchorOf, isDocPage, type DocPage as LoadedDocPage } from "../docPages.ts";
 import type { PageLocation, TreePage } from "../pageTree.ts";
 import { sourcePages } from "../sourceFiles.ts";
 import { findStory, type StoryTree, type TreeSource, type TreeStory } from "../storyTree.ts";
@@ -213,17 +213,24 @@ export const DocPage = ({
   const queued = useMemo(() => queuedBlocks(content.blocks), [content.blocks]);
   const frames = usePageFrames({ stories, queued, pageRef, view, touchOverrides });
   useScrollMemory(pageRef, scroll);
-  useAnchorScroll(pageRef, anchor, scroll.visit, loaded.status === "ready");
+  const placeAgain = useAnchorScroll(pageRef, anchor, scroll.visit, loaded.status === "ready");
+  const goToAnchor = useCallback(
+    (target: string): void => {
+      if (target === anchor) placeAgain();
+      else onOpenAnchor(target);
+    },
+    [anchor, onOpenAnchor, placeAgain]
+  );
   const width = usePageWidth(pageRef);
   const openLink = useCallback(
     (href: string): boolean => {
       if (href.startsWith("#")) {
-        onOpenAnchor(decodeURIComponent(href.slice(1)));
+        goToAnchor(anchorOf(href.slice(1)) ?? "");
         return true;
       }
       return href.startsWith("?") && onOpenAddress(href);
     },
-    [onOpenAnchor, onOpenAddress]
+    [goToAnchor, onOpenAddress]
   );
   // a link of the package's text is plain HTML: it opens in place through here, or the whole catalogue would reload
   useEffect(() => {
@@ -260,15 +267,14 @@ export const DocPage = ({
       scrollRef={pageRef}
       isColumn={isColumn}
       hrefOf={(target: string): string => pageHrefOf(page.id, target)}
-      onOpen={onOpenAnchor}
+      onOpen={goToAnchor}
     />
   );
   return (
     <div className="forgebook-workspace">
       {header}
       <div ref={pageRef} className="forgebook-scroll">
-        {/* keyed by the page, so another page comes in with its own entrance */}
-        <div key={page.id} className="forgebook-docs">
+        <div className="forgebook-docs">
           <article ref={bodyRef} className="forgebook-doc forgebook-docs__body">
             {page.description === undefined ? null : (
               <p className="forgebook-doc__lead">

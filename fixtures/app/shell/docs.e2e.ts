@@ -34,6 +34,19 @@ const reachEveryFrame = async (page: Page, count: number): Promise<void> => {
   }
 };
 
+/** Waits until a heading's smooth scroll is over: its position holds for two checks. */
+const scrollSettled = async (page: Page): Promise<void> => {
+  let last = -1;
+  await expect
+    .poll(async () => {
+      const top = await scroller(page).evaluate((element) => element.scrollTop);
+      const isStill = top === last;
+      last = top;
+      return isStill;
+    })
+    .toBe(true);
+};
+
 test.describe("docs pages", () => {
   test("lists the pages above the components, in reading order, each library named", async ({ page }) => {
     await page.goto("/");
@@ -90,7 +103,7 @@ test.describe("docs pages", () => {
     for (const place of [0, 1, 2]) {
       await expect(frameAt(page, place).locator("html")).not.toHaveAttribute("data-theme", "dark");
     }
-    await page.getByRole("radio", { name: "Dark", exact: true }).first().check({ force: true });
+    await page.getByRole("radio", { name: "Dark", exact: true }).first().click({ force: true });
     await expect(page).toHaveURL(/theme=dark/);
     for (const place of [0, 1, 2]) {
       await expect(frameAt(page, place).locator("html")).toHaveAttribute("data-theme", "dark");
@@ -143,7 +156,7 @@ test.describe("docs pages", () => {
     );
     await expect(page.locator('[id="doc-the-last-section"] a')).toBeFocused();
     // a change of the view keeps the fragment
-    await page.getByRole("radio", { name: "Dark", exact: true }).first().check({ force: true });
+    await page.getByRole("radio", { name: "Dark", exact: true }).first().click({ force: true });
     await expect(page).toHaveURL(/theme=dark.*#the-last-section$/);
     await page.goBack();
     await expect(page).not.toHaveURL(/#the-last-section$/);
@@ -218,6 +231,59 @@ test.describe("docs pages", () => {
     await page.goto(docs("kit:writing-for-the-kit"));
     await expect(page.locator(".forgebook-docs .forgebook-prose")).toContainText("A page with no story");
     await expect(page.getByRole("button", { name: "View" })).toHaveCount(0);
+  });
+
+  test("Back from a heading returns to where the reader was; the same heading again goes back to it", async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 600 });
+    await page.goto(docs("kit:guides-choosing-a-select"));
+    const contents = page.getByRole("navigation", { name: "On this page" });
+    const last = page.locator('[id="doc-the-last-section"]');
+    await contents.getByRole("link", { name: "The last section" }).click();
+    await expect(last).toBeInViewport();
+    await scrollSettled(page);
+    await scroller(page).evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await expect(last).not.toBeInViewport();
+    const entries = await page.evaluate(() => window.history.length);
+    await contents.getByRole("link", { name: "The last section" }).click();
+    await expect(last).toBeInViewport();
+    await scrollSettled(page);
+    expect(await page.evaluate(() => window.history.length)).toBe(entries);
+    await page.goBack();
+    await expect(page).not.toHaveURL(/#the-last-section$/);
+    await expect.poll(() => scroller(page).evaluate((element) => element.scrollTop)).toBe(0);
+  });
+
+  test("a link to a heading of another page arrives at it", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 500 });
+    await page.goto(`${STARTED}`);
+    await page.locator(".forgebook-docs__body").getByRole("link", { name: "choosing a select" }).click();
+    await expect(page.locator("h1")).toHaveText("Choosing a select");
+    await expect(page.locator('[id="doc-in-a-row"]')).toBeInViewport();
+  });
+
+  test("the next page's frames load though this page's never finished", async ({ page }) => {
+    await page.route("**/frame.html*", (route) =>
+      route.request().url().includes("overview") ? undefined : route.continue()
+    );
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(STARTED);
+    await page
+      .getByRole("navigation", { name: "Components" })
+      .getByRole("link", { name: "Choosing a select" })
+      .click();
+    await expect(page.locator("h1")).toHaveText("Choosing a select");
+    await expect(frameAt(page, 0).locator("html")).toHaveAttribute("data-forgebook-status", "ready");
+  });
+
+  test("the dev server reads no file outside what it serves, whatever the query", async ({ request }) => {
+    for (const query of ["forgebook-docs-page", "forgebook-markdown"]) {
+      const answer = await request.get(`/@fs/etc/hosts?import&${query}`);
+      expect(await answer.text()).not.toContain("127.0.0.1");
+    }
   });
 
   test("a page that is not there says so", async ({ page }) => {

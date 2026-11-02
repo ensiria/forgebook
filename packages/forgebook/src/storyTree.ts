@@ -19,7 +19,6 @@ import type {
   StorySource
 } from "@forgebook/story-format/source";
 
-import { kebabCase } from "./kebabCase.ts";
 import { pageProblems, type TreePage, treePages } from "./pageTree.ts";
 import { sourceFiles } from "./sourceFiles.ts";
 
@@ -133,7 +132,12 @@ export type StoryTree = {
  *
  * @param text - any text.
  */
-export const kebab = (text: string): string => kebabCase(text);
+export const kebab = (text: string): string =>
+  text
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 /**
  * A story's id.

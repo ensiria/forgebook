@@ -10,11 +10,11 @@
  *
  * @module
  */
-import type { DocBlock, StorySource } from "@forgebook/story-format/source";
+import type { StorySource } from "@forgebook/story-format/source";
 import { type ReactNode, useEffect } from "react";
 
 import { isComponentDocs } from "../componentDocs.ts";
-import { linkedHtml } from "../docPages.ts";
+import { type DocBlock, linkedHtml } from "../docPages.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { findComponent, findStory, isLogicComponent, type StoryTree, type TreeSource } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
@@ -102,13 +102,15 @@ const CodeBlock = ({ text, html }: { readonly text: string; readonly html: strin
 /**
  * A story of the page, in its frame.
  *
- * @param props - the story's id and what the blocks share.
+ * @param props - the story's id, its place in the page and what the blocks share.
  */
 const StoryBlock = ({
   id,
+  place,
   context
 }: {
   readonly id: string;
+  readonly place: number;
   readonly context: DocBlocksContext;
 }): ReactNode => {
   const { frames, tree, sources } = context;
@@ -137,7 +139,7 @@ const StoryBlock = ({
       story={location.story}
       isDemo={true}
       isMounted={isMounted}
-      observe={(element: HTMLElement | null): void => frames.queue.observe(id, element)}
+      observe={frames.queue.observerOf(id, place)}
     />
   );
 };
@@ -164,7 +166,8 @@ const PropsBlock = ({
       ? sourceFiles(source).docs[location.component.file]
       : undefined
   );
-  const isOver = docs.status === "ready" || docs.status === "error";
+  // a component with no docs is over too: "none" counts only once its turn came, since it is also the state before
+  const isOver = queue.mounted.has(key) && docs.status !== "loading";
   // its place in the queue goes to the next block once it is there: a table holds no frame to wait for
   useEffect(() => {
     if (isOver) queue.markReady(key);
@@ -172,7 +175,7 @@ const PropsBlock = ({
   if (location === undefined) return <MissingBlock message={STRINGS.unknownComponent(id)} />;
   if (docs.status === "error") return <MissingBlock message={`${STRINGS.pageError}: ${docs.message}`} />;
   return (
-    <div ref={(element: HTMLElement | null): void => queue.observe(key, element)}>
+    <div ref={queue.observerOf(key)}>
       {docs.status === "ready" && isComponentDocs(docs.value) ? (
         <ApiReference docs={docs.value} isLogic={isLogicComponent(location.component)} />
       ) : null}
@@ -183,13 +186,15 @@ const PropsBlock = ({
 /**
  * One block of a page.
  *
- * @param props - the block and what the blocks share.
+ * @param props - the block, its place in the page and what the blocks share.
  */
 const DocBlockView = ({
   block,
+  place,
   context
 }: {
   readonly block: DocBlock;
+  readonly place: number;
   readonly context: DocBlocksContext;
 }): ReactNode => {
   switch (block.kind) {
@@ -203,7 +208,7 @@ const DocBlockView = ({
     case "code":
       return <CodeBlock text={block.text} html={block.html} />;
     case "story":
-      return <StoryBlock id={block.id} context={context} />;
+      return <StoryBlock id={block.id} place={place} context={context} />;
     case "props":
       return <PropsBlock id={block.id} context={context} />;
     default:
@@ -226,5 +231,5 @@ export const DocBlocks = ({
   blocks.map((block, place) => (
     // the blocks of one page never reorder, so their place is a stable key, and a story may be shown twice
     // biome-ignore lint/suspicious/noArrayIndexKey: see above
-    <DocBlockView key={place} block={block} context={context} />
+    <DocBlockView key={place} block={block} place={place} context={context} />
   ));

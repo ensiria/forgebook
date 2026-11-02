@@ -6,11 +6,61 @@
  * A page is compiled without knowing its source's id or the reader's view, and an image's address is known only once
  * Vite answers its import, so the HTML names them with a scheme of its own and the shell writes the real addresses in.
  * Headings carry a prefixed element id, so a heading called "Root" never takes the id the shell mounts in; the
- * address's fragment stays the plain anchor (`#root`) a person would write by hand. Pure.
+ * address's fragment stays the plain anchor (`#root`) a person would write by hand. A page's blocks are a protocol
+ * between the plugin and the shell of one version, so their types live here, not in the public story format. Pure.
  *
  * @module
  */
-import type { DocPage } from "@forgebook/story-format/source";
+/** One piece of a docs page, in the order of its file. */
+export type DocBlock =
+  | {
+      /** Text between the other blocks. */
+      readonly kind: "text";
+      /** The text as HTML, its headings carrying their anchors. */
+      readonly html: string;
+    }
+  | {
+      /** A code block of the file, with a button that copies it. */
+      readonly kind: "code";
+      /** The code, as copied. */
+      readonly text: string;
+      /** The same code as HTML, coloured by the catalogue's plugin at build time. */
+      readonly html: string;
+      /** Its language as the fence names it (`tsx`), when it names one. */
+      readonly language?: string;
+    }
+  | {
+      /** A story, live in its frame: a fence named `story <id>`. */
+      readonly kind: "story";
+      /** The story's id, as the catalogue's address writes it (`kit:inputs-select--overview`). */
+      readonly id: string;
+    }
+  | {
+      /** A component's API table, drawn from its types: a fence named `props <id>`. */
+      readonly kind: "props";
+      /** The component's id, as the catalogue's address writes it (`kit:inputs-select`). */
+      readonly id: string;
+    };
+
+/** A heading of a docs page, as its contents list names it. */
+export type DocHeading = {
+  /** Its level: 2 or 3. */
+  readonly depth: 2 | 3;
+  /** Its anchor, the fragment of the page's address (`tokens`): unique in the page. */
+  readonly anchor: string;
+  /** Its text, without marks. */
+  readonly text: string;
+};
+
+/** A docs page as the catalogue's plugin answers it: what the shell draws. */
+export type DocPage = {
+  /** Its blocks, in the order of the file. */
+  readonly blocks: readonly DocBlock[];
+  /** Its second- and third-level headings, in the order of the file. */
+  readonly headings: readonly DocHeading[];
+  /** The addresses of the images it holds, which its HTML names by their place in this list. */
+  readonly assets: readonly string[];
+};
 
 /** What a link to another page of the source starts with in the compiled HTML: its slug and fragment follow. */
 export const PAGE_LINK_SCHEME = "forgebook-page:";
@@ -44,7 +94,7 @@ const isBlock = (value: unknown): boolean => {
 const isHeading = (value: unknown): boolean =>
   isRecord(value) &&
   (value["depth"] === 2 || value["depth"] === 3) &&
-  typeof value["id"] === "string" &&
+  typeof value["anchor"] === "string" &&
   typeof value["text"] === "string";
 
 /**
@@ -65,8 +115,13 @@ export const isDocPage = (value: unknown): value is DocPage =>
 const attributeText = (text: string): string =>
   text.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 
-/** What a link names, as the HTML escaped it: a fragment read back, or none when it is not valid. */
-const anchorOf = (fragment: string | undefined): string | undefined => {
+/**
+ * A fragment read back as a heading's anchor: a `%` that encodes nothing stays as written.
+ *
+ * @param fragment - the fragment, without its `#`; none when there is none.
+ * @returns the anchor; none for an empty fragment.
+ */
+export const anchorOf = (fragment: string | undefined): string | undefined => {
   if (fragment === undefined || fragment === "") return undefined;
   try {
     return decodeURIComponent(fragment);
@@ -74,6 +129,22 @@ const anchorOf = (fragment: string | undefined): string | undefined => {
     return fragment;
   }
 };
+
+/**
+ * A page's slug: the part of its id after the source's, from its title.
+ *
+ * @remarks
+ * As CSF writes ids (`kebab`), keeping every language's letters: a title in Japanese would otherwise have no slug at
+ * all, and two such pages would collide. For a Latin title the two agree.
+ *
+ * @param title - the page's title.
+ */
+export const pageSlug = (title: string): string =>
+  title
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-|-$/g, "");
 
 /**
  * A page's HTML with the real addresses written in: its links to other pages, for the reader's view, and its images.

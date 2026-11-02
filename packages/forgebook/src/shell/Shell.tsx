@@ -10,6 +10,7 @@ import type { StoryLanguage, StorySource } from "@forgebook/story-format/source"
 import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
+import { anchorOf } from "../docPages.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
 import { findPage, type PageLocation } from "../pageTree.ts";
 import { sourceFiles } from "../sourceFiles.ts";
@@ -107,7 +108,11 @@ const NO_LANGUAGES: readonly StoryLanguage[] = [];
 const HOME: Page = { kind: "home" };
 
 /** A page's key: the same for every view of it. */
-const pageKey = (page: Page): string => (page.kind === "home" ? page.kind : `${page.kind}:${page.id}`);
+const pageKey = (page: Page): string => {
+  if (page.kind === "home") return page.kind;
+  // a heading is a place of its own in the history: Back from it returns to where the reader was
+  return page.kind === "page" ? `page:${page.id}#${page.anchor ?? ""}` : `${page.kind}:${page.id}`;
+};
 
 /**
  * A visit of the page an address shows.
@@ -160,17 +165,6 @@ type Address = {
   readonly matrix: readonly string[];
 };
 
-/** A fragment as a heading's anchor; none when it is empty. */
-const anchorOf = (hash: string): string | undefined => {
-  const fragment = hash.replace(/^#/, "");
-  if (fragment === "") return undefined;
-  try {
-    return decodeURIComponent(fragment);
-  } catch {
-    return fragment;
-  }
-};
-
 /**
  * The page an address's query and fragment name: a story wins, then a component, then a docs page; none is the home.
  *
@@ -184,7 +178,7 @@ const pageOf = (search: string, hash: string): Page => {
   const page = params.get("page");
   if (story !== null) return { kind: "story", id: story };
   if (component !== null) return { kind: "component", id: component };
-  if (page !== null) return { kind: "page", id: page, anchor: anchorOf(hash) };
+  if (page !== null) return { kind: "page", id: page, anchor: anchorOf(hash.replace(/^#/, "")) };
   return HOME;
 };
 
@@ -521,7 +515,7 @@ type AddressState = {
   readonly pageAddress: (page: Page) => Address;
   /** Opens a page, as a new entry of the history. */
   readonly openPage: (page: Page) => void;
-  /** Goes to a heading of the shown docs page: a new entry of the history, the same visit, so the page stays put. */
+  /** Goes to a heading of the shown docs page, as a new entry of the history. */
   readonly openAnchor: (anchor: string) => void;
   /** Changes the shown page's address (the view, the panel's values), in place. */
   readonly replaceAddress: (next: Address) => void;
@@ -563,6 +557,7 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
       const next = { ...address, page: { ...address.page, anchor } };
       window.history.pushState(null, "", addressQuery(next, switches));
       setAddress(next);
+      setVisit({ ...visitOf(next, false), isInPage: true });
     },
     replaceAddress: (next: Address): void => {
       window.history.replaceState(null, "", addressQuery(next, switches));
@@ -753,7 +748,9 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
         ) : null}
         {shown.kind === "page" ? (
           <Suspense fallback={<div className="forgebook-workspace">{header}</div>}>
+            {/* keyed by the page: its frames, its text and its scrolling element are that page's alone */}
             <DocPage
+              key={shown.location.page.id}
               location={shown.location}
               anchor={shown.anchor}
               tree={tree}

@@ -14,7 +14,7 @@ import { resolve } from "node:path";
 
 import type { DocPageIndex } from "@forgebook/story-format/source";
 
-import { compiledDocPage, docPageIndex } from "./docPageMarkdown.ts";
+import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
 import { storyFileKeys } from "./storyFilesModule.ts";
 
 /** The query that asks for one docs page, rendered. */
@@ -30,6 +30,15 @@ export type IndexedDocPage = {
   readonly index: DocPageIndex;
 };
 
+/** Reads a linked page, watching it: its title makes the link's address, so a new title renews the page that links. */
+const watchedRead =
+  (watch: (file: string) => void) =>
+  (file: string): string | undefined => {
+    const text = readLinkedFile(file);
+    if (text !== undefined) watch(file);
+    return text;
+  };
+
 /**
  * Every page a pattern matches, indexed.
  *
@@ -42,13 +51,10 @@ export const indexedDocPages = (
   pattern: string,
   watch: (file: string) => void
 ): IndexedDocPage[] => {
-  const keys = storyFileKeys(root, [pattern]);
-  const files = new Set(keys.map((key) => resolve(root, key)));
-  return keys.map((key) => {
+  return storyFileKeys(root, [pattern]).map((key) => {
     const file = resolve(root, key);
     watch(file);
-    const index = docPageIndex(file, readFileSync(file, "utf8"), (other: string) => files.has(other));
-    return { key, file, index };
+    return { key, file, index: docPageIndex(file, readFileSync(file, "utf8"), watchedRead(watch)) };
   });
 };
 
@@ -95,7 +101,11 @@ export const docPagesModule = (
  */
 export const docPageModule = (file: string, watch: (file: string) => void, isServing: boolean): string => {
   watch(file);
-  const { blocks, headings, images, text } = compiledDocPage(file, readFileSync(file, "utf8"));
+  const { blocks, headings, images, text } = compiledDocPage(
+    file,
+    readFileSync(file, "utf8"),
+    watchedRead(watch)
+  );
   return [
     ...images.map((image, place) => `import asset${place} from ${JSON.stringify(`${image}?url`)};`),
     `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: [${images

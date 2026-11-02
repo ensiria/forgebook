@@ -10,7 +10,8 @@
  * @module
  */
 import type { FunctionSignatureDocs, PropDocs } from "../../src/componentDocs.ts";
-import { kebab, storyId } from "../../src/storyTree.ts";
+import { pageSlug } from "../../src/docPages.ts";
+import { storyId } from "../../src/storyTree.ts";
 import type {
   CatalogueComponent,
   CatalogueData,
@@ -145,7 +146,7 @@ const byPlace = (left: { readonly title: string }, right: { readonly title: stri
 /** One docs page's line, ending with its id when the package's source id is known. */
 const pageLine = (page: CataloguePage, sourceId: string | undefined): string => {
   const about = page.description === undefined ? "" : `: ${sentence(page.description)}`;
-  const id = sourceId === undefined ? "" : ` · page: \`${sourceId}:${kebab(page.title)}\``;
+  const id = sourceId === undefined ? "" : ` · page: \`${sourceId}:${pageSlug(page.title)}\``;
   return `- **${page.title}** \`${page.file}\`${about}${id}`;
 };
 
@@ -169,8 +170,9 @@ const componentSection = (data: CatalogueData): string[] => {
 const sectionLines = (data: CatalogueData, section: CatalogueSection): string[] => {
   if (section === "components") return componentSection(data);
   if (section === "pages") {
-    if (data.pages.length === 0) return [];
-    return ["## Docs", "", ...data.pages.map((page) => pageLine(page, data.sourceId)), ""];
+    const pages = data.pages ?? [];
+    if (pages.length === 0) return [];
+    return ["## Docs", "", ...pages.map((page) => pageLine(page, data.sourceId)), ""];
   }
   if (section === "modules") {
     if (data.modules.length === 0) return [];

@@ -22,7 +22,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
+import {
+  type ConfigEnv,
+  isFileLoadingAllowed,
+  type Logger,
+  type Plugin,
+  type UserConfig,
+  type ViteDevServer
+} from "vite";
 
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
@@ -114,6 +121,21 @@ const SOURCE_FILE = /\.tsx?$/;
 
 /** The query that asks for a story file's component docs. */
 const DOCS_QUERY = "?forgebook-docs";
+
+/** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
+const FILE_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY, DOCS_PAGE_QUERY];
+
+/**
+ * Whether a dev server may read the file a query names: a plugin's answer never passes Vite's own check of
+ * `server.fs`, so without this any file could be asked for by adding a query to its address.
+ *
+ * @param id - the module's id.
+ * @param server - the dev server; none in a build, which reads only what the sources import.
+ */
+const isReadable = (id: string, server: ViteDevServer | undefined): boolean =>
+  server === undefined ||
+  !FILE_QUERIES.some((query) => id.endsWith(query)) ||
+  isFileLoadingAllowed(server.config, id.slice(0, id.lastIndexOf("?")));
 
 /** The plugin's options. */
 export type ForgebookPluginOptions = {
@@ -334,6 +356,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
   let config = options.config;
+  /** The dev server; none in a build. */
+  let devServer: ViteDevServer | undefined;
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
@@ -479,6 +503,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
     },
     configureServer: (server: ViteDevServer): void => {
+      devServer = server;
       server.httpServer?.on("close", (): void => void docs?.close());
       // an edited component or type file changes its docs: the worker renews its programs on their next read
       server.watcher.on("change", (file: string): void => renewOnChange(server, file));
@@ -533,6 +558,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = config === undefined ? undefined : generatedModule(id, config);
       if (generated !== undefined) return generated;
+      // an answer, not an error: an error would raise Vite's overlay on every reader's open page
+      if (!isReadable(id, devServer)) return { code: "export default null;", moduleType: "js" };
       const watch = (file: string): void => this.addWatchFile(file);
       const answered = await queryModule(id, watch, async (specifier: string, importer: string) => {
         const resolved = await this.resolve(specifier, importer);

@@ -202,7 +202,7 @@ export const ComponentPage = ({
                       story={story}
                       isDemo={false}
                       isMounted={queue.mounted.has(story.id)}
-                      observe={(element: HTMLElement | null): void => queue.observe(story.id, element)}
+                      observe={queue.observerOf(story.id)}
                     />
                   ))}
                 </section>

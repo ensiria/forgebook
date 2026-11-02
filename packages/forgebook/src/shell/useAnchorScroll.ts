@@ -3,13 +3,14 @@
  * reader follows a link inside it.
  *
  * @remarks
- * While a page loads, its frames take their real heights and move what follows them, so an opened anchor is placed again
- * whenever the content's size changes, until the person scrolls themselves. After a link inside the page, focus moves
- * to the heading's own link: without it, the next Tab starts again from where the link was.
+ * What comes near as the page moves loads then, frames taking their real heights and tables arriving, which moves what
+ * follows them, so a heading is placed again whenever the content's size changes, until the person scrolls themselves.
+ * After a link inside the page, focus moves to the heading's own link: without it, the next Tab starts again from where
+ * the link was.
  *
  * @module
  */
-import { type RefObject, useLayoutEffect, useRef } from "react";
+import { type RefObject, useCallback, useLayoutEffect } from "react";
 
 import { headingElementId } from "../docPages.ts";
 import { OWN_SCROLL_EVENTS, type PageVisit } from "./useScrollMemory.ts";
@@ -27,35 +28,40 @@ const placeHeading = (scroller: HTMLElement, heading: Element, behavior: ScrollB
   scroller.scrollTo({ top: scroller.scrollTop + top - TOP_ROOM, behavior });
 };
 
+/** A heading of the page, by its anchor. */
+const headingOf = (scroller: HTMLElement, anchor: string): Element | null =>
+  scroller.querySelector(`[id="${CSS.escape(headingElementId(anchor))}"]`);
+
+/** Brings a heading into view from a link inside the page. */
+const goToHeading = (scroller: HTMLElement, heading: Element): void => {
+  placeHeading(scroller, heading, scrollStyle(true));
+  heading.querySelector("a")?.focus({ preventScroll: true });
+};
+
 /**
  * Keeps a page's heading in view.
  *
  * @param ref - the page's scrolling element.
  * @param anchor - the heading the address names; none when it names none.
- * @param visit - the visit of the page: a link inside the page keeps it.
+ * @param visit - the visit of the page.
  * @param isReady - whether the page's text is there.
+ * @returns what brings the named heading back into view: a link to it again changes no address.
  */
 export const useAnchorScroll = (
   ref: RefObject<HTMLElement | null>,
   anchor: string | undefined,
   visit: PageVisit,
   isReady: boolean
-): void => {
-  const placedVisit = useRef<PageVisit | undefined>(undefined);
+): (() => void) => {
   useLayoutEffect(() => {
     const scroller = ref.current;
-    if (scroller === null || !isReady) return;
-    const isOwnLink = placedVisit.current === visit;
-    placedVisit.current = visit;
-    if (anchor === undefined) return;
-    const heading = scroller.querySelector(`[id="${CSS.escape(headingElementId(anchor))}"]`);
+    if (scroller === null || anchor === undefined || !isReady) return;
+    const heading = headingOf(scroller, anchor);
     if (heading === null) return;
-    placeHeading(scroller, heading, scrollStyle(isOwnLink));
-    if (isOwnLink) {
-      heading.querySelector("a")?.focus({ preventScroll: true });
-      return;
-    }
-    const resizes = new ResizeObserver((): void => placeHeading(scroller, heading, "auto"));
+    const isOwnLink = visit.isInPage === true;
+    if (isOwnLink) goToHeading(scroller, heading);
+    else placeHeading(scroller, heading, "auto");
+    const resizes = new ResizeObserver((): void => placeHeading(scroller, heading, scrollStyle(isOwnLink)));
     const stop = (): void => {
       resizes.disconnect();
       for (const name of OWN_SCROLL_EVENTS) scroller.removeEventListener(name, stop);
@@ -64,4 +70,9 @@ export const useAnchorScroll = (
     for (const name of OWN_SCROLL_EVENTS) scroller.addEventListener(name, stop, { passive: true });
     return stop;
   }, [ref, anchor, visit, isReady]);
+  return useCallback((): void => {
+    const scroller = ref.current;
+    const heading = scroller === null || anchor === undefined ? null : headingOf(scroller, anchor);
+    if (scroller !== null && heading !== null) goToHeading(scroller, heading);
+  }, [ref, anchor]);
 };
