@@ -5,13 +5,13 @@
  * Its Storybook runs on Parcel, whose rules a library's code relies on, so they are written here for Vite, through the
  * framework's plugins since Forgebook's configuration has no key for Vite: packages resolve to their sources by the
  * `source` condition, a package's translations are imported with a glob (`./intl/*.json`), and a file's text with
- * `bundle-text:`, and every style sheet of its components is a CSS module whatever its name, which Vite tells by the
+ * `bundle-text:`, an import may start from the monorepo's root (`/packages/…`), and every style sheet of its components is a CSS module whatever its name, which Vite tells by the
  * name, so those ids carry it in their query.
  *
  * @module
  */
 import { globSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { react } from "@forgebook/react/vite";
 import { defineConfig } from "forgebook";
@@ -55,7 +55,10 @@ const spectrumVite = {
   },
   load: (id) => (id.startsWith(INTL_PREFIX) ? intlModule(id.slice(INTL_PREFIX.length)) : null),
   config: () => ({
-    resolve: { conditions: ["source", "module", "browser", "development|production"] },
+    resolve: {
+      conditions: ["source", "module", "browser", "development|production"],
+      alias: [{ find: /^\/packages\//, replacement: `${resolve(import.meta.dirname, "../packages")}/` }]
+    },
     css: { transformer: "postcss", modules: { localsConvention: "camelCase" } }
   })
 };
