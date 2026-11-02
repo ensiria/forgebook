@@ -11,6 +11,7 @@
  */
 
 import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
+import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
@@ -141,6 +142,58 @@ export type StoryDocument = {
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
+  readonly problems: readonly string[];
+};
+
+/** Where a docs page opens, in the view the answer describes. */
+export type PageLinks = {
+  /** Its page in the catalogue; a heading's anchor goes after it as the fragment. */
+  readonly address: string;
+};
+
+/** A docs page, as the list of pages gives it. */
+export type AgentPage = {
+  /** `<source>:<title>` in kebab case: what `forgebook page` takes. */
+  readonly id: string;
+  /** Its whole title (`Guides/Theming`). */
+  readonly title: string;
+  /** The id of the source it belongs to. */
+  readonly source: string;
+  /** Its file, relative to the module that declares the source. */
+  readonly file: string;
+  /** What it is about, in a sentence; none when it does not say. */
+  readonly description: string | undefined;
+  /** The ids of the stories it shows, which `forgebook story` takes. */
+  readonly stories: readonly string[];
+  /** The ids of the components whose API tables it shows. */
+  readonly components: readonly string[];
+  /** Where it opens. */
+  readonly links: PageLinks;
+};
+
+/** The docs pages a catalogue has, in reading order, and what is wrong in the index. */
+export type PagesDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The catalogue's name. */
+  readonly title: string;
+  /** Every page. */
+  readonly pages: readonly AgentPage[];
+  /** One message per problem the index found: a page naming a story that is not there, a title taken twice. */
+  readonly problems: readonly string[];
+};
+
+/** One docs page, to read. */
+export type PageDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The page. */
+  readonly page: AgentPage;
+  /** Its headings, each anchor the fragment of its address. */
+  readonly headings: readonly DocHeading[];
+  /** Its Markdown, without its front matter; empty when it could not be read (the reason is then in `problems`). */
+  readonly text: string;
+  /** What went wrong while reading it. */
   readonly problems: readonly string[];
 };
 

@@ -53,6 +53,11 @@ export type ForgebookConfig = CatalogueLists & {
    * named after the catalogue. Give `stories` or `sources`, or both.
    */
   readonly stories?: readonly string[];
+  /**
+   * The project's own docs pages, as globs from the configuration's folder (`["docs/**\/*.md"]`): Markdown with live
+   * stories, listed in the sidebar's Docs section, in the source named after the catalogue.
+   */
+  readonly docs?: readonly string[];
   /** The packages' story sources, as module specifiers exporting a `source` (`["@acme/ui/stories"]`). */
   readonly sources?: readonly string[];
   /** The switches of the toolbar and the View menu; the theme and the contrast when neither it nor a preset declares any. */

@@ -28,6 +28,7 @@ import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
+import { pagesCommands } from "./pagesCommands.mts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
@@ -322,6 +323,7 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...pagesCommands(forgebook),
     ...initCommands(forgebook),
     mcp: forgebook.command({
       summary:
@@ -350,7 +352,7 @@ await defineCommands({
         );
         const server = {
           info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
-          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
+          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides.`,
           tools: catalogueTools({
             ask: client.ask,
             writeNew: (file, exportName) =>

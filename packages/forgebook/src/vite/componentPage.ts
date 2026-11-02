@@ -17,20 +17,21 @@ import { basename, dirname, join } from "node:path";
 
 import { Marked, type Token, type Tokens } from "marked";
 
-import { highlightCode } from "./highlightCode.ts";
+import { escapeHtml, highlightCode } from "./highlightCode.ts";
+
+/**
+ * A Markdown code block as HTML, coloured when its fence names a language.
+ *
+ * @param token - the block.
+ */
+export const codeHtml = ({ text, lang }: Tokens.Code): string => {
+  const language = lang?.trim().split(/\s+/)[0] || undefined;
+  const languageClass = language === undefined ? "" : ` class="language-${escapeHtml(language)}"`;
+  return `<pre><code${languageClass}>${highlightCode(text, language)}</code></pre>\n`;
+};
 
 /** Markdown with GitHub's tables, its code blocks coloured. */
-const markdown = new Marked({
-  async: false,
-  gfm: true,
-  renderer: {
-    code: ({ text, lang }: Tokens.Code): string => {
-      const language = lang?.trim().split(/\s+/)[0] || undefined;
-      const languageClass = language === undefined ? "" : ` class="language-${language}"`;
-      return `<pre><code${languageClass}>${highlightCode(text, language)}</code></pre>\n`;
-    }
-  }
-});
+const markdown = new Marked({ async: false, gfm: true, renderer: { code: codeHtml } });
 
 /** A component's page text, as HTML. */
 export type ComponentPageText = {

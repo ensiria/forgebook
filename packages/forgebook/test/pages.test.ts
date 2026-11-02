@@ -19,6 +19,7 @@ const CONFIG: ResolvedConfig = {
   logo: "/catalogue/logo.svg",
   heights: "story-heights.json",
   stories: ["src/**/*.stories.tsx"],
+  docs: [],
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [{ id: "it", label: "Italiano" }],
@@ -47,6 +48,17 @@ describe("the generated pages", () => {
     expect(entry).toContain('import { source as source0 } from "/catalogue/.forgebook-stories.ts";');
     expect(entry).toContain('import { source as source1 } from "@acme/ui/stories";');
     expect(entry).toContain("sources: [source0, source1],");
+  });
+
+  it("makes the project's own source from its docs pages alone, and lists them", () => {
+    const docsOnly = { ...CONFIG, stories: [], docs: ["./docs/**/*.md"] };
+    expect(shellEntry(docsOnly)).toContain(
+      'import { source as source0 } from "/catalogue/.forgebook-stories.ts";'
+    );
+    const source = storiesSourceModule(docsOnly);
+    expect(source).toContain('import docs0 from "./docs/**/*.md?forgebook-docs-pages";');
+    expect(source).toContain("  docs: [docs0],");
+    expect(storiesSourceModule(CONFIG)).not.toContain("docs:");
   });
 
   it("mounts the framework's frame with the previews, the catalogue's last", () => {

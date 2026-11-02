@@ -59,7 +59,7 @@ test.describe("pages and the address", () => {
         .poll(() => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
         .toBeGreaterThan(0);
     }
-    await library.getByRole("link", { name: "Select" }).click();
+    await library.getByRole("link", { name: "Select", exact: true }).click();
     await expect(page).toHaveURL(/component=kit%3Ainputs-selection-select/);
   });
 
@@ -645,9 +645,9 @@ test.describe("the stage", () => {
   test("the sidebar never lists stories: they are picked in the header", async ({ page }) => {
     await page.goto(story("overview"));
     // Inputs is open (the shown component's family), Foundations closed: one link, the component's, none for a story
-    await expect(page.getByRole("navigation", { name: "Components" }).getByRole("link")).toHaveText([
-      /^Select\d+$/
-    ]);
+    // the section after the Docs one: the library's families
+    const families = page.getByRole("navigation", { name: "Components" }).locator("section").nth(1);
+    await expect(families.getByRole("link")).toHaveText([/^Select\d+$/]);
   });
 
   test("a story that throws shows its error in the frame", async ({ page }) => {

@@ -10,17 +10,20 @@
  * @module
  */
 import { globSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { figmaLink } from "../../src/figmaLink.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
+import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
+import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import type {
   CatalogueComponent,
   CatalogueData,
+  CataloguePage,
   ModuleDocs,
   SassModuleDocs,
   StyleSheetDocs
@@ -156,6 +159,47 @@ const sourceIdIn = (packageDir: string, exports: Readonly<Record<string, string>
   }
 };
 
+/** A `?forgebook-docs-pages` import of a source module: its pattern, before the query. */
+const PAGES_IMPORT = /["']([^"']+)\?forgebook-docs-pages["']/g;
+
+/** A page's position: its `order`, or after every page with one. */
+const orderOf = (order: number | undefined): number => order ?? Number.POSITIVE_INFINITY;
+
+/**
+ * The docs pages a package's `./stories` export declares, read from its `?forgebook-docs-pages` imports, in reading
+ * order.
+ *
+ * @param packageDir - the package's folder.
+ * @param exports - its exports.
+ * @param problems - receives what the pages' index noticed.
+ */
+const collectPages = (
+  packageDir: string,
+  exports: Readonly<Record<string, string>>,
+  problems: string[]
+): CataloguePage[] => {
+  const source = exports[STORIES_SUBPATH];
+  if (source === undefined) return [];
+  const file = resolve(packageDir, source);
+  const patterns = [...(readLinkedFile(file) ?? "").matchAll(PAGES_IMPORT)].flatMap(
+    (match) => match[1] ?? []
+  );
+  const pages = patterns.flatMap((pattern) => indexedDocPages(dirname(file), pattern, (): void => undefined));
+  for (const page of pages)
+    for (const note of page.index.notes ?? []) problems.push(`${relative(packageDir, page.file)}: ${note}`);
+  return pages
+    .sort(
+      (left, right) =>
+        orderOf(left.index.order) - orderOf(right.index.order) ||
+        left.index.title.localeCompare(right.index.title)
+    )
+    .map((page) => ({
+      title: page.index.title,
+      file: relative(packageDir, page.file).split("\\").join("/"),
+      description: page.index.description
+    }));
+};
+
 /**
  * Reads a package for its catalogue.
  *
@@ -195,7 +239,16 @@ export const collectDocs = (
   const description = manifestText(manifest, "description");
   const sourceId = sourceIdIn(packageDir, exports);
   return {
-    data: { packageName, description, sourceId, components, modules, sassModules, styleSheets },
+    data: {
+      packageName,
+      description,
+      sourceId,
+      components,
+      pages: collectPages(packageDir, exports, problems),
+      modules,
+      sassModules,
+      styleSheets
+    },
     problems
   };
 };

@@ -5,13 +5,20 @@
  * @remarks
  * Components first (by family and group, from their stories' titles), each with its import, its summary, its props in
  * short (`size=sm|md*|lg`: `*` marks the default; `!` a required prop; events with their parameters) and
- * its parts. Then the other modules, the Sass modules and the style sheets. Pure: data in, text out.
+ * its parts. Then the docs pages, the other modules, the Sass modules and the style sheets. Pure: data in, text out.
  *
  * @module
  */
 import type { FunctionSignatureDocs, PropDocs } from "../../src/componentDocs.ts";
+import { pageSlug } from "../../src/pageAddress.ts";
 import { storyId } from "../../src/storyTree.ts";
-import type { CatalogueComponent, CatalogueData, ExportDocs, ModuleDocs } from "./catalogueDocs.types.ts";
+import type {
+  CatalogueComponent,
+  CatalogueData,
+  CataloguePage,
+  ExportDocs,
+  ModuleDocs
+} from "./catalogueDocs.types.ts";
 import type { CatalogueSection } from "./catalogueOptions.ts";
 
 /** The props whose keys are the parts. */
@@ -137,21 +144,36 @@ const byPlace = (left: { readonly title: string }, right: { readonly title: stri
   );
 };
 
+/** One docs page's line, ending with its id when the package's source id is known. */
+const pageLine = (page: CataloguePage, sourceId: string | undefined): string => {
+  const about = page.description === undefined ? "" : `: ${sentence(page.description)}`;
+  const id = sourceId === undefined ? "" : ` · page: \`${sourceId}:${pageSlug(page.title)}\``;
+  return `- **${page.title}** \`${page.file}\`${about}${id}`;
+};
+
+/** The components' lines, under a heading per family and group. */
+const componentSection = (data: CatalogueData): string[] => {
+  const lines = ["## Components", ""];
+  if (data.components.length === 0) return [...lines, "None yet.", ""];
+  let heading = "";
+  for (const component of [...data.components].sort(byPlace)) {
+    const group = component.title.split("/").slice(0, -1).join(" › ");
+    if (group !== heading) {
+      lines.push(`### ${group}`);
+      heading = group;
+    }
+    lines.push(componentLine(data.packageName, component, data.sourceId));
+  }
+  return [...lines, ""];
+};
+
 /** The lines of one kind of entries, a heading first; none when the package has none of it. */
 const sectionLines = (data: CatalogueData, section: CatalogueSection): string[] => {
-  if (section === "components") {
-    const lines = ["## Components", ""];
-    if (data.components.length === 0) return [...lines, "None yet.", ""];
-    let heading = "";
-    for (const component of [...data.components].sort(byPlace)) {
-      const group = component.title.split("/").slice(0, -1).join(" › ");
-      if (group !== heading) {
-        lines.push(`### ${group}`);
-        heading = group;
-      }
-      lines.push(componentLine(data.packageName, component, data.sourceId));
-    }
-    return [...lines, ""];
+  if (section === "components") return componentSection(data);
+  if (section === "pages") {
+    const pages = data.pages ?? [];
+    if (pages.length === 0) return [];
+    return ["## Docs", "", ...pages.map((page) => pageLine(page, data.sourceId)), ""];
   }
   if (section === "modules") {
     if (data.modules.length === 0) return [];

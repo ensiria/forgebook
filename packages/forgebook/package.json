@@ -36,6 +36,7 @@
     ".": "./src/vite/config.ts",
     "./agent": "./src/vite/agent.types.ts",
     "./story-tree": "./src/storyTree.ts",
+    "./page-tree": "./src/pageTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
@@ -136,6 +137,10 @@
       "./story-tree": {
         "types": "./dist/src/storyTree.d.ts",
         "default": "./dist/src/storyTree.js"
+      },
+      "./page-tree": {
+        "types": "./dist/src/pageTree.d.ts",
+        "default": "./dist/src/pageTree.js"
       },
       "./shell": {
         "types": "./dist/src/shell/mountShell.d.ts",

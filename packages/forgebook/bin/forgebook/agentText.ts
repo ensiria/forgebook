@@ -18,6 +18,8 @@ import type {
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
+  PageDocument,
+  PagesDocument,
   PluginsDocument,
   StoriesDocument,
   StoryDocument,
@@ -236,9 +238,7 @@ export const pluginsText = (document: PluginsDocument): string => {
   return document.plugins
     .map((plugin) => {
       const parts = [
-        ...plugin.tabs.map(
-          (tab) => `tab ${tab.id}${tab.parameter === undefined ? "" : ` (${tab.parameter})`}`
-        ),
+        ...plugin.tabs.map((tab) => `tab ${tab.id}`),
         ...plugin.switches.map((id) => `switch ${id}`),
         ...plugin.docBlocks.map((fence) => `docs block ${fence}`),
         ...(plugin.runsInFrames ? ["runs in frames"] : [])
@@ -247,3 +247,29 @@ export const pluginsText = (document: PluginsDocument): string => {
     })
     .join("\n");
 };
+
+/**
+ * The docs pages as a table: one row per page, its id first (what `forgebook page` takes), then its title and how many
+ * stories it shows.
+ *
+ * @param document - the pages document.
+ * @param style - colours, glyphs and width.
+ */
+export const pagesText = (document: PagesDocument, style: OutputStyle): string =>
+  document.pages.length === 0
+    ? "No docs pages here."
+    : table(
+        document.pages.map((page) => [page.id, page.title, String(page.stories.length)]),
+        {
+          columns: [{ header: "Id" }, { header: "Page", tone: "muted" }, { header: "Stories", tone: "muted" }]
+        },
+        uncut(style)
+      );
+
+/**
+ * One docs page as a person reads it: where it opens, then its Markdown.
+ *
+ * @param document - the page's document.
+ */
+export const pageText = (document: PageDocument): string =>
+  [document.page.links.address, "", document.text].join("\n");
