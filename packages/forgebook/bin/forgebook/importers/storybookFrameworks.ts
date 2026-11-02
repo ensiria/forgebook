@@ -10,6 +10,7 @@
  *
  * @module
  */
+import { VITE_PATHS } from "../../../src/vite/vitePaths.ts";
 
 /** A Forgebook framework, as the written configuration names it. */
 export type ImportedFramework = {
@@ -62,7 +63,7 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
  * @param name - the package.
  */
 const names = (written: string, name: string): boolean => {
-  const path = written.split("\\").join("/").replace(/\/$/, "");
+  const path = VITE_PATHS.normalize(written).replace(/\/$/, "");
   return path === name || path.endsWith(`/${name}`);
 };
 

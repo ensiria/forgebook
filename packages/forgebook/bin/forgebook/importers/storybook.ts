@@ -14,13 +14,14 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import ts from "typescript-6";
 
 import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
+import { VITE_PATHS, type VitePaths } from "../../../src/vite/vitePaths.ts";
 import { type ImportedFramework, STORYBOOK_FRAMEWORKS, storybookFramework } from "./storybookFrameworks.ts";
 
 /** What a configuration takes from another tool's files. */
@@ -140,24 +141,24 @@ const entryGlob = (
  * @param entries - `main`'s `stories`.
  * @param storybookDir - the `.storybook` folder, absolute.
  * @param projectDir - the project's folder, absolute.
- * @returns the globs, and what was not read.
+ * @param paths - the path functions; the running system's unless a test names another.
+ * @returns the globs, with forward slashes on every system as globs take them, and what was not read.
  */
 export const storyGlobs = (
   entries: readonly unknown[],
   storybookDir: string,
-  projectDir: string
+  projectDir: string,
+  paths: VitePaths = VITE_PATHS
 ): { readonly globs: string[]; readonly notes: string[] } => {
   const globs: string[] = [];
   const notes: string[] = [];
-  const fromProject = (path: string): string => relative(projectDir, resolve(storybookDir, path)) || ".";
+  const fromProject = (path: string): string =>
+    paths.relative(projectDir, paths.resolve(storybookDir, path)) || ".";
   for (const entry of entries) {
     const glob = entryGlob(entry, fromProject, notes);
     if (glob === undefined) continue;
     // `.stories.*` names every script extension: written out as the ones Forgebook reads
-    const named = glob
-      .split("\\")
-      .join("/")
-      .replace(/\.stories\.\*$/, ".stories.@(js|jsx|mjs|ts|tsx)");
+    const named = glob.replace(/\.stories\.\*$/, ".stories.@(js|jsx|mjs|ts|tsx)");
     for (const each of expandedGlobs(named)) {
       if (STORY_FILE.test(each)) globs.push(each);
       else if (!each.endsWith(".mdx")) notes.push(`${each}: not a story file Forgebook reads`);
@@ -416,7 +417,8 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
     framework: reading.framework,
     title: projectTitle(projectDir),
     stories: globs,
-    preview: previewFile === undefined ? undefined : relative(projectDir, previewFile),
+    // with forward slashes: it is written into the configuration, which may be shared across systems
+    preview: previewFile === undefined ? undefined : VITE_PATHS.relative(projectDir, previewFile),
     switches: read.switches,
     notes: [...notes, ...read.notes]
   };
