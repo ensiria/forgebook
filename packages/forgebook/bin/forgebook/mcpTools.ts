@@ -171,7 +171,7 @@ export const catalogueTools = ({
   {
     name: "list_tokens",
     description:
-      "The design tokens of this catalogue, to use instead of a colour, size or duration written by hand: how many of each type, and the first of them. To replace a raw value, call nearest_token; for one token's description, get_token.",
+      "The design tokens of this catalogue and of the libraries it shows, to use instead of a colour, size or duration written by hand: how many of each type, the first of them, and `clashes` where two authors disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
     inputSchema: {
       type: "object",
       properties: {
