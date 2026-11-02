@@ -111,4 +111,13 @@ describe("scannedEntries", () => {
       "/app/node_modules/@acme/ui/src/**/*.stories.jsx"
     ]);
   });
+
+  it("scans the previews, whose imports load with the first story", () => {
+    const entries = scannedEntries(
+      { ...CONFIG, previews: ["/app/.storybook/preview.js"] },
+      resolverOf({}),
+      () => undefined
+    );
+    expect(entries).toContain("/app/.storybook/preview.js");
+  });
 });

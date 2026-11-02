@@ -101,5 +101,6 @@ export const scannedEntries = (
       match[1] === undefined ? [] : [join(dirname(file), match[1]).split("\\").join("/")]
     );
   });
-  return [...config.stories, ...fromSources];
+  // the previews too: what they import loads with the first story, and found then it reloads the page
+  return [...config.stories, ...fromSources, ...config.previews];
 };
