@@ -159,7 +159,7 @@ test.describe("the search", () => {
     await expect(row(page, "Called with the new value")).toBeVisible();
     const opened = context.waitForEvent("page");
     await row(page, "Called with the new value").click({ modifiers: ["ControlOrMeta"] });
-    await expect((await opened).url()).toContain("prop.onValueChange");
+    await expect(await opened).toHaveURL(/prop\.onValueChange/);
     await expect(results(page)).toBeVisible();
   });
 

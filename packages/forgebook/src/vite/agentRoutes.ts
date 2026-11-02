@@ -6,7 +6,8 @@
  * @remarks
  * The server loads the sources and the previews with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool
  * sees what the shell shows. A story module that fails on Node (it reads `window` while it loads) gives its story a
- * problem in the answer instead of an error. Served by the dev server only, where Vite listens (localhost by default);
+ * problem in the answer instead of an error, and a preview that does is left out: it is written for a browser, and only
+ * its args and parameters are read here, so it must not cost a tool the catalogue. Served by the dev server only, where Vite listens (localhost by default);
  * a build has none of it.
  *
  * @module
@@ -18,7 +19,7 @@ import { join, relative } from "node:path";
 import type { StorySource } from "@forgebook/story-format/source";
 import { createIdResolver, type ViteDevServer } from "vite";
 
-import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
+import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
@@ -65,12 +66,25 @@ type AgentModule = {
   readonly preview: LoadedPreview;
 };
 
+/** Whether a value loads a module. */
+const isLoader = (value: unknown): value is () => Promise<unknown> => typeof value === "function";
+
+/** A preview, read from what loads it; nothing when it cannot load on Node. */
+const loadedPreview = async (load: () => Promise<unknown>): Promise<LoadedPreview> => {
+  try {
+    return readPreview(await load());
+  } catch {
+    return NO_PREVIEW;
+  }
+};
+
 /** The agent module read, or why it is not what the plugin generates. */
-const agentModuleOf = (module: unknown): AgentModule => {
+const agentModuleOf = async (module: unknown): Promise<AgentModule> => {
   if (!isRecord(module) || !Array.isArray(module["sources"]) || !Array.isArray(module["previews"]))
     throw new Error("The catalogue's sources did not load");
   const sources = module["sources"].filter(isStorySource);
-  return { sources, preview: mergedPreviews(module["previews"].map(readPreview)) };
+  const previews = await Promise.all(module["previews"].filter(isLoader).map(loadedPreview));
+  return { sources, preview: mergedPreviews(previews) };
 };
 
 /** A loader's value, or why it failed. */
@@ -284,7 +298,7 @@ export const agentAnswer = async (
   try {
     const answerAlone = STORYLESS_ROUTES[route];
     if (answerAlone !== undefined) return await answerAlone(config, params, server.resolveSource);
-    const loaded = agentModuleOf(await server.load(join(config.dir, AGENT_SOURCES_FILE)));
+    const loaded = await agentModuleOf(await server.load(join(config.dir, AGENT_SOURCES_FILE)));
     const context: RouteContext = {
       loaded,
       tree: storyTree(loaded.sources),

@@ -22,6 +22,10 @@ export type StampWatch = {
   readonly texts: readonly string[];
   /** Selectors stamped when they match something drawn. */
   readonly selectors: readonly string[];
+  /** Texts stamped when a frame's body holds them: a real story, whose elements carry no mark of ours. */
+  readonly frameTexts?: readonly string[];
+  /** A regular expression's source: each match in a frame's body is stamped, the text an edit of a real file writes. */
+  readonly frameMark?: string;
 };
 
 /** The part of a page stamps are read through. */
@@ -80,6 +84,15 @@ export const stampScript = (watch: StampWatch): string => `(() => {
     if (target === document && document.body !== null) {
       for (const text of watch.texts) {
         if (!(text in seen) && document.body.textContent.includes(text)) see(text);
+      }
+    }
+    if (target !== document && target.body !== null) {
+      const shown = target.body.textContent;
+      for (const text of watch.frameTexts ?? []) {
+        if (!(text in seen) && shown.includes(text)) see(text);
+      }
+      if (watch.frameMark !== undefined) {
+        for (const mark of shown.match(new RegExp(watch.frameMark, "g")) ?? []) see(mark);
       }
     }
     for (const [key, sighted] of Object.entries(seen)) {

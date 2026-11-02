@@ -1,0 +1,28 @@
+{
+  "name": "fluentui",
+  "repository": "https://github.com/microsoft/fluentui.git",
+  "commit": "a22af26f14588c5af093871bbf6150641250610e",
+  "licence": "MIT",
+  "install": ["node", ".yarn/releases/yarn-4.18.0.cjs", "install", "--immutable", "--mode=skip-build"],
+  "folder": "apps/public-docsite-v9",
+  "expected": { "files": 128, "stories": 872 },
+  "measured": {
+    "forgebookStory": "stories:components-button-button--default",
+    "forgebookComponent": "stories:components-button-button",
+    "text": "Example",
+    "pageText": "Example",
+    "sidebar": "Components"
+  },
+  "edits": {
+    "story": {
+      "file": "../../packages/react-components/react-button/stories/src/Button/ButtonDefault.stories.tsx",
+      "find": "<Button {...props}>Example</Button>",
+      "replace": "<Button {...props}>Example {edit}</Button>"
+    },
+    "component": {
+      "file": "../../packages/react-components/react-button/library/src/components/Button/renderButton.tsx",
+      "find": "{!iconOnly && state.root.children}",
+      "replace": "{!iconOnly && state.root.children} {edit}"
+    }
+  }
+}

@@ -11,22 +11,35 @@
 import ts from "typescript-6";
 
 /**
- * The meta's object literal in a story file: its default export, without `satisfies`, `as` and parentheses.
+ * The value a top-level constant of the file is declared with.
+ *
+ * @param source - the story file, parsed.
+ * @param name - the constant.
+ */
+const constantValue = (source: ts.SourceFile, name: string): ts.Expression | undefined => {
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    const found = statement.declarationList.declarations.find(
+      (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name
+    );
+    if (found !== undefined) return found.initializer;
+  }
+  return undefined;
+};
+
+/**
+ * The meta's object literal in a story file: its default export, written inline or held in a constant of the file
+ * (`export default meta`), without `satisfies`, `as` and parentheses.
  *
  * @param source - the story file, parsed.
  */
 const metaObject = (source: ts.SourceFile): ts.ObjectLiteralExpression | undefined => {
   for (const statement of source.statements) {
     if (!ts.isExportAssignment(statement) || statement.isExportEquals) continue;
-    let expression: ts.Expression = statement.expression;
-    while (
-      ts.isSatisfiesExpression(expression) ||
-      ts.isAsExpression(expression) ||
-      ts.isParenthesizedExpression(expression)
-    ) {
-      expression = expression.expression;
-    }
-    return ts.isObjectLiteralExpression(expression) ? expression : undefined;
+    const exported = unwrapped(statement.expression);
+    const value = ts.isIdentifier(exported) ? constantValue(source, exported.text) : exported;
+    const object = value === undefined ? undefined : unwrapped(value);
+    return object !== undefined && ts.isObjectLiteralExpression(object) ? object : undefined;
   }
   return undefined;
 };

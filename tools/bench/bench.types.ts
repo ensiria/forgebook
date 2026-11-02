@@ -4,6 +4,8 @@
  * @module
  */
 
+import type { SweepResult } from "./sweep.ts";
+
 /** A tool the benchmark can drive. */
 export type ToolName = "forgebook" | "storybook" | "ladle";
 
@@ -77,6 +79,18 @@ export type MachineInfo = {
   readonly node: string;
 };
 
+/** The real library a run took place on. */
+export type RealCorpusInfo = {
+  /** The corpus's name. */
+  readonly name: string;
+  /** The repository. */
+  readonly repository: string;
+  /** The commit. */
+  readonly commit: string;
+  /** Its licence's SPDX id. */
+  readonly licence: string;
+};
+
 /** The `--json` document. */
 export type BenchReport = {
   /** The shape's version, raised when a field changes meaning. */
@@ -85,8 +99,12 @@ export type BenchReport = {
   readonly startedAt: string;
   /** The commit the Forgebook packages were packed from, or the published version measured. */
   readonly forgebook: string;
-  /** The corpus measured. */
-  readonly corpus: { readonly components: number; readonly stories: number };
+  /** The corpus measured: on a real library, `components` counts its story files, as its definition states them. */
+  readonly corpus: {
+    readonly components: number;
+    readonly stories: number;
+    readonly real?: RealCorpusInfo;
+  };
   /** The component the story metrics were taken on. */
   readonly measured: string;
   /** The runs of each time. */
@@ -101,4 +119,6 @@ export type BenchReport = {
   readonly warnings: readonly string[];
   /** The results by tool. */
   readonly tools: Readonly<Partial<Record<ToolName, ToolResult>>>;
+  /** What became of every story, with the `sweep` group. */
+  readonly sweep?: SweepResult;
 };

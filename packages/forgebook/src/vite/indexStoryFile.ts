@@ -6,8 +6,10 @@
  * The sidebar lists every story before any is loaded, so the index comes from the code itself, parsed with Vite's
  * parser (the same files Vite compiles). It reads a meta written inline or as a constant (`export default meta`), a
  * story as an object (CSF 3) or as a function with its properties assigned after it (CSF 2: `A.storyName`,
- * `A.parameters`), named exports and re-exports (`export { A as B }`), `includeStories`, `excludeStories`,
- * `__namedExportsOrder`, the meta's and the stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
+ * `A.parameters`), named exports and re-exports (`export { A as B }`, `export { A } from "./a.stories"`, which is how
+ * a library splits a component's stories into a file each; the index is pure and reads no second file, so such a story
+ * is its export's name and the meta's tags), `includeStories`, `excludeStories`, `__namedExportsOrder`, the meta's and
+ * the stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
@@ -36,6 +38,19 @@ import {
   unwrapped
 } from "./indexFields.ts";
 import { playField } from "./storyPlay.ts";
+
+/** The extension of a file that says nothing about JSX. */
+const PLAIN_SCRIPT = /\.[cm]?js$/;
+
+/**
+ * A story file parsed. A `.js` file parses as JSX: the libraries that write stories in JavaScript write JSX there, and
+ * JSX is a superset of what a `.js` story file can otherwise hold.
+ *
+ * @param file - the file's path; its extension decides TypeScript and JSX.
+ * @param text - the file's source.
+ */
+export const parseStoryFile = (file: string, text: string): ReturnType<typeof parseSync> =>
+  parseSync(file, text, PLAIN_SCRIPT.test(file) ? { lang: "jsx" } : {});
 
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
@@ -263,19 +278,28 @@ const storyOf = (
   return { node, fields };
 };
 
-/** One named export of the file: its exported name, the local name it points at, and where its statement starts. */
-type NamedExport = { readonly exportName: string; readonly local: string; readonly start: number };
+/** One named export of the file. */
+type NamedExport = {
+  /** Its exported name. */
+  readonly exportName: string;
+  /** The local name it points at. */
+  readonly local: string;
+  /** Where its statement starts. */
+  readonly start: number;
+  /** Whether it comes from another file (`export { A } from "./a.stories"`): `local` then names nothing here. */
+  readonly isFromElsewhere?: boolean;
+};
 
 /**
- * The file's named exports, in their order: declared ones and re-exports of local names (`export { A as B }`), never
- * an export from another file.
+ * The file's named exports, in their order: declared ones, re-exports of local names (`export { A as B }`) and exports
+ * from another file (`export { A } from "./a.stories"`), never a type.
  *
  * @param program - the parsed file.
  */
 const namedExports = (program: ESTree.Program): NamedExport[] =>
   program.body.flatMap((statement): NamedExport[] => {
-    if (statement.type !== "ExportNamedDeclaration" || statement.source !== null) return [];
-    const { declaration } = statement;
+    if (statement.type !== "ExportNamedDeclaration" || statement.exportKind === "type") return [];
+    const { declaration, source } = statement;
     if (declaration?.type === "VariableDeclaration") {
       return declaration.declarations.flatMap((declarator) =>
         declarator.id.type === "Identifier"
@@ -286,11 +310,36 @@ const namedExports = (program: ESTree.Program): NamedExport[] =>
     if (declaration?.type === "FunctionDeclaration" && declaration.id !== null)
       return [{ exportName: declaration.id.name, local: declaration.id.name, start: statement.start }];
     return statement.specifiers.flatMap((specifier) =>
-      specifier.local.type === "Identifier" && specifier.exported.type === "Identifier"
-        ? [{ exportName: specifier.exported.name, local: specifier.local.name, start: statement.start }]
+      specifier.exportKind !== "type" &&
+      specifier.local.type === "Identifier" &&
+      specifier.exported.type === "Identifier"
+        ? [
+            {
+              exportName: specifier.exported.name,
+              local: specifier.local.name,
+              start: statement.start,
+              ...(source === null ? {} : { isFromElsewhere: true })
+            }
+          ]
         : []
     );
   });
+
+/** The fields of a story written in another file: the index reads one file, so it knows none. */
+const NO_FIELDS: Fields = (): undefined => undefined;
+
+/**
+ * What the index reads a named export's story from, when it is a story.
+ *
+ * @param top - the file's top level.
+ * @param named - the export.
+ * @returns its fields, or none for an export this file shows is no story.
+ */
+const fieldsOfExport = (top: TopLevel, named: NamedExport): Fields | undefined => {
+  if (named.isFromElsewhere === true) return NO_FIELDS;
+  const story = storyOf(top, named.local);
+  return story.node === undefined ? undefined : story.fields;
+};
 
 /**
  * Whether an export is a story, as the meta's `includeStories` and `excludeStories` say (a list of names or a regular
@@ -445,7 +494,7 @@ export const indexStoryFile = (
   text: string,
   options: IndexOptions = {}
 ): StoryFileIndex | string => {
-  const { program, comments, errors } = parseSync(file, text);
+  const { program, comments, errors } = parseStoryFile(file, text);
   const [error] = errors;
   if (error !== undefined) return `${file} does not parse: ${error.message}`;
   const top = topLevelOf(program);
@@ -457,13 +506,14 @@ export const indexStoryFile = (
   const metaTags = stringListOf(meta, "tags");
   if (metaTags instanceof Error) return `${file}: the meta's ${metaTags.message}`;
   const stories: StoryIndexEntry[] = [];
-  for (const { exportName, local, start } of storyExports(program, top, meta)) {
-    const story = storyOf(top, local);
-    if (story.node === undefined) continue;
-    const fields = storyFields(story.fields, metaTags);
+  for (const named of storyExports(program, top, meta)) {
+    const { exportName, start } = named;
+    const written = fieldsOfExport(top, named);
+    if (written === undefined) continue;
+    const fields = storyFields(written, metaTags);
     if (fields instanceof Error) return `${file}: story ${exportName}: ${fields.message}`;
-    const description = leadingSentence(text, comments, start) ?? docsDescription(story.fields, "story");
-    const played = playField(local, top, meta("play"));
+    const description = leadingSentence(text, comments, start) ?? docsDescription(written, "story");
+    const played = playField(named.local, top, meta("play"));
     stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }), ...played });
   }
   const metaFields = metaFieldsOf(meta);

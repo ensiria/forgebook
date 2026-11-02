@@ -250,8 +250,9 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
 };
 
 /**
- * The module the dev server loads to answer tools and agents: the sources and the previews the frame mounts, as
- * values (`sources`, `previews`), loaded on the server with the same imports the pages use.
+ * The module the dev server loads to answer tools and agents: the sources the frame mounts, and a loader for each of
+ * its previews, which a browser's code may keep from loading on the server (`sources`, `previews`), with the same
+ * imports the pages use.
  *
  * @param config - the configuration.
  */
@@ -259,9 +260,8 @@ export const agentSourcesModule = (config: ResolvedConfig): string => {
   const sources = sourcesCode(config);
   return [
     ...sources.imports,
-    ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
     `export const sources = ${sources.list};`,
-    `export const previews = [${config.previews.map((_file, index) => `preview${index}`).join(", ")}];`,
+    `export const previews = [${config.previews.map((file) => `() => import(${JSON.stringify(file)})`).join(", ")}];`,
     ""
   ].join("\n");
 };

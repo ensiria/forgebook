@@ -28,8 +28,33 @@ export type DocsProgram = {
   readonly checker: ts.TypeChecker;
 };
 
-/** The last program of each configuration, reused by the next read. */
+/**
+ * How many programs are kept. A program holds all its package reaches, hundreds of megabytes in a monorepo whose
+ * `tsconfig` paths lead to every package's sources, and one is made per `tsconfig.json`: kept without a limit they fill
+ * the worker's heap, it stops, and every story still waiting gets that error instead of its docs. Making one again
+ * takes a second or so, which is the cheaper of the two.
+ */
+export const KEPT_PROGRAMS = 4;
+
+/** The last program of each configuration, the one read last at the end: reused by the next read. */
 const programs = new Map<string, ts.Program>();
+
+/**
+ * Keeps a program as the one read last, and lets the oldest go past the limit.
+ *
+ * @param key - the program's key.
+ * @param program - the program.
+ */
+const keepProgram = (key: string, program: ts.Program): void => {
+  programs.delete(key);
+  programs.set(key, program);
+  for (const oldest of programs.keys()) {
+    if (programs.size <= KEPT_PROGRAMS) break;
+    programs.delete(oldest);
+    parsedFiles.delete(oldest);
+    outdated.delete(oldest);
+  }
+};
 
 /**
  * The configurations whose program may hold an edited file: renewed on their next read. A program read again without
@@ -54,9 +79,16 @@ export const readAskedFilesOnly = (): void => {
   askedFiles ??= new Map();
 };
 
+/**
+ * Each configuration as read, until a source changes. Reading one lists every file of its project, so reading it again
+ * for each story file is quadratic in the library's size: minutes of `readdir` on thousands of stories.
+ */
+const parsedConfigs = new Map<string, ts.ParsedCommandLine | undefined>();
+
 /** Marks every program as maybe holding an edited file: each is renewed on its next read. */
 export const markSourcesChanged = (): void => {
   for (const configPath of programs.keys()) outdated.add(configPath);
+  parsedConfigs.clear();
 };
 
 /**
@@ -119,7 +151,10 @@ const keepingHost = (key: string, options: ts.CompilerOptions): ts.CompilerHost 
 const keptProgram = (key: string, rootNames: readonly string[], options: ts.CompilerOptions): ts.Program => {
   const oldProgram = programs.get(key);
   const isSameRoots = oldProgram?.getRootFileNames().length === rootNames.length;
-  if (oldProgram !== undefined && isSameRoots && !outdated.has(key)) return oldProgram;
+  if (oldProgram !== undefined && isSameRoots && !outdated.has(key)) {
+    keepProgram(key, oldProgram);
+    return oldProgram;
+  }
   outdated.delete(key);
   const program = ts.createProgram({
     rootNames,
@@ -127,7 +162,7 @@ const keptProgram = (key: string, rootNames: readonly string[], options: ts.Comp
     host: keepingHost(key, options),
     ...(oldProgram === undefined ? {} : { oldProgram })
   });
-  programs.set(key, program);
+  keepProgram(key, program);
   return program;
 };
 
@@ -199,6 +234,22 @@ const rootsOf = (
 };
 
 /**
+ * A configuration as read, once until a source changes.
+ *
+ * @param configPath - the `tsconfig.json`.
+ */
+const parsedConfig = (configPath: string): ts.ParsedCommandLine | undefined => {
+  if (parsedConfigs.has(configPath)) return parsedConfigs.get(configPath);
+  const parsed = ts.getParsedCommandLineOfConfigFile(
+    configPath,
+    {},
+    { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined }
+  );
+  parsedConfigs.set(configPath, parsed);
+  return parsed;
+};
+
+/**
  * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, the one
  * the files no configuration holds share (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
  *
@@ -209,14 +260,7 @@ const rootsOf = (
 export const programFor = (file: string, isWhole = false): DocsProgram | string => {
   const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
   if (configPath === undefined) return looseProgram(file, FALLBACK_OPTIONS);
-  const parsed = ts.getParsedCommandLineOfConfigFile(
-    configPath,
-    {},
-    {
-      ...ts.sys,
-      onUnRecoverableConfigFileDiagnostic: () => undefined
-    }
-  );
+  const parsed = parsedConfig(configPath);
   if (parsed === undefined) return `${configPath} could not be read`;
   const program = keptProgram(
     configPath,
