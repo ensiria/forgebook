@@ -1,0 +1,9 @@
+/* The fixture app's global style sheet, which `nuxt.config`'s `css` loads in every page and every frame. */
+:root {
+  --shop-accent: #0f766e;
+}
+
+.shop-nav a.router-link-exact-active {
+  font-weight: 700;
+  color: var(--shop-accent);
+}

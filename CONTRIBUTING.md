@@ -95,7 +95,7 @@ whose token the workflow makes for each run from the `RELEASE_APP_KEY` secret of
 
 A staged version is not public yet: npm trusts the workflow to stage only, so a maintainer approves each version with
 2FA, in the order they were staged (`@forgebook/story-format`, `forgebook`, `@forgebook/react`,
-`@forgebook/testing`, `@forgebook/vue`), so each one's dependencies are public first:
+`@forgebook/testing`, `@forgebook/vue`, `@forgebook/nuxt`), so each one's dependencies are public first:
 
 ```sh
 npm stage list forgebook          # the versions waiting, with their ids (and the same for each @forgebook/ package)

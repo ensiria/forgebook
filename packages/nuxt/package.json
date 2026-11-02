@@ -1,0 +1,129 @@
+{
+  "name": "@forgebook/nuxt",
+  "version": "0.1.8",
+  "description": "Forgebook for Nuxt: a Nuxt project's components drawn outside Nuxt, with its auto-imports, its aliases, its router, NuxtLink, useFetch and useAsyncData, useState and its runtime config, on Vite.",
+  "keywords": [
+    "nuxt",
+    "vue",
+    "catalogue",
+    "stories"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/nuxt"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./app/components": "./src/app/components.ts",
+    "./app/data": "./src/app/data.ts",
+    "./app/define": "./src/app/define.ts",
+    "./app/errors": "./src/app/errors.ts",
+    "./app/head": "./src/app/head.ts",
+    "./app/router": "./src/app/router.ts",
+    "./app/state": "./src/app/state.ts",
+    "./docs": "./src/vite/extractDocs.ts",
+    "./project": "./src/pageProject.ts",
+    "./renderer": "./src/renderer.ts",
+    "./story": "./src/storyNuxt.ts",
+    "./vite": "./src/vite/nuxt.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/vue": "workspace:*",
+    "unimport": "7.0.2",
+    "magic-string": "1.4.5"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "vite": "^8.0.0",
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0 || ^5.0.0"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "@vitejs/plugin-vue": "6.0.10",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "vue": "3.5.44",
+    "vue-router": "5.4.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./app/components": {
+        "types": "./dist/src/app/components.d.ts",
+        "default": "./dist/src/app/components.js"
+      },
+      "./app/data": {
+        "types": "./dist/src/app/data.d.ts",
+        "default": "./dist/src/app/data.js"
+      },
+      "./app/define": {
+        "types": "./dist/src/app/define.d.ts",
+        "default": "./dist/src/app/define.js"
+      },
+      "./app/errors": {
+        "types": "./dist/src/app/errors.d.ts",
+        "default": "./dist/src/app/errors.js"
+      },
+      "./app/head": {
+        "types": "./dist/src/app/head.d.ts",
+        "default": "./dist/src/app/head.js"
+      },
+      "./app/router": {
+        "types": "./dist/src/app/router.d.ts",
+        "default": "./dist/src/app/router.js"
+      },
+      "./app/state": {
+        "types": "./dist/src/app/state.d.ts",
+        "default": "./dist/src/app/state.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      },
+      "./project": {
+        "types": "./dist/src/pageProject.d.ts",
+        "default": "./dist/src/pageProject.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/renderer.d.ts",
+        "default": "./dist/src/renderer.js"
+      },
+      "./story": {
+        "types": "./dist/src/storyNuxt.d.ts",
+        "default": "./dist/src/storyNuxt.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/nuxt.d.ts",
+        "default": "./dist/src/vite/nuxt.js"
+      }
+    }
+  }
+}

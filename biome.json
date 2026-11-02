@@ -255,6 +255,7 @@
     "includes": [
       "**",
       "!fixtures/app/public/mockServiceWorker.js",
+      "!fixtures/nuxt/public/mockServiceWorker.js",
       "!**/*.md",
       "!**/*.html",
       "!**/*.css",
