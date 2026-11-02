@@ -54,6 +54,13 @@ describe("the generated pages", () => {
     expect(pageHtml("frame.html", CONFIG)).toContain('<link rel="stylesheet" href="/fonts.css" />');
   });
 
+  it("gives the frame a guard that shows code failing before the frame starts, which the shell page has no need of", () => {
+    const frame = pageHtml("frame.html", CONFIG);
+    expect(frame).toContain('addEventListener("error"');
+    expect(frame.indexOf("<script>")).toBeLessThan(frame.indexOf('<script type="module"'));
+    expect(pageHtml("index.html", CONFIG)).not.toContain('addEventListener("error"');
+  });
+
   it("mounts the shell with the data, the logo, the own stories before the packages' and the code writer", () => {
     const entry = shellEntry(CONFIG);
     expect(entry).toContain(`import { codeOf } from ${JSON.stringify(STUB_FRAMEWORK.pages.code)};`);

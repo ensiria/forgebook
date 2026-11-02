@@ -47,7 +47,7 @@ import {
 import { checkStory } from "./checkStory.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
-import { STATUS_ATTRIBUTE } from "./frameStatus.ts";
+import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
@@ -150,6 +150,8 @@ const playToolsOf = ({ playTools }: FrameConfig): Pick<StoryRunOptions, "playToo
  * @param config - the sources.
  */
 export const mountFrame = async (container: HTMLElement, config: FrameConfig): Promise<void> => {
+  // from here the frame shows its own errors: the page's guard against code that fails before it stands down
+  document.documentElement.setAttribute(FRAME_STARTED_ATTRIBUTE, "");
   const params = new URLSearchParams(window.location.search);
   const storyId = params.get("story") ?? "";
   const languages = config.languages ?? [];

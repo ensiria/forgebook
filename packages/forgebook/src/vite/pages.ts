@@ -60,6 +60,35 @@ const escaped = (text: string): string =>
   text.replace(/[&<>"]/g, (character) => `&#${character.charCodeAt(0)};`);
 
 /**
+ * What a frame shows when its code fails before the frame starts: a preview or a source that throws while it loads, or
+ * that cannot be loaded at all. The frame's own code never runs then, so without this the frame stayed blank for good,
+ * and its shell waited. Plain script in the page, since a module that failed cannot report anything; it stands down
+ * once the frame has started (`FRAME_STARTED_ATTRIBUTE`), when the frame shows its own errors.
+ */
+const FRAME_LOAD_GUARD = `(function () {
+  var root = document.documentElement;
+  function show(message) {
+    if (root.hasAttribute("data-forgebook-started") || root.hasAttribute("data-forgebook-status")) return;
+    var box = document.createElement("div");
+    box.className = "forgebook-frame-error";
+    box.setAttribute("role", "alert");
+    var text = document.createElement("p");
+    text.className = "forgebook-frame-error__message";
+    text.textContent = message;
+    box.appendChild(text);
+    document.getElementById("root").replaceChildren(box);
+    root.setAttribute("data-forgebook-status", "error");
+    var storyId = new URLSearchParams(location.search).get("story") || "";
+    if (parent !== window) parent.postMessage({ type: "forgebook:error", storyId: storyId, message: message }, location.origin);
+  }
+  addEventListener("error", function (event) {
+    var target = event.target;
+    if (target && target.tagName === "SCRIPT") show("The catalogue's code could not be loaded (" + target.src + "): see the console");
+    else show("The catalogue's code failed while it loaded: " + (event.error && event.error.message ? event.error.message : event.message));
+  }, true);
+})();`;
+
+/**
  * A page's HTML: its title, the frame's head tags, the root the entry mounts in.
  *
  * @param page - the page.
@@ -83,6 +112,7 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
     "  </head>",
     "  <body>",
     '    <div id="root"></div>',
+    ...(page === "frame.html" ? [`    <script>${FRAME_LOAD_GUARD}</script>`] : []),
     `    <script type="module" src="/${PAGE_ENTRIES[page]}"></script>`,
     "  </body>",
     "</html>",
