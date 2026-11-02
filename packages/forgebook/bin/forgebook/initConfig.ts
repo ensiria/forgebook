@@ -9,7 +9,7 @@
  *
  * @module
  */
-import type { ImportedConfig } from "./importers/storybook.ts";
+import { ADAPTER_FUNCTIONS, type ImportedConfig } from "./importers/storybook.ts";
 
 /** The file `forgebook init` writes. */
 export const CONFIG_FILE = "forgebook.config.ts";
@@ -34,8 +34,9 @@ const sourceOf = (value: unknown, indent: string): string =>
  * @param tool - the tool's name, for the file's comment (`Storybook`).
  */
 export const initConfigText = (imported: ImportedConfig, tool: string): string => {
+  const adapter = ADAPTER_FUNCTIONS[imported.framework];
   const fields = [
-    `  framework: ${imported.framework}(),`,
+    `  framework: ${adapter}(),`,
     `  title: ${JSON.stringify(imported.title)},`,
     `  stories: ${sourceOf(imported.stories, "  ")},`,
     ...(imported.preview === undefined ? [] : [`  preview: ${JSON.stringify(imported.preview)},`]),
@@ -55,7 +56,7 @@ export const initConfigText = (imported: ImportedConfig, tool: string): string =
     " *",
     " * @module",
     " */",
-    `import { ${imported.framework} } from "@forgebook/${imported.framework}/vite";`,
+    `import { ${adapter} } from "@forgebook/${imported.framework}/vite";`,
     'import { defineConfig } from "forgebook";',
     "",
     "export default defineConfig({",

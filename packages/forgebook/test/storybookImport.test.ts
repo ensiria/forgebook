@@ -152,6 +152,17 @@ describe("importStorybook", () => {
     expect(typeof imported === "string" ? imported : imported.framework).toBe("vue");
   });
 
+  it("reads a Web Components project's Storybook as Web Components", async () => {
+    const project = join(scratch, "web-components");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(project, ".storybook", "main.ts"),
+      'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/web-components-vite" };\n'
+    );
+    const imported = await importStorybook(project);
+    expect(typeof imported === "string" ? imported : imported.framework).toBe("web-components");
+  });
+
   it("refuses a framework Forgebook does not read, saying what it reads", async () => {
     const project = join(scratch, "angular");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
@@ -160,7 +171,7 @@ describe("importStorybook", () => {
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
     );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads Storybook's stories on Vite (@storybook/react-vite, @storybook/vue3-vite); this project uses @storybook/angular"
+      "Forgebook reads Storybook's stories on Vite (@storybook/react-vite, @storybook/vue3-vite, @storybook/web-components-vite); this project uses @storybook/angular"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package
@@ -230,5 +241,21 @@ describe("initConfigText", () => {
     );
     expect(text).toContain('import { vue } from "@forgebook/vue/vite";');
     expect(text).toContain("  framework: vue(),");
+  });
+
+  it("imports a framework whose name is no identifier by its adapter's name", () => {
+    const text = initConfigText(
+      {
+        framework: "web-components",
+        title: "x",
+        stories: ["src/*.stories.ts"],
+        preview: undefined,
+        switches: undefined,
+        notes: []
+      },
+      "Storybook"
+    );
+    expect(text).toContain('import { webComponents } from "@forgebook/web-components/vite";');
+    expect(text).toContain("  framework: webComponents(),");
   });
 });
