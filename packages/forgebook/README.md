@@ -10,8 +10,9 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
 **Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 today, through
-[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react); other frameworks plug in through the same
-adapter (the catalogue's own interface is React either way) · npm, pnpm, yarn or bun ·
+[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), React Native through react-native-web with
+[`@forgebook/react-native-web`](https://www.npmjs.com/package/@forgebook/react-native-web); other frameworks plug in
+through the same adapter (the catalogue's own interface is React either way) · npm, pnpm, yarn or bun ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/LICENSE)
 
 ## Install
@@ -221,8 +222,11 @@ To try it on a Storybook project, run `npx forgebook init --from storybook` in t
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
 computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
-become switches. It reads React on Vite (`@storybook/react-vite`) only, never replaces a configuration without
-`--force`, and lists what it left out.
+become switches. It reads React on Vite (`@storybook/react-vite`) and React Native: Storybook's React Native Web
+framework (`@storybook/react-native-web-vite`, its `modulesToTranspile` kept), its older webpack addon, and on-device
+Storybook's `.rnstorybook` folder, whose stories then draw in the browser through
+[`@forgebook/react-native-web`](https://www.npmjs.com/package/@forgebook/react-native-web). It never replaces a
+configuration without `--force`, and lists what it left out.
 
 ## Monorepos
 
@@ -268,7 +272,7 @@ browser tests run in CI.
 | `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
-| `forgebook init --from storybook` | Writes `forgebook.config.ts` from a project's `.storybook` folder: its story globs, preview and toolbar globals |
+| `forgebook init --from storybook` | Writes `forgebook.config.ts` from a project's `.storybook` (or on-device `.rnstorybook`) folder: its framework, story globs, preview and toolbar globals |
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
@@ -422,6 +426,7 @@ and its JSON lists every story for a script.
 |---|---|
 | `forgebook` | The catalogue: the shell, the frame, the Vite plugin, the commands |
 | [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react) | React's story types, renderer and props reader |
+| [`@forgebook/react-native-web`](https://www.npmjs.com/package/@forgebook/react-native-web) | React Native's components in the browser, through react-native-web |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing) | Tests generated from the stories |
 
