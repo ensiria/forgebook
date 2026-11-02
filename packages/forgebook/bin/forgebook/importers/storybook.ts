@@ -6,7 +6,8 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React stories on Vite only, so another framework is refused with what Forgebook supports.
+ * instead. Forgebook reads React stories on Vite, a Next.js project's among them (Storybook's `@storybook/nextjs`, on
+ * webpack, too: the stories are the same), so another framework is refused with what Forgebook supports.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
@@ -20,8 +21,15 @@ import ts from "typescript-6";
 import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 
+/** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
+export type ImportedFramework = "react" | "nextjs";
+
 /** What a configuration takes from another tool's files. */
 export type ImportedConfig = {
+  /** The Forgebook framework the stories are written for. */
+  readonly framework: ImportedFramework;
+  /** The framework's options, each a text (`{ nextConfig: "web/next.config.js" }`); none when there are none. */
+  readonly frameworkOptions: Readonly<Record<string, string>> | undefined;
   /** The catalogue's name: the package's, or the folder's. */
   readonly title: string;
   /** The story files, as globs from the project's folder. */
@@ -34,8 +42,12 @@ export type ImportedConfig = {
   readonly notes: readonly string[];
 };
 
-/** The framework Forgebook reads Storybook's stories for. */
-const REACT_VITE = "@storybook/react-vite";
+/** The Forgebook frameworks a project's Storybook can move to, by Storybook's framework. */
+const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
+  "@storybook/react-vite": "react",
+  "@storybook/nextjs-vite": "nextjs",
+  "@storybook/nextjs": "nextjs"
+};
 
 /** Storybook's own default for a `stories` entry given as a folder. */
 const DEFAULT_FILES = "**/*.@(mdx|stories.@(js|jsx|mjs|ts|tsx))";
@@ -308,14 +320,20 @@ const projectTitle = (dir: string): string => {
 };
 
 /**
- * The framework `main` names: a text, or an object with its `name`.
+ * The framework `main` names: a text, or an object with its `name` and its `options`.
  *
  * @param main - `main`'s configuration.
  */
-const frameworkName = (main: Readonly<Record<string, unknown>>): string | undefined => {
+const frameworkOf = (
+  main: Readonly<Record<string, unknown>>
+): { readonly name: string | undefined; readonly options: Readonly<Record<string, unknown>> } => {
   const { framework } = main;
-  if (typeof framework === "string") return framework;
-  return isRecord(framework) && typeof framework["name"] === "string" ? framework["name"] : undefined;
+  if (typeof framework === "string") return { name: framework, options: {} };
+  if (!isRecord(framework)) return { name: undefined, options: {} };
+  return {
+    name: typeof framework["name"] === "string" ? framework["name"] : undefined,
+    options: isRecord(framework["options"]) ? framework["options"] : {}
+  };
 };
 
 /**
@@ -342,14 +360,47 @@ const loadedMain = async (
 };
 
 /**
- * Whether `main`'s framework is React on Vite: its name, or a path to its package, as Storybook's monorepo template
- * writes it (`getAbsolutePath("@storybook/react-vite")`).
+ * The Storybook framework `main` names, by its package: its name, or a path to its package, as Storybook's monorepo
+ * template writes it (`getAbsolutePath("@storybook/react-vite")`).
  *
  * @param framework - the framework's name or path.
+ * @returns the package, or none for one Forgebook does not read.
  */
-const isReactVite = (framework: string | undefined): boolean =>
-  framework !== undefined &&
-  (framework === REACT_VITE || framework.split("\\").join("/").endsWith(`/${REACT_VITE}`));
+const storybookFramework = (framework: string | undefined): string | undefined => {
+  if (framework === undefined) return undefined;
+  const path = framework.split("\\").join("/").replace(/\/$/, "");
+  return Object.keys(STORYBOOK_FRAMEWORKS).find((name) => path === name || path.endsWith(`/${name}`));
+};
+
+/**
+ * What a Next.js project's Storybook says that the Next.js framework reads: its `next.config` when not where Next.js
+ * looks, and what Forgebook does without being told.
+ *
+ * @param main - `main`'s configuration.
+ * @param storybook - Storybook's framework package.
+ * @param projectDir - the project's folder.
+ * @returns the framework's options, and the notes.
+ */
+const nextjsSettings = (
+  main: Readonly<Record<string, unknown>>,
+  storybook: string,
+  projectDir: string
+): { readonly options: Readonly<Record<string, string>> | undefined; readonly notes: string[] } => {
+  const notes: string[] = [];
+  if (storybook === "@storybook/nextjs")
+    notes.push(
+      "Storybook's Next.js framework on webpack: Forgebook runs on Vite, so webpackFinal and a Babel configuration are not read"
+    );
+  const features = main["features"];
+  if (isRecord(features) && features["experimentalRSC"] === true)
+    notes.push("experimentalRSC is not needed: Forgebook draws async server components without a flag");
+  const { nextConfigPath } = frameworkOf(main).options;
+  const options =
+    typeof nextConfigPath === "string"
+      ? { nextConfig: relative(projectDir, resolve(projectDir, nextConfigPath)) }
+      : undefined;
+  return { options, notes };
+};
 
 /**
  * Reads a project's Storybook configuration.
@@ -363,20 +414,28 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   if (mainFile === undefined) return `No .storybook/main file in ${projectDir}`;
   const main = await loadedMain(mainFile, projectDir);
   if (typeof main === "string") return main;
-  const framework = frameworkName(main);
-  if (!isReactVite(framework))
-    return `Forgebook reads Storybook's React stories on Vite (${REACT_VITE}); this project uses ${framework ?? "no framework"}`;
+  const storybook = storybookFramework(frameworkOf(main).name);
+  if (storybook === undefined) {
+    const supported = Object.keys(STORYBOOK_FRAMEWORKS).join(", ");
+    return `Forgebook reads Storybook's React stories on Vite and Next.js's (${supported}); this project uses ${frameworkOf(main).name ?? "no framework"}`;
+  }
+  const framework = STORYBOOK_FRAMEWORKS[storybook] ?? "react";
+  const nextjs =
+    framework === "nextjs" ? nextjsSettings(main, storybook, projectDir) : { options: undefined, notes: [] };
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
   if (globs.length === 0) return `${relative(projectDir, mainFile)} names no story file Forgebook reads`;
   if (Array.isArray(main["addons"]) && main["addons"].length > 0)
     notes.push("The addons are left out: Forgebook has its own panel, toolbar and checks");
+  notes.push(...nextjs.notes);
   const previewFile = scriptFile(storybookDir, "preview");
   const read =
     previewFile === undefined
       ? { switches: undefined, notes: [] }
       : previewSwitches(readFileSync(previewFile, "utf8"), previewFile);
   return {
+    framework,
+    frameworkOptions: nextjs.options,
     title: projectTitle(projectDir),
     stories: globs,
     preview: previewFile === undefined ? undefined : relative(projectDir, previewFile),

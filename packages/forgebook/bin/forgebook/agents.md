@@ -41,6 +41,12 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.
 - Write `title`, `parameters.main`, `group`, `height`, `touch` and `logic` as plain values: the catalogue reads them without running
   the file.
+- In a Next.js project (`framework: nextjs()`), stories take their types from `@forgebook/nextjs`. A story says where
+  its component is with `parameters.nextjs.navigation` (`pathname`, `query`, `params`; `router` for the Pages Router),
+  and what its server code reads with `nextjs.cookies`, `headers` and `draftMode`. A link or a router call moves the
+  story's route and is listed among its events; a `play` reads where it went with `storyRoute()`
+  (`@forgebook/nextjs/route`). Async server components are drawn; what they reach on a server (a database, the file
+  system) is not there: fetch it and mock it with `parameters.msw`.
 
 - Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
   `@replacedBy`. `forgebook story` returns them as `docs.guidance`: read them before using a component, and never use a
