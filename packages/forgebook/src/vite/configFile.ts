@@ -31,6 +31,7 @@ import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
+import { tokenThemeOf } from "./themeFromTokens.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
@@ -288,10 +289,15 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
   );
   const problem = switches === undefined ? undefined : switchesProblem(switches);
   if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
-  const theme = mergedThemes([
-    ...presets.map((preset) => preset.shell?.theme ?? {}),
-    config.shell?.theme ?? {}
-  ]);
+  const declaredThemes = [...presets.map((preset) => preset.shell?.theme ?? {}), config.shell?.theme ?? {}];
+  const tokens = (config.tokens ?? []).map((each) =>
+    typeof each === "string"
+      ? { path: absolute(each), mode: undefined }
+      : { path: absolute(each.file), mode: each.mode }
+  );
+  const fromTokens = Object.assign({}, ...declaredThemes.map((each) => each.fromTokens));
+  const tokenThemed = tokenThemeOf(fromTokens, tokens, dir);
+  const theme = mergedThemes([tokenThemed.theme, ...declaredThemes]);
   const lists = mergedLists([...presets, config]);
   // the page reads it as one of the ids, and a configuration is written by JavaScript too, which no type stops
   if (lists.audience !== undefined && !AUDIENCE_IDS.includes(lists.audience)) {
@@ -329,13 +335,9 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
         ...presets.flatMap((preset) => (preset.shell?.css === undefined ? [] : [preset.shell.css])),
         ...(config.shell?.css === undefined ? [] : [absolute(config.shell.css)])
       ],
-      problems: shellThemeProblems(theme)
+      problems: [...tokenThemed.problems, ...shellThemeProblems(theme)]
     },
-    tokens: (config.tokens ?? []).map((each) =>
-      typeof each === "string"
-        ? { path: absolute(each), mode: undefined }
-        : { path: absolute(each.file), mode: each.mode }
-    ),
+    tokens,
     watch: (config.watch ?? []).map(absolute),
     lists,
     hasPlayTools: hasPlayToolsIn(dir),

@@ -611,6 +611,15 @@ A coding agent can use the catalogue while it works: find a story's id, read a s
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for
 example `.mcp.json` for Claude Code:
 
+```
+
+A library with design tokens (`tokens` in the configuration) can theme the shell from them in a few lines. Each role takes the
+token's value in both appearances, its `light` and `dark` themes first; colours written by hand win, and a token that
+is not there or is no colour is warned about and leaves the shell's own. The theme is read when the configuration is, so
+restart after editing the tokens.
+
+```ts
+shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.background.card" } } }
 ```json
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
