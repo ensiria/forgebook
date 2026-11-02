@@ -416,8 +416,10 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
   const { browserContext, page } = await openPage(context, VIEWPORT);
   const main = new Set<string>();
   const frames = new Set<string>();
-  page.on("request", (request) => {
-    if (request.resourceType() !== "script") return;
+  // what was served: a library's page may ask for a script its build does not hold, which fetched nothing
+  page.on("response", (response) => {
+    const request = response.request();
+    if (request.resourceType() !== "script" || !response.ok()) return;
     const path = new URL(request.url()).pathname;
     (request.frame() === page.mainFrame() ? main : frames).add(path);
   });
