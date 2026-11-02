@@ -21,6 +21,9 @@ const STALE_MODULE_MESSAGES = [
 /** The key of a frame address's retry mark. */
 const markKey = (address: string): string => `forgebook:reloaded:${address}`;
 
+/** Where the frame's load guard counts the reloads of a frame whose code could not be loaded, before its address. */
+export const LOAD_RELOADS_KEY = "forgebook:load-reloads:";
+
 /**
  * Whether an error message is a dynamic import that failed to load.
  *
@@ -48,7 +51,8 @@ export const markRetry = (storage: Storage | undefined, address: string): boolea
 };
 
 /**
- * Forgets an address's retry once its story rendered, so a later stale module gets its retry too.
+ * Forgets an address's retry once its story rendered, so a later stale module gets its retry too, and the load guard's
+ * count of reloads.
  *
  * @param storage - the session storage, or `undefined` where it is unavailable.
  * @param address - the frame's address.
@@ -56,6 +60,7 @@ export const markRetry = (storage: Storage | undefined, address: string): boolea
 export const clearRetry = (storage: Storage | undefined, address: string): void => {
   try {
     storage?.removeItem(markKey(address));
+    storage?.removeItem(`${LOAD_RELOADS_KEY}${address}`);
   } catch {
     // nothing to forget where the storage refuses access
   }
