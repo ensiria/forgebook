@@ -1,27 +1,14 @@
 /**
- * A plugin's tab in the panel: loads its view, hands it an element and its context, keeps it up to date, and takes it
- * away with the tab.
- *
- * @remarks
- * Loads with the first plugin's tab to open. A view is someone else's code: one that cannot load, or that throws, is
- * said in its tab and leaves the shell standing. The dock draws a tab's content only while it is chosen, so a view's own
+ * A plugin's tab in the panel: what it is told. The dock draws a tab's content only while it is chosen, so a view's own
  * state goes when another tab is chosen; a frame's report does not, since the stage keeps it.
  *
  * @module
  */
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef } from "react";
 
-import {
-  type JsonValue,
-  PLUGIN_API_VERSION,
-  type PluginStory,
-  type PluginTabContext,
-  type PluginView,
-  type PluginViewHandle
-} from "../plugin.ts";
+import type { JsonValue, PluginStory, PluginStoryFrame, PluginTabContext, PluginView } from "../plugin.ts";
 import { type AsideStory, showAsideStory } from "./asideStory.ts";
-import { STRINGS } from "./strings.ts";
-import { APPEARANCE_ATTRIBUTE } from "./useAppearance.ts";
+import { PluginViewHost, pluginText, useShellAppearance } from "./PluginViewHost.tsx";
 
 /** The host's props. */
 export type PluginTabHostProps = {
@@ -39,24 +26,6 @@ export type PluginTabHostProps = {
   readonly aside: AsideStory;
 };
 
-/** The shell's appearance, as its root says it now. */
-const appearanceNow = (): PluginTabContext["appearance"] =>
-  document.documentElement.getAttribute(APPEARANCE_ATTRIBUTE) === "dark" ? "dark" : "light";
-
-/** The shell's appearance, followed while the tab is shown. */
-const useShellAppearance = (): PluginTabContext["appearance"] => {
-  const [appearance, setAppearance] = useState(appearanceNow);
-  useEffect(() => {
-    const observer = new MutationObserver((): void => setAppearance(appearanceNow()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: [APPEARANCE_ATTRIBUTE] });
-    return (): void => observer.disconnect();
-  }, []);
-  return appearance;
-};
-
-/** An error as a sentence. */
-const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
 /**
  * A plugin's tab.
  *
@@ -70,60 +39,19 @@ export const PluginTabHost = ({
   report,
   aside
 }: PluginTabHostProps): ReactNode => {
-  const targetRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<PluginViewHandle<PluginTabContext> | undefined>(undefined);
-  const [problem, setProblem] = useState<string | undefined>(undefined);
   const appearance = useShellAppearance();
-  // read when the view asks: the frame's view of that moment, without a new context for every change of the stage
+  // read when the view asks: the stage of that moment, without a new context for every change of the stage
   const asideRef = useRef(aside);
   asideRef.current = aside;
-  const context = useMemo(
-    (): PluginTabContext => ({
-      apiVersion: PLUGIN_API_VERSION,
-      appearance,
-      text: (key: string, fallback: string): string => strings[`plugin.${pluginId}.${key}`] ?? fallback,
-      story,
-      report,
-      showStory: (target: HTMLElement, title: string): (() => void) =>
-        showAsideStory(target, title, asideRef.current)
-    }),
-    [appearance, pluginId, strings, story, report]
+  const showStory = useCallback(
+    (target: HTMLElement, { title }: { readonly title: string }): PluginStoryFrame =>
+      showAsideStory(target, title, asideRef.current),
+    []
   );
-  const contextRef = useRef(context);
-  contextRef.current = context;
-
-  useEffect(() => {
-    let isCurrent = true;
-    load()
-      .then((module) => {
-        const target = targetRef.current;
-        if (isCurrent && target !== null) viewRef.current = module.view(target, contextRef.current);
-      })
-      .catch((error: unknown) => {
-        if (isCurrent) setProblem(messageOf(error));
-      });
-    return (): void => {
-      isCurrent = false;
-      viewRef.current?.unmount();
-      viewRef.current = undefined;
-    };
-  }, [load]);
-
-  useEffect(() => {
-    try {
-      viewRef.current?.update(context);
-    } catch (error) {
-      setProblem(messageOf(error));
-    }
-  }, [context]);
-
-  if (problem !== undefined) {
-    return (
-      <p className="forgebook-problems" role="alert">
-        {STRINGS.pluginError}: {problem}
-      </p>
-    );
-  }
-  // no box of its own: a view's height reads the panel's
-  return <div ref={targetRef} style={{ display: "contents" }} />;
+  const text = useMemo(() => pluginText(strings, pluginId), [strings, pluginId]);
+  const context = useMemo(
+    (): PluginTabContext => ({ appearance, text, story, report, showStory }),
+    [appearance, text, story, report, showStory]
+  );
+  return <PluginViewHost load={load} context={context} />;
 };

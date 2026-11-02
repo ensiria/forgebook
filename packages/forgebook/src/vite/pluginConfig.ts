@@ -9,33 +9,38 @@
  *
  * @module
  */
+import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { join, resolve } from "node:path";
+
 import { PANEL_TAB_IDS } from "../catalogue.ts";
-import { type ForgebookPlugin, PLUGIN_API_VERSION } from "../plugin.ts";
+import type { ForgebookPlugin, PluginSwitch } from "../plugin.ts";
 import { DEFAULT_SWITCHES, type ViewSwitch } from "../switches.ts";
 import type { PluginsDocument } from "./agent.types.ts";
 
-/** A plugin's id, a tab's id or a block's fence: lower-case words and hyphens. */
+/** The versions of the contract this Forgebook speaks. */
+export const SUPPORTED_PLUGIN_API_VERSIONS: readonly number[] = [1];
+
+/** A plugin's id: lower-case words and hyphens. */
 const NAME = /^[a-z][a-z0-9-]*$/;
 
-/** The fences a docs page already reads. */
-const OWN_FENCES = ["story", "props"];
-
 /**
- * The first of some names that is there twice, or not a name.
+ * The first of some names that is there twice, or not one of the plugin's.
  *
+ * @param plugin - the plugin's id.
  * @param names - the names.
- * @param isTaken - whether a name is Forgebook's own.
+ * @param seen - the names of every plugin so far.
  * @param what - what a name names, for the message.
  */
 const namesProblem = (
+  plugin: string,
   names: readonly string[],
-  isTaken: (name: string) => boolean,
+  seen: Set<string>,
   what: string
 ): string | undefined => {
-  const seen = new Set<string>();
   for (const name of names) {
-    if (!NAME.test(name)) return `${what} "${name}" must be lower-case words and hyphens`;
-    if (isTaken(name)) return `${what} "${name}" is Forgebook's own`;
+    if (name !== plugin && !(name.startsWith(`${plugin}-`) && NAME.test(name)))
+      return `${what} "${name}" must be "${plugin}", or start with "${plugin}-"`;
     if (seen.has(name)) return `${what} "${name}" is given twice`;
     seen.add(name);
   }
@@ -43,29 +48,63 @@ const namesProblem = (
 };
 
 /**
- * Why one plugin cannot be used, or none.
+ * The module a plugin runs in a catalogue's frames, or none.
  *
  * @param plugin - the plugin.
  * @param framework - the catalogue's framework.
  */
-const pluginProblem = (plugin: ForgebookPlugin, framework: string): string | undefined => {
-  if (plugin.apiVersion !== PLUGIN_API_VERSION) {
+export const pluginFrameModule = (plugin: ForgebookPlugin, framework: string): string | undefined =>
+  typeof plugin.frame === "object" ? plugin.frame[framework] : plugin.frame;
+
+/** A package's name, from a specifier of it (`@acme/ui/browser` → `@acme/ui`). */
+const packageOf = (specifier: string): string =>
+  specifier
+    .split("/")
+    .slice(0, specifier.startsWith("@") ? 2 : 1)
+    .join("/");
+
+/**
+ * Whether a project installs a package, by its folder: a browser-only package may hide even its manifest from Node.
+ *
+ * @param dir - the configuration's folder.
+ * @param name - the package.
+ */
+const isPackageInstalled = (dir: string, name: string): boolean =>
+  (createRequire(resolve(dir, "package.json")).resolve.paths(name) ?? []).some((folder) =>
+    existsSync(join(folder, name))
+  );
+
+/**
+ * Why one plugin cannot be used, or none.
+ *
+ * @param plugin - the plugin.
+ * @param framework - the catalogue's framework.
+ * @param dir - the configuration's folder.
+ */
+const pluginProblem = (plugin: ForgebookPlugin, framework: string, dir: string): string | undefined => {
+  if (!SUPPORTED_PLUGIN_API_VERSIONS.includes(plugin.apiVersion)) {
     return (
       `the plugin "${plugin.id}" is written for version ${String(plugin.apiVersion)} of the plugin API, and this ` +
-      `Forgebook speaks version ${PLUGIN_API_VERSION}: update one of them`
+      `Forgebook speaks version ${SUPPORTED_PLUGIN_API_VERSIONS.join(", ")}: update one of them`
     );
+  }
+  if (typeof plugin.frame === "object" && plugin.frame[framework] === undefined) {
+    const frameworks = Object.keys(plugin.frame).join(", ");
+    return `the plugin "${plugin.id}" runs in frames of ${frameworks}, and this catalogue is ${framework}`;
   }
   const modules = [
     ...(plugin.tabs ?? []).map((tab) => tab.view),
     ...(plugin.docBlocks ?? []).map((block) => block.view),
-    ...(plugin.frame === undefined ? [] : [plugin.frame])
+    ...(plugin.frame === undefined ? [] : [pluginFrameModule(plugin, framework)])
   ];
   if (modules.some((module) => typeof module !== "string" || module === ""))
     return `the plugin "${plugin.id}" names a module that is no specifier`;
-  if (plugin.frame !== undefined && plugin.frameworks?.includes(framework) === false) {
-    return `the plugin "${plugin.id}" runs in frames of ${plugin.frameworks.join(", ")}, and this catalogue is ${framework}`;
-  }
-  return undefined;
+  const missing = (plugin.browserDependencies ?? [])
+    .map(packageOf)
+    .find((name) => !isPackageInstalled(dir, name));
+  return missing === undefined
+    ? undefined
+    : `the plugin "${plugin.id}" needs the package ${missing}, which this project does not install`;
 };
 
 /**
@@ -73,31 +112,46 @@ const pluginProblem = (plugin: ForgebookPlugin, framework: string): string | und
  *
  * @param plugins - the configuration's plugins.
  * @param framework - the catalogue's framework.
+ * @param dir - the configuration's folder.
  */
 export const pluginsProblem = (
   plugins: readonly ForgebookPlugin[],
-  framework: string
+  framework: string,
+  dir: string
 ): string | undefined => {
-  const never = (): boolean => false;
-  const isOwnTab = (id: string): boolean => PANEL_TAB_IDS.some((own) => own === id);
-  return (
-    namesProblem(
-      plugins.map((plugin) => String(plugin.id)),
-      never,
-      "the plugin"
-    ) ??
-    plugins.map((plugin) => pluginProblem(plugin, framework)).find((problem) => problem !== undefined) ??
-    namesProblem(
-      plugins.flatMap((plugin) => plugin.tabs ?? []).map((tab) => tab.id),
-      isOwnTab,
-      "the tab"
-    ) ??
-    namesProblem(
-      plugins.flatMap((plugin) => plugin.docBlocks ?? []).map((block) => block.fence),
-      (fence: string): boolean => OWN_FENCES.includes(fence),
-      "the docs block"
-    )
-  );
+  const ids = new Set<string>();
+  const tabs = new Set<string>(PANEL_TAB_IDS);
+  const switches = new Set<string>();
+  const fences = new Set<string>(["story", "props"]);
+  for (const plugin of plugins) {
+    const { id } = plugin;
+    if (typeof id !== "string" || !NAME.test(id))
+      return `the plugin "${String(id)}" must be lower-case words and hyphens`;
+    if (ids.has(id)) return `the plugin "${id}" is given twice`;
+    ids.add(id);
+    const problem =
+      pluginProblem(plugin, framework, dir) ??
+      namesProblem(
+        id,
+        (plugin.tabs ?? []).map((tab) => tab.id),
+        tabs,
+        "the tab"
+      ) ??
+      namesProblem(
+        id,
+        (plugin.switches ?? []).map((each) => each.id),
+        switches,
+        "the switch"
+      ) ??
+      namesProblem(
+        id,
+        (plugin.docBlocks ?? []).map((block) => block.fence),
+        fences,
+        "the docs block"
+      );
+    if (problem !== undefined) return problem;
+  }
+  return undefined;
 };
 
 /**
@@ -111,7 +165,7 @@ export const withPluginSwitches = (
   switches: readonly ViewSwitch[] | undefined,
   plugins: readonly ForgebookPlugin[]
 ): readonly ViewSwitch[] | undefined => {
-  const added = plugins.flatMap((plugin) => plugin.switches ?? []);
+  const added: readonly PluginSwitch[] = plugins.flatMap((plugin) => plugin.switches ?? []);
   if (added.length === 0) return switches;
   const own = switches ?? DEFAULT_SWITCHES;
   return [...own, ...added.filter((each) => !own.some((other) => other.id === each.id))];
@@ -121,12 +175,25 @@ export const withPluginSwitches = (
  * Every module of the plugins that pages import, for pre-bundling an installed plugin.
  *
  * @param plugins - the plugins.
+ * @param framework - the catalogue's framework.
  */
-export const pluginModules = (plugins: readonly ForgebookPlugin[]): string[] =>
-  plugins.flatMap((plugin) => [
-    ...(plugin.tabs ?? []).map((tab) => tab.view),
-    ...(plugin.frame === undefined ? [] : [plugin.frame])
-  ]);
+export const pluginModules = (plugins: readonly ForgebookPlugin[], framework: string): string[] =>
+  plugins.flatMap((plugin) => {
+    const frame = pluginFrameModule(plugin, framework);
+    return [
+      ...(plugin.tabs ?? []).map((tab) => tab.view),
+      ...(plugin.docBlocks ?? []).map((block) => block.view),
+      ...(frame === undefined ? [] : [frame])
+    ];
+  });
+
+/**
+ * The fences the plugins add, for the docs pages' compiler.
+ *
+ * @param plugins - the plugins.
+ */
+export const pluginFences = (plugins: readonly ForgebookPlugin[]): readonly string[] =>
+  plugins.flatMap((plugin) => (plugin.docBlocks ?? []).map((block) => block.fence));
 
 /**
  * The plugins as tools and agents read them.
@@ -135,13 +202,13 @@ export const pluginModules = (plugins: readonly ForgebookPlugin[]): string[] =>
  */
 export const pluginsDocument = (plugins: readonly ForgebookPlugin[]): PluginsDocument => ({
   schema: 1,
-  apiVersion: PLUGIN_API_VERSION,
+  apiVersions: SUPPORTED_PLUGIN_API_VERSIONS,
   plugins: plugins.map((plugin) => ({
     id: plugin.id,
     tabs: (plugin.tabs ?? []).map((tab) => ({
       id: tab.id,
       label: tab.label,
-      ...(tab.when === undefined ? {} : { parameter: tab.when.parameter })
+      ...(tab.when === undefined ? {} : { when: tab.when })
     })),
     switches: (plugin.switches ?? []).map((each) => each.id),
     docBlocks: (plugin.docBlocks ?? []).map((block) => block.fence),

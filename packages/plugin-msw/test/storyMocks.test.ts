@@ -96,7 +96,7 @@ describe("startStoryMocks", () => {
   it("starts the worker with the handlers, leaves other requests alone, and stops it", async () => {
     const stop = await startStoryMocks(["a", "b"], load, quiet);
     expect(calls).toEqual(["setup:a,b", "start:mockServiceWorker.js:bypass"]);
-    stop();
+    await stop();
     expect(calls.at(-1)).toBe("stop");
   });
 

@@ -28,8 +28,8 @@ export type MockWorker = {
     readonly onUnhandledRequest: "bypass";
     readonly quiet: boolean;
   }) => Promise<unknown>;
-  /** Stops answering. */
-  readonly stop: () => void;
+  /** Stops answering; MSW 3 waits for its last requests. */
+  readonly stop: () => unknown;
   /** What the worker tells of each request. */
   readonly events: {
     /** Listens to an answer: a handler's, or the network's. */
@@ -123,13 +123,13 @@ const reloadForWorker = (): boolean => {
  * @param handlers - the story's handlers, at least one.
  * @param load - loads MSW.
  * @param onEvent - told of each answer; a handler's or the network's.
- * @returns what stops them.
+ * @returns what stops them, once they stopped.
  */
 export const startStoryMocks = async <THandler>(
   handlers: readonly THandler[],
   load: MockToolsLoader<THandler>,
   onEvent: (event: MockEvent, isMocked: boolean) => void
-): Promise<() => void> => {
+): Promise<() => Promise<void>> => {
   const { setupWorker } = await load();
   const worker = setupWorker(...handlers);
   worker.events.on("response:mocked", (event) => onEvent(event, true));
@@ -137,5 +137,7 @@ export const startStoryMocks = async <THandler>(
   await worker.start(WORKER_OPTIONS);
   if (await isServedByWorker()) sessionStorage.removeItem(RELOADED_KEY);
   else if (reloadForWorker()) await new Promise<never>(() => undefined);
-  return (): void => worker.stop();
+  return async (): Promise<void> => {
+    await worker.stop();
+  };
 };

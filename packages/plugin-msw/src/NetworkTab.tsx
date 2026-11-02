@@ -24,25 +24,25 @@ const NetworkTab = ({ context }: PluginViewProps<PluginTabContext>): ReactNode =
   const mocked = text("mocked", "Mocked");
   const network = text("network", "Network");
   return (
-    <div className="forgebook-network">
-      <section className="forgebook-network__part">
-        <h3 className="forgebook-network__heading">{text("handlers", "Handlers")}</h3>
-        <ul className="forgebook-network__list">
+    <div className="msw-network">
+      <section className="msw-network__part">
+        <h3 className="msw-network__heading">{text("handlers", "Handlers")}</h3>
+        <ul className="msw-network__list">
           {report.handlers.map((handler, place) => (
             // two handlers may read the same, and the list never reorders
             // biome-ignore lint/suspicious/noArrayIndexKey: see above
-            <li key={place} className="forgebook-network__row">
+            <li key={place} className="msw-network__row">
               <code>{handler.label}</code>
             </li>
           ))}
         </ul>
       </section>
-      <section className="forgebook-network__part">
-        <h3 className="forgebook-network__heading">{text("requests", "Requests")}</h3>
+      <section className="msw-network__part">
+        <h3 className="msw-network__heading">{text("requests", "Requests")}</h3>
         {report.requests.length === 0 ? (
           <p className="forgebook-tab-note">{text("noRequests", "No request yet.")}</p>
         ) : (
-          <table className="forgebook-network__table">
+          <table className="msw-network__table">
             <thead>
               <tr>
                 <th scope="col">{text("method", "Method")}</th>
@@ -57,7 +57,7 @@ const NetworkTab = ({ context }: PluginViewProps<PluginTabContext>): ReactNode =
                 // biome-ignore lint/suspicious/noArrayIndexKey: see above
                 <tr key={place}>
                   <td>{request.method}</td>
-                  <td className="forgebook-network__address">
+                  <td className="msw-network__address">
                     <code>{request.url}</code>
                   </td>
                   <td>{request.status}</td>

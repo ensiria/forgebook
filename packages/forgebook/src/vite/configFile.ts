@@ -244,7 +244,7 @@ const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "
  */
 const checkedPlugins = (config: ForgebookConfig, dir: string): readonly ForgebookPlugin[] => {
   const plugins = config.plugins ?? [];
-  const problem = pluginsProblem(plugins, config.framework.name);
+  const problem = pluginsProblem(plugins, config.framework.name, dir);
   if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
   return plugins;
 };

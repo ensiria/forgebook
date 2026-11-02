@@ -7,7 +7,7 @@
  *
  * @module
  */
-import { definePlugin, type ForgebookPlugin, PLUGIN_API_VERSION } from "forgebook/plugin";
+import { definePlugin, type ForgebookPlugin } from "forgebook/plugin";
 
 /**
  * The plugin, for a catalogue's `plugins`.
@@ -16,16 +16,9 @@ import { definePlugin, type ForgebookPlugin, PLUGIN_API_VERSION } from "forgeboo
  */
 export const msw = (): ForgebookPlugin =>
   definePlugin({
-    apiVersion: PLUGIN_API_VERSION,
+    apiVersion: 1,
     id: "msw",
     frame: "@forgebook/plugin-msw/frame",
-    tabs: [
-      {
-        id: "network",
-        label: "Network",
-        view: "@forgebook/plugin-msw/tab",
-        when: { parameter: "msw" }
-      }
-    ],
+    tabs: [{ id: "msw", label: "Network", view: "@forgebook/plugin-msw/tab", when: { parameter: "msw" } }],
     browserDependencies: ["msw/browser"]
   });

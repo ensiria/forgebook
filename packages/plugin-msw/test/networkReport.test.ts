@@ -45,8 +45,13 @@ describe("the log", () => {
     expect(requests[0]?.url).toBe(`/${MAX_REQUESTS}`);
   });
 
+  it("marks a query and keeps none of it, since a query can hold a token", () => {
+    expect(shownUrl(`${ORIGIN}/api/a?token=secret`, ORIGIN)).toBe("/api/a?…");
+    expect(shownUrl("https://api.example.test/a?token=secret", ORIGIN)).toBe("https://api.example.test/a?…");
+  });
+
   it("writes the page's own addresses without their origin", () => {
-    expect(shownUrl(`${ORIGIN}/api/a?b=1`, ORIGIN)).toBe("/api/a?b=1");
+    expect(shownUrl(`${ORIGIN}/api/a`, ORIGIN)).toBe("/api/a");
     expect(shownUrl("https://api.example.test/a", ORIGIN)).toBe("https://api.example.test/a");
   });
 });

@@ -315,6 +315,55 @@ describe("runStory with a second framework", () => {
     expect(order.slice(0, 5)).toEqual(["plugin", "loader", "set-up", "story undone", "plugin undone"]);
   });
 
+  it("never holds two mounts' preparations at once, and skips one overtaken", async () => {
+    let running = 0;
+    let most = 0;
+    let started = 0;
+    const { reports } = await run(badge(), undefined, undefined, [
+      async (): Promise<() => Promise<void>> => {
+        started += 1;
+        running += 1;
+        most = Math.max(most, running);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return async (): Promise<void> => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          running -= 1;
+        };
+      }
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const controls = controlsOf(reports);
+    controls.playAgain();
+    controls.playAgain();
+    controls.playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(most).toBe(1);
+    expect(started).toBe(2);
+  });
+
+  it("undoes a plugin's preparation when the story's own cleanup throws", async () => {
+    let isUndone = false;
+    const { reports } = await run(
+      badge({
+        beforeEach: [
+          (): (() => void) => (): void => {
+            throw new Error("No cleanup");
+          }
+        ]
+      }),
+      undefined,
+      undefined,
+      [
+        (): (() => void) => (): void => {
+          isUndone = true;
+        }
+      ]
+    );
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(isUndone).toBe(true);
+  });
+
   it("shows what a plugin's preparation throws as the story's error", async () => {
     const { reports } = await run(badge(), undefined, undefined, [
       (): undefined => {

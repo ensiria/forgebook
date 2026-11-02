@@ -19,6 +19,9 @@ const PLAIN = story("kit:inputs-selection-select--small");
 /** A story whose API is mocked. */
 const MOCKED = story("sb:fetching-mocked--answered");
 
+/** The docs page that holds the blocks. */
+const BLOCKS = "/?page=sb:plugin-blocks";
+
 /** A service worker's first install, on a cold runner, takes longer than a story's first draw, in milliseconds. */
 const WORKER_START = 20_000;
 
@@ -43,7 +46,7 @@ test.describe("a plugin's tab", () => {
     expect(modules.filter((url) => url.includes("ProbeTab"))).toEqual([]);
     await tab.click();
     const shown = page.getByTestId("probe-tab");
-    await expect(shown).toContainText("Probe sb:testing-plugin-probe--probe v1 light");
+    await expect(shown).toContainText("Probe sb:testing-plugin-probe--probe light");
     await expect(shown).toContainText('{"reports":1}');
     expect(modules.some((url) => url.includes("ProbeTab"))).toBe(true);
   });
@@ -104,9 +107,31 @@ test.describe("a plugin's switch and decorator", () => {
   });
 });
 
+test.describe("a plugin's docs block", () => {
+  test("draws in its page, with what its fence says and a story its line names", async ({ page }) => {
+    await page.route("https://embed.figma.com/**", async (route) => {
+      await route.fulfill({ contentType: "text/html", body: "<p>The design, from Figma</p>" });
+    });
+    await page.goto(BLOCKS);
+    await expect(page.getByTestId("probe-block")).toHaveText("The probe's own text");
+    await expect(page.frameLocator("iframe[title='The probed story']").getByTestId("probed")).toBeVisible();
+    await expect(
+      page.frameLocator("iframe[title='Design of The kit, in Figma']").getByText("The design, from Figma")
+    ).toBeVisible();
+  });
+
+  test("says in place that a link is refused, and frames nothing", async ({ page }) => {
+    const asked: string[] = [];
+    page.on("request", (request) => asked.push(request.url()));
+    await page.goto(BLOCKS);
+    await expect(page.getByRole("alert").filter({ hasText: "example.test" })).toBeVisible();
+    expect(asked.filter((url) => url.includes("example.test"))).toEqual([]);
+  });
+});
+
 test.describe("the Network tab", () => {
   test("lists a story's handlers and what answered its requests", async ({ page }) => {
-    await page.goto(`${MOCKED}&tab=network`);
+    await page.goto(`${MOCKED}&tab=msw`);
     await expect(frameOf(page).getByTestId("greeting")).toHaveText("Hello from a mock", {
       timeout: WORKER_START
     });

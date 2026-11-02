@@ -344,8 +344,7 @@ export const Stage = ({
       name: story.name,
       title: component.title,
       componentName: component.name,
-      isLogic: story.isLogic,
-      design: story.design
+      design: story.design === undefined ? {} : { figma: story.design }
     }),
     [story, component]
   );

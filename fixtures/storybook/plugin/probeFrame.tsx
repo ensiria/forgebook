@@ -28,7 +28,7 @@ export const frame = definePluginFrame(
       if (parameters["probe"] === undefined) return undefined;
       const tell = (): void => {
         reports += 1;
-        report({ reports }, String(reports));
+        report({ reports }, { hint: String(reports) });
       };
       tell();
       window.addEventListener(REPORT_EVENT, tell);

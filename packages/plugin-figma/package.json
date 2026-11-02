@@ -1,7 +1,7 @@
 {
   "name": "@forgebook/plugin-figma",
   "version": "0.1.0",
-  "description": "Figma for Forgebook: a story's design in the panel, embedded from Figma, and beside the story.",
+  "description": "Figma for Forgebook: a story's design in the panel, embedded from Figma and beside the story, and a design in a docs page.",
   "keywords": [
     "forgebook",
     "forgebook-plugin"
@@ -25,7 +25,8 @@
   ],
   "exports": {
     ".": "./src/plugin.ts",
-    "./tab": "./src/DesignTab.tsx"
+    "./tab": "./src/DesignTab.tsx",
+    "./block": "./src/DesignBlock.tsx"
   },
   "scripts": {
     "build": "package-build build",
@@ -61,6 +62,10 @@
       "./tab": {
         "types": "./dist/src/DesignTab.d.ts",
         "default": "./dist/src/DesignTab.js"
+      },
+      "./block": {
+        "types": "./dist/src/DesignBlock.d.ts",
+        "default": "./dist/src/DesignBlock.js"
       }
     }
   }

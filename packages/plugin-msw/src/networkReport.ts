@@ -4,7 +4,7 @@
  *
  * @remarks
  * The value crosses between two documents and a report replaces the last one, so it is whole and short: the log keeps
- * the latest requests, and no body or header, which may hold what a log should not. Pure.
+ * the latest requests, and no body, header or query value, which may hold what a log should not. Pure.
  *
  * @module
  */
@@ -20,7 +20,7 @@ export type NetworkHandler = {
 export type NetworkRequest = {
   /** The method. */
   readonly method: string;
-  /** The address, without its origin when it is the page's. */
+  /** The address, without its origin when it is the page's, and without its query's values. */
   readonly url: string;
   /** The answer's status. */
   readonly status: number;
@@ -85,14 +85,16 @@ const PAGE_FILE = /\.(?:[cm]?[jt]sx?|s?css|map|woff2?|ttf|otf|png|jpe?g|gif|svg|
 const DEV_SERVER_PATH = /^\/(?:@|node_modules\/)/;
 
 /**
- * An address as the log writes it: without its origin when it is the page's.
+ * An address as the log writes it: without its origin when it is the page's, and with its query marked but not kept, as
+ * a query can hold a token.
  *
  * @param url - the request's address.
  * @param origin - the page's origin.
  */
 export const shownUrl = (url: string, origin: string): string => {
   const parsed = new URL(url);
-  return parsed.origin === origin ? `${parsed.pathname}${parsed.search}` : url;
+  const path = parsed.origin === origin ? parsed.pathname : `${parsed.origin}${parsed.pathname}`;
+  return parsed.search === "" ? path : `${path}?…`;
 };
 
 /**

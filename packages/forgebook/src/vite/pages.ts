@@ -15,6 +15,7 @@ import { join } from "node:path";
 
 import type { PageConfig } from "../pageConfig.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { pluginFrameModule } from "./pluginConfig.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -116,23 +117,29 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
 };
 
 /**
- * The shell's list of the plugins' tabs, each with the import that loads its view when it first opens; nothing for a
- * catalogue without tabs, whose entry is then what it would be with no plugin.
+ * The shell's list of the plugins' tabs and docs blocks, each with the import that loads its view when it is first
+ * needed; nothing for a catalogue without any, whose entry is then what it would be with no plugin.
  *
  * @param config - the configuration.
  */
-const pluginTabLines = (config: ResolvedConfig): string[] => {
-  const plugins = config.plugins.filter((plugin) => (plugin.tabs ?? []).length > 0);
-  if (plugins.length === 0) return [];
-  const lines = plugins.map((plugin) => {
+const pluginViewLines = (config: ResolvedConfig): string[] => {
+  const lines = config.plugins.flatMap((plugin) => {
     const tabs = (plugin.tabs ?? []).map(
       (tab) =>
         `{ id: ${JSON.stringify(tab.id)}, label: ${JSON.stringify(tab.label)}, ` +
         `when: ${JSON.stringify(tab.when)}, load: () => import(${JSON.stringify(tab.view)}) }`
     );
-    return `      { id: ${JSON.stringify(plugin.id)}, tabs: [${tabs.join(", ")}] },`;
+    const blocks = (plugin.docBlocks ?? []).map(
+      (block) =>
+        `{ fence: ${JSON.stringify(block.fence)}, load: () => import(${JSON.stringify(block.view)}) }`
+    );
+    return tabs.length === 0 && blocks.length === 0
+      ? []
+      : [
+          `      { id: ${JSON.stringify(plugin.id)}, tabs: [${tabs.join(", ")}], docBlocks: [${blocks.join(", ")}] },`
+        ];
   });
-  return ["    plugins: [", ...lines, "    ],"];
+  return lines.length === 0 ? [] : ["    plugins: [", ...lines, "    ],"];
 };
 
 /**
@@ -160,7 +167,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
-    ...pluginTabLines(config),
+    ...pluginViewLines(config),
     "    codeOf",
     "  });",
     ""
@@ -188,7 +195,10 @@ const playToolsLoader = (): string => {
  */
 export const frameEntry = (config: ResolvedConfig): string => {
   const sources = sourcesCode(config);
-  const frames = config.plugins.flatMap((plugin) => (plugin.frame === undefined ? [] : [plugin]));
+  const frames = config.plugins.flatMap((plugin) => {
+    const frame = pluginFrameModule(plugin, config.framework.name);
+    return frame === undefined ? [] : [{ id: plugin.id, frame }];
+  });
   return [
     `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,

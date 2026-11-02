@@ -18,14 +18,21 @@ describe("startPluginFrames", () => {
   it("names a report with its story and its plugin", () => {
     const told: FrameMessage[] = [];
     const create = definePluginFrame(({ report }: PluginFrameHost) => {
-      report({ count: 1 }, "1");
+      report({ count: 1 }, { hint: "1", tab: "acme-log" });
       report("again");
       return {};
     });
     startPluginFrames([{ id: "acme", create }], "kit:a", (message) => told.push(message));
     expect(told).toEqual([
-      { type: "forgebook:plugin", storyId: "kit:a", plugin: "acme", value: { count: 1 }, hint: "1" },
-      { type: "forgebook:plugin", storyId: "kit:a", plugin: "acme", value: "again", hint: null }
+      {
+        type: "forgebook:plugin",
+        storyId: "kit:a",
+        plugin: "acme",
+        value: { count: 1 },
+        hint: "1",
+        tab: "acme-log"
+      },
+      { type: "forgebook:plugin", storyId: "kit:a", plugin: "acme", value: "again", hint: null, tab: null }
     ]);
   });
 
@@ -42,15 +49,5 @@ describe("startPluginFrames", () => {
     );
     expect(frames.decorators).toEqual([decorator]);
     expect(frames.setups).toEqual([prepare]);
-  });
-
-  it("tells a frame module which contract it speaks", () => {
-    let version: number | undefined;
-    const create = definePluginFrame(({ apiVersion }: PluginFrameHost) => {
-      version = apiVersion;
-      return {};
-    });
-    startPluginFrames([{ id: "acme", create }], "s", () => undefined);
-    expect(version).toBe(1);
   });
 });

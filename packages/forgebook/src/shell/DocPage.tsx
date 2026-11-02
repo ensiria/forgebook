@@ -34,6 +34,7 @@ import { useCatalogue } from "./catalogueContext.ts";
 import { DocBlocks, type DocBlocksContext, queuedBlocks } from "./DocBlocks.tsx";
 import { DocContents } from "./DocContents.tsx";
 import { Icon } from "./icons.tsx";
+import type { ShellPlugin } from "./pluginTabs.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { useAnchorScroll } from "./useAnchorScroll.ts";
@@ -55,6 +56,8 @@ const pageState = (value: unknown): Loaded<LoadedDocPage> =>
 
 /** The docs page's props. */
 export type DocPageProps = {
+  /** The plugins, whose blocks the page may hold. */
+  readonly plugins: readonly ShellPlugin[];
   /** The page and its source. */
   readonly location: PageLocation;
   /** The heading the address names; none when it names none. */
@@ -180,6 +183,7 @@ const loadedPage = (loaded: Loaded<LoadedDocPage>): LoadedDocPage =>
  * @param props - the page, its anchor, the view, and how it opens what it links to.
  */
 export const DocPage = ({
+  plugins,
   location,
   anchor,
   tree,
@@ -252,6 +256,8 @@ export const DocPage = ({
     frames,
     view,
     frameUrl,
+    plugins,
+    strings: catalogue.strings,
     switches: catalogue.switches,
     assets: content.assets,
     pageHrefOf: (slug: string, target: string | undefined): string =>

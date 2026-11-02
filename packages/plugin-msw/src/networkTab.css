@@ -3,59 +3,57 @@
  * the catalogue's look.
  */
 
-@layer catalogue {
-  .forgebook-network {
-    display: grid;
-    gap: 1rem;
-    padding: 0.75rem 0.875rem;
-    font-size: 0.8125rem;
-    color: var(--forgebook-text);
-  }
+.msw-network {
+  display: grid;
+  gap: 1rem;
+  padding: 0.75rem 0.875rem;
+  font-size: 0.8125rem;
+  color: var(--forgebook-text);
+}
 
-  /* a narrow panel scrolls the log rather than cutting it */
-  .forgebook-network__part {
-    min-width: 0;
-    overflow-x: auto;
-  }
+/* a narrow panel scrolls the log rather than cutting it */
+.msw-network__part {
+  min-width: 0;
+  overflow-x: auto;
+}
 
-  .forgebook-network__heading {
-    margin: 0 0 0.375rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--forgebook-text-secondary);
-  }
+.msw-network__heading {
+  margin: 0 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--forgebook-text-secondary);
+}
 
-  .forgebook-network__list {
-    padding: 0;
-    margin: 0;
-    list-style: none;
-  }
+.msw-network__list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
 
-  .forgebook-network__row {
-    padding-block: 0.125rem;
-    overflow-wrap: anywhere;
-  }
+.msw-network__row {
+  padding-block: 0.125rem;
+  overflow-wrap: anywhere;
+}
 
-  .forgebook-network__table {
-    width: 100%;
-    min-width: 24rem;
-    border-collapse: collapse;
-  }
+.msw-network__table {
+  width: 100%;
+  min-width: 24rem;
+  border-collapse: collapse;
+}
 
-  .forgebook-network__table th {
-    font-weight: 500;
-    color: var(--forgebook-text-secondary);
-    text-align: start;
-  }
+.msw-network__table th {
+  font-weight: 500;
+  color: var(--forgebook-text-secondary);
+  text-align: start;
+}
 
-  .forgebook-network__table th,
-  .forgebook-network__table td {
-    padding: 0.25rem 0.75rem 0.25rem 0;
-    vertical-align: top;
-    border-bottom: 1px solid var(--forgebook-separator);
-  }
+.msw-network__table th,
+.msw-network__table td {
+  padding: 0.25rem 0.75rem 0.25rem 0;
+  vertical-align: top;
+  border-bottom: 1px solid var(--forgebook-separator);
+}
 
-  .forgebook-network__address {
-    overflow-wrap: anywhere;
-  }
+.msw-network__address {
+  overflow-wrap: anywhere;
 }

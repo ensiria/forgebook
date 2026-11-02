@@ -1,11 +1,11 @@
 /**
  * A plugin that touches every place the plugin API offers, so the shell's tests hold the contract itself: a tab that
- * reads its frame module's report, a tab that cannot load, a switch and a decorator. Only a story with
+ * reads its frame module's report, a tab that cannot load, a switch, a decorator and a docs block that draws a story. Only a story with
  * `parameters.probe` sees any of it.
  *
  * @module
  */
-import { definePlugin, type ForgebookPlugin, PLUGIN_API_VERSION } from "forgebook/plugin";
+import { definePlugin, type ForgebookPlugin } from "forgebook/plugin";
 
 /**
  * The plugin.
@@ -14,10 +14,9 @@ import { definePlugin, type ForgebookPlugin, PLUGIN_API_VERSION } from "forgeboo
  */
 export const probePlugin = (): ForgebookPlugin =>
   definePlugin({
-    apiVersion: PLUGIN_API_VERSION,
+    apiVersion: 1,
     id: "probe",
-    frame: "@fixture/storybook/plugin/frame",
-    frameworks: ["react"],
+    frame: { react: "@fixture/storybook/plugin/frame" },
     tabs: [
       { id: "probe", label: "Probe", view: "@fixture/storybook/plugin/tab", when: { parameter: "probe" } },
       {
@@ -39,5 +38,5 @@ export const probePlugin = (): ForgebookPlugin =>
         ]
       }
     ],
-    docBlocks: [{ fence: "probe", view: "@fixture/storybook/plugin/tab" }]
+    docBlocks: [{ fence: "probe", view: "@fixture/storybook/plugin/block" }]
   });

@@ -82,16 +82,16 @@ describe("the tabs of a story's panel", () => {
   });
 
   it("sets a plugin's tab after Code and before Accessibility, on a story about logic too", () => {
-    const pluginTabs = [{ id: "design", label: "Design", content: null }];
+    const pluginTabs = [{ id: "figma", label: "Design", content: null }];
     expect(dockTabs({ ...inputOf(false), pluginTabs }).map((tab) => tab.id)).toEqual([
       "props",
       "events",
-      "design",
+      "figma",
       "a11y"
     ]);
     expect(dockTabs({ ...inputOf(true), pluginTabs }).map((tab) => tab.id)).toEqual([
       "signature",
-      "design",
+      "figma",
       "a11y"
     ]);
   });

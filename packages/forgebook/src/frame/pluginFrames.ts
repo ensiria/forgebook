@@ -5,7 +5,7 @@
  * @module
  */
 import type { FrameMessage } from "../messages.ts";
-import { type CreatePluginFrame, type JsonValue, PLUGIN_API_VERSION } from "../plugin.ts";
+import type { CreatePluginFrame, JsonValue, PluginReportOptions } from "../plugin.ts";
 import type { LoadedBeforeEach, LoadedDecorator } from "./storyModule.ts";
 
 /** A plugin with a frame module, as the generated frame hands it over. */
@@ -38,9 +38,15 @@ export const startPluginFrames = (
 ): PluginFrames => {
   const frames = plugins.map((plugin) =>
     plugin.create({
-      apiVersion: PLUGIN_API_VERSION,
-      report: (value: JsonValue, hint?: string): void =>
-        tell({ type: "forgebook:plugin", storyId, plugin: plugin.id, value, hint: hint ?? null })
+      report: (value: JsonValue, options: PluginReportOptions = {}): void =>
+        tell({
+          type: "forgebook:plugin",
+          storyId,
+          plugin: plugin.id,
+          value,
+          hint: options.hint ?? null,
+          tab: options.tab ?? null
+        })
     })
   );
   return {

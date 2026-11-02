@@ -3,16 +3,24 @@
  *
  * @remarks
  * Whether a tab shows is decided here from data, so a tab never loads to find out; its view loads the first time it
- * opens (`PluginTabHost`), and so does the host, so a catalogue with no plugin loads only this module.
+ * opens, and so does its host (`LazyHost`), so a catalogue with no plugin loads only this module.
  *
  * @module
  */
-import { lazy, type ReactNode, Suspense } from "react";
+import type { ReactNode } from "react";
 
-import type { JsonValue, PluginStory, PluginTab, PluginTabContext, PluginView } from "../plugin.ts";
+import type {
+  JsonValue,
+  PluginDocBlock,
+  PluginDocBlockContext,
+  PluginStory,
+  PluginTab,
+  PluginTabContext,
+  PluginView
+} from "../plugin.ts";
 import type { AsideStory } from "./asideStory.ts";
 import type { DockTab } from "./Dock.tsx";
-import { STRINGS } from "./strings.ts";
+import { LazyHost } from "./LazyHost.tsx";
 
 /** A plugin's tab as the generated page hands it over: its declaration, and the import of its view. */
 export type ShellPluginTab = Pick<PluginTab, "id" | "label"> & {
@@ -22,20 +30,30 @@ export type ShellPluginTab = Pick<PluginTab, "id" | "label"> & {
   readonly load: () => Promise<{ readonly view: PluginView<PluginTabContext> }>;
 };
 
-/** A plugin with tabs, as the generated page hands it over. */
+/** A plugin's docs block as the generated page hands it over. */
+export type ShellPluginBlock = Pick<PluginDocBlock, "fence"> & {
+  /** Loads the module that draws it. */
+  readonly load: () => Promise<{ readonly view: PluginView<PluginDocBlockContext> }>;
+};
+
+/** A plugin with views, as the generated page hands it over. */
 export type ShellPlugin = {
   /** The plugin's id. */
   readonly id: string;
   /** Its tabs. */
   readonly tabs: readonly ShellPluginTab[];
+  /** Its docs blocks. */
+  readonly docBlocks: readonly ShellPluginBlock[];
 };
 
 /** What a plugin's frame module last said for a story. */
 type PluginReport = {
-  /** What the tab receives. */
+  /** What its tabs receive. */
   readonly value: JsonValue;
-  /** The note beside the tab's name; none shows nothing. */
+  /** The note beside a tab's name; none shows nothing. */
   readonly hint: string | null;
+  /** The tab the note is for; none for the plugin's first. */
+  readonly tab: string | null;
 };
 
 /** The plugins' reports, by `<story>|<plugin>`. */
@@ -43,7 +61,7 @@ export type PluginReports = ReadonlyMap<string, PluginReport>;
 
 /** What the plugins' tabs are built from. */
 type PluginTabsInput = {
-  /** The plugins with tabs. */
+  /** The plugins. */
   readonly plugins: readonly ShellPlugin[];
   /** The texts the catalogue replaces, by name. */
   readonly strings: Readonly<Record<string, string>>;
@@ -59,11 +77,9 @@ type PluginTabsInput = {
   readonly aside: AsideStory;
 };
 
-/** The host, loaded with the first plugin's tab to open. */
-const PluginTabHost = lazy(async () => {
-  const module = await import("./PluginTabHost.tsx");
-  return { default: module.PluginTabHost };
-});
+/** Loads the host of a tab. */
+const loadHost = async (): Promise<typeof import("./PluginTabHost.tsx").PluginTabHost> =>
+  (await import("./PluginTabHost.tsx")).PluginTabHost;
 
 /**
  * Whether a tab is offered for a story.
@@ -74,35 +90,49 @@ const PluginTabHost = lazy(async () => {
  */
 const isOffered = (tab: ShellPluginTab, story: PluginStory, parameters: readonly string[]): boolean => {
   if (tab.when === undefined) return true;
-  // the index reads the design, so its tab is there before the frame ran, and when it fails
-  if (tab.when.parameter === "design" && story.design !== undefined) return true;
-  return parameters.includes(tab.when.parameter);
+  return "design" in tab.when ? story.design.figma !== undefined : parameters.includes(tab.when.parameter);
 };
 
 /**
  * A tab's content: its host, once loaded.
  *
- * @param props - the tab, its plugin, and what it is told.
+ * @param plugin - the tab's plugin.
+ * @param tab - the tab.
+ * @param input - what it is told.
  */
 const pluginTabContent = (
   plugin: ShellPlugin,
   tab: ShellPluginTab,
   { strings, story, reports, isComparing, aside }: PluginTabsInput
 ): ReactNode => (
-  <Suspense fallback={<p className="forgebook-tab-note">{STRINGS.pluginLoading}</p>}>
-    <PluginTabHost
-      // a view lives for one story: it holds what it drew for it (a viewer's position, a dialog)
-      key={`${tab.id}|${story.id}`}
-      load={tab.load}
-      pluginId={plugin.id}
-      strings={strings}
-      story={story}
-      report={isComparing ? undefined : reports.get(`${story.id}|${plugin.id}`)?.value}
+  <LazyHost
+    // a view lives for one story: it holds what it drew for it (a viewer's position, a dialog)
+    key={`${tab.id}|${story.id}`}
+    loadHost={loadHost}
+    props={{
+      load: tab.load,
+      pluginId: plugin.id,
+      strings,
+      story,
+      report: isComparing ? undefined : reports.get(`${story.id}|${plugin.id}`)?.value,
       // the compare view's address already says the whole view
-      aside={isComparing ? { ...aside, view: undefined } : aside}
-    />
-  </Suspense>
+      aside: isComparing ? { ...aside, view: undefined } : aside
+    }}
+  />
 );
+
+/**
+ * The note beside a tab's name.
+ *
+ * @param plugin - the tab's plugin.
+ * @param tab - the tab.
+ * @param input - the reports.
+ */
+const hintOf = (plugin: ShellPlugin, tab: ShellPluginTab, input: PluginTabsInput): string | undefined => {
+  const report = input.reports.get(`${input.story.id}|${plugin.id}`);
+  if (input.isComparing || report === undefined) return undefined;
+  return (report.tab ?? plugin.tabs[0]?.id) === tab.id ? (report.hint ?? undefined) : undefined;
+};
 
 /**
  * The plugins' tabs the story has something for, in the order of `plugins`.
@@ -116,9 +146,7 @@ export const pluginTabsFor = (input: PluginTabsInput): DockTab[] =>
       .map((tab) => ({
         id: tab.id,
         label: input.strings[`tabs.${tab.id}`] ?? tab.label,
-        hint: input.isComparing
-          ? undefined
-          : (input.reports.get(`${input.story.id}|${plugin.id}`)?.hint ?? undefined),
+        hint: hintOf(plugin, tab, input),
         content: pluginTabContent(plugin, tab, input)
       }))
   );

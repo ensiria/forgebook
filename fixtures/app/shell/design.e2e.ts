@@ -69,7 +69,7 @@ test.describe("the Design tab", () => {
 
   test("opens on its own from the address, for a link an agent hands a person", async ({ page }) => {
     await standInForFigma(page);
-    await page.goto(`${FORM}&tab=design`);
+    await page.goto(`${FORM}&tab=figma`);
     await expect(page.getByRole("tab", { name: "Design" })).toHaveAttribute("aria-selected", "true");
     await expect(page.frameLocator("iframe[title^='Design of']").getByText(STAND_IN)).toBeVisible();
   });
@@ -82,7 +82,7 @@ test.describe("the Design tab", () => {
 
   test("links the component to its design, from the header and the panel", async ({ page }) => {
     await standInForFigma(page);
-    await page.goto(`${FORM}&tab=design`);
+    await page.goto(`${FORM}&tab=figma`);
     const links = page.getByRole("link", { name: "Open in Figma" });
     await expect(links).toHaveCount(2);
     for (const link of await links.all()) {
@@ -93,7 +93,7 @@ test.describe("the Design tab", () => {
 
   test("takes the story's own design over the meta's", async ({ page }) => {
     const asked = await standInForFigma(page);
-    await page.goto(`${SMALL}&tab=design`);
+    await page.goto(`${SMALL}&tab=figma`);
     await expect(page.frameLocator("iframe[title^='Design of']").getByText(STAND_IN)).toBeVisible();
     expect(new URL(asked[0] ?? "").searchParams.get("node-id")).toBe("56:78");
   });
@@ -119,7 +119,7 @@ test.describe("the Design tab", () => {
     page
   }) => {
     await standInForFigma(page);
-    await page.goto(`${SMALL}&tab=design`);
+    await page.goto(`${SMALL}&tab=figma`);
     await page.getByRole("button", { name: "Compare with the story" }).click();
     await expect(comparedStory(page).locator("select")).toBeVisible();
     const report = {
@@ -138,7 +138,7 @@ test.describe("the Design tab", () => {
 
   test("follows the story when the history changes it under the comparison", async ({ page }) => {
     const asked = await standInForFigma(page);
-    await page.goto(`${FORM}&tab=design`);
+    await page.goto(`${FORM}&tab=figma`);
     await page.getByRole("button", { name: "Compare with the story" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.evaluate(() => {
@@ -154,7 +154,7 @@ test.describe("the Design tab", () => {
     page
   }) => {
     await standInForFigma(page);
-    await page.goto(`${FORM}&tab=design`);
+    await page.goto(`${FORM}&tab=figma`);
     const compare = page.getByRole("button", { name: "Compare with the story" });
     await compare.click();
     const dialog = page.getByRole("dialog");
@@ -173,7 +173,7 @@ test.describe("the Design tab", () => {
   test("stacks the two on a phone's width", async ({ page }) => {
     await standInForFigma(page);
     await page.setViewportSize({ width: 360, height: 740 });
-    await page.goto(`${FORM}&tab=design`);
+    await page.goto(`${FORM}&tab=figma`);
     await page.getByRole("button", { name: "Compare with the story" }).click();
     const dialog = page.getByRole("dialog");
     const story = await dialog.getByText("Story", { exact: true }).boundingBox();

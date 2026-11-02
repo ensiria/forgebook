@@ -8,6 +8,7 @@
  * @module
  */
 import { isFrameMessage, type PanelArgs, type ShellMessage } from "../messages.ts";
+import type { PluginStoryFrame } from "../plugin.ts";
 import type { LiveView, StageWidth } from "../viewState.ts";
 import { FRAME_ASIDE_ATTRIBUTE } from "./useFrameMessages.ts";
 
@@ -31,9 +32,9 @@ export type AsideStory = {
  * @param target - the element.
  * @param title - the frame's accessible name.
  * @param aside - how the story is drawn.
- * @returns what takes the frame away.
+ * @returns what takes it away.
  */
-export const showAsideStory = (target: HTMLElement, title: string, aside: AsideStory): (() => void) => {
+export const showAsideStory = (target: HTMLElement, title: string, aside: AsideStory): PluginStoryFrame => {
   const frame = target.ownerDocument.createElement("iframe");
   frame.title = title;
   frame.setAttribute(FRAME_ASIDE_ATTRIBUTE, "");
@@ -52,8 +53,10 @@ export const showAsideStory = (target: HTMLElement, title: string, aside: AsideS
   window.addEventListener("message", answer);
   frame.src = aside.address;
   target.append(frame);
-  return (): void => {
-    window.removeEventListener("message", answer);
-    frame.remove();
+  return {
+    remove: (): void => {
+      window.removeEventListener("message", answer);
+      frame.remove();
+    }
   };
 };

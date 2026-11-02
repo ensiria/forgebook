@@ -13,6 +13,7 @@
 import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
 import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
+import type { PluginCondition } from "../plugin.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
@@ -319,8 +320,8 @@ export type AgentPlugin = {
     readonly id: string;
     /** Its name. */
     readonly label: string;
-    /** The story parameter it is offered for; none for every story. */
-    readonly parameter?: string;
+    /** The story it is offered for; none for every story. */
+    readonly when?: PluginCondition;
   }[];
   /** The ids of the switches it adds: `<id>=<value>` in a view sets one. */
   readonly switches: readonly string[];
@@ -334,8 +335,8 @@ export type AgentPlugin = {
 export type PluginsDocument = {
   /** The version of this document. */
   readonly schema: 1;
-  /** The plugin API this Forgebook speaks. */
-  readonly apiVersion: number;
+  /** The versions of the plugin API this Forgebook speaks. */
+  readonly apiVersions: readonly number[];
   /** The plugins the configuration lists, in order. */
   readonly plugins: readonly AgentPlugin[];
 };

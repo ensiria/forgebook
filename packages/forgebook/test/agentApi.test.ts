@@ -155,7 +155,7 @@ describe("a story's design, for agents", () => {
       figma: figmaUrl,
       fileKey: "File1",
       nodeId: "12:34",
-      address: "http://localhost:5173/?theme=dark&tab=design&story=kit%3Aactions-button--primary"
+      address: "http://localhost:5173/?theme=dark&tab=figma&story=kit%3Aactions-button--primary"
     });
     expect(document.component.design).toEqual({ figma: figmaUrl, fileKey: "File1", nodeId: "12:34" });
   });

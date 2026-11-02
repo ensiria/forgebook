@@ -3,12 +3,13 @@
  *
  * @module
  */
+import type { FigmaLink } from "forgebook/figma-link";
 import { describe, expect, it } from "vitest";
 
-import { type DesignLink, figmaEmbedAddress } from "../src/figmaEmbed.ts";
+import { figmaEmbedAddress } from "../src/embedAddress.ts";
 
 /** A link to a node of a file. */
-const NODE: DesignLink = {
+const NODE: FigmaLink = {
   url: "https://www.figma.com/design/AbC123/Kit?node-id=12-34",
   kind: "design",
   fileKey: "AbC123",

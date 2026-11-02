@@ -98,13 +98,20 @@ export const docPagesModule = (
  * @param file - the page's file, absolute.
  * @param watch - adds a file whose edit renews the module.
  * @param isServing - whether a dev server runs.
+ * @param fences - the fences the catalogue's plugins draw.
  */
-export const docPageModule = (file: string, watch: (file: string) => void, isServing: boolean): string => {
+export const docPageModule = (
+  file: string,
+  watch: (file: string) => void,
+  isServing: boolean,
+  fences: readonly string[] = []
+): string => {
   watch(file);
   const { blocks, headings, images, text } = compiledDocPage(
     file,
     readFileSync(file, "utf8"),
-    watchedRead(watch)
+    watchedRead(watch),
+    fences
   );
   return [
     ...images.map((image, place) => `import asset${place} from ${JSON.stringify(`${image}?url`)};`),

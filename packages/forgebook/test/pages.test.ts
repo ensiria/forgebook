@@ -90,7 +90,8 @@ describe("a catalogue's plugins", () => {
     apiVersion: 1,
     id: "acme",
     frame: "@acme/plugin/frame",
-    tabs: [{ id: "acme", label: "Acme", view: "@acme/plugin/tab", when: { parameter: "acme" } }]
+    tabs: [{ id: "acme", label: "Acme", view: "@acme/plugin/tab", when: { parameter: "acme" } }],
+    docBlocks: [{ fence: "acme", view: "@acme/plugin/block" }]
   };
   const listed: ResolvedConfig = { ...CONFIG, plugins: [plugin] };
 
@@ -113,6 +114,21 @@ describe("a catalogue's plugins", () => {
     expect(entry).toContain('load: () => import("@acme/plugin/tab")');
     expect(entry).toContain('when: {"parameter":"acme"}');
     expect(entry).not.toMatch(/^import .*@acme\/plugin/m);
+  });
+
+  it("loads a docs block's view only when a page draws it", () => {
+    const entry = shellEntry(listed);
+    expect(entry).toContain('{ fence: "acme", load: () => import("@acme/plugin/block") }');
+  });
+
+  it("picks the frame module of the catalogue's framework", () => {
+    const byFramework: ResolvedConfig = {
+      ...CONFIG,
+      plugins: [{ ...plugin, frame: { [STUB_FRAMEWORK.name]: "@acme/plugin/stub-frame" } }]
+    };
+    expect(frameEntry(byFramework)).toContain(
+      'import { frame as pluginFrame0 } from "@acme/plugin/stub-frame";'
+    );
   });
 
   it("keeps a plugin's frame module out of the shell, and its tabs out of the frame", () => {

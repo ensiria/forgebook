@@ -135,10 +135,12 @@ export type FrameMessage =
       readonly storyId: string;
       /** The plugin's id. */
       readonly plugin: string;
-      /** What the tab receives. */
+      /** What its tabs receive. */
       readonly value: JsonValue;
-      /** A short note beside the tab's name; none shows nothing. */
+      /** A short note beside a tab's name; none shows nothing. */
       readonly hint: string | null;
+      /** The tab the note is for; none for the plugin's first. */
+      readonly tab: string | null;
     };
 
 /** From the shell to a frame. */
@@ -314,7 +316,8 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
       return (
         typeof value["plugin"] === "string" &&
         isJsonValue(value["value"]) &&
-        (value["hint"] === null || typeof value["hint"] === "string")
+        (value["hint"] === null || typeof value["hint"] === "string") &&
+        (value["tab"] === null || typeof value["tab"] === "string")
       );
     default:
       return false;

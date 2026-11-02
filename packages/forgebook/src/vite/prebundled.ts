@@ -57,7 +57,7 @@ export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn:
     ...PAGE_MODULES,
     config.framework.pages.frame,
     config.framework.pages.code,
-    ...pluginModules(config.plugins)
+    ...pluginModules(config.plugins, config.framework.name)
   ];
   const candidates = [
     ...CORE_BROWSER_DEPENDENCIES,

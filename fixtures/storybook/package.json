@@ -8,6 +8,7 @@
     "./plugin": "./plugin/probe.ts",
     "./plugin/frame": "./plugin/probeFrame.tsx",
     "./plugin/tab": "./plugin/ProbeTab.tsx",
+    "./plugin/block": "./plugin/ProbeBlock.ts",
     "./plugin/broken-tab": "./plugin/BrokenProbeTab.ts",
     "./package.json": "./package.json"
   },

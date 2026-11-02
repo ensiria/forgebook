@@ -5,37 +5,46 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type ForgebookPlugin, PLUGIN_API_VERSION } from "../src/plugin.ts";
-import { DEFAULT_SWITCHES, type ViewSwitch } from "../src/switches.ts";
+import type { ForgebookPlugin, PluginSwitch } from "../src/plugin.ts";
+import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { resolveConfig } from "../src/vite/configFile.ts";
-import { pluginModules, pluginsProblem, withPluginSwitches } from "../src/vite/pluginConfig.ts";
+import {
+  pluginFences,
+  pluginFrameModule,
+  pluginModules,
+  pluginsProblem,
+  SUPPORTED_PLUGIN_API_VERSIONS,
+  withPluginSwitches
+} from "../src/vite/pluginConfig.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A plugin that adds nothing. */
-const plain: ForgebookPlugin = { apiVersion: PLUGIN_API_VERSION, id: "acme" };
+const plain: ForgebookPlugin = { apiVersion: 1, id: "acme" };
 
 /** A switch of a plugin. */
-const density: ViewSwitch = {
-  id: "density",
+const density: PluginSwitch = {
+  id: "acme-density",
   label: "Density",
   default: "normal",
   apply: { kind: "code" },
   values: [{ value: "normal", label: "Normal" }]
 };
 
+/** The folder of this package, where Node finds what it installs. */
+const DIR: string = import.meta.dirname;
+
 /** The problem of a list of plugins in a React catalogue. */
 const problemOf = (plugins: readonly ForgebookPlugin[]): string | undefined =>
-  pluginsProblem(plugins, "react");
+  pluginsProblem(plugins, "react", DIR);
 
 describe("the contract's version", () => {
   it("is the first", () => {
-    expect(PLUGIN_API_VERSION).toBe(1);
+    expect(SUPPORTED_PLUGIN_API_VERSIONS).toEqual([1]);
   });
 
   it("refuses a plugin written for another one, saying both", () => {
     // what a plugin written for a later contract holds: a configuration is not type-checked against this version
-    const later: unknown = { apiVersion: 2, id: "later" };
-    const plugins: ForgebookPlugin[] = JSON.parse(JSON.stringify([later]));
+    const plugins: ForgebookPlugin[] = JSON.parse('[{ "apiVersion": 2, "id": "later" }]');
     expect(problemOf(plugins)).toBe(
       'the plugin "later" is written for version 2 of the plugin API, and this Forgebook speaks version 1: update one of them'
     );
@@ -52,24 +61,33 @@ describe("a list of plugins", () => {
     expect(problemOf([plain, plain])).toBe('the plugin "acme" is given twice');
   });
 
-  it("refuses a tab that takes one of Forgebook's ids, or another plugin's", () => {
-    const tab = { id: "code", label: "Mine", view: "@acme/tab" };
-    expect(problemOf([{ ...plain, tabs: [tab] }])).toBe('the tab "code" is Forgebook\'s own');
-    const shared = { ...tab, id: "shared" };
-    expect(
-      problemOf([
-        { ...plain, tabs: [shared] },
-        { ...plain, id: "other", tabs: [shared] }
-      ])
-    ).toBe('the tab "shared" is given twice');
+  it("takes a tab named after its plugin, alone or with a word", () => {
+    const tabs = [
+      { id: "acme", label: "A", view: "@acme/tab" },
+      { id: "acme-more", label: "B", view: "@acme/tab" }
+    ];
+    expect(problemOf([{ ...plain, tabs }])).toBeUndefined();
   });
 
-  it("refuses a block named as a page's own, or as another's", () => {
-    const block = { fence: "story", view: "@acme/block" };
-    expect(problemOf([{ ...plain, docBlocks: [block] }])).toBe('the docs block "story" is Forgebook\'s own');
-    const shared = { ...block, fence: "chart" };
-    expect(problemOf([{ ...plain, docBlocks: [shared, shared] }])).toBe(
-      'the docs block "chart" is given twice'
+  it("refuses a tab that is not named after its plugin, so no later tab of Forgebook's can break it", () => {
+    expect(problemOf([{ ...plain, tabs: [{ id: "network", label: "N", view: "@acme/tab" }] }])).toBe(
+      'the tab "network" must be "acme", or start with "acme-"'
+    );
+  });
+
+  it("refuses a tab twice, and a tab that takes one of Forgebook's ids", () => {
+    const tab = { id: "acme", label: "A", view: "@acme/tab" };
+    expect(problemOf([{ ...plain, tabs: [tab, tab] }])).toBe('the tab "acme" is given twice');
+    const named: ForgebookPlugin = { ...plain, id: "code", tabs: [{ ...tab, id: "code" }] };
+    expect(problemOf([named])).toBe('the tab "code" is given twice');
+  });
+
+  it("names switches and fences the same way, so a fence never takes a language's name", () => {
+    expect(problemOf([{ ...plain, switches: [{ ...density, id: "density" }] }])).toBe(
+      'the switch "density" must be "acme", or start with "acme-"'
+    );
+    expect(problemOf([{ ...plain, docBlocks: [{ fence: "ts", view: "@acme/block" }] }])).toBe(
+      'the docs block "ts" must be "acme", or start with "acme-"'
     );
   });
 
@@ -77,11 +95,17 @@ describe("a list of plugins", () => {
     expect(problemOf([{ ...plain, frame: "" }])).toContain("names a module that is no specifier");
   });
 
-  it("refuses a frame module for another framework, and only that", () => {
-    const vue: ForgebookPlugin = { ...plain, frame: "@acme/frame", frameworks: ["vue"] };
+  it("refuses a catalogue of a framework its frame module has no entry for", () => {
+    const vue: ForgebookPlugin = { ...plain, frame: { vue: "@acme/frame" } };
     expect(problemOf([vue])).toBe('the plugin "acme" runs in frames of vue, and this catalogue is react');
-    expect(pluginsProblem([vue], "vue")).toBeUndefined();
-    expect(problemOf([{ ...plain, frameworks: ["vue"] }])).toBeUndefined();
+    expect(pluginsProblem([vue], "vue", DIR)).toBeUndefined();
+  });
+
+  it("says what a plugin needs and the project does not install", () => {
+    expect(problemOf([{ ...plain, browserDependencies: ["acme-missing/browser"] }])).toBe(
+      'the plugin "acme" needs the package acme-missing, which this project does not install'
+    );
+    expect(problemOf([{ ...plain, browserDependencies: ["vite/client"] }])).toBeUndefined();
   });
 });
 
@@ -98,20 +122,25 @@ describe("what plugins add", () => {
   });
 
   it("lets the catalogue's own switch of the same id win", () => {
-    const own: ViewSwitch = { ...density, label: "Mine" };
+    const own = { ...density, label: "Mine" };
     expect(withPluginSwitches([own], [{ ...plain, switches: [density] }])).toEqual([own]);
   });
 
-  it("lists the modules the pages import", () => {
-    expect(
-      pluginModules([
-        {
-          ...plain,
-          frame: "@acme/frame",
-          tabs: [{ id: "acme", label: "Acme", view: "@acme/tab" }]
-        }
-      ])
-    ).toEqual(["@acme/tab", "@acme/frame"]);
+  it("reads a frame module for every framework, or for this one", () => {
+    expect(pluginFrameModule({ ...plain, frame: "@acme/frame" }, "react")).toBe("@acme/frame");
+    expect(pluginFrameModule({ ...plain, frame: { react: "@acme/r" } }, "react")).toBe("@acme/r");
+    expect(pluginFrameModule(plain, "react")).toBeUndefined();
+  });
+
+  it("lists the modules the pages import, and the fences a page's compiler reads", () => {
+    const plugin: ForgebookPlugin = {
+      ...plain,
+      frame: "@acme/frame",
+      tabs: [{ id: "acme", label: "Acme", view: "@acme/tab" }],
+      docBlocks: [{ fence: "acme", view: "@acme/block" }]
+    };
+    expect(pluginModules([plugin], "react")).toEqual(["@acme/tab", "@acme/block", "@acme/frame"]);
+    expect(pluginFences([plugin])).toEqual(["acme"]);
   });
 });
 
@@ -132,7 +161,7 @@ describe("a configuration with plugins", () => {
   it("stops at a plugin's switch that takes an address's parameter", () => {
     expect(() =>
       resolveConfig(
-        { ...config, plugins: [{ ...plain, switches: [{ ...density, id: "story" }] }] },
+        { ...config, plugins: [{ ...plain, id: "story", switches: [{ ...density, id: "story" }] }] },
         "/catalogue"
       )
     ).toThrow("is a parameter of the address");

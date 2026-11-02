@@ -13,19 +13,20 @@
  *
  * @module
  */
+import type { FigmaLink } from "forgebook/figma-link";
 import type { PluginTabContext } from "forgebook/plugin";
 import { type PluginViewProps, reactView } from "forgebook/plugin-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 import "./designTab.css";
-import { type DesignLink, figmaEmbedAddress } from "./figmaEmbed.ts";
+import { FigmaEmbed } from "./FigmaEmbed.tsx";
 
 /** What the tab's parts read. */
 type DesignProps = {
   /** What the tab is told. */
   readonly context: PluginTabContext;
   /** The story's design. */
-  readonly link: DesignLink;
+  readonly link: FigmaLink;
   /** What the design is of, for the frames' accessible titles and the comparison's heading. */
   readonly title: string;
 };
@@ -42,41 +43,6 @@ const OpenInFigma = ({ context, link }: Pick<DesignProps, "context" | "link">): 
 );
 
 /**
- * The design, framed from Figma; a spinner until it answers.
- *
- * @remarks
- * The shell's appearance is read once: following a change would reload the viewer and lose where the reader had panned to.
- *
- * @param props - the design and what it is of.
- */
-const FigmaEmbed = ({ context, link, title }: DesignProps): ReactNode => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [address] = useState(() => figmaEmbedAddress(link, context.appearance === "dark"));
-  const loading = context.text("loading", "Loading the design…");
-  return (
-    <div className="forgebook-design__embed">
-      <iframe
-        className="forgebook-design__frame"
-        title={context.text("frame", "Design of {title}, in Figma").replace("{title}", title)}
-        src={address}
-        allowFullScreen={true}
-        // the catalogue's address says nothing Figma needs: `embed-host` names the product
-        referrerPolicy="no-referrer"
-        onLoad={(): void => setIsLoaded(true)}
-      />
-      {isLoaded ? null : (
-        <div className="forgebook-frame-loading" role="status">
-          <span className="forgebook-frame-loading__label">
-            <span className="forgebook-spinner" aria-hidden="true" />
-            {loading}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/**
  * The story and its design, side by side, over the whole page.
  *
  * @param props - the design, and what to do once it closes.
@@ -90,7 +56,7 @@ const CompareDialog = ({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const storyRef = useRef<HTMLDivElement>(null);
   const { showStory, text } = context;
-  const heading = text("compareTitle", "{title}: the story and its design").replace("{title}", title);
+  const heading = text("compareTitle", "{title}: the story and its design", { title });
   const storyPane = text("storyPane", "Story");
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -98,32 +64,34 @@ const CompareDialog = ({
   const storyTitle = `${title} · ${storyPane}`;
   useEffect(() => {
     const target = storyRef.current;
-    return target === null ? undefined : showStory(target, storyTitle);
+    if (target === null) return undefined;
+    const frame = showStory(target, { title: storyTitle });
+    return (): void => frame.remove();
   }, [showStory, storyTitle]);
   return (
     // the keys stop here: the shell's shortcuts would act on the page the dialog hides
     <dialog
       ref={dialogRef}
-      className="forgebook-design__compare"
+      className="figma-design__compare"
       aria-label={heading}
       onClose={onClosed}
       onKeyDown={(event: KeyboardEvent<HTMLDialogElement>): void => event.stopPropagation()}
     >
-      <div className="forgebook-design__bar">
-        <h2 className="forgebook-design__heading">{heading}</h2>
+      <div className="figma-design__bar">
+        <h2 className="figma-design__heading">{heading}</h2>
         <OpenInFigma context={context} link={link} />
         <button type="button" className="forgebook-button" onClick={(): void => dialogRef.current?.close()}>
           {text("close", "Close the comparison")}
         </button>
       </div>
-      <div className="forgebook-design__panes">
-        <figure className="forgebook-design__pane">
-          <figcaption className="forgebook-design__caption">{storyPane}</figcaption>
-          <div ref={storyRef} className="forgebook-design__story" />
+      <div className="figma-design__panes">
+        <figure className="figma-design__pane">
+          <figcaption className="figma-design__caption">{storyPane}</figcaption>
+          <div ref={storyRef} className="figma-design__story" />
         </figure>
-        <figure className="forgebook-design__pane">
-          <figcaption className="forgebook-design__caption">{text("designPane", "Design")}</figcaption>
-          <FigmaEmbed context={context} link={link} title={title} />
+        <figure className="figma-design__pane">
+          <figcaption className="figma-design__caption">{text("designPane", "Design")}</figcaption>
+          <FigmaEmbed text={context.text} appearance={context.appearance} link={link} title={title} />
         </figure>
       </div>
     </dialog>
@@ -138,13 +106,13 @@ const CompareDialog = ({
 const DesignTab = ({ context }: PluginViewProps<PluginTabContext>): ReactNode => {
   const [isComparing, setIsComparing] = useState(false);
   const { story } = context;
-  const link = story.design;
+  const link = story.design.figma;
   if (link === undefined) return null;
   const title = `${story.componentName} › ${story.name}`;
   return (
-    <div className="forgebook-design">
-      <div className="forgebook-design__bar">
-        <p className="forgebook-design__note">
+    <div className="figma-design">
+      <div className="figma-design__bar">
+        <p className="figma-design__note">
           {context.text(
             "note",
             "Figma shows this to anyone who can open the file: a private one asks them to sign in."
@@ -164,7 +132,7 @@ const DesignTab = ({ context }: PluginViewProps<PluginTabContext>): ReactNode =>
           onClosed={(): void => setIsComparing(false)}
         />
       ) : (
-        <FigmaEmbed context={context} link={link} title={title} />
+        <FigmaEmbed text={context.text} appearance={context.appearance} link={link} title={title} />
       )}
     </div>
   );

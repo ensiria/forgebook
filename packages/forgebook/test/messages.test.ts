@@ -15,7 +15,7 @@ import {
 } from "../src/messages.ts";
 
 describe("a plugin's report", () => {
-  const report = { type: "forgebook:plugin", storyId: "a", plugin: "msw", hint: "2" };
+  const report = { type: "forgebook:plugin", storyId: "a", plugin: "msw", hint: "2", tab: null };
 
   it("carries any JSON value, with or without its note", () => {
     expect(isFrameMessage({ ...report, value: { handlers: [{ label: "GET /a" }], n: 1 } })).toBe(true);
@@ -28,6 +28,7 @@ describe("a plugin's report", () => {
     expect(isFrameMessage({ ...report, value: undefined })).toBe(false);
     expect(isFrameMessage({ ...report, value: 1, plugin: 1 })).toBe(false);
     expect(isFrameMessage({ ...report, value: 1, hint: 2 })).toBe(false);
+    expect(isFrameMessage({ ...report, value: 1, tab: 2 })).toBe(false);
   });
 });
 

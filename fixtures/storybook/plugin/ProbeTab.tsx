@@ -7,7 +7,7 @@ import type { PluginTabContext, PluginView } from "forgebook/plugin";
 
 /** What the tab shows of its context. */
 const textOf = (context: PluginTabContext): string =>
-  `${context.text("title", "Probe")} ${context.story.id} v${context.apiVersion} ${context.appearance} ` +
+  `${context.text("title", "Probe {id}", { id: context.story.id })} ${context.appearance} ` +
   JSON.stringify(context.report ?? null);
 
 /** The tab, as Forgebook mounts it. */

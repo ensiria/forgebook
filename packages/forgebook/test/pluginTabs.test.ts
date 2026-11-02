@@ -19,14 +19,13 @@ const STORY: PluginStory = {
   name: "B",
   title: "Kit/A",
   componentName: "A",
-  isLogic: false,
-  design: undefined
+  design: {}
 };
 
 /** The same with one. */
 const DESIGNED: PluginStory = {
   ...STORY,
-  design: { url: "https://www.figma.com/design/F/K", kind: "design", fileKey: "F" }
+  design: { figma: { url: "https://www.figma.com/design/F/K", kind: "design", fileKey: "F" } }
 };
 
 /** One plugin with one tab for a parameter, and one for every story. */
@@ -36,8 +35,9 @@ const PLUGINS: readonly ShellPlugin[] = [
     tabs: [
       { id: "always", label: "Always", when: undefined, load: noLoad },
       { id: "mocks", label: "Mocks", when: { parameter: "msw" }, load: noLoad },
-      { id: "design", label: "Design", when: { parameter: "design" }, load: noLoad }
-    ]
+      { id: "design", label: "Design", when: { design: "figma" }, load: noLoad }
+    ],
+    docBlocks: []
   }
 ];
 
@@ -73,11 +73,26 @@ describe("pluginTabsFor", () => {
     expect(shown({ ...INPUT, story: DESIGNED })).toEqual(["always", "design"]);
   });
 
+  it("offers no design tab for a design parameter whose link did not pass, though the frame reports it", () => {
+    expect(shown({ ...INPUT, parameters: ["design"] })).toEqual(["always"]);
+  });
+
+  it("notes a report on the tab it names, the plugin's first by default", () => {
+    const hints = (tab: string | null): (string | undefined)[] =>
+      pluginTabsFor({
+        ...INPUT,
+        parameters: ["msw"],
+        reports: new Map([["kit:a--b|acme", { value: 1, hint: "3", tab }]])
+      }).map((each) => each.hint);
+    expect(hints(null)).toEqual(["3", undefined]);
+    expect(hints("mocks")).toEqual([undefined, "3"]);
+  });
+
   it("names a tab as the catalogue replaces it, and notes what its plugin reported", () => {
     const [tab] = pluginTabsFor({
       ...INPUT,
       strings: { "tabs.always": "Toujours" },
-      reports: new Map([["kit:a--b|acme", { value: 1, hint: "3" }]])
+      reports: new Map([["kit:a--b|acme", { value: 1, hint: "3", tab: null }]])
     });
     expect(tab?.label).toBe("Toujours");
     expect(tab?.hint).toBe("3");
@@ -87,7 +102,7 @@ describe("pluginTabsFor", () => {
     const [tab] = pluginTabsFor({
       ...INPUT,
       isComparing: true,
-      reports: new Map([["kit:a--b|acme", { value: 1, hint: "3" }]])
+      reports: new Map([["kit:a--b|acme", { value: 1, hint: "3", tab: null }]])
     });
     expect(tab?.hint).toBeUndefined();
   });
@@ -95,7 +110,7 @@ describe("pluginTabsFor", () => {
   it("keeps another story's report to itself", () => {
     const [tab] = pluginTabsFor({
       ...INPUT,
-      reports: new Map([["kit:other|acme", { value: 1, hint: "3" }]])
+      reports: new Map([["kit:other|acme", { value: 1, hint: "3", tab: null }]])
     });
     expect(tab?.hint).toBeUndefined();
   });

@@ -54,6 +54,7 @@ import {
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
+import { pluginFences } from "./pluginConfig.ts";
 import { codeModule, componentFileOf, docsModule, markdownModule, pageModule } from "./pluginModules.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
@@ -299,15 +300,17 @@ const textModule = (
  * @param id - the module's id.
  * @param watch - adds a file whose edit renews the module.
  * @param isServing - whether a dev server runs.
+ * @param fences - the fences the catalogue's plugins draw.
  */
 const docsModuleOf = (
   id: string,
   watch: (file: string) => void,
-  isServing: boolean
+  isServing: boolean,
+  fences: readonly string[]
 ): { code: string; moduleType: "js" } | undefined => {
   if (id.endsWith(DOCS_PAGE_QUERY)) {
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
-    return { code: docPageModule(file, watch, isServing), moduleType: "js" };
+    return { code: docPageModule(file, watch, isServing, fences), moduleType: "js" };
   }
   if (!id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
   const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
@@ -446,7 +449,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       return pageModule(storyFile, componentFile, watch);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
-    return docsModuleOf(id, watch, isServing()) ?? textModule(id, watch);
+    return docsModuleOf(id, watch, isServing(), pluginFences(config?.plugins ?? [])) ?? textModule(id, watch);
   };
   return {
     name: "forgebook",

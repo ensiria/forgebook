@@ -169,6 +169,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let mountCount = 0;
   let hasPlayed = false;
   let prepared: PreparedStory = NOT_PREPARED;
+  let preparing: Promise<void> = Promise.resolve();
 
   // the story's actions are recorded whatever the shell names: a spy, an `argTypes` action
   const actions = actionNames(story.args, story.argTypes);
@@ -364,8 +365,11 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       const next: PreparedStory = {
         ...hooks,
         cleanup: async (): Promise<void> => {
-          await hooks.cleanup();
-          await plugins.cleanup();
+          try {
+            await hooks.cleanup();
+          } finally {
+            await plugins.cleanup();
+          }
         }
       };
       // a later mount started while this one loaded: its set-ups are undone, the later one draws
@@ -382,11 +386,18 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   };
 
   // a new mount draws the story from scratch: its loaders and set-ups run again, its own state starts over and its
-  // play function runs again
+  // play function runs again; it waits for the mount before it, whose set-ups it must undo, and one overtaken meanwhile
+  // never starts: two at once would hold what only one can (a mocked API's worker)
   const mountStory = (): void => {
     unmountAll();
     mountCount += 1;
-    void prepareMount(mountCount).then((isLast) => {
+    const count = mountCount;
+    const turn = preparing.then(() => (count === mountCount ? prepareMount(count) : false));
+    preparing = turn.then(
+      () => undefined,
+      () => undefined
+    );
+    void turn.then((isLast) => {
       if (!isLast) return;
       // a framework may throw while it starts drawing, before its own error capture is in place: shown as any error
       try {

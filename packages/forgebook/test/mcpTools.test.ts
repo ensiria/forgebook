@@ -38,7 +38,7 @@ describe("list_plugins", () => {
     expect(result.isError).toBe(false);
     expect(result.structured).toEqual({
       schema: 1,
-      apiVersion: 1,
+      apiVersions: [1],
       plugins: [
         { id: "acme", tabs: [{ id: "a", label: "A" }], switches: [], docBlocks: [], runsInFrames: false }
       ]

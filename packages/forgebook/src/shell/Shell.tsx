@@ -88,7 +88,7 @@ export type ShellConfig = {
   readonly switches?: readonly ViewSwitch[];
   /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
   readonly lists?: CatalogueLists;
-  /** The plugins with tabs (the generated page passes them); none by default. */
+  /** The plugins with views (the generated page passes them); none by default. */
   readonly plugins?: readonly ShellPlugin[];
 };
 
@@ -784,6 +784,7 @@ const ShellPage = ({
               touchOverrides={touchOverrides}
               onTouchChange={setTouchOverride}
               frameUrl={frameUrl}
+              plugins={plugins}
               storyHrefOf={storyHrefOf}
               onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
               pageHrefOf={(id: string, anchor: string | undefined): string =>

@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { catalogueTools } from "../bin/forgebook/mcpTools.ts";
 import { catalogueMarkdown } from "../bin/forgebook-docs/catalogueMarkdown.ts";
 import { llmsText } from "../bin/forgebook-docs/llmsText.ts";
-import { isDocPage, linkedHtml } from "../src/docPages.ts";
+import { type DocBlock, isDocPage, linkedHtml } from "../src/docPages.ts";
 import { NO_PREVIEW } from "../src/frame/storyModule.ts";
 import { findPage, pageGroups } from "../src/pageTree.ts";
 import { foundPages, searchWords } from "../src/shell/treeSearch.ts";
@@ -22,6 +22,7 @@ import { storyTree } from "../src/storyTree.ts";
 import { storyAddressOf } from "../src/viewState.ts";
 import { isPageDocument, isPagesDocument } from "../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../src/vite/agentRoutes.ts";
+import { compiledDocPage } from "../src/vite/docPageMarkdown.ts";
 import {
   DOCS_PAGE_QUERY,
   docPageModule,
@@ -29,6 +30,7 @@ import {
   indexedDocPages
 } from "../src/vite/docPagesModule.ts";
 import { pageAnswer, pagesDocument } from "../src/vite/docPagesRoute.ts";
+import { pluginsDocument } from "../src/vite/pluginConfig.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
 /** Where the catalogue is served in these tests. */
@@ -73,6 +75,36 @@ const page = (title: string, order?: number): DocPageIndex => ({
   stories: [],
   components: [],
   links: []
+});
+
+describe("a plugin's block", () => {
+  const page = (fences: readonly string[]): readonly DocBlock[] =>
+    compiledDocPage(
+      "/docs/a.md",
+      "Text\n\n```acme kit:a--b rest\nInside\n```\n\n```ts\nconst a = 1;\n```\n",
+      undefined,
+      fences
+    ).blocks;
+
+  it("is compiled for a fence a plugin draws, with what its line and its body say", () => {
+    expect(page(["acme"])[1]).toEqual({
+      kind: "plugin",
+      fence: "acme",
+      argument: "kit:a--b rest",
+      body: "Inside"
+    });
+    expect(page(["acme"])[2]?.kind).toBe("code");
+  });
+
+  it("stays code in a catalogue no plugin draws it for", () => {
+    expect(page([])[1]?.kind).toBe("code");
+  });
+
+  it("passes as a block of a page", () => {
+    expect(isDocPage({ blocks: page(["acme"]), headings: [], assets: [] })).toBe(true);
+    const broken = { kind: "plugin", fence: "acme", argument: 1, body: "" };
+    expect(isDocPage({ blocks: [broken], headings: [], assets: [] })).toBe(false);
+  });
 });
 
 describe("the page tree", () => {
@@ -327,7 +359,8 @@ describe("agents", () => {
       writeNew: () => Promise.reject(new Error("not asked in these tests")),
       check: async () => "unused",
       checkPage: async () => "unused",
-      shot: async () => "unused"
+      shot: async () => "unused",
+      plugins: pluginsDocument([])
     });
     const tool = (name: string): (typeof tools)[number] => {
       const found = tools.find((each) => each.name === name);

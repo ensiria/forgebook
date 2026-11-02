@@ -20,7 +20,7 @@ export type PluginViewProps<TContext extends PluginViewContext> = {
 };
 
 /**
- * A component as a view: what a tab's or a block's module exports by default.
+ * A component as a view: what a tab's or a block's module exports as `view`.
  *
  * @param View - the component.
  */

@@ -71,7 +71,7 @@
     "./shell-theme": "./src/shellTheme.types.ts",
     "./plugin": "./src/plugin.ts",
     "./plugin-react": "./src/pluginReact.tsx",
-    "./vite/plugin-config": "./src/vite/pluginConfig.ts"
+    "./figma-link": "./src/figmaLink.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -278,9 +278,9 @@
         "types": "./dist/src/pluginReact.d.ts",
         "default": "./dist/src/pluginReact.js"
       },
-      "./vite/plugin-config": {
-        "types": "./dist/src/vite/pluginConfig.d.ts",
-        "default": "./dist/src/vite/pluginConfig.js"
+      "./figma-link": {
+        "types": "./dist/src/figmaLink.d.ts",
+        "default": "./dist/src/figmaLink.js"
       }
     },
     "bin": {

@@ -34,14 +34,14 @@ const isHandler = (value: unknown): value is Handler => typeof value === "object
 /** The plugin's frame. */
 export const frame = definePluginFrame(
   ({ report }: PluginFrameHost): PluginFrame => ({
-    prepare: async ({ parameters }: PluginPrepareContext): Promise<(() => void) | undefined> => {
+    prepare: async ({ parameters }: PluginPrepareContext): Promise<(() => Promise<void>) | undefined> => {
       const handlers = handlersOf(parameters).filter(isHandler);
       if (handlers.length === 0) return undefined;
       const labels = handlers.map((handler) => ({ label: handlerLabel(handler) }));
       let requests: readonly NetworkRequest[] = [];
       const tell = (): void => {
         const value: NetworkReport = { handlers: labels, requests };
-        report(value, String(requests.length));
+        report(value, { hint: String(requests.length) });
       };
       tell();
       return startStoryMocks(handlers, loadMsw, ({ request, response }, isMocked) => {

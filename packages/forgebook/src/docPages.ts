@@ -42,6 +42,16 @@ export type DocBlock =
       readonly kind: "props";
       /** The component's id, as the catalogue's address writes it (`kit:inputs-select`). */
       readonly id: string;
+    }
+  | {
+      /** A plugin's block: a fence named as one of the plugin's. */
+      readonly kind: "plugin";
+      /** The fence's name. */
+      readonly fence: string;
+      /** What the fence's line says after its name. */
+      readonly argument: string;
+      /** The text inside the fence. */
+      readonly body: string;
     };
 
 /** A heading of a docs page, as its contents list names it. */
@@ -89,6 +99,13 @@ const isBlock = (value: unknown): boolean => {
   if (!isRecord(value)) return false;
   if (value["kind"] === "text") return typeof value["html"] === "string";
   if (value["kind"] === "code") return typeof value["text"] === "string" && typeof value["html"] === "string";
+  if (value["kind"] === "plugin") {
+    return (
+      typeof value["fence"] === "string" &&
+      typeof value["argument"] === "string" &&
+      typeof value["body"] === "string"
+    );
+  }
   return (value["kind"] === "story" || value["kind"] === "props") && typeof value["id"] === "string";
 };
 

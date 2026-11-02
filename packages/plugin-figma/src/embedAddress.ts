@@ -5,10 +5,7 @@
  *
  * @module
  */
-import type { PluginStory } from "forgebook/plugin";
-
-/** A design's link, as Forgebook checked it. */
-export type DesignLink = NonNullable<PluginStory["design"]>;
+import type { FigmaLink } from "forgebook/figma-link";
 
 /** The host Figma's embeds are served from. */
 const EMBED_HOST = "embed.figma.com";
@@ -23,7 +20,7 @@ const EMBED_PRODUCT = "forgebook";
  * @param link - the design's link.
  * @param isDark - whether Figma's interface around the design is dark.
  */
-export const figmaEmbedAddress = (link: DesignLink, isDark: boolean): string => {
+export const figmaEmbedAddress = (link: FigmaLink, isDark: boolean): string => {
   const params = new URLSearchParams({ "embed-host": EMBED_PRODUCT, theme: isDark ? "dark" : "light" });
   if (link.nodeId !== undefined) params.set("node-id", link.nodeId);
   const branch = link.branchKey === undefined ? "" : `/branch/${link.branchKey}`;
