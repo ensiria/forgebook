@@ -94,11 +94,12 @@ The frame page the tests open, and the Vite configuration that serves it:
 // test/stories/frame.tsx
 import "@forgebook/testing/fonts.css";
 import { mountFrame } from "@forgebook/react/frame";
+import axeUrl from "axe-core/axe.min.js?url";
 
 import { source } from "../../stories/index";
 
 const root = document.getElementById("root");
-if (root !== null) void mountFrame(root, { sources: [source] });
+if (root !== null) void mountFrame(root, { sources: [source], axeUrl });
 
 // test/stories/vite.config.ts
 import { react } from "@forgebook/react/vite";
