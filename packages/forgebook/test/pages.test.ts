@@ -82,6 +82,9 @@ describe("a story's mocked API", () => {
 
   it("keeps it out of the shell", () => {
     expect(shellEntry({ ...CONFIG, hasMocks: true })).not.toContain("msw");
+  });
+});
+
 describe("a catalogue's theme", () => {
   const themed: ResolvedConfig = {
     ...CONFIG,
