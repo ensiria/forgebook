@@ -23,7 +23,7 @@ import { agentsSkill, withAgentsSection } from "./agentsText.ts";
 import { checkText, errorsOutput, shotText } from "./agentText.ts";
 import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
-import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 
 /**
  * The catalogue the errors are asked of: only frames open in a browser report to a running dev server, so without one
@@ -103,6 +103,26 @@ export const agentLoopCommands = (
         views: options.view ?? [],
         isAllVariants: options["all-variants"] === true
       });
+      if (typeof report === "string") throw new ScriptError(report);
+      io.stdout.write(isJson ? formatJson(report) : `${checkText(report, style)}\n`);
+      const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
+      if (problems > 0)
+        throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
+    }
+  }),
+  "check-page": forgebook.command({
+    summary: "Run the checks on a real page of the application: accessibility, what spills, its errors.",
+    json: true,
+    positionals: [{ name: "address", description: "The page's address.", required: true }],
+    examples: [
+      {
+        command: `${COMMAND} check-page http://localhost:3000/checkout`,
+        description: "The screen you built."
+      }
+    ],
+    run: async ({ args, options, io, isJson, style }): Promise<void> => {
+      const config = await configOf(options.config);
+      const report = await runPageCheck(config, [args.address]);
       if (typeof report === "string") throw new ScriptError(report);
       io.stdout.write(isJson ? formatJson(report) : `${checkText(report, style)}\n`);
       const problems = report.results.reduce((count, result) => count + result.problems.length, 0);

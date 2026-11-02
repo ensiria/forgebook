@@ -72,6 +72,8 @@ export type CatalogueReach = {
   readonly check: Check;
   /** Takes a story's pictures. */
   readonly shot: Shot;
+  /** Runs the checks on a page of the application. */
+  readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
 };
 
 /**
@@ -79,7 +81,32 @@ export type CatalogueReach = {
  *
  * @param reach - what they reach the catalogue through.
  */
-export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): readonly McpTool[] => [
+export const catalogueTools = ({
+  ask,
+  writeNew,
+  check,
+  shot,
+  checkPage
+}: CatalogueReach): readonly McpTool[] => [
+  {
+    name: "check_page",
+    description:
+      "Run the catalogue's checks on a real page of the application in a browser: accessibility, what spills, console and page errors. Use it on the screen you built; for a story, check_story.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "The page's address, as http://localhost:3000/checkout." }
+      },
+      required: ["address"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
+      const report = await checkPage(textOf(args, "address") ?? "");
+      return typeof report === "string"
+        ? { structured: { error: report }, isError: true }
+        : { structured: report, isError: false };
+    }
+  },
   {
     name: "list_stories",
     description:

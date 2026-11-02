@@ -56,9 +56,10 @@ export const axeProblems = async (page: Page, a11y: A11ySettings): Promise<Story
  * The elements that spill out of their parents.
  *
  * @param page - the story's frame page, ready.
+ * @param root - the element to look inside; a story's frame by default.
  */
-export const spillProblems = async (page: Page): Promise<StoryProblem[]> => {
-  const spills = await page.evaluate(findSpills, ".forgebook-frame");
+export const spillProblems = async (page: Page, root = ".forgebook-frame"): Promise<StoryProblem[]> => {
+  const spills = await page.evaluate(findSpills, root);
   return spills.map((spill) => ({
     kind: "spill",
     element: spill.element,
