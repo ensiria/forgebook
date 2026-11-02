@@ -15,6 +15,7 @@ import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts"
 import type {
   AgentTokenSummary,
   ErrorsDocument,
+  FoundComponentsDocument,
   NearestTokensDocument,
   StoriesDocument,
   StoryDocument,
@@ -190,3 +191,18 @@ export const nearestTokensText = (document: NearestTokensDocument): string => {
     })
     .join("\n");
 };
+
+/**
+ * The components a query found as a person reads them, saying which words did not match.
+ *
+ * @param document - the answer.
+ */
+export const foundComponentsText = (document: FoundComponentsDocument): string =>
+  document.components.length === 0
+    ? `Nothing in this catalogue holds "${document.query}".`
+    : document.components
+        .map((each) => {
+          const missed = each.missed.length === 0 ? "" : `  (no "${each.missed.join('", "')}")`;
+          return `${each.title}${missed}${each.guidance?.deprecated === undefined ? "" : "  deprecated"}`;
+        })
+        .join("\n");

@@ -324,6 +324,40 @@ describe("forgebook tokens", { timeout: SERVER_TIMEOUT }, () => {
   });
 });
 
+describe("forgebook find", { timeout: SERVER_TIMEOUT }, () => {
+  it("finds a component by a word its meta declares, with its first story and its links", () => {
+    const config = catalogue(root, "findable", {
+      "OptionCards.stories.tsx":
+        "export default { title: 'Inputs/OptionCards', keywords: ['radio tile group'] };\nexport const Plain = {};\n"
+    });
+    const run = runScriptProcess(ENTRY, [
+      "find",
+      "radio tile group",
+      "--config",
+      config,
+      "--url",
+      NO_SERVER,
+      "--json"
+    ]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      schema: 1,
+      components: [
+        { title: "Inputs/OptionCards", missed: [], links: { address: expect.stringContaining("story=") } }
+      ]
+    });
+  });
+
+  it("answers nothing for words nothing holds, and exits well: an empty answer is an answer", () => {
+    const config = catalogue(root, "findable-empty", {
+      "A.stories.tsx": "export default { title: 'Inputs/A' };\nexport const Plain = {};\n"
+    });
+    const run = runScriptProcess(ENTRY, ["find", "zebra", "--config", config, "--url", NO_SERVER, "--json"]);
+    expect(JSON.parse(run.stdout)).toMatchObject({ components: [] });
+    expect(run.exitCode).toBe(0);
+  });
+});
+
 describe("forgebook agents", () => {
   it("prints the instructions, with the commands that check a story", () => {
     const run = runScriptProcess(ENTRY, ["agents", "--print"]);

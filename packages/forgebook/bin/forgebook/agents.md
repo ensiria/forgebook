@@ -50,6 +50,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 
 | Command | What it is for |
 |---|---|
+| `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it |

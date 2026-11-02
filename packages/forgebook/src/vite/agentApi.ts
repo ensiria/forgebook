@@ -23,6 +23,7 @@ import type {
   AgentStory,
   AgentUsingComponent,
   ErrorsDocument,
+  FoundComponentsDocument,
   NearestTokensDocument,
   StoriesDocument,
   StoryDocument,
@@ -346,3 +347,14 @@ export const isNearestTokensDocument = (value: unknown): value is NearestTokensD
   value["schema"] === 1 &&
   Array.isArray(value["matches"]) &&
   Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is an intent search's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isFoundComponentsDocument = (value: unknown): value is FoundComponentsDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  typeof value["query"] === "string" &&
+  Array.isArray(value["components"]);
