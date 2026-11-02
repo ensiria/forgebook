@@ -29,7 +29,7 @@ import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext } from "./Example.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
-import { storyTouchesOf, type TouchOverrides, touchedView } from "./storyTouch.ts";
+import { phoneStories, storyTouchesOf, type TouchOverrides, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
 import { useComponentDocs } from "./useComponentDocs.ts";
@@ -154,8 +154,13 @@ export const ComponentPage = ({
   const { switches } = catalogue;
   // each story marked for a phone with its own finger: its frame gets it in place of the toolbar's Touch
   const touches = useMemo(
-    () => storyTouchesOf(component.stories, touchOverrides),
-    [component, touchOverrides]
+    () =>
+      storyTouchesOf(
+        component.stories,
+        touchOverrides,
+        phoneStories({ device: view.device, orientation: view.orientation }, catalogue.device)
+      ),
+    [component, touchOverrides, view.device, view.orientation, catalogue.device]
   );
   const exampleIds = useMemo(() => examples.map((story) => story.id), [examples]);
   const queue = useFrameQueue(exampleIds, pageRef);

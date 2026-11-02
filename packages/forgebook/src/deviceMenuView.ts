@@ -1,10 +1,10 @@
 /**
- * The changes the device menu makes to the view: a model chosen, the device turned. The address keeps only what
+ * The changes the device control makes to the view: a model chosen, the device turned. The address keeps only what
  * differs from the page's default, as the toggle does (`deviceView.ts`).
  *
  * @remarks
- * Apart from `deviceView.ts`, which the shell's first load reads: only the menu, which comes with the device's parts,
- * uses these. Pure.
+ * Apart from the toggle's `withFrame` (`deviceView.ts`), which the toolbar and the address share; the device control
+ * (`shell/DeviceControl.tsx`) uses these. Pure.
  *
  * @module
  */

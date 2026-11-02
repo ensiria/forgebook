@@ -12,7 +12,7 @@
  */
 import type { DeviceOrientation } from "@forgebook/story-format/csf";
 
-import { DEVICE_IDS, type DeviceId } from "./deviceView.ts";
+import { DEVICE_ENTRIES, type DeviceEntry, type DeviceId } from "./deviceView.ts";
 
 /** Lengths on each side, in CSS px. */
 export type Insets = {
@@ -28,9 +28,6 @@ export type Insets = {
 
 /** The system a device runs, which draws its status bar and its home indicator its own way. */
 export type DevicePlatform = "ios" | "android";
-
-/** What a device is: a phone, or a tablet. */
-export type DeviceKind = "phone" | "tablet";
 
 /**
  * The cut a front camera makes in the screen, upright: an island (a pill floating under the top edge), a notch (cut
@@ -64,14 +61,8 @@ export type DeviceCutout =
       readonly top: number;
     };
 
-/** A device model. */
-export type DeviceModel = {
-  /** Its id, as the address, `parameters.device` and the configuration name it. */
-  readonly id: DeviceId;
-  /** Its name, as the shell's menu writes it; the generic phone's is the shell's text (`deviceGeneric`). */
-  readonly name: string;
-  /** A phone or a tablet. */
-  readonly kind: DeviceKind;
+/** A device model: its entry in the menu, and its hardware. */
+export type DeviceModel = DeviceEntry & {
   /** Its system. */
   readonly platform: DevicePlatform;
   /** Its viewport's width upright, in CSS px. */
@@ -87,11 +78,8 @@ export type DeviceModel = {
 };
 
 /** Every model, by id. */
-const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
+const HARDWARE: Readonly<Record<DeviceId, Omit<DeviceModel, keyof DeviceEntry>>> = {
   "iphone-16": {
-    id: "iphone-16",
-    name: "iPhone 16",
-    kind: "phone",
     platform: "ios",
     width: 393,
     height: 852,
@@ -103,9 +91,6 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
     cutout: { kind: "island", width: 125, height: 37, top: 11 }
   },
   "iphone-16-pro-max": {
-    id: "iphone-16-pro-max",
-    name: "iPhone 16 Pro Max",
-    kind: "phone",
     platform: "ios",
     width: 440,
     height: 956,
@@ -117,9 +102,6 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
     cutout: { kind: "island", width: 125, height: 37, top: 14 }
   },
   "iphone-16e": {
-    id: "iphone-16e",
-    name: "iPhone 16e",
-    kind: "phone",
     platform: "ios",
     width: 390,
     height: 844,
@@ -131,9 +113,6 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
     cutout: { kind: "notch", width: 162, height: 33 }
   },
   "pixel-9": {
-    id: "pixel-9",
-    name: "Pixel 9",
-    kind: "phone",
     platform: "android",
     width: 412,
     height: 923,
@@ -145,9 +124,6 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
     cutout: { kind: "hole", diameter: 24, top: 12 }
   },
   "galaxy-s24": {
-    id: "galaxy-s24",
-    name: "Galaxy S24",
-    kind: "phone",
     platform: "android",
     width: 360,
     height: 780,
@@ -159,9 +135,6 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
     cutout: { kind: "hole", diameter: 20, top: 9 }
   },
   phone: {
-    id: "phone",
-    name: "Generic phone",
-    kind: "phone",
     platform: "android",
     width: 360,
     height: 800,
@@ -172,9 +145,6 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
     }
   },
   "ipad-mini": {
-    id: "ipad-mini",
-    name: "iPad mini",
-    kind: "tablet",
     platform: "ios",
     width: 744,
     height: 1133,
@@ -185,9 +155,6 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
     }
   },
   "ipad-pro-13": {
-    id: "ipad-pro-13",
-    name: "iPad Pro 13″",
-    kind: "tablet",
     platform: "ios",
     width: 1032,
     height: 1376,
@@ -200,14 +167,20 @@ const MODELS: Readonly<Record<DeviceId, DeviceModel>> = {
 };
 
 /** Every model, in the menu's order. */
-export const DEVICE_MODELS: readonly DeviceModel[] = DEVICE_IDS.map((id) => MODELS[id]);
+export const DEVICE_MODELS: readonly DeviceModel[] = DEVICE_ENTRIES.map((entry) => ({
+  ...entry,
+  ...HARDWARE[entry.id]
+}));
 
 /**
  * A model by its id.
  *
  * @param id - the model's id.
  */
-export const deviceModel = (id: DeviceId): DeviceModel => MODELS[id];
+export const deviceModel = (id: DeviceId): DeviceModel => {
+  const entry = DEVICE_ENTRIES.find((each) => each.id === id) ?? { id, name: id, kind: "phone" };
+  return { ...entry, ...HARDWARE[id] };
+};
 
 /** A model's screen, held one way: what the story gets. */
 export type DeviceScreen = {

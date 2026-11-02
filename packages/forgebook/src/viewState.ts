@@ -335,7 +335,9 @@ export const hasViewChanges = (
   switches.some((each) => ids.includes(each.id) && !isDefault(view, each)) ||
   (ids.includes("backdrop") && view.backdrop !== DEFAULT_VIEW.backdrop) ||
   (ids.includes("sheets") && view.sheets !== DEFAULT_VIEW.sheets) ||
-  (ids.includes("text") && view.text !== DEFAULT_VIEW.text);
+  (ids.includes("text") && view.text !== DEFAULT_VIEW.text) ||
+  (ids.includes(DEVICE_PARAMETER) &&
+    (view.device !== DEFAULT_VIEW.device || view.orientation !== DEFAULT_VIEW.orientation));
 
 /**
  * The address of a story's frame.

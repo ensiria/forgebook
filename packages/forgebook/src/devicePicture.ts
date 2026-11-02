@@ -106,7 +106,10 @@ export const framedPicture = (
  *
  * @param view - the view's device and orientation.
  */
-export const namedDevice = (view: DeviceView): NamedDevice | undefined => shownDevice(view, NO_DEVICE);
+export const namedDevice = (view: DeviceView): NamedDevice | undefined => {
+  const shown = shownDevice(view, NO_DEVICE);
+  return shown === undefined ? undefined : { model: shown.model, orientation: shown.orientation };
+};
 
 /**
  * The viewport a device gives a story, held as shown.

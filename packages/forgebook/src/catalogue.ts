@@ -16,7 +16,7 @@ import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
-import { type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "./deviceView.ts";
+import { DEVICE_PARAMETER, type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "./deviceView.ts";
 import type { CatalogueView } from "./namedViews.ts";
 import { switchWithRole, type TouchChoice, touchChoiceOf, type ViewSwitch } from "./switches.ts";
 import { viewQuery } from "./viewWords.ts";
@@ -44,11 +44,12 @@ export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y"
 export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
 
 /**
- * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the background, the
- * style sheets, the text size and the stage's width. Their ids are the address's own parameters, so no switch takes
- * one.
+ * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the device frame (first,
+ * so it sits beside the Touch switch, the last of the ready-made ones), the background, the style sheets, the text
+ * size and the stage's width. Their ids are their parameters in the address, so no switch takes one; the device's is
+ * under Forgebook's name (`forgebook.device`), so a catalogue's own `device` switch keeps its id.
  */
-export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width"] as const;
+export const OWN_CONTROL_IDS = [DEVICE_PARAMETER, "backdrop", "sheets", "text", "width"] as const;
 
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
@@ -101,7 +102,7 @@ export type CatalogueLists = {
   readonly controls?: Readonly<Partial<Record<TurnedOffControl, false>>>;
   /**
    * The controls that start on the toolbar, in their order, by id (a switch's id or one of `OWN_CONTROL_IDS`); the
-   * colour scheme, the contrast and the width by default. A control turned off in `controls` (here or by a preset) is
+   * colour scheme, the contrast, the width and the device by default. A control turned off in `controls` (here or by a preset) is
    * left out. A person's own arrangement replaces it.
    */
   readonly toolbar?: readonly string[];
@@ -218,8 +219,8 @@ const withHundred = (list: readonly number[] | undefined, fallback: readonly num
   list?.includes(100) ? [...list].sort((first, second) => first - second) : fallback;
 
 /**
- * The controls that start on the toolbar when the configuration names none: the colour scheme, the contrast and the
- * width, those the catalogue has.
+ * The controls that start on the toolbar when the configuration names none: the colour scheme, the contrast, the
+ * width and the device, those the catalogue has.
  *
  * @param switches - the catalogue's switches.
  * @param ownControls - Forgebook's own controls shown.
@@ -228,7 +229,8 @@ const defaultToolbar = (switches: readonly ViewSwitch[], ownControls: readonly O
   ...[switchWithRole(switches, "colorScheme"), switchWithRole(switches, "contrast")].flatMap((each) =>
     each === undefined ? [] : [each.id]
   ),
-  ...(ownControls.includes("width") ? ["width"] : [])
+  ...(ownControls.includes("width") ? ["width"] : []),
+  ...(ownControls.includes(DEVICE_PARAMETER) ? [DEVICE_PARAMETER] : [])
 ];
 
 /**

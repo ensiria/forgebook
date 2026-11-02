@@ -27,6 +27,31 @@ export const DEVICE_IDS = [
 /** A device model's id. */
 export type DeviceId = (typeof DEVICE_IDS)[number];
 
+/** What a device is: a phone, or a tablet. */
+export type DeviceKind = "phone" | "tablet";
+
+/** A model as the toolbar's menu lists it: its name and its kind; its sizes and drawing are `devices.ts`'. */
+export type DeviceEntry = {
+  /** Its id. */
+  readonly id: DeviceId;
+  /** Its name; the generic phone's is the shell's text (`deviceGeneric`). */
+  readonly name: string;
+  /** A phone or a tablet, the menu's groups. */
+  readonly kind: DeviceKind;
+};
+
+/** Every model as the menu lists it, in `DEVICE_IDS`' order. */
+export const DEVICE_ENTRIES: readonly DeviceEntry[] = [
+  { id: "iphone-16", name: "iPhone 16", kind: "phone" },
+  { id: "iphone-16-pro-max", name: "iPhone 16 Pro Max", kind: "phone" },
+  { id: "iphone-16e", name: "iPhone 16e", kind: "phone" },
+  { id: "pixel-9", name: "Pixel 9", kind: "phone" },
+  { id: "galaxy-s24", name: "Galaxy S24", kind: "phone" },
+  { id: "phone", name: "Generic phone", kind: "phone" },
+  { id: "ipad-mini", name: "iPad mini", kind: "tablet" },
+  { id: "ipad-pro-13", name: "iPad Pro 13″", kind: "tablet" }
+];
+
 /**
  * The address's parameter of the view's device. Forgebook's own parameters have plain names (`width`, `zoom`), but
  * `device` and `orientation` are names a catalogue may well give its own switches, so these two take Forgebook's name
@@ -75,10 +100,17 @@ export type DeviceDefault = {
   readonly model: DeviceId;
   /** How the device is held. */
   readonly orientation: DeviceOrientation;
+  /** Whether a story shown in the device is touched with a simulated finger, as a phone is. */
+  readonly isTouch: boolean;
 };
 
-/** The default when no one sets one: no frame, the generic phone upright for the toggle. */
-export const NO_DEVICE: DeviceDefault = { isFramed: false, model: DEFAULT_DEVICE, orientation: "portrait" };
+/** The default when no one sets one: no frame, the generic phone upright, touched once framed. */
+export const NO_DEVICE: DeviceDefault = {
+  isFramed: false,
+  model: DEFAULT_DEVICE,
+  orientation: "portrait",
+  isTouch: true
+};
 
 /** The device a story is shown in: a model, held one way. */
 export type ShownDevice = {
@@ -86,6 +118,12 @@ export type ShownDevice = {
   readonly model: DeviceId;
   /** How it is held. */
   readonly orientation: DeviceOrientation;
+};
+
+/** The device a story is shown in, and whether it is touched there. */
+export type StoryDevice = ShownDevice & {
+  /** Whether the story is touched with a simulated finger, unless the reader turns it off. */
+  readonly isTouch: boolean;
 };
 
 /**
@@ -117,7 +155,8 @@ export const deviceDefaultOf = (
 ): DeviceDefault => ({
   isFramed: setting?.frame ?? base.isFramed,
   model: isDeviceId(setting?.model) ? setting.model : base.model,
-  orientation: isDeviceOrientation(setting?.orientation) ? setting.orientation : base.orientation
+  orientation: isDeviceOrientation(setting?.orientation) ? setting.orientation : base.orientation,
+  isTouch: setting?.touch ?? base.isTouch
 });
 
 /**
@@ -147,11 +186,12 @@ export type DeviceView = {
  * @param view - the view's device and orientation.
  * @param story - the story's default (the catalogue's under its own).
  */
-export const shownDevice = (view: DeviceView, story: DeviceDefault): ShownDevice | undefined => {
+export const shownDevice = (view: DeviceView, story: DeviceDefault): StoryDevice | undefined => {
   if (view.device === "off" || (view.device === "auto" && !story.isFramed)) return undefined;
   return {
     model: view.device === "auto" ? story.model : view.device,
-    orientation: view.orientation === "auto" ? story.orientation : view.orientation
+    orientation: view.orientation === "auto" ? story.orientation : view.orientation,
+    isTouch: story.isTouch
   };
 };
 

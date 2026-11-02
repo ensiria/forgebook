@@ -40,9 +40,9 @@ test.describe("device frames", () => {
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveAttribute("data-model", "iphone-16");
     await ready(page);
     expect(await frameSize(page)).toEqual({ width: 393, height: 852 });
-    const toggle = page.getByRole("button", { name: "Device frame" });
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("combobox", { name: "Device" })).toHaveValue("iphone-16");
+    // the device control says what is shown; the width's presets are only widths, off while the device sets it
+    await expect(page.getByRole("combobox", { name: "Device", exact: true })).toHaveValue("iphone-16");
+    await expect(page.getByRole("radio", { name: "Fill" })).toBeDisabled();
     await expect(page.getByRole("textbox", { name: "Width in px" })).toBeDisabled();
     await expect(page.getByRole("textbox", { name: "Width in px" })).toHaveValue("393");
     // the status bar and the camera's cut never take the story's pointer
@@ -62,15 +62,16 @@ test.describe("device frames", () => {
       .frameLocator(".forgebook-story iframe.forgebook-frame-view")
       .locator("html")
       .evaluate((html) => html.setAttribute("data-kept", "yes"));
-    await page.getByRole("combobox", { name: "Device" }).selectOption("pixel-9");
+    await page.getByRole("combobox", { name: "Device", exact: true }).selectOption("pixel-9");
     await expect(page).toHaveURL(/forgebook\.device=pixel-9/);
     expect(await frameSize(page)).toEqual({ width: 412, height: 923 });
     await page.getByRole("button", { name: "Turn the device" }).click();
     await expect(page).toHaveURL(/forgebook\.orientation=landscape/);
     expect(await frameSize(page)).toEqual({ width: 923, height: 412 });
-    await page.getByRole("button", { name: "Device frame" }).click();
+    await page.getByRole("combobox", { name: "Device", exact: true }).selectOption({ label: "No frame" });
     await expect(page).toHaveURL(/forgebook\.device=off/);
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Turn the device" })).toHaveCount(0);
     // the frame stayed mounted throughout: the same document, the attribute set above still on it
     await expect(
       page.frameLocator(".forgebook-story iframe.forgebook-frame-view").locator("html")
@@ -87,9 +88,11 @@ test.describe("device frames", () => {
     await page.goto("/?story=kit:inputs-selection-select--overview&panel=closed");
     await ready(page);
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Device frame" })).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("combobox", { name: "Device", exact: true })).toHaveValue("off");
     expect(chunks).toEqual([]);
-    await page.getByRole("button", { name: "Device frame" }).click();
+    await page
+      .getByRole("combobox", { name: "Device", exact: true })
+      .selectOption({ label: "Generic phone" });
     await expect(page).toHaveURL(/forgebook\.device=phone/);
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveAttribute("data-model", "phone");
     expect(chunks.length).toBeGreaterThan(0);
@@ -114,10 +117,10 @@ test.describe("device frames", () => {
       "landscape"
     );
 
-    // the toolbar reads on while a story is framed by default, and turning it off shows every story without one
-    const toggle = page.getByRole("button", { name: "Device frame" });
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    await toggle.click();
+    // the toolbar shows a device while a story is framed by default, and No frame shows every story without one
+    const control = page.getByRole("combobox", { name: "Device", exact: true });
+    await expect(control).toHaveValue("iphone-16");
+    await control.selectOption({ label: "No frame" });
     await expect(page).toHaveURL(/forgebook\.device=off/);
     await expect(page.locator(".forgebook-example .forgebook-device[data-framed]")).toHaveCount(0);
 
@@ -131,5 +134,49 @@ test.describe("device frames", () => {
     const light = await body.getAttribute("fill");
     await page.evaluate(() => document.documentElement.setAttribute("data-forgebook-appearance", "dark"));
     await expect(body).not.toHaveAttribute("fill", light ?? "");
+  });
+
+  test("a story in a device is touched as a phone is, the reader can turn that off, and a device may say no", async ({
+    page
+  }) => {
+    const html = page.frameLocator(".forgebook-story iframe.forgebook-frame-view").locator("html");
+    await page.goto(screen("phone"));
+    await ready(page);
+    await expect(html).toHaveAttribute("data-forgebook-touch", "touch");
+    await expect(page).not.toHaveURL(/touch=/);
+    // the reader turns it off for the story, here on its example; the frame stays
+    await page.goto("/?component=kit:layouts-app-screen");
+    const toggle = page.getByRole("switch", { name: "Touch Phone with a finger", exact: true });
+    await expect(toggle).toBeChecked();
+    const demo = page.locator("article", { has: toggle });
+    await expect(demo.frameLocator("iframe.forgebook-frame-view").locator("html")).toHaveAttribute(
+      "data-forgebook-touch",
+      "touch"
+    );
+    await toggle.uncheck({ force: true });
+    await expect(demo.frameLocator("iframe.forgebook-frame-view").locator("html")).not.toHaveAttribute(
+      "data-forgebook-touch"
+    );
+    await expect(demo.locator(".forgebook-device[data-framed]")).toHaveCount(1);
+    // without its frame, a story not marked for a phone follows the address: the mouse
+    await page.goto(screen("phone", "forgebook.device=off"));
+    await ready(page);
+    await expect(html).not.toHaveAttribute("data-forgebook-touch");
+    // a device that says `touch: false` keeps the mouse
+    await page.goto(screen("mouse"));
+    await ready(page);
+    await expect(page.locator(".forgebook-device[data-framed]")).toHaveCount(1);
+    await expect(html).not.toHaveAttribute("data-forgebook-touch");
+  });
+
+  test("the device control sits in the View menu beside Touch, as the other controls do", async ({
+    page
+  }) => {
+    await page.goto(screen("phone"));
+    await page.getByRole("button", { name: /^View/ }).click();
+    const rows = await page
+      .locator(".forgebook-arrange")
+      .evaluateAll((each) => each.map((row) => (row as HTMLElement).dataset["control"] ?? ""));
+    expect(rows.indexOf("forgebook.device")).toBeGreaterThanOrEqual(0);
   });
 });

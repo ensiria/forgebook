@@ -265,6 +265,7 @@ describe("indexStoryFile", () => {
       export const Phone = {};
       export const Turned = { parameters: { device: { orientation: "landscape" as const } } };
       export const Off = { parameters: { device: { frame: false } } };
+      export const Mouse = { parameters: { device: { touch: false } } };
 `;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
       title: "A/B",
@@ -272,7 +273,8 @@ describe("indexStoryFile", () => {
       stories: [
         { exportName: "Phone" },
         { exportName: "Turned", device: { orientation: "landscape" } },
-        { exportName: "Off", device: { frame: false } }
+        { exportName: "Off", device: { frame: false } },
+        { exportName: "Mouse", device: { touch: false } }
       ]
     });
   });
@@ -285,7 +287,7 @@ describe("indexStoryFile", () => {
       );
     expect(index("PHONE")).toMatch(/story X: `parameters.device` must be written as a plain object/);
     expect(index("{ size: 3 }")).toMatch(
-      /`parameters.device` has no field `size`: it takes frame, model and orientation/
+      /`parameters.device` has no field `size`: it takes frame, model, orientation and touch/
     );
     expect(index('{ model: "nokia-3310" }')).toMatch(/`parameters.device`: "nokia-3310" is no device model/);
     expect(index('{ orientation: "flat" }')).toMatch(/"flat" is no orientation/);

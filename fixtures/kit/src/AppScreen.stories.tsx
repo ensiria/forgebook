@@ -24,3 +24,6 @@ export const Unframed: Story<typeof AppScreen> = { parameters: { device: { frame
 export const PixelLandscape: Story<typeof AppScreen> = {
   parameters: { device: { model: "pixel-9", orientation: "landscape" } }
 };
+
+/** The same screen in its iPhone, touched with the mouse: its device says so. */
+export const Mouse: Story<typeof AppScreen> = { parameters: { device: { touch: false } } };

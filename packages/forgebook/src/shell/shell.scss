@@ -722,44 +722,14 @@
     gap: $space-3;
   }
 
-  // the device frame's toggle at the start of the width it sets, and its menu while a device is shown: it takes no
-  // more of the bar than the icon it stands in for, its pressable room reaching into the gaps around it, so a bar
-  // that held the width before still holds it
-  .forgebook-device-menu {
-    display: inline-flex;
-    align-items: center;
-    gap: $space-1;
-    margin-inline: -$space-1 (-$space-2-5);
-  }
+  // the device list, its icon before it as the width's, and the turn button after it while a device is shown
+  .forgebook-toolbar__control.forgebook-device-control {
+    gap: $space-1-5;
 
-  .forgebook-device-toggle {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 1.375rem;
-    height: 1.375rem;
-    padding: 0;
-    border: 0;
-    border-radius: $radius-control-small;
-    background: none;
-    color: $text-secondary;
-    cursor: pointer;
-    transition:
-      background-color $duration-quick $ease-out,
-      color $duration-quick $ease-out;
-
-    &:hover {
-      background: $hover;
-      color: $text;
+    // as wide as most names need: the longest is cut rather than widening the bar for every model
+    .forgebook-select {
+      max-width: 8.5rem;
     }
-
-    &[aria-pressed="true"] {
-      background: $selected;
-      color: $accent-text;
-    }
-
-    @include mixins.focus-ring;
   }
 
   // the width's field closes the presets' group: a custom width lights it as a chosen preset is lit

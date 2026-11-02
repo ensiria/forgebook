@@ -13,7 +13,7 @@
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
 import type { OwnControlId } from "../catalogue.ts";
-import { type DeviceDefault, shownDevice } from "../deviceView.ts";
+import { DEVICE_PARAMETER, type DeviceDefault, shownDevice } from "../deviceView.ts";
 import type { FixedView } from "../storyGlobals.ts";
 import { switchControl, type ViewSwitch } from "../switches.ts";
 import type { ToolbarControl as Control } from "../toolbarLayout.ts";
@@ -26,7 +26,7 @@ import {
   type ViewState
 } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
-import { DeviceToggle } from "./DeviceToggle.tsx";
+import { DeviceControl } from "./DeviceControl.tsx";
 import { Icon, type IconName } from "./icons.tsx";
 import { Segmented, type SegmentOption } from "./Segmented.tsx";
 import { STRINGS } from "./strings.ts";
@@ -78,7 +78,8 @@ const OWN_LABELS: Readonly<Record<OwnControlId, () => string>> = {
   backdrop: () => STRINGS.backdrop,
   sheets: () => STRINGS.sheets,
   text: () => STRINGS.text,
-  width: () => STRINGS.width
+  width: () => STRINGS.width,
+  [DEVICE_PARAMETER]: () => STRINGS.device
 };
 
 /**
@@ -237,13 +238,12 @@ const SwitchControl = ({
 };
 
 /**
- * The stage's width: the device frame's toggle first, since a device sets the width in its place; then the presets as
- * segments, closed by the field that takes any width. While a device is shown, its menu takes the presets' place and
- * the field shows the device's width.
+ * The stage's width: its presets as segments, closed by the field that takes any width; off while a device sets it.
  *
  * @param props - its form and what every control shares.
  */
 const WidthControl = ({
+  form,
   view,
   onViewChange,
   isStoryPage,
@@ -253,39 +253,46 @@ const WidthControl = ({
 }: ControlContext & { readonly form: ControlForm }): ReactNode => {
   const { widths } = useCatalogue();
   const setWidth = (width: StageWidth): void => onViewChange({ ...view, width });
-  const isFramed = shownDevice(view, deviceDefault) !== undefined;
-  const field = (
-    <WidthField
-      width={view.width}
-      shownWidth={shownWidth}
-      onWidthChange={setWidth}
-      disabledNote={isFramed ? STRINGS.setByDevice : undefined}
+  const note = widthNote(shownDevice(view, deviceDefault) !== undefined, fixed);
+  const presets = (
+    <Segmented
+      label={STRINGS.width}
+      isDisabled={(isStoryPage && isComparing(view)) || note !== undefined}
+      disabledNote={note}
+      options={[
+        { value: "fill", label: STRINGS.widthFill },
+        ...widths.map((preset) => ({
+          value: preset.width,
+          label: preset.label ?? STRINGS.widthPx(preset.width)
+        }))
+      ]}
+      value={view.width}
+      onValueChange={setWidth}
+      after={
+        <WidthField width={view.width} shownWidth={shownWidth} onWidthChange={setWidth} disabledNote={note} />
+      }
     />
   );
+  if (form === "row") return presets;
   return (
     <div className="forgebook-toolbar__width">
-      <DeviceToggle view={view} onViewChange={onViewChange} defaults={deviceDefault} />
-      {isFramed ? (
-        field
-      ) : (
-        <Segmented
-          label={STRINGS.width}
-          isDisabled={(isStoryPage && isComparing(view)) || fixed.width !== undefined}
-          disabledNote={fixed.width === undefined ? undefined : STRINGS.setByStory}
-          options={[
-            { value: "fill", label: STRINGS.widthFill },
-            ...widths.map((preset) => ({
-              value: preset.width,
-              label: preset.label ?? STRINGS.widthPx(preset.width)
-            }))
-          ]}
-          value={view.width}
-          onValueChange={setWidth}
-          after={field}
-        />
-      )}
+      <span className="forgebook-toolbar__icon" title={STRINGS.width}>
+        <Icon name="width" size={14} />
+      </span>
+      {presets}
     </div>
   );
+};
+
+/**
+ * Why the width cannot be set, or none: a device shown sets it, then a story that fixes it.
+ *
+ * @param isFramed - whether a device is shown.
+ * @param fixed - what the story fixes.
+ */
+const widthNote = (isFramed: boolean, fixed: FixedView): string | undefined => {
+  if (isFramed) return STRINGS.setByDevice;
+  return fixed.width === undefined ? undefined : STRINGS.setByStory;
 };
 
 /**
@@ -301,6 +308,10 @@ const OwnControl = ({
   const catalogue = useCatalogue();
   const { view, onViewChange, isStoryPage, fixed } = context;
   if (id === "width") return <WidthControl form={form} {...context} />;
+  if (id === DEVICE_PARAMETER)
+    return (
+      <DeviceControl form={form} view={view} onViewChange={onViewChange} defaults={context.deviceDefault} />
+    );
   if (id === "backdrop") {
     return (
       <FormChoice

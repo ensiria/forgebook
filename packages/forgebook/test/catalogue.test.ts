@@ -149,14 +149,16 @@ describe("configureStrings", () => {
     expect(catalogueSettings("Acme UI", DEFAULT_SWITCHES).device).toEqual({
       isFramed: false,
       model: "phone",
-      orientation: "portrait"
+      orientation: "portrait",
+      isTouch: true
     });
     expect(
       catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { frame: true, model: "pixel-9" } }).device
     ).toEqual({
       isFramed: true,
       model: "pixel-9",
-      orientation: "portrait"
+      orientation: "portrait",
+      isTouch: true
     });
     expect(
       catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { model: "nokia-3310" } }).device.model

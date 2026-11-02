@@ -232,28 +232,36 @@ const configProblem = (config: unknown): string | undefined => {
  */
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
 
+/** The fields of a device setting, by name, and the type each is written in. */
+const DEVICE_FIELDS: Readonly<Record<string, "boolean" | "string">> = {
+  frame: "boolean",
+  model: "string",
+  orientation: "string",
+  touch: "boolean"
+};
+
 /**
- * Why a device setting cannot be used, or none: not an object of `frame`, `model` and `orientation`, a `frame` that is
- * no boolean, or a model or an orientation that is none. A configuration is code, so its types are not a promise.
+ * Why a device setting cannot be used, or none: not an object of `frame`, `model`, `orientation` and `touch`, a field
+ * of another type, or a model or an orientation that is none. A configuration is code, so its types are not a
+ * promise.
  *
  * @param device - the setting as a configuration or a preset gives it.
  */
 const deviceProblem = (device: unknown): string | undefined => {
   if (typeof device !== "object" || device === null || Array.isArray(device))
     return 'write it as an object: { frame: true, model: "iphone-16" }';
-  const unknownField = Object.keys(device).find((name) => !["frame", "model", "orientation"].includes(name));
-  if (unknownField !== undefined)
-    return `it has no field "${unknownField}": it takes frame, model and orientation`;
-  if ("frame" in device && device.frame !== undefined && typeof device.frame !== "boolean")
-    return "its frame must be true or false";
-  const model = "model" in device ? device.model : undefined;
-  const orientation = "orientation" in device ? device.orientation : undefined;
-  if (model !== undefined && typeof model !== "string") return "its model must be a model's id";
-  if (orientation !== undefined && typeof orientation !== "string")
-    return "its orientation must be portrait or landscape";
+  for (const [name, value] of Object.entries(device)) {
+    const type = DEVICE_FIELDS[name];
+    if (type === undefined)
+      return `it has no field "${name}": it takes ${Object.keys(DEVICE_FIELDS).join(", ")}`;
+    if (value !== undefined && typeof value !== type)
+      return `its ${name} must be ${type === "boolean" ? "true or false" : "a text"}`;
+  }
+  const model: unknown = Reflect.get(device, "model");
+  const orientation: unknown = Reflect.get(device, "orientation");
   return deviceSettingProblem({
-    ...(model === undefined ? {} : { model }),
-    ...(orientation === undefined ? {} : { orientation })
+    ...(typeof model === "string" ? { model } : {}),
+    ...(typeof orientation === "string" ? { orientation } : {})
   });
 };
 

@@ -18,7 +18,7 @@ import {
 } from "../src/deviceView.ts";
 
 /** A story framed in an iPhone 16 upright by default. */
-const FRAMED: DeviceDefault = { isFramed: true, model: "iphone-16", orientation: "portrait" };
+const FRAMED: DeviceDefault = { isFramed: true, model: "iphone-16", orientation: "portrait", isTouch: true };
 
 /** The view that follows the story. */
 const AUTO: DeviceView = { device: "auto", orientation: "auto" };
@@ -27,10 +27,11 @@ describe("deviceDefaultOf", () => {
   it("lays a setting's fields over the default, each one apart", () => {
     expect(deviceDefaultOf(NO_DEVICE, undefined)).toEqual(NO_DEVICE);
     expect(deviceDefaultOf(NO_DEVICE, { frame: true })).toEqual({ ...NO_DEVICE, isFramed: true });
-    expect(deviceDefaultOf(FRAMED, { frame: false, orientation: "landscape" })).toEqual({
+    expect(deviceDefaultOf(FRAMED, { frame: false, orientation: "landscape", touch: false })).toEqual({
       isFramed: false,
       model: "iphone-16",
-      orientation: "landscape"
+      orientation: "landscape",
+      isTouch: false
     });
   });
 
@@ -46,10 +47,11 @@ describe("deviceDefaultOf", () => {
 describe("shownDevice", () => {
   it("follows the story's default while the view says auto", () => {
     expect(shownDevice(AUTO, NO_DEVICE)).toBeUndefined();
-    expect(shownDevice(AUTO, FRAMED)).toEqual({ model: "iphone-16", orientation: "portrait" });
+    expect(shownDevice(AUTO, FRAMED)).toEqual({ model: "iphone-16", orientation: "portrait", isTouch: true });
     expect(shownDevice({ device: "auto", orientation: "landscape" }, FRAMED)).toEqual({
       model: "iphone-16",
-      orientation: "landscape"
+      orientation: "landscape",
+      isTouch: true
     });
   });
 
@@ -57,7 +59,8 @@ describe("shownDevice", () => {
     expect(shownDevice({ device: "off", orientation: "auto" }, FRAMED)).toBeUndefined();
     expect(shownDevice({ device: "pixel-9", orientation: "auto" }, NO_DEVICE)).toEqual({
       model: "pixel-9",
-      orientation: "portrait"
+      orientation: "portrait",
+      isTouch: true
     });
   });
 });
@@ -85,7 +88,8 @@ describe("pageDeviceDefault", () => {
     expect(pageDeviceDefault(NO_DEVICE, [undefined, { frame: true, model: "pixel-9" }])).toEqual({
       isFramed: true,
       model: "pixel-9",
-      orientation: "portrait"
+      orientation: "portrait",
+      isTouch: true
     });
     expect(pageDeviceDefault(NO_DEVICE, [undefined, { model: "pixel-9" }])).toEqual(NO_DEVICE);
     const framed = pageDeviceDefault(NO_DEVICE, [{ frame: true, model: "iphone-16" }]);

@@ -70,6 +70,11 @@ export type StoryDeviceSetting = {
   readonly model?: string;
   /** How the device is held; `portrait` by default. */
   readonly orientation?: DeviceOrientation;
+  /**
+   * Whether the story is touched with the catalogue's simulated finger while it is in the device, as a phone is;
+   * `true` by default. The reader can still turn touch off for it.
+   */
+  readonly touch?: boolean;
 };
 
 /**

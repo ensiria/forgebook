@@ -561,6 +561,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
     touchOverrides,
     onTouchChange: setTouchOverride,
     touch: catalogue.touch,
+    catalogueDevice: catalogue.device,
     onAddressViewChange: changeView
   });
 

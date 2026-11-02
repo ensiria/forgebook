@@ -145,7 +145,7 @@ export default defineConfig({
 });
 ```
 
-Without `toolbar`, the colour scheme, the contrast and the width start there. A control turned off in `controls`
+Without `toolbar`, the colour scheme, the contrast, the width and the device start there. A control turned off in `controls`
 shows nowhere, not even on the toolbar, and keeps its default (the width can still be dragged on the stage). A preset
 may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
 that is no control at all stops the catalogue with an error saying which.
@@ -180,12 +180,20 @@ Chromium window with Chromium's own touch emulation (it needs `@forgebook/testin
 
 ## Devices
 
-At phone and tablet sizes a story can be shown inside a drawn device, as a browser's device mode shows a page: the
-device button after the width turns it on, a list picks the model and a button turns it on its side. The story gets
+At phone and tablet sizes a story can be shown inside a drawn device, as a browser's device mode shows a page. The
+Device control (on the toolbar after the width, and in View beside Touch) says what is shown, "No frame" or the model,
+turns the frame off or picks a model; while a device is shown, a button beside it turns it on its side, and the
+width's presets wait, since the device sets the width. The story gets
 the model's real viewport (its width and its height), the screen's rounded corners clip it, and the status bar, the
 camera's cut and the home indicator sit over it where the device has them. The choice is in the address
 (`forgebook.device=pixel-9&forgebook.orientation=landscape`, under Forgebook's name so a catalogue's own `device` or
-`orientation` switch keeps its parameter), so a link shares it; the compare view puts a device in each cell.
+`orientation` switch keeps its parameter), so a link shares it; the compare view puts a device in each cell. The
+control's id, for a configuration's `toolbar` and `controls`, is the same: `controls: { "forgebook.device": false }`
+takes it away (a story's own default still frames it).
+
+A story in a device is touched with the catalogue's simulated finger, as a phone is (see Touch below): the reader can
+turn that off for it, as for a story marked for a phone, and a device that should keep the mouse says
+`touch: false`.
 
 | Model | Id | Viewport |
 |---|---|---|
@@ -211,6 +219,9 @@ export default {
 } satisfies Meta<typeof Settings>;
 
 export const Landscape: Story<typeof Settings> = { parameters: { device: { orientation: "landscape" } } };
+
+// in the iPhone, with the mouse
+export const Pointer: Story<typeof Settings> = { parameters: { device: { touch: false } } };
 ```
 
 A catalogue sets the default under every story with `device` in its configuration (`device: { model: "pixel-9" }`
