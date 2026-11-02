@@ -71,6 +71,9 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
     '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
     `    <title>${escaped(page === "index.html" ? config.title : "Story")}</title>`,
     ...(page === "frame.html" && config.head !== "" ? [config.head] : []),
+    ...(page === "frame.html" && config.shell.frameCss !== ""
+      ? [`    <style>${config.shell.frameCss}</style>`]
+      : []),
     ...(page === "index.html" && config.shell.themeCss !== ""
       ? [`    <style>${config.shell.themeCss}</style>`]
       : []),
@@ -161,6 +164,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "  mountShell(root, {",
     "    title: config.title,",
     ...(config.logo === undefined ? [] : ["    logo,"]),
+    ...(config.shell.hasBranding ? [] : ["    hasBranding: false,"]),
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
     `    sources: ${sources.list},`,
     '    frameUrl: "frame.html",',

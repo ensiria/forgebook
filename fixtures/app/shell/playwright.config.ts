@@ -15,19 +15,31 @@ import { defineConfig } from "@playwright/test";
 /** The port the fixture app listens on. */
 const PORT = Number(process.env["FORGEBOOK_SHELL_PORT"] ?? "41721");
 
+/** The port the white-label catalogue listens on: the next one, so worktrees that set the first stay apart. */
+const WHITE_LABEL_PORT = PORT + 1;
+
 export default defineConfig({
   testDir: import.meta.dirname,
   testMatch: "*.e2e.ts",
   fullyParallel: true,
   reporter: [["list"]],
-  webServer: {
-    // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
-    // dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here
-    command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT} --force`,
-    cwd: join(import.meta.dirname, ".."),
-    url: `http://127.0.0.1:${PORT}/`,
-    reuseExistingServer: false
-  },
+  webServer: [
+    {
+      // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
+      // dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here
+      command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT} --force`,
+      cwd: join(import.meta.dirname, ".."),
+      url: `http://127.0.0.1:${PORT}/`,
+      reuseExistingServer: false
+    },
+    {
+      // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
+      command: `pnpm exec forgebook dev --config white-label/forgebook.config.ts --host 127.0.0.1 --port ${WHITE_LABEL_PORT} --force`,
+      cwd: join(import.meta.dirname, ".."),
+      url: `http://127.0.0.1:${WHITE_LABEL_PORT}/`,
+      reuseExistingServer: false
+    }
+  ],
   use: {
     browserName: "chromium",
     baseURL: `http://127.0.0.1:${PORT}/`,
