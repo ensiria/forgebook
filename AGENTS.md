@@ -9,9 +9,11 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
 - `packages/forgebook`: the core (`forgebook` on npm): `src/shell` (the catalogue's page), `src/frame` (a story's
   frame), `src/vite` (the plugin, the props extractor, the answers to tools and agents), `bin/` (`forgebook`,
   `forgebook-docs`, `forgebook-texts`).
-- `packages/react` (`@forgebook/react`), `packages/story-format` (`@forgebook/story-format`, no dependencies),
+- `packages/react` (`@forgebook/react`), `packages/nextjs` (`@forgebook/nextjs`, on React's), `packages/story-format`
+  (`@forgebook/story-format`, no dependencies),
   `packages/testing` (`@forgebook/testing`).
-- `fixtures/`: the kit, the stories written the Storybook way, and the catalogue the shell's browser tests run on.
+- `fixtures/`: the kit, the stories written the Storybook way, the catalogue the shell's browser tests run on, and a
+  small Next.js app (`fixtures/nextjs`) whose catalogue they open beside it.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
 
 ## Before you say a change is done
