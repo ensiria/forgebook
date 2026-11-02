@@ -51,6 +51,8 @@ export const liveRecord = <TValue>(initial: Readonly<Record<string, TValue>>): L
       get: (_target: Record<string, TValue>, key: string | symbol): unknown => {
         if (key === $PROXY) return record;
         if (typeof key !== "string") return undefined;
+        // what every object inherits (`toString`, `hasOwnProperty`) stays the object's, unless an arg takes the name
+        if (!keys().includes(key) && key in Object.prototype) return Reflect.get(Object.prototype, key);
         return signalOf(key)[0]();
       },
       has: (_target: Record<string, TValue>, key: string | symbol): boolean =>

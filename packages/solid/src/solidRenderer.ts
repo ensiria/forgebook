@@ -160,7 +160,10 @@ export const solidRenderer: StoryRenderer = {
     /** Says the story is drawn, once its effects ran without an error; a component of no output. */
     const Drawn = (): JSX.Element => {
       onMount(() => {
-        if (failure === undefined) markDrawn();
+        // after the effects of this drain: one of the story's own may still throw in it, and a story that threw is not drawn
+        queueMicrotask(() => {
+          if (failure === undefined) markDrawn();
+        });
       });
       return null;
     };
@@ -201,16 +204,17 @@ export const solidRenderer: StoryRenderer = {
     return {
       drawn,
       update: (next: StoryDrawing): void => {
+        // only an error that stood before these values is tried again: one they cause is reported, and stands
+        const standing = failure;
         args.assign(next.args);
         globals.assign(next.globals);
         setTexts(() => next.texts);
         setClock(() => next.clock);
         setLoaded(() => next.loaded);
         if (!isSameStory(scene(), next)) setScene(() => next);
-        if (failure !== undefined) {
-          const { retry } = failure;
+        if (standing !== undefined && failure === standing) {
           failure = undefined;
-          retry();
+          standing.retry();
         }
       },
       unmount: dispose

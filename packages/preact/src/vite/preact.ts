@@ -26,6 +26,36 @@ const REFRESH_RUNTIME: Readonly<Record<string, string>> = {
 /** A Vite configuration's Oxc options, as far as this plugin reads them. */
 type OxcOptions = Exclude<NonNullable<UserConfig["oxc"]>, false>;
 
+/** How a configuration names its JSX runtime: what Prefresh fills in for every file when the user did not. */
+type JsxNaming = Partial<Record<"importSource" | "pragma" | "pragmaFrag", string>>;
+
+/**
+ * The naming a JSX setting holds.
+ *
+ * @param jsx - Oxc's `jsx` setting, or Rolldown's.
+ */
+const namingOf = (jsx: unknown): JsxNaming => {
+  if (typeof jsx !== "object" || jsx === null) return {};
+  const naming: JsxNaming = {};
+  for (const key of ["importSource", "pragma", "pragmaFrag"] as const) {
+    const value: unknown = Reflect.get(jsx, key);
+    if (typeof value === "string") naming[key] = value;
+  }
+  return naming;
+};
+
+/**
+ * A JSX setting with the user's own naming in place of Prefresh's.
+ *
+ * @param jsx - the setting Prefresh left.
+ * @param naming - the user's naming; none leaves each file's to its `tsconfig.json`.
+ */
+const withNaming = <TJsx extends object>(jsx: TJsx, naming: JsxNaming): TJsx => {
+  const kept = { ...jsx };
+  for (const key of ["importSource", "pragma", "pragmaFrag"] as const) Reflect.deleteProperty(kept, key);
+  return { ...kept, ...naming };
+};
+
 /**
  * Leaves each file's JSX to its own `tsconfig.json`, keeping Preact's refresh, and names refresh's runtime where the
  * project can pre-bundle it.
@@ -33,27 +63,59 @@ type OxcOptions = Exclude<NonNullable<UserConfig["oxc"]>, false>;
  * @remarks
  * `@prefresh/vite` sets one JSX runtime for every file (`preact`), which would turn the shell's React into Preact's
  * when the core is linked as sources. Without the runtime set, Vite reads each file's `jsxImportSource` from its own
- * `tsconfig.json`, as a Preact project writes it, and the shell keeps React's; Fast Refresh's markers are written for
- * every file but the core's and this package's.
+ * `tsconfig.json`, as a Preact project writes it, and the shell keeps React's. A runtime the user names in the Vite
+ * configuration itself is kept, for the pages and the pre-bundled dependencies alike. Fast Refresh's markers are
+ * written for every file but the core's and this package's, and the files the user leaves out stay out.
  *
- * @returns the plugin, after Prefresh's.
+ * @returns the plugins: one that notes the user's naming before Prefresh, one that restores it after.
  */
-const jsxPerFile = (): Plugin => ({
-  name: "forgebook:preact-jsx",
-  enforce: "post",
-  config: (config: UserConfig): void => {
-    const oxc: OxcOptions = typeof config.oxc === "object" ? config.oxc : {};
-    const jsx = typeof oxc.jsx === "object" ? oxc.jsx : {};
-    const { importSource: _importSource, pragma: _pragma, pragmaFrag: _pragmaFrag, ...rest } = jsx;
-    config.oxc = { ...oxc, jsx: { ...rest, runtime: "automatic" }, jsxRefreshExclude: NOT_REFRESHED };
-    const include = config.optimizeDeps?.include;
-    if (include !== undefined)
-      config.optimizeDeps = {
-        ...config.optimizeDeps,
-        include: include.map((name) => REFRESH_RUNTIME[name] ?? name)
-      };
-  }
-});
+const jsxPerFile = (): readonly Plugin[] => {
+  let pages: JsxNaming = {};
+  let dependencies: JsxNaming = {};
+  return [
+    {
+      name: "forgebook:preact-jsx-naming",
+      enforce: "pre",
+      config: (config: UserConfig): void => {
+        pages = namingOf(typeof config.oxc === "object" ? config.oxc.jsx : undefined);
+        dependencies = namingOf(config.optimizeDeps?.rolldownOptions?.transform?.jsx);
+      }
+    },
+    {
+      name: "forgebook:preact-jsx",
+      enforce: "post",
+      config: (config: UserConfig): void => {
+        if (config.oxc === false) return;
+        const oxc: OxcOptions = config.oxc ?? {};
+        const jsx = typeof oxc.jsx === "object" ? oxc.jsx : {};
+        const userExcluded = oxc.jsxRefreshExclude;
+        const excluded = [...NOT_REFRESHED, ...(userExcluded === undefined ? [] : [userExcluded].flat())];
+        config.oxc = {
+          ...oxc,
+          jsx: withNaming({ ...jsx, runtime: "automatic" as const }, pages),
+          jsxRefreshExclude: excluded
+        };
+        const optimizeDeps = config.optimizeDeps ?? {};
+        const transform = optimizeDeps.rolldownOptions?.transform;
+        const dependenciesJsx = transform?.jsx;
+        config.optimizeDeps = {
+          ...optimizeDeps,
+          ...(optimizeDeps.include === undefined
+            ? {}
+            : { include: optimizeDeps.include.map((name) => REFRESH_RUNTIME[name] ?? name) }),
+          ...(typeof dependenciesJsx === "object"
+            ? {
+                rolldownOptions: {
+                  ...optimizeDeps.rolldownOptions,
+                  transform: { ...transform, jsx: withNaming(dependenciesJsx, dependencies) }
+                }
+              }
+            : {})
+        };
+      }
+    }
+  ];
+};
 
 /**
  * Preact, as the plugin reads its components: the docs module the docs' worker loads is this package's `extractDocs.ts`
@@ -78,6 +140,6 @@ export const preact = (): FrameworkAdapter => ({
   ],
   vitePlugins: async (): Promise<readonly PluginOption[]> => {
     const { default: prefresh } = await import("@prefresh/vite");
-    return [await prefresh({ exclude: NOT_REFRESHED }), jsxPerFile()];
+    return [await prefresh({ exclude: NOT_REFRESHED }), ...jsxPerFile()];
   }
 });

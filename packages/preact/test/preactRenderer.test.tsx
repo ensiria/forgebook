@@ -153,7 +153,7 @@ describe("preactRenderer", () => {
     story.unmount();
   });
 
-  it("hands the frame an error thrown in an effect, once", async () => {
+  it("hands the frame an error thrown in an effect, once, and does not call the story drawn", async () => {
     const failing = loaded({
       render: () => {
         useEffect(() => {
@@ -164,9 +164,16 @@ describe("preactRenderer", () => {
     });
     const errors: string[] = [];
     const element = canvas();
-    preactRenderer.mount(element, drawing(failing), (error) => errors.push(error.message));
+    const mounted = preactRenderer.mount(element, drawing(failing), (error) => errors.push(error.message));
+    let isDrawn = false;
+    void mounted.drawn.then(() => {
+      isDrawn = true;
+    });
     await vi.waitFor(() => expect(errors).toEqual(["Effect failed"]));
     expect(element.textContent).toBe("");
+    // a story that threw is not drawn: its play must not run on it
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(isDrawn).toBe(false);
   });
 
   it("renders a story on the server inside the catalogue's decorators, which read its globals", async () => {

@@ -24,7 +24,7 @@
 import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
 import { storyContextOf } from "forgebook/renderer";
 import { type ComponentChildren, render, type VNode } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 
 import { StoryClockContext } from "./clock.ts";
 import { StoryErrorBoundary } from "./StoryErrorBoundary.ts";
@@ -59,21 +59,32 @@ const StoryBody = ({
   storyNode(drawing.story, storyContextOf(drawing, drawing.args, canvasOf), drawing.decorators);
 
 /**
- * The story, telling once that it is drawn: its effect runs after Preact put it in the page, and does not run when the
- * story threw.
+ * The story, telling once that it is drawn: after Preact put it in the page and ran its effects, and not when the story
+ * threw while drawn or in one of those effects.
  *
- * @param props - the story's nodes and what to call once it is drawn.
+ * @param props - the story's nodes, what to call once it is drawn, and how many errors the story has thrown so far.
  */
 const Drawn = ({
   children,
-  onDrawn
+  onDrawn,
+  failures
 }: {
   readonly children: ComponentChildren;
   readonly onDrawn: () => void;
+  readonly failures: () => number;
 }): ComponentChildren => {
   const drawnRef = useRef(onDrawn);
+  const failuresRef = useRef(failures);
+  const before = useRef(0);
+  // layout effects run before any effect of the story: the count then is the one an effect's error would raise
+  useLayoutEffect(() => {
+    before.current = failuresRef.current();
+  }, []);
   useEffect(() => {
-    drawnRef.current();
+    // the story's effects ran before this one, but its boundary hears of their errors as they run: wait for this flush
+    queueMicrotask(() => {
+      if (failuresRef.current() === before.current) drawnRef.current();
+    });
   }, []);
   return children;
 };
@@ -88,13 +99,18 @@ export const preactRenderer: StoryRenderer = {
     const drawn = new Promise<void>((resolve) => {
       markDrawn = resolve;
     });
+    let failures = 0;
+    const report = (error: Error): void => {
+      failures += 1;
+      onError(error);
+    };
     const draw = (drawing: StoryDrawing): void => {
       render(
         inProviders(
           drawing,
           // new args render the story again: a value that made it throw can be changed back
-          <StoryErrorBoundary resetKey={drawing.args} onError={onError}>
-            <Drawn onDrawn={markDrawn}>
+          <StoryErrorBoundary resetKey={drawing.args} onError={report}>
+            <Drawn onDrawn={markDrawn} failures={() => failures}>
               {/* another story starts over: its hooks are not this one's */}
               <StoryBody key={drawing.identity.id} drawing={drawing} canvasOf={() => canvas} />
             </Drawn>

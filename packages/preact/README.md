@@ -24,6 +24,7 @@ and the stories take their types from it:
 
 ```tsx
 import type { Meta, Story } from "@forgebook/preact";
+import { useState } from "preact/hooks";
 
 import { Badge } from "./Badge";
 
@@ -42,6 +43,7 @@ export const Counting: Story<typeof Badge> = {
 
 Your `tsconfig.json` says which JSX the stories are written in, as Preact's guide writes it:
 `"jsx": "react-jsx", "jsxImportSource": "preact"`. Vite reads it for each file, so the catalogue's own React keeps its JSX.
+A runtime named in the Vite configuration instead (`oxc.jsx.importSource`) is kept as you wrote it, for every file.
 
 | Import | What it is |
 |---|---|

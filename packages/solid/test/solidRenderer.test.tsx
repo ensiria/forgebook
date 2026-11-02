@@ -10,7 +10,7 @@ import { heldStoryClock } from "@forgebook/story-format/clock";
 import type { StoryContext } from "@forgebook/story-format/csf";
 import type { StoryDrawing } from "forgebook/renderer";
 import { type LoadedArgs, type LoadedStory, readPreview, readStory } from "forgebook/story-module";
-import { createEffect, createResource, createSignal, type JSX } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, type JSX } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 
 import { useStoryNow } from "../src/clock.ts";
@@ -222,10 +222,55 @@ describe("solidRenderer", () => {
     const mounted = solidRenderer.mount(element, drawing(story, { args: { name: "boom" } }), (error) =>
       errors.push(error.message)
     );
+    let isDrawn = false;
+    void mounted.drawn.then(() => {
+      isDrawn = true;
+    });
     await vi.waitFor(() => expect(errors).toEqual(["Effect failed"]));
     expect(element.textContent).toBe("");
+    // a story that threw is not drawn: its play must not run on it
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(isDrawn).toBe(false);
     mounted.update(drawing(story, { args: { name: "Ada" } }));
     await vi.waitFor(() => expect(element.textContent).toBe("Ada"));
     await mounted.drawn;
+  });
+
+  it("reports once an error new args cause, and keeps it until the next args", async () => {
+    const story = loaded({
+      render: (args: { readonly text?: unknown }) => {
+        const text = createMemo(() => {
+          if (args.text === "boom") throw new Error("Fragile broke");
+          return String(args.text);
+        });
+        return <p>{text()}</p>;
+      }
+    });
+    const errors: string[] = [];
+    const element = canvas();
+    const mounted = solidRenderer.mount(element, drawing(story, { args: { text: "Fine" } }), (error) =>
+      errors.push(error.message)
+    );
+    await mounted.drawn;
+    mounted.update(drawing(story, { args: { text: "boom" } }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(errors).toEqual(["Fragile broke"]);
+    expect(element.textContent).toBe("");
+    mounted.update(drawing(story, { args: { text: "Fine again" } }));
+    expect(element.textContent).toBe("Fine again");
+    expect(errors).toEqual(["Fragile broke"]);
+  });
+
+  it("hands args that keep what every object inherits", async () => {
+    let text = "";
+    const story = loaded({
+      render: (args: Readonly<Record<string, unknown>>) => {
+        text = `${Object.hasOwn(args, "name")} ${String(args)}`;
+        return null;
+      }
+    });
+    const mounted = solidRenderer.mount(canvas(), drawing(story), () => undefined);
+    await mounted.drawn;
+    expect(text).toBe("true [object Object]");
   });
 });
