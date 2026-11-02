@@ -1,6 +1,7 @@
 /**
  * The dev server's answers to tools and agents, under `/__forgebook/api/`: `stories` (every story) and `story?id=…`
- * (one in detail), each with an optional `view` (the view's query, `theme=dark&lang=it`) the links open in.
+ * (one in detail), each with an optional `view` (the view's query, `theme=dark&lang=it`) the links open in; and
+ * `preview?id=…`, the page that shows a story inside a client that renders apps, the one answer that is not JSON.
  *
  * @remarks
  * The server loads the sources and the previews with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool
@@ -22,6 +23,7 @@ import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
+import { frameAddressOf } from "../viewState.ts";
 import type { AgentChangedStory, ChangedStoriesDocument, ErrorsDocument } from "./agent.types.ts";
 import {
   type CataloguePages,
@@ -34,6 +36,7 @@ import type { ResolvedConfig } from "./configFile.ts";
 import { findAnswer } from "./findRoute.ts";
 import { changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
+import { PREVIEW_ROUTE } from "./previewRoute.ts";
 import { STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
@@ -274,6 +277,22 @@ export const agentAnswer = async (
 };
 
 /**
+ * Answers a story's preview page. Its code is read here, on the first request for one: a dev server no client asks for a
+ * preview never loads it.
+ *
+ * @param url - the request's address: where the catalogue is served, and `id` and `view` in its query.
+ * @param response - the answer.
+ */
+const answerPreview = async (url: URL, response: ServerResponse): Promise<void> => {
+  const { previewRelayPage } = await import("./previewPages.ts");
+  const id = url.searchParams.get("id") ?? "";
+  const frame = frameAddressOf(`${url.origin}/frame.html`, id, url.searchParams.get("view") ?? "");
+  response.setHeader("Content-Type", "text/html");
+  response.setHeader("Cache-Control", "no-store");
+  response.end(previewRelayPage(frame, id));
+};
+
+/**
  * The middleware that answers under `AGENT_API`, for a catalogue's dev server.
  *
  * @param server - the dev server, which loads the modules.
@@ -290,6 +309,10 @@ export const agentMiddleware =
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
+    if (route === PREVIEW_ROUTE) {
+      void answerPreview(url, response).catch(next);
+      return;
+    }
     void agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, url.origin, live)
       .then(({ status, body }) => {
         response.statusCode = status;

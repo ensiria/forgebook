@@ -9,6 +9,10 @@
  * requests). An `initialize` puts the session in the handshake era; a request carrying the version in `_meta` is
  * answered statelessly. The tools never change while the server runs, so their list is cacheable and public.
  *
+ * The MCP Apps extension (`io.modelcontextprotocol/ui`, specification 2026-01-26) is offered only to a client that
+ * declares it, read from the handshake or from the request's own `_meta`: what depends on it is a function of what the
+ * client said, never of the connection, and any other client gets exactly the answers of a server without it.
+ *
  * @module
  */
 
@@ -20,6 +24,12 @@ export const HANDSHAKE_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"] as 
 
 /** Every version served, for `server/discover` and for the error a client with another one gets. */
 export const SUPPORTED_VERSIONS: readonly string[] = [MODERN_VERSION, ...HANDSHAKE_VERSIONS];
+
+/** The MCP Apps extension's identifier, in a client's and the server's capabilities. */
+export const UI_EXTENSION = "io.modelcontextprotocol/ui";
+
+/** The content type of an app's resource, the only one the extension defines. */
+export const APP_MIME_TYPE = "text/html;profile=mcp-app";
 
 /** The `_meta` keys of the current era. */
 const META = {
@@ -34,6 +44,8 @@ const ERRORS = {
   invalidRequest: -32600,
   methodNotFound: -32601,
   invalidParams: -32602,
+  internal: -32603,
+  resourceNotFoundBefore: -32002,
   unsupportedVersion: -32022
 } as const;
 
@@ -68,6 +80,31 @@ export type McpTool = {
   readonly inputSchema: Readonly<Record<string, unknown>>;
   /** Runs it with the arguments the client sent. */
   readonly call: (args: Readonly<Record<string, unknown>>) => Promise<McpToolResult>;
+  /**
+   * The `ui://` resource a client shows this tool's answer in. A tool that has one is listed only to a client that
+   * renders apps: the others have no use for it, and every tool listed is words in the agent's context.
+   */
+  readonly appResource?: string;
+};
+
+/** What reading an app's resource gives. */
+export type McpAppContent = {
+  /** The page, one HTML5 document. */
+  readonly html: string;
+  /** The origins the page may frame; the host blocks every other (`frame-src`). */
+  readonly frameDomains: readonly string[];
+};
+
+/** An app's resource: a `ui://` page a client that renders apps shows a tool's answer in. */
+export type McpAppResource = {
+  /** Its address (`ui://forgebook/story-preview`). */
+  readonly uri: string;
+  /** Its name, for the client's lists. */
+  readonly name: string;
+  /** What it shows. */
+  readonly description: string;
+  /** Reads it. A host may do so at any time, before any tool is called, so it starts nothing. */
+  readonly read: () => Promise<McpAppContent>;
 };
 
 /** Who the server is, and what it tells an agent about itself. */
@@ -78,16 +115,28 @@ export type McpServer = {
   readonly instructions: string | undefined;
   /** Its tools. */
   readonly tools: readonly McpTool[];
+  /** The apps' resources its tools show their answers in; none by default. */
+  readonly apps?: readonly McpAppResource[];
 };
 
-/** What a session remembers between messages: whether the client opened it with the handshake. */
+/** What a session remembers between messages: what the client said when it opened it with the handshake. */
 export type McpSession = {
   /** The handshake version agreed on `initialize`; none in the stateless era or before any request. */
   readonly handshakeVersion: string | undefined;
+  /** Whether the handshake declared that the client renders apps. */
+  readonly isAppHost: boolean;
 };
 
 /** A new session: no handshake yet. */
-export const NEW_SESSION: McpSession = { handshakeVersion: undefined };
+export const NEW_SESSION: McpSession = { handshakeVersion: undefined, isAppHost: false };
+
+/** Who a request came from, as far as the answer depends on it. */
+type Asker = {
+  /** Whether it is answered in the stateless era. */
+  readonly isModern: boolean;
+  /** Whether the client renders apps. */
+  readonly isAppHost: boolean;
+};
 
 /** A JSON-RPC answer. */
 type Reply = { readonly jsonrpc: "2.0"; readonly id: unknown } & (
@@ -154,13 +203,40 @@ const modernProblem = (id: unknown, meta: Readonly<Record<string, unknown>>): Re
   return undefined;
 };
 
-/** The tools' list as the protocol gives it. */
-const toolList = (server: McpServer): Readonly<Record<string, unknown>>[] =>
-  server.tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    inputSchema: tool.inputSchema
-  }));
+/** Whether a client's capabilities say it renders the only kind of app there is. */
+const declaresApps = (capabilities: unknown): boolean => {
+  if (!isRecord(capabilities) || !isRecord(capabilities["extensions"])) return false;
+  const settings = capabilities["extensions"][UI_EXTENSION];
+  return (
+    isRecord(settings) &&
+    Array.isArray(settings["mimeTypes"]) &&
+    settings["mimeTypes"].includes(APP_MIME_TYPE)
+  );
+};
+
+/** What the server offers this client: more than its tools only when it has apps and the client renders them. */
+const capabilitiesFor = (server: McpServer, isAppHost: boolean): Readonly<Record<string, unknown>> =>
+  isAppHost && server.apps !== undefined
+    ? { tools: {}, resources: {}, extensions: { [UI_EXTENSION]: {} } }
+    : { tools: {} };
+
+/**
+ * The cache scope of an answer that depends on who asks. A shared cache must not hand one that names apps to a client
+ * that renders none.
+ */
+const scopeFor = (isAppHost: boolean): string => (isAppHost ? "private" : "public");
+
+/** The tools' list as the protocol gives it: an app's tool only to a client that renders it. */
+const toolList = (server: McpServer, isAppHost: boolean): Readonly<Record<string, unknown>>[] =>
+  server.tools
+    .filter((tool) => tool.appResource === undefined || isAppHost)
+    .map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      // biome-ignore lint/style/useNamingConvention: the protocol names this field
+      ...(tool.appResource === undefined ? {} : { _meta: { ui: { resourceUri: tool.appResource } } })
+    }));
 
 /** A tool's answer as the protocol gives it: its JSON as text and as structured content, then its pictures. */
 const toolResult = async (
@@ -185,21 +261,82 @@ const toolResult = async (
   };
 };
 
+/**
+ * An app's resource as `resources/read` gives it. The page names the session's origin, so it is never kept
+ * (`ttlMs: 0`), which the handshake era has no way to say.
+ */
+const readApp = async (
+  app: McpAppResource,
+  isModern: boolean
+): Promise<Readonly<Record<string, unknown>>> => {
+  const { html, frameDomains } = await app.read();
+  const content = {
+    uri: app.uri,
+    mimeType: APP_MIME_TYPE,
+    text: html,
+    // biome-ignore lint/style/useNamingConvention: the protocol names this field
+    _meta: { ui: { csp: { frameDomains }, prefersBorder: true } }
+  };
+  return { contents: [content], ...(isModern ? { ttlMs: 0, cacheScope: "private" } : {}) };
+};
+
+/** Answers a request for the apps' resources, or none for another method or a server without apps. */
+const answerResources = async (
+  server: McpServer,
+  id: unknown,
+  method: string,
+  params: Readonly<Record<string, unknown>>,
+  { isModern }: Asker,
+  finish: (result: Readonly<Record<string, unknown>>) => Reply
+): Promise<Reply | undefined> => {
+  const { apps } = server;
+  if (apps === undefined) return undefined;
+  const kept = isModern ? { ttlMs: TOOLS_TTL_MS, cacheScope: "private" } : {};
+  if (method === "resources/list") {
+    const resources = apps.map(({ uri, name, description }) => ({
+      uri,
+      name,
+      description,
+      mimeType: APP_MIME_TYPE
+    }));
+    return finish({ resources, ...kept });
+  }
+  if (method === "resources/templates/list") return finish({ resourceTemplates: [], ...kept });
+  if (method !== "resources/read") return undefined;
+  const uri = params["uri"];
+  const app = apps.find((each) => each.uri === uri);
+  if (app === undefined)
+    return failure(
+      id,
+      isModern ? ERRORS.invalidParams : ERRORS.resourceNotFoundBefore,
+      "Resource not found",
+      {
+        uri
+      }
+    );
+  try {
+    return finish(await readApp(app, isModern));
+  } catch (error) {
+    return failure(id, ERRORS.internal, error instanceof Error ? error.message : String(error));
+  }
+};
+
 /** Answers a request in either era: the methods both share. */
 const answerRequest = async (
   server: McpServer,
   id: unknown,
   method: string,
   params: Readonly<Record<string, unknown>>,
-  isModern: boolean
+  asker: Asker
 ): Promise<Reply> => {
+  const { isModern, isAppHost } = asker;
   const finish = (result: Readonly<Record<string, unknown>>): Reply =>
     success(id, isModern ? modernResult(server, result) : result);
   if (method === "tools/list")
     return finish(
       isModern
-        ? { tools: toolList(server), ttlMs: TOOLS_TTL_MS, cacheScope: "public" }
-        : { tools: toolList(server) }
+        ? { tools: toolList(server, isAppHost), ttlMs: TOOLS_TTL_MS, cacheScope: scopeFor(isAppHost) }
+        : { tools: toolList(server, isAppHost) }
     );
   if (method === "tools/call") {
     const name = params["name"];
@@ -211,12 +348,13 @@ const answerRequest = async (
   if (method === "server/discover" && isModern)
     return finish({
       supportedVersions: SUPPORTED_VERSIONS,
-      capabilities: { tools: {} },
+      capabilities: capabilitiesFor(server, isAppHost),
       ...(server.instructions === undefined ? {} : { instructions: server.instructions }),
       ttlMs: TOOLS_TTL_MS,
-      cacheScope: "public"
+      cacheScope: scopeFor(isAppHost)
     });
-  return failure(id, ERRORS.methodNotFound, `Method not found: ${method}`);
+  const resources = await answerResources(server, id, method, params, asker, finish);
+  return resources ?? failure(id, ERRORS.methodNotFound, `Method not found: ${method}`);
 };
 
 /** A line read as JSON-RPC: a request, a notification (never answered), or the error answer for a bad line. */
@@ -257,13 +395,14 @@ const readMessage = (line: string): ReadMessage => {
 const initialized = (server: McpServer, id: unknown, params: Readonly<Record<string, unknown>>): McpStep => {
   const asked = params["protocolVersion"];
   const version = HANDSHAKE_VERSIONS.find((each) => each === asked) ?? HANDSHAKE_VERSIONS[0];
+  const isAppHost = declaresApps(params["capabilities"]);
   const result = {
     protocolVersion: version,
-    capabilities: { tools: {} },
+    capabilities: capabilitiesFor(server, isAppHost),
     serverInfo: server.info,
     ...(server.instructions === undefined ? {} : { instructions: server.instructions })
   };
-  return { reply: JSON.stringify(success(id, result)), session: { handshakeVersion: version } };
+  return { reply: JSON.stringify(success(id, result)), session: { handshakeVersion: version, isAppHost } };
 };
 
 /**
@@ -288,8 +427,15 @@ export const answerMcpMessage = async (
     if (method === "ping") return success(id, {});
     const meta = params["_meta"];
     if (isRecord(meta) && META.version in meta)
-      return modernProblem(id, meta) ?? (await answerRequest(server, id, method, params, true));
-    if (session.handshakeVersion !== undefined) return answerRequest(server, id, method, params, false);
+      return (
+        modernProblem(id, meta) ??
+        (await answerRequest(server, id, method, params, {
+          isModern: true,
+          isAppHost: declaresApps(meta[META.capabilities])
+        }))
+      );
+    if (session.handshakeVersion !== undefined)
+      return answerRequest(server, id, method, params, { isModern: false, isAppHost: session.isAppHost });
     return failure(
       id,
       ERRORS.invalidParams,

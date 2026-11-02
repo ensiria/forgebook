@@ -1,7 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`
- * and `nearest_token`.
+ * and `nearest_token`; and `story_preview` (`mcpPreview.ts`), for a client that renders apps.
  *
  * @module
  */
@@ -15,6 +15,7 @@ import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { previewTool } from "./mcpPreview.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
@@ -88,6 +89,8 @@ export type CatalogueReach = {
   readonly shot: Shot;
   /** Runs the checks on a page of the application. */
   readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
+  /** Serves the catalogue where a browser can open a preview, and answers where. */
+  readonly servePreview: () => Promise<string>;
 };
 
 /**
@@ -100,7 +103,8 @@ export const catalogueTools = ({
   writeNew,
   check,
   shot,
-  checkPage
+  checkPage,
+  servePreview
 }: CatalogueReach): readonly McpTool[] => [
   {
     name: "check_page",
@@ -427,5 +431,6 @@ export const catalogueTools = ({
       }));
       return { structured: report, isError: false, images };
     }
-  }
+  },
+  previewTool({ ask, serve: servePreview })
 ];
