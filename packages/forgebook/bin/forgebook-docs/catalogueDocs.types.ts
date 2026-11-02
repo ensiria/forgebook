@@ -68,6 +68,8 @@ export type CatalogueComponent = {
   readonly mainStory: string | undefined;
   /** Whether every story of its file is about logic (`parameters.logic`): a hook or a function, listed by its call. */
   readonly isLogic: boolean;
+  /** The link to its design in Figma (the meta's `parameters.design.figma`), when it has a valid one. */
+  readonly design: string | undefined;
 };
 
 /** Everything `CATALOG.md` lists. */

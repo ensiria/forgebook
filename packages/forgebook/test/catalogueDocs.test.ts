@@ -6,6 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { CatalogueComponent } from "../bin/forgebook-docs/catalogueDocs.types.ts";
+import { catalogueMarkdown } from "../bin/forgebook-docs/catalogueMarkdown.ts";
 import { sassMembers, styleSheetSummary } from "../bin/forgebook-docs/sassDocs.ts";
 
 describe("sassDocs", () => {
@@ -22,5 +24,39 @@ describe("sassDocs", () => {
     expect(styleSheetSummary('// The sheet. More words.\n// Still the comment.\n@use "x";')).toBe(
       "The sheet."
     );
+  });
+});
+
+describe("catalogueMarkdown", () => {
+  it("ends a component's line with its design, when it has one", () => {
+    const component: CatalogueComponent = {
+      title: "Actions/Button",
+      subpath: "./button",
+      docs: {
+        name: "Button",
+        description: "A button.",
+        summary: "",
+        props: [],
+        parts: [],
+        subcomponents: []
+      },
+      stories: ["Overview"],
+      mainStory: "Overview",
+      isLogic: false,
+      design: "https://www.figma.com/design/File1/Kit?node-id=1-2"
+    };
+    const text = catalogueMarkdown(
+      {
+        packageName: "@acme/ui",
+        description: undefined,
+        sourceId: undefined,
+        components: [component],
+        modules: [],
+        sassModules: [],
+        styleSheets: []
+      },
+      ["components"]
+    );
+    expect(text).toContain(" · design: https://www.figma.com/design/File1/Kit?node-id=1-2");
   });
 });

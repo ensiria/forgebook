@@ -82,7 +82,8 @@ const componentLine = (
     sourceId === undefined || component.mainStory === undefined
       ? ""
       : ` · story: \`${storyId(sourceId, component.title, component.mainStory)}\``;
-  return `- **${docs.name}**${where}: ${sentence(docs.description)}. ${props}${parts}${story}`;
+  const design = component.design === undefined ? "" : ` · design: ${component.design}`;
+  return `- **${docs.name}**${where}: ${sentence(docs.description)}. ${props}${parts}${story}${design}`;
 };
 
 /** Letters and digits only, lower case: how a subpath and an export name are compared. */

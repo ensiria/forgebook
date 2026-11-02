@@ -1,6 +1,6 @@
 /**
  * The tabs a story's panel shows: Props, Events and Parts and styling from its component's docs, Code from its file,
- * Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
+ * Design from its link, Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
  * and shows no tab of args (`logicTabs`).
  *
  * @module
@@ -15,6 +15,8 @@ import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { CheckState } from "./A11yTab.tsx";
+import type { DesignTabProps } from "./DesignTab.tsx";
+import { DesignTabLoader } from "./DesignTabLoader.tsx";
 import type { DockTab } from "./Dock.tsx";
 import { deferred } from "./deferred.tsx";
 import { a11yHint, interactionsHint, styleHooks } from "./dockHints.ts";
@@ -76,6 +78,8 @@ export type DockTabsInput = {
   readonly check: CheckState;
   /** Runs it; none when it cannot run. */
   readonly onCheck: (() => void) | undefined;
+  /** What the Design tab shows; none for a story without a design. */
+  readonly design: DesignTabProps | undefined;
 };
 
 /** A message in place of a tab's content: the docs or the code are loading or could not be read. */
@@ -247,6 +251,12 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
   ];
 };
 
+/** The Design tab, for a story with a design. */
+const designTabs = ({ design }: DockTabsInput): DockTab[] =>
+  design === undefined
+    ? []
+    : [{ id: "design", label: STRINGS.tabs.design, content: <DesignTabLoader {...design} /> }];
+
 /**
  * The tabs of a story's panel, in order.
  *
@@ -255,6 +265,7 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
 export const dockTabs = (input: DockTabsInput): DockTab[] => [
   ...docsTabs(input),
   ...codeTabs(input),
+  ...designTabs(input),
   {
     id: "a11y",
     label: STRINGS.tabs.a11y,
