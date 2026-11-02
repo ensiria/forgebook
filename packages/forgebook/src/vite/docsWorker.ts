@@ -7,7 +7,7 @@
  * Started by `docsExtractor.ts` with the framework's docs module (`adapter.ts`), which it loads once; it keeps the
  * programs of `docsProgram.ts` between requests, so only a package's first
  * read builds one, and a changed source file (`{ kind: "changed" }`) renews them on their next read. A usage request
- * (`{ kind: "usage", id, files }`) is answered from the same programs (`usageGraph.ts`). A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
+ * (`{ kind: "usage", id, files }`) is answered from programs of its own, one configuration at a time (`usageGraph.ts`). A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
  * it is (plain data).
  *
  * @module
@@ -16,7 +16,7 @@
 import { type DocsModule, isDocsModule } from "./adapter.ts";
 import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
 import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
-import { docsDependencies, usageDependencies, usageGraph } from "./usageGraph.ts";
+import { docsDependencies, type UsageReading, usageReading } from "./usageGraph.ts";
 
 /** What the extractor started this process with, as JSON. */
 const workerData: unknown = JSON.parse(process.argv[2] ?? "null");
@@ -66,9 +66,9 @@ const extracted = async (storyFile: string): Promise<DocsResult> => {
 };
 
 /** A group of story files' usage, or why it threw: a throw would end the worker and every request waiting on it. */
-const usage = (files: Parameters<typeof usageGraph>[0]): ReturnType<typeof usageGraph> => {
+const usage = (files: Parameters<typeof usageReading>[0]): UsageReading | string => {
   try {
-    return usageGraph(files);
+    return usageReading(files);
   } catch (error) {
     return `The stories' usage could not be read: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -83,8 +83,9 @@ process.on("message", (request: DocsRequest): void => {
     return;
   }
   if (request.kind === "usage") {
-    const result = usage(request.files);
-    const dependencies = typeof result === "string" ? [] : usageDependencies(request.files);
+    const reading = usage(request.files);
+    const result = typeof reading === "string" ? reading : reading.graph;
+    const dependencies = typeof reading === "string" ? [] : reading.dependencies;
     const response: DocsResponse = { kind: "usage", id: request.id, result, dependencies };
     answer(response);
     return;

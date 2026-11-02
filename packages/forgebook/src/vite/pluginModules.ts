@@ -5,6 +5,7 @@
  * @module
  */
 
+import { packedUsage } from "../usedIn.ts";
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
@@ -91,13 +92,15 @@ export const usageModule = async (
   const answer =
     typeof graph === "string"
       ? { error: graph }
-      : joinedUsage(
-          graph,
-          files.map((file) => ({
-            storyFile: file.file,
-            title: file.index.title,
-            related: file.index.related ?? []
-          }))
+      : packedUsage(
+          joinedUsage(
+            graph,
+            files.map((file) => ({
+              storyFile: file.file,
+              title: file.index.title,
+              related: file.index.related ?? []
+            }))
+          )
         );
   // on the dev server only: a static build has no tools to ask, and this would ship every story's files to the reader
   const reach =

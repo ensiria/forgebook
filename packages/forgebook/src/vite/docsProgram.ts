@@ -106,12 +106,22 @@ const FALLBACK_OPTIONS: ts.CompilerOptions = {
 };
 
 /**
+ * Whether a file is a dependency's declarations: the standard library's, or a `.d.ts` in `node_modules`.
+ *
+ * @param fileName - the file.
+ * @param libraryFolder - the standard library's folder.
+ */
+const isDependencyTypes = (fileName: string, libraryFolder: string): boolean =>
+  dirname(fileName) === libraryFolder || (fileName.endsWith(".d.ts") && fileName.includes("/node_modules/"));
+
+/**
  * A compiler host that keeps the files it parsed: handing back the same object is what lets a new program reuse a file.
  *
  * @param key - the program's key.
  * @param options - its compiler options.
+ * @param isOwnOnly - whether a dependency's declarations are left empty (`usageProgramFor`).
  */
-const keepingHost = (key: string, options: ts.CompilerOptions): ts.CompilerHost => {
+const keepingHost = (key: string, options: ts.CompilerOptions, isOwnOnly: boolean): ts.CompilerHost => {
   const host = ts.createCompilerHost(options);
   const parse = host.getSourceFile;
   const libraryFolder = dirname(ts.getDefaultLibFilePath(options));
@@ -127,6 +137,8 @@ const keepingHost = (key: string, options: ts.CompilerOptions): ts.CompilerHost 
     const known = kept.get(fileName);
     if (known !== undefined && known.time === time && shouldCreate !== true) return known.file;
     const version = typeof languageVersion === "object" ? languageVersion : { languageVersion };
+    if (isOwnOnly && isDependencyTypes(fileName, libraryFolder))
+      return ts.createSourceFile(fileName, "", version);
     const file = parse(
       fileName,
       dirname(fileName) === libraryFolder
@@ -147,8 +159,14 @@ const keepingHost = (key: string, options: ts.CompilerOptions): ts.CompilerHost 
  * @param key - the program's key: its configuration file, or what the files no configuration holds share.
  * @param rootNames - its root files.
  * @param options - its compiler options.
+ * @param isOwnOnly - whether a dependency's declarations are left empty.
  */
-const keptProgram = (key: string, rootNames: readonly string[], options: ts.CompilerOptions): ts.Program => {
+const keptProgram = (
+  key: string,
+  rootNames: readonly string[],
+  options: ts.CompilerOptions,
+  isOwnOnly = false
+): ts.Program => {
   const oldProgram = programs.get(key);
   const isSameRoots = oldProgram?.getRootFileNames().length === rootNames.length;
   if (oldProgram !== undefined && isSameRoots && !outdated.has(key)) {
@@ -159,7 +177,7 @@ const keptProgram = (key: string, rootNames: readonly string[], options: ts.Comp
   const program = ts.createProgram({
     rootNames,
     options,
-    host: keepingHost(key, options),
+    host: keepingHost(key, options, isOwnOnly),
     ...(oldProgram === undefined ? {} : { oldProgram })
   });
   keepProgram(key, program);
@@ -269,6 +287,48 @@ export const programFor = (file: string, isWhole = false): DocsProgram | string 
   );
   if (program.getSourceFile(file) === undefined) return looseProgram(file, parsed.options);
   return { program, checker: program.getTypeChecker() };
+};
+
+/** The key mark of a program made for "Used in". */
+const USAGE_KEY = "#usage";
+
+/**
+ * The program "Used in" reads a file with: every file of its configuration, with the dependencies' declarations and the
+ * standard library left empty. What a story renders is a component of the project, found through its own imports, so
+ * the checker never needs a dependency's types, and those are most of a program's memory: enough, in a large
+ * monorepo, to stop the worker. Dropped once read (`dropUsagePrograms`).
+ *
+ * @param file - an absolute path to a story file.
+ * @returns the program, or a message when the configuration above it cannot be read.
+ */
+export const usageProgramFor = (file: string): DocsProgram | string => {
+  const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
+  if (configPath === undefined) return programFor(file, true);
+  const parsed = parsedConfig(configPath);
+  if (parsed === undefined) return `${configPath} could not be read`;
+  const options = { ...parsed.options, noLib: true, types: [] };
+  const program = keptProgram(`${configPath}${USAGE_KEY}`, parsed.fileNames, options, true);
+  if (program.getSourceFile(file) === undefined) return programFor(file, true);
+  return { program, checker: program.getTypeChecker() };
+};
+
+/**
+ * Lets every program go, the files they parsed with them: "Used in" reads a whole configuration, and holding the docs'
+ * programs beside it would add the two. A later read makes its program again, and the docs on disk answer meanwhile.
+ */
+export const dropPrograms = (): void => {
+  programs.clear();
+  parsedFiles.clear();
+  outdated.clear();
+};
+
+/** Lets the programs "Used in" read go: a group's usage is read once, and they would hold the worker's memory. */
+export const dropUsagePrograms = (): void => {
+  for (const key of [...programs.keys()].filter((each) => each.endsWith(USAGE_KEY))) {
+    programs.delete(key);
+    parsedFiles.delete(key);
+    outdated.delete(key);
+  }
 };
 
 /** The files a package's manager rewrites when it installs: every type in `node_modules` hangs on one of them. */

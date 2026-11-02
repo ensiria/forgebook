@@ -14,9 +14,17 @@
  *
  * @module
  */
+import { dirname } from "node:path";
+
 import ts from "typescript-6";
 
-import { programDependencies, programFor } from "./docsProgram.ts";
+import {
+  dropPrograms,
+  dropUsagePrograms,
+  programDependencies,
+  programFor,
+  usageProgramFor
+} from "./docsProgram.ts";
 
 /** A component, by the file that declares it and its name there. */
 export type ComponentRef = {
@@ -356,42 +364,26 @@ export const docsDependencies = (storyFile: string): string[] => {
   ];
 };
 
-/**
- * The files a group of story files' usage can change with: each one's dependencies at once, as `docsDependencies`.
- *
- * @param requests - the story files.
- */
-export const usageDependencies = (requests: readonly UsageRequestFile[]): string[] => {
-  const docsPrograms = requests.flatMap((request) => {
-    const docsProgram = programFor(request.storyFile, true);
-    return typeof docsProgram === "string" ? [] : [{ file: request.storyFile, ...docsProgram }];
-  });
-  const programs = [...new Set(docsPrograms.map(({ program }) => program))];
-  return [
-    ...new Set([
-      ...Object.keys(
-        reachedImports(
-          requests.map((request) => request.storyFile),
-          programs,
-          true
-        )
-      ),
-      ...docsPrograms.slice(0, 1).flatMap(({ file, program }) => programDependencies(file, program))
-    ])
-  ];
+/** A group's facts, with the files they can change with. */
+export type UsageReading = {
+  /** The facts. */
+  readonly graph: UsageGraph;
+  /** What they were read from: the story files, what they reach, each program's own dependencies. */
+  readonly dependencies: readonly string[];
 };
 
 /**
- * The facts of a group of story files: what each story renders, and the import graph the rendered components reach.
+ * The facts of the story files of one configuration, and the files they can change with.
  *
- * @param requests - the story files and their stories' exports.
- * @returns the facts, or why a story file's program could not be read.
+ * @param group - the story files, each held by the same configuration.
  */
-export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | string => {
+const groupReading = (
+  group: readonly UsageRequestFile[]
+): (UsageGraph & { readonly dependencies: readonly string[] }) | string => {
   const files: StoryFileUsage[] = [];
   const programs = new Set<ts.Program>();
-  for (const request of requests) {
-    const docsProgram = programFor(request.storyFile, true);
+  for (const request of group) {
+    const docsProgram = usageProgramFor(request.storyFile);
     if (typeof docsProgram === "string") return docsProgram;
     programs.add(docsProgram.program);
     const usage = fileUsage(request, docsProgram.program);
@@ -401,5 +393,62 @@ export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | 
     ...(file.component === undefined ? [] : [file.component.file]),
     ...file.stories.flatMap((story) => story.renders.map((ref) => ref.file))
   ]);
-  return { files, imports: reachedImports([...new Set(starts)], [...programs]) };
+  const stories = group.map((request) => request.storyFile);
+  const [first] = group;
+  const [program] = programs;
+  const own =
+    first === undefined || program === undefined ? [] : programDependencies(first.storyFile, program);
+  return {
+    files,
+    imports: reachedImports([...new Set(starts)], [...programs]),
+    dependencies: [...Object.keys(reachedImports(stories, [...programs], true)), ...own]
+  };
+};
+
+/**
+ * The facts of a group of story files, and the files they can change with, read one configuration at a time.
+ *
+ * @remarks
+ * A monorepo has a configuration per package, and holding every package's program at once is what stops a worker: so
+ * the story files of one configuration are read together, with a program that leaves the dependencies' types empty
+ * (`usageProgramFor`), and it is let go before the next. An import graph is followed inside the program that holds
+ * its start, which holds what that start imports.
+ *
+ * @param requests - the story files and their stories' exports.
+ * @returns the facts and their files, or why a story file's program could not be read.
+ */
+export const usageReading = (requests: readonly UsageRequestFile[]): UsageReading | string => {
+  const byConfig = new Map<string, UsageRequestFile[]>();
+  for (const request of requests) {
+    const key = ts.findConfigFile(dirname(request.storyFile), ts.sys.fileExists, "tsconfig.json") ?? "";
+    byConfig.set(key, [...(byConfig.get(key) ?? []), request]);
+  }
+  const files: StoryFileUsage[] = [];
+  const imports: Record<string, readonly string[]> = {};
+  const dependencies = new Set<string>();
+  dropPrograms();
+  try {
+    for (const group of byConfig.values()) {
+      const read = groupReading(group);
+      if (typeof read === "string") return read;
+      files.push(...read.files);
+      Object.assign(imports, read.imports);
+      for (const file of read.dependencies) dependencies.add(file);
+      dropUsagePrograms();
+    }
+  } finally {
+    dropUsagePrograms();
+  }
+  return { graph: { files, imports }, dependencies: [...dependencies] };
+};
+
+/**
+ * The facts of a group of story files: what each story renders, and the import graph the rendered components reach.
+ *
+ * @param requests - the story files and their stories' exports.
+ * @returns the facts, or why a story file's program could not be read.
+ */
+export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | string => {
+  const reading = usageReading(requests);
+  return typeof reading === "string" ? reading : reading.graph;
 };

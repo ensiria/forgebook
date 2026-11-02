@@ -25,6 +25,102 @@ export type UsingComponent = {
 /** For each component of a group or a source, by title, the components that use it, direct ones first. */
 export type UsageIndex = Readonly<Record<string, readonly UsingComponent[]>>;
 
+/**
+ * A usage index as a module writes it: each title and each list of stories once, the pairs pointing at them. In a
+ * library whose components all reach one another through a barrel, the plain index names every story of every
+ * component once per component it uses: megabytes, on a dev server's thread and down to the page.
+ */
+export type PackedUsage = {
+  /** The titles, each once. */
+  readonly titles: readonly string[];
+  /** The lists of stories, each once. */
+  readonly lists: readonly (readonly string[])[];
+  /** For each used component's title, its users: the user's title, whether directly (1) or not (0), its stories. */
+  readonly users: Readonly<
+    Record<string, readonly (readonly [title: number, isDirect: number, list: number])[]>
+  >;
+};
+
+/**
+ * A usage index written once per title and list.
+ *
+ * @param index - the index.
+ */
+export const packedUsage = (index: UsageIndex): PackedUsage => {
+  const titles: string[] = [];
+  const lists: (readonly string[])[] = [];
+  const titleAt = new Map<string, number>();
+  const listAt = new Map<string, number>();
+  const at = <TValue>(value: TValue, key: string, known: Map<string, number>, all: TValue[]): number => {
+    const found = known.get(key);
+    if (found !== undefined) return found;
+    known.set(key, all.length);
+    all.push(value);
+    return all.length - 1;
+  };
+  const users = Object.fromEntries(
+    Object.entries(index).map(([title, using]) => [
+      title,
+      using.map(
+        (user) =>
+          [
+            at(user.title, user.title, titleAt, titles),
+            user.isDirect ? 1 : 0,
+            at(user.stories, user.stories.join("\n"), listAt, lists)
+          ] as const
+      )
+    ])
+  );
+  return { titles, lists, users };
+};
+
+/**
+ * Whether a module's answer is a packed usage index.
+ *
+ * @param value - what the module exports by default.
+ */
+const isPackedUsage = (value: unknown): value is PackedUsage =>
+  typeof value === "object" &&
+  value !== null &&
+  "titles" in value &&
+  Array.isArray(value.titles) &&
+  "lists" in value &&
+  Array.isArray(value.lists) &&
+  "users" in value &&
+  typeof value.users === "object" &&
+  value.users !== null;
+
+/**
+ * A packed index as the page reads it; a list of stories repeated is one array, shared.
+ *
+ * @param packed - the packed index.
+ * @returns the index, or none when a pair points past its lists.
+ */
+export const unpackedUsage = (packed: PackedUsage): UsageIndex | undefined => {
+  const index: Record<string, UsingComponent[]> = {};
+  for (const [title, users] of Object.entries(packed.users)) {
+    const using: UsingComponent[] = [];
+    for (const [user, isDirect, list] of users) {
+      const userTitle = packed.titles[user];
+      const stories = packed.lists[list];
+      if (userTitle === undefined || stories === undefined || !isStrings(stories)) return undefined;
+      using.push({ title: userTitle, isDirect: isDirect === 1, stories });
+    }
+    index[title] = using;
+  }
+  return index;
+};
+
+/**
+ * A module's answer as an index: packed, as the plugin writes it, or plain.
+ *
+ * @param answer - what the module exports by default.
+ */
+const readUsage = (answer: unknown): UsageIndex | undefined => {
+  if (isPackedUsage(answer)) return unpackedUsage(answer);
+  return isUsageIndex(answer) ? answer : undefined;
+};
+
 /** How many using components a page shows before "and N more". */
 export const USED_IN_SHOWN = 12;
 
@@ -107,8 +203,9 @@ export const sourceUsage = async (source: StorySource): Promise<UsageIndex | str
       typeof answer.error === "string"
     )
       return answer.error;
-    if (!isUsageIndex(answer)) return "A usage module answered something that is not a usage index";
-    indexes.push(answer);
+    const index = readUsage(answer);
+    if (index === undefined) return "A usage module answered something that is not a usage index";
+    indexes.push(index);
   }
   return mergedUsage(indexes);
 };
