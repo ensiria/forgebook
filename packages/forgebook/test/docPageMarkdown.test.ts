@@ -7,7 +7,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { compiledDocPage, docPageIndex, frontMatterOf } from "../src/vite/docPageMarkdown.ts";
+import { frontMatterOf } from "../src/vite/docMarkdown.ts";
+import { compiledDocPage, docPageIndex } from "../src/vite/docPageMarkdown.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
 /** A page's file, for the addresses relative to it. */
@@ -35,10 +36,14 @@ describe("frontMatterOf", () => {
 
   it("reports what it cannot read instead of dropping a page from its place", () => {
     expect(frontMatterOf("---\ntitel: T\n---\n").notes).toEqual([
-      'its front matter has a line it does not read: "titel: T"'
+      { line: 2, message: 'its front matter has a line it does not read: "titel: T"' }
     ]);
-    expect(frontMatterOf("---\norder: first\n---\n").notes).toEqual(['its order "first" is not a number']);
-    expect(frontMatterOf("---\ntitle: T\n").notes).toEqual(["its front matter never ends"]);
+    expect(frontMatterOf("---\norder: first\n---\n").notes).toEqual([
+      { line: 2, message: 'its order "first" is not a number' }
+    ]);
+    expect(frontMatterOf("---\ntitle: T\n").notes).toEqual([
+      { line: 1, message: "its front matter never ends" }
+    ]);
   });
 });
 
@@ -57,17 +62,19 @@ describe("docPageIndex", () => {
   });
 
   it("reports a block that would not be drawn", () => {
-    expect(indexOf(withFront("```story\n```\n")).notes).toEqual(["a `story` block names no id"]);
+    expect(indexOf(withFront("```story\n```\n")).notes).toEqual([
+      "line 4, column 1: a `story` block names no id"
+    ]);
     expect(indexOf(withFront("- item\n\n  ```story a:b--c\n  ```\n")).notes).toEqual([
-      "a `story a:b--c` block inside a list or a quote is not drawn"
+      "line 6, column 3: a `story a:b--c` block inside a list or a quote is not drawn"
     ]);
   });
 
   it("reports a link to a file that is not there, and an image that is no file of its package", () => {
     const text = withFront("[a](./other.md) [b](https://example.com/x.md) ![c](./missing.png)");
     expect(docPageIndex(FILE, text, () => undefined).notes).toEqual([
-      'it links to "./other.md", which is not there',
-      'its image "./missing.png" is not a file of its package'
+      'line 4, column 1: it links to "./other.md", which is not there',
+      'line 4, column 47: its image "./missing.png" is not a file of its package'
     ]);
   });
 
@@ -82,7 +89,7 @@ describe("docPageIndex", () => {
     const file = join(KIT_DIR, "docs/guides/theming.md");
     const notes = (body: string): readonly string[] | undefined => docPageIndex(file, withFront(body)).notes;
     expect(notes("![a](../../../../package.json)")).toEqual([
-      'its image "../../../../package.json" is not a file of its package'
+      'line 4, column 1: its image "../../../../package.json" is not a file of its package'
     ]);
     expect(notes("![a](./)")).toHaveLength(1);
     expect(notes("![a](./50%.png)")).toHaveLength(1);

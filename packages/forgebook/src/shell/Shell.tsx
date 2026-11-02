@@ -7,7 +7,17 @@
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
-import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentType,
+  lazy,
+  type MouseEvent,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 
 import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
@@ -34,9 +44,9 @@ import {
 import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
 import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
+import type { WrittenHomeProps } from "./AuthoredHome.tsx";
 import { ComponentPage } from "./ComponentPage.tsx";
 import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
-import { HomePage } from "./HomePage.tsx";
 import { LogicMark } from "./LogicMark.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
@@ -86,10 +96,22 @@ export type ShellConfig = {
   readonly switches?: readonly ViewSwitch[];
   /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
   readonly lists?: CatalogueLists;
+  /**
+   * The catalogue's written home (`forgebook.home.md`), drawn in place of the generated home: the page's entry makes
+   * it, lazily, only for a catalogue that has one, so the others' first load carries nothing of it. None keeps the
+   * generated home.
+   */
+  readonly home?: ComponentType<WrittenHomeProps>;
 };
 
 /** A docs page, loaded on first use: a catalogue may have none. */
 const DocPage = lazy(() => import("./DocPage.tsx").then((module) => ({ default: module.DocPage })));
+
+/**
+ * The generated home, loaded on first use: a story or a component opened from its address, as a link shares one, pays
+ * nothing for it.
+ */
+const HomePage = lazy(() => import("./HomePage.tsx").then((module) => ({ default: module.HomePage })));
 
 /**
  * The page an address names: one story, a component's page, a docs page with the heading it opens at, or the home (an
@@ -572,7 +594,7 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
  *
  * @param props - the configuration.
  */
-const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): ReactNode => {
+const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const {
     width: sidebarWidth,
@@ -672,6 +694,36 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
     />
   );
 
+  const Home = home ?? HomePage;
+  const homeProps = {
+    title,
+    tree,
+    sources,
+    recent,
+    hrefOf: (page: RecentPage): string => addressQuery(pageAddress(page), switches),
+    onOpen: (page: RecentPage): void => openPage(page),
+    header
+  };
+  const docProps = {
+    title,
+    tree,
+    sources,
+    view: address.view,
+    touchOverrides,
+    onTouchChange: setTouchOverride,
+    frameUrl,
+    storyHrefOf,
+    onOpenStory: (story: TreeStory): void => openPage(storyPage(story)),
+    pageHrefOf: (id: string, anchor: string | undefined): string =>
+      addressQuery(pageAddress({ kind: "page", id, anchor }), switches),
+    onOpenAddress: (href: string): boolean => openLinkedPage(href, openPage),
+    heightOf: columnHeightOf,
+    backgroundOf: (pageSource: TreeSource): string | undefined =>
+      storyBackground(pageSource.background, address.view, catalogue, isSystemDark),
+    header,
+    scroll
+  };
+
   return (
     <div className="catalogue">
       <Sidebar
@@ -708,17 +760,6 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}
         />
-        {shown.kind === "home" ? (
-          <HomePage
-            title={title}
-            tree={tree}
-            sources={sources}
-            recent={recent}
-            hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
-            onOpen={(page: RecentPage): void => openPage(page)}
-            header={header}
-          />
-        ) : null}
         {shown.kind === "component" ? (
           <ComponentPage
             component={shown.location.component}
@@ -746,36 +787,22 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
             })}
           />
         ) : null}
-        {shown.kind === "page" ? (
-          <Suspense fallback={<div className="forgebook-workspace">{header}</div>}>
-            {/* keyed by the page: its frames, its text and its scrolling element are that page's alone */}
+        {/* the pages loaded on first use: the home, generated or written, and a docs page; keyed by the kind of page, so
+            the home left behind is never kept, hidden, beside the docs page that loads */}
+        <Suspense key={shown.kind} fallback={<div className="forgebook-workspace">{header}</div>}>
+          {shown.kind === "home" ? <Home {...homeProps} {...docProps} /> : null}
+          {shown.kind === "page" ? (
+            // keyed by the page: its frames, its text and its scrolling element are that page's alone
             <DocPage
+              {...docProps}
               key={shown.location.page.id}
               location={shown.location}
               anchor={shown.anchor}
-              tree={tree}
-              sources={sources}
-              view={address.view}
-              touchOverrides={touchOverrides}
-              onTouchChange={setTouchOverride}
-              frameUrl={frameUrl}
-              storyHrefOf={storyHrefOf}
-              onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
-              pageHrefOf={(id: string, anchor: string | undefined): string =>
-                addressQuery(pageAddress({ kind: "page", id, anchor }), switches)
-              }
               onOpenPage={(id: string): void => openPage({ kind: "page", id })}
               onOpenAnchor={openAnchor}
-              onOpenAddress={(href: string): boolean => openLinkedPage(href, openPage)}
-              heightOf={columnHeightOf}
-              backgroundOf={(pageSource: TreeSource): string | undefined =>
-                storyBackground(pageSource.background, address.view, catalogue, isSystemDark)
-              }
-              header={header}
-              scroll={scroll}
             />
-          </Suspense>
-        ) : null}
+          ) : null}
+        </Suspense>
         {shown.kind === "story" ? (
           <Stage
             component={shown.location.component}

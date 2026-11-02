@@ -10,7 +10,7 @@
  * `{ error }` for the panel, `?forgebook-code`, answered with each story's `render` as written (`storyCode.ts`),
  * `?forgebook-page`, answered with the component's documentation file as HTML (`componentPage.ts`), and
  * `?forgebook-markdown`, a source's own Markdown file (its introduction on the home) as HTML. A source's docs pages
- * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`). It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
+ * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`), and the written home with `?forgebook-home`. It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
  * `pkg:` URLs, which the library's style sheets use.
  *
  * A pattern's module watches its story files, so an edit renews it. Vite watches only its root for new files, and the
@@ -36,7 +36,7 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
-import { DOCS_PAGE_QUERY, docPageModule, docPagesModule } from "./docPagesModule.ts";
+import { DOCS_PAGE_QUERY, docPageModule, docPagesModule, HOME_QUERY, homeModule } from "./docPagesModule.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
@@ -123,7 +123,14 @@ const SOURCE_FILE = /\.tsx?$/;
 const DOCS_QUERY = "?forgebook-docs";
 
 /** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
-const FILE_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY, DOCS_PAGE_QUERY];
+const FILE_QUERIES: readonly string[] = [
+  DOCS_QUERY,
+  CODE_QUERY,
+  PAGE_QUERY,
+  MARKDOWN_QUERY,
+  DOCS_PAGE_QUERY,
+  HOME_QUERY
+];
 
 /**
  * Whether a dev server may read the file a query names: a plugin's answer never passes Vite's own check of
@@ -294,7 +301,7 @@ const textModule = (
 };
 
 /**
- * A docs pages' module, when the id is a pattern's or a page's.
+ * A docs pages' module, when the id is a pattern's, a page's or the written home's.
  *
  * @param id - the module's id.
  * @param watch - adds a file whose edit renews the module.
@@ -305,6 +312,9 @@ const docsModuleOf = (
   watch: (file: string) => void,
   isServing: boolean
 ): { code: string; moduleType: "js" } | undefined => {
+  if (id.endsWith(HOME_QUERY)) {
+    return { code: homeModule(id.slice(0, -HOME_QUERY.length), watch, isServing), moduleType: "js" };
+  }
   if (id.endsWith(DOCS_PAGE_QUERY)) {
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
     return { code: docPageModule(file, watch, isServing), moduleType: "js" };

@@ -19,6 +19,7 @@ const CONFIG: ResolvedConfig = {
   heights: "story-heights.json",
   stories: ["src/**/*.stories.tsx"],
   docs: [],
+  home: undefined,
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [{ id: "it", label: "Italiano" }],
@@ -94,6 +95,15 @@ describe("a story's mocked API", () => {
 
   it("keeps it out of the shell", () => {
     expect(shellEntry({ ...CONFIG, hasMocks: true })).not.toContain("msw");
+  });
+
+  it("gives the shell a written home only when there is one, loaded on first use", () => {
+    expect(shellEntry(CONFIG)).not.toContain("home");
+    expect(shellEntry(CONFIG)).not.toContain('from "react"');
+    const entry = shellEntry({ ...CONFIG, home: "/catalogue/forgebook.home.md" });
+    expect(entry).toContain('import { lazy } from "react";');
+    expect(entry).toContain('import("forgebook/shell/home")');
+    expect(entry).toContain('module.writtenHome(() => import("/catalogue/forgebook.home.md?forgebook-home")');
   });
 });
 

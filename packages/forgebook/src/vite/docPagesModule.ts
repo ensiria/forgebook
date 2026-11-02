@@ -14,11 +14,15 @@ import { resolve } from "node:path";
 
 import type { DocPageIndex } from "@forgebook/story-format/source";
 
-import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
+import { readLinkedFile } from "./docPageLinks.ts";
+import { compiledDocPage, compiledHome, docPageIndex } from "./docPageMarkdown.ts";
 import { storyFileKeys } from "./storyFilesModule.ts";
 
 /** The query that asks for one docs page, rendered. */
 export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
+
+/** The query that asks for the catalogue's written home, rendered. */
+export const HOME_QUERY = "?forgebook-home";
 
 /** A page a pattern matches, with its key and its index. */
 export type IndexedDocPage = {
@@ -107,10 +111,45 @@ export const docPageModule = (file: string, watch: (file: string) => void, isSer
     watchedRead(watch)
   );
   return [
-    ...images.map((image, place) => `import asset${place} from ${JSON.stringify(`${image}?url`)};`),
-    `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: [${images
-      .map((_image, place) => `asset${place}`)
-      .join(", ")}] };`,
+    ...imageImports(images),
+    `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: ${assetList(images)} };`,
+    ...(isServing ? [`export const text = ${JSON.stringify(text)};`] : [])
+  ].join("\n");
+};
+
+/** The imports of a page's images, each answered with its address. */
+const imageImports = (images: readonly string[]): string[] =>
+  images.map((image, place) => `import asset${place} from ${JSON.stringify(`${image}?url`)};`);
+
+/** The list of a page's images' addresses, as the module's code writes it. */
+const assetList = (images: readonly string[]): string =>
+  `[${images.map((_image, place) => `asset${place}`).join(", ")}]`;
+
+/**
+ * The code of the written home's module: what the shell draws in place of the generated home, with its problems, and,
+ * on the dev server, its Markdown for tools.
+ *
+ * @param file - the home's file, absolute.
+ * @param watch - adds a file whose edit renews the module.
+ * @param isServing - whether a dev server runs.
+ */
+export const homeModule = (file: string, watch: (file: string) => void, isServing: boolean): string => {
+  watch(file);
+  const { title, description, blocks, stories, notes, images, text } = compiledHome(
+    file,
+    readFileSync(file, "utf8"),
+    watchedRead(watch)
+  );
+  const document = {
+    ...(title === undefined ? {} : { title }),
+    ...(description === undefined ? {} : { description }),
+    blocks,
+    stories,
+    notes
+  };
+  return [
+    ...imageImports(images),
+    `export default { ...${JSON.stringify(document)}, assets: ${assetList(images)} };`,
     ...(isServing ? [`export const text = ${JSON.stringify(text)};`] : [])
   ].join("\n");
 };

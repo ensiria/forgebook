@@ -16,7 +16,7 @@ import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
-import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
+import { readLinkedFile } from "../../src/vite/docPageLinks.ts";
 import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import type {

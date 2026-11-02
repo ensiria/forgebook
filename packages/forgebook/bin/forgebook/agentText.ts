@@ -232,16 +232,19 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
  * @param document - the pages document.
  * @param style - colours, glyphs and width.
  */
-export const pagesText = (document: PagesDocument, style: OutputStyle): string =>
-  document.pages.length === 0
+export const pagesText = (document: PagesDocument, style: OutputStyle): string => {
+  // the written home comes first, as the page a reader meets first
+  const pages = document.home === undefined ? document.pages : [document.home, ...document.pages];
+  return pages.length === 0
     ? "No docs pages here."
     : table(
-        document.pages.map((page) => [page.id, page.title, String(page.stories.length)]),
+        pages.map((page) => [page.id, page.title, String(page.stories.length)]),
         {
           columns: [{ header: "Id" }, { header: "Page", tone: "muted" }, { header: "Stories", tone: "muted" }]
         },
         uncut(style)
       );
+};
 
 /**
  * One docs page as a person reads it: where it opens, then its Markdown.

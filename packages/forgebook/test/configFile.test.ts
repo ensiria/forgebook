@@ -83,6 +83,36 @@ describe("resolveConfig", () => {
   });
 });
 
+describe("the written home", () => {
+  it("takes forgebook.home.md beside the configuration, a home it names, or none", () => {
+    const dir = folder();
+    expect(resolveConfig(BASE, dir).home).toBeUndefined();
+    writeFileSync(join(dir, "forgebook.home.md"), "# Home\n");
+    expect(resolveConfig(BASE, dir).home).toBe(join(dir, "forgebook.home.md"));
+    mkdirSync(join(dir, "docs"));
+    writeFileSync(join(dir, "docs/home.md"), "# Other\n");
+    expect(resolveConfig({ ...BASE, home: "docs/home.md" }, dir).home).toBe(join(dir, "docs/home.md"));
+  });
+
+  it("keeps the generated home with false, even beside a written one", () => {
+    const dir = folder();
+    writeFileSync(join(dir, "forgebook.home.md"), "# Home\n");
+    expect(resolveConfig({ ...BASE, home: false }, dir).home).toBeUndefined();
+  });
+
+  it("names a home that is not there", () => {
+    expect(() => resolveConfig({ ...BASE, home: "gone.md" }, folder())).toThrow(
+      /its home "gone.md" is not there/
+    );
+  });
+
+  it("ignores a home.md without the prefix, which a project may keep for another reason", () => {
+    const dir = folder();
+    writeFileSync(join(dir, "home.md"), "# Not the catalogue's\n");
+    expect(resolveConfig(BASE, dir).home).toBeUndefined();
+  });
+});
+
 describe("findConfigFile", () => {
   it("finds forgebook.config.ts in a folder, and none in a folder without one", () => {
     const dir = folder();

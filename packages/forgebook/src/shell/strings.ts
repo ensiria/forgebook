@@ -18,10 +18,6 @@ const shellStrings = {
   searchLabel: "Search components, stories and docs",
   componentsNav: "Components",
   docsNav: "Docs",
-  pageContents: "On this page",
-  previousPage: "Previous",
-  nextPage: "Next",
-  docPageError: "The page could not be read",
   sidebarWidth: "Sidebar width",
   hideSidebar: "Hide the sidebar",
   showSidebar: "Show the sidebar",
@@ -180,14 +176,6 @@ const shellStrings = {
   storyLabel: "Story",
   frameTitle: (component: string, story: string): string => `${component}: ${story}`,
   home: "Home",
-  homeEmpty: "No stories yet: a source with story files shows its families here.",
-  homeSummary: (components: number, sources: number): string =>
-    `${components} ${components === 1 ? "component" : "components"} in ${sources} ${sources === 1 ? "library" : "libraries"}.`,
-  homeIntroError: "The library's introduction could not be read",
-  recentlyOpened: "Recently opened",
-  componentsCount: (count: number): string => `${count} ${count === 1 ? "component" : "components"}`,
-  showAll: (count: number): string => `Show all ${count}`,
-  showFewer: "Show fewer",
   unknownStory: (id: string): string =>
     `No story "${id}": it may have been renamed. Pick one in the sidebar.`,
   unknownPage: (id: string): string => `No page "${id}": it may have been renamed. Pick one in the sidebar.`,
@@ -262,11 +250,28 @@ const replaceText = (texts: Record<string, unknown>, path: readonly string[], te
   if (isTextGroup(current)) replaceText(current, rest, text);
 };
 
+/** The catalogue's replacements, kept for the texts of the parts of the shell that load later. */
+let replaced: Readonly<Record<string, string>> = {};
+
 /**
  * Applies a catalogue's replacements to the shell's texts, once, before the shell draws.
  *
  * @param replacements - the new texts, by their path (`tabs.props`).
  */
 export const configureStrings = (replacements: Readonly<Record<string, string>>): void => {
+  replaced = replacements;
   for (const [path, text] of Object.entries(replacements)) replaceText(STRINGS, path.split("."), text);
+};
+
+/**
+ * The texts of a part of the shell loaded on first use (the docs pages), with the catalogue's replacements applied as
+ * they load: they live with their part, so the first load does not carry them, and keep their names among the shell's
+ * texts, so a catalogue replaces them as any other.
+ *
+ * @param texts - the part's texts, as Forgebook writes them.
+ * @returns the same texts, replaced where the catalogue asks.
+ */
+export const lateStrings = <TTexts extends Record<string, unknown>>(texts: TTexts): TTexts => {
+  for (const [path, text] of Object.entries(replaced)) replaceText(texts, path.split("."), text);
+  return texts;
 };

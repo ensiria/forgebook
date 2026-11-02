@@ -5,5 +5,5 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true
   },
-  "include": ["forgebook.config.ts"]
+  "include": ["forgebook.config.ts", "forgebook.generated.config.ts"]
 }

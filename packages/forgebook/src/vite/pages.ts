@@ -13,8 +13,10 @@
  */
 import { join } from "node:path";
 
+import { OWN_SOURCE_ID } from "../docPages.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { HOME_QUERY } from "./docPagesModule.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -43,9 +45,6 @@ export const STORIES_SOURCE_FILE = ".forgebook-stories.ts";
  * sources and the previews, as the frame gets them (never written to disk).
  */
 export const AGENT_SOURCES_FILE = ".forgebook-agent.ts";
-
-/** The project's own stories' source id. */
-export const OWN_SOURCE_ID = "stories";
 
 /**
  * Text set in HTML: its `<`, `>`, `&` and quotes escaped.
@@ -116,6 +115,21 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
 };
 
 /**
+ * The shell's written home, as the entry writes it: loaded as the home opens, with its text, so a catalogue without
+ * one pays nothing for it, and the shell's own code holds nothing of it.
+ *
+ * @param home - the home's absolute path.
+ */
+const writtenHomeCode = (home: string): string =>
+  [
+    "lazy(() =>",
+    '      import("forgebook/shell/home").then((module) => ({',
+    `        default: module.writtenHome(() => import(${JSON.stringify(`${home}${HOME_QUERY}`)}).then((page) => page.default))`,
+    "      }))",
+    "    )"
+  ].join("\n");
+
+/**
  * The shell's entry: the shell mounted with the configuration's data, the logo, the sources and the code writer.
  *
  * @param config - the configuration.
@@ -124,6 +138,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
   const sources = sourcesCode(config);
   return [
     'import { mountShell } from "forgebook/shell";',
+    ...(config.home === undefined ? [] : ['import { lazy } from "react";']),
     `import { codeOf } from ${JSON.stringify(config.framework.pages.code)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
     ...(config.logo === undefined ? [] : [`import logo from ${JSON.stringify(`${config.logo}?url`)};`]),
@@ -135,6 +150,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    title: config.title,",
     ...(config.logo === undefined ? [] : ["    logo,"]),
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
+    ...(config.home === undefined ? [] : [`    home: ${writtenHomeCode(config.home)},`]),
     `    sources: ${sources.list},`,
     '    frameUrl: "frame.html",',
     "    languages: config.languages,",

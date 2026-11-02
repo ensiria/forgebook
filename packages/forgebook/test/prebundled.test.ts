@@ -18,6 +18,7 @@ const CONFIG: ResolvedConfig = {
   heights: undefined,
   stories: [],
   docs: [],
+  home: undefined,
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [],
