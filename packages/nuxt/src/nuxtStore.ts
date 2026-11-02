@@ -294,7 +294,9 @@ export const createNuxtStore = (
       app.provide(NUXT_STORE, store);
       app.config.globalProperties["$nuxt"] = nuxtApp;
       // the route is already set, so vue-router does not start; a navigation to it makes it ready and listening
-      void replace({ path: start.fullPath, force: true }).catch(() => undefined);
+      void replace({ path: start.path, query: start.query, hash: start.hash, force: true }).catch(
+        () => undefined
+      );
     }
   };
   return store;

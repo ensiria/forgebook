@@ -100,9 +100,12 @@ describe("the route", () => {
       (await drawn(drawing(() => h(RouteReader), { route: { name: "blog-slug", params: { slug: "a" } } })))
         .textContent
     ).toBe("/blog/a a");
-    expect((await drawn(drawing(() => h(RouteReader), { route: "/blog/b?x=1" }))).textContent).toBe(
+    expect((await drawn(drawing(() => h(RouteReader), { route: "/blog/b?x=1#top" }))).textContent).toBe(
       "/blog/b b"
     );
+    await settled();
+    // the route stays where the story set it once the router is ready, its search and hash with it
+    expect(storyNuxt().route.fullPath).toBe("/blog/b?x=1#top");
     // a path no page has still moves the route; a name no page has stays home
     expect((await drawn(drawing(() => h(RouteReader), { route: "/elsewhere" }))).textContent).toBe(
       "/elsewhere none"

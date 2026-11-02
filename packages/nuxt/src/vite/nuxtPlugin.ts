@@ -23,6 +23,7 @@ import { createUnimport, type Import, scanDirExports, toExports, type Unimport }
 import {
   type ConfigEnv,
   loadEnv,
+  normalizePath,
   type Plugin,
   type PluginOption,
   type ResolvedConfig,
@@ -98,6 +99,8 @@ type ProjectState = {
   readonly components: ReadonlyMap<string, ProjectComponent>;
   /** What a file gets without importing it. */
   readonly unimport: Unimport;
+  /** What a file gets without importing it, each as its name and its module. */
+  readonly importNames: readonly string[];
 };
 
 /**
@@ -151,9 +154,18 @@ const readProject = async (
     publicRuntimeConfig: withEnvironment(config.publicRuntimeConfig, env),
     routes: pageRoutes(filesOf(config.pagesDir)),
     components: componentsOf(config),
-    unimport: createUnimport({ presets: ["vue"], imports, addons: { vueTemplate: true } })
+    unimport: createUnimport({ presets: ["vue"], imports, addons: { vueTemplate: true } }),
+    importNames: imports.map((each) => `${each.name} ${each.from}`)
   };
 };
+
+/**
+ * What a page knows of the project's folders, as one text: two reads with the same one need no reload.
+ *
+ * @param state - the project.
+ */
+const shapeOf = (state: ProjectState): string =>
+  JSON.stringify([state.routes, [...state.components.values()], state.importNames]);
 
 /**
  * The code of `#components`: each of the project's components, its `Lazy` form, and Nuxt's own.
@@ -363,6 +375,8 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
     },
     resolveId: (id: string): string | undefined => {
       if (VIRTUAL_MODULES.some((name) => name === id)) return resolvedId(id);
+      // a deep import of Nuxt's app (`#app/composables/router`) names a part of what `#app` exports
+      if (id.startsWith("#app/") || id.startsWith("nuxt/app/")) return resolvedId("#app");
       if (BUILD_MODULE.test(id)) return resolvedId(`build:${id.slice(1)}`);
       return undefined;
     },
@@ -374,15 +388,21 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
       return virtualModule(name, project());
     },
     configureServer: (server: ViteDevServer): void => {
-      const watched = (): string[] => {
+      const isWatched = (file: string, isAddedOrRemoved: boolean): boolean => {
         const { config } = project();
-        return [config.pagesDir, ...config.componentsDirs.map((dir) => dir.path), ...config.importsDirs];
+        const isIn = (dir: string): boolean => file.startsWith(`${dir}${sep}`);
+        // an added or removed page or component changes the project; an edited one only its own module
+        if (config.importsDirs.some(isIn)) return true;
+        return (
+          isAddedOrRemoved && [config.pagesDir, ...config.componentsDirs.map((dir) => dir.path)].some(isIn)
+        );
       };
       const reread = async (file: string, isAddedOrRemoved: boolean): Promise<void> => {
-        const isInFolder = watched().some((dir) => file.startsWith(`${dir}${sep}`));
-        const isImports = project().config.importsDirs.some((dir) => file.startsWith(`${dir}${sep}`));
-        if (!isInFolder || (!isAddedOrRemoved && !isImports)) return;
+        if (!isWatched(file, isAddedOrRemoved)) return;
+        const before = shapeOf(project());
         state = await readProject(project().config, env);
+        // an edit that changes no export of a composable leaves the page to its hot update
+        if (shapeOf(project()) === before) return;
         for (const name of VIRTUAL_MODULES) {
           const module = server.moduleGraph.getModuleById(resolvedId(name));
           if (module !== undefined) server.moduleGraph.invalidateModule(module);
@@ -407,7 +427,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
         if (id.startsWith("\0") || !CODE_FILE.test(file) || file.includes("/node_modules/")) return undefined;
         if (query !== "" && !query.includes("type=script")) return undefined;
         const current = project();
-        if (!file.startsWith(current.config.rootDir)) return undefined;
+        if (!file.startsWith(normalizePath(current.config.rootDir))) return undefined;
         const source = new MagicString(code);
         const withComponents = withComponentImports(source, current.components);
         const result = current.config.isAutoImport
