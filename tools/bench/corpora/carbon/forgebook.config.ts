@@ -12,10 +12,10 @@
 
 import { react as forgebookReact } from "@forgebook/react/vite";
 import babel from "@rolldown/plugin-babel";
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "forgebook";
 
-const framework = forgebookReact();
+// its stories are JSX in `.js` files, which React's plugin reads only when told to
+const framework = forgebookReact({ include: /\.[jt]sx?$/ });
 
 /** What `viteFinal` in Carbon's Storybook sets, and the empty pages. */
 const carbonVite = {
@@ -41,7 +41,7 @@ export default defineConfig({
     ...framework,
     vitePlugins: async () => [
       carbonVite,
-      react({ include: /\.[jt]sx?$/ }),
+      ...((await framework.vitePlugins?.()) ?? []),
       babel({ presets: ["babel-preset-carbon"] })
     ]
   },

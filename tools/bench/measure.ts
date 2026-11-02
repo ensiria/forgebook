@@ -19,6 +19,7 @@ import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import { contentSize } from "./diskUsage.ts";
 import { NO_DAEMONS } from "./leftovers.ts";
+import { emptyOutput, type KeptOutput, keepOutput, outputText } from "./serverOutput.ts";
 import { stampScript, waitForStamps } from "./stamps.ts";
 import { serveStatic } from "./staticServer.ts";
 import type { EditKind, MeasureSubject } from "./subject.ts";
@@ -110,27 +111,16 @@ export const startServer = async (context: MeasureContext): Promise<ChildProcess
     env: environment(context.io, command)
   });
   liveServers.add(server);
-  const output: string[] = [];
-  const keep = (chunk: Buffer): void => {
-    output.push(
-      ...chunk
-        .toString()
-        .split("\n")
-        .filter((line) => line.trim() !== "")
-    );
-    output.splice(0, Math.max(0, output.length - OUTPUT_LINES));
-  };
+  const output = emptyOutput();
+  const keep = (chunk: Buffer): void => keepOutput(output, chunk.toString());
   server.stdout?.on("data", keep);
   server.stderr?.on("data", keep);
   serverOutput.set(server, output);
   return server;
 };
 
-/** How many of a server's last lines of output the harness keeps, to say why it stopped. */
-const OUTPUT_LINES = 12;
-
-/** Each server's last lines of output, read when it stops before answering. */
-const serverOutput = new WeakMap<ChildProcess, readonly string[]>();
+/** Each server's output as kept (`serverOutput.ts`), read when it stops before answering. */
+const serverOutput = new WeakMap<ChildProcess, KeptOutput>();
 
 /** Whether a server's process has ended, by its own exit or a signal. */
 const hasEnded = (server: ChildProcess): boolean => server.exitCode !== null || server.signalCode !== null;
@@ -171,8 +161,9 @@ export const waitForServer = async (
   const deadline = Date.now() + SAMPLE_TIMEOUT;
   while (Date.now() < deadline) {
     if (hasEnded(server)) {
-      const output = serverOutput.get(server) ?? [];
-      const last = output.length === 0 ? "" : `: ${output.join(" / ")}`;
+      const kept = serverOutput.get(server);
+      const text = kept === undefined ? "" : outputText(kept);
+      const last = text === "" ? "" : `: ${text}`;
       throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})${last}`);
     }
     const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`).then(
