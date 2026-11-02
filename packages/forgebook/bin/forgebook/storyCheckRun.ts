@@ -17,9 +17,12 @@ import { pathToFileURL } from "node:url";
 
 import {
   isStoryCheckReport,
+  isStoryDiffReport,
   isStoryShotReport,
+  type SemanticModel,
   type StoryCheckReport,
   type StoryCheckRequest,
+  type StoryDiffReport,
   type StoryShotReport
 } from "../../src/storyCheck.ts";
 import { catalogueSwitches, type ViewSwitch } from "../../src/switches.ts";
@@ -42,6 +45,8 @@ export type StoryCheckInput = {
   readonly views: readonly string[];
   /** Run every variant the catalogue's browser tests check. */
   readonly isAllVariants: boolean;
+  /** Ask the configured model too: it sends each story's tree and picture to that address. */
+  readonly isSemantic?: boolean;
 };
 
 /**
@@ -168,17 +173,21 @@ const runOnStories = async (
  * @param config - the catalogue's configuration.
  * @param url - where `forgebook dev` runs, when not at Vite's default address.
  * @param input - the id, the views and whether to check every variant.
+ * @param model - the model `isSemantic` asks, or what to set to have one.
  * @returns the report, or why the check could not run.
  */
 export const runStoryCheck = async (
   config: ResolvedConfig,
   url: string | undefined,
-  input: StoryCheckInput
+  input: StoryCheckInput,
+  model?: SemanticModel | string
 ): Promise<StoryCheckReport | string> => {
+  const semantic = input.isSemantic === true ? model : undefined;
+  if (typeof semantic === "string") return semantic;
   const answer = await runOnStories(config, url, input, {
     specifier: "@forgebook/testing/check",
     name: "checkStories",
-    extra: {}
+    extra: semantic === undefined ? {} : { semantic }
   });
   if (typeof answer === "string" || isStoryCheckReport(answer)) return answer;
   return "@forgebook/testing/check answered something that is not a check's report";
@@ -206,6 +215,30 @@ export const runStoryShot = async (
   });
   if (typeof answer === "string" || isStoryShotReport(answer)) return answer;
   return "@forgebook/testing/shot answered something that is not a picture run's report";
+};
+
+/**
+ * Compares the stories' pictures with their baselines.
+ *
+ * @param config - the catalogue's configuration.
+ * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param input - the id, the views and whether to compare every variant.
+ * @param folders - the baselines' folder and the one the new pictures go in, absolute.
+ * @returns the results, or why they could not be had.
+ */
+export const runStoryDiff = async (
+  config: ResolvedConfig,
+  url: string | undefined,
+  input: StoryCheckInput,
+  folders: { readonly baselines: string; readonly outDir: string }
+): Promise<StoryDiffReport | string> => {
+  const answer = await runOnStories(config, url, input, {
+    specifier: "@forgebook/testing/diff",
+    name: "diffStories",
+    extra: { ...folders, ...(input.id.includes("--") ? {} : { component: input.id }) }
+  });
+  if (typeof answer === "string" || isStoryDiffReport(answer)) return answer;
+  return "@forgebook/testing/diff answered something that is not a comparison's report";
 };
 
 /**
