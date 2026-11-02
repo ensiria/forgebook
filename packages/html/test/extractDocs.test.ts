@@ -36,7 +36,8 @@ const argOf = (docs: ComponentDocs, name: string): PropDocs => {
   return arg;
 };
 
-describe("a function the meta names", () => {
+// the first read builds the fixture's TypeScript program, which takes seconds on a shared runner
+describe("a function the meta names", { timeout: 30_000 }, () => {
   const docs = docsOf(docsFile("Button.stories.ts"));
 
   it("is named after the function, and says what its TSDoc and its module say", () => {
@@ -71,7 +72,8 @@ describe("a function the meta names", () => {
   });
 });
 
-describe("a story file with no component", () => {
+// the first read builds the fixture's TypeScript program, which takes seconds on a shared runner
+describe("a story file with no component", { timeout: 30_000 }, () => {
   it("reads the type its meta is checked against, named after the story file", () => {
     const docs = docsOf(docsFile("Card.stories.ts"));
     expect(docs.name).toBe("Card");
@@ -103,7 +105,8 @@ describe("a story file with no component", () => {
   });
 });
 
-describe("plain JavaScript", () => {
+// the first read builds the fixture's TypeScript program, which takes seconds on a shared runner
+describe("plain JavaScript", { timeout: 30_000 }, () => {
   it("reads a function's args from its JSDoc", () => {
     const docs = docsOf(join(FIXTURES, "loose", "src", "Tile.stories.js"));
     expect(docs.name).toBe("tile");
@@ -112,7 +115,8 @@ describe("plain JavaScript", () => {
   });
 });
 
-describe("forgebook new", () => {
+// the first read builds the fixture's TypeScript program, which takes seconds on a shared runner
+describe("forgebook new", { timeout: 30_000 }, () => {
   it("reads the function a file exports, by name when there are several", () => {
     expect(extractFileComponent(docsFile("button.ts"))).toContain("several components (createButton, icon)");
     const component = extractFileComponent(docsFile("button.ts"), "createButton");

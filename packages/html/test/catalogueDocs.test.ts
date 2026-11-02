@@ -16,7 +16,8 @@ import { extractStoryComponent } from "../src/vite/extractDocs.ts";
 /** The HTML fixture catalogue, a package that exports a function drawing a button. */
 const FIXTURE = join(import.meta.dirname, "..", "..", "..", "fixtures", "html");
 
-describe("collectDocs and catalogueMarkdown", () => {
+// reading the fixture builds its TypeScript program, which takes seconds on a shared runner
+describe("collectDocs and catalogueMarkdown", { timeout: 30_000 }, () => {
   const { data, problems } = collectDocs(FIXTURE, extractStoryComponent, { exclude: [] });
 
   it("lists a function the package exports, with its args and its summary", () => {
