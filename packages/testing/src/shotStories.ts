@@ -18,13 +18,22 @@ import type { StoryShot, StoryShotReport, StoryShotRequest } from "forgebook/sto
 
 import { eachStoryPage, openedStory, type StoryPage } from "./storyPages.ts";
 
+/** A text with no hyphens at its ends; a loop, since a regular expression slows on a long run of them. */
+const trimmedHyphens = (text: string): string => {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "-") start += 1;
+  while (end > start && text[end - 1] === "-") end -= 1;
+  return text.slice(start, end);
+};
+
 /**
  * A picture's file name: the story's id and the view's name, each kept to letters, digits and hyphens.
  *
  * @param storyPage - the story and the view.
  */
 export const shotName = (storyPage: Pick<StoryPage, "story" | "name">): string => {
-  const safe = (text: string): string => text.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  const safe = (text: string): string => trimmedHyphens(text.replace(/[^a-zA-Z0-9-]+/g, "-"));
   return `${safe(storyPage.story.id)}--${safe(storyPage.name) || "default"}.png`;
 };
 

@@ -17,4 +17,11 @@ describe("shotName", () => {
       "kit-data-badge--default--default.png"
     );
   });
+
+  it("stays quick on a name that is a long run of hyphens", () => {
+    const name = `${"-".repeat(200_000)}x${"-".repeat(200_000)}`;
+    const started = performance.now();
+    expect(shotName({ story: { id: name }, name: "" })).toBe("x--default.png");
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
 });
