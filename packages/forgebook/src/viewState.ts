@@ -13,7 +13,14 @@
  */
 
 import type { CatalogueSettings, OwnControlId, PanelTabId } from "./catalogue.ts";
-import { type DeviceChoice, isDeviceId, isDeviceOrientation, type OrientationChoice } from "./deviceView.ts";
+import {
+  DEVICE_PARAMETER,
+  type DeviceChoice,
+  isDeviceId,
+  isDeviceOrientation,
+  ORIENTATION_PARAMETER,
+  type OrientationChoice
+} from "./deviceView.ts";
 import { switchValueOf, switchWithRole, type TouchChoice, type ViewSwitch } from "./switches.ts";
 
 /**
@@ -251,8 +258,8 @@ export const parseView = (search: string, catalogue: ViewCatalogue): ViewState =
     panelTab: choice(params.get("tab"), catalogue.tabs, catalogue.tabs[0] ?? DEFAULT_VIEW.panelTab),
     zoom: choice(params.get("zoom"), catalogue.zooms, DEFAULT_VIEW.zoom),
     tools: toolsOf(params.get("tools")),
-    device: deviceChoice(params.get("device")),
-    orientation: orientationChoice(params.get("orientation"))
+    device: deviceChoice(params.get(DEVICE_PARAMETER)),
+    orientation: orientationChoice(params.get(ORIENTATION_PARAMETER))
   };
 };
 
@@ -306,8 +313,8 @@ export const viewParams = (view: ViewState, switches: readonly ViewSwitch[]): UR
   if (view.panelTab !== DEFAULT_VIEW.panelTab) params.set("tab", view.panelTab);
   if (view.zoom !== DEFAULT_VIEW.zoom) params.set("zoom", String(view.zoom));
   if (view.tools.length > 0) params.set("tools", view.tools.join(","));
-  if (view.device !== DEFAULT_VIEW.device) params.set("device", view.device);
-  if (view.orientation !== DEFAULT_VIEW.orientation) params.set("orientation", view.orientation);
+  if (view.device !== DEFAULT_VIEW.device) params.set(DEVICE_PARAMETER, view.device);
+  if (view.orientation !== DEFAULT_VIEW.orientation) params.set(ORIENTATION_PARAMETER, view.orientation);
   return params;
 };
 
@@ -463,7 +470,7 @@ export const codeGlobalsOf = (
   );
 
 /** The parameters only the shell reads: a frame's address leaves them out. */
-const SHELL_PARAMETERS = [
+const SHELL_PARAMETERS: readonly string[] = [
   "compare",
   "width",
   "height",
@@ -471,8 +478,8 @@ const SHELL_PARAMETERS = [
   "tab",
   "zoom",
   "tools",
-  "device",
-  "orientation",
+  DEVICE_PARAMETER,
+  ORIENTATION_PARAMETER,
   "args",
   "matrix",
   "component"

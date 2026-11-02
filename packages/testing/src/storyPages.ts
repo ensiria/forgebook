@@ -38,7 +38,7 @@ export type StoryPage = {
   /** The window's width, when the view sets one. */
   readonly width: number | undefined;
   /**
-   * The device the view names (`device=iphone-16`): the window takes its viewport and the picture its frame. A
+   * The device the view names (`forgebook.device=iphone-16`): the window takes its viewport and the picture its frame. A
    * story's own default device never counts, so the tests and the pictures stay unframed unless asked.
    */
   readonly device: NamedDevice | undefined;

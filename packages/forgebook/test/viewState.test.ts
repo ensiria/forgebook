@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type CatalogueSettings, catalogueSettings } from "../src/catalogue.ts";
-import { touchChoiceOf, type ViewSwitch } from "../src/switches.ts";
+import { switchesProblem, touchChoiceOf, type ViewSwitch } from "../src/switches.ts";
 import {
   codeGlobalsOf,
   DEFAULT_VIEW,
@@ -232,17 +232,21 @@ describe("the touch a story marked for a phone is drawn with", () => {
 describe("the device in the address", () => {
   it("reads off and a model's id, the story's own (auto) for anything else, and writes only what is set", () => {
     expect(parseView("", CATALOGUE)).toMatchObject({ device: "auto", orientation: "auto" });
-    expect(parseView("device=pixel-9&orientation=landscape", CATALOGUE)).toMatchObject({
+    expect(parseView("forgebook.device=pixel-9&forgebook.orientation=landscape", CATALOGUE)).toMatchObject({
       device: "pixel-9",
       orientation: "landscape"
     });
-    expect(parseView("device=off", CATALOGUE).device).toBe("off");
-    expect(parseView("device=nokia-3310&orientation=upside-down", CATALOGUE)).toMatchObject({
+    expect(parseView("forgebook.device=off", CATALOGUE).device).toBe("off");
+    expect(
+      parseView("forgebook.device=nokia-3310&forgebook.orientation=upside-down", CATALOGUE)
+    ).toMatchObject({
       device: "auto",
       orientation: "auto"
     });
     const view: ViewState = { ...DEFAULT_VIEW, device: "ipad-mini", orientation: "landscape" };
-    expect(viewParams(view, SWITCHES).toString()).toBe("device=ipad-mini&orientation=landscape");
+    expect(viewParams(view, SWITCHES).toString()).toBe(
+      "forgebook.device=ipad-mini&forgebook.orientation=landscape"
+    );
     expect(viewParams(DEFAULT_VIEW, SWITCHES).toString()).toBe("");
   });
 
@@ -250,7 +254,36 @@ describe("the device in the address", () => {
     const view: ViewState = { ...DEFAULT_VIEW, device: "iphone-16" };
     expect(frameAddress("frame.html", "kit:a--b", view, SWITCHES)).toBe("frame.html?story=kit%3Aa--b");
     expect(
-      frameAddressOf("frame.html", "kit:a--b", "device=iphone-16&orientation=landscape&theme=dark")
+      frameAddressOf(
+        "frame.html",
+        "kit:a--b",
+        "forgebook.device=iphone-16&forgebook.orientation=landscape&theme=dark"
+      )
     ).toBe("frame.html?theme=dark&story=kit%3Aa--b");
+  });
+
+  it("leaves `device` and `orientation` to a catalogue's own switches of those names", () => {
+    const own = (id: string): ViewSwitch => ({
+      id,
+      label: id,
+      apply: { kind: "attribute", name: `data-${id}` },
+      default: "desktop",
+      values: [
+        { value: "desktop", label: "Desktop" },
+        { value: "tablet", label: "Tablet" }
+      ]
+    });
+    const switches = [own("device"), own("orientation")];
+    expect(switchesProblem(switches)).toBeUndefined();
+    const catalogue = catalogueSettings("Fixture", switches);
+    const view = parseView("device=tablet&orientation=tablet&forgebook.device=pixel-9", catalogue);
+    expect(view).toMatchObject({
+      switches: { device: "tablet", orientation: "tablet" },
+      device: "pixel-9",
+      orientation: "auto"
+    });
+    expect(viewParams(view, switches).toString()).toBe(
+      "device=tablet&orientation=tablet&forgebook.device=pixel-9"
+    );
   });
 });

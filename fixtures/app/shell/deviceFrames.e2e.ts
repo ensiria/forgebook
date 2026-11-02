@@ -63,13 +63,13 @@ test.describe("device frames", () => {
       .locator("html")
       .evaluate((html) => html.setAttribute("data-kept", "yes"));
     await page.getByRole("combobox", { name: "Device" }).selectOption("pixel-9");
-    await expect(page).toHaveURL(/device=pixel-9/);
+    await expect(page).toHaveURL(/forgebook\.device=pixel-9/);
     expect(await frameSize(page)).toEqual({ width: 412, height: 923 });
     await page.getByRole("button", { name: "Turn the device" }).click();
-    await expect(page).toHaveURL(/orientation=landscape/);
+    await expect(page).toHaveURL(/forgebook\.orientation=landscape/);
     expect(await frameSize(page)).toEqual({ width: 923, height: 412 });
     await page.getByRole("button", { name: "Device frame" }).click();
-    await expect(page).toHaveURL(/device=off/);
+    await expect(page).toHaveURL(/forgebook\.device=off/);
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveCount(0);
     // the frame stayed mounted throughout: the same document, the attribute set above still on it
     await expect(
@@ -90,7 +90,7 @@ test.describe("device frames", () => {
     await expect(page.getByRole("button", { name: "Device frame" })).toHaveAttribute("aria-pressed", "false");
     expect(chunks).toEqual([]);
     await page.getByRole("button", { name: "Device frame" }).click();
-    await expect(page).toHaveURL(/device=phone/);
+    await expect(page).toHaveURL(/forgebook\.device=phone/);
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveAttribute("data-model", "phone");
     expect(chunks.length).toBeGreaterThan(0);
   });
@@ -118,7 +118,7 @@ test.describe("device frames", () => {
     const toggle = page.getByRole("button", { name: "Device frame" });
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await toggle.click();
-    await expect(page).toHaveURL(/device=off/);
+    await expect(page).toHaveURL(/forgebook\.device=off/);
     await expect(page.locator(".forgebook-example .forgebook-device[data-framed]")).toHaveCount(0);
 
     await page.goto(screen("phone", "compare=theme"));

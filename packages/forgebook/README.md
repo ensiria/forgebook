@@ -184,7 +184,8 @@ At phone and tablet sizes a story can be shown inside a drawn device, as a brows
 device button after the width turns it on, a list picks the model and a button turns it on its side. The story gets
 the model's real viewport (its width and its height), the screen's rounded corners clip it, and the status bar, the
 camera's cut and the home indicator sit over it where the device has them. The choice is in the address
-(`device=pixel-9&orientation=landscape`), so a link shares it; the compare view puts a device in each cell.
+(`forgebook.device=pixel-9&forgebook.orientation=landscape`, under Forgebook's name so a catalogue's own `device` or
+`orientation` switch keeps its parameter), so a link shares it; the compare view puts a device in each cell.
 
 | Model | Id | Viewport |
 |---|---|---|
@@ -219,11 +220,8 @@ choice wins over both: turned off, a framed story shows without its device.
 The device is the shell's: the story's own document is the same, so the generated tests and `forgebook shot` stay
 unframed, unless a view names a model (`forgebook shot <id> --view "iphone-16"`, or `"dark pixel-9 landscape"`), which
 gives the picture framed (`portrait` and `landscape` need a model beside them; a catalogue's switch with a value
-named like a model keeps the word, so write `device=phone` then). A frame does not set `env(safe-area-inset-*)`, which browsers keep at zero in a frame: keep
+named like a model keeps the word, so write `forgebook.device=phone` then). A frame does not set `env(safe-area-inset-*)`, which browsers keep at zero in a frame: keep
 content clear of the status bar the device draws. The drawing and its styles load the first time a device is shown.
-
-`device` and `orientation` are parameters of the address, so no switch may take those ids: a catalogue with a switch
-named `device` renames it (its id, and the values its stories write in `globals`) to load.
 
 ## Hooks and functions
 

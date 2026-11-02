@@ -11,7 +11,7 @@
  *
  * @module
  */
-import { isDeviceId, isDeviceOrientation } from "./deviceView.ts";
+import { DEVICE_PARAMETER, isDeviceId, isDeviceOrientation, ORIENTATION_PARAMETER } from "./deviceView.ts";
 import type { ViewSwitch } from "./switches.ts";
 
 /**
@@ -21,8 +21,8 @@ import type { ViewSwitch } from "./switches.ts";
  * @param parts - the view's parameters, as words made them.
  */
 const deviceWordsProblem = (parts: readonly string[]): { readonly error: string } | undefined => {
-  const hasDevice = parts.some((part) => part.startsWith("device="));
-  if (!hasDevice && parts.some((part) => part.startsWith("orientation=")))
+  const hasDevice = parts.some((part) => part.startsWith(`${DEVICE_PARAMETER}=`));
+  if (!hasDevice && parts.some((part) => part.startsWith(`${ORIENTATION_PARAMETER}=`)))
     return {
       error: "portrait and landscape need a device: write a model's id beside them (iphone-16 landscape)"
     };
@@ -53,11 +53,11 @@ export const viewQuery = (
     const [owner] = owners;
     // a switch's own value wins: a device's words are Forgebook's, a catalogue's switch may use one
     if (owner === undefined && isDeviceId(word)) {
-      parts.push(`device=${word}`);
+      parts.push(`${DEVICE_PARAMETER}=${word}`);
       continue;
     }
     if (owner === undefined && isDeviceOrientation(word)) {
-      parts.push(`orientation=${word}`);
+      parts.push(`${ORIENTATION_PARAMETER}=${word}`);
       continue;
     }
     if (owner === undefined) return { error: `No switch has the value "${word}", and no device is named so` };

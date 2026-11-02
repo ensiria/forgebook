@@ -42,7 +42,7 @@ describe("the pages a run opens", () => {
       ...REQUEST,
       stories: [{ id: "kit:button--default" }],
       isAllVariants: false,
-      views: ["device=pixel-9&orientation=landscape", "theme=dark"]
+      views: ["forgebook.device=pixel-9&forgebook.orientation=landscape", "theme=dark"]
     });
     expect(pages.map((page) => page.device)).toEqual([
       { model: "pixel-9", orientation: "landscape" },

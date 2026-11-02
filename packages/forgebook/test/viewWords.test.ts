@@ -57,7 +57,7 @@ describe("isStoryShotReport", () => {
 describe("a device in words", () => {
   it("reads a model's id as the device and portrait or landscape as how it is held", () => {
     expect(viewQuery("dark iphone-16 landscape", FIXTURE_SWITCHES)).toEqual({
-      query: "theme=dark&device=iphone-16&orientation=landscape"
+      query: "theme=dark&forgebook.device=iphone-16&forgebook.orientation=landscape"
     });
   });
 

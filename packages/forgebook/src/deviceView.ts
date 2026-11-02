@@ -27,6 +27,16 @@ export const DEVICE_IDS = [
 /** A device model's id. */
 export type DeviceId = (typeof DEVICE_IDS)[number];
 
+/**
+ * The address's parameter of the view's device. Forgebook's own parameters have plain names (`width`, `zoom`), but
+ * `device` and `orientation` are names a catalogue may well give its own switches, so these two take Forgebook's name
+ * before them: a catalogue's `device` switch keeps its parameter. A dot, not a colon, so the address shows it as is.
+ */
+export const DEVICE_PARAMETER = "forgebook.device";
+
+/** The address's parameter of how the device is held, under Forgebook's name as `DEVICE_PARAMETER` is. */
+export const ORIENTATION_PARAMETER = "forgebook.orientation";
+
 /** The model shown when nothing names one: a generic phone, so no brand is the catalogue's default. */
 export const DEFAULT_DEVICE: DeviceId = "phone";
 

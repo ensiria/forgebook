@@ -90,7 +90,7 @@ describe("the catalogue's named views", () => {
       ),
       settings
     );
-    expect(settings.views[0]?.query).toBe("device=ipad-mini&orientation=landscape");
+    expect(settings.views[0]?.query).toBe("forgebook.device=ipad-mini&forgebook.orientation=landscape");
     expect(view).toMatchObject({ device: "ipad-mini", orientation: "landscape" });
   });
 
