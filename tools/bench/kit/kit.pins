@@ -1,5 +1,7 @@
 # What the bench kit downloads, pinned: each file from its project's own site, with the SHA-256 that project
-# publishes (Node: nodejs.org/dist/v<version>/SHASUMS256.txt; MinGit: the digest on the Git for Windows release).
+# publishes (Node: nodejs.org/dist/v<version>/SHASUMS256.txt; MinGit: the digest on the Git for Windows release;
+# the Visual C++ runtime: the hash in the path of Microsoft's own download, where aka.ms/vs/17/release/vc_redist.<arch>.exe
+# leads).
 # One key=value per line, read by start-bench.ps1 and start-bench.sh alike.
 # Node is 24.14.0, the version the reference numbers were measured with: in 24.22.2 the fetch the harness polls servers
 # with throws setTypeOfService EINVAL from a socket callback on macOS, which ends the run and leaves its servers behind.
@@ -23,3 +25,8 @@ mingit.win-x64.url=https://github.com/git-for-windows/git/releases/download/v2.5
 mingit.win-x64.sha256=e3bf78351fe777fba47ddee5950082f8a98bb0f02604fdc7ba3ee2cb68ffa877
 mingit.win-arm64.url=https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.4/MinGit-2.56.0.4-arm64.zip
 mingit.win-arm64.sha256=70f7649f78088c1db1d2f3571ca46a04d5bef06e4e9d56d8ed7f9829e8c6c4db
+vcredist.version=14 (Visual Studio 2017-2026)
+vcredist.win-x64.url=https://download.visualstudio.microsoft.com/download/pr/990c720a-46ce-4dc7-87b9-c2eb615d34b9/CC0FF0EB1DC3F5188AE6300FAEF32BF5BEEBA4BDD6E8E445A9184072096B713B/VC_redist.x64.exe
+vcredist.win-x64.sha256=cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b
+vcredist.win-arm64.url=https://download.visualstudio.microsoft.com/download/pr/d7450eb5-03e1-436d-9e7e-deb5fe4759b3/5139E1440C3A20B92153A4DB561C069A0175AAF76C276C3E5B6F56099EDCF4B0/VC_redist.arm64.exe
+vcredist.win-arm64.sha256=5139e1440c3a20b92153a4db561c069a0175aaf76c276c3e5b6f56099edcf4b0

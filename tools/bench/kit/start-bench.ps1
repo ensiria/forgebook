@@ -79,6 +79,37 @@ function Expand-Once([string] $Zip, [string] $Destination) {
   New-Item -ItemType File -Path (Join-Path $Destination '.kit-unpacked') | Out-Null
 }
 
+# Whether the Visual C++ runtime is installed: native modules Storybook and Ladle load (oxc-resolver, Rollup's) need
+# it, and a fresh Windows may not have it.
+function Test-VcRuntime([string] $Platform) {
+  $system = Join-Path $env:SystemRoot 'System32'
+  $files = @('vcruntime140.dll', 'msvcp140.dll') + $(if ($Platform -eq 'win-x64') { @('vcruntime140_1.dll') } else { @() })
+  return -not ($files | Where-Object { -not (Test-Path -LiteralPath (Join-Path $system $_)) })
+}
+
+# Installs the Visual C++ runtime from Microsoft, when it is missing. It is the one step that needs an administrator:
+# Windows asks for permission, and a refusal leaves the kit going without Storybook and Ladle.
+function Install-VcRuntime([string] $Platform, [hashtable] $Pins, [string] $Downloads) {
+  if (Test-VcRuntime $Platform) { return }
+  Step 'Runtime Microsoft Visual C++'
+  Say 'Su questo PC manca il runtime Microsoft Visual C++, che serve a Storybook e a Ladle. Lo installo dal sito di Microsoft.'
+  Say 'Windows chiederà il permesso di un amministratore: è l''unico passo che lo richiede.'
+  $installer = Join-Path $Downloads "vc_redist-$Platform.exe"
+  Get-Verified $Pins["vcredist.$Platform.url"] $Pins["vcredist.$Platform.sha256"] $installer
+  $signature = Get-AuthenticodeSignature -LiteralPath $installer
+  if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+    Fail 'il programma di installazione del runtime non è firmato da Microsoft. Non lo uso.'
+  }
+  try {
+    Start-Process -FilePath $installer -ArgumentList '/install', '/quiet', '/norestart' -Verb RunAs -Wait
+  } catch {
+    Say 'Permesso negato.'
+  }
+  if (-not (Test-VcRuntime $Platform)) {
+    Say 'Attenzione: il runtime non è installato, quindi Storybook e Ladle non potranno essere misurati. Il resto della prova va avanti.'
+  }
+}
+
 # Keeps the PC awake while the benchmark runs: the flag holds as long as this PowerShell's thread waits for Node.
 function Stop-Sleep {
   try {
@@ -140,6 +171,8 @@ Get-Verified $pins["node.$platform.url"] $pins["node.$platform.sha256"] $nodeZip
 $nodeUnpacked = Join-Path $tools "node-$($pins['node.version'])"
 Expand-Once $nodeZip $nodeUnpacked
 $node = (Get-ChildItem -LiteralPath $nodeUnpacked -Directory | Select-Object -First 1).FullName
+
+Install-VcRuntime $platform $pins $downloads
 
 Step "Git (MinGit $($pins['mingit.version']))"
 $gitZip = Join-Path $downloads "mingit-$($pins['mingit.version'])-$platform.zip"

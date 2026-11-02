@@ -13,7 +13,10 @@ Linux desktop. They copy this folder, double-click one file, answer two question
    checked against the SHA-256 in `kit.pins`; pnpm through corepack; Forgebook cloned over HTTPS at the commit `kit.pins` names; Playwright's Chromium. Every cache (npm, pnpm,
    corepack, Yarn, the browsers) stays in that folder, and Git reads no configuration of the user's and never asks for
    credentials. On Linux, Git comes from the system and Chromium's system libraries must be there: installing either
-   needs an administrator, and the launcher says so with the command.
+   needs an administrator, and the launcher says so with the command. On Windows, the Visual C++ runtime that
+   Storybook's and Ladle's native modules load is missing from a fresh system: the launcher installs Microsoft's own
+   package (hash pinned, signature checked), the one step that asks for an administrator, and goes on without those
+   two tools when the permission is refused.
 3. **Calibrates**: Forgebook alone, a start and a build on 100 stories, a few minutes. Its two phases, preparing
    (packing, installs) and measuring, scale the durations a reference machine recorded in `reference.json`, so each
    profile gets an estimate, shown as a range before the question.
