@@ -10,8 +10,12 @@
  *
  * @module
  */
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
 import { createServer, type ViteDevServer } from "vite";
 
+import { AGENT_INDEX_FILE, indexAnswer, isAgentIndex } from "../../src/vite/agentIndex.ts";
 import {
   AGENT_API,
   type AgentAnswer,
@@ -80,6 +84,78 @@ const ownClient = async (config: ResolvedConfig, origin: string): Promise<Catalo
       agentAnswer(agentServer(server, config), config, route, params, origin),
     runningAt: undefined,
     close: () => server.close()
+  };
+};
+
+/** The largest index read, in bytes, and how long an address may take: what it answers is not trusted. */
+const MAX_INDEX_BYTES = 64 * 1024 * 1024;
+const INDEX_TIMEOUT = 30_000;
+
+/** A response's text, up to the largest index: an endless answer would otherwise fill the memory. */
+const boundedText = async (response: Response, address: string): Promise<string> => {
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for await (const part of response.body ?? []) {
+    size += part.byteLength;
+    if (size > MAX_INDEX_BYTES) throw new Error(`${address} is over ${MAX_INDEX_BYTES} bytes`);
+    parts.push(part);
+  }
+  return Buffer.concat(parts).toString("utf8");
+};
+
+/** Where `forgebook mcp --from` reads the index: a built catalogue's address, or its folder. */
+const indexSource = (from: string): { readonly text: () => Promise<string>; readonly origin: string } => {
+  if (!/^https?:\/\//i.test(from)) {
+    return { text: () => readFile(resolve(from, AGENT_INDEX_FILE), "utf8"), origin: "" };
+  }
+  const origin = from.replace(/\/+$/, "");
+  const address = `${origin}/${AGENT_INDEX_FILE}`;
+  const text = async (): Promise<string> => {
+    const response = await fetch(address, { signal: AbortSignal.timeout(INDEX_TIMEOUT) });
+    if (!response.ok) throw new Error(`${address} answered ${response.status}`);
+    return boundedText(response, address);
+  };
+  return { text, origin };
+};
+
+/** The parsed index: a host's fallback page is not JSON, and that is the same as no index. */
+const parsedIndex = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
+
+/** An answer that can be sent: a file's shape is checked only at its top, and text too deep to write must not end the server. */
+const sendable = (answer: AgentAnswer): AgentAnswer => {
+  try {
+    JSON.stringify(answer.body);
+    return answer;
+  } catch {
+    return { status: 500, body: { error: "The index holds an answer that cannot be written" } };
+  }
+};
+
+/**
+ * The answers of a built catalogue, from its index.
+ *
+ * @param from - its address, or its folder; the links work from an address, and are paths from a folder.
+ * @returns the client.
+ * @throws when there is no index, or this version cannot read it.
+ */
+export const indexClient = async (from: string): Promise<CatalogueClient> => {
+  const { text, origin } = indexSource(from);
+  const index = parsedIndex(await text());
+  if (!isAgentIndex(index)) {
+    throw new Error(`${from} holds no index this version reads: \`forgebook build --agent-index\` writes it`);
+  }
+  const pages = { page: `${origin}/`, frame: `${origin}/frame.html` };
+  return {
+    ask: async (route: string, params: URLSearchParams): Promise<AgentAnswer> =>
+      sendable(indexAnswer(index, pages, route, params)),
+    runningAt: undefined,
+    close: async () => undefined
   };
 };
 
