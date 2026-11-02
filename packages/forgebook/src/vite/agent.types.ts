@@ -9,9 +9,12 @@
  *
  * @module
  */
+
 import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
 import type { LiveError } from "../liveErrors.ts";
+import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
+import type { NearestTokens } from "./nearestToken.ts";
 
 /** The version of the documents' shape. */
 export type AgentSchema = 1;
@@ -115,6 +118,48 @@ export type StoryDocument = {
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
+  readonly problems: readonly string[];
+};
+
+/** A token in a list: what to write, without what a list does not need. */
+export type AgentTokenSummary = Pick<
+  DesignToken,
+  "name" | "type" | "value" | "modes" | "deprecated" | "isThemeOnly"
+>;
+
+/** The catalogue's tokens: how many, and the first of them, since agents degrade on long answers. */
+export type TokensDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** Whether the catalogue names a tokens file at all. */
+  readonly isConfigured: boolean;
+  /** How many tokens match, whatever the limit. */
+  readonly total: number;
+  /** How many of each type. */
+  readonly types: Readonly<Record<string, number>>;
+  /** The tokens, up to the limit asked for, in the files' order. */
+  readonly tokens: readonly AgentTokenSummary[];
+  /** What in the tokens files could not be read. */
+  readonly problems: readonly string[];
+};
+
+/** One token, with all that is known of it. */
+export type TokenDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The token. */
+  readonly token: DesignToken;
+  /** What in the tokens files could not be read. */
+  readonly problems: readonly string[];
+};
+
+/** The tokens nearest a value written by hand. */
+export type NearestTokensDocument = NearestTokens & {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The value asked about. */
+  readonly value: string;
+  /** What in the tokens files could not be read. */
   readonly problems: readonly string[];
 };
 

@@ -10,35 +10,36 @@
  *
  * @module
  */
+import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import type { StorySource } from "@forgebook/story-format/source";
 import type { ViteDevServer } from "vite";
 
-import { isComponentDocs, type UsageGuidance } from "../componentDocs.ts";
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import {
-  componentId,
-  findStory,
-  type StoryTree,
-  storyTree,
-  type TreeComponent,
-  type TreeSource
-} from "../storyTree.ts";
+import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
-import type { AgentFoundComponent, ErrorsDocument, FoundComponentsDocument } from "./agent.types.ts";
-import {
-  type CataloguePages,
-  type LoadedStoryParts,
-  storiesDocument,
-  storyDocument,
-  storyLinks
-} from "./agentApi.ts";
+import type {
+  AgentTokenSummary,
+  ErrorsDocument,
+  NearestTokensDocument,
+  TokenDocument,
+  TokensDocument
+} from "./agent.types.ts";
+import { type CataloguePages, type LoadedStoryParts, storiesDocument, storyDocument } from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
-import { findComponents } from "./findComponent.ts";
+import {
+  type DesignToken,
+  filteredTokens,
+  type ParsedTokens,
+  readTokens,
+  type TokensInput
+} from "./designTokens.ts";
+import { findAnswer } from "./findRoute.ts";
+import { nearestTokens } from "./nearestToken.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
 
 /** The path the answers live under. */
@@ -72,7 +73,9 @@ const agentModuleOf = (module: unknown): AgentModule => {
 };
 
 /** A loader's value, or why it failed. */
-const settled = async (load: (() => Promise<unknown>) | undefined): Promise<LoadedStoryParts["docs"]> => {
+export const settled = async (
+  load: (() => Promise<unknown>) | undefined
+): Promise<LoadedStoryParts["docs"]> => {
   if (load === undefined) return { value: { name: null } };
   try {
     return { value: await load() };
@@ -117,7 +120,7 @@ export const ROOT_HEADER = "forgebook-root";
 export const rootHeaderValue = (dir: string): string => encodeURIComponent(dir);
 
 /** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
-type RouteContext = {
+export type RouteContext = {
   /** The sources and the preview, as the dev server loaded them. */
   readonly loaded: AgentModule;
   /** The sources' story tree. */
@@ -188,62 +191,98 @@ const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   return { status: 200, body: storyDocument(location, parts, pages, view, usage) };
 };
 
-/** Every component of the tree, with its source. */
-const treeComponents = (
-  tree: StoryTree
-): readonly { readonly source: TreeSource; readonly component: TreeComponent }[] =>
-  tree.sources.flatMap((source) =>
-    source.families.flatMap((family) =>
-      family.groups.flatMap((group) => group.components.map((component) => ({ source, component })))
-    )
-  );
+/** A list's size unless asked otherwise: an agent degrades on long answers, and asks `nearest` or one token. */
+const TOKENS_LIMIT = 100;
 
-/** What a component's docs say of when to use it; none when they cannot be read, which never loses the result. */
-const guidanceOfComponent = async (
-  source: StorySource | undefined,
-  file: string
-): Promise<UsageGuidance | undefined> => {
-  if (source === undefined) return undefined;
-  const loaded = await settled(sourceFiles(source).docs[file]);
-  const value = "value" in loaded ? loaded.value : undefined;
-  return isComponentDocs(value) ? value.guidance : undefined;
+/** The one answer a question about a catalogue with no tokens gets, so an agent does not read it as "no such token". */
+const NO_TOKENS_FILE: AgentAnswer = {
+  status: 404,
+  body: { error: 'This catalogue names no tokens file: `tokens: ["tokens.json"]` in forgebook.config.ts' }
 };
 
-/**
- * The components a query describes, with their guidance and the links of their first story.
- *
- * @param context - what the routes read.
- */
-const findAnswer = async ({ tree, params, pages, view, loaded }: RouteContext): Promise<AgentAnswer> => {
-  const query = params.get("query") ?? "";
-  if (query.trim() === "") return { status: 400, body: { error: "No words to look for" } };
-  const located = treeComponents(tree);
-  const findable = located.map(({ source, component }) => ({
-    id: componentId(source.id, component.title),
-    title: component.title,
-    keywords: component.keywords,
-    stories: component.stories.map((story) => `${story.name} ${story.description ?? ""}`)
-  }));
-  const components = await Promise.all(
-    findComponents(findable, query).map(async (found): Promise<AgentFoundComponent> => {
-      const place = located.find(
-        ({ source, component }) => componentId(source.id, component.title) === found.id
-      );
-      const story = place?.component.stories[0]?.id;
-      const source = loaded.sources.find((each) => each.id === place?.source.id);
-      const guidance =
-        place === undefined ? undefined : await guidanceOfComponent(source, place.component.file);
-      return {
-        ...found,
-        story,
-        links: story === undefined ? undefined : storyLinks(pages, story, view),
-        ...(guidance === undefined ? {} : { guidance })
-      };
+/** The catalogue's tokens, read at each question, so an edited file answers at once and costs nothing unasked. */
+const catalogueTokens = async (config: ResolvedConfig): Promise<ParsedTokens> => {
+  const unread: string[] = [];
+  const inputs = await Promise.all(
+    config.tokens.map(async ({ path, mode }): Promise<TokensInput[]> => {
+      try {
+        return [{ label: relative(config.dir, path), mode, file: JSON.parse(await readFile(path, "utf8")) }];
+      } catch (error) {
+        unread.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+        return [];
+      }
     })
   );
-  const body: FoundComponentsDocument = { schema: 1, query, components };
+  const { tokens, problems } = readTokens(inputs.flat());
+  return { tokens, problems: [...unread, ...problems] };
+};
+
+/** How many tokens of each type. */
+const typeCounts = (tokens: readonly DesignToken[]): Record<string, number> => {
+  const counts: Record<string, number> = {};
+  for (const { type } of tokens) counts[type] = (counts[type] ?? 0) + 1;
+  return counts;
+};
+
+/** A token as a list gives it: no description, and no empty fields, since each one costs an agent's context. */
+const tokenSummary = (token: DesignToken): AgentTokenSummary => {
+  const { name, type, value, modes, deprecated, isThemeOnly } = token;
+  return {
+    name,
+    type,
+    value,
+    modes,
+    ...(deprecated === undefined ? {} : { deprecated }),
+    ...(isThemeOnly === undefined ? {} : { isThemeOnly })
+  };
+};
+
+/** The tokens, of a category when one is asked for, up to a limit, with how many there are. */
+const tokensAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
+  const { tokens, problems } = await catalogueTokens(config);
+  const chosen = filteredTokens(tokens, params.get("category") || undefined);
+  const limit = Number(params.get("limit") || TOKENS_LIMIT);
+  const body: TokensDocument = {
+    schema: 1,
+    isConfigured: config.tokens.length > 0,
+    total: chosen.length,
+    types: typeCounts(chosen),
+    tokens: chosen.slice(0, Number.isFinite(limit) ? limit : TOKENS_LIMIT).map(tokenSummary),
+    problems
+  };
   return { status: 200, body };
 };
+
+/** One token; what broke in the files is said, since a token that failed to read looks like one that is not there. */
+const tokenAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
+  if (config.tokens.length === 0) return NO_TOKENS_FILE;
+  const name = params.get("name") ?? "";
+  const { tokens, problems } = await catalogueTokens(config);
+  const token = tokens.find((each) => each.name === name);
+  if (token === undefined) {
+    const read = problems.length === 0 ? "" : ` (and the tokens files have problems: ${problems.join("; ")})`;
+    return { status: 404, body: { error: `No token "${name}"${read}` } };
+  }
+  const body: TokenDocument = { schema: 1, token, problems };
+  return { status: 200, body };
+};
+
+/** The tokens nearest a value; a question that cannot be answered is an error, never an empty list. */
+const nearestTokenAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
+  if (config.tokens.length === 0) return NO_TOKENS_FILE;
+  const value = params.get("value") ?? "";
+  if (value === "") return { status: 400, body: { error: "No value to compare" } };
+  const { tokens, problems } = await catalogueTokens(config);
+  const nearest = nearestTokens(tokens, value, params.get("type") || undefined);
+  if (nearest.reason !== undefined) return { status: 400, body: { error: nearest.reason } };
+  const body: NearestTokensDocument = { schema: 1, value, ...nearest, problems };
+  return { status: 200, body };
+};
+
+/** The answers about tokens: they need nothing of the stories, so a broken story cannot take them down mid-edit. */
+const tokenRoutes: Readonly<
+  Record<string, (config: ResolvedConfig, params: URLSearchParams) => Promise<AgentAnswer>>
+> = { tokens: tokensAnswer, token: tokenAnswer, "nearest-token": nearestTokenAnswer };
 
 /**
  * Answers one of the API's paths.
@@ -251,7 +290,8 @@ const findAnswer = async ({ tree, params, pages, view, loaded }: RouteContext): 
  * @param load - loads a module on the server (the dev server's `ssrLoadModule`).
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
- * @param params - the query: `id` for a story, `view` for the links, `usedIn=true` for the list's "Used in" (a
+ * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
+ *   tokens, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
  * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
  * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
@@ -266,6 +306,8 @@ export const agentAnswer = async (
   live?: LiveErrors
 ): Promise<AgentAnswer> => {
   try {
+    const answerTokens = tokenRoutes[route];
+    if (answerTokens !== undefined) return await answerTokens(config, params);
     const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
     const context: RouteContext = {
       loaded,

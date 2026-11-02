@@ -1,5 +1,5 @@
 /**
- * The shell's own appearance: light, dark or the system's, a reader's choice kept in their browser, the catalogue's
+ * The shell's own appearance: light, dark, the system's or the story's, a reader's choice kept in their browser, the catalogue's
  * default before they pick one; written on the page's root, where the palettes of `shell.scss` read it.
  *
  * @remarks
@@ -11,7 +11,10 @@
 import { useEffect } from "react";
 
 import { APPEARANCES, type Appearance } from "../catalogue.ts";
+import type { ViewSwitch } from "../switches.ts";
+import { isComparing, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
+import { offeredAppearances, shellIsDark } from "./shellScheme.ts";
 import { useStored } from "./useStored.ts";
 import { useSystemDark } from "./useSystemDark.ts";
 
@@ -28,21 +31,31 @@ export type AppearanceState = {
   readonly appearance: Appearance;
   /** Picks an appearance, kept for the next visit. */
   readonly setAppearance: (appearance: Appearance) => void;
+  /** The appearances this catalogue offers. */
+  readonly offered: readonly Appearance[];
 };
 
 /**
  * The shell's appearance, applied to the page's root.
  *
+ * @param view - the view, whose colour scheme the shell can follow.
+ * @param switches - the catalogue's switches.
  * @returns the appearance shown and its setter.
  */
-export const useAppearance = (): AppearanceState => {
+export const useAppearance = (view: ViewState, switches: readonly ViewSwitch[]): AppearanceState => {
   const catalogue = useCatalogue();
   const [chosen, setChosen] = useStored("appearance", storedAppearance, (value) => value ?? "");
   const appearance = chosen ?? catalogue.appearance;
   const isSystemDark = useSystemDark();
-  const isDark = appearance === "dark" || (appearance === "system" && isSystemDark);
+  const isDark = shellIsDark({
+    appearance,
+    values: view.switches,
+    switches,
+    isSystemDark,
+    isComparing: isComparing(view)
+  });
   useEffect(() => {
     document.documentElement.setAttribute(APPEARANCE_ATTRIBUTE, isDark ? "dark" : "light");
   }, [isDark]);
-  return { appearance, setAppearance: setChosen };
+  return { appearance, setAppearance: setChosen, offered: offeredAppearances(switches) };
 };

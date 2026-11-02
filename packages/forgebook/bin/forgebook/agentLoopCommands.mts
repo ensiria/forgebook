@@ -18,10 +18,11 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { isFoundComponentsDocument } from "../../src/vite/agentApi.ts";
 import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
-import { agentsSkill, withAgentsSection } from "./agentsText.ts";
-import { checkText, errorsOutput, shotText } from "./agentText.ts";
-import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { agentsSkill, SKILL_FOLDERS, withAgentsSection } from "./agentsText.ts";
+import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentText.ts";
+import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 
@@ -108,6 +109,32 @@ export const agentLoopCommands = (
       const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
       if (problems > 0)
         throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
+    }
+  }),
+  find: forgebook.command({
+    summary: "Find components by what they are for, in your own words.",
+    json: true,
+    positionals: [{ name: "query", description: "What you are looking for.", required: true }],
+    options: {
+      url: {
+        type: "string",
+        env: "FORGEBOOK_URL",
+        valueName: "address",
+        description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+      }
+    },
+    examples: [
+      { command: `${COMMAND} find modal`, description: "Whatever this catalogue calls a modal." },
+      { command: `${COMMAND} find "radio tile group" --json`, description: "As an agent asks." }
+    ],
+    run: async ({ options, args, io, log, isJson }): Promise<void> => {
+      const config = await configOf(options.config);
+      const params = new URLSearchParams({ query: args.query });
+      const body = await askCatalogue(config, options.url, "find", params, log);
+      if (!isFoundComponentsDocument(body)) {
+        throw new ScriptError("The catalogue's answer has an unexpected shape");
+      }
+      printAnswer(foundComponentsText(body), body, [], { io, log, isJson });
     }
   }),
   errors: forgebook.command({
@@ -227,13 +254,13 @@ export const agentLoopCommands = (
       },
       skill: {
         type: "boolean",
-        description: "Also write them as a Claude Code skill, .claude/skills/forgebook/SKILL.md."
+        description: `Also write them as an Agent Skill, SKILL.md in ${SKILL_FOLDERS.join(" and ")}.`
       },
       print: { type: "boolean", description: "Print the instructions instead of writing them." }
     },
     examples: [
       { command: `${COMMAND} agents`, description: "Add or renew Forgebook's section of AGENTS.md." },
-      { command: `${COMMAND} agents --skill`, description: "And the Claude Code skill." }
+      { command: `${COMMAND} agents --skill`, description: "And the skill, for any agent." }
     ],
     run: ({ options, io, log }): void => {
       const section = readFileSync(new URL("./agents.md", import.meta.url), "utf8");
@@ -246,10 +273,12 @@ export const agentLoopCommands = (
       writeFileSync(file, withAgentsSection(isNew ? undefined : readFileSync(file, "utf8"), section));
       log.success(`${relative(process.cwd(), file)}: Forgebook's section ${isNew ? "written" : "renewed"}`);
       if (options.skill !== true) return;
-      const skill = resolve(".claude", "skills", "forgebook", "SKILL.md");
-      mkdirSync(dirname(skill), { recursive: true });
-      writeFileSync(skill, agentsSkill(section));
-      log.success(`${relative(process.cwd(), skill)} written`);
+      for (const folder of SKILL_FOLDERS) {
+        const skill = resolve(folder, "SKILL.md");
+        mkdirSync(dirname(skill), { recursive: true });
+        writeFileSync(skill, agentsSkill(section));
+        log.success(`${relative(process.cwd(), skill)} written`);
+      }
     }
   })
 });

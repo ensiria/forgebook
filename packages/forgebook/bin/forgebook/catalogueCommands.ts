@@ -12,7 +12,14 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import type { FoundComponentsDocument, StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
+import type {
+  FoundComponentsDocument,
+  NearestTokensDocument,
+  StoriesDocument,
+  StoryDocument,
+  TokenDocument,
+  TokensDocument
+} from "../../src/vite/agent.types.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import {
   CONFIG_FILES,
@@ -111,7 +118,13 @@ export const askCatalogue = async (
  */
 export const printAnswer = (
   text: string,
-  document: StoriesDocument | StoryDocument | FoundComponentsDocument,
+  document:
+    | StoriesDocument
+    | StoryDocument
+    | TokensDocument
+    | TokenDocument
+    | NearestTokensDocument
+    | FoundComponentsDocument,
   problems: readonly string[],
   context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
 ): void => {
@@ -119,4 +132,21 @@ export const printAnswer = (
   for (const problem of problems) context.log.warn(problem);
   if (problems.length > 0)
     throw new ScriptError(`${problems.length} problems`, { exitCode: EXIT.failure, isReported: true });
+};
+
+/**
+ * Prints an answer about tokens that holds whatever else is wrong in the files: the problems are warned about, and the
+ * command succeeds, since a good answer must not read as a failure because of an unrelated token.
+ *
+ * @param text - the answer as a person reads it.
+ * @param document - the answer.
+ * @param context - where it goes.
+ */
+export const printTokenAnswer = (
+  text: string,
+  document: TokenDocument | NearestTokensDocument,
+  context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
+): void => {
+  context.io.stdout.write(context.isJson ? formatJson(document) : `${text}\n`);
+  for (const problem of document.problems) context.log.warn(problem);
 };
