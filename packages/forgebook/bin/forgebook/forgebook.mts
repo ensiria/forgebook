@@ -96,13 +96,27 @@ await defineCommands({
     build: forgebook.command({
       summary: "Build the catalogue into static files.",
       options: {
-        out: { type: "string", valueName: "folder", description: "The folder to write; dist by default." }
+        out: { type: "string", valueName: "folder", description: "The folder to write; dist by default." },
+        base: {
+          type: "string",
+          valueName: "path",
+          description: "The path the catalogue is served under (/pr-12/); the root by default."
+        }
       },
-      examples: [{ command: `${COMMAND} build --out site`, description: "Build it into static files." }],
+      examples: [
+        { command: `${COMMAND} build --out site`, description: "Build it into static files." },
+        {
+          command: `${COMMAND} build --base /pr-12/`,
+          description: "For a host that serves it under a sub-path."
+        }
+      ],
       run: async ({ options, log }): Promise<void> => {
         const config = await configOf(options.config);
         await build(
-          await catalogueVite(config, { build: { outDir: resolve(config.dir, options.out ?? "dist") } })
+          await catalogueVite(config, {
+            ...(options.base === undefined ? {} : { base: options.base }),
+            build: { outDir: resolve(config.dir, options.out ?? "dist") }
+          })
         );
         log.success(`${config.title} built`);
       }

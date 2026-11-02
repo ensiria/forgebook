@@ -244,11 +244,40 @@ become switches. It reads React on Vite (`@storybook/react-vite`) only, never re
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+## A preview for every pull request
+`forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
+for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
+artefact; the last step is yours, and any host works:
+```yaml
+# .github/workflows/catalogue-preview.yml
+name: catalogue preview
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx forgebook build --out preview --base "/pr-${{ github.event.number }}/"
+      - uses: actions/upload-artifact@v4
+          name: catalogue-preview
+          path: preview
+      # then publish the folder, for example:
+      # GitHub Pages:  actions/upload-pages-artifact, then actions/deploy-pages (one site, so without --base per PR)
+      # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
+      # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
+```
+A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
 ## Your look in the shell
-
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
 written into the page at build, and the frames are left alone, since they belong to your stories.
-
 ```ts
 // forgebook.config.ts
 shell: {
@@ -259,20 +288,15 @@ shell: {
     radius: { control: "4px", card: "8px" }
   }
 }
-```
-
 Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
 `window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,
 `danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
 theme too, and the catalogue's wins role by role.
-
 The reader's Appearance menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
 dark shell. It stays on the system's while comparing, since several themes share the stage. `appearance: "story"` makes
 it the catalogue's default; a reader's own choice always wins.
-
 When the catalogue starts, a role that does not exist is named, and so is a hex colour that leaves a text or code under
 4.5:1 on its ground, or the accent, which draws the keyboard's focus, under 3:1. Other colour notations are not checked.
-
 Fonts are yours to load: a web font goes in a style sheet of your own, `shell.css`, with `@font-face`. That sheet loads
 after the shell's. It is also an escape hatch, since the shell's class names are not public API and can change in any
 release. Layout is not themable, though a font does change how wide text runs.
