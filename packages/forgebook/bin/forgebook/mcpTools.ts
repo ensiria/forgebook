@@ -1,6 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors` and `story_shot`.
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`
+ * and `nearest_token`.
  *
  * @module
  */
@@ -62,6 +63,19 @@ type Check = (input: StoryCheckInput) => Promise<StoryCheckReport | string>;
 /** Takes a story's pictures into a folder: the report, or why they could not be taken. */
 type Shot = (input: StoryCheckInput, outDir: string) => Promise<StoryShotReport | string>;
 
+/** An answer as a tool's result that fails on what it found, as the command of the same name does. */
+const problemsResult = (answer: AgentAnswer): McpToolResult => {
+  const result = resultOf(answer);
+  const body = answer.body;
+  const hasProblems =
+    typeof body === "object" &&
+    body !== null &&
+    "problems" in body &&
+    Array.isArray(body.problems) &&
+    body.problems.length > 0;
+  return { ...result, isError: result.isError || hasProblems };
+};
+
 /** What the tools reach the catalogue through. */
 export type CatalogueReach = {
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
@@ -72,6 +86,8 @@ export type CatalogueReach = {
   readonly check: Check;
   /** Takes a story's pictures. */
   readonly shot: Shot;
+  /** Runs the checks on a page of the application. */
+  readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
 };
 
 /**
@@ -79,7 +95,146 @@ export type CatalogueReach = {
  *
  * @param reach - what they reach the catalogue through.
  */
-export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): readonly McpTool[] => [
+export const catalogueTools = ({
+  ask,
+  writeNew,
+  check,
+  shot,
+  checkPage
+}: CatalogueReach): readonly McpTool[] => [
+  {
+    name: "check_page",
+    description:
+      "Run the catalogue's checks on a real page of the application in a browser: accessibility, what spills, console and page errors. Use it on the screen you built; for a story, check_story.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "The page's address, as http://localhost:3000/checkout." }
+      },
+      required: ["address"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
+      const report = await checkPage(textOf(args, "address") ?? "");
+      return typeof report === "string"
+        ? { structured: { error: report }, isError: true }
+        : { structured: report, isError: false };
+    }
+  },
+  {
+    name: "changed_stories",
+    description:
+      "The stories a change touches: every story that reaches a file git says changed, through the imports. Call it after editing, then run check_story on what it lists.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "The commit to compare with; HEAD by default, so what is not committed."
+        }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("changed", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
+  },
+  {
+    name: "find_component",
+    description:
+      'The components a description fits, best first, in your own words ("modal", "radio tile group"): call it before writing a component that may already exist. Each with the words it matched and missed, when to use it, and its first story.',
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", description: "What you are looking for, in any words." } },
+      required: ["query"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("find", new URLSearchParams({ query: textOf(args, "query") ?? "" })))
+  },
+  {
+    name: "check_code",
+    description:
+      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "The commit to compare with; HEAD by default, so what is not committed."
+        }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
+  },
+  {
+    name: "list_tokens",
+    description:
+      "The design tokens of this catalogue, to use instead of a colour, size or duration written by hand: how many of each type, and the first of them. To replace a raw value, call nearest_token; for one token's description, get_token.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          description: "A token type (color) or a first group (space); none for all."
+        },
+        limit: { type: "number", description: "The most tokens to give; 100 by default." }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(
+        await ask(
+          "tokens",
+          new URLSearchParams({
+            category: textOf(args, "category") ?? "",
+            limit: String(args["limit"] ?? "")
+          })
+        )
+      )
+  },
+  {
+    name: "get_token",
+    description:
+      "One design token: its value in each theme, what it is for, the token it aliases, and why not to use it if deprecated.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "The token's name, as list_tokens gives it." } },
+      required: ["name"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("token", new URLSearchParams({ name: textOf(args, "name") ?? "" })))
+  },
+  {
+    name: "nearest_token",
+    description:
+      "The tokens nearest a value written by hand, nearest first: call it before writing a raw colour or size. Use a match only when `isClose` or `isExact` is true; otherwise no token fits, so say so rather than force one. Deprecated tokens are left out.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: {
+          type: "string",
+          description: "The value, as code writes it: #1c1b1b, rgb(1 2 3), 16px, 200ms."
+        },
+        type: {
+          type: "string",
+          description:
+            "What to compare with: color, dimension, duration, number, fontWeight, or a CSS property (background, padding, font-size). Read from the value when left out."
+        }
+      },
+      required: ["value"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(
+        await ask(
+          "nearest-token",
+          new URLSearchParams({ value: textOf(args, "value") ?? "", type: textOf(args, "type") ?? "" })
+        )
+      )
+  },
   {
     name: "list_stories",
     description:

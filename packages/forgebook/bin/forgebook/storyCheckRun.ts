@@ -207,3 +207,22 @@ export const runStoryShot = async (
   if (typeof answer === "string" || isStoryShotReport(answer)) return answer;
   return "@forgebook/testing/shot answered something that is not a picture run's report";
 };
+
+/**
+ * Checks pages of an application.
+ *
+ * @param config - the catalogue's configuration: its accessibility rules, and the folder the testing package is in.
+ * @param addresses - the pages' addresses.
+ * @returns the report, or why the check could not run.
+ */
+export const runPageCheck = async (
+  config: ResolvedConfig,
+  addresses: readonly string[]
+): Promise<StoryCheckReport | string> => {
+  const check = await testingFunction(config.dir, "@forgebook/testing/check-page", "checkPages");
+  if (typeof check === "string") return check;
+  const answer = await check({ addresses, lists: config.lists });
+  return isStoryCheckReport(answer)
+    ? answer
+    : "@forgebook/testing/check-page answered something that is not a report";
+};

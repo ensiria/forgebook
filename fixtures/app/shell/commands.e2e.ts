@@ -5,9 +5,10 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { expect, test } from "@playwright/test";
 
@@ -31,6 +32,75 @@ const forgebook = (baseURL: string, argv: readonly string[]): { status: number |
   });
   return { status: run.status, stdout: run.stdout };
 };
+
+test.describe("forgebook check-page", () => {
+  test.setTimeout(180_000);
+
+  /** Runs the command on an address: it needs no catalogue server, only the catalogue's folder. */
+  const checkPage = (address: string): { readonly status: number | null; readonly stdout: string } => {
+    const run = spawnSync(process.execPath, [ENTRY, "check-page", address, "--json"], {
+      cwd: APP,
+      encoding: "utf8",
+      timeout: 120_000
+    });
+    return { status: run.status, stdout: run.stdout };
+  };
+
+  test("names a real page's problems by kind, and fails on them", () => {
+    const html = `<!doctype html><html lang="en"><title>A page</title><main><img src="data:,"></main>
+      <script>console.error("broken on purpose")</script></html>`;
+    const folder = mkdtempSync(join(tmpdir(), "forgebook-page-"));
+    writeFileSync(join(folder, "page.html"), html);
+    const run = checkPage(pathToFileURL(join(folder, "page.html")).href);
+    rmSync(folder, { recursive: true });
+    expect(run.status).not.toBe(0);
+    const report: unknown = JSON.parse(run.stdout);
+    expect(report).toMatchObject({
+      results: [{ problems: expect.arrayContaining([expect.objectContaining({ kind: "axe" })]) }]
+    });
+    expect(run.stdout).toContain("broken on purpose");
+  });
+
+  /** The focus problems of a page with these lines in its body. */
+  const focusOf = (body: string): string[] => {
+    const folder = mkdtempSync(join(tmpdir(), "forgebook-page-"));
+    writeFileSync(
+      join(folder, "page.html"),
+      `<!doctype html><html lang="en"><title>A page</title><main>${body}</main></html>`
+    );
+    const run = checkPage(pathToFileURL(join(folder, "page.html")).href);
+    rmSync(folder, { recursive: true });
+    const report: unknown = JSON.parse(run.stdout);
+    const problems = JSON.stringify(report).match(/"kind":"focus","message":"[^"]*"/g) ?? [];
+    return [...problems];
+  };
+
+  test("names a modal that does not take the focus, and one that lets Tab out", () => {
+    const button = "<button>Before</button>";
+    const open = '<div role="dialog" aria-modal="true" aria-label="A"><button>Inside</button></div>';
+    expect(focusOf(`${button}${open}`).join()).toContain("did not move the focus");
+    const taken = `${button}${open}<script>document.querySelector('[role=dialog] button').focus()</script>`;
+    expect(focusOf(taken).join()).toContain("Tab leaves the modal");
+  });
+
+  test("passes a native modal, which traps the focus itself, and a page with none", () => {
+    const native = `<dialog aria-label="A"><button>Inside</button></dialog>
+      <script>document.querySelector("dialog").showModal()</script>`;
+    expect(focusOf(native)).toEqual([]);
+    expect(focusOf("<button>Alone</button>")).toEqual([]);
+  });
+
+  test("passes a page with nothing wrong", () => {
+    const folder = mkdtempSync(join(tmpdir(), "forgebook-page-"));
+    writeFileSync(
+      join(folder, "page.html"),
+      '<!doctype html><html lang="en"><title>A page</title><main><h1>Fine</h1></main></html>'
+    );
+    const run = checkPage(pathToFileURL(join(folder, "page.html")).href);
+    rmSync(folder, { recursive: true });
+    expect(run.status).toBe(0);
+  });
+});
 
 test.describe("forgebook check", () => {
   test.setTimeout(180_000);

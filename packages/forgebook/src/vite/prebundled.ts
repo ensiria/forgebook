@@ -14,7 +14,7 @@
  */
 import { dirname, join } from "node:path";
 
-import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
 const CORE_BROWSER_DEPENDENCIES = [
@@ -57,6 +57,8 @@ export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn:
     ...(config.framework.browserDependencies ?? []),
     ...(config.hasPlayTools ? PLAY_TOOLS_PACKAGES : [])
   ];
+  // named without resolving it: it is a browser-only module, which Node cannot resolve though it is installed
+  const mocks = config.hasMocks ? [MOCKS_MODULE] : [];
   const installedPages = pageModules.filter((name) => {
     const file = resolve(name);
     return file !== undefined && isInstalled(file);
@@ -65,7 +67,12 @@ export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn:
     (name) => `forgebook > ${name}`
   );
   return [
-    ...new Set([...candidates.filter((name) => resolve(name) !== undefined), ...own, ...installedPages])
+    ...new Set([
+      ...candidates.filter((name) => resolve(name) !== undefined),
+      ...mocks,
+      ...own,
+      ...installedPages
+    ])
   ];
 };
 

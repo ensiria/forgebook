@@ -56,9 +56,10 @@ export const axeProblems = async (page: Page, a11y: A11ySettings): Promise<Story
  * The elements that spill out of their parents.
  *
  * @param page - the story's frame page, ready.
+ * @param root - the element to look inside; a story's frame by default.
  */
-export const spillProblems = async (page: Page): Promise<StoryProblem[]> => {
-  const spills = await page.evaluate(findSpills, ".forgebook-frame");
+export const spillProblems = async (page: Page, root = ".forgebook-frame"): Promise<StoryProblem[]> => {
+  const spills = await page.evaluate(findSpills, root);
   return spills.map((spill) => ({
     kind: "spill",
     element: spill.element,
@@ -85,6 +86,60 @@ export const overlayProblems = async (
     element: overlay.element,
     message: `${overlay.element} ends ${overlay.by}px below the frame's ${overlay.frameHeight}px: declare parameters.height`
   }));
+};
+
+/** A modal, in a document: what a keyboard has to stay inside of. */
+const MODAL = 'dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]';
+
+/** Whether the focus is inside the modal, as the page sees it. */
+const isFocusInside = (page: Page): Promise<boolean> =>
+  page.evaluate(
+    (selector) => document.querySelector(selector)?.contains(document.activeElement) === true,
+    MODAL
+  );
+
+/**
+ * Whether the focus reached the page behind the modal. On `body` it is not: a native modal lets Tab go on to the browser's
+ * own controls, which is how it works, and the page behind stays out of reach.
+ */
+const isFocusBehind = (page: Page): Promise<boolean> =>
+  page.evaluate((selector) => {
+    const active = document.activeElement;
+    return active !== document.body && document.querySelector(selector)?.contains(active) === false;
+  }, MODAL);
+
+/**
+ * What a modal does wrong with the keyboard: what an axe run and a screenshot do not show. It moves the focus inside when
+ * it opens, and Tab stays inside. Last of a page's checks, since it presses keys.
+ *
+ * @param page - the page, ready; a page with no open modal has nothing to check.
+ */
+export const focusProblems = async (page: Page): Promise<StoryProblem[]> => {
+  const stops = await page.evaluate(
+    (selector) =>
+      document
+        .querySelector(selector)
+        ?.querySelectorAll("a[href], button, input, select, textarea, [tabindex]").length,
+    MODAL
+  );
+  if (stops === undefined) return [];
+  if (stops === 0) {
+    return [
+      { kind: "focus", message: "The modal holds nothing to focus: a keyboard cannot reach it or leave it" }
+    ];
+  }
+  if (!(await isFocusInside(page))) {
+    return [{ kind: "focus", message: "The modal did not move the focus inside when it opened" }];
+  }
+  for (let press = 0; press <= stops; press += 1) {
+    await page.keyboard.press("Tab");
+    if (await isFocusBehind(page)) {
+      return [
+        { kind: "focus", message: "Tab leaves the modal: the focus has to stay inside while it is open" }
+      ];
+    }
+  }
+  return [];
 };
 
 /**
