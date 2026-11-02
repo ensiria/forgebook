@@ -212,7 +212,9 @@ first segment, as for any component (`Hooks/useUndo` is under Hooks; the source'
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and
 titles from the file's path, `args` and `argTypes` (with their controls), actions from `fn()` or an `argTypes` action,
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
-`tags` (`!dev`, `!test`) and a story's `globals`.
+`tags` (`!dev`, `!test`), a story's `globals`, stories gathered from other files (`export { A } from "./a.stories"`), JSX
+in `.js` story files, hooks in a `render` or a decorator, and a preview's named exports and the text values of its
+`globalTypes` defaults and `initialGlobals`.
 
 It does not read MDX, doc blocks or addons. Actions are explicit only: an `on*` prop is not turned into an action by
 its name.
