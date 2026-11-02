@@ -16,7 +16,7 @@ import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { autoTitle, patternBase } from "./autoTitle.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
-import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** A pattern of story files and the folder it is read from: the declaring module's folder, the import's pattern. */
 export type StoryFilesGroup = {
@@ -59,19 +59,6 @@ export const storyFilesGroupOf = (text: string): StoryFilesGroup => {
 };
 
 /**
- * A matched file's key: its path relative to the declaring module's folder, with forward slashes on every system and
- * starting with `./` or `../`, so a story's id is the same wherever the catalogue runs.
- *
- * @param root - the declaring module's folder.
- * @param file - the file as the glob gives it, relative to `root` (with backslashes on Windows).
- * @param paths - the path functions; the running system's unless a test names another.
- */
-export const storyFileKey = (root: string, file: string, paths: VitePaths = VITE_PATHS): string => {
-  const path = paths.relative(root, paths.join(root, file));
-  return path.startsWith(".") ? path : `./${path}`;
-};
-
-/**
  * The story files patterns match, as paths relative to `root` starting with `./` or `../`, sorted.
  *
  * @param root - the folder the patterns are relative to: the declaring module's.
@@ -80,7 +67,8 @@ export const storyFileKey = (root: string, file: string, paths: VitePaths = VITE
 export const storyFileKeys = (root: string, patterns: readonly string[]): string[] =>
   patterns
     .flatMap((pattern) => globSync(pattern, { cwd: root }))
-    .map((file) => storyFileKey(root, file))
+    // with forward slashes on every system, so a story file has the same key wherever the catalogue runs
+    .map((file) => VITE_PATHS.relativeKey(root, file))
     .sort();
 
 /**

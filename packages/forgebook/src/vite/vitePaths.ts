@@ -10,7 +10,10 @@
  * through these; a path only shown to a person or handed to `fs` keeps Node's form.
  * `normalize` follows the rule of Vite's own `normalizePath` (backslashes to slashes on Windows, then POSIX
  * normalisation), so both write the same text; it is written here so a test can name the system (`path.win32`) and run
- * the Windows logic anywhere. On macOS and Linux a backslash is a legal character of a file name and stays.
+ * the Windows logic anywhere. On macOS and Linux a backslash is a legal character of a file name and stays. One
+ * departure: a Windows network path keeps its two leading slashes (`//server/share`), where POSIX normalisation keeps
+ * one, which Windows reads as a folder of the current drive. Paths are compared as written: a drive letter in another
+ * case (`c:` and `C:`) names another path, as it does for Vite.
  *
  * @module
  */
@@ -34,6 +37,11 @@ export type VitePaths = {
   readonly dirname: (path: string) => string;
   /** `path.relative`, with forward slashes: empty when both name the same folder. */
   readonly relative: (from: string, to: string) => string;
+  /**
+   * A file's key in a folder (`./src/x.stories.tsx`, `../kit/x.stories.tsx`): its path from the folder, with forward
+   * slashes, starting with a dot.
+   */
+  readonly relativeKey: (folder: string, file: string) => string;
   /** `path.isAbsolute` on the system: `C:\app` and `C:/app` on Windows, `/app` everywhere. */
   readonly isAbsolute: (path: string) => boolean;
   /** Whether two paths name the same file as written, whatever separators each uses. */
@@ -49,7 +57,10 @@ export const vitePathsOf = (system: PathSystem): VitePaths => {
   const isWindows = system.sep === "\\";
   const normalize = (path: string): string => {
     if (path === "") return "";
-    return posix.normalize(isWindows ? path.replaceAll("\\", "/") : path);
+    if (!isWindows) return posix.normalize(path);
+    const slashed = path.replaceAll("\\", "/");
+    const normalized = posix.normalize(slashed);
+    return slashed.startsWith("//") && !normalized.startsWith("//") ? `/${normalized}` : normalized;
   };
   return {
     normalize,
@@ -57,6 +68,10 @@ export const vitePathsOf = (system: PathSystem): VitePaths => {
     join: (...segments: readonly string[]): string => normalize(system.join(...segments)),
     dirname: (path: string): string => normalize(system.dirname(path)),
     relative: (from: string, to: string): string => normalize(system.relative(from, to)),
+    relativeKey: (folder: string, file: string): string => {
+      const path = normalize(system.relative(folder, system.resolve(folder, file)));
+      return path.startsWith(".") ? path : `./${path}`;
+    },
     isAbsolute: (path: string): boolean => system.isAbsolute(path),
     isSame: (first: string, second: string): boolean => normalize(first) === normalize(second)
   };

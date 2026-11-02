@@ -26,6 +26,8 @@ describe("vitePathsOf on Windows", () => {
     expect(WINDOWS.normalize("C:/Users/ada/app")).toBe("C:/Users/ada/app");
     expect(WINDOWS.normalize("src\\a\\A.stories.tsx")).toBe("src/a/A.stories.tsx");
     expect(WINDOWS.normalize("")).toBe("");
+    // a network path keeps both slashes: with one, Windows reads it as a folder of the current drive
+    expect(WINDOWS.normalize("\\\\server\\share\\app\\x.ts")).toBe("//server/share/app/x.ts");
   });
 
   it("joins, resolves and takes folders in Vite's form, from paths with either separator", () => {
@@ -53,6 +55,20 @@ describe("vitePathsOf on Windows", () => {
     expect(WINDOWS.isAbsolute("@acme/ui/preview")).toBe(false);
     expect(WINDOWS.isSame("C:/Users/ada/app/frame.html", "C:\\Users\\ada\\app\\frame.html")).toBe(true);
     expect(WINDOWS.isSame("C:/Users/ada/app/frame.html", "C:/Users/ada/app/index.html")).toBe(false);
+  });
+});
+
+describe("relativeKey", () => {
+  it("keys a file Windows' glob gives with backslashes with forward slashes, from `./` or `../`", () => {
+    expect(WINDOWS.relativeKey("C:/Users/ada/kit", "src\\a\\A.stories.tsx")).toBe("./src/a/A.stories.tsx");
+    expect(WINDOWS.relativeKey("C:/Users/ada/kit/forgebook", "..\\src\\A.stories.tsx")).toBe(
+      "../src/A.stories.tsx"
+    );
+  });
+
+  it("gives the same keys on POSIX", () => {
+    expect(POSIX.relativeKey("/srv/kit", "src/a/A.stories.tsx")).toBe("./src/a/A.stories.tsx");
+    expect(POSIX.relativeKey("/srv/kit/forgebook", "../src/A.stories.tsx")).toBe("../src/A.stories.tsx");
   });
 });
 
