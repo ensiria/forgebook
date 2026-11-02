@@ -9,6 +9,27 @@ import { describe, expect, it } from "vitest";
 import { componentImport } from "../src/vite/storyMeta.ts";
 
 describe("componentImport", () => {
+  it("reads the component of a meta held in a constant", () => {
+    const text = `import { Banner } from "./Banner";
+      const meta = { title: "A/B", component: Banner } satisfies Meta<typeof Banner>;
+      export default meta;`;
+    expect(componentImport("A.stories.tsx", text)).toBe("./Banner");
+  });
+
+  it("reads the component of a typed constant", () => {
+    const text = `import { Banner } from "./Banner";
+      const meta: Meta<typeof Banner> = { component: Banner };
+      export default meta;`;
+    expect(componentImport("A.stories.tsx", text)).toBe("./Banner");
+  });
+
+  it("still reads an inline meta, and nothing from a default export that is no object", () => {
+    expect(
+      componentImport("A.stories.tsx", `import { B } from "./B"; export default { component: B };`)
+    ).toBe("./B");
+    expect(componentImport("A.stories.tsx", "const meta = make(); export default meta;")).toBeUndefined();
+  });
+
   it("finds the module the meta's component is imported from, named or default, without a program", () => {
     const named = `import { Select, type SelectProps } from "./Select";
       export default { title: "A/B", component: Select } satisfies Meta<typeof Select>;`;
