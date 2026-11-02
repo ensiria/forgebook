@@ -77,7 +77,11 @@ test.describe("the search", () => {
   test("opens a story found by its description", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("searchbox").fill("default select");
-    await row(page, "Story").first().click();
+    // the first search on a dev server waits for the package's TypeScript program, and the rows move when it comes
+    await expect(page.locator(".forgebook-search-panel[data-ready]")).toBeVisible({ timeout: 30_000 });
+    await row(page, /^Story.*The default select/)
+      .first()
+      .click();
     await expect(page).toHaveURL(/story=kit%3Ainputs-selection-select--overview/);
   });
 
