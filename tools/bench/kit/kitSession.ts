@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
-import { confirm } from "@ensiria/cli-kit/prompts";
+import { select } from "@ensiria/cli-kit/prompts";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { machineInfo } from "../machine.ts";
@@ -79,6 +79,30 @@ export type Asker = {
   /** Whether `--yes` answers every question with its default. */
   readonly isYes: boolean;
 };
+
+/**
+ * Asks a yes-or-no question in Italian: «Sì» or «No», chosen like any other choice.
+ *
+ * @remarks
+ * cli-kit's `confirm` draws "Yes / No" and takes only `y` and `n`, which an Italian reader answers with `s`.
+ * With `--yes` the question's own default is taken, so a question whose safe answer is no stays no.
+ *
+ * @param message - the question.
+ * @param isYesDefault - whether «Sì» is the answer Enter gives.
+ * @param asker - what the question needs.
+ */
+export const askYesNo = async (message: string, isYesDefault: boolean, asker: Asker): Promise<boolean> =>
+  (await select<"yes" | "no">(
+    {
+      message,
+      choices: [
+        { value: "yes", label: "Sì" },
+        { value: "no", label: "No" }
+      ],
+      default: isYesDefault ? "yes" : "no"
+    },
+    asker
+  )) === "yes";
 
 /** This machine, as a key: a calibration copied with the folder to another machine is not reused. */
 export const machineKey = (): string => {
@@ -167,7 +191,7 @@ export const checkMachine = async (profile: KitProfile, paths: KitPaths, asker: 
     asker.log.warn(
       `Con meno di ${gigabytes(needs.memory)} di memoria qualche misura può fallire per memoria esaurita.`
     );
-    const isGoing = await confirm({ message: "Continuo lo stesso?", default: true }, asker);
+    const isGoing = await askYesNo("Continuo lo stesso?", true, asker);
     if (!isGoing) throw new ScriptError("Fermato prima di iniziare.");
   }
 };

@@ -15,7 +15,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join, resolve } from "node:path";
 
-import { confirm, select } from "@ensiria/cli-kit/prompts";
+import { select } from "@ensiria/cli-kit/prompts";
 import { defineScript, ScriptError } from "@ensiria/cli-kit/script";
 
 import { writeReference, writeResults } from "./kitOutput.ts";
@@ -30,6 +30,7 @@ import {
 import { calibrate, clearLeftovers, runItem } from "./kitRunner.ts";
 import {
   type Asker,
+  askYesNo,
   CLEAN_MARKER,
   checkMachine,
   checkoutCommit,
@@ -121,7 +122,7 @@ const answerEarlierRun = async (
   if (choice === "resume") return "resume";
   if (choice === "clean") {
     const message = `Cancello ${paths.home}? I file dei risultati già creati restano dove sono.`;
-    if (await confirm({ message, default: false }, asker)) writeFileSync(join(paths.home, CLEAN_MARKER), "");
+    if (await askYesNo(message, false, asker)) writeFileSync(join(paths.home, CLEAN_MARKER), "");
     return "stop";
   }
   if (choice === "results") {
@@ -162,7 +163,7 @@ const startRun = async (session: Session, given: string | undefined): Promise<bo
     "  Durante la prova lascia il PC acceso e collegato alla corrente, e non usarlo: altri programmi aperti " +
       "falsano i tempi. Lo schermo può spegnersi."
   );
-  if (!(await confirm({ message: "Inizio?", default: true }, asker))) return false;
+  if (!(await askYesNo("Inizio?", true, asker))) return false;
   const estimated = estimates[profile];
   session.update({
     profile,

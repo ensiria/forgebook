@@ -9,12 +9,11 @@ import { homedir, hostname, userInfo } from "node:os";
 import { join } from "node:path";
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
-import { confirm } from "@ensiria/cli-kit/prompts";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { machineInfo, systemName } from "../machine.ts";
 import { anonymize, type Identity, leaks, readme } from "./kitResults.ts";
-import { type Asker, gigabytes, type KitPaths } from "./kitSession.ts";
+import { type Asker, askYesNo, gigabytes, type KitPaths } from "./kitSession.ts";
 import type { KitState } from "./kitState.ts";
 import { zipArchive } from "./zipArchive.ts";
 
@@ -68,10 +67,7 @@ export const writeResults = async (
   asker.log.step("Il file dei risultati conterrà:");
   for (const { name, data } of entries) asker.log.plain(`  ${name}  (${(data.length / 1024).toFixed(0)} KB)`);
   asker.log.plain(readme([]).split("\nFile:")[0] ?? "");
-  const isWriting = await confirm(
-    { message: "Creo il file dei risultati sul Desktop?", default: true },
-    asker
-  );
+  const isWriting = await askYesNo("Creo il file dei risultati sul Desktop?", true, asker);
   if (!isWriting) return undefined;
   const folder = existsSync(desktop) ? desktop : paths.home;
   const now = new Date();
