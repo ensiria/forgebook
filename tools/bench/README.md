@@ -69,6 +69,17 @@ slow page and not of a slow computer.
 median moved more than 10 % or a metric went missing, which is how the numbers are shown to be reproducible. Keep a copy
 of the report: `report.json` is overwritten, and a run cannot be compared with itself.
 
+## The budget
+
+`--budget <file>` fails a run when a metric of Forgebook is over its limit, or was not measured: a check that passes by
+losing its number protects nothing. The pull requests' `budget` job runs the light part of the benchmark (install, start
+and build on 100 stories) against `budget.json`, on `ubuntu-latest`.
+
+The limits are the numbers of that job on that runner, a little above: 2 % for sizes, so a small feature does not have to
+reopen the budget and the dependencies that float do not fail an unrelated change; 50 % for times, which a shared runner
+moves by that much. Sizes are what this check really holds. A limit moves in a pull request, in plain sight, with the
+reason: raising one is a decision, not a chore.
+
 ## Following a run
 
 `--status <file>` appends a JSON line per step, only between samples, so whatever follows the file cannot wake up during
@@ -84,6 +95,7 @@ a measurement. `tail -F` reads it from anywhere.
 - `corpus.ts`: the generated library, pure.
 - `prepare.ts`: packing, clean installs, the project on disk.
 - `machine.ts`, `benchStats.ts`, `reportTable.ts`, `statusFile.ts`, `staticServer.ts`, `diskUsage.ts`: what they say.
+- `budget.ts`, `budget.json`: the check of a pull request, and its limits.
 - `targets/`: the pinned tools.
 
 Everything it generates lands in `--work`, by default `forgebook-bench/` beside the repository; the last report is
