@@ -7,7 +7,7 @@
  */
 
 import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-format/source";
-import { lazy, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
 import type { ComponentDocs, PropDocs } from "../componentDocs.ts";
@@ -16,6 +16,7 @@ import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { CheckState } from "./A11yTab.tsx";
 import type { DockTab } from "./Dock.tsx";
+import { deferred } from "./deferred.tsx";
 import { a11yHint, interactionsHint, styleHooks } from "./dockHints.ts";
 import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
 import { STRINGS } from "./strings.ts";
@@ -23,17 +24,15 @@ import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
 
-// a story opens on Props: the other tabs load when they are chosen, and the panel's Suspense holds their place
-const A11yTab = lazy(async () => ({ default: (await import("./A11yTab.tsx")).A11yTab }));
-const CodeTab = lazy(async () => ({ default: (await import("./CodeTab.tsx")).CodeTab }));
-const EventsTab = lazy(async () => ({ default: (await import("./EventsTab.tsx")).EventsTab }));
-const InteractionsTab = lazy(async () => ({
-  default: (await import("./InteractionsTab.tsx")).InteractionsTab
-}));
-const PartsTab = lazy(async () => ({ default: (await import("./PartsTab.tsx")).PartsTab }));
-const SignatureReference = lazy(async () => ({
-  default: (await import("./SignatureReference.tsx")).SignatureReference
-}));
+// a story opens on Props: the other tabs load when they are chosen
+const A11yTab = deferred(async () => (await import("./A11yTab.tsx")).A11yTab);
+const CodeTab = deferred(async () => (await import("./CodeTab.tsx")).CodeTab);
+const EventsTab = deferred(async () => (await import("./EventsTab.tsx")).EventsTab);
+const InteractionsTab = deferred(async () => (await import("./InteractionsTab.tsx")).InteractionsTab);
+const PartsTab = deferred(async () => (await import("./PartsTab.tsx")).PartsTab);
+const SignatureReference = deferred(
+  async () => (await import("./SignatureReference.tsx")).SignatureReference
+);
 
 /** What the tabs are built from. */
 export type DockTabsInput = {
