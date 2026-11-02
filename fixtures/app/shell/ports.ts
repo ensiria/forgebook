@@ -1,6 +1,6 @@
 /**
- * The ports the shell's browser tests listen on: the fixture app's from `FORGEBOOK_SHELL_PORT`, then the Vue fixture's
- * and the Svelte fixture's.
+ * The ports the shell's browser tests listen on: the fixture app's from `FORGEBOOK_SHELL_PORT`, then the Vue fixture's,
+ * the Svelte fixture's and the SvelteKit fixture's.
  *
  * @module
  */
@@ -13,3 +13,6 @@ export const VUE_PORT = SHELL_PORT + 1;
 
 /** The port the Svelte fixture catalogue listens on. */
 export const SVELTE_PORT = SHELL_PORT + 2;
+
+/** The port the SvelteKit fixture catalogue listens on. */
+export const SVELTEKIT_PORT = SHELL_PORT + 3;

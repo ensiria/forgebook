@@ -268,7 +268,7 @@
   "files": {
     "includes": [
       "**",
-      "!fixtures/app/public/mockServiceWorker.js",
+      "!fixtures/*/public/mockServiceWorker.js",
       "!**/*.md",
       "!**/*.html",
       "!**/*.css",

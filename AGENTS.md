@@ -10,6 +10,7 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   frame), `src/vite` (the plugin, the props extractor, the answers to tools and agents), `bin/` (`forgebook`,
   `forgebook-docs`, `forgebook-texts`).
 - `packages/react` (`@forgebook/react`), `packages/vue` (`@forgebook/vue`), `packages/svelte` (`@forgebook/svelte`),
+  `packages/sveltekit` (`@forgebook/sveltekit`, SvelteKit on the Svelte adapter),
   `packages/story-format` (`@forgebook/story-format`, no dependencies),
   `packages/testing` (`@forgebook/testing`).
 - `fixtures/`: the kit, the stories written the Storybook way, and the catalogue the shell's browser tests run on.

@@ -33,6 +33,7 @@ const config: Linter.Config[] = [
       "**/dist/**",
       "**/.heights-build/**",
       "**/.svelte-check/**",
+      "**/.svelte-kit/**",
       "**/public/**"
     ]
   },

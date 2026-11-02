@@ -6,8 +6,8 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React, Vue and Svelte stories on Vite only, so another framework is refused with what Forgebook
- * supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the notes, since Forgebook reads CSF in
+ * instead. Forgebook reads React, Vue, Svelte and SvelteKit stories on Vite only, so another framework is refused with what
+ * Forgebook supports; a SvelteKit project's `sveltekit_experimental` parameters are read as they are. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the notes, since Forgebook reads CSF in
  * scripts.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
@@ -23,7 +23,7 @@ import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 
 /** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
-export type ImportedFramework = "react" | "vue" | "svelte";
+export type ImportedFramework = "react" | "vue" | "svelte" | "sveltekit";
 
 /** What a configuration takes from another tool's files. */
 export type ImportedConfig = {
@@ -46,7 +46,7 @@ const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   "@storybook/react-vite": "react",
   "@storybook/vue3-vite": "vue",
   "@storybook/svelte-vite": "svelte",
-  "@storybook/sveltekit": "svelte"
+  "@storybook/sveltekit": "sveltekit"
 };
 
 /** Storybook's own default for a `stories` entry given as a folder. */
@@ -389,10 +389,6 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
   if (globs.length === 0) return `${relative(projectDir, mainFile)} names no story file Forgebook reads`;
-  if (storybookFramework === "@storybook/sveltekit")
-    notes.push(
-      "SvelteKit's $app modules and $lib alias are not provided: a story that imports them needs an alias of its own"
-    );
   if (Array.isArray(main["addons"]) && main["addons"].length > 0)
     notes.push("The addons are left out: Forgebook has its own panel, toolbar and checks");
   const previewFile = scriptFile(storybookDir, "preview");

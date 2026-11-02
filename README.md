@@ -15,9 +15,10 @@ This repository holds Forgebook's packages; each has its own README, which is al
 | [`@forgebook/react`](packages/react) | React's story types, renderer and props reader |
 | [`@forgebook/vue`](packages/vue) | Vue's story types, renderer and props, events and slots reader |
 | [`@forgebook/svelte`](packages/svelte) | Svelte's story types, renderer and props, snippets and callback props reader |
+| [`@forgebook/sveltekit`](packages/sveltekit) | SvelteKit on Svelte's adapter: `$app/state`, navigation, forms, paths, the environment and a page's `load` in a story |
 | [`@forgebook/story-format`](packages/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](packages/testing) | Tests generated from the stories: browser, visual and server render |
 
-Requirements: Node 22.18 or later and Vite 8; React 19, Vue 3.5 or Svelte 5. [MIT licence](LICENSE).
+Requirements: Node 22.18 or later and Vite 8; React 19, Vue 3.5 or Svelte 5 (SvelteKit 2 or 3). [MIT licence](LICENSE).
 
 Bugs, proposals and pull requests: [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md).
