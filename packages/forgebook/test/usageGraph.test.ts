@@ -4,17 +4,17 @@
  *
  * @module
  */
-import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { type UsageGraph, usageGraph } from "../src/vite/usageGraph.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 
 /** The usage fixture package. */
-const DIR = join(import.meta.dirname, "fixtures", "usage");
+const DIR = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
 
 /** A file of the fixture. */
-const at = (name: string): string => join(DIR, name);
+const at = (name: string): string => VITE_PATHS.join(DIR, name);
 
 /** The graph of the fixture's story files, read once. */
 const graph = ((): UsageGraph => {

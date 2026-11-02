@@ -6,14 +6,14 @@
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, win32 } from "node:path";
+import { join, resolve, win32 } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { contrastSwitch, themeSwitch } from "../src/switches.ts";
 import type { ForgebookConfig } from "../src/vite/config.ts";
 import { findConfigFile, resolveConfig } from "../src/vite/configFile.ts";
-import { vitePathsOf } from "../src/vite/vitePaths.ts";
+import { VITE_PATHS, vitePathsOf } from "../src/vite/vitePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A configuration with the least it needs. */
@@ -73,14 +73,16 @@ describe("resolveConfig", () => {
       { ...BASE, logo: "logo.svg", presets: [{ name: "a", preview: "/a.ts" }] },
       dir
     );
-    expect(resolved.logo).toBe(join(dir, "logo.svg"));
-    expect(resolved.previews).toEqual(["/a.ts", join(dir, "forgebook.preview.tsx")]);
+    expect(resolved.logo).toBe(VITE_PATHS.join(dir, "logo.svg"));
+    expect(resolved.previews).toEqual(["/a.ts", VITE_PATHS.join(dir, "forgebook.preview.tsx")]);
   });
 
   it("names a problem of the merged switches with the configuration's file", () => {
     expect(() =>
       resolveConfig({ ...BASE, switches: [{ ...themeSwitch(), id: "width" }] }, "/catalogue")
-    ).toThrow('/catalogue/forgebook.config: "width" is a parameter of the address, not a switch\'s name');
+    ).toThrow(
+      `${resolve("/catalogue", "forgebook.config")}: "width" is a parameter of the address, not a switch's name`
+    );
   });
 });
 
@@ -116,7 +118,7 @@ describe("the shell's look", () => {
       { ...base, presets: [{ name: "p", shell: { css: "/lib/shell.css" } }], shell: { css: "own.css" } },
       "/c"
     );
-    expect(shell.styleSheets).toEqual(["/lib/shell.css", "/c/own.css"]);
+    expect(shell.styleSheets).toEqual(["/lib/shell.css", VITE_PATHS.resolve("/c", "own.css")]);
   });
 
   it("refuses a value that would break the page, naming it", () => {
