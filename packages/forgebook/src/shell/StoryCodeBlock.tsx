@@ -18,7 +18,7 @@ export type StoryCodeSource = {
   readonly code: StoryFileCode;
   /** The story's export name. */
   readonly exportName: string;
-  /** The component's name, for the code of a story drawn from its args. */
+  /** The component's name as code writes it (`codeNameOf`), for the code of a story drawn from its args. */
   readonly componentName: string;
   /** The values of the moment: the story's args, with the panel's over them on the story page. */
   readonly args: PanelArgs;

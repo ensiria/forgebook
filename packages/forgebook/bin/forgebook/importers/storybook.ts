@@ -6,7 +6,8 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React and Vue stories on Vite only, so another framework is refused with what Forgebook supports.
+ * instead. Forgebook reads React and Vue stories on Vite, and Angular's, so another framework is refused with what Forgebook
+ * supports; an Angular project's `angular.json` adds what `importers/storybookAngular.ts` reads.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
@@ -19,14 +20,17 @@ import ts from "typescript-6";
 
 import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
+import { importAngular } from "./storybookAngular.ts";
 
 /** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
-export type ImportedFramework = "react" | "vue";
+export type ImportedFramework = "react" | "vue" | "angular";
 
 /** What a configuration takes from another tool's files. */
 export type ImportedConfig = {
   /** The Forgebook framework the stories are written for. */
   readonly framework: ImportedFramework;
+  /** The framework's options, as its adapter takes them (`angular({ tsconfig })`); none for its defaults. */
+  readonly frameworkOptions?: Readonly<Record<string, string>>;
   /** The catalogue's name: the package's, or the folder's. */
   readonly title: string;
   /** The story files, as globs from the project's folder. */
@@ -39,10 +43,15 @@ export type ImportedConfig = {
   readonly notes: readonly string[];
 };
 
-/** The Forgebook frameworks a project's Storybook can move to, by Storybook's framework on Vite. */
+/**
+ * The Forgebook frameworks a project's Storybook can move to, by Storybook's framework: on Vite, and Angular's two, whose
+ * stories compile the same way through the Angular adapter's Vite plugin.
+ */
 const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   "@storybook/react-vite": "react",
-  "@storybook/vue3-vite": "vue"
+  "@storybook/vue3-vite": "vue",
+  "@storybook/angular": "angular",
+  "@analogjs/storybook-angular": "angular"
 };
 
 /** Storybook's own default for a `stories` entry given as a folder. */
@@ -316,6 +325,16 @@ const projectTitle = (dir: string): string => {
 };
 
 /**
+ * The options `main` gives its framework: `{ name, options }`'s `options`, empty when it names the framework alone.
+ *
+ * @param main - `main`'s configuration.
+ */
+const frameworkOptionsOf = (main: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> => {
+  const { framework } = main;
+  return isRecord(framework) && isRecord(framework["options"]) ? framework["options"] : {};
+};
+
+/**
  * The framework `main` names: a text, or an object with its `name`.
  *
  * @param main - `main`'s configuration.
@@ -380,7 +399,7 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   const framework = importedFramework(storybookFramework);
   if (framework === undefined) {
     const supported = Object.keys(STORYBOOK_FRAMEWORKS).join(", ");
-    return `Forgebook reads Storybook's stories on Vite (${supported}); this project uses ${storybookFramework ?? "no framework"}`;
+    return `Forgebook reads Storybook's stories for ${supported}; this project uses ${storybookFramework ?? "no framework"}`;
   }
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
@@ -392,12 +411,17 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
     previewFile === undefined
       ? { switches: undefined, notes: [] }
       : previewSwitches(readFileSync(previewFile, "utf8"), previewFile);
+  const angular =
+    framework === "angular" ? importAngular(projectDir, storybookDir, frameworkOptionsOf(main)) : undefined;
   return {
     framework,
+    ...(angular === undefined || Object.keys(angular.options).length === 0
+      ? {}
+      : { frameworkOptions: angular.options }),
     title: projectTitle(projectDir),
     stories: globs,
     preview: previewFile === undefined ? undefined : relative(projectDir, previewFile),
     switches: read.switches,
-    notes: [...notes, ...read.notes]
+    notes: [...notes, ...read.notes, ...(angular?.notes ?? [])]
   };
 };

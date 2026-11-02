@@ -10,7 +10,7 @@ import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-forma
 import type { ReactNode } from "react";
 
 import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
-import type { ComponentDocs, PropDocs } from "../componentDocs.ts";
+import { type ComponentDocs, codeNameOf, type PropDocs } from "../componentDocs.ts";
 import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
@@ -232,7 +232,7 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
         <CodeTab
           code={code.value}
           exportName={input.exportName}
-          componentName={docs.status === "ready" ? docs.value.name : input.componentName}
+          componentName={docs.status === "ready" ? codeNameOf(docs.value) : input.componentName}
           args={input.values}
         />
       )

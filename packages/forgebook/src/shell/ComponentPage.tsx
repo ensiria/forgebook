@@ -14,7 +14,7 @@
 import { type ReactNode, useMemo, useRef, useState } from "react";
 
 import { groupLabel } from "../catalogue.ts";
-import type { ComponentDocs } from "../componentDocs.ts";
+import { type ComponentDocs, codeNameOf } from "../componentDocs.ts";
 import type { PanelArgs, ShellMessage } from "../messages.ts";
 import {
   groupedStories,
@@ -192,7 +192,7 @@ export const ComponentPage = ({
     heights,
     settled,
     code,
-    componentName: componentDocs?.name ?? component.name,
+    componentName: componentDocs === undefined ? component.name : codeNameOf(componentDocs),
     argsOf: (storyId: string): PanelArgs => storyArgs.get(storyId) ?? {},
     heightOf,
     background

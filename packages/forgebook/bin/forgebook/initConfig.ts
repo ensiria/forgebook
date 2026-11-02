@@ -28,6 +28,17 @@ const sourceOf = (value: unknown, indent: string): string =>
     .join(`\n${indent}`);
 
 /**
+ * The framework's options as its adapter's argument (`{ tsconfig: ".storybook/tsconfig.json" }`), empty for none.
+ *
+ * @param options - the options read.
+ */
+const adapterOptions = (options: Readonly<Record<string, string>> | undefined): string => {
+  const entries = Object.entries(options ?? {});
+  if (entries.length === 0) return "";
+  return `{ ${entries.map(([name, value]) => `${name}: ${JSON.stringify(value)}`).join(", ")} }`;
+};
+
+/**
  * The configuration file's text.
  *
  * @param imported - what the importer read.
@@ -35,7 +46,7 @@ const sourceOf = (value: unknown, indent: string): string =>
  */
 export const initConfigText = (imported: ImportedConfig, tool: string): string => {
   const fields = [
-    `  framework: ${imported.framework}(),`,
+    `  framework: ${imported.framework}(${adapterOptions(imported.frameworkOptions)}),`,
     `  title: ${JSON.stringify(imported.title)},`,
     `  stories: ${sourceOf(imported.stories, "  ")},`,
     ...(imported.preview === undefined ? [] : [`  preview: ${JSON.stringify(imported.preview)},`]),
