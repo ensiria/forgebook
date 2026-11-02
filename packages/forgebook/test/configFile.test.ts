@@ -6,13 +6,14 @@
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { contrastSwitch, themeSwitch } from "../src/switches.ts";
 import type { ForgebookConfig } from "../src/vite/config.ts";
 import { findConfigFile, resolveConfig } from "../src/vite/configFile.ts";
+import { vitePathsOf } from "../src/vite/vitePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A configuration with the least it needs. */
@@ -127,5 +128,43 @@ describe("the shell's look", () => {
   it("keeps what will not work, for a warning", () => {
     const { shell } = resolveConfig({ ...base, shell: { theme: { light: { text: "#eeeeee" } } } }, "/c");
     expect(shell.problems.length).toBeGreaterThan(0);
+  });
+});
+
+describe("resolveConfig on Windows", () => {
+  it("writes every path in Vite's form, forward slashes, and keeps a preset's package specifier as written", () => {
+    const resolved = resolveConfig(
+      {
+        ...BASE,
+        logo: "assets\\logo.svg",
+        preview: "..\\shared\\preview.tsx",
+        tokens: ["tokens.json", { file: "C:\\Users\\ada\\tokens\\dark.json", mode: "dark" }],
+        watch: ["../kit/src"],
+        shell: { css: "shell.css" },
+        presets: [
+          {
+            name: "files",
+            preview: "C:\\Users\\ada\\kit\\preview.ts",
+            shell: { css: "C:\\Users\\ada\\kit\\shell.css" }
+          },
+          { name: "package", preview: "@acme/ui/preview" }
+        ]
+      },
+      "C:\\Users\\ada\\app",
+      vitePathsOf(win32)
+    );
+    expect(resolved.dir).toBe("C:/Users/ada/app");
+    expect(resolved.logo).toBe("C:/Users/ada/app/assets/logo.svg");
+    expect(resolved.previews).toEqual([
+      "C:/Users/ada/kit/preview.ts",
+      "@acme/ui/preview",
+      "C:/Users/ada/shared/preview.tsx"
+    ]);
+    expect(resolved.shell.styleSheets).toEqual(["C:/Users/ada/kit/shell.css", "C:/Users/ada/app/shell.css"]);
+    expect(resolved.tokens).toEqual([
+      { path: "C:/Users/ada/app/tokens.json", mode: undefined },
+      { path: "C:/Users/ada/tokens/dark.json", mode: "dark" }
+    ]);
+    expect(resolved.watch).toEqual(["C:/Users/ada/kit/src"]);
   });
 });

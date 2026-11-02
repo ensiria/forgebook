@@ -11,12 +11,12 @@
  * @module
  */
 import { globSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { autoTitle, patternBase } from "./autoTitle.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
+import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** A pattern of story files and the folder it is read from: the declaring module's folder, the import's pattern. */
 export type StoryFilesGroup = {
@@ -59,6 +59,19 @@ export const storyFilesGroupOf = (text: string): StoryFilesGroup => {
 };
 
 /**
+ * A matched file's key: its path relative to the declaring module's folder, with forward slashes on every system and
+ * starting with `./` or `../`, so a story's id is the same wherever the catalogue runs.
+ *
+ * @param root - the declaring module's folder.
+ * @param file - the file as the glob gives it, relative to `root` (with backslashes on Windows).
+ * @param paths - the path functions; the running system's unless a test names another.
+ */
+export const storyFileKey = (root: string, file: string, paths: VitePaths = VITE_PATHS): string => {
+  const path = paths.relative(root, paths.join(root, file));
+  return path.startsWith(".") ? path : `./${path}`;
+};
+
+/**
  * The story files patterns match, as paths relative to `root` starting with `./` or `../`, sorted.
  *
  * @param root - the folder the patterns are relative to: the declaring module's.
@@ -67,10 +80,7 @@ export const storyFilesGroupOf = (text: string): StoryFilesGroup => {
 export const storyFileKeys = (root: string, patterns: readonly string[]): string[] =>
   patterns
     .flatMap((pattern) => globSync(pattern, { cwd: root }))
-    .map((file) => {
-      const path = relative(root, join(root, file)).split("\\").join("/");
-      return path.startsWith(".") ? path : `./${path}`;
-    })
+    .map((file) => storyFileKey(root, file))
     .sort();
 
 /**
@@ -103,7 +113,7 @@ export const indexedStoryFiles = (
   watch: (file: string) => void
 ): IndexedStoryFile[] =>
   storyFileKeys(root, [pattern]).map((key) => {
-    const file = resolve(root, key);
+    const file = VITE_PATHS.resolve(root, key);
     watch(file);
     const title = autoTitle(patternBase(pattern), key);
     const index = indexStoryFile(
@@ -140,9 +150,11 @@ export const storyFilesModule = (
     files.map((file) => [file.key, file.index])
   );
   const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(root, pattern)}`);
-  // absolute paths: the module has no folder of its own; Vite serves them under /@fs/ in development
-  const path = (key: string): string => JSON.stringify(resolve(root, key));
-  const query = (key: string, name: string): string => JSON.stringify(`${resolve(root, key)}?${name}`);
+  // absolute paths in Vite's form: the module has no folder of its own, Vite serves them under /@fs/ in development,
+  // and the queries' ids come back to the plugin as written here
+  const absolute = (key: string): string => VITE_PATHS.resolve(root, key);
+  const path = (key: string): string => JSON.stringify(absolute(key));
+  const query = (key: string, name: string): string => JSON.stringify(`${absolute(key)}?${name}`);
   return [
     "export default {",
     `index: ${JSON.stringify(index)},`,

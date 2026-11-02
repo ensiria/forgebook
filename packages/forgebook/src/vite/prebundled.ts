@@ -12,9 +12,8 @@
  *
  * @module
  */
-import { dirname, join } from "node:path";
-
 import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
 const CORE_BROWSER_DEPENDENCIES = [
@@ -102,7 +101,7 @@ export const scannedEntries = (
     const text = file === undefined ? undefined : readText(file);
     if (file === undefined || text === undefined) return [];
     return [...text.matchAll(FILES_IMPORT)].flatMap((match) =>
-      match[1] === undefined ? [] : [join(dirname(file), match[1]).split("\\").join("/")]
+      match[1] === undefined ? [] : [VITE_PATHS.join(VITE_PATHS.dirname(file), match[1])]
     );
   });
   return [...config.stories, ...fromSources];
