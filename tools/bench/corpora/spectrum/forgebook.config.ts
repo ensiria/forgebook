@@ -4,7 +4,9 @@
  * @remarks
  * Its Storybook runs on Parcel, whose rules a library's code relies on, so they are written here for Vite, through the
  * framework's plugins since Forgebook's configuration has no key for Vite: packages resolve to their sources by the
- * `source` condition, and a package's translations are imported with a glob (`./intl/*.json`).
+ * `source` condition, a package's translations are imported with a glob (`./intl/*.json`), and a file's text with
+ * `bundle-text:`, and every style sheet of its components is a CSS module whatever its name, which Vite tells by the
+ * name, so those ids carry it in their query.
  *
  * @module
  */
@@ -22,6 +24,12 @@ const INTL_PREFIX = "\0bench-intl:";
 /** A glob of a package's translations. */
 const INTL_GLOB = /\*\.json$/;
 
+/** What Parcel writes before a file it imports as text. */
+const TEXT_PREFIX = "bundle-text:";
+
+/** Where a style sheet is a CSS module that does not say so: imported by Spectrum's components. */
+const MODULE_IMPORTER = /\/packages\/@(adobe|react-spectrum)\//;
+
 /** The translations of a folder, as Parcel's glob resolver gives them: by file name, without its extension. */
 const intlModule = (folder) => {
   const entries = globSync("*.json", { cwd: folder }).map((file) => [
@@ -35,10 +43,16 @@ const intlModule = (folder) => {
 const spectrumVite = {
   name: "bench-spectrum",
   enforce: "pre",
-  resolveId: (source, importer) =>
-    INTL_GLOB.test(source) && importer !== undefined
-      ? `${INTL_PREFIX}${join(dirname(importer), dirname(source))}`
-      : null,
+  async resolveId(source, importer, options) {
+    if (importer === undefined) return null;
+    if (source.endsWith(".css") && MODULE_IMPORTER.test(importer)) {
+      const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
+      return resolved === null ? null : `${resolved.id}?.module.css`;
+    }
+    if (source.startsWith(TEXT_PREFIX))
+      return `${join(dirname(importer), source.slice(TEXT_PREFIX.length))}?raw`;
+    return INTL_GLOB.test(source) ? `${INTL_PREFIX}${join(dirname(importer), dirname(source))}` : null;
+  },
   load: (id) => (id.startsWith(INTL_PREFIX) ? intlModule(id.slice(INTL_PREFIX.length)) : null),
   config: () => ({
     resolve: { conditions: ["source", "module", "browser", "development|production"] },

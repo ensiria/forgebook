@@ -4,6 +4,7 @@
   "commit": "a562b335e645c172ec5a940b3e47ccdadbeeaa15",
   "licence": "Apache-2.0",
   "install": ["node", ".yarn/releases/yarn-4.18.0.cjs", "install", "--immutable", "--mode=skip-build"],
+  "prepare": [["node_modules/.bin/patch-package"], ["node", ".yarn/releases/yarn-4.18.0.cjs", "build:icons"]],
   "folder": ".",
   "expected": { "files": 179, "stories": 1511 },
   "measured": {

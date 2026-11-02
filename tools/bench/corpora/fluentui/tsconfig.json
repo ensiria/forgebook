@@ -1,5 +1,0 @@
-// So the preview, which sits outside every package of the monorepo, resolves its packages as their stories do.
-{
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": { "jsx": "react-jsx" }
-}

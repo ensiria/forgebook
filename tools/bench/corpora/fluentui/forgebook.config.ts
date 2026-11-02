@@ -3,12 +3,14 @@
  *
  * @remarks
  * Forgebook's configuration has no key for Vite, so the additions go through the framework's plugins. The monorepo's
- * packages resolve to their sources through its `tsconfig` paths, as its Storybook registers them, and its stories
- * import Markdown as text, which its webpack rules read.
+ * packages resolve to their sources through `tsconfig.base.all.json`, the map its documentation's Storybook registers:
+ * the `tsconfig` nearest a story holds a smaller one. Its stories import Markdown as text, which its webpack rules read.
  *
  * @module
  */
+import { readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import { react } from "@forgebook/react/vite";
 import { defineConfig } from "forgebook";
@@ -17,6 +19,27 @@ const framework = react();
 
 /** Markdown as text, which Vite has no rule for. */
 const MARKDOWN = /\.md(\?.*)?$/;
+
+/** The monorepo's root, from this folder. */
+const ROOT = resolve(import.meta.dirname, "../../..");
+
+/** The folder of the packages no map holds, which `@fluentui/react-components/unstable` still exports. */
+const DEPRECATED = resolve(ROOT, "packages/react-components/deprecated");
+
+/** A deprecated package's source. */
+const deprecatedAlias = (name) => ({
+  find: new RegExp(`^@fluentui/${name}$`),
+  replacement: resolve(DEPRECATED, name, "src/index.ts")
+});
+
+/** The packages' sources, by name, from the map Fluent's documentation uses. */
+const packageAliases = () => {
+  const { compilerOptions } = JSON.parse(readFileSync(resolve(ROOT, "tsconfig.base.all.json"), "utf8"));
+  const paths = Object.entries(compilerOptions.paths).flatMap(([name, [path]]) =>
+    name.includes("*") ? [] : [{ find: new RegExp(`^${name}$`), replacement: resolve(ROOT, path) }]
+  );
+  return [...paths, ...readdirSync(DEPRECATED).map(deprecatedAlias)];
+};
 
 /** What Fluent's Storybook sets in webpack. */
 const fluentVite = {
@@ -27,7 +50,7 @@ const fluentVite = {
     const text = await readFile(id.split("?")[0] ?? id, "utf8");
     return `export default ${JSON.stringify(text)};`;
   },
-  config: () => ({ resolve: { tsconfigPaths: true } })
+  config: () => ({ resolve: { alias: packageAliases() } })
 };
 
 export default defineConfig({

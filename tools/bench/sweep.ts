@@ -49,6 +49,18 @@ export type SweepResult = {
   readonly problems: readonly string[];
 };
 
+/** How many stories in a row may fail before a sweep stops: every other one would wait out its timeout. */
+const GIVE_UP_AFTER = JOBS * 3;
+
+/**
+ * Whether a sweep has seen enough: nothing drew at all, so what is broken is the catalogue, not the stories, and going
+ * on would take hours of timeouts.
+ *
+ * @param outcomes - what became of the stories so far.
+ */
+export const hasGivenUp = (outcomes: readonly { readonly failure: string | undefined }[]): boolean =>
+  outcomes.length >= GIVE_UP_AFTER && outcomes.every((outcome) => outcome.failure !== undefined);
+
 /** A story to open. */
 export type SweepStory = {
   /** Its id. */
@@ -161,6 +173,10 @@ export const sweepStories = async (
         next += 1;
         outcomes.push(await openStory(context.browser, story));
         onProgress(outcomes.length, stories.length);
+        if (hasGivenUp(outcomes)) {
+          next = stories.length;
+          throw new Error(`no story of the first ${outcomes.length} drew: ${outcomes[0]?.failure ?? ""}`);
+        }
       }
     };
     await Promise.all(Array.from({ length: JOBS }, work));

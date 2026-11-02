@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { failuresOf, HAS_STATUS, storiesOfDocument } from "./sweep.ts";
+import { failuresOf, HAS_STATUS, hasGivenUp, storiesOfDocument } from "./sweep.ts";
 
 /** The wait's expression, run on a frame with this status, as a page runs it. */
 const hasStatus = (status: string | null): unknown =>
@@ -24,6 +24,19 @@ describe("storiesOfDocument", () => {
 
   it("reads nothing from what is no document", () => {
     expect(storiesOfDocument(undefined, "http://host/")).toEqual([]);
+  });
+});
+
+describe("hasGivenUp", () => {
+  const failed = { failure: "boom" };
+
+  it("gives up only when nothing drew, after a dozen stories", () => {
+    expect(hasGivenUp(Array.from({ length: 11 }, () => failed))).toBe(false);
+    expect(hasGivenUp(Array.from({ length: 12 }, () => failed))).toBe(true);
+  });
+
+  it("goes on through any number of failures once a story drew", () => {
+    expect(hasGivenUp([{ failure: undefined }, ...Array.from({ length: 50 }, () => failed)])).toBe(false);
   });
 });
 
