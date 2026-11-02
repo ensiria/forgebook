@@ -26,6 +26,7 @@ import { metaComponent, metaField } from "forgebook/vite/story-meta";
 import ts from "typescript-6";
 
 import { signatureDocs } from "./extractSignature.ts";
+import { guidanceOf } from "./usageGuidance.ts";
 
 /** The module a React story file imports its types from (`Meta`, `Story`), for the stories `forgebook new` writes. */
 export const storyTypesModule = "@forgebook/react";
@@ -520,6 +521,7 @@ const componentOf = (
       props,
       parts,
       subcomponents: subcomponents.docs,
+      ...guidanceOf(symbol, checker),
       ...(signature === undefined ? {} : { signature })
     },
     file: sources[0] ?? file,

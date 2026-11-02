@@ -336,19 +336,17 @@ It offers ten tools: `list_stories`, `get_story`, `story_address`, `new_stories`
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
 
+A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
+`@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
 The most common mistake of an agent working on a design system is a colour or a size written by hand. Name your
 [DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and each theme in a file of
 its own, and agents can ask what to write instead:
-
 ```ts
 tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
 ```
-
 ```sh
 npx forgebook tokens --category color --json
 npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whether each is really close
-```
-
 `forgebook mcp` offers the same as `list_tokens`, `get_token` and `nearest_token`. References (`{a.b}`, `$ref`), `$extends`
 and `$root` are followed, and a base alias follows what a theme overrides. Deprecated tokens are never suggested. Colours
 in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed but counted as `uncompared`. A theme can

@@ -272,3 +272,51 @@ describe("extractFileComponent", () => {
     );
   });
 });
+
+describe("a component's guidance", () => {
+  /** The docs of a component written with this TSDoc, in a folder of its own. */
+  const docsOf = (tsdoc: string): unknown => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-guidance-"));
+    writeFileSync(
+      join(dir, "Card.tsx"),
+      `${tsdoc}\nexport const Card = (props: { readonly label: string }) => <p>{props.label}</p>;\n`
+    );
+    writeFileSync(
+      join(dir, "Card.stories.tsx"),
+      'import { Card } from "./Card";\nexport default { title: "A/Card", component: Card };\n'
+    );
+    return extractComponentDocs(join(dir, "Card.stories.tsx"));
+  };
+
+  it("reads when to use it and when not, what to use instead and why not", () => {
+    const docs = docsOf(`/**
+ * A card.
+ *
+ * @useWhen a group of related facts.
+ * @useWhen a link to a page.
+ * @avoidWhen a single line of text.
+ * @alternatives \`Row\`, \`Panel\`
+ * @deprecated it does not scale.
+ * @replacedBy \`Tile\`
+ */`);
+    expect(docs).toMatchObject({
+      guidance: {
+        useWhen: ["a group of related facts.", "a link to a page."],
+        avoidWhen: ["a single line of text."],
+        alternatives: ["Row", "Panel"],
+        deprecated: "it does not scale.",
+        replacedBy: "Tile"
+      }
+    });
+  });
+
+  it("says deprecated with no reason, since the tag alone means it", () => {
+    expect(docsOf("/** A card.\n * @deprecated\n */")).toMatchObject({
+      guidance: { deprecated: "Deprecated." }
+    });
+  });
+
+  it("carries no field for a component that says nothing, so answers stay short", () => {
+    expect(docsOf("/** A card. */")).not.toHaveProperty("guidance");
+  });
+});
