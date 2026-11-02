@@ -28,7 +28,7 @@ Linux desktop. They copy this folder, double-click one file, answer two question
 5. **Runs** each part as `bench.mts` with `--json --status`, its log kept, its progress shown when the status file
    changes. The machine is kept awake (`SetThreadExecutionState`, `systemd-inhibit`, `caffeinate`); the screen may
    sleep. After each part, and at each launch, whatever a benchmark that crashed left running from the kit's own
-   folders is stopped (`leftovers.ts`): a server left behind would hold its port and its CPU.
+   folders is stopped (the benchmark's `leftovers.ts`): a server left behind would hold its port and its CPU.
 6. **Writes the results**: one zip on the Desktop with the reports, the kit's own summary (`kit.json`: profile, estimate
    and real durations, the machine's description) and the logs. Every text is cleaned first (`kitResults.ts`): the
    home folder becomes `~`, the user's and the computer's names placeholders, and a text where any is left stops the
@@ -65,5 +65,5 @@ start-bench.cmd --profile quick --yes  # no questions: the defaults, for a test
 - `kit.pins`: what is downloaded, and the commit.
 - `kit.mts`: the questions; `kitSession.ts` the folder, the state and the checks; `kitRunner.ts` the benchmark as a
   child process; `kitOutput.ts` the results file and the reference.
-- `kitPlan.ts`, `kitState.ts`, `kitResults.ts`, `leftovers.ts`, `zipArchive.ts`: the logic, tested in `kit.test.ts`.
+- `kitPlan.ts`, `kitState.ts`, `kitResults.ts`, `zipArchive.ts`: the logic, tested in `kit.test.ts`.
 - `reference.json`: the reference machine's durations.

@@ -29,7 +29,7 @@ import {
 } from "../shellTheme.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
-import type { ForgebookConfig } from "./config.ts";
+import type { BuildOptions, ForgebookConfig } from "./config.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 
@@ -99,6 +99,8 @@ export type ResolvedConfig = {
   readonly hasPlayTools: boolean;
   /** The plugins, checked, in the configuration's order. */
   readonly plugins: readonly ForgebookPlugin[];
+  /** How `forgebook build` writes the catalogue, every option given its default. */
+  readonly build: Required<BuildOptions>;
 };
 
 /** The packages of the play tools: both installed, or the plays get neither. */
@@ -341,7 +343,8 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     watch: (config.watch ?? []).map(absolute),
     lists,
     hasPlayTools: hasPlayToolsIn(dir),
-    plugins
+    plugins,
+    build: { readableNames: config.build?.readableNames === true }
   };
 };
 

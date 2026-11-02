@@ -18,6 +18,7 @@ import { storyTextOf } from "@forgebook/story-format/texts";
 
 import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
+import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
 import { shownLanguage } from "../languages.ts";
 import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
 import {
@@ -157,7 +158,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const languages = config.languages ?? [];
   const switches = catalogueSwitches(config.switches, languages, config.lists?.controls);
   const catalogue = catalogueSettings("", switches, config.lists);
-  const preview = mergedPreviews((config.previews ?? []).map(readPreview));
+  // the previews' modules: an edit of one (or of what it imports) brings its successor
+  let previews: readonly unknown[] = config.previews ?? [];
+  let preview = mergedPreviews(previews.map(readPreview));
   const view = parseView(window.location.search, catalogue);
   applyView(document.documentElement, view, catalogue);
   // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
@@ -233,11 +236,14 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     await source.setup?.();
     await preview.setup?.();
     await loadSheets(document, viewSheets(source.sheets, view));
-    const story = readStory(await load(), location.story.exportName, preview);
-    if (typeof story === "string") {
-      fail(story);
+    // the story file's exports: an edit of the file hands them on with its successor's
+    let shownFile: unknown = await load();
+    const first = readStory(shownFile, location.story.exportName, preview);
+    if (typeof first === "string") {
+      fail(first);
       return;
     }
+    let story = first;
     const plugins = startPluginFrames(config.plugins ?? [], storyId, tellShell);
     fixed = fixedViewOf(story.globals, story.parameters, catalogue);
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
@@ -248,15 +254,38 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       if (controls !== undefined) answerShell(event.data, controls, storyId, catalogue.a11y, config.axeUrl);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them)
-    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => {
+    // (a language the source gives as a loader is loaded as it is shown)
+    const shownFor = async (
+      live: Pick<LiveView, "switches">
+    ): Promise<Pick<StoryDrawing, "texts" | "globals">> => {
       const switchesShown = { switches: { ...live.switches, ...fixed.switches } };
       return {
-        texts: shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
+        texts: await shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
         globals: { ...preview.globals, ...codeGlobalsOf(switchesShown, switches) }
       };
     };
-    const shown = shownFor(view);
+    const shown = await shownFor(view);
+    // the view the reader chose last: a language that loads slower than the next one chosen is never drawn
+    let shownCount = 0;
     const { texts } = shown;
+    // what the panel shows of the story; told again when an edit of its file changes it
+    const tellReady = (): void => {
+      // the panel shows a text an arg names as the story shows it, with its key beside it
+      const args = panelArgsOf(withStoryTexts(story.args, storyTextOf(texts)), source.namedValues);
+      tellShell({
+        type: "forgebook:ready",
+        storyId,
+        canReplay: story.replay !== undefined,
+        hasClock: story.clockStart !== undefined,
+        args,
+        textKeys: storyTextKeysOf(story.args),
+        argTypes: panelArgTypesOf(story.argTypes, excludedControls(story.parameters["controls"])),
+        controls: story.controls,
+        actions: actionNames(story.args, story.argTypes),
+        fixed,
+        parameters: Object.keys(story.parameters)
+      });
+    };
     const running = runStory({
       container,
       story,
@@ -277,23 +306,16 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         // waiting on the resize observer, which may report after the ready status
         reportSize();
         document.documentElement.setAttribute(STATUS_ATTRIBUTE, "ready");
-        // the panel shows a text an arg names as the story shows it, with its key beside it
-        const args = panelArgsOf(withStoryTexts(story.args, storyTextOf(texts)), source.namedValues);
-        const textKeys = storyTextKeysOf(story.args);
-        tellShell({
-          type: "forgebook:ready",
-          storyId,
-          canReplay: story.replay !== undefined,
-          hasClock: story.clockStart !== undefined,
-          args,
-          textKeys,
-          argTypes: panelArgTypesOf(story.argTypes, excludedControls(story.parameters["controls"])),
-          controls: story.controls,
-          actions: actionNames(story.args, story.argTypes),
-          fixed,
-          parameters: Object.keys(story.parameters)
-        });
-        changeShown = (live: LiveView): void => running.setShown(shownFor(live));
+        tellReady();
+        changeShown = (live: LiveView): void => {
+          shownCount += 1;
+          const count = shownCount;
+          shownFor(live)
+            .then((next) => {
+              if (count === shownCount) running.setShown(next);
+            })
+            .catch((error: unknown) => reportError(error instanceof Error ? error.message : String(error)));
+        };
       },
       onError: reportError,
       onTrace: (trace: PlayTrace): void => {
@@ -314,6 +336,37 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           values: values.map(previewValue),
           details: values.map(detailOf)
         })
+    });
+    // an edit of the story file, or of a file it re-exports stories from, draws the story anew in place: the reader keeps
+    // what they did in it. A story the edit took away leaves nothing to draw in place: the page loads again
+    window.addEventListener(STORY_FILE_EVENT, (event: Event): void => {
+      const succession = successionOf(event);
+      if (succession === undefined || succession.previous !== shownFile) return;
+      event.preventDefault();
+      shownFile = succession.next;
+      const next = readStory(succession.next, location.story.exportName, preview);
+      if (typeof next === "string") {
+        window.location.reload();
+        return;
+      }
+      story = next;
+      running.setStory(next);
+      if (controls !== undefined) tellReady();
+    });
+    // an edit of a preview, or of a component it imports through a library's index, draws the story anew with the new
+    // previews; the set-ups they run already ran, and stay as they were
+    window.addEventListener(PREVIEWS_EVENT, (event: Event): void => {
+      const renewal = previewsRenewalOf(event);
+      if (renewal === undefined) return;
+      previews = previews.map((module, index) => renewal.next[index] ?? module);
+      preview = mergedPreviews(previews.map(readPreview));
+      const next = readStory(shownFile, location.story.exportName, preview);
+      if (typeof next === "string") {
+        window.location.reload();
+        return;
+      }
+      story = next;
+      running.setStory(next, [...preview.decorators, ...plugins.decorators]);
     });
     // the shell opens another story by loading another page: the set-ups' cleanups run as this one goes (a page kept
     // for the back button keeps its story)

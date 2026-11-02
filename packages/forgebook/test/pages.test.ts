@@ -30,7 +30,8 @@ const CONFIG: ResolvedConfig = {
   watch: [],
   lists: {},
   hasPlayTools: false,
-  plugins: []
+  plugins: [],
+  build: { readableNames: false }
 };
 
 describe("the generated pages", () => {
@@ -86,6 +87,13 @@ describe("the generated pages", () => {
     expect(entry).toContain(`import { mountFrame } from ${JSON.stringify(STUB_FRAMEWORK.pages.frame)};`);
     expect(entry).toContain('import * as preview0 from "/catalogue/forgebook.preview.tsx";');
     expect(entry).toContain("previews: [preview0]");
+  });
+
+  it("takes its previews' edits on a dev server, for the frame to draw the story anew instead of reloading", () => {
+    const entry = frameEntry(CONFIG);
+    expect(entry).toContain('import.meta.hot.accept(["/catalogue/forgebook.preview.tsx"], (next) =>');
+    expect(entry).toContain('new CustomEvent("forgebook:previews", { detail: { next } })');
+    expect(frameEntry({ ...CONFIG, previews: [] })).not.toContain("import.meta.hot");
   });
 
   it("loads Testing Library for the plays only when the project installs it, and only on the first play", () => {

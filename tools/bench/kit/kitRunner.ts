@@ -15,6 +15,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { programName, stopLeftovers } from "../leftovers.ts";
 import { parseReport } from "../reportTable.ts";
 import {
   CALIBRATION_ARGS,
@@ -26,7 +27,6 @@ import {
 } from "./kitPlan.ts";
 import { BENCH, ITEM_NAMES, type KitPaths, PORT, REPOSITORY } from "./kitSession.ts";
 import type { ItemOutcome, ItemState } from "./kitState.ts";
-import { stopLeftovers } from "./leftovers.ts";
 
 /** One step of the benchmark's status file, as far as the progress reads it. */
 export type StatusStep = {
@@ -96,9 +96,11 @@ export type BenchRequest = {
  * @param log - where to say it.
  */
 export const clearLeftovers = async (paths: KitPaths, io: ScriptIo, log: Logger): Promise<void> => {
-  const stopped = await stopLeftovers([paths.work, paths.calibration, join(paths.home, "browsers")], io);
+  const folders = [paths.work, paths.calibration, join(paths.home, "browsers")];
+  // whatever its age: a benchmark that crashed in an earlier launch left it
+  const stopped = await stopLeftovers(folders, undefined, io);
   if (stopped.length === 0) return;
-  const names = [...new Set(stopped)].join(", ");
+  const names = [...new Set(stopped.map(({ command }) => programName(command)))].join(", ");
   log.warn(
     stopped.length === 1
       ? `Ho fermato un processo rimasto acceso dopo la prova (${names}).`

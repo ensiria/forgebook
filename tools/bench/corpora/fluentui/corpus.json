@@ -8,7 +8,7 @@
     [
       "sh",
       "-c",
-      "node .yarn/releases/yarn-4.18.0.cjs nx run react-storybook-addon-playground:build --excludeTaskDependencies; test -f packages/react-components/react-storybook-addon-playground/lib-commonjs/preset/preset.js && mkdir -p packages/react-components/react-storybook-addon-playground/dist && cp packages/react-components/react-storybook-addon-playground/src/styles.css packages/react-components/react-storybook-addon-playground/dist/styles.css"
+      "node .yarn/releases/yarn-4.18.0.cjs nx run react-storybook-addon-playground:build --excludeTaskDependencies; test -f packages/react-components/react-storybook-addon-playground/lib-commonjs/preset/preset.js && mkdir -p packages/react-components/react-storybook-addon-playground/dist && cp packages/react-components/react-storybook-addon-playground/src/styles.css packages/react-components/react-storybook-addon-playground/dist/styles.css && { node .yarn/releases/yarn-4.18.0.cjs nx run react-virtualizer:build --excludeTaskDependencies; test -f packages/react-components/deprecated/react-virtualizer/lib/index.js; }"
     ]
   ],
   "folder": "apps/public-docsite-v9",

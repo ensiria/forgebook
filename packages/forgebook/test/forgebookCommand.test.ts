@@ -5,7 +5,16 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -750,6 +759,26 @@ describe("a built catalogue for agents", { timeout: SERVER_TIMEOUT }, () => {
     const out = join(root, "built-site");
     expect(runScriptProcess(ENTRY, ["build", "--config", Fixture, "--out", out]).exitCode).toBe(0);
     expect(existsSync(join(out, "forgebook-agent.json"))).toBe(false);
+  });
+
+  it("names its chunks by their hash alone, and after their modules too with --readable-names", () => {
+    /** The script files a build wrote whose names say more than a hash (Vite names the pages' entries anyway). */
+    const named = (out: string): string[] =>
+      readdirSync(join(out, "assets")).filter((name) => /^[^.]+-[\w-]{8}\.js$/.test(name));
+    const compact = join(root, "built-compact");
+    expect(runScriptProcess(ENTRY, ["build", "--config", Fixture, "--out", compact]).exitCode).toBe(0);
+    const readable = join(root, "built-readable");
+    const built = runScriptProcess(ENTRY, [
+      "build",
+      "--config",
+      Fixture,
+      "--out",
+      readable,
+      "--readable-names"
+    ]);
+    expect(built.exitCode).toBe(0);
+    expect(named(compact).map((name) => name.split("-")[0])).toEqual(["frame", "index"]);
+    expect(named(readable).length).toBeGreaterThan(10);
   });
 
   it("says what to do when the folder holds no index", () => {

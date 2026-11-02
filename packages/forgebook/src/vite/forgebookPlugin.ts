@@ -41,6 +41,7 @@ import { type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
+import { FILES_MODULE_HOT, renewedModule, storyFileHotHooks } from "./hotSnippets.ts";
 import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
@@ -71,6 +72,7 @@ import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
   type KeptIndex,
   SEARCH_PREFIX,
+  storyFileIndex,
   storyFilesGroupOf,
   storyFilesGroupText,
   USAGE_PREFIX
@@ -133,6 +135,9 @@ const DOCS_QUERY = "?forgebook-docs";
 
 /** The queries `textModules.ts` answers. */
 const TEXT_QUERIES: readonly string[] = [CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY];
+
+/** The queries of a story file's modules the shell reads, which hand an edit to it in place on a dev server. */
+const RENEWED_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY];
 
 /** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
 const FILE_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY, DOCS_PAGE_QUERY];
@@ -261,6 +266,11 @@ const generatedModule = (
 export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin => {
   /** The modules of the patterns, renewed when a story file is added or removed. */
   const filesModules = new Set<string>();
+  /** Each pattern's story files, by path, with the index its module was served with: an edit changing one reloads. */
+  const servedFiles = new Map<
+    string,
+    ReadonlyMap<string, { readonly key: string; readonly index: string }>
+  >();
   /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
   const usageModules = new Set<string>();
   /** The docs pages' modules, renewed when a Markdown file is added or removed. */
@@ -355,8 +365,39 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    return patternModule(id, watch, config?.lists.usedIn !== false, indexCache(), isServing());
+    const { files, ...module } = filesModule(id, watch);
+    if (!isServing()) return module;
+    servedFiles.set(
+      id,
+      new Map(files.map((file) => [file.file, { key: file.key, index: JSON.stringify(file.index) }]))
+    );
+    return { ...module, code: `${module.code}\n${FILES_MODULE_HOT}` };
   };
+  /**
+   * A pattern's module.
+   *
+   * @param id - the module's id.
+   * @param watch - adds a file whose edit renews the module.
+   */
+  const filesModule = (id: string, watch: (file: string) => void): ReturnType<typeof patternModule> =>
+    patternModule(id, watch, config?.lists.usedIn !== false, indexCache(), isServing());
+  /**
+   * The patterns' modules an edit of a story file changed (a story added or renamed, a title), which the open pages
+   * read once: the file alone is indexed again. One that cannot be read yet (an edit half typed) changes nothing: its
+   * module shows the error, and the next edit is read again.
+   *
+   * @param file - the edited story file.
+   */
+  const changedFilesModules = (file: string): readonly string[] =>
+    [...servedFiles]
+      .filter(([id, served]) => {
+        const kept = served.get(file);
+        if (kept === undefined) return false;
+        const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
+        const index = storyFileIndex(root, pattern, kept.key);
+        return typeof index !== "string" && JSON.stringify(index) !== kept.index;
+      })
+      .map(([id]) => id);
   /**
    * The modules a file added or removed changes; none when it changes no list.
    *
@@ -431,8 +472,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
                 rolldownOptions: {
                   input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") },
                   // a catalogue names each file several times over, once per loader: a name of its hash alone is a
-                  // tenth of what the index weighs, and nobody reads a build's chunks by name
-                  output: { chunkFileNames: "assets/[hash].js" }
+                  // tenth of what the index weighs; a catalogue whose builds are read by name keeps Vite's names
+                  ...(config.build.readableNames ? {} : { output: { chunkFileNames: "assets/[hash].js" } })
                 }
               }
             };
@@ -503,6 +544,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const watched = [...(config?.watch ?? []), ...(options.watch ?? [])];
       if (watched.length > 0) server.watcher.add(watched);
       const refresh = (file: string): void => {
+        // a source added or removed changes what an import resolves to
+        renewOnChange(server, file);
         const renewed = modulesListing(file);
         if (renewed === undefined) return;
         const graph = server.environments.client.moduleGraph;
@@ -522,6 +565,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
+    ...storyFileHotHooks(isServing, changedFilesModules),
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = config === undefined ? undefined : generatedModule(id, config, command);
       if (generated !== undefined) return generated;
@@ -532,7 +576,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const resolved = await this.resolve(specifier, importer);
         return resolved?.id;
       });
-      if (answered !== undefined) return answered;
+      if (answered !== undefined) return renewedModule(id, answered, RENEWED_QUERIES, isServing());
       try {
         const resolveSource = async (specifier: string): Promise<string | undefined> =>
           (await this.resolve(specifier))?.id;

@@ -10,11 +10,12 @@ import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
 import {
+  type IndexedStoryFile,
   indexedStoryFiles,
   type KeptIndex,
   REACH_QUERY,
+  storyFilesCode,
   storyFilesGroupOf,
-  storyFilesModule,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { storyReach } from "./storyReach.ts";
@@ -50,7 +51,8 @@ export const docsModule = (
 };
 
 /**
- * The module of a `?forgebook-files` pattern: every matched story file's index and loaders.
+ * The module of a `?forgebook-files` pattern: every matched story file's index and loaders; with the files, indexed,
+ * which the dev server keeps to tell an edit that changes the list.
  *
  * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
@@ -65,9 +67,10 @@ export const patternModule = (
   hasUsage: boolean,
   cache: DiskCache<KeptIndex> | undefined,
   isServing: boolean
-): { code: string; moduleType: "js" } => {
+): { code: string; moduleType: "js"; files: readonly IndexedStoryFile[] } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  return { code: storyFilesModule(root, pattern, watch, hasUsage, cache, isServing), moduleType: "js" };
+  const files = indexedStoryFiles(root, pattern, watch, cache);
+  return { code: storyFilesCode(root, pattern, files, hasUsage, isServing), moduleType: "js", files };
 };
 
 /**

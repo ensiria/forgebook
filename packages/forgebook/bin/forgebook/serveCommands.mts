@@ -104,6 +104,11 @@ export const serveCommands = (
       "agent-index": {
         type: "boolean",
         description: "Also write what agents read, for forgebook mcp --from: props, docs, tokens, public."
+      },
+      "readable-names": {
+        type: "boolean",
+        description:
+          "Name each chunk after its module as well as its hash; build.readableNames in the configuration."
       }
     },
     examples: [
@@ -111,10 +116,18 @@ export const serveCommands = (
       {
         command: `${COMMAND} build --base /pr-12/`,
         description: "For a host that serves it under a sub-path."
+      },
+      {
+        command: `${COMMAND} build --readable-names`,
+        description: "With chunks named after their modules, to read what a build holds."
       }
     ],
     run: async ({ options, log }): Promise<void> => {
-      const config = await configOf(options.config);
+      const read = await configOf(options.config);
+      const config =
+        options["readable-names"] === true
+          ? { ...read, build: { ...read.build, readableNames: true } }
+          : read;
       const { build } = await import("vite");
       const outDir = resolve(config.dir, options.out ?? "dist");
       await build(

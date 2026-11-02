@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
+import { NO_DAEMONS } from "./leftovers.ts";
 import { execProgram } from "./programs.ts";
 import { DEFINITION_FILE } from "./realCorpus.ts";
 import type { CorpusPaths, RealCorpus } from "./realCorpus.types.ts";
@@ -62,7 +63,12 @@ const runCommand = async (
   io: ScriptIo
 ): Promise<void> => {
   if (program === undefined) return;
-  await execProgram(program, args, { cwd: clone, io, output: "capture", env: { ...io.env, ...env } });
+  await execProgram(program, args, {
+    cwd: clone,
+    io,
+    output: "capture",
+    env: { ...io.env, ...NO_DAEMONS, ...env }
+  });
 };
 
 /** Installs the library's dependencies, once for a commit, and builds what its stories need. */

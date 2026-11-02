@@ -17,6 +17,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import { contentSize } from "./diskUsage.ts";
+import { NO_DAEMONS } from "./leftovers.ts";
 import { isOwnGroup, killTree, samplePeak } from "./processes.ts";
 import { execProgram, invocation } from "./programs.ts";
 import { stampScript, waitForStamps } from "./stamps.ts";
@@ -75,6 +76,7 @@ export type MeasureContext = {
 /** The environment a target's command runs in: the script's, with the target's additions. */
 const environment = (io: ScriptIo, command: TargetCommand): NodeJS.ProcessEnv => ({
   ...io.env,
+  ...NO_DAEMONS,
   BROWSER: "none",
   ...command.env
 });
@@ -110,13 +112,32 @@ export const startServer = async (context: MeasureContext): Promise<ChildProcess
   const server = spawn(program, [...args], {
     cwd: context.directory,
     detached: isOwnGroup,
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
     env,
     windowsHide: true
   });
   liveServers.add(server);
+  const output: string[] = [];
+  const keep = (chunk: Buffer): void => {
+    output.push(
+      ...chunk
+        .toString()
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+    );
+    output.splice(0, Math.max(0, output.length - OUTPUT_LINES));
+  };
+  server.stdout?.on("data", keep);
+  server.stderr?.on("data", keep);
+  serverOutput.set(server, output);
   return server;
 };
+
+/** How many of a server's last lines of output the harness keeps, to say why it stopped. */
+const OUTPUT_LINES = 12;
+
+/** Each server's last lines of output, read when it stops before answering. */
+const serverOutput = new WeakMap<ChildProcess, readonly string[]>();
 
 /** Whether a server's process has ended, by its own exit or a signal. */
 const hasEnded = (server: ChildProcess): boolean => server.exitCode !== null || server.signalCode !== null;
@@ -156,7 +177,11 @@ export const waitForServer = async (
 ): Promise<void> => {
   const deadline = Date.now() + SAMPLE_TIMEOUT;
   while (Date.now() < deadline) {
-    if (hasEnded(server)) throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})`);
+    if (hasEnded(server)) {
+      const output = serverOutput.get(server) ?? [];
+      const last = output.length === 0 ? "" : `: ${output.join(" / ")}`;
+      throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})${last}`);
+    }
     const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`).then(
       (response) => readyPath === undefined || response.ok,
       () => false

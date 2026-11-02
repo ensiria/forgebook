@@ -115,6 +115,20 @@ export type IndexedStoryFile = {
 export type KeptIndex = Readonly<Record<string, StoryFileIndex>>;
 
 /**
+ * One story file a pattern matches, indexed from its text on disk, with the title its path makes when it writes none.
+ *
+ * @param root - the declaring module's folder.
+ * @param pattern - the pattern.
+ * @param key - the file's path relative to the declaring module.
+ * @returns the index, or a message saying why the file cannot be indexed.
+ */
+export const storyFileIndex = (root: string, pattern: string, key: string): StoryFileIndex | string => {
+  const file = resolve(root, key);
+  const title = autoTitle(patternBase(pattern), key);
+  return indexStoryFile(file, readFileSync(file, "utf8"), title === undefined ? {} : { autoTitle: title });
+};
+
+/**
  * Every story file a pattern matches, indexed.
  *
  * @param root - the declaring module's folder.
@@ -136,12 +150,7 @@ export const indexedStoryFiles = (
     watch(file);
     const known = kept?.[key];
     if (known !== undefined) return { key, file, index: known };
-    const title = autoTitle(patternBase(pattern), key);
-    const index = indexStoryFile(
-      file,
-      readFileSync(file, "utf8"),
-      title === undefined ? {} : { autoTitle: title }
-    );
+    const index = storyFileIndex(root, pattern, key);
     if (typeof index === "string") throw new Error(index);
     return { key, file, index };
   });
@@ -174,8 +183,25 @@ export const storyFilesModule = (
   hasUsage = true,
   cache?: DiskCache<KeptIndex>,
   hasReach = false
+): string =>
+  storyFilesCode(root, pattern, indexedStoryFiles(root, pattern, watch, cache), hasUsage, hasReach);
+
+/**
+ * The code of the module for one pattern, from its story files indexed.
+ *
+ * @param root - the declaring module's folder.
+ * @param pattern - the pattern before `?forgebook-files`.
+ * @param files - the story files it matches, indexed.
+ * @param hasUsage - whether the group offers its "Used in" loader.
+ * @param hasReach - whether the group offers what each story reaches, for a dev server's tools.
+ */
+export const storyFilesCode = (
+  root: string,
+  pattern: string,
+  files: readonly IndexedStoryFile[],
+  hasUsage: boolean,
+  hasReach: boolean
 ): string => {
-  const files = indexedStoryFiles(root, pattern, watch, cache);
   const keys = files.map((file) => file.key);
   const index: Record<string, StoryFileIndex> = Object.fromEntries(
     files.map((file) => [file.key, file.index])

@@ -1,13 +1,17 @@
 /**
  * Tests for the catalogue's Vite plugin: a `?forgebook-files` import answered with one module per pattern, the folders
- * it is given watched, and a story file added or removed there renewing the patterns' modules and reloading the page.
+ * it is given watched, a story file added or removed there renewing the patterns' modules and reloading the page, and
+ * the names a build gives its chunks.
  *
  * @module
  */
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { resolveConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
@@ -172,5 +176,42 @@ describe("forgebookPlugin in the dev server", () => {
     expect(fake.added).toEqual([]);
     expect(fake.invalidated).toEqual([id, id]);
     expect(fake.reloads).toBe(2);
+  });
+});
+
+/** A catalogue's folder with one story file. */
+const catalogueFolder = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "forgebook-build-"));
+  mkdirSync(join(dir, "src"));
+  writeFileSync(
+    join(dir, "src", "Badge.stories.tsx"),
+    'export default { title: "Kit/Badge" };\nexport const Badge = {};\n'
+  );
+  return dir;
+};
+
+describe("a build's chunk names", () => {
+  /** The chunks' file names a build of a configuration writes; Vite's own when `undefined`. */
+  const chunkNames = async (readableNames: boolean | undefined): Promise<unknown> => {
+    const build = readableNames === undefined ? {} : { build: { readableNames } };
+    const config = resolveConfig(
+      { framework: STUB_FRAMEWORK, title: "Catalogue", stories: ["src/*.stories.tsx"], ...build },
+      catalogueFolder()
+    );
+    const hook = forgebookPlugin({ config }).config;
+    if (typeof hook !== "function") throw new Error("missing hook");
+    const answer: unknown = await hook.call(undefined as never, {}, { command: "build", mode: "production" });
+    const output =
+      typeof answer === "object" && answer !== null && "build" in answer ? JSON.stringify(answer.build) : "";
+    return /"chunkFileNames":"([^"]*)"/.exec(output)?.[1];
+  };
+
+  it("are their hashes alone by default", async () => {
+    expect(await chunkNames(undefined)).toBe("assets/[hash].js");
+    expect(await chunkNames(false)).toBe("assets/[hash].js");
+  });
+
+  it("are left to Vite, which names each after its module, when the configuration asks for readable names", async () => {
+    expect(await chunkNames(true)).toBeUndefined();
   });
 });

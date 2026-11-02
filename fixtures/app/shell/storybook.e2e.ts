@@ -52,7 +52,9 @@ const STORY_IDS = [
   "storybook-formats-exports-button--first",
   "storybook-formats-exports-button--second",
   "storybook-formats-exports-button--renamed",
-  "storybook-plain-java-script--untyped"
+  "storybook-plain-java-script--untyped",
+  "storybook-hot-edit--own",
+  "storybook-hot-edit--behind"
 ];
 
 test("every story written the Storybook way is ready in its frame, without a page error", async ({

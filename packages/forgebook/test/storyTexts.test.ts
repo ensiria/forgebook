@@ -14,19 +14,37 @@ const TEXTS = {
 };
 
 describe("story texts", () => {
-  it("draws the English table for the stories' own language", () => {
-    expect(shownTexts(TEXTS, undefined)).toEqual(TEXTS.en);
+  it("draws the English table for the stories' own language", async () => {
+    expect(await shownTexts(TEXTS, undefined)).toEqual(TEXTS.en);
   });
 
-  it("puts a language's texts over the English ones, which fill the keys it lacks", () => {
-    expect(shownTexts(TEXTS, { id: "it", label: "Italiano" })).toEqual({
+  it("puts a language's texts over the English ones, which fill the keys it lacks", async () => {
+    expect(await shownTexts(TEXTS, { id: "it", label: "Italiano" })).toEqual({
       "card.title": "Progetti",
       "card.count": "{count} rows"
     });
   });
 
-  it("pseudo-translates the English for a pseudo-language, keeping the placeholders", () => {
-    const pseudo = shownTexts(TEXTS, {
+  it("loads a language a source gives as a loader only when it is shown", async () => {
+    const loaded: string[] = [];
+    const lazy = {
+      en: async (): Promise<{ default: Readonly<Record<string, string>> }> => {
+        loaded.push("en");
+        return { default: TEXTS.en };
+      },
+      it: async (): Promise<{ default: Readonly<Record<string, string>> }> => {
+        loaded.push("it");
+        return { default: TEXTS.it };
+      }
+    };
+    expect(await shownTexts(lazy, undefined)).toEqual(TEXTS.en);
+    expect(loaded).toEqual(["en"]);
+    expect((await shownTexts(lazy, { id: "it", label: "Italiano" }))["card.title"]).toBe("Progetti");
+    expect(loaded).toEqual(["en", "en", "it"]);
+  });
+
+  it("pseudo-translates the English for a pseudo-language, keeping the placeholders", async () => {
+    const pseudo = await shownTexts(TEXTS, {
       id: "pseudo",
       label: "Pseudo",
       isPseudo: true

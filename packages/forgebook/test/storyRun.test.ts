@@ -11,7 +11,12 @@ import { describe, expect, it, vi } from "vitest";
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
 import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
-import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun.ts";
+import {
+  type RunningStory,
+  runStory,
+  type StoryControls,
+  type StoryRunOptions
+} from "../src/frame/storyRun.ts";
 import type { PanelArgs } from "../src/messages.ts";
 import { domRenderer } from "./domRenderer.ts";
 
@@ -58,7 +63,11 @@ const run = async (
   playTools?: PlayToolsLoader,
   onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
   pluginSetups: StoryRunOptions["pluginSetups"] = []
-): Promise<{ readonly container: HTMLElement; readonly reports: Reports }> => {
+): Promise<{
+  readonly container: HTMLElement;
+  readonly reports: Reports;
+  readonly running: RunningStory;
+}> => {
   const container = document.createElement("div");
   document.body.append(container);
   const reports: Reports = { controls: undefined, errors: [] };
@@ -83,9 +92,9 @@ const run = async (
     },
     onTrace: () => undefined
   };
-  runStory(options);
+  const running = runStory(options);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  return { container, reports };
+  return { container, reports, running };
 };
 
 /** The controls of a run that is ready. */
@@ -117,6 +126,38 @@ describe("runStory with a second framework", () => {
     controlsOf(reports).setPanelArgs({ label: "Sale" });
     expect(container.querySelector(".forgebook-frame")).toBe(canvas);
     expect(canvas?.textContent).toBe("Sale");
+  });
+
+  it("draws a story its edited file changed in the same canvas, the panel's values kept over its new args", async () => {
+    const { container, reports, running } = await run(badge({ args: { label: "New", tone: "plain" } }));
+    const canvas = container.querySelector(".forgebook-frame");
+    controlsOf(reports).setPanelArgs({ tone: "loud" });
+    running.setStory(
+      loaded({
+        args: { label: "Edited", tone: "plain" },
+        render: (args: { readonly label?: unknown; readonly tone?: unknown }): HTMLElement => {
+          const element = document.createElement("span");
+          element.textContent = `${String(args.label)} ${String(args.tone)}`;
+          return element;
+        }
+      })
+    );
+    expect(container.querySelector(".forgebook-frame")).toBe(canvas);
+    expect(canvas?.textContent).toBe("Edited loud");
+  });
+
+  it("mounts a story with a play its edited file changed anew, and plays it again", async () => {
+    let plays = 0;
+    const play = (): void => {
+      plays += 1;
+    };
+    const { container, running } = await run(badge({ play }));
+    const first = container.querySelector(".forgebook-frame");
+    running.setStory(badge({ args: { label: "Edited" }, play }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(container.querySelector(".forgebook-frame")).not.toBe(first);
+    expect(container.querySelector(".forgebook-frame")?.textContent).toBe("Edited");
+    expect(plays).toBe(2);
   });
 
   it("mounts the story anew on Replay, and plays it again", async () => {

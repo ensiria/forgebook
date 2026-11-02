@@ -448,6 +448,15 @@ browser tests run in CI.
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+`forgebook build` names each script it writes by its hash alone (`assets/3f9a1c2b.js`): a catalogue names every file
+once per loader, so shorter names make a smaller build. To read what a build holds, name each file after its module
+too (`assets/Button-3f9a1c2b.js`), for one build with `forgebook build --readable-names`, or for every build in the
+configuration:
+
+```ts
+export default defineConfig({ /* … */ build: { readableNames: true } });
+```
+
 `forgebook dev` keeps what it read in `node_modules/.vite/forgebook`: the story index, each component's docs and each
 story's code, with the files they came from. A later start answers from there and builds no TypeScript program until a
 source changes; removing the folder starts over.

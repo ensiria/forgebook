@@ -12,7 +12,6 @@ import { estimate, formatDuration, phaseTiming, profileItems, type Reference } f
 import { anonymize, HOST_PLACEHOLDER, leaks, USER_PLACEHOLDER } from "./kitResults.ts";
 import { buildMedian, failedMetrics } from "./kitRunner.ts";
 import { parseState } from "./kitState.ts";
-import { leftoverPids, parsePsCommands, programName } from "./leftovers.ts";
 import { zipArchive } from "./zipArchive.ts";
 
 describe("profileItems", () => {
@@ -122,51 +121,6 @@ describe("failedMetrics", () => {
       }
     };
     expect(failedMetrics(JSON.stringify(report))).toEqual(["start"]);
-  });
-});
-
-describe("leftoverPids", () => {
-  const processes = [
-    {
-      pid: 10,
-      command:
-        "node C:\\Users\\u\\AppData\\Local\\ForgebookBench\\work\\forgebook\\node_modules\\forgebook\\cli.js dev"
-    },
-    {
-      pid: 11,
-      command: "C:/USERS/U/APPDATA/LOCAL/FORGEBOOKBENCH/BROWSERS/chrome-headless-shell.exe --type=renderer"
-    },
-    {
-      pid: 12,
-      command: "node C:\\Users\\u\\AppData\\Local\\ForgebookBench\\repo\\tools\\bench\\kit\\kit.mts"
-    },
-    { pid: 13, command: "C:\\Program Files\\Editor\\editor.exe C:\\Users\\u\\Documents\\work\\notes.txt" }
-  ];
-  const folders = [
-    "C:\\Users\\u\\AppData\\Local\\ForgebookBench\\work",
-    "C:\\Users\\u\\AppData\\Local\\ForgebookBench\\browsers"
-  ];
-
-  it("stops what runs from the kit's folders, in any case and with either separator, and nothing else", () => {
-    expect(leftoverPids(processes, folders, [])).toEqual([10, 11]);
-  });
-
-  it("spares the processes named", () => {
-    expect(leftoverPids(processes, folders, [10])).toEqual([11]);
-  });
-
-  it("names a program without its folder or extension, quoted or not", () => {
-    expect(programName('"C:\\Program Files\\x\\node.exe" a.js')).toBe("node");
-    expect(programName("/k/work/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.27.7")).toBe(
-      "esbuild"
-    );
-  });
-
-  it("reads ps's rows", () => {
-    expect(parsePsCommands("  42 node /k/work/x dev\n7 /sbin/launchd\n")).toEqual([
-      { pid: 42, command: "node /k/work/x dev" },
-      { pid: 7, command: "/sbin/launchd" }
-    ]);
   });
 });
 

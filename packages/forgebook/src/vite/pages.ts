@@ -13,6 +13,8 @@
  */
 import { join } from "node:path";
 
+import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
+import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { pluginFrameModule } from "./pluginConfig.ts";
@@ -63,9 +65,14 @@ const escaped = (text: string): string =>
  * What a frame shows when its code fails before the frame starts: a preview or a source that throws while it loads, or
  * that cannot be loaded at all. The frame's own code never runs then, so without this the frame stayed blank for good,
  * and its shell waited. Plain script in the page, since a module that failed cannot report anything; it stands down
- * once the frame has started (`FRAME_STARTED_ATTRIBUTE`), when the frame shows its own errors.
+ * once the frame has started (`FRAME_STARTED_ATTRIBUTE`), when the frame shows its own errors. Code that could not be
+ * loaded is loaded again first, up to three times, one, two then four seconds later, counted in the session's storage
+ * until the frame draws its story (`staleModule.ts` clears the count): in development a library served as source asks
+ * for thousands of modules, and the browser refuses some while the other frames load (`ERR_INSUFFICIENT_RESOURCES`).
  */
 const FRAME_LOAD_GUARD = `(function () {
+  var RELOAD_DELAY = 1000;
+  var RELOADS = 3;
   var root = document.documentElement;
   function show(message) {
     if (root.hasAttribute("data-forgebook-started") || root.hasAttribute("data-forgebook-status")) return;
@@ -81,10 +88,27 @@ const FRAME_LOAD_GUARD = `(function () {
     var storyId = new URLSearchParams(location.search).get("story") || "";
     if (parent !== window) parent.postMessage({ type: "forgebook:error", storyId: storyId, message: message }, location.origin);
   }
+  function reloadAgain() {
+    var done;
+    try {
+      var key = "${LOAD_RELOADS_KEY}" + location.href;
+      done = Number(sessionStorage.getItem(key) || "0");
+      if (done >= RELOADS) return false;
+      sessionStorage.setItem(key, String(done + 1));
+    } catch (error) {
+      return false;
+    }
+    setTimeout(function () { location.reload(); }, RELOAD_DELAY * Math.pow(2, done));
+    return true;
+  }
   addEventListener("error", function (event) {
     var target = event.target;
-    if (target && target.tagName === "SCRIPT") show("The catalogue's code could not be loaded (" + target.src + "): see the console");
-    else show("The catalogue's code failed while it loaded: " + (event.error && event.error.message ? event.error.message : event.message));
+    if (target && target.tagName === "SCRIPT") {
+      if (root.hasAttribute("data-forgebook-started") || reloadAgain()) return;
+      show("The catalogue's code could not be loaded (" + target.src + "): see the console");
+      return;
+    }
+    show("The catalogue's code failed while it loaded: " + (event.error && event.error.message ? event.error.message : event.message));
   }, true);
 })();`;
 
@@ -237,6 +261,23 @@ export type AxeAddress = {
 };
 
 /**
+ * What the frame's entry runs on a dev server to take the edits of its previews and of what they import, which the frame
+ * draws in place (`hotModules.ts`); without it, an edit of a component a preview imports through a library's index
+ * reloads every open page.
+ *
+ * @param previews - the previews' files, as the entry imports them.
+ */
+const previewsHot = (previews: readonly string[]): readonly string[] =>
+  previews.length === 0
+    ? []
+    : [
+        "if (import.meta.hot)",
+        `  import.meta.hot.accept(${JSON.stringify(previews)}, (next) =>`,
+        `    window.dispatchEvent(new CustomEvent(${JSON.stringify(PREVIEWS_EVENT)}, { detail: { next } }))`,
+        "  );"
+      ];
+
+/**
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
@@ -275,6 +316,7 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
         ]),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
+    ...previewsHot(config.previews),
     ""
   ].join("\n");
 };

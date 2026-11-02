@@ -8,6 +8,8 @@ import { extname } from "node:path";
 import type { FrameworkAdapter } from "forgebook/vite/adapter";
 import type { PluginOption } from "vite";
 
+import { refreshThroughCasts } from "./refreshThroughCasts.ts";
+
 /**
  * React, as the plugin reads its components: the docs module the docs' worker loads is this package's
  * `extractDocs.ts` (the props from the first parameter's type, events as `on*` props); the generated pages draw with
@@ -25,9 +27,8 @@ export const react = (): FrameworkAdapter => ({
   // Fast Refresh: an edited component updates in its frame and the story keeps its state
   vitePlugins: async (): Promise<readonly PluginOption[]> => {
     const { default: plugin } = await import("@vitejs/plugin-react");
-    // a story file is never a Fast Refresh boundary: its functions are stories the frame calls, not components React
-    // mounts, so a refresh would accept the edit and draw nothing new (a file of stories another one re-exports, as
-    // Fluent writes them). Edited, it reloads its frame, as a story file with a meta always did
-    return [plugin({ exclude: [/\/node_modules\//, /\.stories\.[cm]?[jt]sx?$/] })];
+    // story files too: Fast Refresh renews what React mounts, and the frame draws the stories anew, since it calls them
+    // and React never mounts them (forgebook's `hotModules.ts`)
+    return [refreshThroughCasts(), plugin()];
   }
 });
