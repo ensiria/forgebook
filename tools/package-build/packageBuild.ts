@@ -108,13 +108,22 @@ export const isCompiled = (file: string): boolean =>
  * Whether a source file belongs to the build: not a test, a test's fixture, a folder's `tsconfig.json` (it checks the
  * sources, the build does not ship them) or a Sass partial (`_tokens.scss`, compiled into the sheets that import it).
  *
+ * @remarks
+ * The path comes from Node's glob, which separates folders with backslashes on Windows: both separators are read, or a
+ * build there would ship the tests and compile the partials on their own.
+ *
  * @param file - the file's path, relative to the package.
  */
-export const isPublished = (file: string): boolean =>
-  !/\.test\.tsx?$/.test(file) &&
-  !file.split("/").some((segment) => segment === "test" || segment === "__fixtures__") &&
-  !/(^|\/)tsconfig[^/]*\.json$/.test(file) &&
-  !/(^|\/)_[^/]+\.scss$/.test(file);
+export const isPublished = (file: string): boolean => {
+  const segments = file.split(/[\\/]/);
+  const name = segments.at(-1) ?? "";
+  return (
+    !/\.test\.tsx?$/.test(name) &&
+    !segments.some((segment) => segment === "test" || segment === "__fixtures__") &&
+    !/^tsconfig.*\.json$/.test(name) &&
+    !/^_.+\.scss$/.test(name)
+  );
+};
 
 /**
  * Whether the tool packing a package is pnpm, from the user agent a package manager gives its scripts

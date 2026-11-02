@@ -1423,6 +1423,39 @@ test.describe("the panel", () => {
     await expect(frameOf(page).locator("select")).toHaveAttribute("data-size", "lg");
   });
 
+  test("a shared link's values reach the frame only for the story's props, with their types; the rest are reported", async ({
+    page
+  }) => {
+    const dialogs: string[] = [];
+    page.on("dialog", (dialog) => {
+      dialogs.push(dialog.message());
+      void dialog.dismiss();
+    });
+    const crafted = {
+      size: "lg",
+      onclick: "alert(1)",
+      innerHTML: "<img src=x onerror=alert(2)>",
+      hint: 5,
+      icon: { of: "constructor", named: "constructor" }
+    };
+    await page.goto(story("overview", `args=${encodeURIComponent(JSON.stringify(crafted))}`));
+    await frameStatus(page);
+    const select = frameOf(page).locator("select");
+    await expect(select).toHaveAttribute("data-size", "lg");
+    await select.click();
+    await expect(select).not.toHaveAttribute("onclick");
+    const note = page.locator(".forgebook-dropped-args");
+    await expect(note).toContainText("onclick not one of its props");
+    await expect(note).toContainText("innerHTML not one of its props");
+    await expect(note).toContainText("hint not of the prop's type");
+    await expect(note).toContainText("icon not one of its props");
+    expect(dialogs).toEqual([]);
+    await note.getByRole("button", { name: "Remove them from the address" }).click();
+    await expect(note).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`args=${encodeURIComponent(JSON.stringify({ size: "lg" }))}$`));
+    await expect(select).toHaveAttribute("data-size", "lg");
+  });
+
   test("named views: the catalogue's picked, a reader's saved, kept after a reload, and removed", async ({
     page
   }) => {

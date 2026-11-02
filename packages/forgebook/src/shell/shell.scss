@@ -1479,6 +1479,38 @@
     }
   }
 
+  // above the story: the values a shared link named that the story does not take
+  .forgebook-dropped-args {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: $space-1 $space-3;
+    margin-block-start: $space-2;
+    padding: $space-2 $space-3;
+    border-radius: $radius-card;
+    background: $surface;
+    box-shadow: $ring-quiet;
+    font: $text-caption;
+    color: $text-secondary;
+  }
+
+  .forgebook-dropped-args__text {
+    margin: 0;
+  }
+
+  .forgebook-dropped-args__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1 $space-3;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    code {
+      color: $text;
+    }
+  }
+
   .forgebook-empty {
     margin: $space-8;
     color: $text-secondary;
