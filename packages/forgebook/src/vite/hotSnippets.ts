@@ -72,7 +72,7 @@ export const FILES_MODULE_HOT = "if (import.meta.hot) import.meta.hot.accept();"
  */
 export const storyFileHotHooks = (
   isServing: () => boolean,
-  changedFilesModules: () => readonly string[]
+  changedFilesModules: (file: string) => readonly string[]
 ): Pick<Plugin, "transform" | "hotUpdate"> => ({
   transform: {
     // a pattern's module is named after its pattern, which may end like a story file
@@ -84,7 +84,7 @@ export const storyFileHotHooks = (
   },
   hotUpdate(options: HotUpdateOptions): EnvironmentModuleNode[] | undefined {
     if (this.environment.name !== "client" || !STORY_FILE.test(options.file)) return undefined;
-    const changed = changedFilesModules();
+    const changed = changedFilesModules(options.file);
     if (changed.length === 0) return undefined;
     const graph = this.environment.moduleGraph;
     for (const id of changed) {

@@ -72,6 +72,7 @@ import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
   type KeptIndex,
   SEARCH_PREFIX,
+  storyFileIndex,
   storyFilesGroupOf,
   storyFilesGroupText,
   USAGE_PREFIX
@@ -265,8 +266,11 @@ const generatedModule = (
 export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin => {
   /** The modules of the patterns, renewed when a story file is added or removed. */
   const filesModules = new Set<string>();
-  /** The code each pattern's module was last served with: an edit that changes it reloads the pages. */
-  const filesCode = new Map<string, string>();
+  /** Each pattern's story files, by path, with the index its module was served with: an edit changing one reloads. */
+  const servedFiles = new Map<
+    string,
+    ReadonlyMap<string, { readonly key: string; readonly index: string }>
+  >();
   /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
   const usageModules = new Set<string>();
   /** The docs pages' modules, renewed when a Markdown file is added or removed. */
@@ -361,9 +365,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    const module = filesModule(id, watch);
+    const { files, ...module } = filesModule(id, watch);
     if (!isServing()) return module;
-    filesCode.set(id, module.code);
+    servedFiles.set(
+      id,
+      new Map(files.map((file) => [file.file, { key: file.key, index: JSON.stringify(file.index) }]))
+    );
     return { ...module, code: `${module.code}\n${FILES_MODULE_HOT}` };
   };
   /**
@@ -372,7 +379,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
    */
-  const filesModule = (id: string, watch: (file: string) => void): { code: string; moduleType: "js" } =>
+  const filesModule = (id: string, watch: (file: string) => void): ReturnType<typeof patternModule> =>
     patternModule(id, watch, config?.lists.usedIn !== false, indexCache(), isServing());
   /**
    * A query's module as served: on a dev server, a story file's docs, code or page module hands its edit to the shell.
@@ -387,9 +394,23 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     isServing() && RENEWED_QUERIES.some((query) => id.endsWith(query))
       ? { ...module, code: `${module.code}\n${renewedModuleHot(id)}` }
       : module;
-  /** The patterns' modules an edit changed (a story added or renamed, a title), which the open pages read once. */
-  const changedFilesModules = (): readonly string[] =>
-    [...filesCode].filter(([id, code]) => filesModule(id, () => undefined).code !== code).map(([id]) => id);
+  /**
+   * The patterns' modules an edit of a story file changed (a story added or renamed, a title), which the open pages
+   * read once: the file alone is indexed again. One that cannot be read yet (an edit half typed) changes nothing: its
+   * module shows the error, and the next edit is read again.
+   *
+   * @param file - the edited story file.
+   */
+  const changedFilesModules = (file: string): readonly string[] =>
+    [...servedFiles]
+      .filter(([id, served]) => {
+        const kept = served.get(file);
+        if (kept === undefined) return false;
+        const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
+        const index = storyFileIndex(root, pattern, kept.key);
+        return typeof index !== "string" && JSON.stringify(index) !== kept.index;
+      })
+      .map(([id]) => id);
   /**
    * The modules a file added or removed changes; none when it changes no list.
    *
