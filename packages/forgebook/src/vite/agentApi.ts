@@ -33,6 +33,7 @@ import type {
   NearestTokensDocument,
   PageDocument,
   PagesDocument,
+  SearchDocument,
   StoriesDocument,
   StoryDocument,
   StoryLinks,
@@ -409,6 +410,19 @@ export const isFoundComponentsDocument = (value: unknown): value is FoundCompone
   value["schema"] === 1 &&
   typeof value["query"] === "string" &&
   Array.isArray(value["components"]);
+
+/**
+ * Whether a value is a search's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isSearchDocument = (value: unknown): value is SearchDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  typeof value["query"] === "string" &&
+  typeof value["total"] === "number" &&
+  Array.isArray(value["results"]) &&
+  Array.isArray(value["problems"]);
 
 /**
  * Whether a value is the changed stories' document, as a client receives it over HTTP.

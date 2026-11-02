@@ -38,6 +38,9 @@ const SETTLE = 1500;
 /** How often the server's memory is read, in milliseconds. */
 const MEMORY_INTERVAL = 250;
 
+/** A word every generated component holds, so the first search reads the whole index. */
+const SEARCH_WORDS = "widget";
+
 /** A viewport tall enough that a component's stories are all in view, so a lazy frame is not left waiting. */
 const TALL_VIEWPORT = { width: 1280, height: 2600 };
 
@@ -407,10 +410,13 @@ export type LoadSample = {
   readonly frame: number | undefined;
   /** JavaScript fetched in all, each file once, in bytes: a file both sides fetch counts in both columns. */
   readonly total: number;
+  /** JavaScript the first search then fetches, in bytes; none where a tool's search loads with its page. */
+  readonly search: number | undefined;
 };
 
 /**
- * Serves the last build and counts the JavaScript a first load fetches once the network went quiet.
+ * Serves the last build and counts the JavaScript a first load fetches once the network went quiet, then what the first
+ * search adds: the list's code and the index, which nobody who never searches pays for.
  *
  * @param context - the measurement's context.
  */
@@ -430,11 +436,17 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
     await page.waitForLoadState("networkidle");
     const total = (paths: ReadonlySet<string>): number =>
       [...paths].reduce((sum, path) => sum + server.gzippedSize(path), 0);
-    return {
+    const first = {
       shell: total(main),
       frame: page.frames().length > 1 ? total(frames) : undefined,
       total: total(new Set([...main, ...frames]))
     };
+    const { search } = context.target;
+    if (search === undefined) return { ...first, search: undefined };
+    const loaded = new Set(main);
+    await page.locator(search.field).fill(SEARCH_WORDS);
+    await page.locator(search.ready).waitFor({ timeout: SAMPLE_TIMEOUT });
+    return { ...first, search: total(new Set([...main].filter((path) => !loaded.has(path)))) };
   } finally {
     await browserContext.close();
     await server.close();

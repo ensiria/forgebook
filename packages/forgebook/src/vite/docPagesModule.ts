@@ -15,10 +15,16 @@ import { resolve } from "node:path";
 import type { DocPageIndex } from "@forgebook/story-format/source";
 
 import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
-import { storyFileKeys } from "./storyFilesModule.ts";
+import { storyFileKeys, storyFilesGroupText } from "./storyFilesModule.ts";
 
 /** The query that asks for one docs page, rendered. */
 export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
+
+/**
+ * The id prefix of a docs pages' search index: the group follows (`storyFilesGroupText`). The plugin answers it
+ * (`searchModule.ts`) only when a page asks, on the first search.
+ */
+export const PAGES_SEARCH_PREFIX = "virtual:forgebook-search-pages:";
 
 /** A page a pattern matches, with its key and its index. */
 export type IndexedDocPage = {
@@ -80,10 +86,12 @@ export const docPagesModule = (
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
   const page = (key: string): string => JSON.stringify(`${resolve(root, key)}${DOCS_PAGE_QUERY}`);
+  const search = JSON.stringify(`${PAGES_SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
   return [
     "export default {",
     `index: ${JSON.stringify(index)},`,
     `pages: ${objectOf(keys, (key) => `() => import(${page(key)}).then((module) => module.default)`)},`,
+    `search: () => import(${search}).then((module) => module.default),`,
     ...(isServing
       ? [`text: ${objectOf(keys, (key) => `() => import(${page(key)}).then((module) => module.text)`)}`]
       : []),

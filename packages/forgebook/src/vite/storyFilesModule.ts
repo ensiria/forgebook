@@ -80,6 +80,12 @@ export const storyFileKeys = (root: string, patterns: readonly string[]): string
  */
 export const USAGE_PREFIX = "virtual:forgebook-usage:";
 
+/**
+ * The id prefix of a group's search index: the group follows (`storyFilesGroupText`). The plugin answers it
+ * (`searchModule.ts`) only when a page asks, on the first search.
+ */
+export const SEARCH_PREFIX = "virtual:forgebook-search:";
+
 /** A story file a pattern matches, with its key and its index. */
 export type IndexedStoryFile = {
   /** Its path relative to the declaring module (`../src/x.stories.tsx`). */
@@ -162,6 +168,7 @@ export const storyFilesModule = (
     files.map((file) => [file.key, file.index])
   );
   const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(root, pattern)}`);
+  const search = JSON.stringify(`${SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
   // absolute paths: the module has no folder of its own; Vite serves them under /@fs/ in development
   const path = (key: string): string => JSON.stringify(resolve(root, key));
   const query = (key: string, name: string): string => JSON.stringify(`${resolve(root, key)}?${name}`);
@@ -171,7 +178,8 @@ export const storyFilesModule = (
     `stories: ${objectOf(keys, (key) => `() => import(${path(key)})`)},`,
     `docs: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`)},`,
     `code: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`)},`,
-    `pages: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`)}${hasUsage ? "," : ""}`,
+    `pages: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`)},`,
+    `search: () => import(${search}).then((module) => module.default)${hasUsage ? "," : ""}`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasUsage ? [`reach: () => import(${usage}).then((module) => module.reach)`] : []),
     "};"

@@ -38,7 +38,7 @@ import type { ComponentFiles, FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
-import { DOCS_PAGE_QUERY, docPageModule, docPagesModule } from "./docPagesModule.ts";
+import { DOCS_PAGE_QUERY, docPageModule, docPagesModule, PAGES_SEARCH_PREFIX } from "./docPagesModule.ts";
 import { type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
@@ -61,10 +61,12 @@ import {
 } from "./pages.ts";
 import { pluginFences } from "./pluginConfig.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
+import { pagesSearchModule, storySearchModule } from "./searchModule.ts";
 import { CODE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 import {
   indexedStoryFiles,
   type KeptIndex,
+  SEARCH_PREFIX,
   storyFilesGroupOf,
   storyFilesGroupText,
   storyFilesModule,
@@ -237,16 +239,24 @@ const patternModule = (
 /** The resolved id of a group's "Used in" module: Rollup's mark of a virtual module, then its import's specifier. */
 const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
 
+/** The resolved id of a group of story files' search index. */
+const SEARCH_ID_PREFIX = `\0${SEARCH_PREFIX}`;
+
+/** The resolved id of a group of docs pages' search index. */
+const PAGES_SEARCH_ID_PREFIX = `\0${PAGES_SEARCH_PREFIX}`;
+
 /**
- * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in"), when the import names
- * one.
+ * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in" or search index), when the
+ * import names one.
  *
  * @param source - the import's specifier.
  */
 const virtualId = (source: string): string | undefined => {
   if (source === CONFIG_MODULE) return CONFIG_ID;
   if (source === TOKENS_MODULE) return TOKENS_ID;
-  return source.startsWith(USAGE_PREFIX) ? `\0${source}` : undefined;
+  return [USAGE_PREFIX, SEARCH_PREFIX, PAGES_SEARCH_PREFIX].some((prefix) => source.startsWith(prefix))
+    ? `\0${source}`
+    : undefined;
 };
 
 /**
@@ -403,6 +413,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const usageModules = new Set<string>();
   /** The docs pages' modules, renewed when a Markdown file is added or removed. */
   const docsModules = new Set<string>();
+  /** The groups' search indexes: any edit may change what a component's docs say. */
+  const searchModules = new Set<string>();
+  /** A build's component docs, by story file: the page's module and the search index both read them, once. */
+  const builtDocs = new Map<string, Promise<DocsResult>>();
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
   let config = options.config;
@@ -426,7 +440,18 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     return docs;
   };
   /**
-   * Renews what an edited source file may change: the docs' programs, and every group's "Used in".
+   * A story file's component docs: a dev server reads them again each time, as they change while it runs.
+   *
+   * @param storyFile - the story file.
+   */
+  const docsOf = (storyFile: string): Promise<DocsResult> => {
+    if (isServing()) return extractor().extract(storyFile);
+    const read = builtDocs.get(storyFile) ?? extractor().extract(storyFile);
+    builtDocs.set(storyFile, read);
+    return read;
+  };
+  /**
+   * Renews what an edited source file may change: the docs' programs, and every group's "Used in" and search index.
    *
    * @param server - the dev server.
    * @param file - the edited file.
@@ -436,13 +461,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
     const graph = server.environments.client.moduleGraph;
-    for (const id of usageModules) {
+    for (const id of [...usageModules, ...searchModules]) {
       const module = graph.getModuleById(id);
       if (module !== undefined) graph.invalidateModule(module);
     }
   };
   /**
-   * A pattern's module or a group's "Used in" module, when the id is one.
+   * A pattern's module or a group's "Used in" module or search index, when the id is one.
    *
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
@@ -457,6 +482,16 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       usageModules.add(id);
       return usageModule(id, watch, extractor().usage, isServing());
     }
+    if (id.startsWith(SEARCH_ID_PREFIX)) {
+      searchModules.add(id);
+      const { root, pattern } = storyFilesGroupOf(id.slice(SEARCH_ID_PREFIX.length));
+      return { code: await storySearchModule(root, pattern, watch, docsOf, isServing()), moduleType: "js" };
+    }
+    if (id.startsWith(PAGES_SEARCH_ID_PREFIX)) {
+      docsModules.add(id);
+      const { root, pattern } = storyFilesGroupOf(id.slice(PAGES_SEARCH_ID_PREFIX.length));
+      return { code: pagesSearchModule(root, pattern, watch), moduleType: "js" };
+    }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
     return patternModule(id, watch, config?.lists.usedIn !== false, indexCache());
@@ -468,7 +503,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    */
   const modulesListing = (file: string): readonly string[] | undefined => {
     // the patterns' modules list the story files; the groups' "Used in" read them
-    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules];
+    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules, ...searchModules];
     return DOCS_PAGE_FILE.test(file) && docsModules.size > 0 ? [...docsModules] : undefined;
   };
   const pagePath = (page: PageFile): string | undefined =>
@@ -492,7 +527,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     resolveImport: (specifier: string, importer: string) => Promise<string | undefined>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.endsWith(DOCS_QUERY)) {
-      return docsModule(await extractor().extract(id.slice(0, -DOCS_QUERY.length)), watch);
+      return docsModule(await docsOf(id.slice(0, -DOCS_QUERY.length)), watch);
     }
     if (TEXT_QUERIES.some((query) => id.endsWith(query))) {
       // imported here: the highlighter and the TypeScript compiler it splits code with are the server's heaviest

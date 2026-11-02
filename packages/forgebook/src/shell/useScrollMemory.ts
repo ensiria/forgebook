@@ -28,6 +28,8 @@ export type PageVisit = {
    * scroll, and its position so far is kept for Back. False by default.
    */
   readonly isInPage?: boolean;
+  /** Whether the focus goes to what the address names: a search left the field for it. */
+  readonly movesFocus?: boolean;
 };
 
 /** What a page needs to know of its scroll position: its visit, and every page's last position. */

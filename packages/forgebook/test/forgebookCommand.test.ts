@@ -516,6 +516,85 @@ describe("forgebook find", { timeout: SERVER_TIMEOUT }, () => {
   });
 });
 
+describe("forgebook search", { timeout: SERVER_TIMEOUT }, () => {
+  /** A catalogue with a component and its documentation file. */
+  const documented = (name: string): string =>
+    catalogue(root, name, {
+      "Select.stories.tsx": "export default { title: 'Inputs/Select' };\nexport const Plain = {};\n",
+      "select.md": "# Select\n\n## Keyboard\n\nThe arrow keys walk the options in order.\n"
+    });
+
+  it("finds a sentence of a component's documentation, with the address of its heading", () => {
+    const config = documented("searched");
+    const run = runScriptProcess(ENTRY, [
+      "search",
+      "arrow keys walk",
+      "--config",
+      config,
+      "--url",
+      NO_SERVER,
+      "--json"
+    ]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      schema: 1,
+      total: 1,
+      results: [
+        {
+          kind: "component",
+          name: "Select",
+          missed: [],
+          hits: [
+            {
+              kind: "text",
+              name: "Keyboard",
+              text: "The arrow keys walk the options in order.",
+              address: expect.stringMatching(/component=[^#]*#keyboard$/)
+            }
+          ]
+        }
+      ]
+    });
+  });
+
+  it("prints the same for a person, and says when nothing is found", () => {
+    const config = documented("searched-text");
+    const found = runScriptProcess(ENTRY, ["search", "keyboard", "--config", config, "--url", NO_SERVER]);
+    expect(found.stdout).toContain("heading Keyboard");
+    expect(found.stdout).toContain("#keyboard");
+    const none = runScriptProcess(ENTRY, ["search", "zebra", "--config", config, "--url", NO_SERVER]);
+    expect(none.stdout).toContain('Nothing in the catalogue holds "zebra"');
+    expect(none.exitCode).toBe(0);
+  });
+
+  it("is what an agent's session gets through forgebook mcp", () => {
+    const config = documented("searched-mcp");
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", config, "--url", NO_SERVER], {
+      input: [
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 0,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "test", version: "1" }
+          }
+        }),
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "search_catalogue", arguments: { query: "arrow keys", limit: 1 } }
+        })
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 30_000
+    });
+    expect(run.stdout).toContain("#keyboard");
+  });
+});
+
 describe("forgebook changed", { timeout: 60_000 }, () => {
   it("lists a story that reaches an edited file, through an import", () => {
     const config = catalogue(root, "changing", {
