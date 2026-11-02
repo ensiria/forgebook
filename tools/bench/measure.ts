@@ -104,12 +104,31 @@ export const startServer = async (context: MeasureContext): Promise<ChildProcess
   const server = spawn(programOf(context, command), [...command.args], {
     cwd: context.directory,
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
     env: environment(context.io, command)
   });
   liveServers.add(server);
+  const output: string[] = [];
+  const keep = (chunk: Buffer): void => {
+    output.push(
+      ...chunk
+        .toString()
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+    );
+    output.splice(0, Math.max(0, output.length - OUTPUT_LINES));
+  };
+  server.stdout?.on("data", keep);
+  server.stderr?.on("data", keep);
+  serverOutput.set(server, output);
   return server;
 };
+
+/** How many of a server's last lines of output the harness keeps, to say why it stopped. */
+const OUTPUT_LINES = 12;
+
+/** Each server's last lines of output, read when it stops before answering. */
+const serverOutput = new WeakMap<ChildProcess, readonly string[]>();
 
 /** Whether a server's process has ended, by its own exit or a signal. */
 const hasEnded = (server: ChildProcess): boolean => server.exitCode !== null || server.signalCode !== null;
@@ -149,7 +168,11 @@ export const waitForServer = async (
 ): Promise<void> => {
   const deadline = Date.now() + SAMPLE_TIMEOUT;
   while (Date.now() < deadline) {
-    if (hasEnded(server)) throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})`);
+    if (hasEnded(server)) {
+      const output = serverOutput.get(server) ?? [];
+      const last = output.length === 0 ? "" : `: ${output.join(" / ")}`;
+      throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})${last}`);
+    }
     const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`).then(
       (response) => readyPath === undefined || response.ok,
       () => false
