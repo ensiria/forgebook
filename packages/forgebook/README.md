@@ -266,6 +266,10 @@ Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } f
 `danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
 theme too, and the catalogue's wins role by role.
 
+The reader's Appearance menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
+dark shell. It stays on the system's while comparing, since several themes share the stage. `appearance: "story"` makes
+it the catalogue's default; a reader's own choice always wins.
+
 When the catalogue starts, a role that does not exist is named, and so is a hex colour that leaves a text or code under
 4.5:1 on its ground, or the accent, which draws the keyboard's focus, under 3:1. Other colour notations are not checked.
 

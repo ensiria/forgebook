@@ -6,21 +6,26 @@
  */
 import { type MouseEvent, type ReactNode, useId } from "react";
 
-import { APPEARANCES, type Appearance } from "../catalogue.ts";
+import type { Appearance } from "../catalogue.ts";
 import { Icon, type IconName } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
 import type { AppearanceState } from "./useAppearance.ts";
 import { usePopover } from "./usePopover.ts";
 
 /** Each appearance's icon. */
-const ICONS: Readonly<Record<Appearance, IconName>> = { light: "sun", dark: "moon", system: "monitor" };
+const ICONS: Readonly<Record<Appearance, IconName>> = {
+  light: "sun",
+  dark: "moon",
+  system: "monitor",
+  story: "eye"
+};
 
 /**
  * The appearance menu.
  *
  * @param props - the appearance shown and its setter.
  */
-export const AppearanceMenu = ({ appearance, setAppearance }: AppearanceState): ReactNode => {
+export const AppearanceMenu = ({ appearance, setAppearance, offered }: AppearanceState): ReactNode => {
   const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
   const name = useId();
   return (
@@ -46,7 +51,7 @@ export const AppearanceMenu = ({ appearance, setAppearance }: AppearanceState): 
         >
           <fieldset className="forgebook-choices">
             <legend className="forgebook-visually-hidden">{STRINGS.appearance}</legend>
-            {APPEARANCES.map((each) => (
+            {offered.map((each) => (
               <label key={each} className="forgebook-choice">
                 <input
                   type="radio"
