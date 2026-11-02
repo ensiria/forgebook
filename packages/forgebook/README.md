@@ -105,6 +105,11 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
   their TSDoc, nothing written twice.
+- **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
+  Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
+  `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
+  (`onclick`, `innerHTML`, a text for a number) is left out and listed above the story, with a button that removes it
+  from the address. A value that is code never comes from a link.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break and every number a huge one, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
@@ -302,8 +307,9 @@ export const Loaded: Story<typeof Users> = {
   }
 };
 `parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
-unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
-on the dev server and in a static build.
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. On a
+component page, where one worker serves every frame, each story's handlers answer its own frame only: a story with none
+goes to the network. It works on the dev server and in a static build.
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an

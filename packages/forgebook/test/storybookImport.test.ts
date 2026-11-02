@@ -7,7 +7,7 @@
  */
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -18,6 +18,7 @@ import {
   storyGlobs
 } from "../bin/forgebook/importers/storybook.ts";
 import { initConfigText } from "../bin/forgebook/initConfig.ts";
+import { vitePathsOf } from "../src/vite/vitePaths.ts";
 import { STORYBOOK_DIR } from "./fixturePaths.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "forgebook-import-"));
@@ -64,6 +65,18 @@ describe("storyGlobs", () => {
       '../lib: its titlePrefix "Lib" is not read',
       "The MDX pages are left out: Forgebook reads story files, not MDX"
     ]);
+  });
+});
+
+describe("storyGlobs on Windows", () => {
+  it("writes the globs with forward slashes, which globs take, from a project in a Windows folder", () => {
+    const { globs } = storyGlobs(
+      ["../src/**/*.stories.tsx", { directory: "..\\lib\\ui", files: "*.stories.tsx" }],
+      "C:\\Users\\ada\\project\\.storybook",
+      "C:\\Users\\ada\\project",
+      vitePathsOf(win32)
+    );
+    expect(globs).toEqual(["src/**/*.stories.tsx", "lib/ui/*.stories.tsx"]);
   });
 });
 
