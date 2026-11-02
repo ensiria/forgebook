@@ -163,18 +163,21 @@ const playToolsLoader = (): string => {
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
+ * @param axeScript - the file of axe's script, when it can be found: its address goes to the frame.
  */
-export const frameEntry = (config: ResolvedConfig): string => {
+export const frameEntry = (config: ResolvedConfig, axeScript?: string): string => {
   const sources = sourcesCode(config);
   return [
     `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
+    ...(axeScript === undefined ? [] : [`import axeUrl from ${JSON.stringify(`${axeScript}?url`)};`]),
     ...sources.imports,
     ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  void mountFrame(root, {",
     `    sources: ${sources.list},`,
+    ...(axeScript === undefined ? [] : ["    axeUrl,"]),
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",

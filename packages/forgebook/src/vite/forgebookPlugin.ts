@@ -256,7 +256,10 @@ const generatedModule = (
   if (id === join(config.dir, PAGE_ENTRIES["index.html"]))
     return { code: shellEntry(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["frame.html"]))
-    return { code: frameEntry(config), moduleType: "js" };
+    return {
+      code: frameEntry(config, packageResolver(PACKAGE_DIR)("axe-core/axe.min.js")),
+      moduleType: "js"
+    };
   if (id === join(config.dir, STORIES_SOURCE_FILE))
     return { code: storiesSourceModule(config), moduleType: "js" };
   if (id === join(config.dir, AGENT_SOURCES_FILE))
@@ -378,7 +381,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
               // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
               // story files (the project's and the sources') are scanned for what their components import
               optimizeDeps: {
-                include: prebundled(config, packageResolver(config.dir), packageResolver(PACKAGE_DIR)),
+                include: prebundled(config, packageResolver(config.dir)),
                 entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
               },
               build: {

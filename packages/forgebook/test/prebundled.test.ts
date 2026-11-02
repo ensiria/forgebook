@@ -44,45 +44,38 @@ const resolverOf =
 const LINKED: Resolve = (name: string): string => `/workspace/${name}/index.js`;
 
 describe("prebundled", () => {
-  it("names the shell's, the framework's and the core's own packages, the core's through the core", () => {
-    expect(prebundled(CONFIG, LINKED, LINKED)).toEqual([
+  it("names the shell's and the framework's packages", () => {
+    expect(prebundled(CONFIG, LINKED)).toEqual([
       "react",
       "react/jsx-runtime",
       "react/jsx-dev-runtime",
       "react-dom/client",
-      "stub-dom",
-      "forgebook > axe-core"
+      "stub-dom"
     ]);
   });
 
   it("adds Testing Library only when the project installs it", () => {
-    expect(prebundled({ ...CONFIG, hasPlayTools: true }, LINKED, LINKED)).toContain(
-      "@testing-library/user-event"
-    );
-    expect(prebundled(CONFIG, LINKED, LINKED)).not.toContain("@testing-library/dom");
+    expect(prebundled({ ...CONFIG, hasPlayTools: true }, LINKED)).toContain("@testing-library/user-event");
+    expect(prebundled(CONFIG, LINKED)).not.toContain("@testing-library/dom");
   });
 
   it("leaves out what cannot be resolved, which Vite would fail on", () => {
-    expect(
-      prebundled(CONFIG, resolverOf({ react: "/app/node_modules/react/index.js" }), resolverOf({}))
-    ).toEqual(["react"]);
+    expect(prebundled(CONFIG, resolverOf({ react: "/app/node_modules/react/index.js" }))).toEqual(["react"]);
   });
 
   it("adds Forgebook's page modules only when they come from an installed package, not a linked one", () => {
     const installed: Resolve = (name: string): string => `/app/node_modules/${name}/index.js`;
-    const names = prebundled(CONFIG, installed, LINKED);
+    const names = prebundled(CONFIG, installed);
     expect(names).toContain("forgebook/shell");
     expect(names).toContain(STUB_FRAMEWORK.pages.frame);
-    expect(prebundled(CONFIG, LINKED, LINKED)).not.toContain("forgebook/shell");
+    expect(prebundled(CONFIG, LINKED)).not.toContain("forgebook/shell");
   });
 });
 
 describe("a project with MSW", () => {
   it("pre-bundles its browser module, which Node cannot resolve, so a page does not reload to find it", () => {
-    expect(prebundled({ ...CONFIG, hasMocks: true }, resolverOf({}), resolverOf({}))).toContain(
-      "msw/browser"
-    );
-    expect(prebundled(CONFIG, resolverOf({}), resolverOf({}))).not.toContain("msw/browser");
+    expect(prebundled({ ...CONFIG, hasMocks: true }, resolverOf({}))).toContain("msw/browser");
+    expect(prebundled(CONFIG, resolverOf({}))).not.toContain("msw/browser");
   });
 });
 

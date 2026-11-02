@@ -24,12 +24,6 @@ const CORE_BROWSER_DEPENDENCIES = [
   "react-dom/client"
 ] as const;
 
-/**
- * What the frame imports in the browser from the core's own dependencies: named through the core, as
- * `forgebook > axe-core`, since a project need not be able to resolve them itself.
- */
-const CORE_OWN_DEPENDENCIES = ["axe-core"] as const;
-
 /** Forgebook's modules the generated pages import, besides the framework's. */
 const PAGE_MODULES = ["forgebook/shell"] as const;
 
@@ -48,9 +42,8 @@ const isInstalled = (file: string): boolean => file.split(/[\\/]/).includes("nod
  *
  * @param config - the catalogue's configuration.
  * @param resolve - resolves a package from the catalogue's folder.
- * @param resolveOwn - resolves a package from the core's own folder.
  */
-export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn: Resolve): string[] => {
+export const prebundled = (config: ResolvedConfig, resolve: Resolve): string[] => {
   const pageModules = [...PAGE_MODULES, config.framework.pages.frame, config.framework.pages.code];
   const candidates = [
     ...CORE_BROWSER_DEPENDENCIES,
@@ -63,16 +56,8 @@ export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn:
     const file = resolve(name);
     return file !== undefined && isInstalled(file);
   });
-  const own = CORE_OWN_DEPENDENCIES.filter((name) => resolveOwn(name) !== undefined).map(
-    (name) => `forgebook > ${name}`
-  );
   return [
-    ...new Set([
-      ...candidates.filter((name) => resolve(name) !== undefined),
-      ...mocks,
-      ...own,
-      ...installedPages
-    ])
+    ...new Set([...candidates.filter((name) => resolve(name) !== undefined), ...mocks, ...installedPages])
   ];
 };
 
