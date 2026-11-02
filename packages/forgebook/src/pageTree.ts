@@ -10,7 +10,7 @@
  */
 import type { DocPageIndex, StorySource } from "@forgebook/story-format/source";
 
-import { pageSlug } from "./docPages.ts";
+import { pageSlug } from "./pageAddress.ts";
 import { sourcePages } from "./sourceFiles.ts";
 import type { StoryTree, TreeSource } from "./storyTree.ts";
 

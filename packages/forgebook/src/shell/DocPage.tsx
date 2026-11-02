@@ -23,7 +23,8 @@ import {
   useState
 } from "react";
 
-import { anchorOf, isDocPage, type DocPage as LoadedDocPage } from "../docPages.ts";
+import { isDocPage, type DocPage as LoadedDocPage } from "../docPages.ts";
+import { anchorOf } from "../pageAddress.ts";
 import type { PageLocation, TreePage } from "../pageTree.ts";
 import { sourcePages } from "../sourceFiles.ts";
 import { findStory, type StoryTree, type TreeSource, type TreeStory } from "../storyTree.ts";

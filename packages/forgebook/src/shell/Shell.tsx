@@ -10,8 +10,8 @@ import type { StoryLanguage, StorySource } from "@forgebook/story-format/source"
 import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
-import { anchorOf } from "../docPages.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
+import { anchorOf } from "../pageAddress.ts";
 import { findPage, type PageLocation } from "../pageTree.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";

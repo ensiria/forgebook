@@ -10,7 +10,7 @@
  * @module
  */
 import type { FunctionSignatureDocs, PropDocs } from "../../src/componentDocs.ts";
-import { pageSlug } from "../../src/docPages.ts";
+import { pageSlug } from "../../src/pageAddress.ts";
 import { storyId } from "../../src/storyTree.ts";
 import type {
   CatalogueComponent,

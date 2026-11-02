@@ -19,14 +19,8 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import type { DocPageIndex } from "@forgebook/story-format/source";
 import { Marked, type Token, type Tokens } from "marked";
 
-import {
-  ASSET_SCHEME,
-  type DocBlock,
-  type DocHeading,
-  type DocPage,
-  PAGE_LINK_SCHEME,
-  pageSlug
-} from "../docPages.ts";
+import { ASSET_SCHEME, type DocBlock, type DocHeading, type DocPage, PAGE_LINK_SCHEME } from "../docPages.ts";
+import { pageSlug } from "../pageAddress.ts";
 import { storyName } from "../storyTree.ts";
 import { codeHtml } from "./componentPage.ts";
 import { escapeHtml, highlightCode } from "./highlightCode.ts";
