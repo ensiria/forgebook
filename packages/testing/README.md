@@ -166,3 +166,17 @@ translation catalogue), its HTML checked.
 | `forgebook-shot` | Opens one story of a running catalogue and reports it with a picture |
 
 More: [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).
+
+## Writing a framework adapter
+
+A framework is an adapter package: a renderer, a code writer and a docs reader. `@forgebook/testing/conformance` is what
+every adapter passes, in its own Vitest with a simulated page, so a framework is done when this is green:
+
+```ts
+import { describeAdapter } from "@forgebook/testing/conformance";
+
+describeAdapter({ name: "Vue", renderer, drawing, codeOf });
+```
+
+`drawing(name)` gives a story with a button showing `Hello <name> <clicks>`, its clicks in its own state, which throws for
+`THROWING_NAME`. `@forgebook/react`'s `test/conformance.test.tsx` is a complete example.
