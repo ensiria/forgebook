@@ -84,8 +84,8 @@ node tools/bench/bench.mts --corpus primer --compare --work /some/folder
 - **Pinned.** A definition holds a full commit and an `https` repository, and refuses a branch, a tag or anything that
   would ask for credentials. The clone lands in `--work`, outside this repository, shallow and without large files.
 - **Their code is data.** The clone runs no hook and installs with lifecycle scripts off. `prepare`, when a definition
-  has one, is the only code of the library that runs before its stories, and only because those stories import what it
-  builds.
+  has one, is the only code of the library that runs before its stories, and only because those stories, or the
+  library's own Storybook, import what it builds (Fluent's Storybook loads an addon of the monorepo from its build).
 - **Forgebook** is packed as usual and installed in `.forgebook-bench`, inside the catalogue's folder, with the corpus's
   `forgebook.config.ts` and without React: a story and the frame have to share the library's one copy, so a library on
   an older React is measured on it. What the library's Storybook adds to its bundler is in that file, passed through the

@@ -4,14 +4,25 @@
   "commit": "a22af26f14588c5af093871bbf6150641250610e",
   "licence": "MIT",
   "install": ["node", ".yarn/releases/yarn-4.18.0.cjs", "install", "--immutable", "--mode=skip-build"],
+  "prepare": [
+    [
+      "sh",
+      "-c",
+      "node .yarn/releases/yarn-4.18.0.cjs nx run react-storybook-addon-playground:build --excludeTaskDependencies; test -f packages/react-components/react-storybook-addon-playground/lib-commonjs/preset/preset.js && mkdir -p packages/react-components/react-storybook-addon-playground/dist && cp packages/react-components/react-storybook-addon-playground/src/styles.css packages/react-components/react-storybook-addon-playground/dist/styles.css"
+    ]
+  ],
   "folder": "apps/public-docsite-v9",
-  "expected": { "files": 128, "stories": 872 },
+  "expected": {
+    "files": 128,
+    "stories": 872
+  },
   "measured": {
     "forgebookStory": "stories:components-button-button--default",
     "forgebookComponent": "stories:components-button-button",
     "text": "Example",
     "pageText": "Example",
-    "sidebar": "Components"
+    "sidebar": "Components",
+    "storybookStory": "components-button-button--default"
   },
   "edits": {
     "story": {
@@ -24,5 +35,9 @@
       "find": "{!iconOnly && state.root.children}",
       "replace": "{!iconOnly && state.root.children} {edit}"
     }
+  },
+  "storybook": {
+    "folder": "apps/public-docsite-v9",
+    "configDir": ".storybook"
   }
 }

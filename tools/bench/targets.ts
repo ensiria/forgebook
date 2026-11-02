@@ -60,6 +60,11 @@ export type Target = {
    * outside its sources, which its globs may read.
    */
   readonly buildFolder?: string;
+  /**
+   * A page that answers only once the tool can draw a story, waited for before a page opens: a bundler that builds on
+   * the first request answers 404 meanwhile, and a frame opened then is never reloaded.
+   */
+  readonly readyPath?: string;
   /** The package whose direct dependencies a report counts. */
   readonly mainPackage: string;
 };
@@ -223,6 +228,8 @@ export const libraryStorybook = (storybook: CorpusStorybook, clone: string, buil
     ...STORYBOOK,
     configFiles: {},
     buildFolder,
+    // Spectrum's Storybook builds its preview with Parcel on the first request, answering 404 until then
+    readyPath: "iframe.html",
     caches: [...STORYBOOK.caches, inClone("node_modules/.vite"), inClone("node_modules/.cache")],
     dev: (port) => {
       const { args } = STORYBOOK.dev(port);

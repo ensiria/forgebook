@@ -134,13 +134,24 @@ export const stopAllServers = async (): Promise<void> => {
 /** The address of a server of this context. */
 export const baseOf = (context: Pick<MeasureContext, "port">): string => `http://${HOST}:${context.port}/`;
 
-/** Waits until a server answers, however it answers; one that dies fails at once, with no timeout to sit through. */
-export const waitForServer = async (server: ChildProcess, address: string): Promise<void> => {
+/**
+ * Waits until a server answers, however it answers, or, given a page, until that page answers with success; one that
+ * dies fails at once, with no timeout to sit through.
+ *
+ * @param server - the server's process.
+ * @param address - its address.
+ * @param readyPath - a page that answers only once the server can draw (`Target.readyPath`).
+ */
+export const waitForServer = async (
+  server: ChildProcess,
+  address: string,
+  readyPath?: string
+): Promise<void> => {
   const deadline = Date.now() + SAMPLE_TIMEOUT;
   while (Date.now() < deadline) {
     if (hasEnded(server)) throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})`);
-    const hasAnswered = await fetch(address).then(
-      () => true,
+    const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`).then(
+      (response) => readyPath === undefined || response.ok,
       () => false
     );
     if (hasAnswered) return;
@@ -217,7 +228,7 @@ export const measureStart = async (context: MeasureContext, isCold: boolean): Pr
   const start = Date.now();
   const server = await startServer(context);
   try {
-    await waitForServer(server, baseOf(context));
+    await waitForServer(server, baseOf(context), context.target.readyPath);
     await page.goto(context.subject.storyAddress(baseOf(context)));
     const keys = [context.subject.storyKey, context.subject.sidebar];
     const [story = 0, sidebar = 0] = await settledStamps(page, keys, start + SAMPLE_TIMEOUT);
@@ -246,7 +257,7 @@ export const measureEdits = async (
   const { browserContext, page } = await openPage(context, VIEWPORT);
   const server = await startServer(context);
   try {
-    await waitForServer(server, baseOf(context));
+    await waitForServer(server, baseOf(context), context.target.readyPath);
     await page.goto(context.subject.storyAddress(baseOf(context)));
     await settledStamps(page, [context.subject.storyKey], Date.now() + SAMPLE_TIMEOUT);
     const samples: number[] = [];
@@ -284,7 +295,7 @@ export const measureComponentPage = async (context: MeasureContext, address: str
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
   const server = await startServer(context);
   try {
-    await waitForServer(server, baseOf(context));
+    await waitForServer(server, baseOf(context), context.target.readyPath);
     const start = Date.now();
     await page.goto(address);
     // by text and not by count: a tool may draw a story twice, which must not stand in for one still missing
@@ -360,7 +371,7 @@ export const measureMemory = async (
     }
   })();
   try {
-    await waitForServer(server, baseOf(context));
+    await waitForServer(server, baseOf(context), context.target.readyPath);
     await page.goto(address);
     await quiet(page);
     await new Promise((resolve) => setTimeout(resolve, SETTLE * 2));
