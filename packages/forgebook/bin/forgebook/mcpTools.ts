@@ -266,7 +266,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -393,7 +393,7 @@ export const catalogueTools = ({
   {
     name: "story_shot",
     description:
-      "Take a story's pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files' paths. Views are written as the catalogue's address writes them (theme=dark&width=360) or as words (\"dark it 360\"). Needs @forgebook/testing and Playwright in the project.",
+      'Take a story\'s pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files\' paths. Views are written as the catalogue\'s address writes them (theme=dark&width=360) or as words ("dark it 360"); a device model\'s id in a view ("iphone-16", "pixel-9 landscape") frames the picture in that device. Needs @forgebook/testing and Playwright in the project.',
     inputSchema: {
       type: "object",
       properties: {

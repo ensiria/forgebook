@@ -178,6 +178,53 @@ Safari need a device. For real touch events and native scrolling, `forgebook dev
 Chromium window with Chromium's own touch emulation (it needs `@forgebook/testing` and Playwright, as `check` does).
 `controls: { touch: false }` takes the switch away.
 
+## Devices
+
+At phone and tablet sizes a story can be shown inside a drawn device, as a browser's device mode shows a page: the
+device button after the width turns it on, a list picks the model and a button turns it on its side. The story gets
+the model's real viewport (its width and its height), the screen's rounded corners clip it, and the status bar, the
+camera's cut and the home indicator sit over it where the device has them. The choice is in the address
+(`device=pixel-9&orientation=landscape`), so a link shares it; the compare view puts a device in each cell.
+
+| Model | Id | Viewport |
+|---|---|---|
+| iPhone 16 | `iphone-16` | 393 × 852 |
+| iPhone 16 Pro Max | `iphone-16-pro-max` | 440 × 956 |
+| iPhone 16e | `iphone-16e` | 390 × 844 |
+| Pixel 9 | `pixel-9` | 412 × 923 |
+| Galaxy S24 | `galaxy-s24` | 360 × 780 |
+| Generic phone | `phone` | 360 × 800 |
+| iPad mini | `ipad-mini` | 744 × 1133 |
+| iPad Pro 13″ | `ipad-pro-13` | 1032 × 1376 |
+
+An id names a model for good: it is never renamed or removed, and a new model gets a new id.
+
+A story meant for a device says so, on its page and on its component's page:
+
+```tsx
+export default {
+  title: "Screens/Settings",
+  component: Settings,
+  // every story of the file in an iPhone 16; a story's own fields win
+  parameters: { device: { frame: true, model: "iphone-16" } }
+} satisfies Meta<typeof Settings>;
+
+export const Landscape: Story<typeof Settings> = { parameters: { device: { orientation: "landscape" } } };
+```
+
+A catalogue sets the default under every story with `device` in its configuration (`device: { model: "pixel-9" }`
+only picks the model the button turns on). Nothing is framed for a catalogue and a story that set nothing. The reader's
+choice wins over both: turned off, a framed story shows without its device.
+
+The device is the shell's: the story's own document is the same, so the generated tests and `forgebook shot` stay
+unframed, unless a view names a model (`forgebook shot <id> --view "iphone-16"`, or `"dark pixel-9 landscape"`), which
+gives the picture framed (`portrait` and `landscape` need a model beside them; a catalogue's switch with a value
+named like a model keeps the word, so write `device=phone` then). A frame does not set `env(safe-area-inset-*)`, which browsers keep at zero in a frame: keep
+content clear of the status bar the device draws. The drawing and its styles load the first time a device is shown.
+
+`device` and `orientation` are parameters of the address, so no switch may take those ids: a catalogue with a switch
+named `device` renames it (its id, and the values its stories write in `globals`) to load.
+
 ## Hooks and functions
 
 A story can be about logic, not looks: a small scene that uses a hook or a function, there to document and try what it
@@ -272,7 +319,7 @@ browser tests run in CI.
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
-| `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
+| `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height (framed in a device a view names); with `@forgebook/testing` |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |

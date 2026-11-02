@@ -10,6 +10,8 @@
  * @module
  */
 
+import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
+
 import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
@@ -46,6 +48,12 @@ export type AgentStory = {
   readonly height?: number;
   /** Whether it is about logic, not looks (`parameters.logic`): a hook's or a function's scene. */
   readonly isLogic: boolean;
+  /**
+   * The device it is shown in by default (`parameters.device`, its own fields over the meta's), when either sets one;
+   * the catalogue's `device` sits under it. Add the model's id to a view (`forgebook shot <id> --view iphone-16`) for
+   * a framed picture.
+   */
+  readonly device?: StoryDeviceSetting;
   /** Where it opens. */
   readonly links: StoryLinks;
 };

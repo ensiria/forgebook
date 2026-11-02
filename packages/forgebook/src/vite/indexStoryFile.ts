@@ -11,7 +11,8 @@
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
- * the story loads. `touch` and `logic` are read by the index only, so written by code they are a problem. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
+ * the story loads. `touch`, `logic` and `device` are read by the index only (`indexedParameters.ts`), so written by
+ * code they are a problem. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
  * written by code is also noted, since the author meant another. A value written plainly but wrongly
  * (`controls: true`) is a problem. Pure: text in, index or problem out.
  *
@@ -22,6 +23,9 @@ import type { StoryGroup } from "@forgebook/story-format/csf";
 import type { StoryControlsSetting, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import { type ESTree, parseSync } from "vite";
 
+import { propertyValue, unwrapped } from "./estreeValues.ts";
+import { indexedParameters } from "./indexedParameters.ts";
+
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
   /** The title from the file's path (`Inputs/Select`); none when the file's place gives none. */
@@ -30,45 +34,6 @@ export type IndexOptions = {
 
 /** A story's or a meta's fields by name: an object's properties, or a function story's assigned properties. */
 type Fields = (name: string) => ESTree.Expression | undefined;
-
-/**
- * An expression without the TypeScript wrappers a meta is often written with (`satisfies Meta<…>`, `as Meta`).
- *
- * @param expression - the expression.
- */
-export const unwrapped = (expression: ESTree.Expression): ESTree.Expression => {
-  if (
-    expression.type === "TSSatisfiesExpression" ||
-    expression.type === "TSAsExpression" ||
-    expression.type === "ParenthesizedExpression"
-  ) {
-    return unwrapped(expression.expression);
-  }
-  return expression;
-};
-
-/** A property key's name: an identifier's or a literal's; `undefined` for any other key. */
-const keyName = (key: ESTree.PropertyKey): string | undefined => {
-  if (key.type === "Identifier") return key.name;
-  return key.type === "Literal" ? String(key.value) : undefined;
-};
-
-/**
- * The value of an object's property written plainly (a name or a string as its key), its TypeScript wrappers removed.
- *
- * @param object - the object.
- * @param name - the property's name.
- */
-export const propertyValue = (
-  object: ESTree.ObjectExpression,
-  name: string
-): ESTree.Expression | undefined => {
-  for (const property of object.properties) {
-    if (property.type !== "Property" || property.computed) continue;
-    if (keyName(property.key) === name) return unwrapped(property.value);
-  }
-  return undefined;
-};
 
 /** An object's fields. */
 const objectFields =
@@ -132,36 +97,6 @@ const groupOf = (fields: Fields): StoryGroup | undefined | Error => {
   if (group === undefined || !isPlain(group)) return undefined;
   if (group.type === "Literal" && typeof group.value === "string" && group.value !== "") return group.value;
   return new Error("`parameters.group` must be written as a plain string");
-};
-
-/**
- * A boolean parameter only the index reads (`touch`, `logic`): `true` or `false` written plainly, `undefined` when
- * none, or a problem otherwise. Written by code it would be lost, since the frame does not read it.
- *
- * @param fields - the story's or the meta's fields.
- * @param name - the parameter's name.
- */
-const booleanParameter = (fields: Fields, name: string): boolean | undefined | Error => {
-  const value = parameter(fields, name);
-  if (value === undefined) return undefined;
-  if (value.type === "Literal" && typeof value.value === "boolean") return value.value;
-  return new Error(`\`parameters.${name}\` must be written as a plain \`true\` or \`false\``);
-};
-
-/**
- * The flags a meta or a story sets (`touch`, `logic`), as the index keeps them: each only when written, or a problem.
- *
- * @param fields - the story's or the meta's fields.
- */
-const flagsOf = (fields: Fields): Pick<StoryIndexEntry, "isTouch" | "isLogic"> | Error => {
-  const touch = booleanParameter(fields, "touch");
-  if (touch instanceof Error) return touch;
-  const logic = booleanParameter(fields, "logic");
-  if (logic instanceof Error) return logic;
-  return {
-    ...(touch === undefined ? {} : { isTouch: touch }),
-    ...(logic === undefined ? {} : { isLogic: logic })
-  };
 };
 
 /** `parameters.height`: `undefined` when none or written by code, the height in CSS px, or a problem when wrong. */
@@ -242,7 +177,7 @@ const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readon
 /** What the index reads of one story besides its export. */
 type StoryFields = Pick<
   StoryIndexEntry,
-  "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "isLogic" | "tags"
+  "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "isLogic" | "device" | "tags"
 >;
 
 /**
@@ -264,7 +199,7 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   if (ownTags instanceof Error) return ownTags;
   const tags = combinedTags([metaTags, ownTags]);
   const main = parameter(fields, "main");
-  const flags = flagsOf(fields);
+  const flags = indexedParameters((name) => parameter(fields, name));
   if (flags instanceof Error) return flags;
   return {
     ...(name === undefined ? {} : { name }),
@@ -520,7 +455,7 @@ const titleOf = (
 /** The meta's fields besides its title and stories, each only when set. */
 type MetaFields = Pick<
   StoryFileIndex,
-  "controls" | "height" | "alsoIn" | "related" | "keywords" | "description"
+  "controls" | "height" | "isTouch" | "isLogic" | "device" | "alsoIn" | "related" | "keywords" | "description"
 >;
 
 /**
@@ -536,7 +471,7 @@ const metaFieldsOf = (meta: Fields): MetaFields | Error => {
   const lists = metaListsOf(meta);
   if (lists instanceof Error) return lists;
   const description = docsDescription(meta, "component");
-  const flags = flagsOf(meta);
+  const flags = indexedParameters((name) => parameter(meta, name));
   if (flags instanceof Error) return flags;
   return {
     ...(controls === undefined ? {} : { controls }),

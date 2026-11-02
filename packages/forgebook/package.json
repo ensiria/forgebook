@@ -55,6 +55,7 @@
     "./story-heights": "./src/storyHeights.ts",
     "./story-ids-element": "./src/storyIdsElement.ts",
     "./view-state": "./src/viewState.ts",
+    "./device-picture": "./src/devicePicture.ts",
     "./frame-clock": "./src/frame/frameClock.ts",
     "./source-files": "./src/sourceFiles.ts",
     "./story-clock": "./src/storyClock.ts",
@@ -213,6 +214,10 @@
       "./view-state": {
         "types": "./dist/src/viewState.d.ts",
         "default": "./dist/src/viewState.js"
+      },
+      "./device-picture": {
+        "types": "./dist/src/devicePicture.d.ts",
+        "default": "./dist/src/devicePicture.js"
       },
       "./frame-clock": {
         "types": "./dist/src/frame/frameClock.d.ts",

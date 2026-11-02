@@ -10,7 +10,7 @@
  */
 import { type ESTree, parseSync } from "vite";
 
-import { propertyValue, unwrapped } from "../../src/vite/indexStoryFile.ts";
+import { propertyValue, unwrapped } from "../../src/vite/estreeValues.ts";
 
 /** The object a top-level `export const source = …` holds, if it is written as one. */
 const sourceObject = (

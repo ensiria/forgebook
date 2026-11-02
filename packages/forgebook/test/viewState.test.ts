@@ -12,6 +12,7 @@ import {
   DEFAULT_VIEW,
   defaultView,
   frameAddress,
+  frameAddressOf,
   hasViewChanges,
   isMoreContrastOf,
   isTouchView,
@@ -225,5 +226,31 @@ describe("the touch a story marked for a phone is drawn with", () => {
     const changed = withSwitches({ touch: "touch", theme: "dark" });
     expect(withTouchOf(changed, DEFAULTS, choice).switches).toEqual(withSwitches({ theme: "dark" }).switches);
     expect(withTouchOf(changed, changed, choice)).toBe(changed);
+  });
+});
+
+describe("the device in the address", () => {
+  it("reads off and a model's id, the story's own (auto) for anything else, and writes only what is set", () => {
+    expect(parseView("", CATALOGUE)).toMatchObject({ device: "auto", orientation: "auto" });
+    expect(parseView("device=pixel-9&orientation=landscape", CATALOGUE)).toMatchObject({
+      device: "pixel-9",
+      orientation: "landscape"
+    });
+    expect(parseView("device=off", CATALOGUE).device).toBe("off");
+    expect(parseView("device=nokia-3310&orientation=upside-down", CATALOGUE)).toMatchObject({
+      device: "auto",
+      orientation: "auto"
+    });
+    const view: ViewState = { ...DEFAULT_VIEW, device: "ipad-mini", orientation: "landscape" };
+    expect(viewParams(view, SWITCHES).toString()).toBe("device=ipad-mini&orientation=landscape");
+    expect(viewParams(DEFAULT_VIEW, SWITCHES).toString()).toBe("");
+  });
+
+  it("leaves the device out of a frame's address: the frame is the story's own document, never the device", () => {
+    const view: ViewState = { ...DEFAULT_VIEW, device: "iphone-16" };
+    expect(frameAddress("frame.html", "kit:a--b", view, SWITCHES)).toBe("frame.html?story=kit%3Aa--b");
+    expect(
+      frameAddressOf("frame.html", "kit:a--b", "device=iphone-16&orientation=landscape&theme=dark")
+    ).toBe("frame.html?theme=dark&story=kit%3Aa--b");
   });
 });

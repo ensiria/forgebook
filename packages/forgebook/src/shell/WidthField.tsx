@@ -18,6 +18,8 @@ export type WidthFieldProps = {
   readonly shownWidth: number | undefined;
   /** Called with a typed width, kept within the catalogue's range. */
   readonly onWidthChange: (width: StageWidth) => void;
+  /** Why the width cannot be typed (a device sets it), shown as the field's tooltip; none while it can. */
+  readonly disabledNote?: string | undefined;
 };
 
 /**
@@ -25,7 +27,12 @@ export type WidthFieldProps = {
  *
  * @param props - the set and the shown width, and what a typed width does.
  */
-export const WidthField = ({ width, shownWidth, onWidthChange }: WidthFieldProps): ReactNode => {
+export const WidthField = ({
+  width,
+  shownWidth,
+  onWidthChange,
+  disabledNote
+}: WidthFieldProps): ReactNode => {
   // the field's text while it is being typed in
   const [draft, setDraft] = useState<string | undefined>(undefined);
   const { widths, widthRange } = useCatalogue();
@@ -46,7 +53,8 @@ export const WidthField = ({ width, shownWidth, onWidthChange }: WidthFieldProps
         inputMode="numeric"
         pattern="[0-9]*"
         aria-label={STRINGS.widthTyped}
-        title={width === "fill" ? STRINGS.widthFillNote : undefined}
+        disabled={disabledNote !== undefined}
+        title={disabledNote ?? (width === "fill" ? STRINGS.widthFillNote : undefined)}
         placeholder={STRINGS.widthAuto}
         value={draft ?? (shown === undefined ? "" : String(shown))}
         onChange={(event: ChangeEvent<HTMLInputElement>): void => setDraft(event.currentTarget.value)}

@@ -14,9 +14,11 @@ import { createRequire } from "node:module";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
+import { deviceSettingProblem } from "../deviceView.ts";
 import { mergedThemes, shellThemeCss, shellThemeProblems, themeValueProblem } from "../shellTheme.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
@@ -162,7 +164,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
  * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
  * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
  * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar the last
- * that names one.
+ * that names one; the device field by field.
  *
  * @param all - the presets' lists, then the catalogue's.
  */
@@ -172,7 +174,10 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   const strings: Record<string, string> = {};
   const keys: Record<string, string | false> = {};
   let merged: CatalogueLists = {};
+  // the device field by field, as a story's lies over its meta's: a preset's model stays under a catalogue's frame
+  let device: StoryDeviceSetting | undefined;
   for (const lists of all) {
+    if (lists.device !== undefined) device = { ...device, ...lists.device };
     Object.assign(tabs, lists.tabs);
     Object.assign(controls, lists.controls);
     Object.assign(strings, lists.strings);
@@ -183,6 +188,7 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   const tags = all.findLast((lists) => lists.a11y?.tags !== undefined)?.a11y?.tags;
   return {
     ...merged,
+    ...(device === undefined ? {} : { device }),
     backgrounds: {
       ...(builtIn === undefined ? {} : { builtIn }),
       custom: mergedById(all.map((lists) => lists.backgrounds?.custom))
@@ -227,6 +233,48 @@ const configProblem = (config: unknown): string | undefined => {
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
 
 /**
+ * Why a device setting cannot be used, or none: not an object of `frame`, `model` and `orientation`, a `frame` that is
+ * no boolean, or a model or an orientation that is none. A configuration is code, so its types are not a promise.
+ *
+ * @param device - the setting as a configuration or a preset gives it.
+ */
+const deviceProblem = (device: unknown): string | undefined => {
+  if (typeof device !== "object" || device === null || Array.isArray(device))
+    return 'write it as an object: { frame: true, model: "iphone-16" }';
+  const unknownField = Object.keys(device).find((name) => !["frame", "model", "orientation"].includes(name));
+  if (unknownField !== undefined)
+    return `it has no field "${unknownField}": it takes frame, model and orientation`;
+  if ("frame" in device && device.frame !== undefined && typeof device.frame !== "boolean")
+    return "its frame must be true or false";
+  const model = "model" in device ? device.model : undefined;
+  const orientation = "orientation" in device ? device.orientation : undefined;
+  if (model !== undefined && typeof model !== "string") return "its model must be a model's id";
+  if (orientation !== undefined && typeof orientation !== "string")
+    return "its orientation must be portrait or landscape";
+  return deviceSettingProblem({
+    ...(model === undefined ? {} : { model }),
+    ...(orientation === undefined ? {} : { orientation })
+  });
+};
+
+/**
+ * The configuration's and the presets' lists, once checked where the shell would leave a mistake out: a device that
+ * cannot be used.
+ *
+ * @param all - the presets' lists, then the configuration's.
+ * @param dir - the configuration's folder, for the message.
+ * @throws when a device cannot be used.
+ */
+const checkedLists = (all: readonly CatalogueLists[], dir: string): readonly CatalogueLists[] => {
+  for (const lists of all) {
+    const problem = lists.device === undefined ? undefined : deviceProblem(lists.device);
+    if (problem !== undefined)
+      throw new Error(`${resolve(dir, "forgebook.config")}: Forgebook's device: ${problem}`);
+  }
+  return all;
+};
+
+/**
  * A configuration with its presets merged and its paths made absolute.
  *
  * @param config - the configuration.
@@ -246,6 +294,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
   ]);
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
+  const lists = mergedLists(checkedLists([...presets, config], dir));
   const ownPreview =
     config.preview === undefined
       ? PREVIEW_FILES.map((name) => resolve(dir, name)).find((file) => existsSync(file))
@@ -281,7 +330,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
         : { path: absolute(each.file), mode: each.mode }
     ),
     watch: (config.watch ?? []).map(absolute),
-    lists: mergedLists([...presets, config]),
+    lists,
     hasPlayTools: hasPlayToolsIn(dir),
     hasMocks: packageResolver(dir)(MOCKS_MANIFEST) !== undefined
   };

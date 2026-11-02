@@ -42,6 +42,22 @@ describe("a reader's named views", () => {
     expect(namedViewsText([])).toBe("");
   });
 
+  it("hold the device, and read one saved before they did as following the story's", () => {
+    const phone = viewValues({ ...DEFAULT_VIEW, device: "pixel-9", orientation: "landscape" });
+    expect(withViewValues(DEFAULT_VIEW, phone)).toMatchObject({
+      device: "pixel-9",
+      orientation: "landscape"
+    });
+    expect(isSameView(phone, viewValues(DEFAULT_VIEW), DEFAULT_SWITCHES)).toBe(false);
+    const older =
+      '[{"name":"Old","values":{"switches":{},"backdrop":"plain","sheets":"full","text":100,"width":360}}]';
+    expect(readNamedViews(older)[0]?.values).toMatchObject({
+      width: 360,
+      device: "auto",
+      orientation: "auto"
+    });
+  });
+
   it("set their values over the view, and compare a switch at its default with one left out", () => {
     expect(withViewValues({ ...DEFAULT_VIEW, zoom: 150 }, DARK)).toMatchObject({ zoom: 150, width: 360 });
     const theme = DEFAULT_SWITCHES.find((each) => each.id === "theme");
@@ -61,6 +77,21 @@ describe("the catalogue's named views", () => {
     expect(settings.views).toHaveLength(1);
     expect(settings.views[0]?.name).toBe("Night");
     expect(settings.views[0]?.query).toContain("width=360");
+  });
+
+  it("carry a device written as words to the view they set", () => {
+    const settings = catalogueSettings("A", DEFAULT_SWITCHES, {
+      views: [{ name: "Tablet", view: "ipad-mini landscape" }]
+    });
+    const view = checkedView(
+      withViewValues(
+        DEFAULT_VIEW,
+        viewValues({ ...DEFAULT_VIEW, device: "ipad-mini", orientation: "landscape" })
+      ),
+      settings
+    );
+    expect(settings.views[0]?.query).toBe("device=ipad-mini&orientation=landscape");
+    expect(view).toMatchObject({ device: "ipad-mini", orientation: "landscape" });
   });
 
   it("stop a catalogue whose view cannot be read", () => {

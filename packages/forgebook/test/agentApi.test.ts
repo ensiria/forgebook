@@ -72,6 +72,32 @@ describe("storiesDocument", () => {
     expect(button?.stories[0]?.description).toBe("The main action.");
   });
 
+  it("gives a story's device as its parameter says, and none to a story without one", () => {
+    const tree = storyTree([
+      {
+        ...SOURCE,
+        files: [
+          {
+            index: {
+              "./screen.stories.tsx": {
+                title: "Layouts/Screen",
+                device: { frame: true },
+                stories: [{ exportName: "Phone", device: { model: "pixel-9" } }]
+              }
+            },
+            stories: {},
+            docs: {},
+            code: {},
+            pages: {}
+          }
+        ]
+      }
+    ]);
+    const [screen] = storiesDocument("Kit catalogue", tree, PAGES, "").components;
+    expect(screen?.stories[0]?.device).toEqual({ frame: true, model: "pixel-9" });
+    expect(document.components[0]?.stories[0]).not.toHaveProperty("device");
+  });
+
   it("carries the schema, the sources and the index's problems", () => {
     expect(document.schema).toBe(1);
     expect(document.sources).toEqual([{ id: "kit", name: "Kit" }]);

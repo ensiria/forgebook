@@ -33,6 +33,13 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
   catalogue draws it with a finger and offers a toggle to turn that off.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
+- A screen meant for a phone or a tablet can be shown in a drawn device by default:
+  `parameters: { device: { frame: true, model: "iphone-16" } }` (on the meta for every story; `orientation:
+  "landscape"` turns it). The models: `iphone-16`, `iphone-16-pro-max`, `iphone-16e`, `pixel-9`, `galaxy-s24`, `phone`
+  (generic), `ipad-mini`, `ipad-pro-13`. The story gets the model's viewport; the status bar and the camera's cut sit
+  over its top, so keep content clear of the safe area. `get_story` returns the setting as `device`. Pictures and
+  tests stay unframed unless a view names a model: `forgebook shot <id> --view "iphone-16"` (or `"dark pixel-9
+  landscape"`) gives a framed picture.
 - A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook
   (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`
   that tries it. The catalogue documents its signature from its types and TSDoc (`@param`, `@returns`), and the tests
@@ -63,7 +70,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | `npx forgebook verify --json` | The checks on all of them, with one exit code: run it before you say a change is done |
 | `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
-| `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`) |
+| `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`); a model's id in the view (`iphone-16`) frames it in that device |
 
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.

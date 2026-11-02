@@ -26,6 +26,7 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
+      device: undefined,
       tags: []
     },
     {
@@ -39,6 +40,7 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
+      device: undefined,
       tags: []
     },
     {
@@ -52,6 +54,7 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
+      device: undefined,
       tags: []
     }
   ],

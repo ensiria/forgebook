@@ -14,6 +14,7 @@
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { type PanelArgTypes, panelProps, settableProps } from "../argTypes.ts";
+import { deviceDefaultOf, shownDevice } from "../deviceView.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
 import type { ArgValue, PanelArgs, ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
@@ -28,18 +29,20 @@ import {
   type PanelTab,
   type StageHeight,
   type StageWidth,
+  schemeOf,
   type ViewState,
   type Zoom
 } from "../viewState.ts";
 import type { CheckState } from "./A11yTab.tsx";
 import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
-import { compareVariants } from "./compareVariants.ts";
+import { DeviceSlot, inkScheme, roomSizing, useFramedDevice } from "./DeviceSlot.tsx";
 import { Dock } from "./Dock.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { MatrixPicker } from "./MatrixPicker.tsx";
+import { StageCompare } from "./StageCompare.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { STRINGS } from "./strings.ts";
@@ -49,6 +52,7 @@ import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages }
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCode } from "./useStoryCode.ts";
+import { useSystemDark } from "./useSystemDark.ts";
 import { useWorstCase } from "./useWorstCase.ts";
 
 /** The `argTypes` of a story before its frame reported them. */
@@ -343,6 +347,13 @@ export const Stage = ({
   );
   useLiveView(storyRef, view, !isComparing(view));
   useScrollMemory(storyRef, scroll);
+  // a device sets the story's width and height in place of the stage's own, and its screen is the toolbar's width
+  const framed = useFramedDevice(shownDevice(view, deviceDefaultOf(catalogue.device, story.device)));
+  const isSystemDark = useSystemDark();
+  const screenWidth = framed?.drawing.screen.width;
+  useEffect(() => {
+    if (screenWidth !== undefined) onShownWidthChange(screenWidth);
+  }, [screenWidth, onShownWidthChange]);
   // a story not shown yet waits at its measured height, or keeps the last story's, until it reports its own, so the
   // page does not jump twice
   const reportedHeight = heights.get(address);
@@ -421,48 +432,47 @@ export const Stage = ({
               </a>
             </div>
             {isComparing(view) ? (
-              <div className="forgebook-compare">
-                {compareVariants(view.compare, catalogue).map((variant) => (
-                  <figure
-                    key={variant.label}
-                    className="forgebook-compare__cell"
-                    // the label (the shell's text) reads on the page's colour; the frame draws the backdrop
-                    style={{ backgroundColor: backgroundOf({ ...variant.viewOf(view), backdrop: "plain" }) }}
-                  >
-                    <figcaption className="forgebook-compare__label">{variant.label}</figcaption>
-                    <FrameView
-                      title={`${title} · ${variant.label}`}
-                      address={frameAddress(frameUrl, story.id, variant.viewOf(view), switches)}
-                      heights={heights}
-                      settled={settled}
-                      fallbackHeight={lastHeight}
-                      sceneHeight={story.height}
-                    />
-                  </figure>
-                ))}
-              </div>
+              <StageCompare
+                story={story}
+                title={title}
+                view={view}
+                frameUrl={frameUrl}
+                framed={framed}
+                heights={heights}
+                settled={settled}
+                fallbackHeight={lastHeight}
+                backgroundOf={backgroundOf}
+              />
             ) : (
               <StageViewport
                 zoom={view.zoom}
-                width={view.width}
-                onWidthChange={widthSetter(panel.fixed, view, onViewChange)}
-                onShownWidthChange={onShownWidthChange}
-                background={backgroundOf(view)}
-                height={view.height}
-                onHeightChange={(height: StageHeight): void => onViewChange({ ...view, height })}
+                {...roomSizing(framed, {
+                  width: view.width,
+                  onWidthChange: widthSetter(panel.fixed, view, onViewChange),
+                  onShownWidthChange,
+                  background: backgroundOf(view),
+                  height: view.height,
+                  onHeightChange: (height: StageHeight): void => onViewChange({ ...view, height })
+                })}
               >
                 {(fixedHeight: number | undefined): ReactNode => (
-                  <FrameView
-                    ref={frameRef}
-                    key={story.id}
-                    title={title}
-                    address={address}
-                    heights={heights}
-                    settled={settled}
-                    fallbackHeight={measuredHeight ?? lastHeight}
-                    sceneHeight={story.height}
-                    fixedHeight={fixedHeight}
-                  />
+                  <DeviceSlot
+                    framed={framed}
+                    scheme={inkScheme(schemeOf(view, switches), isSystemDark)}
+                    background={backgroundOf(view)}
+                  >
+                    <FrameView
+                      ref={frameRef}
+                      key={story.id}
+                      title={title}
+                      address={address}
+                      heights={heights}
+                      settled={settled}
+                      fallbackHeight={measuredHeight ?? lastHeight}
+                      sceneHeight={story.height}
+                      fixedHeight={framed?.drawing.screen.height ?? fixedHeight}
+                    />
+                  </DeviceSlot>
                 )}
               </StageViewport>
             )}

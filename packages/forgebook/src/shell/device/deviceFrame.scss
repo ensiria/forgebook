@@ -1,0 +1,64 @@
+// A story in a drawn device: the hardware under the story, the camera's cut and the status bar over it, the screen
+// between them clipped to its rounded corners. Loaded with the device's parts, so a catalogue that never shows a
+// device never loads it.
+
+@use "../../styles/tokens" as *;
+@use "../../styles/mixins";
+
+@layer catalogue {
+  .forgebook-device[data-framed] {
+    position: relative;
+    flex: none;
+  }
+
+  .forgebook-device__layer {
+    position: absolute;
+    inset: 0;
+    display: block;
+    overflow: visible;
+
+    // a shadow that follows the hardware's outline, buttons included, in the shell's own shadows
+    &[data-layer="under"] {
+      filter: drop-shadow(0 14px 28px var(--forgebook-shadow-lift)) drop-shadow(0 2px 5px var(--forgebook-shadow-soft));
+    }
+
+    // the status bar and the camera's cut sit over the story, never taking its pointer or its touches
+    &[data-layer="over"] {
+      pointer-events: none;
+    }
+  }
+
+  // the screen clips the story to its corners, as glass does; isolated, so the frame's own layers stay inside it
+  .forgebook-device[data-framed] > .forgebook-device__screen {
+    position: absolute;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  // the stage's room around a device: the device is the story's edge, so the room draws no surface or edge of its own,
+  // and leaves the device's shadow room
+  .forgebook-viewport__room[data-device] {
+    padding: $space-6 0;
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .forgebook-example__stage .forgebook-viewport__room[data-device] {
+    box-shadow: none;
+  }
+
+  // the compare view's cells, each a device: as many side by side as fit, the device centred in its cell
+  .forgebook-compare[data-device] {
+    .forgebook-compare__cell {
+      display: grid;
+      justify-items: center;
+      padding-bottom: $space-6;
+      overflow-x: auto;
+    }
+  }
+
+  .forgebook-device-menu__model {
+    max-width: 10rem;
+  }
+}

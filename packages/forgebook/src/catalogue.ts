@@ -12,8 +12,11 @@
  * @module
  */
 
+import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
+
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
+import { type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "./deviceView.ts";
 import type { CatalogueView } from "./namedViews.ts";
 import { switchWithRole, type TouchChoice, touchChoiceOf, type ViewSwitch } from "./switches.ts";
 import { viewQuery } from "./viewWords.ts";
@@ -124,6 +127,12 @@ export type CatalogueLists = {
    * (`theme=dark&width=360`) or as words (`"dark it 360"`); a reader saves their own beside them.
    */
   readonly views?: readonly CatalogueView[];
+  /**
+   * The device every story is shown in by default, under each story's own `parameters.device`: `{ frame: true }`
+   * frames them all in a generic phone, `{ model: "pixel-9" }` only sets the model the toolbar's toggle turns on. No
+   * frame by default.
+   */
+  readonly device?: StoryDeviceSetting;
 };
 
 /** The shell's own appearance: light, dark, the system's, or the colour scheme of the story shown. */
@@ -172,6 +181,8 @@ export type CatalogueSettings = {
   readonly keys: ControlKeys;
   /** The catalogue's named views, their values in the address's form. */
   readonly views: readonly { readonly name: string; readonly query: string }[];
+  /** The device every story is shown in by default, under its own. */
+  readonly device: DeviceDefault;
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -317,7 +328,9 @@ export const catalogueSettings = (
     hasUsedIn: lists.usedIn !== false,
     appearance: lists.appearance ?? "system",
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
-    views: catalogueViews(switches, lists.views)
+    views: catalogueViews(switches, lists.views),
+    // checked when the configuration loads (`configFile.ts`): a model that is none is left out here
+    device: deviceDefaultOf(NO_DEVICE, lists.device)
   };
 };
 

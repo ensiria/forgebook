@@ -1,7 +1,7 @@
 /**
  * The stories a check or a picture run asks for, opened as the catalogue's browser tests open them: each story in each
  * view (or every variant the tests check), its clock held, on its page's own colour, the window as wide as the view's
- * width, one browser for the run and a context of its own per page.
+ * width (a device's viewport when the view names one), one browser for the run and a context of its own per page.
  *
  * @remarks
  * Shared by `checkStories.ts` and `shotStories.ts`, which `forgebook check` and `forgebook shot` load from the project.
@@ -12,6 +12,7 @@
  */
 import { chromium, type Page } from "@playwright/test";
 import { catalogueSettings } from "forgebook/catalogue";
+import { deviceViewport, type NamedDevice, namedDevice } from "forgebook/device-picture";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryCheckRequest, StoryCheckStory } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
@@ -36,6 +37,11 @@ export type StoryPage = {
   readonly view: ViewState;
   /** The window's width, when the view sets one. */
   readonly width: number | undefined;
+  /**
+   * The device the view names (`device=iphone-16`): the window takes its viewport and the picture its frame. A
+   * story's own default device never counts, so the tests and the pictures stay unframed unless asked.
+   */
+  readonly device: NamedDevice | undefined;
   /** The frame's address in that view, its clock held. */
   readonly frame: string;
 };
@@ -86,6 +92,7 @@ export const storyPagesOf = (request: StoryCheckRequest): StoryPage[] => {
         name,
         view: shown,
         width,
+        device: namedDevice(view),
         frame: heldClockAddress(frameAddress(request.frameUrl, story.id, shown, request.switches))
       };
     })
@@ -99,7 +106,12 @@ export const storyPagesOf = (request: StoryCheckRequest): StoryPage[] => {
  * @param storyPage - the story and the view.
  */
 export const openedStory = async (page: Page, storyPage: StoryPage): Promise<FrameStatus> => {
-  await page.setViewportSize({ width: storyPage.width ?? WINDOW.width, height: WINDOW.height });
+  const screen = storyPage.device === undefined ? undefined : deviceViewport(storyPage.device);
+  await page.setViewportSize(
+    screen === undefined
+      ? { width: storyPage.width ?? WINDOW.width, height: WINDOW.height }
+      : { width: screen.width, height: screen.height }
+  );
   await page.goto(storyPage.frame);
   try {
     await page.waitForFunction(

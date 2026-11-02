@@ -83,6 +83,8 @@ const RESERVED_IDS = [
   "tab",
   "zoom",
   "tools",
+  "device",
+  "orientation",
   "args",
   "matrix",
   "clock"

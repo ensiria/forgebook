@@ -10,6 +10,7 @@ import type { StoryLanguage, StorySource } from "@forgebook/story-format/source"
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
+import { type DeviceDefault, deviceDefaultOf, pageDeviceDefault } from "../deviceView.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";
@@ -246,6 +247,23 @@ const sidebarCurrent = (
   location === undefined
     ? undefined
     : { sourceId: location.source.id, title: location.component.title, storyId };
+
+/**
+ * The page's default device for the toolbar: the shown story's, a component's stories' on its page (`pageDeviceDefault`),
+ * the catalogue's elsewhere.
+ *
+ * @param catalogueDevice - the catalogue's default.
+ * @param shown - the page shown.
+ */
+const deviceOfShown = (catalogueDevice: DeviceDefault, shown: Shown): DeviceDefault => {
+  if (shown.kind === "story") return deviceDefaultOf(catalogueDevice, shown.location.story.device);
+  if (shown.kind === "component")
+    return pageDeviceDefault(
+      catalogueDevice,
+      shown.location.component.stories.map((story) => story.device)
+    );
+  return catalogueDevice;
+};
 
 /**
  * What the shown story fixes of the view, for the toolbar; nothing on any other page.
@@ -615,6 +633,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}
+          deviceDefault={deviceOfShown(catalogue.device, shown)}
         />
         {shown.kind === "home" ? (
           <HomePage

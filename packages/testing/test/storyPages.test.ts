@@ -36,4 +36,18 @@ describe("the pages a run opens", () => {
       "kit:hooks-use-undo--history theme=dark"
     ]);
   });
+
+  it("takes a device only from a view that names one, never from a story's own default", () => {
+    const pages = storyPagesOf({
+      ...REQUEST,
+      stories: [{ id: "kit:button--default" }],
+      isAllVariants: false,
+      views: ["device=pixel-9&orientation=landscape", "theme=dark"]
+    });
+    expect(pages.map((page) => page.device)).toEqual([
+      { model: "pixel-9", orientation: "landscape" },
+      undefined
+    ]);
+    expect(pages[0]?.frame).not.toContain("device");
+  });
 });

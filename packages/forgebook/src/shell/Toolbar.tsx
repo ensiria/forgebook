@@ -12,6 +12,7 @@
 import { type MouseEvent, type ReactNode, useId, useRef } from "react";
 
 import type { CatalogueSettings } from "../catalogue.ts";
+import { type DeviceDefault, NO_DEVICE } from "../deviceView.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import { switchWithRole } from "../switches.ts";
 import { hasViewChanges, isComparing, type ViewState } from "../viewState.ts";
@@ -42,6 +43,8 @@ export type ToolbarProps = {
   readonly fixed?: FixedView;
   /** Whether the shown page is about logic (a hook's story or page): the bar puts away what only changes looks. */
   readonly isLogic?: boolean;
+  /** The page's default device: the shown story's, or the catalogue's on a component's page; none by default. */
+  readonly deviceDefault?: DeviceDefault;
 };
 
 /** One choice of the Compare menu: what it sets side by side, and its name. */
@@ -174,14 +177,15 @@ export const Toolbar = ({
   onShowSidebar,
   shownWidth,
   fixed = NOT_FIXED,
-  isLogic = false
+  isLogic = false,
+  deviceDefault = NO_DEVICE
 }: ToolbarProps): ReactNode => {
   const layout = useToolbarLayout();
   const catalogue = useCatalogue();
   // the story's fixed values are shown, and a change of anything else keeps the user's own in the address
   const view = withFixed(ownView, fixed);
   const onViewChange = (changed: ViewState): void => onOwnViewChange(withOwnFixed(changed, ownView, fixed));
-  const context = { view, onViewChange, isStoryPage, fixed, shownWidth };
+  const context = { view, onViewChange, isStoryPage, fixed, shownWidth, deviceDefault };
   useControlKeys({ keys: layout.keys, view, onViewChange, fixed, isStoryPage });
   const pinnedRef = useRef<HTMLDivElement>(null);
   // a page about logic puts away the pinned controls that only change looks: the View menu then counts them

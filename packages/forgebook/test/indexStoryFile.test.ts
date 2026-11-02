@@ -260,6 +260,40 @@ describe("indexStoryFile", () => {
     });
   });
 
+  it("reads the device a meta and a story are shown in, written plainly", () => {
+    const text = `export default { title: "A/B", parameters: { device: { frame: true, model: "iphone-16" } } };
+      export const Phone = {};
+      export const Turned = { parameters: { device: { orientation: "landscape" as const } } };
+      export const Off = { parameters: { device: { frame: false } } };
+`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      device: { frame: true, model: "iphone-16" },
+      stories: [
+        { exportName: "Phone" },
+        { exportName: "Turned", device: { orientation: "landscape" } },
+        { exportName: "Off", device: { frame: false } }
+      ]
+    });
+  });
+
+  it("refuses a device written by code, with a field it has not, or naming a model or orientation that is none", () => {
+    const index = (device: string): unknown =>
+      indexStoryFile(
+        "A.stories.tsx",
+        `export default { title: "A/B" };\nexport const X = { parameters: { device: ${device} } };`
+      );
+    expect(index("PHONE")).toMatch(/story X: `parameters.device` must be written as a plain object/);
+    expect(index("{ size: 3 }")).toMatch(
+      /`parameters.device` has no field `size`: it takes frame, model and orientation/
+    );
+    expect(index('{ model: "nokia-3310" }')).toMatch(/`parameters.device`: "nokia-3310" is no device model/);
+    expect(index('{ orientation: "flat" }')).toMatch(/"flat" is no orientation/);
+    expect(index("{ frame: 1 }")).toMatch(
+      /`parameters.device.frame` must be written as a plain `true` or `false`/
+    );
+  });
+
   it("refuses touch and logic written by code: only the index reads them, so they must be plain", () => {
     expect(
       indexStoryFile(

@@ -52,6 +52,26 @@ export type ReplayMode =
       readonly hold?: number;
     };
 
+/** How a device is held: upright, or turned on its side with its top to the left. */
+export type DeviceOrientation = "portrait" | "landscape";
+
+/**
+ * The device a story is shown in by default (`parameters.device`): a drawn phone or tablet around it, at the model's
+ * real viewport size, which the person can still turn off, change or rotate. Each field is optional: a story's own
+ * fields win over the meta's, which win over the catalogue's `device`.
+ */
+export type StoryDeviceSetting = {
+  /** Whether the story starts in the device frame; `false` by default, and on a story it leaves the meta's out. */
+  readonly frame?: boolean;
+  /**
+   * The model, by id (`iphone-16`; the catalogue's documentation lists them): the one the frame shows, and the one
+   * the toolbar's toggle turns on; `phone`, a generic phone, by default.
+   */
+  readonly model?: string;
+  /** How the device is held; `portrait` by default. */
+  readonly orientation?: DeviceOrientation;
+};
+
 /**
  * A group of stories in the sidebar (`states`, `in-context`): its order and heading come from the catalogue's
  * configuration (or a library's preset); a group it does not name sits after the named ones.
@@ -163,6 +183,12 @@ export type StoryParameters = {
    * story's own `false` leaves it out. Written plainly (`logic: true`, the index reads it).
    */
   readonly logic?: boolean;
+  /**
+   * The device the story is shown in by default: `{ frame: true, model: "iphone-16" }` draws an iPhone 16 around it,
+   * at its viewport, on the story's page and on its component's page. On a meta, for every story of the file; a
+   * story's own fields win. Written plainly (the index reads it); off by default.
+   */
+  readonly device?: StoryDeviceSetting;
   /**
    * The story reads the story clock (`context.clock`, `useStoryNow`): a Live story, which starts at this moment and
    * then runs; the catalogue shows pause, resume, restart and the speed, and the tests hold it at its start.
