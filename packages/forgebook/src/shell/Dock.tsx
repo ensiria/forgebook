@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useId, useRef } from "react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, Suspense, useId, useRef } from "react";
 
 import type { PanelTab } from "../viewState.ts";
 import { Icon } from "./icons.tsx";
@@ -167,7 +167,7 @@ export const Dock = ({ tabs, activeTab, onTabChange, onClose }: DockProps): Reac
           role="tabpanel"
           aria-labelledby={`${baseId}-${shown.id}`}
         >
-          {shown.content}
+          <Suspense fallback={null}>{shown.content}</Suspense>
         </div>
       )}
     </section>

@@ -7,7 +7,7 @@
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
@@ -31,9 +31,7 @@ import {
 import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
 import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
-import { ComponentPage } from "./ComponentPage.tsx";
 import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
-import { HomePage } from "./HomePage.tsx";
 import { LogicMark } from "./LogicMark.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
@@ -52,6 +50,10 @@ import { useStoryHeights } from "./useStoryHeights.ts";
 import { useStoryIdsElement } from "./useStoryIdsElement.ts";
 import { useStoryKeys } from "./useStoryKeys.ts";
 import { useSystemDark } from "./useSystemDark.ts";
+
+// a page of another kind than the one opened loads when it is opened: most visits open a story
+const ComponentPage = lazy(async () => ({ default: (await import("./ComponentPage.tsx")).ComponentPage }));
+const HomePage = lazy(async () => ({ default: (await import("./HomePage.tsx")).HomePage }));
 
 /** What an app passes to the shell. */
 export type ShellConfig = {
@@ -617,44 +619,48 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
           fixed={fixedOfShown(fixedViews, shown)}
         />
         {shown.kind === "home" ? (
-          <HomePage
-            title={title}
-            tree={tree}
-            sources={sources}
-            recent={recent}
-            hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
-            onOpen={(page: RecentPage): void => openPage(page)}
-            header={header}
-          />
+          <Suspense fallback={header}>
+            <HomePage
+              title={title}
+              tree={tree}
+              sources={sources}
+              recent={recent}
+              hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
+              onOpen={(page: RecentPage): void => openPage(page)}
+              header={header}
+            />
+          </Suspense>
         ) : null}
         {shown.kind === "component" ? (
-          <ComponentPage
-            component={shown.location.component}
-            view={address.view}
-            touchOverrides={touchOverrides}
-            onTouchChange={setTouchOverride}
-            frameUrl={frameUrl}
-            hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches)}
-            onOpen={(story: TreeStory): void => openPage(storyPage(story))}
-            loadDocs={files?.docs[shown.location.component.file]}
-            loadCode={files?.code[shown.location.component.file]}
-            loadPage={files?.pages[shown.location.component.file]}
-            background={storyBackground(
-              shown.location.source.background,
-              address.view,
-              catalogue,
-              isSystemDark
-            )}
-            heightOf={(storyId: string): number | undefined =>
-              knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH))
-            }
-            header={header}
-            scroll={scroll}
-            usedIn={usedInLinks(source, catalogue.hasUsedIn, tree, {
-              hrefOf: (page: Page): string => addressQuery(pageAddress(page), switches),
-              onOpen: openPage
-            })}
-          />
+          <Suspense fallback={header}>
+            <ComponentPage
+              component={shown.location.component}
+              view={address.view}
+              touchOverrides={touchOverrides}
+              onTouchChange={setTouchOverride}
+              frameUrl={frameUrl}
+              hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches)}
+              onOpen={(story: TreeStory): void => openPage(storyPage(story))}
+              loadDocs={files?.docs[shown.location.component.file]}
+              loadCode={files?.code[shown.location.component.file]}
+              loadPage={files?.pages[shown.location.component.file]}
+              background={storyBackground(
+                shown.location.source.background,
+                address.view,
+                catalogue,
+                isSystemDark
+              )}
+              heightOf={(storyId: string): number | undefined =>
+                knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH))
+              }
+              header={header}
+              scroll={scroll}
+              usedIn={usedInLinks(source, catalogue.hasUsedIn, tree, {
+                hrefOf: (page: Page): string => addressQuery(pageAddress(page), switches),
+                onOpen: openPage
+              })}
+            />
+          </Suspense>
         ) : null}
         {shown.kind === "story" ? (
           <Stage

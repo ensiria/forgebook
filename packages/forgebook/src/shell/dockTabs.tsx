@@ -7,25 +7,33 @@
  */
 
 import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-format/source";
-import type { ReactNode } from "react";
+import { lazy, type ReactNode } from "react";
 
 import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
 import type { ComponentDocs, PropDocs } from "../componentDocs.ts";
 import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
-import { A11yTab, a11yHint, type CheckState } from "./A11yTab.tsx";
-import { CodeTab } from "./CodeTab.tsx";
+import type { CheckState } from "./A11yTab.tsx";
 import type { DockTab } from "./Dock.tsx";
-import { EventsTab } from "./EventsTab.tsx";
-import { InteractionsTab, interactionsHint } from "./InteractionsTab.tsx";
-import { PartsTab, styleHooks } from "./PartsTab.tsx";
+import { a11yHint, interactionsHint, styleHooks } from "./dockHints.ts";
 import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
-import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
+
+// a story opens on Props: the other tabs load when they are chosen, and the panel's Suspense holds their place
+const A11yTab = lazy(async () => ({ default: (await import("./A11yTab.tsx")).A11yTab }));
+const CodeTab = lazy(async () => ({ default: (await import("./CodeTab.tsx")).CodeTab }));
+const EventsTab = lazy(async () => ({ default: (await import("./EventsTab.tsx")).EventsTab }));
+const InteractionsTab = lazy(async () => ({
+  default: (await import("./InteractionsTab.tsx")).InteractionsTab
+}));
+const PartsTab = lazy(async () => ({ default: (await import("./PartsTab.tsx")).PartsTab }));
+const SignatureReference = lazy(async () => ({
+  default: (await import("./SignatureReference.tsx")).SignatureReference
+}));
 
 /** What the tabs are built from. */
 export type DockTabsInput = {

@@ -296,7 +296,7 @@ const isBoundTemplate = (value: ESTree.Expression): value is ESTree.CallExpressi
   value.callee.property.name === "bind";
 
 /** The file's top level, read once: its constants, its functions, and the properties assigned to them. */
-type TopLevel = {
+export type TopLevel = {
   /** Each `const`'s value, by name. */
   readonly values: ReadonlyMap<string, ESTree.Expression>;
   /** Each function declared at the top, by name. */
@@ -354,7 +354,7 @@ const declaredBy = (statement: ESTree.Program["body"][number]): Declared[] => {
  *
  * @param program - the parsed file.
  */
-const topLevelOf = (program: ESTree.Program): TopLevel => {
+export const topLevelOf = (program: ESTree.Program): TopLevel => {
   const values = new Map<string, ESTree.Expression>();
   const functions = new Map<string, ESTree.Function>();
   const assigned = new Map<string, Map<string, ESTree.Expression>>();
@@ -465,7 +465,7 @@ const exportsOrder = (top: TopLevel): readonly string[] | undefined => {
  * @param program - the parsed file.
  * @param top - the file's top level.
  */
-const metaObject = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
+export const metaObject = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
   const meta = program.body.find((statement) => statement.type === "ExportDefaultDeclaration");
   if (meta === undefined) return undefined;
   const { declaration } = meta;
@@ -562,27 +562,6 @@ const storyExports = (program: ESTree.Program, top: TopLevel, meta: Fields): Nam
   if (order === undefined) return exported;
   const rank = (name: string): number => (order.includes(name) ? order.indexOf(name) : order.length);
   return [...exported].sort((first, second) => rank(first.exportName) - rank(second.exportName));
-};
-
-/**
- * The module a story file imports its meta's component from (`./Button`), read from the file alone: no program, so it
- * answers at once, where the docs need the package's program.
- *
- * @param file - the story file's path, for the parser (its extension decides TypeScript and JSX).
- * @param text - the story file's text.
- * @returns the import's module specifier, or none when the meta names no imported component.
- */
-export const componentImport = (file: string, text: string): string | undefined => {
-  const { program } = parseSync(file, text);
-  const meta = metaObject(program, topLevelOf(program));
-  const component = meta === undefined ? undefined : propertyValue(meta, "component");
-  if (component?.type !== "Identifier") return undefined;
-  for (const statement of program.body) {
-    if (statement.type !== "ImportDeclaration") continue;
-    const isLocal = statement.specifiers.some(({ local }) => local.name === component.name);
-    if (isLocal) return statement.source.value;
-  }
-  return undefined;
 };
 
 /**

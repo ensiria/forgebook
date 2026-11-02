@@ -26,6 +26,16 @@ const settled = async (parts: Locator): Promise<void> => {
   );
 };
 
+/**
+ * Opens the View menu: its panel loads on the first press, so the press is over once the panel is there.
+ *
+ * @param page - the catalogue's page.
+ */
+const clickView = async (page: Page): Promise<void> => {
+  await page.getByRole("button", { name: /^View/ }).click();
+  await expect(page.getByRole("dialog", { name: "View" })).toBeVisible();
+};
+
 /** Waits until the open popovers have finished growing in. */
 const popoversSettled = (page: Page): Promise<void> => settled(page.locator(".forgebook-popover"));
 
@@ -587,7 +597,7 @@ test.describe("the stage", () => {
     await frameOf(page)
       .locator("html")
       .evaluate((root) => root.setAttribute("data-test-mark", "kept"));
-    await page.getByRole("button", { name: "View", exact: true }).click();
+    await clickView(page);
     await popoversSettled(page);
     const motion = page.getByRole("group", { name: "Motion" });
     await expect(motion.getByRole("radio")).toHaveCount(6);
@@ -607,7 +617,7 @@ test.describe("the stage", () => {
     await frameStatus(page);
     await page.getByRole("radio", { name: "Phone L" }).check({ force: true });
     await expect(page).toHaveURL(/width=412/);
-    await page.getByRole("button", { name: "View", exact: true }).click();
+    await clickView(page);
     await page.getByLabel("Background", { exact: true }).selectOption("paper");
     await expect(page).toHaveURL(/backdrop=paper/);
     // a style element's text is not shown text: its content is read as is
@@ -832,7 +842,7 @@ test.describe("the toolbar each person arranges", () => {
 
   // the button's name takes its dot's when a value it holds is changed
   const openView = async (page: Page): Promise<void> => {
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await popoversSettled(page);
   };
 
@@ -1069,7 +1079,7 @@ test.describe("the stories' texts", () => {
     const root = frameOf(page).locator("html");
     await expect(root).toHaveAttribute("dir", "rtl");
     await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await popoversSettled(page);
     await page.getByRole("group", { name: "Direction" }).getByRole("radio", { name: "Left to right" }).check({
       force: true
@@ -1088,7 +1098,7 @@ test.describe("the stories' texts", () => {
     await frameOf(page)
       .locator("html")
       .evaluate((root) => root.setAttribute("data-test-mark", "kept"));
-    await page.getByRole("button", { name: "View", exact: true }).click();
+    await clickView(page);
     await page.getByLabel("Language", { exact: true }).selectOption("it");
     await expect(page).toHaveURL(/lang=it/);
     await expect(frameOf(page).locator("span").first()).toHaveText("Periodo di fatturazione");
@@ -1294,7 +1304,7 @@ test.describe("touch", () => {
     await page.goto("/?story=kit:interaction-touch-pad--by-pointer");
     await frameStatus(page);
     await expect(frameOf(page).getByText("Open the row's menu for its actions")).toBeVisible();
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await popoversSettled(page);
     await page
       .getByRole("dialog", { name: "View" })
@@ -1323,7 +1333,7 @@ test.describe("touch", () => {
     await page.getByRole("link", { name: "Open the story Inbox", exact: true }).click();
     await frameStatus(page);
     await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-touch");
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await popoversSettled(page);
     await page
       .getByRole("dialog", { name: "View" })
@@ -1343,7 +1353,7 @@ test.describe("touch", () => {
   }) => {
     await page.goto(touchPad());
     await frameStatus(page);
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await popoversSettled(page);
     // the limits are a note on an info button, not a paragraph: shown on hover, in the menu and on the bar
     await page.getByRole("dialog", { name: "View" }).getByRole("button", { name: "About Touch" }).hover();
@@ -1366,7 +1376,7 @@ test.describe("touch", () => {
       .getByRole("radio", { name: "Mouse" })
       .check({ force: true });
     await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-touch");
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await expect(page.locator(".forgebook-popover")).toHaveCount(0);
     const button = await centreOf(frameOf(page).getByRole("button", { name: "Press me" }));
     await page.mouse.click(button.x, button.y);
@@ -1429,7 +1439,7 @@ test.describe("the panel", () => {
     await page.goto(story("overview"));
     await frameStatus(page);
     const openView = async (): Promise<void> => {
-      await page.getByRole("button", { name: /^View/ }).click();
+      await clickView(page);
       await popoversSettled(page);
     };
     await openView();
@@ -1461,7 +1471,7 @@ test.describe("the panel", () => {
     const afterT = new URL(page.url()).searchParams.get("theme");
     await page.keyboard.press("Shift+T");
     await expect(page).not.toHaveURL(new RegExp(`theme=${afterT}`));
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await popoversSettled(page);
     await page.getByRole("button", { name: "Theme: key T" }).click();
     await page.keyboard.press("c");
@@ -1481,7 +1491,7 @@ test.describe("the panel", () => {
     await page.goto(story("overview", "theme=dark"));
     await frameStatus(page);
     await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(1);
-    await page.getByRole("button", { name: /^View/ }).click();
+    await clickView(page);
     await popoversSettled(page);
     await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(2);
     await page.goto(story("overview"));

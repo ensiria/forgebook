@@ -15,14 +15,10 @@
  *
  * @module
  */
-import { isRealTouchWindow } from "../realTouch.ts";
 import { type TouchDots, touchDots } from "./touchDots.ts";
 import { type Finger, sendClick, sendMouse, sendPointer, sendTouch } from "./touchEvents.ts";
 import { dragAxis, isDragging, LONG_PRESS_MS, mirroredFinger, type Point } from "./touchGesture.ts";
 import { endPan, type Pan, panBy, panOf } from "./touchScroll.ts";
-
-/** The root's attribute that turns the simulation on. */
-const TOUCH_ATTRIBUTE = "data-forgebook-touch";
 
 /** The simulated pointers' ids: apart from the real mouse's, so the browser never confuses them. */
 const FINGER_IDS = [100, 101] as const;
@@ -425,7 +421,7 @@ const CAUGHT: readonly string[] = [
  * @param document - the frame's document.
  * @returns what stops it.
  */
-const startTouch = (document: Document): (() => void) => {
+export const startTouch = (document: Document): (() => void) => {
   const state: LayerState = {
     document,
     dots: touchDots(document),
@@ -462,26 +458,4 @@ const startTouch = (document: Document): (() => void) => {
     restore();
     state.dots.remove();
   };
-};
-
-/**
- * Follows the root's touch attribute from now on: the simulation runs while it is set.
- *
- * @param document - the frame's document.
- */
-export const followTouch = (document: Document): void => {
-  let stop: (() => void) | undefined;
-  // in Chromium's real touch window the pages see real touch: simulating it on top would send every touch twice
-  const view = document.defaultView;
-  if (view !== null && isRealTouchWindow(view)) return;
-  const update = (): void => {
-    const isOn = document.documentElement.hasAttribute(TOUCH_ATTRIBUTE);
-    if (isOn && stop === undefined) stop = startTouch(document);
-    else if (!isOn && stop !== undefined) {
-      stop();
-      stop = undefined;
-    }
-  };
-  new MutationObserver(update).observe(document.documentElement, { attributeFilter: [TOUCH_ATTRIBUTE] });
-  update();
 };

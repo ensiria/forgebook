@@ -36,12 +36,19 @@ import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGloba
 import { shownTexts, storyTextKeysOf, withStoryTexts } from "../storyTexts.ts";
 import { findStory, storyTree } from "../storyTree.ts";
 import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
-import { codeGlobalsOf, frameAddress, type LiveView, languageOf, parseView } from "../viewState.ts";
+import {
+  codeGlobalsOf,
+  frameAddress,
+  type LiveView,
+  languageOf,
+  type MeasureTool,
+  parseView
+} from "../viewState.ts";
 import { checkStory } from "./checkStory.ts";
+import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
 import { STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
-import { applyTools } from "./measureTools.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
 import { spillOutline } from "./spillOutline.ts";
@@ -49,7 +56,6 @@ import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./s
 import type { MockToolsLoader } from "./storyMocks.ts";
 import { mergedPreviews, readPreview, readStory } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
-import { followTouch } from "./touchLayer.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {
@@ -150,7 +156,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   applyView(document.documentElement, view, catalogue);
   // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
   // sees touch
-  followTouch(document);
+  await followTouch(document);
   // what the story fixes of the view, once it is read: every view the frame applies has it over the shell's
   let fixed: FixedView = NOT_FIXED;
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount
@@ -160,9 +166,17 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const showSpills = spillOutline(document, ".forgebook-frame", (count) =>
     tellShell({ type: "forgebook:spills", storyId, count })
   );
+  // the measuring tools load when one is first turned on: the shell tells every frame, most often that none is
+  let hasTools = false;
+  const showTools = async (tools: readonly MeasureTool[]): Promise<void> => {
+    if (tools.length === 0 && !hasTools) return;
+    hasTools = true;
+    const { applyTools } = await import("./measureTools.ts");
+    applyTools(document, tools, catalogue.gridStep);
+  };
   window.addEventListener("message", (event: MessageEvent): void => {
     if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
-    if (event.data.type === "forgebook:tools") applyTools(document, event.data.tools, catalogue.gridStep);
+    if (event.data.type === "forgebook:tools") void showTools(event.data.tools);
     if (event.data.type === "forgebook:spills") showSpills(event.data.isOn);
     if (event.data.type !== "forgebook:view") return;
     applyView(document.documentElement, withFixed(event.data.view, fixed), catalogue);

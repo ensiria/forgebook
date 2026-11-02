@@ -12,9 +12,9 @@ import { readFileSync } from "node:fs";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 
+import { componentImport } from "./componentImport.ts";
 import { componentPage, markdownHtml } from "./componentPage.ts";
 import { highlightCode } from "./highlightCode.ts";
-import { componentImport } from "./indexStoryFile.ts";
 import { moduleSummaryOfText } from "./moduleSummary.ts";
 import { storyCode } from "./storyCode.ts";
 
