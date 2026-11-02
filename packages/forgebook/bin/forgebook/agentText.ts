@@ -11,7 +11,7 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
-import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { StoryCheckReport, StoryDiffReport, StoryShotReport } from "../../src/storyCheck.ts";
 import type {
   AgentTokenSummary,
   CheckedCodeDocument,
@@ -137,6 +137,38 @@ export const shotText = (
   table(
     report.shots.map((shot) => [shot.storyId, shot.view || "default", shownFile(shot.file)]),
     { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Picture" }] },
+    uncut(style)
+  );
+
+/**
+ * A comparison with the baselines as a person reads it.
+ *
+ * @param report - the results.
+ * @param shownFile - how a file is named.
+ * @param style - the output's style.
+ */
+export const diffText = (
+  report: StoryDiffReport,
+  shownFile: (file: string) => string,
+  style: OutputStyle
+): string =>
+  table(
+    report.results.map((each) => [
+      each.storyId,
+      each.view || "default",
+      each.status,
+      each.status === "changed" ? `${each.percent.toFixed(2)} %` : "",
+      each.diff === undefined ? "" : shownFile(each.diff)
+    ]),
+    {
+      columns: [
+        { header: "Story" },
+        { header: "View", tone: "muted" },
+        { header: "Status" },
+        { header: "Changed" },
+        { header: "Marked" }
+      ]
+    },
     uncut(style)
   );
 
