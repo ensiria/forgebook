@@ -1,21 +1,23 @@
 # What the bench kit downloads, pinned: each file from its project's own site, with the SHA-256 that project
 # publishes (Node: nodejs.org/dist/v<version>/SHASUMS256.txt; MinGit: the digest on the Git for Windows release).
 # One key=value per line, read by start-bench.ps1 and start-bench.sh alike.
+# Node is 24.14.0, the version the reference numbers were measured with: in 24.22.2 the fetch the harness polls servers
+# with throws setTypeOfService EINVAL from a socket callback on macOS, which ends the run and leaves its servers behind.
 forgebook.repository=https://github.com/ensiria/forgebook.git
 forgebook.commit=PINNED_AFTER_COMMIT
-node.version=24.22.2
-node.win-x64.url=https://nodejs.org/dist/v24.22.2/node-v24.22.2-win-x64.zip
-node.win-x64.sha256=ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2
-node.win-arm64.url=https://nodejs.org/dist/v24.22.2/node-v24.22.2-win-arm64.zip
-node.win-arm64.sha256=f47968c213105077f64c6510f007632c0ca2574802a0b5067c327c49abe1c468
-node.linux-x64.url=https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-x64.tar.gz
-node.linux-x64.sha256=361718c444e49af2ca5a110c83ba6a8901143f23ab285ebbef0341f391f482a9
-node.linux-arm64.url=https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-arm64.tar.gz
-node.linux-arm64.sha256=95c264150aceb7f3437a29fd6984924f5f8d1511ea3cbd6c508b83f6c555dae2
-node.darwin-x64.url=https://nodejs.org/dist/v24.22.2/node-v24.22.2-darwin-x64.tar.gz
-node.darwin-x64.sha256=d5e336d588c45be0c37dbd52cc29895593009ca4997a77a1fd02815131ed0e52
-node.darwin-arm64.url=https://nodejs.org/dist/v24.22.2/node-v24.22.2-darwin-arm64.tar.gz
-node.darwin-arm64.sha256=aa9549349e47dffaa42dcf95d6e06ade8c4bdafc980979883b88767670df385a
+node.version=24.14.0
+node.win-x64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip
+node.win-x64.sha256=313fa40c0d7b18575821de8cb17483031fe07d95de5994f6f435f3b345f85c66
+node.win-arm64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-arm64.zip
+node.win-arm64.sha256=88d36e8109736a2fa9bdc596f2cf507a3c52c69cdf96e54f8acd473ec14be853
+node.linux-x64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-x64.tar.gz
+node.linux-x64.sha256=dbf5b8665dec15e59e6359a517fefb47b23fdb9152d8def975b9bca3dfc6d355
+node.linux-arm64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-arm64.tar.gz
+node.linux-arm64.sha256=f44740cd218de8127f1c44c41510a3a740fa5c9c8d1cdce1c3bedada79f3cde7
+node.darwin-x64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-darwin-x64.tar.gz
+node.darwin-x64.sha256=f2879eb810e25993a0578e5d878930266fd2eafcffe9f2839b3d8db354d4879e
+node.darwin-arm64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-darwin-arm64.tar.gz
+node.darwin-arm64.sha256=a1a54f46a750d2523d628d924aab61758a51c9dad3e0238beb14141be9615dd3
 mingit.version=2.56.0.4
 mingit.win-x64.url=https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.4/MinGit-2.56.0.4-64-bit.zip
 mingit.win-x64.sha256=e3bf78351fe777fba47ddee5950082f8a98bb0f02604fdc7ba3ee2cb68ffa877

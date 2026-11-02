@@ -19,6 +19,7 @@ import { parseReport } from "../reportTable.ts";
 import { CALIBRATION_ARGS, formatDuration, type KitItem, type PhaseTiming, phaseTiming } from "./kitPlan.ts";
 import { BENCH, ITEM_NAMES, type KitPaths, PORT, REPOSITORY } from "./kitSession.ts";
 import type { ItemOutcome, ItemState } from "./kitState.ts";
+import { stopLeftovers } from "./leftovers.ts";
 
 /** One step of the benchmark's status file, as far as the progress reads it. */
 export type StatusStep = {
@@ -77,6 +78,19 @@ export type BenchRequest = {
   readonly log: string;
   /** What to say of its progress. */
   readonly label: string;
+};
+
+/**
+ * Stops what an earlier benchmark left running from the kit's folders, and says so: a server that outlived a crash
+ * would hold its port and its CPU through every later measurement.
+ *
+ * @param paths - the kit's folders.
+ * @param io - the script's streams.
+ * @param log - where to say it.
+ */
+export const clearLeftovers = async (paths: KitPaths, io: ScriptIo, log: Logger): Promise<void> => {
+  const stopped = await stopLeftovers([paths.work, paths.calibration, join(paths.home, "browsers")], io);
+  if (stopped > 0) log.warn(`Ho fermato ${stopped} processi rimasti da una prova interrotta.`);
 };
 
 /**
@@ -139,6 +153,7 @@ export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Pro
     io,
     log
   );
+  await clearLeftovers(paths, io, log);
   const report = join(paths.calibration, "report.json");
   // a report means the benchmark ran: a metric that failed is a result to send back, not a reason to stop here
   if (!existsSync(report) || statSync(report).mtimeMs < startedAt) {
@@ -200,6 +215,7 @@ export const runItem = async (
     io,
     log
   );
+  await clearLeftovers(paths, io, log);
   const hasReport = existsSync(report) && statSync(report).mtimeMs >= startedAt;
   if (hasReport) copyFileSync(report, join(paths.reports, item.report));
   const outcome = outcomeOf(run.exitCode, hasReport);

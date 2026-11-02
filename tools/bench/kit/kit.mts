@@ -27,7 +27,7 @@ import {
   profileItems,
   SPECTRUM_ON_WINDOWS
 } from "./kitPlan.ts";
-import { calibrate, runItem } from "./kitRunner.ts";
+import { calibrate, clearLeftovers, runItem } from "./kitRunner.ts";
 import {
   type Asker,
   CLEAN_MARKER,
@@ -224,6 +224,7 @@ await defineScript({
     for (const folder of [paths.work, paths.calibration, paths.status, paths.logs, paths.reports]) {
       mkdirSync(folder, { recursive: true });
     }
+    await clearLeftovers(paths, io, log);
     let state = loadState(paths, await checkoutCommit(io), log);
     const session: Session = {
       paths,
