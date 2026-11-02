@@ -224,6 +224,43 @@ computed `stories` list is read too; the preview is read from its source, so onl
 become switches. It reads React on Vite (`@storybook/react-vite`) only, never replaces a configuration without
 `--force`, and lists what it left out.
 
+## Monorepos
+
+Each package hands its stories to one catalogue, a package of its own that imports nothing from the libraries but their
+`stories` export. A package writes a source and exports it:
+
+```ts
+// packages/ui/stories.ts
+/// <reference types="@forgebook/story-format/client" />
+import type { StorySource } from "@forgebook/story-format/source";
+
+import files from "./src/**/*.stories.tsx?forgebook-files";
+
+export const source: StorySource = { id: "ui", name: "UI", files: [files] };
+```
+
+```jsonc
+// packages/ui/package.json
+{ "exports": { "./stories": "./stories.ts" } }
+```
+
+The catalogue depends on each package and lists their sources, and `watch` lets the dev server see story files added to
+them:
+
+```ts
+// apps/catalogue/forgebook.config.ts
+export default defineConfig({
+  framework: react(),
+  title: "Acme",
+  sources: ["@acme/ui/stories", "@acme/charts/stories"],
+  watch: ["../../packages/ui/src", "../../packages/charts/src"]
+});
+```
+
+A story's id starts with its source's (`ui:actions-button--plain`), so two packages can both have a `Button`. Props are read
+through each package's own `tsconfig.json`. This repository's fixture catalogue is built this way, on two packages, and its
+browser tests run in CI.
+
 ## Commands
 
 | Command | What it does |
