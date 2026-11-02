@@ -12,7 +12,8 @@ import { extractComponentDocs, extractFileComponent, storyTypesModule } from "..
 /** The fixture's components. */
 const DOCS = join(import.meta.dirname, "..", "fixtures", "docs", "src");
 
-describe("the Solid docs module", () => {
+// the first read builds the fixture's TypeScript program, which takes seconds on a shared runner
+describe("the Solid docs module", { timeout: 30_000 }, () => {
   it("reads a component's props in their order, with their kind and texts, events as their handlers", () => {
     const docs = extractComponentDocs(join(DOCS, "Badge.stories.tsx"));
     if (typeof docs === "string" || docs.name === null) throw new Error(String(docs));

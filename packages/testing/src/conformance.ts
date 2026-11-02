@@ -56,6 +56,9 @@ export type AdapterSubject = {
 /** Which of the suite's cases a run holds. */
 export type AdapterCases = "all" | "page" | "server";
 
+/** How long the docs case may take, in milliseconds: it builds a TypeScript program on its first read. */
+const DOCS_TIMEOUT = 30_000;
+
 /** The canvases of the running test, emptied after it. */
 const canvases: HTMLElement[] = [];
 
@@ -173,8 +176,13 @@ export const describeAdapter = (subject: AdapterSubject): void => {
       expect(code).toContain("Ada");
     });
 
-    it.runIf(inPage && docsOf !== undefined)("reads a component's docs in the catalogue's shape", () => {
-      expect(isComponentDocs(docsOf?.())).toBe(true);
-    });
+    // reading the docs builds the package's TypeScript program from nothing, which takes seconds on a shared runner
+    it.runIf(inPage && docsOf !== undefined)(
+      "reads a component's docs in the catalogue's shape",
+      { timeout: DOCS_TIMEOUT },
+      () => {
+        expect(isComponentDocs(docsOf?.())).toBe(true);
+      }
+    );
   });
 };

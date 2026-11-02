@@ -25,7 +25,8 @@ const docsOf = (storyFile: string): ComponentDocs => {
   return docs;
 };
 
-describe("the Preact docs module", () => {
+// the first read builds the fixture's TypeScript program, which takes seconds on a shared runner
+describe("the Preact docs module", { timeout: 30_000 }, () => {
   it("reads a function component's props in their order, with their kind, texts and defaults", () => {
     const docs = docsOf("Badge.stories.tsx");
     expect(docs.name).toBe("Badge");
