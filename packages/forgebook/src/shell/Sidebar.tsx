@@ -148,7 +148,6 @@ export const Sidebar = ({
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
   const mark = logo ?? (hasBranding ? FORGEBOOK_MARK_URL : undefined);
-  const _searchRef = useRef<HTMLInputElement>(null);
   const [filterTree, setFilterTree] = useState<typeof shownTree>();
   const showFiltered = useCallback((filter: typeof shownTree): void => setFilterTree(() => filter), []);
   const navRef = useRef<HTMLElement>(null);

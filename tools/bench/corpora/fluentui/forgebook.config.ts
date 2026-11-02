@@ -66,8 +66,8 @@ export default defineConfig({
     vitePlugins: async () => [fluentVite, ...((await framework.vitePlugins?.()) ?? [])]
   },
   title: "Fluent UI",
-  // "Used in" holds one TypeScript program per package at once: here that fills the docs worker's heap and stops it,
-  // and with it every story's docs still waiting
+  // "Used in" reads one TypeScript program per package, one after the other: on 289 packages that is minutes of a
+  // build, which is not what the build is measured for
   usedIn: false,
   stories: [
     "../../../packages/react-components/!(react-headless-components-preview)/stories/src/**/index.stories.@(ts|tsx)",
