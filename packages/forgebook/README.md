@@ -307,8 +307,9 @@ export const Loaded: Story<typeof Users> = {
   }
 };
 `parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
-unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
-on the dev server and in a static build.
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. On a
+component page, where one worker serves every frame, each story's handlers answer its own frame only: a story with none
+goes to the network. It works on the dev server and in a static build.
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
