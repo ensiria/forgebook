@@ -27,6 +27,7 @@ import {
   resolutionHost,
   usageProgramFor
 } from "./docsProgram.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** A component, by the file that declares it and its name there. */
 export type ComponentRef = {
@@ -384,7 +385,9 @@ const groupReading = (
 ): (UsageGraph & { readonly dependencies: readonly string[] }) | string => {
   const files: StoryFileUsage[] = [];
   const programs = new Set<ts.Program>();
-  for (const request of group) {
+  for (const asked of group) {
+    // in Vite's form, as TypeScript names the files the graph is made of, so a story file meets its components
+    const request = { ...asked, storyFile: VITE_PATHS.normalize(asked.storyFile) };
     const docsProgram = usageProgramFor(request.storyFile);
     if (typeof docsProgram === "string") return docsProgram;
     programs.add(docsProgram.program);

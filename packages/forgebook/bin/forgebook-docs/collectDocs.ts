@@ -11,7 +11,7 @@
  * @module
  */
 import { globSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
@@ -23,6 +23,7 @@ import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
 import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import { readTokenFiles, type SourceTokens, sourceTokensIn } from "../../src/vite/sourceTokens.ts";
+import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type {
   CatalogueComponent,
   CatalogueData,
@@ -84,12 +85,14 @@ const collectComponents = (
 ): { components: CatalogueComponent[]; componentFiles: Set<string> } => {
   const components: CatalogueComponent[] = [];
   const componentFiles = new Set<string>();
+  // with forward slashes: the glob gives backslashes on Windows, and the folders and the title are read by `/`
   const storyFiles = globSync("**/*.stories.*", { cwd: packageDir })
+    .map((file) => VITE_PATHS.normalize(file))
     .filter((file) => STORY_FILE.test(file))
     .filter((file) => !file.split("/").some((segment) => segment === "node_modules" || segment === "dist"))
     .sort();
   for (const relative of storyFiles) {
-    const file = join(packageDir, relative);
+    const file = VITE_PATHS.join(packageDir, relative);
     // a meta without a title is placed by its path from the package's folder: the catalogue's patterns are not known
     const title = autoTitle("", relative);
     const options = title === undefined ? {} : { autoTitle: title };
@@ -100,12 +103,12 @@ const collectComponents = (
       continue;
     }
     if (!("file" in component)) continue;
-    const subpath = Object.entries(exports).find(
-      ([, source]) => resolve(packageDir, source) === component.file
+    const subpath = Object.entries(exports).find(([, source]) =>
+      VITE_PATHS.isSame(VITE_PATHS.resolve(packageDir, source), component.file)
     )?.[0];
     // a component no subpath exports is a story's own (a foundations page), not part of the package
     if (subpath === undefined || isExcluded(subpath, exclude)) continue;
-    componentFiles.add(component.file);
+    componentFiles.add(VITE_PATHS.normalize(component.file));
     components.push({
       title: index.title,
       subpath,
@@ -227,7 +230,7 @@ export const collectDocs = (
   extractStoryComponent: ExtractStoryComponent,
   options: Pick<CatalogueOptions, "exclude"> & Partial<Pick<CatalogueOptions, "sections">>
 ): CollectedDocs => {
-  const manifest: unknown = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
+  const manifest: unknown = JSON.parse(readFileSync(VITE_PATHS.join(packageDir, "package.json"), "utf8"));
   const packageName = manifestText(manifest, "name") ?? packageDir;
   const exports = sourceExports(manifest);
   const problems: string[] = [];
@@ -242,7 +245,7 @@ export const collectDocs = (
   const sassModules: SassModuleDocs[] = [];
   const styleSheets: StyleSheetDocs[] = [];
   for (const [subpath, source] of Object.entries(exports)) {
-    const file = resolve(packageDir, source);
+    const file = VITE_PATHS.resolve(packageDir, source);
     if (subpath === STORIES_SUBPATH || componentFiles.has(file) || isExcluded(subpath, options.exclude))
       continue;
     const entry = readExport(subpath, source, file);

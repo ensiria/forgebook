@@ -5,7 +5,6 @@
  *
  * @module
  */
-import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -16,9 +15,10 @@ import { mergedLists } from "../src/vite/configFile.ts";
 import { storyFilesModule } from "../src/vite/storyFilesModule.ts";
 import { type UsageGraph, usageGraph } from "../src/vite/usageGraph.ts";
 import { joinedUsage, type UsageFile } from "../src/vite/usageModule.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 
 /** A file of the usage fixture. */
-const at = (name: string): string => join(import.meta.dirname, "fixtures", "usage", name);
+const at = (name: string): string => VITE_PATHS.join(import.meta.dirname, "fixtures", "usage", name);
 
 const GRAPH = ((): UsageGraph => {
   const result = usageGraph([
@@ -86,7 +86,7 @@ describe("mergedUsage", () => {
 
 describe("a catalogue that turns Used in off", () => {
   it("offers no usage loader in its files' modules, and says so in its settings", () => {
-    const dir = join(import.meta.dirname, "fixtures", "usage");
+    const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
     const offered = storyFilesModule(dir, "./*.stories.tsx", () => undefined);
     const off = storyFilesModule(dir, "./*.stories.tsx", () => undefined, false);
     expect(offered).toContain(`usage: () => import("virtual:forgebook-usage:${dir}::0::*.stories.tsx")`);

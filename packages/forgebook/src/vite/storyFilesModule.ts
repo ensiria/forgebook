@@ -11,13 +11,13 @@
  * @module
  */
 import { globSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { autoTitle, patternBase } from "./autoTitle.ts";
 import type { DiskCache } from "./diskCache.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** A pattern of story files and the folder it is read from: the declaring module's folder, the import's pattern. */
 export type StoryFilesGroup = {
@@ -80,10 +80,8 @@ const excludedFrom = (pattern: string): ((name: string) => boolean) =>
 export const storyFileKeys = (root: string, patterns: readonly string[]): string[] =>
   patterns
     .flatMap((pattern) => globSync(pattern, { cwd: root, exclude: excludedFrom(pattern) }))
-    .map((file) => {
-      const path = relative(root, join(root, file)).split("\\").join("/");
-      return path.startsWith(".") ? path : `./${path}`;
-    })
+    // with forward slashes on every system, so a story file has the same key wherever the catalogue runs
+    .map((file) => VITE_PATHS.relativeKey(root, file))
     .sort();
 
 /**
@@ -123,7 +121,7 @@ export type KeptIndex = Readonly<Record<string, StoryFileIndex>>;
  * @returns the index, or a message saying why the file cannot be indexed.
  */
 export const storyFileIndex = (root: string, pattern: string, key: string): StoryFileIndex | string => {
-  const file = resolve(root, key);
+  const file = VITE_PATHS.resolve(root, key);
   const title = autoTitle(patternBase(pattern), key);
   return indexStoryFile(file, readFileSync(file, "utf8"), title === undefined ? {} : { autoTitle: title });
 };
@@ -146,7 +144,7 @@ export const indexedStoryFiles = (
   const name = storyFilesGroupText(root, pattern);
   const kept = cache?.read(name);
   const files = storyFileKeys(root, [pattern]).map((key) => {
-    const file = resolve(root, key);
+    const file = VITE_PATHS.resolve(root, key);
     watch(file);
     const known = kept?.[key];
     if (known !== undefined) return { key, file, index: known };
@@ -203,14 +201,18 @@ export const storyFilesCode = (
   hasReach: boolean
 ): string => {
   const keys = files.map((file) => file.key);
+  // the group's id in Vite's form, as the plugin names the declaring module's folder
+  const folder = VITE_PATHS.normalize(root);
   const index: Record<string, StoryFileIndex> = Object.fromEntries(
     files.map((file) => [file.key, file.index])
   );
-  const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(root, pattern)}`);
-  const search = JSON.stringify(`${SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
-  // absolute paths: the module has no folder of its own; Vite serves them under /@fs/ in development
-  const path = (key: string): string => JSON.stringify(resolve(root, key));
-  const query = (key: string, name: string): string => JSON.stringify(`${resolve(root, key)}?${name}`);
+  const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const search = JSON.stringify(`${SEARCH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  // absolute paths in Vite's form: the module has no folder of its own, Vite serves them under /@fs/ in development,
+  // and the queries' ids come back to the plugin as written here
+  const absolute = (key: string): string => VITE_PATHS.resolve(root, key);
+  const path = (key: string): string => JSON.stringify(absolute(key));
+  const query = (key: string, name: string): string => JSON.stringify(`${absolute(key)}?${name}`);
   // one row per file: a name written once, not once per loader, which is a tenth of a large catalogue's first load
   const rows = keys.map(
     (key) =>
