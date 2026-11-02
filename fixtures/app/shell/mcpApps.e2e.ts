@@ -263,6 +263,8 @@ test.describe("forgebook mcp's inline preview", () => {
       await expect(
         page.frameLocator("#view").getByRole("button", { name: "Open in the catalogue" })
       ).toBeVisible();
+      const frameBox = await page.frameLocator("#view").locator("#frame").boundingBox();
+      expect(frameBox?.height).toBeGreaterThan(0);
       await page.screenshot({ path: testInfo.outputPath("preview.png") });
       await writeFile(testInfo.outputPath("messages.json"), JSON.stringify(host.received));
 

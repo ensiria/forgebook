@@ -280,13 +280,13 @@ export const agentAnswer = async (
  * Answers a story's preview page. Its code is read here, on the first request for one: a dev server no client asks for a
  * preview never loads it.
  *
- * @param url - the request's address: where the catalogue is served, and `id` and `view` in its query.
+ * @param url - the request's address: `id` and `view` in its query.
  * @param response - the answer.
  */
 const answerPreview = async (url: URL, response: ServerResponse): Promise<void> => {
   const { previewRelayPage } = await import("./previewPages.ts");
   const id = url.searchParams.get("id") ?? "";
-  const frame = frameAddressOf(`${url.origin}/frame.html`, id, url.searchParams.get("view") ?? "");
+  const frame = frameAddressOf("/frame.html", id, url.searchParams.get("view") ?? "");
   response.setHeader("Content-Type", "text/html");
   response.setHeader("Cache-Control", "no-store");
   response.end(previewRelayPage(frame, id));

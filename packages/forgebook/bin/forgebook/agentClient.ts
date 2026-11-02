@@ -107,7 +107,13 @@ const ownListening = async (config: ResolvedConfig, port: number): Promise<Serve
       logLevel: "error"
     })
   );
-  await server.listen();
+  try {
+    await server.listen();
+  } catch (error) {
+    // a server that could not listen still watches the files, which would keep the process alive
+    await server.close();
+    throw error;
+  }
   const address = server.resolvedUrls?.local[0]?.replace(/\/+$/, "");
   if (address === undefined) {
     await server.close();

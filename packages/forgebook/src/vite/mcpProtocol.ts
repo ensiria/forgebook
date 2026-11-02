@@ -226,17 +226,19 @@ const capabilitiesFor = (server: McpServer, isAppHost: boolean): Readonly<Record
  */
 const scopeFor = (isAppHost: boolean): string => (isAppHost ? "private" : "public");
 
-/** The tools' list as the protocol gives it: an app's tool only to a client that renders it. */
+/** The tools a client is offered: an app's only to one that renders it. */
+const toolsFor = (server: McpServer, isAppHost: boolean): readonly McpTool[] =>
+  server.tools.filter((tool) => tool.appResource === undefined || isAppHost);
+
+/** The tools' list as the protocol gives it. */
 const toolList = (server: McpServer, isAppHost: boolean): Readonly<Record<string, unknown>>[] =>
-  server.tools
-    .filter((tool) => tool.appResource === undefined || isAppHost)
-    .map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      // biome-ignore lint/style/useNamingConvention: the protocol names this field
-      ...(tool.appResource === undefined ? {} : { _meta: { ui: { resourceUri: tool.appResource } } })
-    }));
+  toolsFor(server, isAppHost).map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    // biome-ignore lint/style/useNamingConvention: the protocol names this field
+    ...(tool.appResource === undefined ? {} : { _meta: { ui: { resourceUri: tool.appResource } } })
+  }));
 
 /** A tool's answer as the protocol gives it: its JSON as text and as structured content, then its pictures. */
 const toolResult = async (
@@ -286,11 +288,11 @@ const answerResources = async (
   id: unknown,
   method: string,
   params: Readonly<Record<string, unknown>>,
-  { isModern }: Asker,
+  { isModern, isAppHost }: Asker,
   finish: (result: Readonly<Record<string, unknown>>) => Reply
 ): Promise<Reply | undefined> => {
   const { apps } = server;
-  if (apps === undefined) return undefined;
+  if (apps === undefined || !isAppHost) return undefined;
   const kept = isModern ? { ttlMs: TOOLS_TTL_MS, cacheScope: "private" } : {};
   if (method === "resources/list") {
     const resources = apps.map(({ uri, name, description }) => ({
@@ -340,7 +342,7 @@ const answerRequest = async (
     );
   if (method === "tools/call") {
     const name = params["name"];
-    const tool = server.tools.find((each) => each.name === name);
+    const tool = toolsFor(server, isAppHost).find((each) => each.name === name);
     if (tool === undefined) return failure(id, ERRORS.invalidParams, `Unknown tool: ${String(name)}`);
     const args = params["arguments"];
     return finish(await toolResult(tool, isRecord(args) ? args : {}));

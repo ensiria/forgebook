@@ -21,6 +21,25 @@ import {
   UI_EXTENSION
 } from "../src/vite/mcpProtocol.ts";
 
+/** The catalogue's answer: one story. */
+const STORIES: Readonly<Record<string, unknown>> = {
+  schema: 1,
+  problems: [],
+  components: [
+    {
+      stories: [
+        {
+          id: "kit:button--primary",
+          links: {
+            address: "http://localhost:5173/?story=kit%3Abutton--primary",
+            frame: "http://localhost:5173/frame.html?story=kit%3Abutton--primary"
+          }
+        }
+      ]
+    }
+  ]
+};
+
 /** A catalogue with one story, counting what was started. */
 const reach = (): {
   readonly server: McpServer;
@@ -40,23 +59,7 @@ const reach = (): {
       previewTool({
         ask: async () => ({
           status: 200,
-          body: {
-            schema: 1,
-            problems: [],
-            components: [
-              {
-                stories: [
-                  {
-                    id: "kit:button--primary",
-                    links: {
-                      address: "http://localhost:5173/?story=kit%3Abutton--primary",
-                      frame: "http://localhost:5173/frame.html?story=kit%3Abutton--primary"
-                    }
-                  }
-                ]
-              }
-            ]
-          }
+          body: STORIES
         }),
         serve: async () => {
           counts.started += 1;
@@ -165,6 +168,20 @@ describe("a client that renders no apps", () => {
     expect((await send(server, "server/discover", stateless)).answer).toEqual(
       (await send(without, "server/discover", stateless)).answer
     );
+  });
+
+  it("does not answer for what it did not offer", async () => {
+    const { server, counts } = reach();
+    const session = await handshake(server, {});
+    const tool = { name: "story_preview", arguments: { id: "kit:button--primary" } };
+    expect((await send(server, "tools/call", tool, session)).answer).toMatchObject({
+      error: { code: -32602 }
+    });
+    for (const method of ["resources/list", "resources/read", "resources/templates/list"])
+      expect((await send(server, method, { uri: PREVIEW_URI }, session)).answer).toMatchObject({
+        error: { code: -32601 }
+      });
+    expect(counts.started).toBe(0);
   });
 });
 
@@ -275,6 +292,19 @@ describe("what runs when", () => {
       }
     });
     expect(JSON.stringify(result)).toContain('"type":"text"');
+  });
+
+  it("answers with no preview when the catalogue cannot be served, for the page to take a picture", async () => {
+    const tool = previewTool({
+      ask: async () => ({ status: 200, body: STORIES }),
+      serve: () => Promise.reject(new Error("port taken"))
+    });
+    const result = await tool.call({ id: "kit:button--primary" });
+    expect(result).toMatchObject({
+      isError: false,
+      structured: { id: "kit:button--primary", problem: "port taken" }
+    });
+    expect(JSON.stringify(result)).not.toContain('"preview"');
   });
 
   it("starts nothing for a story that does not exist", async () => {

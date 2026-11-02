@@ -11,7 +11,7 @@
  *
  * A frame opened alone on a cold dev server can stay blank: when the server prepares a dependency again, a static import
  * of the frame's own entry fails before any of its code runs, so its reload for a stale module never happens and no
- * shell is there to load it again. So the relay does, once, when the frame loaded and its story stays silent.
+ * shell is there to load it again. So the relay does, once, when the frame loaded and has said nothing at all.
  *
  * Runs in the page, written into it by its source (`previewPages.ts`), so it takes no import.
  *
@@ -50,11 +50,11 @@ export const previewRelay = (frameAddress: string, title: string): void => {
   const tell = (message: PreviewRelayMessage): void => {
     window.parent.postMessage(message, "*");
   };
-  let isDrawn = false;
+  let hasHeard = false;
   let hasReloaded = false;
   frame.addEventListener("load", () => {
     setTimeout(() => {
-      if (isDrawn || hasReloaded) return;
+      if (hasHeard || hasReloaded) return;
       hasReloaded = true;
       frame.contentWindow?.location.reload();
     }, reloadAfterMs);
@@ -63,11 +63,15 @@ export const previewRelay = (frameAddress: string, title: string): void => {
     if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
     const { data } = event;
     if (typeof data !== "object" || data === null || !("type" in data)) return;
-    if (data.type === "forgebook:ready" || data.type === "forgebook:error") {
-      isDrawn = true;
+    hasHeard = true;
+    if (data.type === "forgebook:ready" || data.type === "forgebook:error")
       tell({ type: "forgebook:preview-ready" });
-    }
-    if (data.type === "forgebook:size" && "height" in data && typeof data.height === "number") {
+    if (
+      data.type === "forgebook:size" &&
+      "height" in data &&
+      typeof data.height === "number" &&
+      data.height > 0
+    ) {
       frame.style.height = `${data.height}px`;
       tell({ type: "forgebook:preview-size", height: data.height });
     }

@@ -76,7 +76,14 @@ export const previewTool = ({ ask, serve }: PreviewReach): McpTool => ({
       .flatMap((component) => component.stories)
       .find((each) => each.id === id);
     if (story === undefined) return { structured: { error: `No story "${id}"` }, isError: true };
-    const origin = await serve();
+    let origin: string;
+    try {
+      origin = await serve();
+    } catch (error) {
+      // the story exists: with no address to show it at, the page takes its picture instead
+      const problem = error instanceof Error ? error.message : String(error);
+      return { structured: { id, links: story.links, problem }, isError: false };
+    }
     const preview = `${origin}${AGENT_API}${PREVIEW_ROUTE}?${new URLSearchParams({ id, view }).toString()}`;
     return {
       structured: {
@@ -119,7 +126,7 @@ export const previewResource = ({ origin, strings, version }: PreviewResourceOpt
         shotTool: SHOT_TOOL,
         silenceMs: SILENCE_MS
       }),
-      frameDomains: [await origin()]
+      frameDomains: [new URL(await origin()).origin]
     };
   }
 });

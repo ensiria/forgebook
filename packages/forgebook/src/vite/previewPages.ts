@@ -15,6 +15,9 @@ import { PREVIEW_ELEMENTS, type PreviewViewOptions, previewView } from "../previ
 /** A value as text a script element can hold: nothing in it can close the element. */
 const scriptValue = (value: unknown): string => JSON.stringify(value).replaceAll("<", "\\u003c");
 
+/** The class of a frame still loading. */
+const LOADING_CLASS = "loading";
+
 /** The app's look: the host's variables, with defaults for a host that gives none, in its appearance. */
 const VIEW_STYLE = `
 :root { color-scheme: light dark; }
@@ -35,6 +38,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 #${PREVIEW_ELEMENTS.open}:focus-visible { outline: 2px solid var(--color-ring-primary, Highlight); outline-offset: 2px; }
 #${PREVIEW_ELEMENTS.frame} { display: block; width: 100%; height: 240px; border: 0; }
 #${PREVIEW_ELEMENTS.picture} { display: block; max-width: 100%; height: auto; }
+.${LOADING_CLASS} { position: absolute; top: 0; left: 0; visibility: hidden; pointer-events: none; }
 [hidden] { display: none !important; }
 `;
 
@@ -43,7 +47,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
  *
  * @param options - what its script is given.
  */
-export const previewViewPage = (options: PreviewViewOptions): string => `<!DOCTYPE html>
+export const previewViewPage = (options: Omit<PreviewViewOptions, "loadingClass">): string => `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -58,7 +62,7 @@ export const previewViewPage = (options: PreviewViewOptions): string => `<!DOCTY
 <p id="${PREVIEW_ELEMENTS.status}" role="status"></p>
 <iframe id="${PREVIEW_ELEMENTS.frame}" hidden></iframe>
 <img id="${PREVIEW_ELEMENTS.picture}" alt="" hidden>
-<script>(${previewView.toString()})(${scriptValue(options)}, ${scriptValue(PREVIEW_ELEMENTS)});</script>
+<script>(${previewView.toString()})(${scriptValue({ ...options, loadingClass: LOADING_CLASS })}, ${scriptValue(PREVIEW_ELEMENTS)});</script>
 </body>
 </html>
 `;

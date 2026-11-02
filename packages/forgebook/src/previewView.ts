@@ -34,6 +34,8 @@ export type PreviewViewOptions = {
   readonly shotTool: string;
   /** How long a story may stay silent before its picture is asked for, in ms. */
   readonly silenceMs: number;
+  /** The class of a frame still loading, which the style sheet keeps out of sight. */
+  readonly loadingClass: string;
 };
 
 /** The ids of the elements `previewPages.ts` writes, which the page fills. */
@@ -96,6 +98,7 @@ export const previewView = (options: PreviewViewOptions, elements: typeof PREVIE
   let isLive = false;
   let isFallingBack = false;
   let hasRelay = false;
+  let storyOrigin: string | undefined;
   let silence: ReturnType<typeof setTimeout> | undefined;
 
   const say = (text: string): void => {
@@ -112,7 +115,7 @@ export const previewView = (options: PreviewViewOptions, elements: typeof PREVIE
     clearTimeout(silence);
     say("");
     picture.hidden = true;
-    frame.hidden = false;
+    frame.classList.remove(options.loadingClass);
   };
 
   // at this page's own width, so that the picture is not a whole window shrunk into it
@@ -152,6 +155,11 @@ export const previewView = (options: PreviewViewOptions, elements: typeof PREVIE
     if (url.protocol !== "http:" && url.protocol !== "https:") return;
     say(texts.previewLoading);
     silence = setTimeout(() => void showPicture(), options.silenceMs);
+    storyOrigin = url.origin;
+    // laid out while it loads, only out of sight: a frame with no box has no viewport and no animation frames, so a
+    // story measuring itself gets zero and a play waiting on either never ends
+    frame.classList.add(options.loadingClass);
+    frame.hidden = false;
     frame.src = url.href;
   };
 
@@ -173,7 +181,7 @@ export const previewView = (options: PreviewViewOptions, elements: typeof PREVIE
     title.textContent = storyId ?? "";
     showLink();
     const preview = textOf(structured["preview"]);
-    if (preview === undefined) say(texts.previewUnavailable);
+    if (preview === undefined) void showPicture();
     else showStory(preview);
   };
 
@@ -187,6 +195,8 @@ export const previewView = (options: PreviewViewOptions, elements: typeof PREVIE
   const applyBox = (box: unknown): void => {
     if (!isRecord(box)) return;
     const { style } = document.documentElement;
+    style.height = "";
+    style.maxHeight = "";
     if ("height" in box) style.height = "100vh";
     else if (typeof box["maxHeight"] === "number") style.maxHeight = `${box["maxHeight"]}px`;
   };
@@ -243,13 +253,14 @@ export const previewView = (options: PreviewViewOptions, elements: typeof PREVIE
     const size: PreviewRelayMessage["type"] = "forgebook:preview-size";
     if (message["type"] === started) hasRelay = true;
     if (message["type"] === ready) showLive();
-    if (message["type"] === size && typeof message["height"] === "number")
+    if (message["type"] === size && typeof message["height"] === "number" && message["height"] > 0)
       frame.style.height = `${message["height"]}px`;
   };
 
   window.addEventListener("message", (event: MessageEvent<unknown>) => {
     if (event.source === frame.contentWindow) {
-      hearStory(event.data);
+      // the source alone would also let a frame that navigated elsewhere speak for the story
+      if (event.origin === storyOrigin) hearStory(event.data);
       return;
     }
     if (event.source !== window.parent || !isRecord(event.data)) return;
