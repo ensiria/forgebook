@@ -30,6 +30,8 @@ import type {
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
+  PageDocument,
+  PagesDocument,
   StoriesDocument,
   StoryDocument,
   StoryLinks,
@@ -97,7 +99,7 @@ const agentDesign = (
 ): { readonly design?: AgentDesign } => {
   if (story.design === undefined) return {};
   const onTab = new URLSearchParams(view);
-  onTab.set("tab", "design");
+  onTab.set("tab", "figma");
   return {
     design: {
       ...agentDesignLink(story.design),
@@ -423,4 +425,27 @@ export const isCheckedCodeDocument = (value: unknown): value is CheckedCodeDocum
   isRecord(value) &&
   value["schema"] === 1 &&
   typeof value["since"] === "string" &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is the docs pages' document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isPagesDocument = (value: unknown): value is PagesDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["pages"]) &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is one docs page's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isPageDocument = (value: unknown): value is PageDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  isRecord(value["page"]) &&
+  typeof value["text"] === "string" &&
   Array.isArray(value["problems"]);

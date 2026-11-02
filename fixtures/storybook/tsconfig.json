@@ -5,7 +5,9 @@
   "compilerOptions": {
     "types": ["node", "vite/client", "@forgebook/story-format/client"],
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    // the plugin's types are Forgebook's, whose modules carry `.ts` (Node loads them)
+    "allowImportingTsExtensions": true
   },
-  "include": ["src", "stories.ts", ".storybook"]
+  "include": ["src", "plugin", "stories.ts", ".storybook"]
 }

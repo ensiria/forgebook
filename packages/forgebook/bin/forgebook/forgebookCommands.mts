@@ -11,20 +11,22 @@ import { relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
-import { readPackageVersion } from "@ensiria/cli-kit/files";
+import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
 import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
+import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
-import { storiesText, storyText } from "./agentText.ts";
+import { pluginsText, storiesText, storyText } from "./agentText.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
+import { pagesCommands } from "./pagesCommands.mts";
 import { prebundle, prebundleInChild } from "./prebundleRun.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
@@ -180,6 +182,15 @@ await defineCommands({
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
       }
     }),
+    plugins: forgebook.command({
+      summary: "List the plugins the catalogue lists, and what each adds.",
+      json: true,
+      examples: [{ command: `${COMMAND} plugins --json`, description: "As an agent reads them." }],
+      run: async ({ options, io, isJson }): Promise<void> => {
+        const document = pluginsDocument((await configOf(options.config)).plugins);
+        io.stdout.write(isJson ? formatJson(document) : `${pluginsText(document)}\n`);
+      }
+    }),
     tokens: forgebook.command({
       summary:
         "List the catalogue's design tokens, show one, or find the one nearest a value written by hand.",
@@ -325,6 +336,7 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...pagesCommands(forgebook),
     ...initCommands(forgebook),
     mcp: forgebook.command({
       summary:
@@ -354,14 +366,15 @@ await defineCommands({
         );
         const server = {
           info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
-          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
+          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides.`,
           tools: catalogueTools({
             ask: client.ask,
             writeNew: (file, exportName) =>
               newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
             check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
             shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
-            checkPage: (address) => runPageCheck(config, [address])
+            checkPage: (address) => runPageCheck(config, [address]),
+            plugins: pluginsDocument(config.plugins)
           })
         };
         let session = NEW_SESSION;

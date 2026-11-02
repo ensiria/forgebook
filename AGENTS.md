@@ -10,7 +10,8 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   frame), `src/vite` (the plugin, the props extractor, the answers to tools and agents), `bin/` (`forgebook`,
   `forgebook-docs`, `forgebook-texts`).
 - `packages/react` (`@forgebook/react`), `packages/story-format` (`@forgebook/story-format`, no dependencies),
-  `packages/testing` (`@forgebook/testing`).
+  `packages/testing` (`@forgebook/testing`), and the plugins built on `forgebook/plugin` (`packages/plugin-figma`,
+  `packages/plugin-msw`): the contract's two real users, so a change of `PLUGINS.md` is tried on them.
 - `fixtures/`: the kit, the stories written the Storybook way, and the catalogue the shell's browser tests run on.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
 

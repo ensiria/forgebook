@@ -14,7 +14,8 @@
 import { join } from "node:path";
 
 import type { PageConfig } from "../pageConfig.ts";
-import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { pluginFrameModule } from "./pluginConfig.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -104,7 +105,8 @@ export const configModule = (config: ResolvedConfig): string => {
  * @param config - the configuration.
  */
 const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; readonly list: string } => {
-  const own = config.stories.length > 0 ? [`./${STORIES_SOURCE_FILE}`] : [];
+  const hasOwn = config.stories.length > 0 || config.docs.length > 0;
+  const own = hasOwn ? [`./${STORIES_SOURCE_FILE}`] : [];
   const specifiers = [...own.map((file) => join(config.dir, file.slice(2))), ...config.sources];
   return {
     imports: specifiers.map(
@@ -112,6 +114,32 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
     ),
     list: `[${specifiers.map((_specifier, index) => `source${index}`).join(", ")}]`
   };
+};
+
+/**
+ * The shell's list of the plugins' tabs and docs blocks, each with the import that loads its view when it is first
+ * needed; nothing for a catalogue without any, whose entry is then what it would be with no plugin.
+ *
+ * @param config - the configuration.
+ */
+const pluginViewLines = (config: ResolvedConfig): string[] => {
+  const lines = config.plugins.flatMap((plugin) => {
+    const tabs = (plugin.tabs ?? []).map(
+      (tab) =>
+        `{ id: ${JSON.stringify(tab.id)}, label: ${JSON.stringify(tab.label)}, ` +
+        `when: ${JSON.stringify(tab.when)}, load: () => import(${JSON.stringify(tab.view)}) }`
+    );
+    const blocks = (plugin.docBlocks ?? []).map(
+      (block) =>
+        `{ fence: ${JSON.stringify(block.fence)}, load: () => import(${JSON.stringify(block.view)}) }`
+    );
+    return tabs.length === 0 && blocks.length === 0
+      ? []
+      : [
+          `      { id: ${JSON.stringify(plugin.id)}, tabs: [${tabs.join(", ")}], docBlocks: [${blocks.join(", ")}] },`
+        ];
+  });
+  return lines.length === 0 ? [] : ["    plugins: [", ...lines, "    ],"];
 };
 
 /**
@@ -139,6 +167,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    ...pluginViewLines(config),
     "    codeOf",
     "  });",
     ""
@@ -175,12 +204,19 @@ export type AxeAddress = {
  */
 export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => {
   const sources = sourcesCode(config);
+  const frames = config.plugins.flatMap((plugin) => {
+    const frame = pluginFrameModule(plugin, config.framework.name);
+    return frame === undefined ? [] : [{ id: plugin.id, frame }];
+  });
   return [
     `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
     ...(axe?.imports ?? []),
     ...sources.imports,
     ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
+    ...frames.map(
+      (plugin, index) => `import { frame as pluginFrame${index} } from ${JSON.stringify(plugin.frame)};`
+    ),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  void mountFrame(root, {",
@@ -190,7 +226,13 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
-    ...(config.hasMocks ? [`    mockTools: () => import(${JSON.stringify(MOCKS_MODULE)}),`] : []),
+    ...(frames.length === 0
+      ? []
+      : [
+          `    plugins: [${frames
+            .map((plugin, index) => `{ id: ${JSON.stringify(plugin.id)}, create: pluginFrame${index} }`)
+            .join(", ")}],`
+        ]),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ""
@@ -215,7 +257,8 @@ export const agentSourcesModule = (config: ResolvedConfig): string => {
 };
 
 /**
- * The source of the project's own stories: one `?forgebook-files` import per glob, named after the catalogue.
+ * The source of the project's own stories and docs pages: one `?forgebook-files` or `?forgebook-docs-pages` import per
+ * glob, named after the catalogue.
  *
  * @param config - the configuration.
  */
@@ -225,10 +268,17 @@ export const storiesSourceModule = (config: ResolvedConfig): string =>
       (pattern, index) =>
         `import files${index} from ${JSON.stringify(`./${pattern.replace(/^\.\//, "")}?forgebook-files`)};`
     ),
+    ...config.docs.map(
+      (pattern, index) =>
+        `import docs${index} from ${JSON.stringify(`./${pattern.replace(/^\.\//, "")}?forgebook-docs-pages`)};`
+    ),
     "export const source = {",
     `  id: ${JSON.stringify(OWN_SOURCE_ID)},`,
     `  name: ${JSON.stringify(config.title)},`,
     `  files: [${config.stories.map((_pattern, index) => `files${index}`).join(", ")}],`,
+    ...(config.docs.length === 0
+      ? []
+      : [`  docs: [${config.docs.map((_pattern, index) => `docs${index}`).join(", ")}],`]),
     "  sheets: { required: [], theme: [], restyled: [] }",
     "};",
     ""

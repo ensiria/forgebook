@@ -16,11 +16,13 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
-import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
+import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
+import type { ForgebookPlugin } from "../plugin.ts";
 import { mergedThemes, shellThemeCss, shellThemeProblems, themeValueProblem } from "../shellTheme.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
+import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
@@ -60,6 +62,8 @@ export type ResolvedConfig = {
   readonly heights: string | undefined;
   /** The project's own story globs, from the configuration's folder. */
   readonly stories: readonly string[];
+  /** The project's own docs pages' globs, from the configuration's folder. */
+  readonly docs: readonly string[];
   /** The sources' module specifiers. */
   readonly sources: readonly string[];
   /** The switches, the presets' and the catalogue's merged; none when neither declares any. */
@@ -80,15 +84,9 @@ export type ResolvedConfig = {
   readonly lists: CatalogueLists;
   /** Whether the project installs Testing Library, whose `canvas` and `userEvent` every play then receives. */
   readonly hasPlayTools: boolean;
-  /** Whether the project installs MSW, which a story's `parameters.msw` then mocks its API with. */
-  readonly hasMocks: boolean;
+  /** The plugins, checked, in the configuration's order. */
+  readonly plugins: readonly ForgebookPlugin[];
 };
-
-/** MSW's browser module, for a story's mocked API. */
-export const MOCKS_MODULE = "msw/browser";
-
-/** Its package's manifest, what tells it is installed: the module itself cannot be resolved from Node. */
-const MOCKS_MANIFEST = "msw/package.json";
 
 /** The packages of the play tools: both installed, or the plays get neither. */
 export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/user-event"] as const;
@@ -167,7 +165,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
  * @param all - the presets' lists, then the catalogue's.
  */
 export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
-  const tabs: Partial<Record<PanelTabId, false>> = {};
+  const tabs: Record<string, false> = {};
   const controls: Partial<Record<TurnedOffControl, false>> = {};
   const strings: Record<string, string> = {};
   const keys: Record<string, string | false> = {};
@@ -201,6 +199,12 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   };
 };
 
+/** Whether a configuration's list has something in it. */
+const isListed = (config: object, key: string): boolean => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list) && list.length > 0;
+};
+
 /**
  * Why a loaded configuration cannot be used, or none.
  *
@@ -212,9 +216,7 @@ const configProblem = (config: unknown): string | undefined => {
   if (!("framework" in config) || typeof config.framework !== "object" || config.framework === null)
     return "it names no framework (`framework: react()`)";
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
-  const hasStories = "stories" in config && Array.isArray(config.stories) && config.stories.length > 0;
-  const hasSources = "sources" in config && Array.isArray(config.sources) && config.sources.length > 0;
-  if (!hasStories && !hasSources)
+  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
   return undefined;
 };
@@ -225,6 +227,27 @@ const configProblem = (config: unknown): string | undefined => {
  * @param config - what the file exports by default.
  */
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
+
+/** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
+const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "docs" | "sources"> => ({
+  stories: config.stories ?? [],
+  docs: config.docs ?? [],
+  sources: config.sources ?? []
+});
+
+/**
+ * A configuration's plugins, once they can be used.
+ *
+ * @param config - the configuration.
+ * @param dir - the folder of its file.
+ * @throws when they cannot.
+ */
+const checkedPlugins = (config: ForgebookConfig, dir: string): readonly ForgebookPlugin[] => {
+  const plugins = config.plugins ?? [];
+  const problem = pluginsProblem(plugins, config.framework.name, dir);
+  if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
+  return plugins;
+};
 
 /**
  * A configuration with its presets merged and its paths made absolute.
@@ -237,7 +260,11 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
   const presets = config.presets ?? [];
   const absolute = (path: string): string => (isAbsolute(path) ? path : resolve(dir, path));
   const declared = [...presets.map((preset) => preset.switches), config.switches];
-  const switches = declared.some((list) => list !== undefined) ? mergedById(declared) : undefined;
+  const plugins = checkedPlugins(config, dir);
+  const switches = withPluginSwitches(
+    declared.some((list) => list !== undefined) ? mergedById(declared) : undefined,
+    plugins
+  );
   const problem = switches === undefined ? undefined : switchesProblem(switches);
   if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
   const theme = mergedThemes([
@@ -256,8 +283,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     title: config.title,
     logo: config.logo === undefined ? undefined : absolute(config.logo),
     heights: config.heights,
-    stories: config.stories ?? [],
-    sources: config.sources ?? [],
+    ...shownFiles(config),
     switches,
     languages: mergedById([...presets.map((preset) => preset.languages), config.languages]),
     previews: [
@@ -283,7 +309,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     watch: (config.watch ?? []).map(absolute),
     lists: mergedLists([...presets, config]),
     hasPlayTools: hasPlayToolsIn(dir),
-    hasMocks: packageResolver(dir)(MOCKS_MANIFEST) !== undefined
+    plugins
   };
 };
 

@@ -1,6 +1,6 @@
 /**
  * The dev server's answers to tools and agents, under `/__forgebook/api/`: `stories` (every story) and `story?id=…`
- * (one in detail), each with an optional `view` (the view's query, `theme=dark&lang=it`) the links open in.
+ * (one in detail), `pages` and `page?id=…` (the docs pages), each with an optional `view` (the view's query, `theme=dark&lang=it`) the links open in.
  *
  * @remarks
  * The server loads the sources and the previews with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool
@@ -31,6 +31,7 @@ import {
   storyLinks
 } from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
+import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
 import { findAnswer } from "./findRoute.ts";
 import { changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
@@ -291,6 +292,8 @@ export const agentAnswer = async (
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
+    if (route === "pages") return pagesAnswer(context);
+    if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context);
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {

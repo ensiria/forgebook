@@ -68,10 +68,12 @@ export const catalogueDocs = async (
     packageName: data.packageName,
     description: data.description,
     catalogueFile: options.file,
-    hasTokens: options.sections.includes("tokens") && data.tokens.length > 0
+    hasTokens: options.sections.includes("tokens") && data.tokens.length > 0,
+    pages: data.pages ?? []
   });
   const counts = {
     components: data.components.length,
+    pages: data.pages?.length ?? 0,
     modules: data.modules.length,
     sassModules: data.sassModules.length,
     styleSheets: data.styleSheets.length,

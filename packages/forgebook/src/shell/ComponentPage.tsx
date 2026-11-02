@@ -11,11 +11,10 @@
  *
  * @module
  */
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef } from "react";
 
 import { groupLabel } from "../catalogue.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
-import type { PanelArgs, ShellMessage } from "../messages.ts";
 import {
   groupedStories,
   isLogicComponent,
@@ -23,21 +22,19 @@ import {
   type TreeComponent,
   type TreeStory
 } from "../storyTree.ts";
-import { liveView, type ViewState } from "../viewState.ts";
+import type { ViewState } from "../viewState.ts";
 import { ApiReference } from "./ApiReference.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext } from "./Example.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
-import { storyTouchesOf, type TouchOverrides, touchedView } from "./storyTouch.ts";
+import type { TouchOverrides } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
 import { useComponentDocs } from "./useComponentDocs.ts";
-import { type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
-import { useFrameQueue } from "./useFrameQueue.ts";
-import { useLiveView, useLoadedView } from "./useLiveView.ts";
 import type { Loaded } from "./useLoaded.ts";
 import { type PageDoc, usePageDoc } from "./usePageDoc.ts";
+import { usePageFrames } from "./usePageFrames.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCode } from "./useStoryCode.ts";
 
@@ -140,60 +137,34 @@ export const ComponentPage = ({
   const docs = useComponentDocs(loadDocs);
   const code = useStoryCode(loadCode);
   const page = usePageDoc(loadPage);
-  // each story's own args, as its frame reports them: the code of a story drawn from its args is written from them
-  const [storyArgs, setStoryArgs] = useState<ReadonlyMap<string, PanelArgs>>(new Map());
   const demo = mainStory(component);
   const examples = useMemo(
     () => component.stories.filter((story) => story.id !== demo?.id),
     [component, demo]
   );
-  // the frames keep the view they loaded with; only the style sheets load them again, the rest of the view (the
-  // switches, the language among them) is sent to them live
-  const frameView = useLoadedView(view.sheets, view);
   const catalogue = useCatalogue();
-  const { switches } = catalogue;
-  // each story marked for a phone with its own finger: its frame gets it in place of the toolbar's Touch
-  const touches = useMemo(
-    () => storyTouchesOf(component.stories, touchOverrides),
-    [component, touchOverrides]
-  );
   const exampleIds = useMemo(() => examples.map((story) => story.id), [examples]);
-  const queue = useFrameQueue(exampleIds, pageRef);
-  const { heights, settled } = useFrameMessages({
-    onReady: (frame: Window, message: ReadyMessage): void => {
-      queue.markReady(message.storyId);
-      setStoryArgs((current) => new Map(current).set(message.storyId, message.args));
-      const send = (shellMessage: ShellMessage): void =>
-        frame.postMessage(shellMessage, window.location.origin);
-      send({
-        type: "forgebook:view",
-        view: touchedView(liveView(view), message.storyId, touches, catalogue.touch)
-      });
-      send({ type: "forgebook:tools", tools: view.tools });
-    },
-    onCall: (): void => undefined,
-    // a frame that failed is over too: its place in the queue goes to the next one
-    onFailed: queue.markReady
+  const { queue, ...frames } = usePageFrames({
+    stories: component.stories,
+    queued: exampleIds,
+    pageRef,
+    view,
+    touchOverrides
   });
-  useLiveView(pageRef, view, true, { touches, choice: catalogue.touch });
   useScrollMemory(pageRef, scroll);
   const componentDocs = docs.status === "ready" ? docs.value : undefined;
   const isLogic = isLogicComponent(component);
   const context: ExampleContext = {
+    ...frames,
     component,
     view,
     frameUrl,
     hrefOf,
     onOpen,
-    frameView,
-    switches,
-    touches,
+    switches: catalogue.switches,
     onTouchChange,
-    heights,
-    settled,
     code,
     componentName: componentDocs?.name ?? component.name,
-    argsOf: (storyId: string): PanelArgs => storyArgs.get(storyId) ?? {},
     heightOf,
     background
   };
@@ -231,7 +202,7 @@ export const ComponentPage = ({
                       story={story}
                       isDemo={false}
                       isMounted={queue.mounted.has(story.id)}
-                      observe={(element: HTMLElement | null): void => queue.observe(story.id, element)}
+                      observe={queue.observerOf(story.id)}
                     />
                   ))}
                 </section>

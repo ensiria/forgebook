@@ -12,7 +12,7 @@
  * @module
  */
 
-import type { CatalogueSettings, OwnControlId, PanelTabId } from "./catalogue.ts";
+import type { CatalogueSettings, OwnControlId } from "./catalogue.ts";
 import { switchValueOf, switchWithRole, type TouchChoice, type ViewSwitch } from "./switches.ts";
 
 /**
@@ -47,7 +47,7 @@ export type MeasureTool = "outline" | "grid" | "measure";
 export type Zoom = number;
 
 /** A tab of the panel under a story. */
-export type PanelTab = PanelTabId;
+export type PanelTab = string;
 
 /** The story's width on the stage: the stage's whole width, or a width in CSS px (a preset, or dragged). */
 export type StageWidth = "fill" | number;
@@ -484,7 +484,23 @@ export const frameAddressOf = (frameUrl: string, id: string, search: string): st
 export const storyAddressOf = (pageUrl: string, id: string, search: string): string => {
   const params = new URLSearchParams(search);
   params.delete("component");
+  params.delete("page");
   params.delete("story");
   params.set("story", id);
+  return `${pageUrl}?${params.toString()}`;
+};
+
+/**
+ * A docs page's address in the catalogue, in a view.
+ *
+ * @param pageUrl - the catalogue's page.
+ * @param id - the page's id.
+ * @param search - the view's query; empty for the default view.
+ */
+export const docPageAddressOf = (pageUrl: string, id: string, search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("component");
+  params.delete("story");
+  params.set("page", id);
   return `${pageUrl}?${params.toString()}`;
 };

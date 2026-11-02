@@ -303,6 +303,14 @@
     font: inherit;
   }
 
+  // a library's name among the Docs section's pages, when several libraries have some
+  .forgebook-tree__docs-source {
+    margin: $space-1-5 0 0;
+    padding: $space-1 $space-2;
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
   // a named group's components sit one step in, under its name past its arrow (the arrow, 12px, and its gap)
   .forgebook-tree__group > .forgebook-tree__fold {
     padding-inline-start: calc(0.75rem + #{$space-1-5});

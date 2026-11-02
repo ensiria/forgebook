@@ -15,6 +15,8 @@ This repository holds Forgebook's packages; each has its own README, which is al
 | [`@forgebook/react`](packages/react) | React's story types, renderer and props reader |
 | [`@forgebook/story-format`](packages/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](packages/testing) | Tests generated from the stories: browser, visual and server render |
+| [`@forgebook/plugin-figma`](packages/plugin-figma) | A story's design in the panel, and beside the story |
+| [`@forgebook/plugin-msw`](packages/plugin-msw) | A story's API answered by its handlers, and a Network tab |
 
 Requirements: Node 22.18 or later and Vite 8; React 19 today. [MIT licence](LICENSE).
 

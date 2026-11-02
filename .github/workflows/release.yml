@@ -79,7 +79,7 @@ jobs:
       - name: Stage on npm
         run: |
           mkdir -p "$RUNNER_TEMP/packages"
-          for folder in story-format forgebook react testing; do
+          for folder in story-format forgebook react testing plugin-figma plugin-msw; do
             name=$(node -p "require('./packages/$folder/package.json').name")
             version=$(node -p "require('./packages/$folder/package.json').version")
             if [ -n "$(npm view "$name@$version" version 2>/dev/null)" ]; then

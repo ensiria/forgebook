@@ -69,7 +69,7 @@ test.describe("pages and the address", () => {
         .poll(() => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
         .toBeGreaterThan(0);
     }
-    await library.getByRole("link", { name: "Select" }).click();
+    await library.getByRole("link", { name: "Select", exact: true }).click();
     await expect(page).toHaveURL(/component=kit%3Ainputs-selection-select/);
   });
 
@@ -655,9 +655,9 @@ test.describe("the stage", () => {
   test("the sidebar never lists stories: they are picked in the header", async ({ page }) => {
     await page.goto(story("overview"));
     // Inputs is open (the shown component's family), Foundations closed: one link, the component's, none for a story
-    await expect(page.getByRole("navigation", { name: "Components" }).getByRole("link")).toHaveText([
-      /^Select\d+$/
-    ]);
+    // the section after the Docs one: the library's families
+    const families = page.getByRole("navigation", { name: "Components" }).locator("section").nth(1);
+    await expect(families.getByRole("link")).toHaveText([/^Select\d+$/]);
   });
 
   test("a story that throws shows its error in the frame", async ({ page }) => {
@@ -864,6 +864,7 @@ test.describe("the toolbar each person arranges", () => {
       "motion",
       "speed",
       "press",
+      "probe",
       "lang",
       "dir",
       "touch",
@@ -917,7 +918,7 @@ test.describe("the toolbar each person arranges", () => {
     await hiddenRow.getByRole("radio", { name: "Darken", exact: true }).check({ force: true });
     await expect(page).toHaveURL(/press=darken/);
     await page.getByRole("button", { name: "Show Press" }).click();
-    expect((await menuRows(page)).slice(4, 7)).toEqual(["speed", "press", "lang"]);
+    expect((await menuRows(page)).slice(4, 7)).toEqual(["speed", "press", "probe"]);
   });
 
   test("the rows move by keyboard and by pointer, and the bar follows their order", async ({ page }) => {
@@ -931,7 +932,7 @@ test.describe("the toolbar each person arranges", () => {
     await page.keyboard.press("ArrowUp");
     await expect(handle).toBeFocused();
     expect((await menuRows(page)).slice(0, 4)).toEqual(["theme", "contrast", "motion", "width"]);
-    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 12");
+    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 13");
     expect(await barControls(page)).toEqual(["theme", "contrast", "motion", "width"]);
     // by pointer: the theme dragged below the contrast
     const grip = page.getByRole("button", { name: "Move Theme" });

@@ -1,7 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`
- * and `nearest_token`.
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
+ * `nearest_token`, `list_pages`, `get_page` and `list_plugins`.
  *
  * @module
  */
@@ -11,11 +11,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { PluginsDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
+import { pageTools } from "./pageTools.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
 /** The session's folder for pictures; made on the first call. */
@@ -31,28 +34,6 @@ const shotsFolder = (): string => {
   mkdirSync(shotsDir, { recursive: true });
   return shotsDir;
 };
-
-/** Asks the catalogue one of its answers. */
-type Ask = (route: string, params: URLSearchParams) => Promise<AgentAnswer>;
-
-/** The schema of the view argument, shared by the tools. */
-const VIEW = {
-  type: "string",
-  description:
-    "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it); none for the default."
-} as const;
-
-/** A text argument, or none. */
-const textOf = (args: Readonly<Record<string, unknown>>, name: string): string | undefined => {
-  const value = args[name];
-  return typeof value === "string" && value !== "" ? value : undefined;
-};
-
-/** An answer as a tool's result: a failure when the catalogue did not answer 200. */
-const resultOf = (answer: AgentAnswer): McpToolResult => ({
-  structured: answer.body,
-  isError: answer.status !== 200
-});
 
 /** Writes a component's first stories, as `forgebook new --print` does. */
 type NewStories = (file: string, exportName: string | undefined) => Promise<NewStoriesFile>;
@@ -78,6 +59,8 @@ const problemsResult = (answer: AgentAnswer): McpToolResult => {
 
 /** What the tools reach the catalogue through. */
 export type CatalogueReach = {
+  /** The plugins the configuration lists. */
+  readonly plugins: PluginsDocument;
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
   readonly ask: Ask;
   /** Writes a component's first stories, the file relative to the catalogue's folder. */
@@ -100,8 +83,17 @@ export const catalogueTools = ({
   writeNew,
   check,
   shot,
-  checkPage
+  checkPage,
+  plugins
 }: CatalogueReach): readonly McpTool[] => [
+  ...pageTools(ask),
+  {
+    name: "list_plugins",
+    description:
+      "The plugins this catalogue lists and what each adds: panel tabs (open one with tab=<id> in a view), switches, docs blocks. A tab needs its plugin: a story's parameter does nothing without it.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    call: async (): Promise<McpToolResult> => ({ structured: plugins, isError: false })
+  },
   {
     name: "check_page",
     description:

@@ -14,6 +14,7 @@
 import type { StoryLanguage, StoryTokensFile } from "@forgebook/story-format/source";
 
 import type { CatalogueLists } from "../catalogue.ts";
+import type { ForgebookPlugin } from "../plugin.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
@@ -52,6 +53,11 @@ export type ForgebookConfig = CatalogueLists & {
    * named after the catalogue. Give `stories` or `sources`, or both.
    */
   readonly stories?: readonly string[];
+  /**
+   * The project's own docs pages, as globs from the configuration's folder (`["docs/**\/*.md"]`): Markdown with live
+   * stories, listed in the sidebar's Docs section, in the source named after the catalogue.
+   */
+  readonly docs?: readonly string[];
   /** The packages' story sources, as module specifiers exporting a `source` (`["@acme/ui/stories"]`). */
   readonly sources?: readonly string[];
   /** The switches of the toolbar and the View menu; the theme and the contrast when neither it nor a preset declares any. */
@@ -74,6 +80,8 @@ export type ForgebookConfig = CatalogueLists & {
   readonly watch?: readonly string[];
   /** The libraries' presets, in order; the configuration's own values win over theirs. */
   readonly presets?: readonly ForgebookPreset[];
+  /** The plugins, in order (`[figma()]`): a package adds nothing to the catalogue until it is listed here. */
+  readonly plugins?: readonly ForgebookPlugin[];
 };
 
 /**

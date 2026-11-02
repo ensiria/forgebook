@@ -19,15 +19,7 @@ import { diskCache } from "./diskCache.ts";
 import { moduleSummaryOfText } from "./moduleSummary.ts";
 import { pageFileOf } from "./pageFile.ts";
 import { storyCode } from "./storyCode.ts";
-
-/** The query that asks for a story file's code: each story's `render` as written. */
-const CODE_QUERY = "?forgebook-code";
-
-/** The query that asks for a story file's component page: its documentation file as HTML. */
-const PAGE_QUERY = "?forgebook-page";
-
-/** The query a source's Markdown file is imported with (its introduction on the home), answered with its HTML. */
-const MARKDOWN_QUERY = "?forgebook-markdown";
+import { CODE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 
 /** A story file's code as its module exports it: each story's text and coloured HTML, or why it cannot be read. */
 type CodeValue = Readonly<Record<string, unknown>>;

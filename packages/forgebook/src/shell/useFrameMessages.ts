@@ -19,6 +19,9 @@ export const FRAME_ASIDE_ATTRIBUTE = "data-forgebook-aside";
 /** A message of a frame that the stage answers. */
 export type ReadyMessage = Extract<FrameMessage, { type: "forgebook:ready" }>;
 
+/** What a plugin's frame module reported. */
+export type PluginReportMessage = Extract<FrameMessage, { type: "forgebook:plugin" }>;
+
 /** A call of an event, as the log shows it. */
 export type EventCall = Omit<Extract<FrameMessage, { type: "forgebook:call" }>, "type"> & {
   /** When it arrived, in ms since the epoch. */
@@ -54,6 +57,8 @@ export type FrameHandlers = {
    * several frames of a story); none where nothing shows them.
    */
   readonly onSpills?: (storyId: string, count: number, frame: string) => void;
+  /** A plugin's frame module told its tab about a story; none where no tab shows it. */
+  readonly onPluginReport?: (message: PluginReportMessage) => void;
 };
 
 /** An accessibility check's result, as a frame reported it. */
@@ -117,6 +122,9 @@ const onFrameMessage = (
       return;
     case "forgebook:spills":
       handlers.onSpills?.(message.storyId, message.count, address ?? "");
+      return;
+    case "forgebook:plugin":
+      handlers.onPluginReport?.(message);
       return;
     case "forgebook:call":
       handlers.onCall({

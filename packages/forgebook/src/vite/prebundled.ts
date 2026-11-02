@@ -6,15 +6,17 @@
  * Vite finds what to pre-bundle by scanning the app's HTML and entries on disk; a catalogue's pages and their entries
  * are generated (`pages.ts`), so without this list Vite discovers each package as a page imports it, pre-bundles it
  * then, and reloads the page, more than once on a first start. The list is the shell's and the frame's packages (the
- * shell is React), the framework's, Testing Library's when the project installs it, and Forgebook's own modules when
- * they come from an installed package (a linked one is source, which Vite does not pre-bundle). A package the project
+ * shell is React), the framework's, Testing Library's when the project installs it, what the plugins name, and
+ * Forgebook's own modules and the plugins' when they come from an installed package (a linked one is source, which Vite
+ * does not pre-bundle). A package the project
  * cannot resolve is left out, since Vite fails on one it cannot find. Pure: a resolver in, names out.
  *
  * @module
  */
 import { dirname, join } from "node:path";
 
-import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { pluginModules } from "./pluginConfig.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
 const CORE_BROWSER_DEPENDENCIES = [
@@ -44,20 +46,29 @@ const isInstalled = (file: string): boolean => file.split(/[\\/]/).includes("nod
  * @param resolve - resolves a package from the catalogue's folder.
  */
 export const prebundled = (config: ResolvedConfig, resolve: Resolve): string[] => {
-  const pageModules = [...PAGE_MODULES, config.framework.pages.frame, config.framework.pages.code];
+  const pageModules = [
+    ...PAGE_MODULES,
+    config.framework.pages.frame,
+    config.framework.pages.code,
+    ...pluginModules(config.plugins, config.framework.name)
+  ];
   const candidates = [
     ...CORE_BROWSER_DEPENDENCIES,
     ...(config.framework.browserDependencies ?? []),
     ...(config.hasPlayTools ? PLAY_TOOLS_PACKAGES : [])
   ];
-  // named without resolving it: it is a browser-only module, which Node cannot resolve though it is installed
-  const mocks = config.hasMocks ? [MOCKS_MODULE] : [];
+  // named without resolving them: a browser-only module (`msw/browser`) cannot be resolved by Node though it is installed
+  const pluginDependencies = config.plugins.flatMap((plugin) => plugin.browserDependencies ?? []);
   const installedPages = pageModules.filter((name) => {
     const file = resolve(name);
     return file !== undefined && isInstalled(file);
   });
   return [
-    ...new Set([...candidates.filter((name) => resolve(name) !== undefined), ...mocks, ...installedPages])
+    ...new Set([
+      ...candidates.filter((name) => resolve(name) !== undefined),
+      ...pluginDependencies,
+      ...installedPages
+    ])
   ];
 };
 

@@ -11,13 +11,14 @@
  * @module
  */
 
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { type PanelArgTypes, panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
 import type { ArgValue, PanelArgs, ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
+import type { PluginStory } from "../plugin.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import {
@@ -31,29 +32,39 @@ import {
   type ViewState,
   type Zoom
 } from "../viewState.ts";
-import type { CheckState } from "./A11yTab.tsx";
 import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { compareVariants } from "./compareVariants.ts";
-import type { DesignTabProps } from "./DesignTab.tsx";
 import { Dock } from "./Dock.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { MatrixPicker } from "./MatrixPicker.tsx";
+import type { PluginReports, ShellPlugin } from "./pluginTabs.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { STRINGS } from "./strings.ts";
 import { useComponentDocs } from "./useComponentDocs.ts";
 import { useCopy } from "./useCopy.ts";
-import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
+import {
+  type CheckResult,
+  type EventCall,
+  type PluginReportMessage,
+  type ReadyMessage,
+  useFrameMessages
+} from "./useFrameMessages.ts";
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
+import { usePluginTabs } from "./usePluginTabs.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
+import { useStoryCheck } from "./useStoryCheck.ts";
 import { useStoryCode } from "./useStoryCode.ts";
 import { useWorstCase } from "./useWorstCase.ts";
 
 /** The `argTypes` of a story before its frame reported them. */
 const NO_ARG_TYPES: PanelArgTypes = {};
+
+/** What a story's frame reports for the panel and the stage. */
+type ReportedPanel = Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed" | "parameters">;
 
 /**
  * What the stage's handles set the width with; none, so no handles, when the story fixes the width.
@@ -76,11 +87,14 @@ const widthSetter = (
  * @param panels - what each story's frame reported, by story.
  * @param story - the story.
  */
-const reportedPanel = (
-  panels: ReadonlyMap<string, Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed">>,
-  story: TreeStory
-): Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed"> =>
-  panels.get(story.id) ?? { argTypes: NO_ARG_TYPES, controls: story.controls, actions: [], fixed: NOT_FIXED };
+const reportedPanel = (panels: ReadonlyMap<string, ReportedPanel>, story: TreeStory): ReportedPanel =>
+  panels.get(story.id) ?? {
+    argTypes: NO_ARG_TYPES,
+    controls: story.controls,
+    actions: [],
+    fixed: NOT_FIXED,
+    parameters: []
+  };
 
 /** The height of the first frame before its story reports its own, in CSS px. */
 const INITIAL_FRAME_HEIGHT = 240;
@@ -110,6 +124,8 @@ export type StageProps = {
   readonly onMatrixAxesChange: (axes: readonly string[]) => void;
   /** The frame page's address. */
   readonly frameUrl: string;
+  /** The plugins with tabs. */
+  readonly plugins: readonly ShellPlugin[];
   /** Loads the story file's code for the Code tab; `undefined` when the source has none. */
   readonly loadCode: (() => Promise<unknown>) | undefined;
   /** Loads the component's docs for the panel; `undefined` when the source has none for the file. */
@@ -129,39 +145,6 @@ export type StageProps = {
   readonly backgroundOf: (view: Pick<ViewState, "switches" | "backdrop">) => string | undefined;
   /** Where its scrolling part starts: the shell's visit of the page and every page's last position. */
   readonly scroll: PageScroll;
-};
-
-/**
- * The accessibility check of the shown story: its state, cleared when the story or the view changes, and how to run
- * it in the frame.
- *
- * @param frameRef - the story's frame.
- * @param checkKey - the story and the view, as one text: a check belongs to them.
- */
-const useStoryCheck = (
-  frameRef: RefObject<HTMLIFrameElement | null>,
-  checkKey: string
-): { check: CheckState; run: () => void; receive: (result: CheckResult) => void } => {
-  const [check, setCheck] = useState<CheckState>({ status: "idle" });
-  const [checkedKey, setCheckedKey] = useState(checkKey);
-  if (checkedKey !== checkKey) {
-    setCheckedKey(checkKey);
-    setCheck({ status: "idle" });
-  }
-  return {
-    check,
-    run: (): void => {
-      setCheck({ status: "running" });
-      const message: ShellMessage = { type: "forgebook:check" };
-      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
-    },
-    receive: (result: CheckResult): void =>
-      setCheck(
-        "error" in result
-          ? { status: "error", message: result.error }
-          : { status: "done", violations: result.violations }
-      )
-  };
 };
 
 /**
@@ -195,22 +178,6 @@ const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
 
 /**
- * What the Design tab shows; none for a story without a design.
- *
- * @param component - the story's component.
- * @param story - the story.
- * @param frame - the story's frame, for the comparison.
- */
-const designTabOf = (
-  component: TreeComponent,
-  story: TreeStory,
-  frame: DesignTabProps["frame"]
-): DesignTabProps | undefined =>
-  story.design === undefined
-    ? undefined
-    : { link: story.design, title: `${component.name} › ${story.name}`, frame };
-
-/**
  * The stage.
  *
  * @param props - the component, the story, the view, the panel's values, the frame page and the loaders.
@@ -226,6 +193,7 @@ export const Stage = ({
   matrixAxes,
   onMatrixAxesChange,
   frameUrl,
+  plugins,
   loadCode,
   loadDocs,
   namedValues,
@@ -246,9 +214,7 @@ export const Stage = ({
     new Map()
   );
   // each story's `argTypes` and controls, as its frame read them once it ran
-  const [storyPanels, setStoryPanels] = useState<
-    ReadonlyMap<string, Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed">>
-  >(new Map());
+  const [storyPanels, setStoryPanels] = useState<ReadonlyMap<string, ReportedPanel>>(new Map());
   // the story is drawn with what it fixes of the view; a change from here keeps the user's own in the address
   const panel = reportedPanel(storyPanels, story);
   const view = withFixed(ownView, panel.fixed);
@@ -257,6 +223,8 @@ export const Stage = ({
   const [calls, setCalls] = useState<readonly EventCall[]>([]);
   // each story's play trace, by story: a trace belongs to the story that played
   const [traces, setTraces] = useState<ReadonlyMap<string, PlayTrace>>(new Map());
+  // what each plugin's frame module last told its tab, by story: a plugin's report belongs to the story that sent it
+  const [pluginReports, setPluginReports] = useState<PluginReports>(new Map());
   const catalogue = useCatalogue();
   const { switches } = catalogue;
   const storyCheck = useStoryCheck(frameRef, frameAddress(frameUrl, story.id, view, switches));
@@ -305,7 +273,8 @@ export const Stage = ({
           argTypes: message.argTypes,
           controls: message.controls,
           actions: message.actions,
-          fixed: message.fixed
+          fixed: message.fixed,
+          parameters: message.parameters
         })
       );
       onFixedChange(message.storyId, message.fixed);
@@ -326,7 +295,9 @@ export const Stage = ({
     onChecked: (result: CheckResult): void => {
       if (result.storyId === story.id) storyCheck.receive(result);
     },
-    onSpills: worstCase.receive
+    onSpills: worstCase.receive,
+    onPluginReport: (message: PluginReportMessage): void =>
+      setPluginReports((current) => new Map(current).set(`${message.storyId}|${message.plugin}`, message))
   });
 
   // the docs may arrive after the frames: they learn the events then
@@ -368,6 +339,33 @@ export const Stage = ({
     if (reportedHeight !== undefined) setLastHeight(reportedHeight);
   }, [reportedHeight]);
 
+  const pluginStory = useMemo(
+    (): PluginStory => ({
+      id: story.id,
+      name: story.name,
+      title: component.title,
+      componentName: component.name,
+      design: story.design === undefined ? {} : { figma: story.design }
+    }),
+    [story, component]
+  );
+
+  const pluginTabs = usePluginTabs({
+    plugins,
+    strings: catalogue.strings,
+    story: pluginStory,
+    parameters: panel.parameters,
+    reports: pluginReports,
+    isComparing: isComparing(view),
+    aside: {
+      address: frameAddress(frameUrl, story.id, view, switches),
+      width: view.width,
+      background: backgroundOf(view),
+      args: panelArgs,
+      view: liveView(view)
+    }
+  });
+
   // a tab the catalogue turns off is never shown
   const tabs = dockTabs({
     docs,
@@ -398,13 +396,7 @@ export const Stage = ({
     },
     check: storyCheck.check,
     onCheck: isComparing(view) ? undefined : storyCheck.run,
-    design: designTabOf(component, story, {
-      address: frameAddress(frameUrl, story.id, view, switches),
-      width: view.width,
-      background: backgroundOf(view),
-      args: panelArgs,
-      view: isComparing(view) ? undefined : liveView(view)
-    })
+    pluginTabs
   }).filter((tab) => catalogue.tabs.includes(tab.id));
 
   return (

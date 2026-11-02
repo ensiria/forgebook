@@ -37,6 +37,7 @@
     ".": "./src/vite/config.ts",
     "./agent": "./src/vite/agent.types.ts",
     "./story-tree": "./src/storyTree.ts",
+    "./page-tree": "./src/pageTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
@@ -68,7 +69,10 @@
     "./story-check": "./src/storyCheck.ts",
     "./spills": "./src/spills.ts",
     "./real-touch": "./src/realTouch.ts",
-    "./shell-theme": "./src/shellTheme.types.ts"
+    "./shell-theme": "./src/shellTheme.types.ts",
+    "./plugin": "./src/plugin.ts",
+    "./plugin-react": "./src/pluginReact.tsx",
+    "./figma-link": "./src/figmaLink.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -88,7 +92,6 @@
   "peerDependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/user-event": "^14.6.0",
-    "msw": "^2.0.0 || ^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sass-embedded": "^1.80.0",
@@ -116,9 +119,6 @@
     "@testing-library/user-event": {
       "optional": true
     },
-    "msw": {
-      "optional": true
-    },
     "sass-embedded": {
       "optional": true
     }
@@ -137,6 +137,10 @@
       "./story-tree": {
         "types": "./dist/src/storyTree.d.ts",
         "default": "./dist/src/storyTree.js"
+      },
+      "./page-tree": {
+        "types": "./dist/src/pageTree.d.ts",
+        "default": "./dist/src/pageTree.js"
       },
       "./shell": {
         "types": "./dist/src/shell/mountShell.d.ts",
@@ -265,6 +269,18 @@
       "./shell-theme": {
         "types": "./dist/src/shellTheme.types.d.ts",
         "default": "./dist/src/shellTheme.types.js"
+      },
+      "./plugin": {
+        "types": "./dist/src/plugin.d.ts",
+        "default": "./dist/src/plugin.js"
+      },
+      "./plugin-react": {
+        "types": "./dist/src/pluginReact.d.ts",
+        "default": "./dist/src/pluginReact.js"
+      },
+      "./figma-link": {
+        "types": "./dist/src/figmaLink.d.ts",
+        "default": "./dist/src/figmaLink.js"
       }
     },
     "bin": {
