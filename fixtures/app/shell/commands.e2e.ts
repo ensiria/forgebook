@@ -61,6 +61,35 @@ test.describe("forgebook check-page", () => {
     expect(run.stdout).toContain("broken on purpose");
   });
 
+  /** The focus problems of a page with these lines in its body. */
+  const focusOf = (body: string): string[] => {
+    const folder = mkdtempSync(join(tmpdir(), "forgebook-page-"));
+    writeFileSync(
+      join(folder, "page.html"),
+      `<!doctype html><html lang="en"><title>A page</title><main>${body}</main></html>`
+    );
+    const run = checkPage(pathToFileURL(join(folder, "page.html")).href);
+    rmSync(folder, { recursive: true });
+    const report: unknown = JSON.parse(run.stdout);
+    const problems = JSON.stringify(report).match(/"kind":"focus","message":"[^"]*"/g) ?? [];
+    return [...problems];
+  };
+
+  test("names a modal that does not take the focus, and one that lets Tab out", () => {
+    const button = "<button>Before</button>";
+    const open = '<div role="dialog" aria-modal="true" aria-label="A"><button>Inside</button></div>';
+    expect(focusOf(`${button}${open}`).join()).toContain("did not move the focus");
+    const taken = `${button}${open}<script>document.querySelector('[role=dialog] button').focus()</script>`;
+    expect(focusOf(taken).join()).toContain("Tab leaves the modal");
+  });
+
+  test("passes a native modal, which traps the focus itself, and a page with none", () => {
+    const native = `<dialog aria-label="A"><button>Inside</button></dialog>
+      <script>document.querySelector("dialog").showModal()</script>`;
+    expect(focusOf(native)).toEqual([]);
+    expect(focusOf("<button>Alone</button>")).toEqual([]);
+  });
+
   test("passes a page with nothing wrong", () => {
     const folder = mkdtempSync(join(tmpdir(), "forgebook-page-"));
     writeFileSync(

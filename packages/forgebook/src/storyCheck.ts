@@ -16,7 +16,7 @@ import type { CatalogueLists } from "./catalogue.ts";
 import type { ViewSwitch } from "./switches.ts";
 
 /** What kind of check found a problem. */
-export type StoryProblemKind = "frame" | "axe" | "spill" | "overlay" | "error";
+export type StoryProblemKind = "frame" | "axe" | "spill" | "overlay" | "focus" | "error";
 
 /** One problem a check found. */
 export type StoryProblem = {
@@ -77,7 +77,7 @@ export type StoryCheckReport = {
 };
 
 /** Every kind, for reading a report back. */
-const KINDS: readonly StoryProblemKind[] = ["frame", "axe", "spill", "overlay", "error"];
+const KINDS: readonly StoryProblemKind[] = ["frame", "axe", "spill", "overlay", "focus", "error"];
 
 /**
  * Whether a value is a problem.

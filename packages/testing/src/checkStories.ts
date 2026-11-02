@@ -19,7 +19,14 @@ import type {
 } from "forgebook/story-check";
 
 import { isOverlayChecked } from "./overlays.ts";
-import { axeProblems, errorProblems, overlayProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
+import {
+  axeProblems,
+  errorProblems,
+  focusProblems,
+  overlayProblems,
+  spillProblems,
+  watchedErrors
+} from "./storyCheck.ts";
 import { eachStoryPage, openedStory, READY_MS, type StoryPage } from "./storyPages.ts";
 import { hasLookChecks } from "./storyTestPlan.ts";
 
@@ -58,7 +65,8 @@ const checkedPage = async (
         ...(await overlayProblems(page, isOverlayChecked(storyPage.view), storyPage.story.height))
       ]
     : [];
-  return result([...(await axeProblems(page, a11y)), ...lookProblems, ...errorProblems(errors)]);
+  const axe = await axeProblems(page, a11y);
+  return result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(errors)]);
 };
 
 /**
