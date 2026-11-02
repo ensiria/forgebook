@@ -43,6 +43,7 @@ import { takesArgs } from "./dockHints.ts";
 import { dockTabs } from "./dockTabs.tsx";
 import { EmbedButton } from "./EmbedButton.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
 import { Icon } from "./icons.tsx";
 import { MatrixPicker } from "./MatrixPicker.tsx";
 import type { PluginReports, ShellPlugin } from "./pluginTabs.tsx";
@@ -276,8 +277,7 @@ export const Stage = ({
         })
       );
       onFixedChange(message.storyId, message.fixed);
-      const send = (shellMessage: ShellMessage): void =>
-        frame.postMessage(shellMessage, window.location.origin);
+      const send = (shellMessage: ShellMessage): void => frame.postMessage(shellMessage, framesOrigin());
       send({ type: "forgebook:events", names: eventNames });
       send({ type: "forgebook:args", args: panelArgs });
       send({ type: "forgebook:matrix", matrix });
@@ -313,7 +313,7 @@ export const Stage = ({
 
   const replay = (): void => {
     const message: ShellMessage = { type: "forgebook:replay" };
-    frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+    frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
   };
   const title = STRINGS.frameTitle(component.name, story.name);
   const canReplay = replayable === story.id && !isComparing(view);
@@ -390,7 +390,7 @@ export const Stage = ({
     trace: isComparing(view) ? undefined : traces.get(story.id),
     onPlayAgain: (): void => {
       const message: ShellMessage = { type: "forgebook:play-again" };
-      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+      frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
     },
     check: storyCheck.check,
     onCheck: isComparing(view) ? undefined : storyCheck.run,

@@ -44,7 +44,10 @@ describe("agentAnswer", () => {
       previews: [(): Promise<unknown> => Promise.reject(new ReferenceError("document is not defined"))]
     });
     const server = { load, resolveSource: async (): Promise<undefined> => undefined };
-    const answer = await agentAnswer(server, CONFIG, "stories", new URLSearchParams(), "http://host");
+    const answer = await agentAnswer(server, CONFIG, "stories", new URLSearchParams(), {
+      catalogue: "http://host",
+      frames: "http://host"
+    });
     expect(answer.status).toBe(200);
     expect(JSON.stringify(answer.body)).toContain("stories:kit-button--plain");
   });

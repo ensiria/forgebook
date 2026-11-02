@@ -18,17 +18,11 @@ import { storyTextOf } from "@forgebook/story-format/texts";
 
 import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
+import type { FramesPlacement } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
 import { shownLanguage } from "../languages.ts";
 import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
-import {
-  detailOf,
-  type FrameMessage,
-  isShellMessage,
-  type PanelArgs,
-  previewValue,
-  type ShellMessage
-} from "../messages.ts";
+import { detailOf, type PanelArgs, previewValue, type ShellMessage } from "../messages.ts";
 import { panelArgsOf, storyArgsOf } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { sourceFiles } from "../sourceFiles.ts";
@@ -53,6 +47,7 @@ import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
 import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
+import { type ShellChannel, shellChannel } from "./shellChannel.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import { mergedPreviews, readPreview, readStory } from "./storyModule.ts";
@@ -81,6 +76,8 @@ export type FrameConfig = {
   readonly playTools?: PlayToolsLoader;
   /** The plugins with a frame module (the generated frame passes them); none by default. */
   readonly plugins?: readonly FramePlugin[];
+  /** Where the frames run, so the frame hears only its shell: on the catalogue's own origin by default. */
+  readonly frames?: FramesPlacement;
 };
 
 /**
@@ -98,10 +95,29 @@ import.meta.hot?.on("vite:afterUpdate", (): void => {
   if (document.documentElement.getAttribute(STATUS_ATTRIBUTE) === "error") window.location.reload();
 });
 
-/** Tells the shell, which is the parent page on the same origin. */
-const tellShell = (message: FrameMessage): void => {
-  if (window.parent !== window) window.parent.postMessage(message, window.location.origin);
-};
+/**
+ * Why a story asked for its check cannot be checked: it could not be drawn, and answers with its error instead.
+ *
+ * @param message - the shell's message.
+ * @param failure - why the story is not drawn; none while it is.
+ * @returns the error, or none when the message asks no check or the story is drawn.
+ */
+const failedCheck = (message: ShellMessage, failure: string | undefined): string | undefined =>
+  message.type === "forgebook:check" ? failure : undefined;
+
+/**
+ * Answers the shell's checks with the story's error while it could not be drawn: the shell cannot read the frame's
+ * document, which may be on an origin of its own.
+ *
+ * @param shell - the channel to the shell.
+ * @param storyId - the story's id.
+ * @param failure - why the story is not drawn now; none while it is.
+ */
+const answerFailedChecks = (shell: ShellChannel, storyId: string, failure: () => string | undefined): void =>
+  shell.listen((message: ShellMessage): void => {
+    const failed = failedCheck(message, failure());
+    if (failed !== undefined) shell.tell({ type: "forgebook:error", storyId, message: failed });
+  });
 
 /**
  * Does what a message of the shell asks of the rendered story; the view's live part is applied apart, before the story
@@ -112,13 +128,15 @@ const tellShell = (message: FrameMessage): void => {
  * @param storyId - the story's id, for the answers.
  * @param rules - the catalogue's accessibility rules, for a check.
  * @param axeUrl - the address of axe's script, for a check.
+ * @param tellShell - tells the shell the check's result.
  */
 const answerShell = (
   message: ShellMessage,
   controls: StoryControls,
   storyId: string,
   rules: A11ySettings,
-  axeUrl: string | undefined
+  axeUrl: string | undefined,
+  tellShell: ShellChannel["tell"]
 ): void => {
   if (message.type === "forgebook:replay") void controls.replay();
   else if (message.type === "forgebook:args") controls.setPanelArgs(message.args);
@@ -162,6 +180,11 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   let previews: readonly unknown[] = config.previews ?? [];
   let preview = mergedPreviews(previews.map(readPreview));
   const view = parseView(window.location.search, catalogue);
+  const shell = shellChannel(config.frames, window);
+  // why the story is not drawn, once it failed
+  let failure: string | undefined;
+  answerFailedChecks(shell, storyId, () => failure);
+  const tellShell = shell.tell;
   applyView(document.documentElement, view, catalogue);
   // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
   // sees touch
@@ -183,19 +206,13 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     const { applyTools } = await import("./measureTools.ts");
     applyTools(document, tools, catalogue.gridStep);
   };
-  window.addEventListener("message", (event: MessageEvent): void => {
-    if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
-    if (event.data.type === "forgebook:tools") void showTools(event.data.tools);
-    if (event.data.type === "forgebook:spills") showSpills(event.data.isOn);
-    if (event.data.type !== "forgebook:view") return;
-    applyView(document.documentElement, withFixed(event.data.view, fixed), catalogue);
-    changeShown?.(event.data.view);
-    const address = frameAddress(
-      window.location.pathname,
-      storyId,
-      { ...view, ...event.data.view },
-      switches
-    );
+  shell.listen((message: ShellMessage): void => {
+    if (message.type === "forgebook:tools") void showTools(message.tools);
+    if (message.type === "forgebook:spills") showSpills(message.isOn);
+    if (message.type !== "forgebook:view") return;
+    applyView(document.documentElement, withFixed(message.view, fixed), catalogue);
+    changeShown?.(message.view);
+    const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
     window.history.replaceState(null, "", address);
   });
   // observed from the start, so the shell sizes the frame to an error as well as to a story
@@ -206,6 +223,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   };
   new ResizeObserver(reportSize).observe(document.body);
   const reportError = (message: string): void => {
+    failure = message;
     document.documentElement.setAttribute(STATUS_ATTRIBUTE, "error");
     tellShell({ type: "forgebook:error", storyId, message });
     tellDevServer({ kind: "render", storyId, view: window.location.search, message });
@@ -249,9 +267,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
     let controls: StoryControls | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
-    window.addEventListener("message", (event: MessageEvent): void => {
-      if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
-      if (controls !== undefined) answerShell(event.data, controls, storyId, catalogue.a11y, config.axeUrl);
+    shell.listen((message: ShellMessage): void => {
+      if (controls !== undefined)
+        answerShell(message, controls, storyId, catalogue.a11y, config.axeUrl, tellShell);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them)
     // (a language the source gives as a loader is loaded as it is shown)

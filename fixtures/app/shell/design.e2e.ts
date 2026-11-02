@@ -42,7 +42,12 @@ const comparedStory = (page: Page): FrameLocator =>
  */
 const reportFrom = async (iframe: Locator, report: unknown): Promise<void> => {
   const frame = await (await iframe.elementHandle())?.contentFrame();
-  await frame?.evaluate((message) => window.parent.postMessage(message, window.location.origin), report);
+  // to the shell's origin, which the frame learns from its parent: the frames may run on an origin of their own
+  await frame?.evaluate(
+    (message) =>
+      window.parent.postMessage(message, window.location.ancestorOrigins[0] ?? window.location.origin),
+    report
+  );
 };
 
 test.describe("the Design tab", () => {

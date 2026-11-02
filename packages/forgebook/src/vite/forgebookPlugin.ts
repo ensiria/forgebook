@@ -19,7 +19,7 @@
  *
  * @module
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 
 import {
@@ -31,6 +31,7 @@ import {
   type ViteDevServer
 } from "vite";
 
+import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
@@ -40,6 +41,8 @@ import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } 
 import { type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
+import { builtPlacement } from "./framesConfig.ts";
+import { serveFrames } from "./framesServer.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { FILES_MODULE_HOT, renewedModule, storyFileHotHooks } from "./hotSnippets.ts";
 import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
@@ -58,6 +61,7 @@ import {
   storiesSourceModule,
   TOKENS_MODULE
 } from "./pages.ts";
+import { pagesViteConfig } from "./pagesViteConfig.ts";
 import { pluginFences } from "./pluginConfig.ts";
 import {
   DOCS_PAGES_PREFIX,
@@ -68,7 +72,6 @@ import {
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
-import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
   type KeptIndex,
   SEARCH_PREFIX,
@@ -85,19 +88,6 @@ import {
   PAGE_QUERY,
   PAGES_SEARCH_PREFIX
 } from "./textQueries.ts";
-
-/**
- * A file's text, or none when it cannot be read.
- *
- * @param file - the file.
- */
-const readTextFile = (file: string): string | undefined => {
-  try {
-    return readFileSync(file, "utf8");
-  } catch {
-    return undefined;
-  }
-};
 
 /** This module's folder, in the core's package: the core's own dependencies resolve from here, not the project's. */
 const PACKAGE_DIR: string = import.meta.dirname;
@@ -230,8 +220,8 @@ const requestedPage = (url: string): PageFile | undefined => {
 };
 
 /**
- * A module the plugin generates for a catalogue's pages, when the id names one: the configuration's data, an entry,
- * the project's own stories' source, or a page's HTML (unless the folder has one of its own).
+ * A module the plugin generates for a catalogue's pages, when the id names one: an entry, the project's own stories'
+ * source, or a page's HTML (unless the folder has one of its own).
  *
  * @param id - the module's id.
  * @param config - the catalogue's configuration.
@@ -242,7 +232,6 @@ const generatedModule = (
   config: ResolvedConfig,
   command: ConfigEnv["command"]
 ): { code: string; moduleType: "js" } | string | undefined => {
-  if (id === CONFIG_ID) return { code: configModule(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["index.html"]))
     return { code: shellEntry(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["frame.html"]))
@@ -281,6 +270,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const builtDocs = new Map<string, Promise<DocsResult>>();
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
+  /** Where the frames run: the dev server's second port once it listens, the configuration's choice in a build. */
+  let framesPlacement = async (): Promise<FramesPlacement> =>
+    config === undefined ? SAME_ORIGIN : builtPlacement(config.frames);
   let config = options.config;
   /** The dev server; none in a build. */
   let devServer: ViteDevServer | undefined;
@@ -382,6 +374,17 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const filesModule = (id: string, watch: (file: string) => void): ReturnType<typeof patternModule> =>
     patternModule(id, watch, config?.lists.usedIn !== false, indexCache(), isServing());
   /**
+   * A module of the catalogue's pages, when the id names one: the configuration's data, with where the frames run, or
+   * a generated entry or page.
+   *
+   * @param id - the module's id.
+   */
+  const pageModule = async (id: string): Promise<{ code: string; moduleType: "js" } | string | undefined> => {
+    if (config === undefined) return undefined;
+    if (id === CONFIG_ID) return { code: configModule(config, await framesPlacement()), moduleType: "js" };
+    return generatedModule(id, config, command);
+  };
+  /**
    * The patterns' modules an edit of a story file changed (a story added or renamed, a title), which the open pages
    * read once: the file alone is indexed again. One that cannot be read yet (an edit half typed) changes nothing: its
    * module shows the error, and the next edit is read again.
@@ -457,26 +460,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
       }
-      const pages =
-        config === undefined
-          ? {}
-          : {
-              root: config.dir,
-              // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
-              // story files (the project's and the sources') are scanned for what their components import
-              optimizeDeps: {
-                include: prebundled(config, packageResolver(config.dir)),
-                entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
-              },
-              build: {
-                rolldownOptions: {
-                  input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") },
-                  // a catalogue names each file several times over, once per loader: a name of its hash alone is a
-                  // tenth of what the index weighs; a catalogue whose builds are read by name keeps Vite's names
-                  ...(config.build.readableNames ? {} : { output: { chunkFileNames: "assets/[hash].js" } })
-                }
-              }
-            };
+      const pages = config === undefined ? {} : pagesViteConfig(config, userConfig);
       return {
         ...pages,
         css: {
@@ -509,10 +493,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     configureServer: (server: ViteDevServer): void => {
       devServer = server;
       server.httpServer?.on("close", (): void => void docs?.close());
+      // first: the frames' own origin, and the guard that keeps every other origin's page from reading this one
+      if (config !== undefined) serveFrames(server, config, (placement) => (framesPlacement = placement));
       // an edited component or type file changes its docs: the worker renews its programs on their next read
       server.watcher.on("change", (file: string): void => renewOnChange(server, file));
       // the answers to tools and agents (`forgebook stories`, `forgebook mcp`), from the same sources as the pages
-      if (config !== undefined) server.middlewares.use(agentMiddleware(server, config, live));
+      if (config !== undefined)
+        server.middlewares.use(agentMiddleware(server, config, live, () => framesPlacement()));
       if (config?.heights !== undefined) {
         const file = {
           heights: config.heights,
@@ -567,7 +554,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     },
     ...storyFileHotHooks(isServing, changedFilesModules),
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
-      const generated = config === undefined ? undefined : generatedModule(id, config, command);
+      const generated = await pageModule(id);
       if (generated !== undefined) return generated;
       // an answer, not an error: an error would raise Vite's overlay on every reader's open page
       if (!isReadable(id, devServer)) return { code: "export default null;", moduleType: "js" };

@@ -3,8 +3,8 @@
  * The page between a client's app and a story's frame: it shows the frame and says when the story is up and how tall.
  *
  * @remarks
- * The app runs on an origin the host chooses, so a frame cannot talk to it: a frame posts to its own origin only, which
- * keeps its messages (a story's args among them) from any page that embeds it. This page is on the catalogue's origin,
+ * The app runs on an origin the host chooses, so a frame cannot talk to it: a frame posts to the catalogue's origin only,
+ * which keeps its messages (a story's args among them) from any page that embeds it. This page is on the catalogue's origin,
  * reads the frame's messages as the shell does, and passes the app three facts and nothing else: that it runs, that
  * something was drawn, and the height. A page that embeds it learns no more than that, so it can post to any origin, as
  * it has to: the app's may be opaque. A story that fails counts as drawn, as the frame shows the error itself.
@@ -44,6 +44,8 @@ export type PreviewRelayMessage =
 export const previewRelay = (frameAddress: string, title: string): void => {
   /** How long a loaded frame may stay silent before its one reload, in ms. */
   const reloadAfterMs = 4000;
+  // the frame's own origin, which may be another than this page's: only its messages are read
+  const framesOrigin = new URL(frameAddress, window.location.href).origin;
   const frame = document.createElement("iframe");
   frame.title = title;
   frame.style.cssText = "display:block;width:100%;height:100vh;border:0";
@@ -56,11 +58,12 @@ export const previewRelay = (frameAddress: string, title: string): void => {
     setTimeout(() => {
       if (hasHeard || hasReloaded) return;
       hasReloaded = true;
-      frame.contentWindow?.location.reload();
+      // set again, not reloaded from inside: the frame may run on an origin of its own, out of this page's reach
+      frame.src = frameAddress;
     }, reloadAfterMs);
   });
   window.addEventListener("message", (event: MessageEvent<unknown>) => {
-    if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
+    if (event.origin !== framesOrigin || event.source !== frame.contentWindow) return;
     const { data } = event;
     if (typeof data !== "object" || data === null || !("type" in data)) return;
     hasHeard = true;

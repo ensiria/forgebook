@@ -544,6 +544,36 @@ jobs:
       # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
       # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+## Stories on an origin of their own
+
+A story's code, or a value a shared link puts in one of its props (an `href`, an `html`), runs in its frame. So that it
+cannot read or act on the catalogue, the frames run on another origin than the catalogue's page:
+
+- **On the dev server**, by default: a second port, the catalogue's + 1 (`forgebook dev` prints it as `Frames`). The
+  catalogue refuses what another origin's page asks of it, and the frames' port serves only the frame page, the public
+  folder and the modules your stories import: a frame cannot call the agent API (`/__forgebook/api/`) or read a file
+  of the project that no story imports. Choose the port with `--frame-port` or `frames: { port }`.
+- **In a static build**, the frames share the catalogue's origin, unless you serve the same files from a second host
+  and name both, ideally two subdomains of one site (two different sites make the frame's cookies third-party):
+
+```ts
+export default defineConfig({
+  // …
+  frames: { origins: { catalogue: "https://ui.example.com", frames: "https://ui-frames.example.com" } }
+});
+```
+
+`origins` also serves a dev server behind a proxy that gives each port a host of its own. `frames: "same-origin"` keeps
+the frames on the catalogue's origin everywhere, for a place that opens one port only; then a story's code can reach the
+catalogue as before. What the frames could use on the catalogue's origin still works on theirs: storage, cookies, MSW's
+worker, the clipboard, full screen, the camera and the microphone. A story's link can no longer take the catalogue's
+tab to another address.
+
+What stays reachable from a frame: the code it runs (your stories, their components, what the catalogue imports), the
+errors Vite sends every page while you edit, and `forgebook errors`, where a frame reports its own errors. If the
+default port is taken, the frames move to the next free one, so their storage moves with them; give `--frame-port` to
+keep it.
+
 ## Your look in the shell
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
 written into the page at build, and the frames are left alone, since they belong to your stories.

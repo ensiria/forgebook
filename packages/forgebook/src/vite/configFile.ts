@@ -30,6 +30,7 @@ import {
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
+import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 
@@ -101,6 +102,8 @@ export type ResolvedConfig = {
   readonly plugins: readonly ForgebookPlugin[];
   /** How `forgebook build` writes the catalogue, every option given its default. */
   readonly build: Required<BuildOptions>;
+  /** Where the stories' frames run. */
+  readonly frames: ResolvedFrames;
 };
 
 /** The packages of the play tools: both installed, or the plays get neither. */
@@ -234,7 +237,7 @@ const configProblem = (config: unknown): string | undefined => {
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
   if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
-  return undefined;
+  return framesProblem("frames" in config ? config.frames : undefined);
 };
 
 /**
@@ -344,7 +347,8 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     lists,
     hasPlayTools: hasPlayToolsIn(dir),
     plugins,
-    build: { readableNames: config.build?.readableNames === true }
+    build: { readableNames: config.build?.readableNames === true },
+    frames: resolvedFrames(config.frames)
   };
 };
 

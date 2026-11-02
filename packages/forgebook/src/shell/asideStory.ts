@@ -10,6 +10,7 @@
 import { isFrameMessage, type PanelArgs, type ShellMessage } from "../messages.ts";
 import type { PluginStoryFrame } from "../plugin.ts";
 import type { LiveView, StageWidth } from "../viewState.ts";
+import { framesOrigin, isFromFrames } from "./framesOrigin.ts";
 import { FRAME_ASIDE_ATTRIBUTE } from "./useFrameMessages.ts";
 
 /** How the story is drawn again. */
@@ -44,9 +45,9 @@ export const showAsideStory = (target: HTMLElement, title: string, aside: AsideS
   if (aside.background !== undefined) target.style.backgroundColor = aside.background;
   const answer = (event: MessageEvent): void => {
     const story = frame.contentWindow;
-    if (event.origin !== window.location.origin || event.source !== story || story === null) return;
+    if (!isFromFrames(event) || event.source !== story || story === null) return;
     if (!isFrameMessage(event.data) || event.data.type !== "forgebook:ready") return;
-    const send = (message: ShellMessage): void => story.postMessage(message, window.location.origin);
+    const send = (message: ShellMessage): void => story.postMessage(message, framesOrigin());
     send({ type: "forgebook:args", args: aside.args });
     if (aside.view !== undefined) send({ type: "forgebook:view", view: aside.view });
   };

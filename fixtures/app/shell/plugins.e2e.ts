@@ -148,9 +148,10 @@ test.describe("the Network tab", () => {
     await expect(greeting).toHaveText("Loading", { timeout: WORKER_START });
     const frame = page.frameLocator("iframe.forgebook-frame-view").locator("html");
     await expect(frame).toHaveAttribute("data-forgebook-status", "ready", { timeout: WORKER_START });
-    await frame.evaluate((root) => {
-      const view = root.ownerDocument.defaultView;
-      view?.postMessage({ type: "forgebook:play-again" }, view.location.origin);
+    // as the shell asks it: from the catalogue's page, to the frame's origin
+    await page.locator("iframe.forgebook-frame-view").evaluate((element) => {
+      if (!(element instanceof HTMLIFrameElement)) return;
+      element.contentWindow?.postMessage({ type: "forgebook:play-again" }, new URL(element.src).origin);
     });
     await expect(greeting).toHaveCount(0);
     await expect(greeting).toHaveText("Loading", { timeout: 10_000 });

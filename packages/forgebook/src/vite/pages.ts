@@ -14,6 +14,7 @@
 import { join } from "node:path";
 
 import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
+import type { FramesPlacement } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
@@ -69,6 +70,9 @@ const escaped = (text: string): string =>
  * loaded is loaded again first, up to three times, one, two then four seconds later, counted in the session's storage
  * until the frame draws its story (`staleModule.ts` clears the count): in development a library served as source asks
  * for thousands of modules, and the browser refuses some while the other frames load (`ERR_INSUFFICIENT_RESOURCES`).
+ * Its error goes to the page that holds the frame, by that page's origin (`location.ancestorOrigins`, else the
+ * referrer's), since the frame may run on an origin of its own and the frame's code that knows the catalogue's never
+ * ran; it holds the error's text only, which the frame shows anyway.
  */
 const FRAME_LOAD_GUARD = `(function () {
   var RELOAD_DELAY = 1000;
@@ -86,7 +90,16 @@ const FRAME_LOAD_GUARD = `(function () {
     document.getElementById("root").replaceChildren(box);
     root.setAttribute("data-forgebook-status", "error");
     var storyId = new URLSearchParams(location.search).get("story") || "";
-    if (parent !== window) parent.postMessage({ type: "forgebook:error", storyId: storyId, message: message }, location.origin);
+    var shell = parentOrigin();
+    if (parent !== window && shell !== null) parent.postMessage({ type: "forgebook:error", storyId: storyId, message: message }, shell);
+  }
+  function parentOrigin() {
+    try {
+      if (location.ancestorOrigins && location.ancestorOrigins.length > 0) return location.ancestorOrigins[0];
+      return document.referrer === "" ? null : new URL(document.referrer).origin;
+    } catch (error) {
+      return null;
+    }
   }
   function reloadAgain() {
     var done;
@@ -147,14 +160,16 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
  * The configuration's data, as the pages' module exports it.
  *
  * @param config - the configuration.
+ * @param frames - where the frames run: known on the dev server once both of its ports listen.
  */
-export const configModule = (config: ResolvedConfig): string => {
+export const configModule = (config: ResolvedConfig, frames: FramesPlacement): string => {
   const data: PageConfig = {
     title: config.title,
     heights: config.heights,
     switches: config.switches,
     languages: config.languages,
-    lists: config.lists
+    lists: config.lists,
+    frames
   };
   return `export default ${JSON.stringify(data)};`;
 };
@@ -225,6 +240,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
     `    sources: ${sources.list},`,
     '    frameUrl: "frame.html",',
+    "    frames: config.frames,",
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
@@ -306,6 +322,7 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    "    frames: config.frames,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
     ...(frames.length === 0
       ? []

@@ -5,15 +5,14 @@
  * @remarks
  * Part of the audiences' chunk. The table reads the index only, so it costs no frame. The check is asked for by a
  * person, never by itself: axe downloads with the first one, and the page's far frames load for it through the queue. A
- * frame already there is asked at once; one that is not gets asked by its ready message, since a message sent to a
- * document still loading is lost. The details of a broken rule stay on the story's page, in its Accessibility tab.
+ * frame already there is asked at once, and answers with its check or its error; one still loading gets asked by its
+ * ready message, since a message sent to a document still loading is lost. The details of a broken rule stay on the story's page, in its Accessibility tab.
  *
  * @module
  */
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 
 import { groupLabel, type StoryGroupSetting } from "../catalogue.ts";
-import { STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
 import type { ShellMessage } from "../messages.ts";
 import { groupedStories, type TreeStory } from "../storyTree.ts";
 import type { CheckState } from "./A11yTab.tsx";
@@ -21,6 +20,7 @@ import { AUDIENCE_TEXTS } from "./audiencePage.ts";
 import { CodeText } from "./CodeText.tsx";
 import { a11yHint } from "./dockHints.ts";
 import { type ExampleContext, StoryLink } from "./Example.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
 import { type CheckResult, type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
 import type { FrameQueue } from "./useFrameQueue.ts";
 
@@ -36,14 +36,6 @@ type PageChecksState = {
 };
 
 /**
- * What a frame's document says of its story; none while another document is still there.
- *
- * @param frame - the frame.
- */
-const frameStatus = (frame: HTMLIFrameElement): string | null | undefined =>
-  frame.contentDocument?.documentElement.getAttribute(STATUS_ATTRIBUTE);
-
-/**
  * The checks of a page's stories.
  *
  * @param pageRef - the element that holds the page's frames.
@@ -55,7 +47,8 @@ const usePageChecks = (
 ): PageChecksState => {
   const [checks, setChecks] = useState<PageChecks>(new Map());
   const isAsked = useRef(false);
-  // read by a frame's ready message, which may repeat: a second run of axe in a document refuses to start
+  // the checks under way: a frame is asked once, since a second run of axe in a document refuses to start; its ready
+  // message, once per document, asks again a frame whose first ask arrived while it loaded
   const running = useRef(new Set<string>());
 
   const setCheck = (storyId: string, check: CheckState): void =>
@@ -66,15 +59,19 @@ const usePageChecks = (
     running.current.add(storyId);
     setCheck(storyId, { status: "running" });
     const message: ShellMessage = { type: "forgebook:check" };
-    frame.postMessage(message, window.location.origin);
+    frame.postMessage(message, framesOrigin());
   };
 
   useFrameMessages({
+    // a frame asked while it still loaded lost the message: its ready message asks it again
     onReady: (frame: Window, { storyId }: ReadyMessage): void => {
-      if (isAsked.current) ask(frame, storyId);
+      if (!isAsked.current) return;
+      running.current.delete(storyId);
+      ask(frame, storyId);
     },
     onCall: (): void => undefined,
     onFailed: (storyId: string): void => {
+      running.current.delete(storyId);
       if (isAsked.current) setCheck(storyId, { status: "error", message: AUDIENCE_TEXTS.coverageFailed });
     },
     onChecked: (result: CheckResult): void => {
@@ -92,12 +89,12 @@ const usePageChecks = (
   const checkAll = (): void => {
     isAsked.current = true;
     queue.loadAll();
+    // every frame is asked: one whose story is drawn answers its check, one that failed its error; one still loading
+    // loses the message and is asked by its ready message
     for (const frame of pageRef.current?.querySelectorAll("iframe") ?? []) {
       const storyId = new URL(frame.src, window.location.href).searchParams.get("story");
-      const status = frameStatus(frame);
       if (storyId === null || frame.contentWindow === null) continue;
-      if (status === "ready") ask(frame.contentWindow, storyId);
-      if (status === "error") setCheck(storyId, { status: "error", message: AUDIENCE_TEXTS.coverageFailed });
+      ask(frame.contentWindow, storyId);
     }
   };
 

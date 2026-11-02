@@ -18,6 +18,7 @@ import type { ForgebookPlugin } from "../plugin.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
+import type { FramesOption } from "./framesConfig.ts";
 
 /** What a library's preset gives a catalogue. */
 export type ForgebookPreset = CatalogueLists & {
@@ -87,6 +88,12 @@ export type ForgebookConfig = CatalogueLists & {
   readonly plugins?: readonly ForgebookPlugin[];
   /** How `forgebook build` writes the catalogue. */
   readonly build?: BuildOptions;
+  /**
+   * Where the stories' frames run. On the dev server, an origin of their own by default (the catalogue's port + 1), so
+   * a story's code cannot reach the catalogue's page, its agent API or the project's files; a build keeps the
+   * catalogue's origin unless `origins` names a second host. `"same-origin"` runs them on the catalogue's origin.
+   */
+  readonly frames?: FramesOption;
 };
 
 /** How `forgebook build` writes the catalogue. */

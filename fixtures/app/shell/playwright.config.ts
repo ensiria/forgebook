@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { SHELL_PORT, VUE_PORT, WHITE_LABEL_PORT } from "./ports";
+import { framePortOf, SHELL_PORT, VUE_PORT, WHITE_LABEL_PORT } from "./ports";
 
 /**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
@@ -23,7 +23,7 @@ import { SHELL_PORT, VUE_PORT, WHITE_LABEL_PORT } from "./ports";
  * @param port - the port it listens on.
  */
 const catalogueServer = (folder: string, port: number) => ({
-  command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${port} --force`,
+  command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${port} --frame-port ${framePortOf(port)} --force`,
   cwd: folder,
   url: `http://127.0.0.1:${port}/`,
   reuseExistingServer: false
@@ -38,7 +38,7 @@ export default defineConfig({
     catalogueServer(join(import.meta.dirname, ".."), SHELL_PORT),
     {
       // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
-      command: `pnpm exec forgebook dev --config white-label/forgebook.config.ts --host 127.0.0.1 --port ${WHITE_LABEL_PORT} --force`,
+      command: `pnpm exec forgebook dev --config white-label/forgebook.config.ts --host 127.0.0.1 --port ${WHITE_LABEL_PORT} --frame-port ${framePortOf(WHITE_LABEL_PORT)} --force`,
       cwd: join(import.meta.dirname, ".."),
       url: `http://127.0.0.1:${WHITE_LABEL_PORT}/`,
       reuseExistingServer: false

@@ -20,6 +20,7 @@ import type { StorySource } from "@forgebook/story-format/source";
 import { createIdResolver, type ViteDevServer } from "vite";
 
 import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
+import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
@@ -37,6 +38,8 @@ import { agentIndexAnswer } from "./agentIndexRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
 import { findAnswer } from "./findRoute.ts";
+import { framesOriginOf } from "./framesConfig.ts";
+import { hostOf } from "./framesServer.ts";
 import { changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
 import { PREVIEW_ROUTE } from "./previewRoute.ts";
@@ -283,7 +286,7 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
  * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
  *   tokens, `query` and `limit` for a search, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
- * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
+ * @param origins - where the catalogue is served (`http://localhost:5173`) and where its frames are, for the links.
  * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
  *   command's own, which no frame reports to.
  */
@@ -292,7 +295,7 @@ export const agentAnswer = async (
   config: ResolvedConfig,
   route: string,
   params: URLSearchParams,
-  origin: string,
+  origins: PageOrigins,
   live?: LiveErrors
 ): Promise<AgentAnswer> => {
   try {
@@ -304,7 +307,7 @@ export const agentAnswer = async (
       tree: storyTree(loaded.sources),
       config,
       params,
-      pages: { page: `${origin}/`, frame: `${origin}/frame.html` },
+      pages: { page: `${origins.catalogue}/`, frame: `${origins.frames}/frame.html` },
       view: params.get("view") ?? ""
     };
     if (route === "errors") return errorsAnswer(context, live);
@@ -329,11 +332,13 @@ export const agentAnswer = async (
  *
  * @param url - the request's address: `id` and `view` in its query.
  * @param response - the answer.
+ * @param framesOrigin - where the frames run, which the relay's frame is loaded from.
  */
-const answerPreview = async (url: URL, response: ServerResponse): Promise<void> => {
+const answerPreview = async (url: URL, response: ServerResponse, framesOrigin: string): Promise<void> => {
   const { previewRelayPage } = await import("./previewPages.ts");
   const id = url.searchParams.get("id") ?? "";
-  const frame = frameAddressOf("/frame.html", id, url.searchParams.get("view") ?? "");
+  // the frame on its own origin, as the shell shows it: the relay reads its messages from there
+  const frame = `${framesOrigin}${frameAddressOf("/frame.html", id, url.searchParams.get("view") ?? "")}`;
   response.setHeader("Content-Type", "text/html");
   response.setHeader("Cache-Control", "no-store");
   response.end(previewRelayPage(frame, id));
@@ -345,23 +350,36 @@ const answerPreview = async (url: URL, response: ServerResponse): Promise<void> 
  * @param server - the dev server, which loads the modules.
  * @param config - the catalogue's configuration.
  * @param live - the errors the open frames report.
+ * @param placement - where the frames run, for the links to them.
  * @returns a Connect middleware: it answers its own paths and passes every other request on.
  */
 export const agentMiddleware =
-  (server: ViteDevServer, config: ResolvedConfig, live: LiveErrors) =>
+  (
+    server: ViteDevServer,
+    config: ResolvedConfig,
+    live: LiveErrors,
+    placement: () => Promise<FramesPlacement>
+  ) =>
   (request: IncomingMessage, response: ServerResponse, next: (error?: unknown) => void): void => {
-    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+    const scheme = server.config.server.https === undefined ? "http:" : "https:";
+    const url = new URL(request.url ?? "/", `${scheme}//${hostOf(request) ?? "localhost"}`);
     if (!url.pathname.startsWith(AGENT_API)) {
       next();
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
-    if (route === PREVIEW_ROUTE) {
-      void answerPreview(url, response).catch(next);
-      return;
-    }
-    void agentAnswer(agentServer(server, config), config, route, url.searchParams, url.origin, live)
-      .then(({ status, body }) => {
+    void placement()
+      .then(async (frames: FramesPlacement) => {
+        const origins = { catalogue: url.origin, frames: framesOriginOf(frames, url.href) ?? url.origin };
+        if (route !== PREVIEW_ROUTE)
+          return agentAnswer(agentServer(server, config), config, route, url.searchParams, origins, live);
+        await answerPreview(url, response, origins.frames);
+        return undefined;
+      })
+      .then((answer: AgentAnswer | undefined) => {
+        // the preview's relay page was answered already
+        if (answer === undefined) return;
+        const { status, body } = answer;
         response.statusCode = status;
         response.setHeader("Content-Type", "application/json");
         response.setHeader(ROOT_HEADER, rootHeaderValue(config.dir));
