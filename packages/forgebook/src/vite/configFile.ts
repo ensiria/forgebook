@@ -11,7 +11,7 @@
  */
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
@@ -22,6 +22,7 @@ import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
+import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
@@ -47,7 +48,10 @@ export type ResolvedTokensFile = {
   readonly mode: string | undefined;
 };
 
-/** A configuration ready for the pages: its folder, its presets merged, its paths absolute. */
+/**
+ * A configuration ready for the pages: its folder, its presets merged, its paths absolute and in Vite's form (forward
+ * slashes on every system, `vitePaths.ts`), so they compare with Vite's ids and can be written into generated code.
+ */
 export type ResolvedConfig = {
   /** The folder the configuration file is in: Vite's root. */
   readonly dir: string;
@@ -85,8 +89,11 @@ export type ResolvedConfig = {
   readonly hasMocks: boolean;
 };
 
-/** MSW's browser module, for a story's mocked API. */
-export const MOCKS_MODULE = "msw/browser";
+/**
+ * MSW's modules, for a story's mocked API: the browser module, which starts the worker, and the main one, whose handler
+ * keeps each story's handlers to its own frame.
+ */
+export const MOCKS_MODULES = ["msw/browser", "msw"] as const;
 
 /** Its package's manifest, what tells it is installed: the module itself cannot be resolved from Node. */
 const MOCKS_MANIFEST = "msw/package.json";
@@ -228,15 +235,23 @@ const configProblem = (config: unknown): string | undefined => {
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
 
 /**
- * A configuration with its presets merged and its paths made absolute.
+ * A configuration with its presets merged and its paths made absolute, in Vite's form.
  *
  * @param config - the configuration.
- * @param dir - the folder of its file.
+ * @param fileDir - the folder of its file.
+ * @param paths - the path functions; the running system's unless a test names another.
  * @throws when the merged switches cannot be used.
  */
-export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedConfig => {
+export const resolveConfig = (
+  config: ForgebookConfig,
+  fileDir: string,
+  paths: VitePaths = VITE_PATHS
+): ResolvedConfig => {
   const presets = config.presets ?? [];
-  const absolute = (path: string): string => (isAbsolute(path) ? path : resolve(dir, path));
+  const dir = paths.normalize(fileDir);
+  const absolute = (path: string): string => paths.resolve(dir, path);
+  // a preset's preview and style sheet are absolute paths (its own files) or a package's specifier, kept as written
+  const ownPath = (path: string): string => (paths.isAbsolute(path) ? paths.normalize(path) : path);
   const declared = [...presets.map((preset) => preset.switches), config.switches];
   const switches = declared.some((list) => list !== undefined) ? mergedById(declared) : undefined;
   const problem = switches === undefined ? undefined : switchesProblem(switches);
@@ -254,7 +269,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
   const ownPreview =
     config.preview === undefined
-      ? PREVIEW_FILES.map((name) => resolve(dir, name)).find((file) => existsSync(file))
+      ? PREVIEW_FILES.map((name) => paths.join(dir, name)).find((file) => existsSync(file))
       : absolute(config.preview);
   return {
     dir,
@@ -267,7 +282,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     switches,
     languages: mergedById([...presets.map((preset) => preset.languages), config.languages]),
     previews: [
-      ...presets.flatMap((preset) => (preset.preview === undefined ? [] : [preset.preview])),
+      ...presets.flatMap((preset) => (preset.preview === undefined ? [] : [ownPath(preset.preview)])),
       ...(ownPreview === undefined ? [] : [ownPreview])
     ],
     head: [...presets.map((preset) => preset.head ?? ""), config.head ?? ""]
@@ -276,7 +291,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     shell: {
       themeCss: shellThemeCss(theme),
       styleSheets: [
-        ...presets.flatMap((preset) => (preset.shell?.css === undefined ? [] : [preset.shell.css])),
+        ...presets.flatMap((preset) => (preset.shell?.css === undefined ? [] : [ownPath(preset.shell.css)])),
         ...(config.shell?.css === undefined ? [] : [absolute(config.shell.css)])
       ],
       problems: [...tokenThemed.problems, ...shellThemeProblems(theme)]

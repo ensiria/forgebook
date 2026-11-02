@@ -105,6 +105,11 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
   their TSDoc, nothing written twice.
+- **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
+  Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
+  `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
+  (`onclick`, `innerHTML`, a text for a number) is left out and listed above the story, with a button that removes it
+  from the address. A value that is code never comes from a link.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break and every number a huge one, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
@@ -117,9 +122,9 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
-  own, each with its name, logo and texts.
-- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook and helper of a
-  package, from its exports, their TSDoc and its stories.
+  own, each with its name, logo, texts and design tokens.
+- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook, helper and
+  design token of a package, from its exports, their TSDoc, its stories and its source.
 - **Tests from the stories**, with [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing): every
   story in the browser with axe, spills and overlays, screenshots, and every story rendered on the server.
 
@@ -302,8 +307,9 @@ export const Loaded: Story<typeof Users> = {
   }
 };
 `parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
-unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
-on the dev server and in a static build.
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. On a
+component page, where one worker serves every frame, each story's handlers answer its own frame only: a story with none
+goes to the network. It works on the dev server and in a static build.
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
@@ -395,6 +401,18 @@ its own, and agents can ask what to write instead:
 ```ts
 tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
 ```
+A library gives its tokens to every catalogue that shows it: the same list on its source, by path from the module that
+declares the source. It is read from that module's text, never by running it, so a broken story cannot hide a token: write
+it in the object of `export const source`, with plain strings and paths inside the package. A source re-exported or
+spread from another module gives no tokens.
+```ts
+export const source: StorySource = { id: "acme-ui", tokens: ["tokens.json"] /* … */ };
+```
+A catalogue reads each source's files in its `sources` order, then its own, so its aliases reach a library's palette. When
+two authors give one token different values in the same theme the last stands, which makes the catalogue's own the final
+word: it is what puts the libraries together. The answer says so in `clashes` (`kept`, `replaced`), the command warns,
+and neither fails: a clash is a choice to review, not a token that cannot be read. A file over another may write only
+`$value`: the token keeps its type, description and deprecation.
 ```sh
 npx forgebook tokens --category color --json
 npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whether each is really close
@@ -414,8 +432,8 @@ are read for values: stories, tests, token definitions and generated files are l
 code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
-component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),
-and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the
+component, hook, helper, style module (what it is, how to import it, its props, the id of a story that shows it) and
+design token of its source (its value, each theme's, what it aliases, what it is for), and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the
 package's `package.json`:
 
 ```json
