@@ -5,7 +5,7 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -473,6 +473,54 @@ describe("forgebook check-code", { timeout: SERVER_TIMEOUT }, () => {
     const broken = check();
     expect(broken.exitCode).not.toBe(0);
     expect(broken.stderr).toContain("tokens files have problems");
+  });
+});
+
+describe("a built catalogue for agents", { timeout: SERVER_TIMEOUT }, () => {
+  /** The fixture's catalogue, which has a real framework to build with. */
+  const Fixture = join(import.meta.dirname, "..", "..", "..", "fixtures", "app", "forgebook.config.ts");
+
+  it("answers from its folder, with no server and no repository, and only reads", () => {
+    const out = join(root, "built-site");
+    const built = runScriptProcess(ENTRY, ["build", "--config", Fixture, "--out", out, "--agent-index"]);
+    expect(built.exitCode).toBe(0);
+    const message = (id: number, method: string, params: unknown): string =>
+      JSON.stringify({ jsonrpc: "2.0", id, method, params });
+    const input = [
+      message(1, "initialize", {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" }
+      }),
+      JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      message(2, "tools/list", {}),
+      message(3, "tools/call", { name: "find_component", arguments: { query: "button" } })
+    ].join("\n");
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--from", out], {
+      cwd: tmpdir(),
+      input: `${input}\n`,
+      encoding: "utf8"
+    });
+    expect(run.status).toBe(0);
+    const [, list, found] = run.stdout.trim().split("\n");
+    expect(list).toContain("find_component");
+    expect(list).not.toContain("check_story");
+    expect(list).not.toContain("new_stories");
+    expect(found).toContain("components/Button");
+  });
+
+  it("writes nothing for agents unless asked, and takes an old index away", () => {
+    const out = join(root, "built-site");
+    expect(runScriptProcess(ENTRY, ["build", "--config", Fixture, "--out", out]).exitCode).toBe(0);
+    expect(existsSync(join(out, "forgebook-agent.json"))).toBe(false);
+  });
+
+  it("says what to do when the folder holds no index", () => {
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--from", join(root, "built-site")], {
+      input: "",
+      encoding: "utf8"
+    });
+    expect(run.status).not.toBe(0);
   });
 });
 

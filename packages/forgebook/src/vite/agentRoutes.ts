@@ -30,11 +30,12 @@ import {
   storyDocument,
   storyLinks
 } from "./agentApi.ts";
+import { agentIndexAnswer } from "./agentIndexRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { findAnswer } from "./findRoute.ts";
 import { changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
-import { STORYLESS_ROUTES } from "./storylessRoutes.ts";
+import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
 /** The path the answers live under. */
@@ -152,7 +153,7 @@ const errorsAnswer = (context: RouteContext, live: LiveErrors | undefined): Agen
  *
  * @param context - what the routes read.
  */
-const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
+export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   const { config, params, tree, pages, view, loaded } = context;
   const usage =
     config.lists.usedIn !== false && params.get("usedIn") === "true"
@@ -209,7 +210,7 @@ const changedAnswer = async ({
  *
  * @param context - what the routes read.
  */
-const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
+export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   const { config, params, tree, pages, view, loaded } = context;
   const id = params.get("id") ?? "";
   const location = findStory(tree, id);
@@ -267,6 +268,7 @@ export const agentAnswer = async (
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
     if (route === "changed") return await changedAnswer(context);
+    if (route === "agent-index") return await agentIndexAnswer(context, await catalogueTokens(config));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };

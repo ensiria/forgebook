@@ -10,37 +10,16 @@
 import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 
-import type {
-  AgentTokenSummary,
-  CheckedCodeDocument,
-  NearestTokensDocument,
-  TokenDocument,
-  TokensDocument
-} from "./agent.types.ts";
+import type { CheckedCodeDocument } from "./agent.types.ts";
 import type { AgentAnswer } from "./agentRoutes.ts";
 import { addedLines, checkedCode, deletedTests, fileLines } from "./checkCode.ts";
 import type { ResolvedConfig } from "./configFile.ts";
-import {
-  type DesignToken,
-  filteredTokens,
-  type ParsedTokens,
-  readTokens,
-  type TokensInput
-} from "./designTokens.ts";
+import { readTokens, type TokensInput } from "./designTokens.ts";
 import { gitChange, gitOutput } from "./gitChange.ts";
-import { nearestTokens } from "./nearestToken.ts";
-
-/** A list's size unless asked otherwise: an agent degrades on long answers, and asks `nearest` or one token. */
-const TOKENS_LIMIT = 100;
-
-/** The one answer a question about a catalogue with no tokens gets, so an agent does not read it as "no such token". */
-const NO_TOKENS_FILE: AgentAnswer = {
-  status: 404,
-  body: { error: 'This catalogue names no tokens file: `tokens: ["tokens.json"]` in forgebook.config.ts' }
-};
+import { TOKEN_ANSWERS, type TokenReading } from "./tokenAnswers.ts";
 
 /** The catalogue's tokens, read at each question, so an edited file answers at once and costs nothing unasked. */
-const catalogueTokens = async (config: ResolvedConfig): Promise<ParsedTokens> => {
+export const catalogueTokens = async (config: ResolvedConfig): Promise<TokenReading> => {
   const unread: string[] = [];
   const inputs = await Promise.all(
     config.tokens.map(async ({ path, mode }): Promise<TokensInput[]> => {
@@ -53,69 +32,7 @@ const catalogueTokens = async (config: ResolvedConfig): Promise<ParsedTokens> =>
     })
   );
   const { tokens, problems } = readTokens(inputs.flat());
-  return { tokens, problems: [...unread, ...problems] };
-};
-
-/** How many tokens of each type. */
-const typeCounts = (tokens: readonly DesignToken[]): Record<string, number> => {
-  const counts: Record<string, number> = {};
-  for (const { type } of tokens) counts[type] = (counts[type] ?? 0) + 1;
-  return counts;
-};
-
-/** A token as a list gives it: no description, and no empty fields, since each one costs an agent's context. */
-const tokenSummary = (token: DesignToken): AgentTokenSummary => {
-  const { name, type, value, modes, deprecated, isThemeOnly } = token;
-  return {
-    name,
-    type,
-    value,
-    modes,
-    ...(deprecated === undefined ? {} : { deprecated }),
-    ...(isThemeOnly === undefined ? {} : { isThemeOnly })
-  };
-};
-
-/** The tokens, of a category when one is asked for, up to a limit, with how many there are. */
-const tokensAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
-  const { tokens, problems } = await catalogueTokens(config);
-  const chosen = filteredTokens(tokens, params.get("category") || undefined);
-  const limit = Number(params.get("limit") || TOKENS_LIMIT);
-  const body: TokensDocument = {
-    schema: 1,
-    isConfigured: config.tokens.length > 0,
-    total: chosen.length,
-    types: typeCounts(chosen),
-    tokens: chosen.slice(0, Number.isFinite(limit) ? limit : TOKENS_LIMIT).map(tokenSummary),
-    problems
-  };
-  return { status: 200, body };
-};
-
-/** One token; what broke in the files is said, since a token that failed to read looks like one that is not there. */
-const tokenAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
-  if (config.tokens.length === 0) return NO_TOKENS_FILE;
-  const name = params.get("name") ?? "";
-  const { tokens, problems } = await catalogueTokens(config);
-  const token = tokens.find((each) => each.name === name);
-  if (token === undefined) {
-    const read = problems.length === 0 ? "" : ` (and the tokens files have problems: ${problems.join("; ")})`;
-    return { status: 404, body: { error: `No token "${name}"${read}` } };
-  }
-  const body: TokenDocument = { schema: 1, token, problems };
-  return { status: 200, body };
-};
-
-/** The tokens nearest a value; a question that cannot be answered is an error, never an empty list. */
-const nearestTokenAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
-  if (config.tokens.length === 0) return NO_TOKENS_FILE;
-  const value = params.get("value") ?? "";
-  if (value === "") return { status: 400, body: { error: "No value to compare" } };
-  const { tokens, problems } = await catalogueTokens(config);
-  const nearest = nearestTokens(tokens, value, params.get("type") || undefined);
-  if (nearest.reason !== undefined) return { status: 400, body: { error: nearest.reason } };
-  const body: NearestTokensDocument = { schema: 1, value, ...nearest, problems };
-  return { status: 200, body };
+  return { tokens, problems: [...unread, ...problems], isConfigured: config.tokens.length > 0 };
 };
 
 /**
@@ -159,8 +76,12 @@ const checkCodeAnswer = async (config: ResolvedConfig, params: URLSearchParams):
 export const STORYLESS_ROUTES: Readonly<
   Record<string, (config: ResolvedConfig, params: URLSearchParams) => Promise<AgentAnswer>>
 > = {
-  tokens: tokensAnswer,
-  token: tokenAnswer,
-  "nearest-token": nearestTokenAnswer,
+  ...Object.fromEntries(
+    Object.entries(TOKEN_ANSWERS).map(([route, answer]) => [
+      route,
+      async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> =>
+        answer(await catalogueTokens(config), params)
+    ])
+  ),
   "check-code": checkCodeAnswer
 };
