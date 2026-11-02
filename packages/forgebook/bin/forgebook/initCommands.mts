@@ -18,7 +18,6 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { CONFIG_FILES } from "../../src/vite/configFile.ts";
 import { COMMAND, type ForgebookOptions } from "./catalogueCommands.ts";
-import { importStorybook } from "./importers/storybook.ts";
 import { CONFIG_FILE, initConfigText } from "./initConfig.ts";
 
 /** The modules the written configuration imports, by the package that has each. */
@@ -79,6 +78,7 @@ export const initCommands = (
         throw new ScriptError(`${existing} is already there`, {
           hint: "Give --force to replace it with the one read from Storybook"
         });
+      const { importStorybook } = await import("./importers/storybook.ts");
       const imported = await importStorybook(process.cwd());
       if (typeof imported === "string") throw new ScriptError(imported);
       writeFileSync(file, initConfigText(imported, "Storybook"));

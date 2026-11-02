@@ -4,11 +4,9 @@
  *
  * @remarks
  * One worker per plugin, started on the first request and kept: its programs make every later read quick, until a
- * source file changes (`changed`, which the dev server's watcher sends). Requests
- * are answered in order; a warm-up (`warm`) builds a package's program before a page asks for it, one at a time and
- * only while the worker has nothing else to do, so a page's request waits behind one warm-up at most, never behind
- * them all. The worker never keeps the process alive (`unref`), and `close` ends it when the build or the server
- * ends.
+ * source file changes (`changed`, which the dev server's watcher sends). Nothing starts it ahead of a request: a
+ * TypeScript program is two thirds of the server's memory, and a story's page never reads one. Requests are answered
+ * in order. The worker never keeps the process alive (`unref`), and `close` ends it when the build or the server ends.
  *
  * @module
  */
@@ -75,8 +73,6 @@ export type DocsExtractor = {
   readonly extract: (storyFile: string) => Promise<DocsResult>;
   /** What a group of story files' stories render, and the import graph they reach. */
   readonly usage: (files: readonly UsageRequestFile[]) => Promise<UsageResult>;
-  /** Builds the program that holds a story file, ahead of its first read. */
-  readonly warm: (storyFile: string) => void;
   /** Tells the worker a source file changed, so the next read sees it. */
   readonly changed: () => void;
   /** Ends the worker; a later request starts a new one. */
@@ -104,10 +100,8 @@ export type DocsWorkerData = {
 export const createDocsExtractor = (docsModule: string): DocsExtractor => {
   let worker: Worker | undefined;
   let nextId = 0;
-  // every request sent and not answered yet, a warm-up's answer included (none reads it)
+  // every request sent and not answered yet
   const pending = new Map<number, (response: DocsResponse | string) => void>();
-  // the warm-ups not sent yet: one goes out only when nothing is pending
-  const warmUps: string[] = [];
   const started = (): Worker => {
     if (worker !== undefined) return worker;
     const workerData: DocsWorkerData = { docsModule };
@@ -116,7 +110,6 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
     created.on("message", (response: DocsResponse): void => {
       pending.get(response.id)?.(response);
       pending.delete(response.id);
-      sendWarmUp();
     });
     // a worker that dies answers every request still waiting with why, and the next request starts a new one
     created.on("error", (error: Error): void => {
@@ -139,11 +132,6 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
         typeof response === "string" || response.kind !== "extract" ? String(response) : response.result
       )
     );
-  const sendWarmUp = (): void => {
-    if (pending.size > 0) return;
-    const storyFile = warmUps.shift();
-    if (storyFile !== undefined) extract(storyFile, () => undefined);
-  };
   return {
     extract: (storyFile: string): Promise<DocsResult> =>
       new Promise((resolve) => extract(storyFile, resolve)),
@@ -155,10 +143,6 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
           )
         )
       ),
-    warm: (storyFile: string): void => {
-      warmUps.push(storyFile);
-      sendWarmUp();
-    },
     changed: (): void => {
       // a worker not started yet has no program to renew
       const request: DocsRequest = { kind: "changed" };
@@ -167,7 +151,6 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
     close: async (): Promise<void> => {
       const running = worker;
       worker = undefined;
-      warmUps.length = 0;
       await running?.terminate();
     }
   };

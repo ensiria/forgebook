@@ -17,9 +17,8 @@ describe("createDocsExtractor", () => {
   const extractor = createDocsExtractor(STUB_FRAMEWORK.docsModule);
   afterAll(() => extractor.close());
 
-  it("reads a story file's component docs off the calling thread, after a warm-up", async () => {
+  it("reads a story file's component docs off the calling thread", async () => {
     const storyFile = join(KIT, "Select.stories.tsx");
-    extractor.warm(storyFile);
     const result = await extractor.extract(storyFile);
     expect(typeof result === "string" ? result : result.docs).toMatchObject({ name: "Select" });
   }, 60_000);

@@ -8,7 +8,7 @@
  * programs of `docsProgram.ts` between requests, so only a package's first
  * read builds one, and a changed source file (`{ kind: "changed" }`) renews them on their next read. A usage request
  * (`{ kind: "usage", id, files }`) is answered from the same programs (`usageGraph.ts`). A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
- * it is (plain data); a warm-up is a request whose answer nobody reads.
+ * it is (plain data).
  *
  * @module
  */

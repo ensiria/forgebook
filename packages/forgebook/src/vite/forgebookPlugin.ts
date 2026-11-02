@@ -22,21 +22,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import type { StoryMarkdown } from "@forgebook/story-format/source";
-import ts from "typescript-6";
 import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
-import { componentPage, markdownHtml } from "./componentPage.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
-import { moduleSummaryOf } from "./docsProgram.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
-import { highlightCode } from "./highlightCode.ts";
 import {
   AGENT_SOURCES_FILE,
   agentSourcesModule,
@@ -52,7 +47,6 @@ import {
   storiesSourceModule
 } from "./pages.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
-import { storyCode } from "./storyCode.ts";
 import {
   indexedStoryFiles,
   storyFilesGroupOf,
@@ -60,7 +54,6 @@ import {
   storyFilesModule,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
-import { componentImport } from "./storyMeta.ts";
 import { storyReach } from "./storyReach.ts";
 import { joinedUsage } from "./usageModule.ts";
 
@@ -96,20 +89,14 @@ const FILES_QUERY = "?forgebook-files";
 /** The id of a pattern's module: virtual, with the declaring module's folder and the pattern after it. */
 const FILES_PREFIX = "\0forgebook-files:";
 
-/** The query that asks for a story file's code: each story's `render` as written. */
-const CODE_QUERY = "?forgebook-code";
-
-/** The query that asks for a story file's component page: its documentation file as HTML. */
-const PAGE_QUERY = "?forgebook-page";
-
-/** The query a source's Markdown file is imported with (its introduction on the home), answered with its HTML. */
-const MARKDOWN_QUERY = "?forgebook-markdown";
-
 /** A TypeScript source file, whose edit may change a component's docs. */
 const SOURCE_FILE = /\.tsx?$/;
 
 /** The query that asks for a story file's component docs. */
 const DOCS_QUERY = "?forgebook-docs";
+
+/** A module `textModules.ts` answers, by its query. */
+const TEXT_MODULE = /\?forgebook-(?:code|page|markdown)$/;
 
 /** The plugin's options. */
 export type ForgebookPluginOptions = {
@@ -147,85 +134,6 @@ const docsModule = (
 };
 
 /**
- * The module that answers a `?forgebook-code` import: each story's `render` text and its coloured HTML, or `{ error }`
- * for the card.
- *
- * @param storyFile - the story file's absolute path; Vite renews the module when it changes, as the id names it.
- */
-const codeModule = (storyFile: string): { code: string; moduleType: "js" } => {
-  const code = storyCode(storyFile, readFileSync(storyFile, "utf8"));
-  const value =
-    typeof code === "string"
-      ? { error: code }
-      : Object.fromEntries(
-          Object.entries(code).map(([name, text]) => [name, { text, html: highlightCode(text, "tsx") }])
-        );
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
-};
-
-/**
- * The file of a story file's component, from the meta's import, resolved as the app resolves it.
- *
- * @param storyFile - the story file's absolute path.
- * @param resolve - resolves an import of the story file to its file; none when it does not resolve.
- * @returns the component's file, or none when the meta names no imported component.
- */
-const componentFileOf = async (
-  storyFile: string,
-  resolve: (specifier: string) => Promise<string | undefined>
-): Promise<string | undefined> => {
-  const specifier = componentImport(storyFile, readFileSync(storyFile, "utf8"));
-  return specifier === undefined ? undefined : resolve(specifier);
-};
-
-/**
- * The module that answers a `?forgebook-page` import: the component's documentation file as HTML (empty without
- * one), and its file's summary, the first paragraph of its `@module` comment, for the page's lead.
- *
- * @remarks
- * The summary is read here, from the component's file alone, rather than with the docs: the docs wait for the
- * package's TypeScript program, and the lead would come seconds after the rest of the page.
- *
- * @param storyFile - the story file's absolute path.
- * @param componentFile - the component's file, as the story file's import resolves; none when it names none.
- * @param watch - adds a file whose edit renews the module (the documentation file, the component's file).
- */
-const pageModule = (
-  storyFile: string,
-  componentFile: string | undefined,
-  watch: (file: string) => void
-): { code: string; moduleType: "js" } => {
-  const page = componentPage(storyFile);
-  if (page !== undefined) watch(page.file);
-  if (componentFile !== undefined) watch(componentFile);
-  const summary =
-    componentFile === undefined
-      ? ""
-      : moduleSummaryOf(
-          ts.createSourceFile(
-            componentFile,
-            readFileSync(componentFile, "utf8"),
-            ts.ScriptTarget.Latest,
-            true
-          )
-        );
-  const value = { html: page?.html ?? "", summary };
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
-};
-
-/**
- * The module that answers a `?forgebook-markdown` import: a source's Markdown file (its introduction) as HTML.
- *
- * @param file - the Markdown file's absolute path.
- * @param watch - adds a file whose edit renews the module (the Markdown file).
- */
-const markdownModule = (file: string, watch: (file: string) => void): { code: string; moduleType: "js" } => {
-  watch(file);
-  const value: StoryMarkdown = { html: markdownHtml(readFileSync(file, "utf8")) };
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
-};
-
-/**
  * The id of a `?forgebook-files` module: its prefix, then its group (`storyFilesGroupText`), which holds no `..`.
  *
  * @param folder - the importing module's folder.
@@ -239,29 +147,16 @@ const filesId = (folder: string, pattern: string): string =>
  *
  * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
- * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks.
  * @param hasUsage - whether the group offers its "Used in" loader.
  * @throws when a story file cannot be indexed.
  */
 const patternModule = (
   id: string,
   watch: (file: string) => void,
-  warm: (storyFile: string) => void,
   hasUsage: boolean
 ): { code: string; moduleType: "js" } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  let first: string | undefined;
-  const code = storyFilesModule(
-    root,
-    pattern,
-    (file: string): void => {
-      first ??= file;
-      watch(file);
-    },
-    hasUsage
-  );
-  if (first !== undefined) warm(first);
-  return { code, moduleType: "js" };
+  return { code: storyFilesModule(root, pattern, watch, hasUsage), moduleType: "js" };
 };
 
 /** The resolved id of a group's "Used in" module: Rollup's mark of a virtual module, then its import's specifier. */
@@ -334,22 +229,6 @@ const requestedPage = (url: string): PageFile | undefined => {
   const path = url.split("?")[0] ?? "";
   const name = path === "/" ? "index.html" : path.replace(/^\//, "");
   return PAGE_FILES.find((page) => page === name);
-};
-
-/**
- * A module the plugin answers from a file's text alone, when the id asks for one: a story file's code, or a Markdown
- * file as HTML.
- *
- * @param id - the module's id.
- * @param watch - adds a file whose edit renews the module.
- */
-const textModule = (
-  id: string,
-  watch: (file: string) => void
-): { code: string; moduleType: "js" } | undefined => {
-  if (id.endsWith(CODE_QUERY)) return codeModule(id.slice(0, -CODE_QUERY.length));
-  if (id.endsWith(MARKDOWN_QUERY)) return markdownModule(id.slice(0, -MARKDOWN_QUERY.length), watch);
-  return undefined;
 };
 
 /**
@@ -437,7 +316,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    return patternModule(id, watch, extractor().warm, config?.lists.usedIn !== false);
+    return patternModule(id, watch, config?.lists.usedIn !== false);
   };
   const pagePath = (page: PageFile): string | undefined =>
     config === undefined ? undefined : join(config.dir, page);
@@ -462,14 +341,11 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (id.endsWith(DOCS_QUERY)) {
       return docsModule(await extractor().extract(id.slice(0, -DOCS_QUERY.length)), watch);
     }
-    if (id.endsWith(PAGE_QUERY)) {
-      const storyFile = id.slice(0, -PAGE_QUERY.length);
-      const componentFile = await componentFileOf(storyFile, (specifier: string) =>
-        resolveImport(specifier, storyFile)
-      );
-      return pageModule(storyFile, componentFile, watch);
-    }
-    return textModule(id, watch);
+    if (!TEXT_MODULE.test(id)) return undefined;
+    // imported here: the highlighter and the TypeScript compiler it splits code with are the server's heaviest
+    // modules, and a story's page never asks for one of these
+    const { textModule } = await import("./textModules.ts");
+    return textModule(id, watch, resolveImport);
   };
   return {
     name: "forgebook",

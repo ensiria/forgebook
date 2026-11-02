@@ -94,7 +94,7 @@ const hooksOf = (
     load: (id: string): unknown => load.call(context as never, id),
     configureServer: (server: unknown): void =>
       void configureServer.call(undefined as never, server as never),
-    // ends the docs' worker a pattern's warm-up started
+    // ends the docs' worker a docs module started
     closeBundle: async (): Promise<unknown> => closeBundle.call(undefined as never),
     watched
   };

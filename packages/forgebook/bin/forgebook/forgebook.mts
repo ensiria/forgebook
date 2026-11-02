@@ -13,11 +13,9 @@ import { createInterface } from "node:readline";
 import { defineCommands } from "@ensiria/cli-kit/commands";
 import { readPackageVersion } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
-import { build, createServer } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
 import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
-import { catalogueDocs } from "../forgebook-docs/catalogueDocs.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
@@ -74,6 +72,7 @@ await defineCommands({
         const port = options.port === undefined ? undefined : Number(options.port);
         if (port !== undefined && !Number.isInteger(port))
           throw new ScriptError(`--port ${options.port} is not a port`);
+        const { createServer } = await import("vite");
         const server = await createServer(
           await catalogueVite(config, {
             server: {
@@ -112,6 +111,7 @@ await defineCommands({
       ],
       run: async ({ options, log }): Promise<void> => {
         const config = await configOf(options.config);
+        const { build } = await import("vite");
         await build(
           await catalogueVite(config, {
             ...(options.base === undefined ? {} : { base: options.base }),
@@ -255,8 +255,9 @@ await defineCommands({
         },
         { command: `${COMMAND} docs --check`, description: "Check them in CI." }
       ],
-      run: ({ options, log }): Promise<CatalogueDocsReport> =>
-        catalogueDocs(
+      run: async ({ options, log }): Promise<CatalogueDocsReport> => {
+        const { catalogueDocs } = await import("../forgebook-docs/catalogueDocs.ts");
+        return catalogueDocs(
           {
             packageDir: resolve(options.package),
             framework: options.framework,
@@ -264,7 +265,8 @@ await defineCommands({
             fixCommand: `${COMMAND} docs`
           },
           log
-        )
+        );
+      }
     }),
     new: forgebook.command({
       summary:
