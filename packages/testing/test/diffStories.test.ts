@@ -1,63 +1,12 @@
 /**
- * Tests for comparing pictures, on real ones from a browser: one pixel is found, and the same picture is the same.
+ * Tests for comparing pictures: pure pixels, the baselines left by a removed story, and what is refused. Real pictures
+ * through a browser are in the shell suite (`fixtures/app/shell/pictures.e2e.ts`), which has one.
  *
  * @module
  */
-import { type Browser, chromium, type Page } from "@playwright/test";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  comparePictures,
-  comparePixels,
-  diffStories,
-  type Pixels,
-  removedBaselines
-} from "../src/diffStories.ts";
-
-let browser: Browser;
-let page: Page;
-
-/** A picture of a square, with one pixel of another colour when asked. */
-const picture = async (pixel: { readonly x: number; readonly y: number } | undefined): Promise<string> => {
-  const data = await page.evaluate(async (at) => {
-    const canvas = new OffscreenCanvas(40, 30);
-    const context = canvas.getContext("2d");
-    if (context === null) throw new Error("No canvas");
-    context.fillStyle = "#2040a0";
-    context.fillRect(0, 0, 40, 30);
-    if (at !== undefined) {
-      context.fillStyle = "#ffffff";
-      context.fillRect(at.x, at.y, 1, 1);
-    }
-    const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer());
-    return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
-  }, pixel);
-  return `data:image/png;base64,${data}`;
-};
-
-beforeAll(async () => {
-  browser = await chromium.launch();
-  page = await browser.newPage();
-});
-
-afterAll(async () => {
-  await browser.close();
-});
-
-describe("comparePictures", () => {
-  it("says two equal pictures are the same", async () => {
-    const plain = await picture(undefined);
-    expect(await comparePictures(page, plain, plain)).toMatchObject({ changedPixels: 0, percent: 0 });
-  });
-
-  it("finds one pixel, says where, and marks it", async () => {
-    const difference = await comparePictures(page, await picture(undefined), await picture({ x: 7, y: 12 }));
-    expect(difference.changedPixels).toBe(1);
-    expect(difference.region).toEqual({ x: 7, y: 12, width: 1, height: 1 });
-    expect(difference.percent).toBeCloseTo(100 / 1200);
-    expect(difference.marked).toMatch(/^data:image\/png;base64,/);
-  });
-});
+import { comparePixels, diffStories, type Pixels, removedBaselines } from "../src/diffStories.ts";
 
 describe("comparePixels", () => {
   const blank = (width: number, height: number): Pixels => ({
@@ -72,6 +21,14 @@ describe("comparePixels", () => {
     expect(comparePixels(blank(2, 1), moved).changedPixels).toBe(0);
     moved.bytes[0] = 3;
     expect(comparePixels(blank(2, 1), moved).changedPixels).toBe(1);
+  });
+
+  it("says where the changed pixels are and how many", () => {
+    const moved = blank(4, 3);
+    moved.bytes.set([255, 255, 255, 255], (2 * 4 + 1) * 4);
+    const difference = comparePixels(blank(4, 3), moved);
+    expect(difference).toMatchObject({ changedPixels: 1, region: { x: 1, y: 2, width: 1, height: 1 } });
+    expect(difference.percent).toBeCloseTo(100 / 12);
   });
 
   it("says a picture of another size cannot be compared", () => {
@@ -109,23 +66,4 @@ describe("diffStories", () => {
     };
     await expect(diffStories(request)).rejects.toThrow("baselines' folder");
   });
-});
-
-describe("a tall picture", () => {
-  it("is compared whole, past what one message holds", async () => {
-    const tall = await page.evaluate(async () => {
-      const canvas = new OffscreenCanvas(1280, 16_000);
-      const context = canvas.getContext("2d");
-      if (context === null) throw new Error("No canvas");
-      context.fillStyle = "#2040a0";
-      context.fillRect(0, 0, 1280, 16_000);
-      const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer());
-      let text = "";
-      for (let start = 0; start < bytes.length; start += 0x8000) {
-        text += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
-      }
-      return `data:image/png;base64,${btoa(text)}`;
-    });
-    expect(await comparePictures(page, tall, tall)).toMatchObject({ changedPixels: 0 });
-  }, 60_000);
 });
