@@ -11,7 +11,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "./csf.ts";
+import type { StoryDesign, StoryGroup } from "./csf.ts";
 
 /** The props the panel can set for a story: every adjustable one, or only the named ones (none for fixed examples). */
 export type StoryControlsSetting = "all" | readonly string[];
@@ -28,6 +28,8 @@ export type StoryIndexEntry = {
   readonly group?: StoryGroup;
   /** The story's own `parameters.height`, when it sets one, in CSS px. */
   readonly height?: number;
+  /** The story's own `parameters.design`, when it sets one with a `figma` link. */
+  readonly design?: StoryDesign;
   /** Whether the story sets `parameters.main: true`: the component's demo. */
   readonly isMain?: boolean;
   /**
@@ -57,6 +59,8 @@ export type StoryFileIndex = {
   readonly controls?: StoryControlsSetting;
   /** The meta's `parameters.height`, when it sets one: every story's frame height, in CSS px. */
   readonly height?: number;
+  /** The meta's `parameters.design`, when it sets one with a `figma` link: the component's, and every story's. */
+  readonly design?: StoryDesign;
   /** The meta's `parameters.touch`, when it sets one: every story starts in touch unless it says otherwise. */
   readonly isTouch?: boolean;
   /** The meta's `parameters.logic`, when it sets one: every story is about logic unless it says otherwise. */

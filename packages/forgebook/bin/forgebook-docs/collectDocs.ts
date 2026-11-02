@@ -14,6 +14,7 @@ import { join, resolve } from "node:path";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
+import { figmaLink } from "../../src/figmaLink.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
@@ -58,6 +59,16 @@ const sourceExports = (manifest: unknown): Readonly<Record<string, string>> => {
 const isLogicFile = (index: StoryFileIndex): boolean =>
   index.stories.length > 0 && index.stories.every((story) => (story.isLogic ?? index.isLogic) === true);
 
+/**
+ * The link to a component's design, when its meta writes a valid one: a wrong one is the catalogue's to report.
+ *
+ * @param index - the file's index.
+ */
+const designOf = (index: StoryFileIndex): string | undefined => {
+  const link = index.design === undefined ? undefined : figmaLink(index.design.figma);
+  return link === undefined || typeof link === "string" ? undefined : link.url;
+};
+
 /** The components of the package's story files, read by the framework's extractor. */
 const collectComponents = (
   packageDir: string,
@@ -96,7 +107,8 @@ const collectComponents = (
       docs: component.docs,
       stories: index.stories.map((story) => story.name ?? story.exportName),
       mainStory: (index.stories.find((story) => story.isMain === true) ?? index.stories[0])?.exportName,
-      isLogic: isLogicFile(index)
+      isLogic: isLogicFile(index),
+      design: designOf(index)
     });
   }
   return { components, componentFiles };

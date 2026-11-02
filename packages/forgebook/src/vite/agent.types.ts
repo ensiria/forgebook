@@ -28,6 +28,24 @@ export type StoryLinks = {
   readonly frame: string;
 };
 
+/** A design's place in Figma: what to give a person, or a tool that reads Figma. */
+export type AgentDesignLink = {
+  /** The link that opens it in Figma. */
+  readonly figma: string;
+  /** The file's key. */
+  readonly fileKey: string;
+  /** The branch's key, for a link to a branch of the file. */
+  readonly branchKey?: string;
+  /** The node, as Figma's API writes it (`12:34`); none for a link to the whole file. */
+  readonly nodeId?: string;
+};
+
+/** A story's design: its place in Figma, and where a person sees it beside the story. */
+export type AgentDesign = AgentDesignLink & {
+  /** The story's page in the catalogue, on its Design tab (on its first tab where the catalogue turned that one off). */
+  readonly address: string;
+};
+
 /** A story, as the list of stories gives it. */
 export type AgentStory = {
   /** `<source>:<title>--<export>` in kebab case: what `forgebook story` takes. */
@@ -74,6 +92,8 @@ export type AgentComponent = {
   readonly file: string;
   /** Its stories: the listed ones in the catalogue's order, then the unlisted ones. */
   readonly stories: readonly AgentStory[];
+  /** Its design (the meta's `parameters.design.figma`), when it has one. */
+  readonly design?: AgentDesignLink;
   /**
    * The other components of its source whose stories use it, direct users first; only when asked for (it reads the
    * package's import graph) and the catalogue offers it.
@@ -110,12 +130,14 @@ export type StoryDocument = {
   /** The story, with its links in the view asked for. */
   readonly story: AgentStory;
   /** Its component's id and title, and its "Used in" when the catalogue offers it. */
-  readonly component: Pick<AgentComponent, "id" | "title" | "source" | "file" | "usedIn">;
+  readonly component: Pick<AgentComponent, "id" | "title" | "source" | "file" | "design" | "usedIn">;
   /**
    * The component's docs as the props panel reads them (its props, their types, defaults and TSDoc); none when the
    * story file names no component, or its docs could not be read (the reason is then in `problems`).
    */
   readonly docs: ComponentDocs | undefined;
+  /** Its design: its own `parameters.design.figma`, else its component's; none when it has none. */
+  readonly design?: AgentDesign;
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */

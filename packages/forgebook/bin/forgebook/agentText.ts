@@ -63,6 +63,7 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
+  if (document.design !== undefined) entries.push(["Design", document.design.figma]);
   return keyValue(entries, uncut(style));
 };
 

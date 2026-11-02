@@ -35,6 +35,7 @@ import type { CheckState } from "./A11yTab.tsx";
 import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { compareVariants } from "./compareVariants.ts";
+import type { DesignTabProps } from "./DesignTab.tsx";
 import { Dock } from "./Dock.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
@@ -192,6 +193,22 @@ const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
  */
 const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
+
+/**
+ * What the Design tab shows; none for a story without a design.
+ *
+ * @param component - the story's component.
+ * @param story - the story.
+ * @param frame - the story's frame, for the comparison.
+ */
+const designTabOf = (
+  component: TreeComponent,
+  story: TreeStory,
+  frame: DesignTabProps["frame"]
+): DesignTabProps | undefined =>
+  story.design === undefined
+    ? undefined
+    : { link: story.design, title: `${component.name} › ${story.name}`, frame };
 
 /**
  * The stage.
@@ -380,7 +397,14 @@ export const Stage = ({
       frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
     },
     check: storyCheck.check,
-    onCheck: isComparing(view) ? undefined : storyCheck.run
+    onCheck: isComparing(view) ? undefined : storyCheck.run,
+    design: designTabOf(component, story, {
+      address: frameAddress(frameUrl, story.id, view, switches),
+      width: view.width,
+      background: backgroundOf(view),
+      args: panelArgs,
+      view: isComparing(view) ? undefined : liveView(view)
+    })
   }).filter((tab) => catalogue.tabs.includes(tab.id));
 
   return (
