@@ -34,6 +34,15 @@ const POLL_INTERVAL = 25;
 /** The pause between two edits, so one update does not land on the last, in milliseconds. */
 const EDIT_PAUSE = 150;
 
+/**
+ * Up to how much longer the pause after an edit lasts, at random, in milliseconds. With a fixed pause the edits fell into
+ * step with when the file watcher reports a change (on macOS, within a few ms or about 90 ms later), so a tool whose
+ * page settles a few ms later or sooner landed on one side of it nearly every time: Forgebook's HMR read about 20 or 90
+ * ms by its frames' placement alone, while the update took the same 4 ms from the server to the frame in both. A random
+ * pause samples both sides alike.
+ */
+const EDIT_JITTER = 100;
+
 /** How long a page has to stay unchanged after a story shows, or a reload could replace it, in milliseconds. */
 const SETTLE = 1500;
 
@@ -288,7 +297,7 @@ export const measureEdits = async (
       await writeFile(file, text(original, shown));
       const [drawn = 0] = await waitForStamps(page, [shown], start + SAMPLE_TIMEOUT);
       samples.push(drawn - start);
-      await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE));
+      await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE + Math.random() * EDIT_JITTER));
     }
     return samples;
   } finally {
