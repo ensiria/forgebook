@@ -1,5 +1,5 @@
 /**
- * What a package hands a catalogue: its story files, its style sheets, its texts.
+ * What a package hands a catalogue: its story files, its style sheets, its texts, its docs pages.
  *
  * @remarks
  * Every package with stories exports one `StorySource` from a development-only `./stories` subpath, never published;
@@ -165,6 +165,86 @@ export type StoryMarkdown = {
   readonly html: string;
 };
 
+/** One piece of a docs page, in the order of its file. */
+export type DocBlock =
+  | {
+      /** Text between the other blocks. */
+      readonly kind: "text";
+      /** The text as HTML, its headings carrying their anchors. */
+      readonly html: string;
+    }
+  | {
+      /** A code block of the file, with a button that copies it. */
+      readonly kind: "code";
+      /** The code, as copied. */
+      readonly text: string;
+      /** The same code as HTML, coloured by the catalogue's plugin at build time. */
+      readonly html: string;
+      /** Its language as the fence names it (`tsx`), when it names one. */
+      readonly language?: string;
+    }
+  | {
+      /** A story, live in its frame: a fence named `story <id>`. */
+      readonly kind: "story";
+      /** The story's id, as the catalogue's address writes it (`kit:inputs-select--overview`). */
+      readonly id: string;
+    }
+  | {
+      /** A component's API table, drawn from its types: a fence named `props <id>`. */
+      readonly kind: "props";
+      /** The component's id, as the catalogue's address writes it (`kit:inputs-select`). */
+      readonly id: string;
+    };
+
+/** A heading of a docs page, as its contents list names it. */
+export type DocHeading = {
+  /** Its level: 2 or 3. */
+  readonly depth: 2 | 3;
+  /** Its anchor, the fragment of the page's address (`tokens`): unique in the page. */
+  readonly id: string;
+  /** Its text, without marks. */
+  readonly text: string;
+};
+
+/** A docs page as the catalogue's plugin answers it: what the shell draws. */
+export type DocPage = {
+  /** Its blocks, in the order of the file. */
+  readonly blocks: readonly DocBlock[];
+  /** Its second- and third-level headings, in the order of the file. */
+  readonly headings: readonly DocHeading[];
+  /** The addresses of the images it holds, which its HTML names by their place in this list. */
+  readonly assets: readonly string[];
+};
+
+/** A docs page as the index lists it, read from its file before anyone opens it. */
+export type DocPageIndex = {
+  /** Its place and name: `Guides/Theming`, or `Theming` for a page outside any group. */
+  readonly title: string;
+  /** Where it sits among the pages: lower first, then the pages without one, by title. */
+  readonly order?: number;
+  /** What it is about, in a sentence: the page's lead, and what tools list. */
+  readonly description?: string;
+  /** The ids of the stories it shows, in its order. */
+  readonly stories: readonly string[];
+  /** The ids of the components whose API tables it shows, in its order. */
+  readonly components: readonly string[];
+  /** What the index noticed without refusing the file: an unknown key, a link to no page. */
+  readonly notes?: readonly string[];
+};
+
+/**
+ * The docs pages of a pattern, as the catalogue's plugin answers a `?forgebook-docs-pages` import: each page's index and
+ * the loader of the page, by the file's path relative to the importing module (`./docs/theming.md`).
+ */
+export type DocPages = {
+  /** Each page's index: its title and what it shows, read from its file. */
+  readonly index: Readonly<Record<string, DocPageIndex>>;
+  /** Each page, loaded when it opens. */
+  readonly pages: Readonly<Record<string, () => Promise<unknown>>>;
+  /** Each page's Markdown, for tools on the dev server; none in a static build. */
+  readonly text?: Readonly<Record<string, () => Promise<unknown>>>;
+};
+
 /** A package's stories, as the catalogue reads them. */
 export type StorySource = {
   /** A stable id, part of every story id's URL (`acme-ui`). */
@@ -215,4 +295,9 @@ export type StorySource = {
    * (`home: () => import("./home.md?forgebook-markdown")`). None by default: the home then shows only its families.
    */
   readonly home?: () => Promise<{ readonly default: StoryMarkdown }>;
+  /**
+   * Its docs pages: guides and foundations in Markdown, with live stories, listed in the sidebar's Docs section. One
+   * group per `?forgebook-docs-pages` import, the keys unique across the groups. None by default.
+   */
+  readonly docs?: readonly DocPages[];
 };

@@ -6,6 +6,8 @@
  * @module
  */
 
+import type { CataloguePage } from "./catalogueDocs.types.ts";
+
 /** What the file says. */
 export type LlmsTextInput = {
   /** The package's name. */
@@ -14,6 +16,8 @@ export type LlmsTextInput = {
   readonly description: string | undefined;
   /** The catalogue's file name (`CATALOG.md`). */
   readonly catalogueFile: string;
+  /** The package's docs pages; none by default. */
+  readonly pages?: readonly CataloguePage[];
 };
 
 /**
@@ -33,6 +37,10 @@ export const llmsText = (input: LlmsTextInput): string =>
     "## Docs",
     "",
     `- [${input.catalogueFile}](${input.catalogueFile}): every component, hook, helper and style module, one line each: what it is, how to import it, its props, and the id of a story that shows it`,
+    ...(input.pages ?? []).map(
+      (page) =>
+        `- [${page.title}](${page.file})${page.description === undefined ? "" : `: ${page.description}`}`
+    ),
     "",
     "## Optional",
     "",

@@ -34,7 +34,7 @@ export type PageScroll = {
 };
 
 /** The input that means the person scrolls themselves: a position given back stops being chased. */
-const OWN_SCROLL_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+export const OWN_SCROLL_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
 
 /**
  * Puts a page's scrolling element where the page should start, and keeps its position for when it comes back.
