@@ -48,6 +48,12 @@ describe("the generated pages", () => {
     expect(entry).toContain("sources: [source0, source1],");
   });
 
+  it("hands the shell how the framework's stories take an address's texts, when it says", () => {
+    expect(shellEntry(CONFIG)).not.toContain("addressTexts");
+    const plain = { ...CONFIG, framework: { ...STUB_FRAMEWORK, addressTexts: "plain" as const } };
+    expect(shellEntry(plain)).toContain('    addressTexts: "plain",');
+  });
+
   it("mounts the framework's frame with the previews, the catalogue's last", () => {
     const entry = frameEntry(CONFIG);
     expect(entry).toContain(`import { mountFrame } from ${JSON.stringify(STUB_FRAMEWORK.pages.frame)};`);
