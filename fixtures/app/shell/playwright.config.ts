@@ -3,8 +3,9 @@
  * the unit tests cannot reach (the address, the panel, the stage, the keys, the errors).
  *
  * @remarks
- * Run with `pnpm --filter @fixture/app test:shell`. The port comes from `FORGEBOOK_SHELL_PORT`, so two
- * worktrees can run the tests at once.
+ * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT`, so two worktrees can
+ * run the tests at once. The React Native fixture catalogue runs beside the fixture app, for what a React Native
+ * project's components need (`reactNative.e2e.ts`).
  *
  * @module
  */
@@ -12,25 +13,37 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-/** The port the fixture app listens on. */
-const PORT = Number(process.env["FORGEBOOK_SHELL_PORT"] ?? "41721");
+import { REACT_NATIVE_PORT, SHELL_PORT } from "./ports";
+
+/**
+ * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
+ * dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here.
+ *
+ * @param folder - the catalogue's folder.
+ * @param port - the port it listens on.
+ */
+const catalogueServer = (
+  folder: string,
+  port: number
+): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
+  command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${port} --force`,
+  cwd: folder,
+  url: `http://127.0.0.1:${port}/`,
+  reuseExistingServer: false
+});
 
 export default defineConfig({
   testDir: import.meta.dirname,
   testMatch: "*.e2e.ts",
   fullyParallel: true,
   reporter: [["list"]],
-  webServer: {
-    // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
-    // dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here
-    command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT} --force`,
-    cwd: join(import.meta.dirname, ".."),
-    url: `http://127.0.0.1:${PORT}/`,
-    reuseExistingServer: false
-  },
+  webServer: [
+    catalogueServer(join(import.meta.dirname, ".."), SHELL_PORT),
+    catalogueServer(join(import.meta.dirname, "..", "..", "react-native"), REACT_NATIVE_PORT)
+  ],
   use: {
     browserName: "chromium",
-    baseURL: `http://127.0.0.1:${PORT}/`,
+    baseURL: `http://127.0.0.1:${SHELL_PORT}/`,
     viewport: { width: 1280, height: 900 }
   }
 });

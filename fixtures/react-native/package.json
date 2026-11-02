@@ -1,0 +1,33 @@
+{
+  "name": "@fixture/react-native",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A small React Native app's components with stories (a view, texts, a pressable, a list, a font, icons, safe areas): Forgebook's React Native catalogue, drawn through react-native-web, which the shell's browser tests open.",
+  "type": "module",
+  "scripts": {
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@expo/vector-icons": "15.1.1",
+    "@forgebook/react": "workspace:*",
+    "@forgebook/react-native-web": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "expo": "58.0.22",
+    "expo-font": "58.0.11",
+    "forgebook": "workspace:*",
+    "msw": "3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "5.11.0",
+    "react-native-web": "0.21.4",
+    "vite": "8.3.5"
+  }
+}

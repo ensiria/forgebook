@@ -194,6 +194,10 @@
       }
     },
     {
+      "includes": ["packages/react-native-web/test/project/**"],
+      "linter": { "rules": { "correctness": { "useImportExtensions": "off" } } }
+    },
+    {
       "includes": ["**/*.stories.tsx"],
       "linter": {
         "rules": {
@@ -206,6 +210,7 @@
     {
       "includes": [
         "**/*.config.ts",
+        "**/forgebook.preview.tsx",
         "**/*.config.mts",
         "**/*.config.js",
         "**/.storybook/main.ts",
@@ -220,7 +225,11 @@
       }
     },
     {
-      "includes": ["packages/testing/src/playwrightConfig.ts", "fixtures/app/shell/playwright.config.ts"],
+      "includes": [
+        "packages/testing/src/playwrightConfig.ts",
+        "fixtures/app/shell/playwright.config.ts",
+        "fixtures/app/shell/ports.ts"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -240,6 +249,8 @@
     "includes": [
       "**",
       "!fixtures/app/public/mockServiceWorker.js",
+      "!fixtures/react-native/src/legacy/knots.js",
+      "!packages/react-native-web/test/project/Badge.js",
       "!**/*.md",
       "!**/*.html",
       "!**/*.css",
