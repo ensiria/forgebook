@@ -8,7 +8,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
@@ -19,6 +18,7 @@ import { budgetLines, parseBudget } from "./budget.ts";
 import { stopAllServers } from "./measure.ts";
 import { type BenchFolders, packForgebook, publishedForgebook } from "./prepare.ts";
 import { type RealRun, realTargets } from "./prepareRun.ts";
+import { execProgram } from "./programs.ts";
 import { corpusPaths, DEFINITION_FILE, definitionFolder, parseCorpus } from "./realCorpus.ts";
 import { parseReport, reportMarkdown, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
@@ -97,8 +97,11 @@ const forgebookUnderTest = async (
 ): Promise<{ readonly packages: Readonly<Record<string, string>>; readonly label: string }> => {
   if (version !== undefined) return { packages: publishedForgebook(version), label: version };
   const packages = await packForgebook(folders, io);
-  const { stdout: commit } = await exec("git", ["rev-parse", "--short", "HEAD"], { cwd: REPOSITORY, io });
-  const { stdout: changes } = await exec("git", ["status", "--porcelain"], { cwd: REPOSITORY, io });
+  const { stdout: commit } = await execProgram("git", ["rev-parse", "--short", "HEAD"], {
+    cwd: REPOSITORY,
+    io
+  });
+  const { stdout: changes } = await execProgram("git", ["status", "--porcelain"], { cwd: REPOSITORY, io });
   // a published number names a commit: what makes it not one is said, or nobody can tell why
   if (changes.trim() !== "")
     warn(`the checkout has changes, so the report reads -dirty:\n${changes.trimEnd()}`);

@@ -14,9 +14,9 @@ import { existsSync } from "node:fs";
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
+import { execProgram } from "./programs.ts";
 import { DEFINITION_FILE } from "./realCorpus.ts";
 import type { CorpusPaths, RealCorpus } from "./realCorpus.types.ts";
 
@@ -35,8 +35,8 @@ const NO_SCRIPTS = {
 
 /** Fetches the commit alone, or finds it there, and puts the clone back on it. */
 const fetchClone = async ({ repository, commit }: RealCorpus, clone: string, io: ScriptIo): Promise<void> => {
-  const git = (...args: readonly string[]): ReturnType<typeof exec> =>
-    exec("git", [...GIT, ...args], {
+  const git = (...args: readonly string[]): ReturnType<typeof execProgram> =>
+    execProgram("git", [...GIT, ...args], {
       cwd: clone,
       io,
       output: "capture",
@@ -62,7 +62,7 @@ const runCommand = async (
   io: ScriptIo
 ): Promise<void> => {
   if (program === undefined) return;
-  await exec(program, args, { cwd: clone, io, output: "capture", env: { ...io.env, ...env } });
+  await execProgram(program, args, { cwd: clone, io, output: "capture", env: { ...io.env, ...env } });
 };
 
 /** Installs the library's dependencies, once for a commit, and builds what its stories need. */
@@ -122,7 +122,7 @@ const installForgebook = async (
   await writeFile(join(bench, "package.json"), JSON.stringify(manifest, null, 2));
   // no peers: they would bring a second React, and a library older than Forgebook's peer range is measured as it is
   const flags = ["--ignore-scripts", "--legacy-peer-deps", "--no-audit", "--no-fund", "--loglevel=error"];
-  await exec("npm", ["install", ...flags], { cwd: bench, io, output: "capture" });
+  await execProgram("npm", ["install", ...flags], { cwd: bench, io, output: "capture" });
   const files = await readdir(definition);
   await Promise.all(
     files

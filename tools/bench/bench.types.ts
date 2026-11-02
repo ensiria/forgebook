@@ -37,22 +37,37 @@ export type ToolResult = {
   readonly metrics: Readonly<Record<string, MetricResult>>;
 };
 
-/** What a macOS machine said about its load, before a tool's measurements. */
+/**
+ * What a machine said about its load, before a tool's measurements. A reading a system cannot give is left out, or
+ * `undefined`, never guessed: macOS gives the first seven, Windows and Linux what they have of them and the rest.
+ */
 export type MachineReadings = {
-  /** Whether it runs from the charger. */
+  /** Whether it runs from the mains: a machine without a battery always does. */
   readonly isOnCharger: boolean;
-  /** The battery's charge, 0 to 100. */
+  /** The battery's charge, 0 to 100; none without a battery. */
   readonly batteryPercent: number | undefined;
-  /** Whether the system reports a thermal or performance limit. */
-  readonly hasThermalWarning: boolean;
-  /** Whether Time Machine is running. */
-  readonly isBackingUp: boolean;
-  /** Whether Spotlight indexes the volume measured on. */
-  readonly isIndexed: boolean;
-  /** Idle CPU in `top`'s last sample, 0 to 100. */
+  /** Whether the system reports a thermal or performance limit; only macOS says. */
+  readonly hasThermalWarning: boolean | undefined;
+  /** Whether a backup is running (Time Machine); only macOS says. */
+  readonly isBackingUp: boolean | undefined;
+  /** Whether the volume measured on is indexed (Spotlight); only macOS says. */
+  readonly isIndexed: boolean | undefined;
+  /** Idle CPU over the last second of the reading, 0 to 100. */
   readonly idlePercent: number | undefined;
-  /** The one-minute load. */
+  /** The one-minute load; Windows has none. */
   readonly load: number | undefined;
+  /** The antivirus products the system knows, by name (Windows). */
+  readonly antivirus?: readonly string[];
+  /** Whether an antivirus scans files as they are opened (Windows): every file a tool reads pays for it. */
+  readonly isScanningFiles?: boolean;
+  /** The share of the whole machine the antivirus used over the last second, 0 to 100. */
+  readonly antivirusCpuPercent?: number;
+  /** The share the file indexer used (Windows Search; Tracker or Baloo on Linux), 0 to 100. */
+  readonly indexerCpuPercent?: number;
+  /** The share system updates used (Windows Update; apt, PackageKit on Linux), 0 to 100. */
+  readonly updatesCpuPercent?: number;
+  /** The power plan (Windows): `balanced`, `high performance`, `power saver`, or the plan's own name. */
+  readonly powerPlan?: string;
 };
 
 /** The machine's load at a moment of the run. */
@@ -77,6 +92,11 @@ export type MachineInfo = {
   readonly memory: number;
   /** Node's version. */
   readonly node: string;
+  /**
+   * The system's own name and edition (`Microsoft Windows 11 Pro`, `Ubuntu 24.04.1 LTS`), where `system` alone is a
+   * kernel's number; absent on macOS, whose reports name it by `system`.
+   */
+  readonly os?: string;
 };
 
 /** The real library a run took place on. */
