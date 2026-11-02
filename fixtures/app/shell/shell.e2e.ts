@@ -535,9 +535,7 @@ test.describe("the stage", () => {
     await expect(frame).toHaveCSS("height", "777px");
     await expect(page.locator(".forgebook-frame-loading")).toBeVisible();
     // the frame's document is up and has told its height by now; the box keeps waiting at the measured one
-    await expect
-      .poll(() => frame.evaluate((element) => (element as HTMLIFrameElement).contentDocument?.body !== null))
-      .toBe(true);
+    await expect(frameOf(page).locator("body")).toBeAttached();
     await page.waitForTimeout(300);
     await expect(frame).toHaveCSS("height", "777px");
     release();

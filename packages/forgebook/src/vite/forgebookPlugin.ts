@@ -26,6 +26,7 @@ import type { StoryMarkdown } from "@forgebook/story-format/source";
 import ts from "typescript-6";
 import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
 
+import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
@@ -35,6 +36,8 @@ import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } 
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { moduleSummaryOf } from "./docsProgram.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
+import { builtPlacement } from "./framesConfig.ts";
+import { serveFrames } from "./framesServer.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { highlightCode } from "./highlightCode.ts";
 import {
@@ -353,8 +356,8 @@ const textModule = (
 };
 
 /**
- * A module the plugin generates for a catalogue's pages, when the id names one: the configuration's data, an entry,
- * the project's own stories' source, or a page's HTML (unless the folder has one of its own).
+ * A module the plugin generates for a catalogue's pages, when the id names one: an entry, the project's own stories'
+ * source, or a page's HTML (unless the folder has one of its own).
  *
  * @param id - the module's id.
  * @param config - the catalogue's configuration.
@@ -363,7 +366,6 @@ const generatedModule = (
   id: string,
   config: ResolvedConfig
 ): { code: string; moduleType: "js" } | string | undefined => {
-  if (id === CONFIG_ID) return { code: configModule(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["index.html"]))
     return { code: shellEntry(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["frame.html"]))
@@ -391,6 +393,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const usageModules = new Set<string>();
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
+  /** Where the frames run: the dev server's second port once it listens, the configuration's choice in a build. */
+  let framesPlacement = async (): Promise<FramesPlacement> =>
+    config === undefined ? SAME_ORIGIN : builtPlacement(config.frames);
   let config = options.config;
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
@@ -495,7 +500,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
                 rolldownOptions: {
                   input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") }
                 }
-              }
+              },
+              // Vite lets any localhost page read the server: neither origin needs another's reads, and the guards
+              // would be the only wall left between the frames and the catalogue (unless the app chose its own)
+              ...(config.frames.kind === "isolated" && userConfig.server?.cors === undefined
+                ? { server: { cors: false } }
+                : {})
             };
       return {
         ...pages,
@@ -528,10 +538,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     },
     configureServer: (server: ViteDevServer): void => {
       server.httpServer?.on("close", (): void => void docs?.close());
+      // first: the frames' own origin, and the guard that keeps every other origin's page from reading this one
+      if (config !== undefined) serveFrames(server, config, (placement) => (framesPlacement = placement));
       // an edited component or type file changes its docs: the worker renews its programs on their next read
       server.watcher.on("change", (file: string): void => renewOnChange(server, file));
       // the answers to tools and agents (`forgebook stories`, `forgebook mcp`), from the same sources as the pages
-      if (config !== undefined) server.middlewares.use(agentMiddleware(server, config, live));
+      if (config !== undefined)
+        server.middlewares.use(agentMiddleware(server, config, live, () => framesPlacement()));
       if (config?.heights !== undefined) {
         const file = {
           heights: config.heights,
@@ -579,6 +592,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       await docs?.close();
     },
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
+      if (id === CONFIG_ID && config !== undefined)
+        return { code: configModule(config, await framesPlacement()), moduleType: "js" };
       const generated = config === undefined ? undefined : generatedModule(id, config);
       if (generated !== undefined) return generated;
       const watch = (file: string): void => this.addWatchFile(file);

@@ -28,6 +28,7 @@ import { ApiReference } from "./ApiReference.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext } from "./Example.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
 import { storyTouchesOf, type TouchOverrides, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
@@ -163,8 +164,7 @@ export const ComponentPage = ({
     onReady: (frame: Window, message: ReadyMessage): void => {
       queue.markReady(message.storyId);
       setStoryArgs((current) => new Map(current).set(message.storyId, message.args));
-      const send = (shellMessage: ShellMessage): void =>
-        frame.postMessage(shellMessage, window.location.origin);
+      const send = (shellMessage: ShellMessage): void => frame.postMessage(shellMessage, framesOrigin());
       send({
         type: "forgebook:view",
         view: touchedView(liveView(view), message.storyId, touches, catalogue.touch)

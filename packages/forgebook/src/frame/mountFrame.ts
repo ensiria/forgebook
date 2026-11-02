@@ -18,16 +18,10 @@ import { storyTextOf } from "@forgebook/story-format/texts";
 
 import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
+import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { shownLanguage } from "../languages.ts";
 import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
-import {
-  detailOf,
-  type FrameMessage,
-  isShellMessage,
-  type PanelArgs,
-  previewValue,
-  type ShellMessage
-} from "../messages.ts";
+import { detailOf, type PanelArgs, previewValue, type ShellMessage } from "../messages.ts";
 import { panelArgsOf, storyArgsOf } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { sourceFiles } from "../sourceFiles.ts";
@@ -44,6 +38,7 @@ import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import { applyTools } from "./measureTools.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
+import { type ShellChannel, shellChannel } from "./shellChannel.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import type { MockToolsLoader } from "./storyMocks.ts";
@@ -72,6 +67,8 @@ export type FrameConfig = {
   readonly playTools?: PlayToolsLoader;
   /** Loads MSW, for a story that mocks its API; none when the project does not install it. */
   readonly mockTools?: MockToolsLoader;
+  /** Where the frames run, so the frame hears only its shell: on the catalogue's own origin by default. */
+  readonly frames?: FramesPlacement;
 };
 
 /**
@@ -84,11 +81,6 @@ const tellDevServer = (report: LiveErrorReport): void => {
   import.meta.hot?.send(LIVE_ERROR_EVENT, report);
 };
 
-/** Tells the shell, which is the parent page on the same origin. */
-const tellShell = (message: FrameMessage): void => {
-  if (window.parent !== window) window.parent.postMessage(message, window.location.origin);
-};
-
 /**
  * Does what a message of the shell asks of the rendered story; the view's live part is applied apart, before the story
  * loads.
@@ -97,12 +89,14 @@ const tellShell = (message: FrameMessage): void => {
  * @param controls - the rendered story's controls.
  * @param storyId - the story's id, for the answers.
  * @param rules - the catalogue's accessibility rules, for a check.
+ * @param tellShell - tells the shell the check's result.
  */
 const answerShell = (
   message: ShellMessage,
   controls: StoryControls,
   storyId: string,
-  rules: A11ySettings
+  rules: A11ySettings,
+  tellShell: ShellChannel["tell"]
 ): void => {
   if (message.type === "forgebook:replay") void controls.replay();
   else if (message.type === "forgebook:args") controls.setPanelArgs(message.args);
@@ -147,6 +141,8 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const catalogue = catalogueSettings("", switches, config.lists);
   const preview = mergedPreviews((config.previews ?? []).map(readPreview));
   const view = parseView(window.location.search, catalogue);
+  const shell = shellChannel(config.frames ?? SAME_ORIGIN, window);
+  const tellShell = shell.tell;
   applyView(document.documentElement, view, catalogue);
   // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
   // sees touch
@@ -160,19 +156,13 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const showSpills = spillOutline(document, ".forgebook-frame", (count) =>
     tellShell({ type: "forgebook:spills", storyId, count })
   );
-  window.addEventListener("message", (event: MessageEvent): void => {
-    if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
-    if (event.data.type === "forgebook:tools") applyTools(document, event.data.tools, catalogue.gridStep);
-    if (event.data.type === "forgebook:spills") showSpills(event.data.isOn);
-    if (event.data.type !== "forgebook:view") return;
-    applyView(document.documentElement, withFixed(event.data.view, fixed), catalogue);
-    changeShown?.(event.data.view);
-    const address = frameAddress(
-      window.location.pathname,
-      storyId,
-      { ...view, ...event.data.view },
-      switches
-    );
+  shell.listen((message: ShellMessage): void => {
+    if (message.type === "forgebook:tools") applyTools(document, message.tools, catalogue.gridStep);
+    if (message.type === "forgebook:spills") showSpills(message.isOn);
+    if (message.type !== "forgebook:view") return;
+    applyView(document.documentElement, withFixed(message.view, fixed), catalogue);
+    changeShown?.(message.view);
+    const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
     window.history.replaceState(null, "", address);
   });
   // observed from the start, so the shell sizes the frame to an error as well as to a story
@@ -222,9 +212,8 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
     let controls: StoryControls | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
-    window.addEventListener("message", (event: MessageEvent): void => {
-      if (event.origin !== window.location.origin || !isShellMessage(event.data)) return;
-      if (controls !== undefined) answerShell(event.data, controls, storyId, catalogue.a11y);
+    shell.listen((message: ShellMessage): void => {
+      if (controls !== undefined) answerShell(message, controls, storyId, catalogue.a11y, tellShell);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them)
     const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => {

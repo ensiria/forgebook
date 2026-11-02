@@ -21,6 +21,7 @@ import { mergedThemes, shellThemeCss, shellThemeProblems, themeValueProblem } fr
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
+import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
@@ -82,6 +83,8 @@ export type ResolvedConfig = {
   readonly hasPlayTools: boolean;
   /** Whether the project installs MSW, which a story's `parameters.msw` then mocks its API with. */
   readonly hasMocks: boolean;
+  /** Where the stories' frames run. */
+  readonly frames: ResolvedFrames;
 };
 
 /** MSW's browser module, for a story's mocked API. */
@@ -216,7 +219,7 @@ const configProblem = (config: unknown): string | undefined => {
   const hasSources = "sources" in config && Array.isArray(config.sources) && config.sources.length > 0;
   if (!hasStories && !hasSources)
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
-  return undefined;
+  return framesProblem("frames" in config ? config.frames : undefined);
 };
 
 /**
@@ -283,7 +286,8 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     watch: (config.watch ?? []).map(absolute),
     lists: mergedLists([...presets, config]),
     hasPlayTools: hasPlayToolsIn(dir),
-    hasMocks: packageResolver(dir)(MOCKS_MANIFEST) !== undefined
+    hasMocks: packageResolver(dir)(MOCKS_MANIFEST) !== undefined,
+    frames: resolvedFrames(config.frames)
   };
 };
 

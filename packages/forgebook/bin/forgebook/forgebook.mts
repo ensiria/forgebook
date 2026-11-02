@@ -23,7 +23,7 @@ import { catalogueClient } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
-import { catalogueVite } from "./catalogueVite.ts";
+import { catalogueVite, withFramePort } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
@@ -52,6 +52,11 @@ await defineCommands({
           valueName: "address",
           description: "The address to listen on; localhost by default."
         },
+        "frame-port": {
+          type: "string",
+          valueName: "number",
+          description: "The stories' frames' port (their own origin); the catalogue's port + 1 by default."
+        },
         force: {
           type: "boolean",
           description: "Pre-bundle the dependencies again, ignoring Vite's cache (as a first start does)."
@@ -70,7 +75,7 @@ await defineCommands({
         { command: `${COMMAND} dev --touch`, description: "And try the stories with Chromium's real touch." }
       ],
       run: async ({ options, onInterrupt, log }): Promise<void> => {
-        const config = await configOf(options.config);
+        const config = withFramePort(await configOf(options.config), options["frame-port"]);
         const port = options.port === undefined ? undefined : Number(options.port);
         if (port !== undefined && !Number.isInteger(port))
           throw new ScriptError(`--port ${options.port} is not a port`);

@@ -76,7 +76,10 @@ const ownClient = async (config: ResolvedConfig, origin: string): Promise<Catalo
   );
   return {
     ask: (route: string, params: URLSearchParams): Promise<AgentAnswer> =>
-      agentAnswer((id: string) => server.ssrLoadModule(id), config, route, params, origin),
+      agentAnswer((id: string) => server.ssrLoadModule(id), config, route, params, {
+        catalogue: origin,
+        frames: origin
+      }),
     runningAt: undefined,
     close: () => server.close()
   };

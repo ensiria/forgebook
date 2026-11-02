@@ -9,8 +9,10 @@ import "./shell.scss";
 import { createRoot } from "react-dom/client";
 
 import type { StoryCodeWriter } from "../frame/renderer.ts";
+import { type FramesPlacement, framePageAddress, pageOrigins, SAME_ORIGIN } from "../frameOrigins.ts";
 import { CodeWriterContext } from "./codeWriter.ts";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
+import { setFramesOrigin } from "./framesOrigin.ts";
 import { Shell, type ShellConfig } from "./Shell.tsx";
 import { configureStrings } from "./strings.ts";
 
@@ -18,6 +20,8 @@ import { configureStrings } from "./strings.ts";
 export type MountShellConfig = ShellConfig & {
   /** Writes a story drawn from its args in the framework's code (`storyJsx` of `@forgebook/react`). */
   readonly codeOf: StoryCodeWriter;
+  /** Where the frames run: on the catalogue's own origin by default. */
+  readonly frames?: FramesPlacement;
 };
 
 /**
@@ -45,10 +49,13 @@ const setPageIcon = (logo: string | undefined): void => {
 export const mountShell = (container: HTMLElement, config: MountShellConfig): void => {
   setPageIcon(config.logo);
   configureStrings(config.lists?.strings ?? {});
-  const { codeOf, ...shell } = config;
+  const { codeOf, frames = SAME_ORIGIN, ...shell } = config;
+  const origins = pageOrigins(frames, window.location, "catalogue");
+  setFramesOrigin(origins.frames);
+  const frameUrl = framePageAddress(shell.frameUrl, origins.frames, window.location.pathname);
   createRoot(container).render(
     <CodeWriterContext.Provider value={codeOf}>
-      <Shell {...shell} />
+      <Shell {...shell} frameUrl={frameUrl} />
     </CodeWriterContext.Provider>
   );
 };

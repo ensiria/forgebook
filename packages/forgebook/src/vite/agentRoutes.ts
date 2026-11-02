@@ -18,6 +18,7 @@ import type { StorySource } from "@forgebook/story-format/source";
 import type { ViteDevServer } from "vite";
 
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
+import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
@@ -32,6 +33,8 @@ import {
 } from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { findAnswer } from "./findRoute.ts";
+import { framesOriginOf } from "./framesConfig.ts";
+import { hostOf } from "./framesServer.ts";
 import { changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
 import { STORYLESS_ROUTES } from "./storylessRoutes.ts";
@@ -238,7 +241,7 @@ const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
  * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
  *   tokens, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
- * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
+ * @param origins - where the catalogue is served (`http://localhost:5173`) and where its frames are, for the links.
  * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
  *   command's own, which no frame reports to.
  */
@@ -247,7 +250,7 @@ export const agentAnswer = async (
   config: ResolvedConfig,
   route: string,
   params: URLSearchParams,
-  origin: string,
+  origins: PageOrigins,
   live?: LiveErrors
 ): Promise<AgentAnswer> => {
   try {
@@ -259,7 +262,7 @@ export const agentAnswer = async (
       tree: storyTree(loaded.sources),
       config,
       params,
-      pages: { page: `${origin}/`, frame: `${origin}/frame.html` },
+      pages: { page: `${origins.catalogue}/`, frame: `${origins.frames}/frame.html` },
       view: params.get("view") ?? ""
     };
     if (route === "errors") return errorsAnswer(context, live);
@@ -279,18 +282,29 @@ export const agentAnswer = async (
  * @param server - the dev server, which loads the modules.
  * @param config - the catalogue's configuration.
  * @param live - the errors the open frames report.
+ * @param placement - where the frames run, for the links to them.
  * @returns a Connect middleware: it answers its own paths and passes every other request on.
  */
 export const agentMiddleware =
-  (server: ViteDevServer, config: ResolvedConfig, live: LiveErrors) =>
+  (
+    server: ViteDevServer,
+    config: ResolvedConfig,
+    live: LiveErrors,
+    placement: () => Promise<FramesPlacement>
+  ) =>
   (request: IncomingMessage, response: ServerResponse, next: (error?: unknown) => void): void => {
-    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+    const scheme = server.config.server.https === undefined ? "http:" : "https:";
+    const url = new URL(request.url ?? "/", `${scheme}//${hostOf(request) ?? "localhost"}`);
     if (!url.pathname.startsWith(AGENT_API)) {
       next();
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
-    void agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, url.origin, live)
+    void placement()
+      .then((frames: FramesPlacement) => {
+        const origins = { catalogue: url.origin, frames: framesOriginOf(frames, url.href) ?? url.origin };
+        return agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, origins, live);
+      })
       .then(({ status, body }) => {
         response.statusCode = status;
         response.setHeader("Content-Type", "application/json");

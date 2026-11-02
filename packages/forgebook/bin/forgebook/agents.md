@@ -68,4 +68,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.
 
+A story's frame runs on its own origin (the dev server's second port): open a story by the `page` or `frame` link an
+answer gives, never by building a frame's address yourself, and do not expect a story's code to reach the catalogue's
+page or its API.
+
 Run `npx forgebook <command> --help` for the options. With an MCP client, `npx forgebook mcp` offers the same as tools.
