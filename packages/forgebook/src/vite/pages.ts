@@ -14,7 +14,7 @@
 import { join } from "node:path";
 
 import type { PageConfig } from "../pageConfig.ts";
-import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { MOCKS_MODULES, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -160,6 +160,20 @@ const playToolsLoader = (): string => {
 };
 
 /**
+ * The frame's loader of MSW: the worker and the handlers it adds to a story's, imported for the first story with
+ * handlers, so a catalogue whose stories mock nothing never loads them.
+ */
+const mockToolsLoader = (): string => {
+  const imports = MOCKS_MODULES.map((name) => `import(${JSON.stringify(name)})`).join(", ");
+  return [
+    "    mockTools: async () => {",
+    `      const [browser, core] = await Promise.all([${imports}]);`,
+    "      return { setupWorker: browser.setupWorker, http: core.http, passthrough: core.passthrough };",
+    "    },"
+  ].join("\n");
+};
+
+/**
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
@@ -179,7 +193,7 @@ export const frameEntry = (config: ResolvedConfig): string => {
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
-    ...(config.hasMocks ? [`    mockTools: () => import(${JSON.stringify(MOCKS_MODULE)}),`] : []),
+    ...(config.hasMocks ? [mockToolsLoader()] : []),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ""

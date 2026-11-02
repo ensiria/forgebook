@@ -84,8 +84,11 @@ export type ResolvedConfig = {
   readonly hasMocks: boolean;
 };
 
-/** MSW's browser module, for a story's mocked API. */
-export const MOCKS_MODULE = "msw/browser";
+/**
+ * MSW's modules, for a story's mocked API: the browser module, which starts the worker, and the main one, whose handler
+ * keeps each story's handlers to its own frame.
+ */
+export const MOCKS_MODULES = ["msw/browser", "msw"] as const;
 
 /** Its package's manifest, what tells it is installed: the module itself cannot be resolved from Node. */
 const MOCKS_MANIFEST = "msw/package.json";

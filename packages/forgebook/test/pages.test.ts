@@ -76,7 +76,8 @@ describe("a story's mocked API", () => {
   it("names MSW in the frame's entry only for a project that installs it, and only as a dynamic import", () => {
     expect(frameEntry(CONFIG)).not.toContain("msw");
     const entry = frameEntry({ ...CONFIG, hasMocks: true });
-    expect(entry).toContain('mockTools: () => import("msw/browser"),');
+    expect(entry).toContain('await Promise.all([import("msw/browser"), import("msw")]);');
+    expect(entry).toContain("http: core.http, passthrough: core.passthrough");
     expect(entry).not.toContain('from "msw');
   });
 
