@@ -10,8 +10,9 @@
  *
  * @module
  */
+import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import type { StorySource } from "@forgebook/story-format/source";
 import type { ViteDevServer } from "vite";
@@ -19,12 +20,22 @@ import type { ViteDevServer } from "vite";
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
+import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
-import type { ErrorsDocument } from "./agent.types.ts";
-import { type CataloguePages, type LoadedStoryParts, storiesDocument, storyDocument } from "./agentApi.ts";
+import type { AgentChangedStory, ChangedStoriesDocument, ErrorsDocument } from "./agent.types.ts";
+import {
+  type CataloguePages,
+  type LoadedStoryParts,
+  storiesDocument,
+  storyDocument,
+  storyLinks
+} from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
+import { findAnswer } from "./findRoute.ts";
+import { changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
+import { STORYLESS_ROUTES } from "./storylessRoutes.ts";
+import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
 /** The path the answers live under. */
 export const AGENT_API = "/__forgebook/api/";
@@ -57,7 +68,9 @@ const agentModuleOf = (module: unknown): AgentModule => {
 };
 
 /** A loader's value, or why it failed. */
-const settled = async (load: (() => Promise<unknown>) | undefined): Promise<LoadedStoryParts["docs"]> => {
+export const settled = async (
+  load: (() => Promise<unknown>) | undefined
+): Promise<LoadedStoryParts["docs"]> => {
   if (load === undefined) return { value: { name: null } };
   try {
     return { value: await load() };
@@ -102,7 +115,7 @@ export const ROOT_HEADER = "forgebook-root";
 export const rootHeaderValue = (dir: string): string => encodeURIComponent(dir);
 
 /** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
-type RouteContext = {
+export type RouteContext = {
   /** The sources and the preview, as the dev server loaded them. */
   readonly loaded: AgentModule;
   /** The sources' story tree. */
@@ -148,6 +161,49 @@ const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   return { status: 200, body: storiesDocument(config.title, tree, pages, view, usage) };
 };
 
+/** Whether a value is a list of stories with what they reach. */
+const isReach = (value: unknown): value is readonly ReachedStory[] => Array.isArray(value);
+
+/**
+ * The stories a change touches, read from the files git names and the import graph "Used in" reads.
+ *
+ * @param context - what the routes read.
+ */
+const changedAnswer = async ({
+  config,
+  loaded,
+  tree,
+  params,
+  pages,
+  view
+}: RouteContext): Promise<AgentAnswer> => {
+  const since = params.get("since") || "HEAD";
+  const base = await changeBase(config.dir, since);
+  if (base === undefined) return { status: 400, body: { error: `"${since}" names no commit here` } };
+  const { root, files } = await changedFiles(config.dir, base);
+  const reaches = await Promise.all(
+    loaded.sources.flatMap((source) =>
+      source.files.map(async (group) => {
+        const reach = await group.reach?.();
+        return { source: source.id, reach: isReach(reach) ? reach : [] };
+      })
+    )
+  );
+  // git names real paths and the graph the catalogue's own, which differ in a folder reached through a link
+  const realDir = await realpath(config.dir);
+  const changed = files.map((file) => join(config.dir, relative(realDir, join(root, file))));
+  const stories = reaches.flatMap(({ source, reach }) =>
+    affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
+      const id = `${componentId(source, story.title)}--${kebab(story.exportName)}`;
+      return findStory(tree, id) === undefined
+        ? []
+        : [{ id, title: story.title, links: storyLinks(pages, id, view) }];
+    })
+  );
+  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems: [] };
+  return { status: 200, body };
+};
+
 /**
  * One story in detail, its component's "Used in" when offered.
  *
@@ -179,7 +235,8 @@ const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
  * @param load - loads a module on the server (the dev server's `ssrLoadModule`).
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
- * @param params - the query: `id` for a story, `view` for the links, `usedIn=true` for the list's "Used in" (a
+ * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
+ *   tokens, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
  * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
  * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
@@ -194,6 +251,8 @@ export const agentAnswer = async (
   live?: LiveErrors
 ): Promise<AgentAnswer> => {
   try {
+    const answerAlone = STORYLESS_ROUTES[route];
+    if (answerAlone !== undefined) return await answerAlone(config, params);
     const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
     const context: RouteContext = {
       loaded,
@@ -206,6 +265,8 @@ export const agentAnswer = async (
     if (route === "errors") return errorsAnswer(context, live);
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
+    if (route === "find") return await findAnswer(context);
+    if (route === "changed") return await changedAnswer(context);
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };

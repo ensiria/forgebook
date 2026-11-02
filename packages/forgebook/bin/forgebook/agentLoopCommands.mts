@@ -18,10 +18,15 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import type { StoryCheckReport } from "../../src/storyCheck.ts";
+import type { ChangedStoriesDocument } from "../../src/vite/agent.types.ts";
+import { isChangedStoriesDocument, isFoundComponentsDocument } from "../../src/vite/agentApi.ts";
+import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
-import { agentsSkill, withAgentsSection } from "./agentsText.ts";
-import { checkText, errorsOutput, shotText } from "./agentText.ts";
-import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { agentsSkill, SKILL_FOLDERS, withAgentsSection } from "./agentsText.ts";
+import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentText.ts";
+import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
+import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 
@@ -51,6 +56,27 @@ const errorsClient = async (
   }
   log.warn("No catalogue running there: only frames open in a browser report, so there is nothing to list");
   return client;
+};
+
+/** Where `forgebook dev` runs, for the commands that ask it. */
+const URL_OPTION = {
+  type: "string",
+  env: "FORGEBOOK_URL",
+  valueName: "address",
+  description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+} as const;
+
+/** The stories a change touches, as the catalogue answers. */
+const changedOf = async (
+  config: ResolvedConfig,
+  options: { readonly since: string | undefined; readonly url: string | undefined },
+  log: Logger
+): Promise<ChangedStoriesDocument> => {
+  const params = new URLSearchParams({ since: options.since ?? "" });
+  const body = await askCatalogue(config, options.url, "changed", params, log);
+  if (!isChangedStoriesDocument(body))
+    throw new ScriptError("The catalogue's answer has an unexpected shape");
+  return body;
 };
 
 /**
@@ -110,6 +136,92 @@ export const agentLoopCommands = (
         throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
     }
   }),
+  find: forgebook.command({
+    summary: "Find components by what they are for, in your own words.",
+    json: true,
+    positionals: [{ name: "query", description: "What you are looking for.", required: true }],
+    options: {
+      url: {
+        type: "string",
+        env: "FORGEBOOK_URL",
+        valueName: "address",
+        description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+      }
+    },
+    examples: [
+      { command: `${COMMAND} find modal`, description: "Whatever this catalogue calls a modal." },
+      { command: `${COMMAND} find "radio tile group" --json`, description: "As an agent asks." }
+    ],
+    run: async ({ options, args, io, log, isJson }): Promise<void> => {
+      const config = await configOf(options.config);
+      const params = new URLSearchParams({ query: args.query });
+      const body = await askCatalogue(config, options.url, "find", params, log);
+      if (!isFoundComponentsDocument(body)) {
+        throw new ScriptError("The catalogue's answer has an unexpected shape");
+      }
+      printAnswer(foundComponentsText(body), body, [], { io, log, isJson });
+    }
+  }),
+  changed: forgebook.command({
+    summary: "List the stories a change touches, through what they import.",
+    json: true,
+    options: {
+      since: {
+        type: "string",
+        valueName: "ref",
+        description: "The commit to compare with; HEAD by default, so what is not committed."
+      },
+      url: URL_OPTION
+    },
+    examples: [
+      { command: `${COMMAND} changed`, description: "What your uncommitted work touches." },
+      { command: `${COMMAND} changed --since origin/develop --json`, description: "What a branch touches." }
+    ],
+    run: async ({ options, io, log, isJson }): Promise<void> => {
+      const config = await configOf(options.config);
+      const body = await changedOf(config, options, log);
+      const text = body.stories.map((story) => story.id).join("\n");
+      io.stdout.write(isJson ? formatJson(body) : `${text === "" ? "No story touched." : text}\n`);
+    }
+  }),
+  verify: forgebook.command({
+    summary: "Run the catalogue's checks on every story a change touches, with one exit code.",
+    json: true,
+    options: {
+      since: {
+        type: "string",
+        valueName: "ref",
+        description: "The commit to compare with; HEAD by default, so what is not committed."
+      },
+      url: URL_OPTION
+    },
+    examples: [
+      { command: `${COMMAND} verify`, description: "Before you say a change is done." },
+      { command: `${COMMAND} verify --since origin/develop --json`, description: "In a pull request." }
+    ],
+    run: async ({ options, io, log, isJson, style }): Promise<void> => {
+      const config = await configOf(options.config);
+      const { stories, files } = await changedOf(config, options, log);
+      const reports: StoryCheckReport[] = [];
+      for (const story of stories) {
+        const report = await runStoryCheck(config, options.url, {
+          id: story.id,
+          views: [],
+          isAllVariants: false
+        });
+        if (typeof report === "string") throw new ScriptError(report);
+        reports.push(report);
+      }
+      const problems = reports
+        .flatMap((report) => report.results)
+        .reduce((sum, each) => sum + each.problems.length, 0);
+      const text =
+        reports.length === 0 ? "No story touched." : reports.map((each) => checkText(each, style)).join("\n");
+      io.stdout.write(isJson ? formatJson({ schema: 1, files, stories, reports, problems }) : `${text}\n`);
+      if (problems > 0)
+        throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
+    }
+  }),
   "check-page": forgebook.command({
     summary: "Run the checks on a real page of the application: accessibility, what spills, its errors.",
     json: true,
@@ -128,6 +240,34 @@ export const agentLoopCommands = (
       const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
       if (problems > 0)
         throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
+    }
+  }),
+  "check-code": forgebook.command({
+    summary: "Check what a change adds against the design system, with an exit code for CI.",
+    json: true,
+    options: {
+      since: {
+        type: "string",
+        valueName: "ref",
+        description: "The commit to compare with; HEAD by default, so what is not committed."
+      },
+      url: {
+        type: "string",
+        env: "FORGEBOOK_URL",
+        valueName: "address",
+        description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+      }
+    },
+    examples: [
+      { command: `${COMMAND} check-code`, description: "Your uncommitted work." },
+      {
+        command: `${COMMAND} check-code --since origin/develop --json`,
+        description: "A pull request, in CI."
+      }
+    ],
+    run: async ({ options, io, log, isJson }): Promise<void> => {
+      const config = await configOf(options.config);
+      await runCheckCode({ config, url: options.url, context: { io, log, isJson } }, options.since);
     }
   }),
   errors: forgebook.command({
@@ -247,13 +387,13 @@ export const agentLoopCommands = (
       },
       skill: {
         type: "boolean",
-        description: "Also write them as a Claude Code skill, .claude/skills/forgebook/SKILL.md."
+        description: `Also write them as an Agent Skill, SKILL.md in ${SKILL_FOLDERS.join(" and ")}.`
       },
       print: { type: "boolean", description: "Print the instructions instead of writing them." }
     },
     examples: [
       { command: `${COMMAND} agents`, description: "Add or renew Forgebook's section of AGENTS.md." },
-      { command: `${COMMAND} agents --skill`, description: "And the Claude Code skill." }
+      { command: `${COMMAND} agents --skill`, description: "And the skill, for any agent." }
     ],
     run: ({ options, io, log }): void => {
       const section = readFileSync(new URL("./agents.md", import.meta.url), "utf8");
@@ -266,10 +406,12 @@ export const agentLoopCommands = (
       writeFileSync(file, withAgentsSection(isNew ? undefined : readFileSync(file, "utf8"), section));
       log.success(`${relative(process.cwd(), file)}: Forgebook's section ${isNew ? "written" : "renewed"}`);
       if (options.skill !== true) return;
-      const skill = resolve(".claude", "skills", "forgebook", "SKILL.md");
-      mkdirSync(dirname(skill), { recursive: true });
-      writeFileSync(skill, agentsSkill(section));
-      log.success(`${relative(process.cwd(), skill)} written`);
+      for (const folder of SKILL_FOLDERS) {
+        const skill = resolve(folder, "SKILL.md");
+        mkdirSync(dirname(skill), { recursive: true });
+        writeFileSync(skill, agentsSkill(section));
+        log.success(`${relative(process.cwd(), skill)} written`);
+      }
     }
   })
 });

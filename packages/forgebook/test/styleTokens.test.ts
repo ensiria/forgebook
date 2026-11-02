@@ -9,6 +9,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { GROUND_ROLES, TEXT_ROLES } from "../src/shellTheme.ts";
+
 const TOKENS = readFileSync(join(import.meta.dirname, "..", "src", "styles", "_tokens.scss"), "utf8");
 
 /** The palettes of the tokens file. */
@@ -50,14 +52,10 @@ const contrast = (first: readonly number[], second: readonly number[]): number =
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
 };
 
-/** The text colours, and the grounds each is read on. */
-const TEXTS = ["text", "text-secondary", "text-tertiary", "accent-text", "danger-text"];
-const GROUNDS = ["window", "sidebar", "surface"];
-
 describe.each<PaletteName>(["light", "dark"])("the shell's %s palette", (palette) => {
   const hex = (name: string): string => tokenHex(palette, name);
 
-  it.each(TEXTS.flatMap((text) => GROUNDS.map((ground) => [text, ground])))(
+  it.each(TEXT_ROLES.flatMap((text) => GROUND_ROLES.map((ground) => [text, ground])))(
     "%s reaches 4.5:1 on %s",
     (text, ground) => {
       expect(
