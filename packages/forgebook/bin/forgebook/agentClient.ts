@@ -12,7 +12,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import { createServer, type ViteDevServer } from "vite";
 
@@ -26,7 +26,7 @@ import {
   rootHeaderValue
 } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
-import { catalogueVite } from "./catalogueVite.ts";
+import { catalogueVite, viteCacheFolder } from "./catalogueVite.ts";
 
 /** Where `forgebook dev` serves when no port is given: Vite's default. */
 export const DEFAULT_ORIGIN = "http://localhost:5173";
@@ -67,6 +67,16 @@ const runningClient = async (
 };
 
 /**
+ * The cache folder of a server a command starts for itself, apart from `forgebook dev`'s: a command runs beside a dev
+ * server it did not find in time (it answers slowly on a loaded machine), and Vite starting on the same folder empties
+ * it, under the pages that server is serving.
+ *
+ * @param config - the catalogue's configuration.
+ */
+const commandCacheDir = (config: ResolvedConfig): string =>
+  join(viteCacheFolder(config.dir), "forgebook", "command");
+
+/**
  * A dev server of its own, in middleware mode, and the answers from it.
  *
  * @param config - the catalogue's configuration.
@@ -77,7 +87,8 @@ const ownClient = async (config: ResolvedConfig, origin: string): Promise<Catalo
     await catalogueVite(config, {
       server: { middlewareMode: true, hmr: false },
       appType: "custom",
-      logLevel: "error"
+      logLevel: "error",
+      cacheDir: commandCacheDir(config)
     })
   );
   return {
@@ -180,7 +191,8 @@ const ownListening = async (config: ResolvedConfig, port: number): Promise<Serve
   const server: ViteDevServer = await createServer(
     await catalogueVite(config, {
       server: { port, strictPort: port !== 0, host: "127.0.0.1" },
-      logLevel: "error"
+      logLevel: "error",
+      cacheDir: commandCacheDir(config)
     })
   );
   try {
