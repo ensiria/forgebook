@@ -48,8 +48,11 @@ const estimateLine = (profileEstimate: Estimate | undefined): string => {
   const { totalMs, lowMs, highMs, items } = profileEstimate;
   const missing = items.filter(({ ms }) => ms === undefined).map(({ id }) => id);
   const range = `circa ${formatDuration(totalMs)} (tra ${formatDuration(lowMs)} e ${formatDuration(highMs)})`;
-  return missing.length === 0 ? range : `${range}, senza ${missing.join(", ")} che non ha una stima`;
+  return missing.length === 0 ? range : `${range}, escluse le parti senza stima (${missing.join(", ")})`;
 };
+
+/** A profile's name, for a person. */
+const PROFILE_NAMES: Readonly<Record<KitProfile, string>> = { quick: "rapida", full: "completa" };
 
 /** What to do with what an earlier launch left. */
 type EarlierChoice = "resume" | "restart" | "results" | "clean" | "quit";
@@ -61,8 +64,8 @@ const earlierRun = async (state: KitState, asker: Asker): Promise<EarlierChoice 
   const ended = items.filter(({ id }) => state.items[id] !== undefined).length;
   const isComplete = ended === items.length;
   const description = isComplete
-    ? `La corsa del profilo «${state.profile}» è finita${state.archive === undefined ? "" : ` e i risultati sono in ${state.archive}`}.`
-    : `Una corsa del profilo «${state.profile}» si è fermata: ${ended} parti su ${items.length} completate.`;
+    ? `La prova ${PROFILE_NAMES[state.profile]} è finita${state.archive === undefined ? "" : ` e i risultati sono in ${state.archive}`}.`
+    : `Una prova ${PROFILE_NAMES[state.profile]} si è fermata: ${ended} parti su ${items.length} completate.`;
   asker.log.info(description);
   return select<EarlierChoice>(
     {
@@ -153,7 +156,7 @@ const startRun = async (session: Session, given: string | undefined): Promise<bo
   if (platform() === "win32") log.info(SPECTRUM_ON_WINDOWS);
   const profile = await chooseProfile(given, estimates, asker);
   await checkMachine(profile, paths, asker);
-  log.step(`Prova ${profile === "quick" ? "rapida" : "completa"}: ${estimateLine(estimates[profile])}.`);
+  log.step(`Prova ${PROFILE_NAMES[profile]}: ${estimateLine(estimates[profile])}.`);
   for (const item of profileItems(profile, platform())) log.plain(`  · ${ITEM_NAMES[item.id]}`);
   log.plain(
     "  Durante la prova lascia il PC acceso e collegato alla corrente, e non usarlo: altri programmi aperti " +
