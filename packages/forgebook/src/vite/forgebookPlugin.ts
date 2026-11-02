@@ -19,7 +19,7 @@
  *
  * @module
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
@@ -29,6 +29,7 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
+import { type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
@@ -49,6 +50,7 @@ import {
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
   indexedStoryFiles,
+  type KeptIndex,
   storyFilesGroupOf,
   storyFilesGroupText,
   storyFilesModule,
@@ -82,6 +84,12 @@ const sassOptions = async (): Promise<NonNullable<UserConfig["css"]>> => {
   const { NodePackageImporter } = await import("sass-embedded");
   return { preprocessorOptions: { scss: { importers: [new NodePackageImporter()] } } };
 };
+
+/** What made a kept index: this package's build, so a new version reads the files again. */
+const INDEX_STAMP = String(statSync(new URL(import.meta.url)).mtimeMs);
+
+/** Whether what a cache file holds is a pattern's index. */
+const isKeptIndex = (value: unknown): value is KeptIndex => typeof value === "object" && value !== null;
 
 /** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
 const FILES_QUERY = "?forgebook-files";
@@ -148,15 +156,17 @@ const filesId = (folder: string, pattern: string): string =>
  * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param hasUsage - whether the group offers its "Used in" loader.
+ * @param cache - the indexes kept between starts.
  * @throws when a story file cannot be indexed.
  */
 const patternModule = (
   id: string,
   watch: (file: string) => void,
-  hasUsage: boolean
+  hasUsage: boolean,
+  cache: DiskCache<KeptIndex> | undefined
 ): { code: string; moduleType: "js" } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  return { code: storyFilesModule(root, pattern, watch, hasUsage), moduleType: "js" };
+  return { code: storyFilesModule(root, pattern, watch, hasUsage, cache), moduleType: "js" };
 };
 
 /** The resolved id of a group's "Used in" module: Rollup's mark of a virtual module, then its import's specifier. */
@@ -279,6 +289,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   let docs: DocsExtractor | undefined;
   /** Where the answers worth keeping between starts live: inside Vite's cache folder, once Vite has resolved it. */
   let cacheFolder: string | undefined;
+  const indexCache = (): DiskCache<KeptIndex> | undefined =>
+    cacheFolder === undefined ? undefined : diskCache(join(cacheFolder, "index"), INDEX_STAMP, isKeptIndex);
   const extractor = (): DocsExtractor => {
     const framework = config?.framework ?? options.framework;
     if (framework === undefined)
@@ -318,7 +330,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    return patternModule(id, watch, config?.lists.usedIn !== false);
+    return patternModule(id, watch, config?.lists.usedIn !== false, indexCache());
   };
   const pagePath = (page: PageFile): string | undefined =>
     config === undefined ? undefined : join(config.dir, page);

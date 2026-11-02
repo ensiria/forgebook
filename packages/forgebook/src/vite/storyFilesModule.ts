@@ -16,6 +16,7 @@ import { join, relative, resolve } from "node:path";
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { autoTitle, patternBase } from "./autoTitle.ts";
+import type { DiskCache } from "./diskCache.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
 
 /** A pattern of story files and the folder it is read from: the declaring module's folder, the import's pattern. */
@@ -89,22 +90,31 @@ export type IndexedStoryFile = {
   readonly index: StoryFileIndex;
 };
 
+/** A pattern's index as it is kept between starts, by file key. */
+export type KeptIndex = Readonly<Record<string, StoryFileIndex>>;
+
 /**
  * Every story file a pattern matches, indexed.
  *
  * @param root - the declaring module's folder.
  * @param pattern - the pattern.
  * @param watch - adds a file whose edit renews the module that read it.
+ * @param cache - the indexes kept between starts, which hold while the files they came from do; none reads them all.
  * @throws when a story file cannot be indexed.
  */
 export const indexedStoryFiles = (
   root: string,
   pattern: string,
-  watch: (file: string) => void
-): IndexedStoryFile[] =>
-  storyFileKeys(root, [pattern]).map((key) => {
+  watch: (file: string) => void,
+  cache?: DiskCache<KeptIndex>
+): IndexedStoryFile[] => {
+  const name = storyFilesGroupText(root, pattern);
+  const kept = cache?.read(name);
+  const files = storyFileKeys(root, [pattern]).map((key) => {
     const file = resolve(root, key);
     watch(file);
+    const known = kept?.[key];
+    if (known !== undefined) return { key, file, index: known };
     const title = autoTitle(patternBase(pattern), key);
     const index = indexStoryFile(
       file,
@@ -114,6 +124,16 @@ export const indexedStoryFiles = (
     if (typeof index === "string") throw new Error(index);
     return { key, file, index };
   });
+  if (files.some(({ key }) => kept?.[key] === undefined)) {
+    const index = Object.fromEntries(files.map((each) => [each.key, each.index]));
+    cache?.write(
+      name,
+      index,
+      files.map((each) => each.file)
+    );
+  }
+  return files;
+};
 
 /** An object literal of a key per file, each value written by `value`. */
 const objectOf = (keys: readonly string[], value: (key: string) => string): string =>
@@ -126,15 +146,17 @@ const objectOf = (keys: readonly string[], value: (key: string) => string): stri
  * @param pattern - the pattern before `?forgebook-files`.
  * @param watch - adds a file whose edit renews the module (each story file: its index is in the module).
  * @param hasUsage - whether the group offers its "Used in" loader (the catalogue did not turn it off).
+ * @param cache - the indexes kept between starts.
  * @returns the module's code, or a message saying which file cannot be indexed.
  */
 export const storyFilesModule = (
   root: string,
   pattern: string,
   watch: (file: string) => void,
-  hasUsage = true
+  hasUsage = true,
+  cache?: DiskCache<KeptIndex>
 ): string => {
-  const files = indexedStoryFiles(root, pattern, watch);
+  const files = indexedStoryFiles(root, pattern, watch, cache);
   const keys = files.map((file) => file.key);
   const index: Record<string, StoryFileIndex> = Object.fromEntries(
     files.map((file) => [file.key, file.index])
