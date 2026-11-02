@@ -1,0 +1,5 @@
+{
+  "name": "loose-fixture",
+  "private": true,
+  "description": "A project with no TypeScript configuration: its stories and its function in JavaScript."
+}
