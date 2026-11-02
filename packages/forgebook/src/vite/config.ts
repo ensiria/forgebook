@@ -14,6 +14,7 @@
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import type { CatalogueLists } from "../catalogue.ts";
+import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 
@@ -29,6 +30,8 @@ export type ForgebookPreset = CatalogueLists & {
   readonly preview?: string;
   /** Tags for every frame's `<head>`, before the catalogue's. */
   readonly head?: string;
+  /** The shell's look, under the catalogue's: its theme, and a style sheet by absolute path. */
+  readonly shell?: ShellOptions;
 };
 
 /** A tokens file: its path from the configuration's folder, with its theme when it is a theme's. */
@@ -55,6 +58,8 @@ export type ForgebookConfig = CatalogueLists & {
   readonly switches?: readonly ViewSwitch[];
   /** The languages its stories can be drawn in; none turns the Language row off. */
   readonly languages?: readonly StoryLanguage[];
+  /** The shell's look: a theme of colours, fonts and corners, and an escape hatch. */
+  readonly shell?: ShellOptions;
   /**
    * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of
    * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from.

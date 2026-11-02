@@ -200,7 +200,7 @@ const shellStrings = {
   resetArgs: "Reset",
   appearance: "Appearance",
   appearanceOf: (name: string): string => `Appearance: ${name}`,
-  appearances: { light: "Light", dark: "Dark", system: "System" },
+  appearances: { light: "Light", dark: "Dark", system: "System", story: "Follow the story" },
   worstCase: "Worst case",
   worstCaseHint:
     "Long texts with a word too long to break, huge numbers: the elements that spill are outlined",

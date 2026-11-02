@@ -42,6 +42,41 @@ export const gitOutput = async (dir: string, ...args: readonly string[]): Promis
 const listed = (text: string): readonly string[] => text.split("\n").filter((line) => line !== "");
 
 /**
+ * The commit a change starts from.
+ *
+ * @param dir - a folder of the repository.
+ * @param since - a commit, as asked.
+ * @returns its hash, or none when it names no commit.
+ */
+export const changeBase = async (dir: string, since: string): Promise<string | undefined> => {
+  try {
+    const commit = (
+      await gitOutput(dir, "rev-parse", "--verify", "--quiet", "--end-of-options", `${since}^{commit}`)
+    ).trim();
+    return (await gitOutput(dir, "merge-base", commit, "HEAD")).trim();
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The files a change touches, tracked or new.
+ *
+ * @param dir - a folder of the repository.
+ * @param base - the commit it starts from.
+ * @returns the repository's folder, and the files relative to it.
+ */
+export const changedFiles = async (
+  dir: string,
+  base: string
+): Promise<{ readonly root: string; readonly files: readonly string[] }> => {
+  const root = (await gitOutput(dir, "rev-parse", "--show-toplevel")).trim();
+  const tracked = listed(await gitOutput(dir, "diff", "--no-ext-diff", "--name-only", base, "--"));
+  const untracked = listed(await gitOutput(dir, "ls-files", "--others", "--exclude-standard", "--full-name"));
+  return { root, files: [...new Set([...tracked, ...untracked])] };
+};
+
+/**
  * Reads a change.
  *
  * @param dir - a folder of the repository.
@@ -49,15 +84,8 @@ const listed = (text: string): readonly string[] => text.split("\n").filter((lin
  * @returns the change, or why it cannot be read.
  */
 export const gitChange = async (dir: string, since: string): Promise<GitChange | string> => {
-  let base: string;
-  try {
-    const commit = (
-      await gitOutput(dir, "rev-parse", "--verify", "--quiet", "--end-of-options", `${since}^{commit}`)
-    ).trim();
-    base = (await gitOutput(dir, "merge-base", commit, "HEAD")).trim();
-  } catch {
-    return `"${since}" names no commit here`;
-  }
+  const base = await changeBase(dir, since);
+  if (base === undefined) return `"${since}" names no commit here`;
   const form = ["--no-ext-diff", "--no-textconv", "--no-color", "--src-prefix=a/", "--dst-prefix=b/"];
   return {
     diff: await gitOutput(dir, "diff", ...form, "--unified=0", base, "--"),

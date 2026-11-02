@@ -22,9 +22,11 @@ const CONFIG: ResolvedConfig = {
   languages: [],
   previews: [],
   head: "",
+  shell: { themeCss: "", styleSheets: [], problems: [] },
   tokens: [],
   watch: [],
   lists: {},
+  hasMocks: false,
   hasPlayTools: false
 };
 
@@ -72,6 +74,15 @@ describe("prebundled", () => {
     expect(names).toContain("forgebook/shell");
     expect(names).toContain(STUB_FRAMEWORK.pages.frame);
     expect(prebundled(CONFIG, LINKED, LINKED)).not.toContain("forgebook/shell");
+  });
+});
+
+describe("a project with MSW", () => {
+  it("pre-bundles its browser module, which Node cannot resolve, so a page does not reload to find it", () => {
+    expect(prebundled({ ...CONFIG, hasMocks: true }, resolverOf({}), resolverOf({}))).toContain(
+      "msw/browser"
+    );
+    expect(prebundled(CONFIG, resolverOf({}), resolverOf({}))).not.toContain("msw/browser");
   });
 });
 

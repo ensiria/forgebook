@@ -10,10 +10,11 @@
  * @module
  */
 
-import type { ComponentDocs } from "../componentDocs.ts";
+import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
+import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
 
 /** The version of the documents' shape. */
@@ -160,6 +161,50 @@ export type NearestTokensDocument = NearestTokens & {
   /** The value asked about. */
   readonly value: string;
   /** What in the tokens files could not be read. */
+  readonly problems: readonly string[];
+};
+
+/** A component an intent search found, with what a next step needs. */
+export type AgentFoundComponent = FoundComponent & {
+  /** Its first story's id, to pass to `story`. */
+  readonly story: string | undefined;
+  /** The links that open that story. */
+  readonly links: StoryLinks | undefined;
+  /** When to use it and when not, when its TSDoc says. */
+  readonly guidance?: UsageGuidance;
+};
+
+/** The components a query describes. */
+export type FoundComponentsDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The query. */
+  readonly query: string;
+  /** Up to five, best first; none means nothing in the catalogue holds those words. */
+  readonly components: readonly AgentFoundComponent[];
+};
+
+/** A story a change touches. */
+export type AgentChangedStory = {
+  /** Its id. */
+  readonly id: string;
+  /** Its component's title. */
+  readonly title: string;
+  /** The links that open it. */
+  readonly links: StoryLinks;
+};
+
+/** The stories a change touches. */
+export type ChangedStoriesDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** What the change is measured from. */
+  readonly since: string;
+  /** The files changed, relative to the repository. */
+  readonly files: readonly string[];
+  /** The stories that reach them. */
+  readonly stories: readonly AgentChangedStory[];
+  /** What could not be read: a group whose usage failed. */
   readonly problems: readonly string[];
 };
 

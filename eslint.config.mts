@@ -27,7 +27,7 @@ const NO_BARRELS = [
 
 /** The configuration. */
 const config: Linter.Config[] = [
-  { ignores: ["**/node_modules/**", "**/dist/**", "**/.heights-build/**"] },
+  { ignores: ["**/node_modules/**", "**/dist/**", "**/.heights-build/**", "**/public/**"] },
   {
     files: TYPESCRIPT,
     languageOptions: {
