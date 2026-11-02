@@ -70,6 +70,9 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
     '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
     `    <title>${escaped(page === "index.html" ? config.title : "Story")}</title>`,
     ...(page === "frame.html" && config.head !== "" ? [config.head] : []),
+    ...(page === "index.html" && config.shell.themeCss !== ""
+      ? [`    <style>${config.shell.themeCss}</style>`]
+      : []),
     "  </head>",
     "  <body>",
     '    <div id="root"></div>',
@@ -124,6 +127,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
     ...(config.logo === undefined ? [] : [`import logo from ${JSON.stringify(`${config.logo}?url`)};`]),
     ...sources.imports,
+    ...config.shell.styleSheets.map((file) => `import ${JSON.stringify(file)};`),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  mountShell(root, {",

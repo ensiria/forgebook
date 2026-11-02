@@ -92,3 +92,40 @@ describe("findConfigFile", () => {
     expect(findConfigFile(dir)).toBe(join(dir, "forgebook.config.ts"));
   });
 });
+
+describe("the shell's look", () => {
+  const base = { framework: STUB_FRAMEWORK, title: "T", stories: ["s"] };
+
+  it("merges a preset's theme under the catalogue's, role by role", () => {
+    const { shell } = resolveConfig(
+      {
+        ...base,
+        presets: [{ name: "p", shell: { theme: { fonts: { sans: "Inter" }, dark: { accent: "#111111" } } } }],
+        shell: { theme: { dark: { accent: "#b28bff" } } }
+      },
+      "/c"
+    );
+    expect(shell.themeCss).toContain("--forgebook-font-sans:Inter");
+    expect(shell.themeCss).toContain("--forgebook-accent:#b28bff");
+    expect(shell.themeCss).not.toContain("#111111");
+  });
+
+  it("lists style sheets with the presets' first, and makes the catalogue's absolute", () => {
+    const { shell } = resolveConfig(
+      { ...base, presets: [{ name: "p", shell: { css: "/lib/shell.css" } }], shell: { css: "own.css" } },
+      "/c"
+    );
+    expect(shell.styleSheets).toEqual(["/lib/shell.css", "/c/own.css"]);
+  });
+
+  it("refuses a value that would break the page, naming it", () => {
+    expect(() => resolveConfig({ ...base, shell: { theme: { dark: { text: "red}" } } } }, "/c")).toThrow(
+      "dark.text"
+    );
+  });
+
+  it("keeps what will not work, for a warning", () => {
+    const { shell } = resolveConfig({ ...base, shell: { theme: { light: { text: "#eeeeee" } } } }, "/c");
+    expect(shell.problems.length).toBeGreaterThan(0);
+  });
+});
