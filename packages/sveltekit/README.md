@@ -28,7 +28,9 @@ It reads SvelteKit's options where SvelteKit keeps them (the `sveltekit()` plugi
 i18n compiler), so a component is drawn as the app draws it. `vite.config` is read as `vite dev` reads it, for a
 catalogue's build too, so the app's plugins run there: `keepPlugin` leaves out one only an app's build needs (a
 source-map upload, a service-worker generator). `sveltekit({ dir, viteConfig, keepPlugin })` names another folder or
-configuration; `viteConfig: false` reads only `svelte.config.js`.
+configuration; `viteConfig: false` reads only `svelte.config.js`. A SvelteKit 3 project's `tsconfig.json` extends
+`$app/tsconfig`, which `svelte-kit sync` writes: run it before the catalogue, as SvelteKit's templates do on install
+(`"prepare": "svelte-kit sync"`); the catalogue says so when it has not run.
 
 ## A story on a page
 

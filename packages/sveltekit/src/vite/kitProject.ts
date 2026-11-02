@@ -131,6 +131,55 @@ const extensionsOf = (options: Readonly<Record<string, unknown>>): string[] => {
 };
 
 /**
+ * What is wrong with a SvelteKit 3 project `svelte-kit sync` has not run in: its `tsconfig.json` extends
+ * `$app/tsconfig`, which the command writes, so every module of the catalogue fails to compile without it.
+ *
+ * @param root - the project's folder.
+ * @param version - SvelteKit's major version.
+ * @param problem - what was found wrong before.
+ */
+const syncedProblem = (
+  root: string,
+  version: 2 | 3,
+  problem: string | undefined
+): { readonly problem: string | undefined } => {
+  const isSynced = version === 2 || existsSync(join(root, "node_modules", "$app", "tsconfig.json"));
+  return {
+    problem:
+      problem ??
+      (isSynced
+        ? undefined
+        : "SvelteKit has not written its types: run `svelte-kit sync` first (SvelteKit's templates run it on install, as `prepare`), since the project's tsconfig.json extends $app/tsconfig")
+  };
+};
+
+/**
+ * The plugins a project's Vite configuration writes, loaded as `vite dev` loads it.
+ *
+ * @param root - the project's folder.
+ * @param viteConfig - the configuration, from the folder; the one Vite would find by default; `false` reads none.
+ * @returns the plugins as written, and why the configuration could not be loaded.
+ */
+const viteConfigPlugins = async (
+  root: string,
+  viteConfig: string | false | undefined
+): Promise<{ readonly plugins: unknown; readonly problem: string | undefined }> => {
+  if (viteConfig === false) return { plugins: [], problem: undefined };
+  try {
+    const loaded = await loadConfigFromFile(
+      { command: "serve", mode: "development" },
+      viteConfig === undefined ? undefined : resolve(root, viteConfig),
+      root,
+      "silent"
+    );
+    return { plugins: loaded?.config.plugins, problem: undefined };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { plugins: [], problem: `The project's Vite configuration could not be loaded: ${reason}` };
+  }
+};
+
+/**
  * Reads a SvelteKit project.
  *
  * @param dir - the project's folder.
@@ -143,34 +192,24 @@ export const loadKitProject = async (
   keepPlugin: (plugin: Plugin) => boolean = (): boolean => true
 ): Promise<KitProject> => {
   const root = resolve(dir);
-  let loaded: Awaited<ReturnType<typeof loadConfigFromFile>> = null;
-  let problem: string | undefined;
-  if (viteConfig !== false) {
-    try {
-      loaded = await loadConfigFromFile(
-        { command: "serve", mode: "development" },
-        viteConfig === undefined ? undefined : resolve(root, viteConfig),
-        root,
-        "silent"
-      );
-    } catch (error) {
-      problem = `The project's Vite configuration could not be loaded: ${error instanceof Error ? error.message : String(error)}`;
-    }
-  }
-  const plugins = await flatPlugins(loaded?.config.plugins);
+  const { plugins: written, problem } = await viteConfigPlugins(root, viteConfig);
+  const plugins = await flatPlugins(written);
   const options = setupOptions(plugins);
   const others = plugins.filter((plugin) => !KIT_PLUGIN.test(plugin.name) && keepPlugin(plugin));
   // SvelteKit 2's options hold SvelteKit's under `kit`, beside Svelte's; SvelteKit 3's are SvelteKit's alone
-  if (options !== undefined)
+  if (options !== undefined) {
+    const kit = options["kit"];
+    const version = isRecord(kit) ? 2 : 3;
     return {
+      ...syncedProblem(root, version, problem),
       dir: root,
-      kit: isRecord(options["kit"]) ? options["kit"] : options,
-      version: isRecord(options["kit"]) ? 2 : 3,
+      kit: isRecord(kit) ? kit : options,
+      version,
       extensions: extensionsOf(options),
       svelte: svelteOptionsOf(options),
-      plugins: others,
-      problem
+      plugins: others
     };
+  }
   const fromSvelteConfig = await svelteConfigOptions(root);
   return {
     dir: root,

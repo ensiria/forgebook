@@ -8,6 +8,7 @@
     "#lib/*": "./src/lib/*"
   },
   "scripts": {
+    "prepare": "svelte-kit sync",
     "dev": "forgebook dev",
     "build": "forgebook build",
     "test": "vitest run",

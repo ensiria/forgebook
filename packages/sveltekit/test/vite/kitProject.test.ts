@@ -17,7 +17,8 @@ const FIXTURES = join(import.meta.dirname, "..", "fixtures");
 describe("loadKitProject", () => {
   it("reads SvelteKit 3's options from the project's Vite configuration, and keeps its other plugins", async () => {
     const project = await loadKitProject(join(FIXTURES, "kit3"), undefined);
-    expect(project.problem).toBeUndefined();
+    // `svelte-kit sync` never ran in this project, so its tsconfig.json would extend nothing: the catalogue says so
+    expect(project.problem).toContain("run `svelte-kit sync` first");
     expect(project.kit["paths"]).toMatchObject({ base: "/docs" });
     expect(project.kit["version"]).toMatchObject({ name: "3.0.0" });
     expect(project.svelte).toMatchObject({ configFile: false, compilerOptions: { runes: true } });
