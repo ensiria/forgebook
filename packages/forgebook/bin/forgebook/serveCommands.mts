@@ -14,7 +14,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { settleAgentIndex } from "./builtCatalogue.ts";
 import { COMMAND, configOf, configPathOf, type ForgebookOptions } from "./catalogueCommands.ts";
-import { catalogueVite, withFramePort } from "./catalogueVite.ts";
+import { catalogueVite, withFramePort, withSameOriginFrames } from "./catalogueVite.ts";
 import { prebundle, prebundleInChild } from "./prebundleRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
 
@@ -44,6 +44,11 @@ export const serveCommands = (
         valueName: "number",
         description: "The stories' frames' port (their own origin); the catalogue's port + 1 by default."
       },
+      "same-origin-frames": {
+        type: "boolean",
+        description:
+          "Run the stories' frames on the catalogue's origin (frames: \"same-origin\" in the configuration)."
+      },
       force: {
         type: "boolean",
         description: "Pre-bundle the dependencies again, ignoring Vite's cache (as a first start does)."
@@ -62,7 +67,11 @@ export const serveCommands = (
       { command: `${COMMAND} dev --touch`, description: "And try the stories with Chromium's real touch." }
     ],
     run: async ({ options, onInterrupt, log }): Promise<void> => {
-      const config = withFramePort(await configOf(options.config), options["frame-port"]);
+      const read = withSameOriginFrames(
+        await configOf(options.config),
+        options["same-origin-frames"] === true
+      );
+      const config = withFramePort(read, options["frame-port"]);
       const port = options.port === undefined ? undefined : Number(options.port);
       if (port !== undefined && !Number.isInteger(port))
         throw new ScriptError(`--port ${options.port} is not a port`);

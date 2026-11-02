@@ -97,3 +97,13 @@ export const withFramePort = (config: ResolvedConfig, framePort: string | undefi
     });
   return { ...config, frames: { ...config.frames, port } };
 };
+
+/**
+ * The configuration with the frames on the catalogue's origin when the command line asks for it
+ * (`--same-origin-frames`), over the file's: for a setup that forwards one port only, or to compare the two.
+ *
+ * @param config - the configuration.
+ * @param isSameOrigin - whether the option was given.
+ */
+export const withSameOriginFrames = (config: ResolvedConfig, isSameOrigin: boolean): ResolvedConfig =>
+  isSameOrigin ? { ...config, frames: { kind: "same-origin" } } : config;
