@@ -15,6 +15,7 @@
     "build": "pnpm --filter \"./packages/*\" build",
     "manifest": "pnpm --filter \"./packages/*\" manifest",
     "manifest:check": "pnpm --filter \"./packages/*\" manifest --check",
+    "bench": "node tools/bench/bench.mts",
     "refs:check": "node tools/check-internal-refs/check-internal-refs.mts",
     "checks": "pnpm typecheck && pnpm lint && pnpm refs:check && pnpm test && pnpm manifest:check && pnpm build"
   },

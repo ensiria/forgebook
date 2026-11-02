@@ -66,7 +66,8 @@
     "./catalogue": "./src/catalogue.ts",
     "./story-check": "./src/storyCheck.ts",
     "./spills": "./src/spills.ts",
-    "./real-touch": "./src/realTouch.ts"
+    "./real-touch": "./src/realTouch.ts",
+    "./shell-theme": "./src/shellTheme.types.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -87,6 +88,7 @@
   "peerDependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/user-event": "^14.6.0",
+    "msw": "^2.0.0 || ^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sass-embedded": "^1.80.0",
@@ -112,6 +114,9 @@
       "optional": true
     },
     "@testing-library/user-event": {
+      "optional": true
+    },
+    "msw": {
       "optional": true
     },
     "sass-embedded": {
@@ -256,6 +261,10 @@
       "./real-touch": {
         "types": "./dist/src/realTouch.d.ts",
         "default": "./dist/src/realTouch.js"
+      },
+      "./shell-theme": {
+        "types": "./dist/src/shellTheme.types.d.ts",
+        "default": "./dist/src/shellTheme.types.js"
       }
     },
     "bin": {

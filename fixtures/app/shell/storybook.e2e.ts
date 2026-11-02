@@ -209,3 +209,26 @@ test.describe("a story's globals", () => {
     expect(Math.round(box?.width ?? 0)).toBe(560);
   });
 });
+
+test.describe("a story's mocked API", () => {
+  /** A service worker's first install, on a cold runner, takes longer than a story's first draw, in milliseconds. */
+  const workerStart = 20_000;
+
+  test("answers a story's fetch from its handlers, as a list or a record of lists", async ({ page }) => {
+    await page.goto(story("fetching-mocked--answered"));
+    await expect(frameOf(page).getByTestId("greeting")).toHaveText("Hello from a mock", {
+      timeout: workerStart
+    });
+    await page.goto(story("fetching-mocked--answered-by-name"));
+    await expect(frameOf(page).getByTestId("greeting")).toHaveText("Named mock", { timeout: workerStart });
+  });
+
+  test("loads nothing of MSW for a story with no handlers, and lets its request go", async ({ page }) => {
+    const requests: string[] = [];
+    page.on("request", (request) => requests.push(request.url()));
+    await page.goto(story("fetching-mocked--unmocked"));
+    await expect(frameOf(page).getByTestId("greeting")).toHaveText("No answer");
+    expect(requests.filter((url) => url.includes("mockServiceWorker"))).toEqual([]);
+    expect(requests.filter((url) => url.includes("msw_browser"))).toEqual([]);
+  });
+});

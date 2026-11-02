@@ -9,6 +9,7 @@
   // light until the page says otherwise; before the script sets the appearance, the system's preference decides, so a
   // dark system never sees a light page flash first
   :root {
+    @include mixins.look;
     @include mixins.palette($light);
     color-scheme: light;
   }
