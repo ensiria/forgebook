@@ -141,6 +141,7 @@ a measurement. `tail -F` reads it from anywhere.
 - `corpora/`: the real libraries, one folder each.
 - `prepare.ts`: packing, clean installs, the project on disk.
 - `leftovers.ts`: the daemons turned off, and what a run left running, found and stopped.
+- `serverOutput.ts`: what a server printed, kept to say why it stopped: its first error and its last lines.
 - `machine.ts`, `benchStats.ts`, `reportTable.ts`, `statusFile.ts`, `staticServer.ts`, `diskUsage.ts`: what they say.
 - `budget.ts`, `budget.json`: the check of a pull request, and its limits.
 - `targets/`: the pinned tools.
