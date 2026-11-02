@@ -5,6 +5,7 @@
  */
 import { extname } from "node:path";
 
+import type { Options as SveltePluginOptions } from "@sveltejs/vite-plugin-svelte";
 import type { FrameworkAdapter } from "forgebook/vite/adapter";
 import type { PluginOption, UserConfig } from "vite";
 
@@ -24,14 +25,25 @@ const ownComponent = (): PluginOption => ({
   config: (): UserConfig => ({ ssr: { noExternal: [PACKAGE] } })
 });
 
+/** The options of `svelte()`. */
+export type SvelteOptions = {
+  /**
+   * The options of Svelte's Vite plugin (`preprocess`, `compilerOptions`, `extensions`…), over what it reads from the
+   * project's `svelte.config.js`; `configFile: false` reads none. For a project that keeps them elsewhere (SvelteKit 3
+   * writes them in `vite.config`); none by default.
+   */
+  readonly plugin?: Partial<SveltePluginOptions>;
+};
+
 /**
  * Svelte, as the plugin reads its components: the docs module the docs' worker loads is this package's `extractDocs.ts`
  * (the props, snippets and callback props through `svelte2tsx` and TypeScript); the generated pages draw with its renderer
  * and write code with its markup writer; Vite gets Svelte's plugin, which reads the project's `svelte.config.js`.
  *
+ * @param options - the options of Svelte's Vite plugin.
  * @returns the adapter.
  */
-export const svelte = (): FrameworkAdapter => ({
+export const svelte = (options: SvelteOptions = {}): FrameworkAdapter => ({
   name: "svelte",
   // beside this module, with its extension: `.ts` in the sources, `.js` once built for npm
   docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
@@ -42,6 +54,6 @@ export const svelte = (): FrameworkAdapter => ({
   // components and their hot updates: an edited component updates in its frame
   vitePlugins: async (): Promise<readonly PluginOption[]> => {
     const { svelte: sveltePlugin } = await import("@sveltejs/vite-plugin-svelte");
-    return [sveltePlugin(), ownComponent()];
+    return [sveltePlugin(options.plugin), ownComponent()];
   }
 });
