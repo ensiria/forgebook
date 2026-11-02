@@ -12,10 +12,9 @@
  */
 import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join, relative } from "node:path";
 
 import type { StorySource } from "@forgebook/story-format/source";
-import type { ViteDevServer } from "vite";
+import { createIdResolver, type ViteDevServer } from "vite";
 
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
 import type { LiveErrors } from "../liveErrors.ts";
@@ -33,8 +32,8 @@ import {
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { findAnswer } from "./findRoute.ts";
-import { changeBase, changedFiles } from "./gitChange.ts";
-import { AGENT_SOURCES_FILE } from "./pages.ts";
+import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts";
+import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
@@ -94,6 +93,31 @@ const usageBySource = async (sources: readonly StorySource[]): Promise<Map<strin
   return new Map(
     answers.flatMap(([id, index]): [string, UsageIndex][] => (typeof index === "string" ? [] : [[id, index]]))
   );
+};
+
+/** What an answer asks of the dev server. */
+export type AgentServer = {
+  /** Loads a module on the server. */
+  readonly load: (id: string) => Promise<unknown>;
+  /** The file a source's module specifier leads to, as the pages' imports find it; none when nothing does. */
+  readonly resolveSource: (specifier: string) => Promise<string | undefined>;
+};
+
+/**
+ * What the answers ask of a dev server.
+ *
+ * @param server - the dev server.
+ * @param config - the catalogue's configuration, whose generated module the sources are imported from.
+ */
+export const agentServer = (server: ViteDevServer, config: ResolvedConfig): AgentServer => {
+  // Vite's resolver, not Node's: a catalogue's aliases and a package's export conditions lead to the same file; `scan`
+  // keeps it on the package's own file and away from the optimizer, which would answer with a prebundle
+  const resolveId = createIdResolver(server.config, { scan: true });
+  return {
+    load: (id: string): Promise<unknown> => server.ssrLoadModule(id),
+    resolveSource: (specifier: string): Promise<string | undefined> =>
+      resolveId(server.environments.client, specifier, pageModulePath(config.dir, AGENT_SOURCES_FILE))
+  };
 };
 
 /** An answer: its HTTP status and its JSON body. */
@@ -190,9 +214,7 @@ const changedAnswer = async ({
       })
     )
   );
-  // git names real paths and the graph the catalogue's own, which differ in a folder reached through a link
-  const realDir = await realpath(config.dir);
-  const changed = files.map((file) => join(config.dir, relative(realDir, join(root, file))));
+  const changed = catalogueChangedFiles(config.dir, await realpath(config.dir), root, files);
   const stories = reaches.flatMap(({ source, reach }) =>
     affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
       const id = `${componentId(source, story.title)}--${kebab(story.exportName)}`;
@@ -233,7 +255,7 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
 /**
  * Answers one of the API's paths.
  *
- * @param load - loads a module on the server (the dev server's `ssrLoadModule`).
+ * @param server - what the answers ask of the dev server.
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
  * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
@@ -244,7 +266,7 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
  *   command's own, which no frame reports to.
  */
 export const agentAnswer = async (
-  load: (id: string) => Promise<unknown>,
+  server: AgentServer,
   config: ResolvedConfig,
   route: string,
   params: URLSearchParams,
@@ -253,8 +275,8 @@ export const agentAnswer = async (
 ): Promise<AgentAnswer> => {
   try {
     const answerAlone = STORYLESS_ROUTES[route];
-    if (answerAlone !== undefined) return await answerAlone(config, params);
-    const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
+    if (answerAlone !== undefined) return await answerAlone(config, params, server.resolveSource);
+    const loaded = agentModuleOf(await server.load(pageModulePath(config.dir, AGENT_SOURCES_FILE)));
     const context: RouteContext = {
       loaded,
       tree: storyTree(loaded.sources),
@@ -268,7 +290,8 @@ export const agentAnswer = async (
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
     if (route === "changed") return await changedAnswer(context);
-    if (route === "agent-index") return await agentIndexAnswer(context, await catalogueTokens(config));
+    if (route === "agent-index")
+      return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
@@ -292,7 +315,7 @@ export const agentMiddleware =
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
-    void agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, url.origin, live)
+    void agentAnswer(agentServer(server, config), config, route, url.searchParams, url.origin, live)
       .then(({ status, body }) => {
         response.statusCode = status;
         response.setHeader("Content-Type", "application/json");

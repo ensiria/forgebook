@@ -269,6 +269,161 @@ describe("forgebook tokens", { timeout: SERVER_TIMEOUT }, () => {
     expect(failing(config, "--nearest", "#000", "--type", "nonsense")).toContain("Cannot compare");
   });
 
+  /** A catalogue over a library in `lib/`, which says what its source module runs when loaded. */
+  const withLibrary = (name: string, moduleHead: string): string => {
+    const project = join(root, name);
+    const config = catalogue(root, name, { "A.stories.tsx": "export default { title: 'A/B' };\n" });
+    mkdirSync(join(project, "lib", "themes"), { recursive: true });
+    const color = (value: string): unknown =>
+      Object.fromEntries([
+        ["$type", "color"],
+        ["$value", value]
+      ]);
+    writeFileSync(
+      join(project, "lib", "themes", "tokens.json"),
+      JSON.stringify({ red: color("#ff0000"), blue: color("#0000ff") })
+    );
+    writeFileSync(join(project, "tokens.json"), JSON.stringify({ red: color("#ee0000") }));
+    writeFileSync(
+      join(project, "lib", "source.ts"),
+      `${moduleHead}\nexport const source = { id: "lib", name: "Lib", files: [], tokens: ["themes/tokens.json"] };\n`
+    );
+    const written: unknown = JSON.parse(
+      readFileSync(config, "utf8")
+        .replace(/^export default /, "")
+        .replace(/;\s*$/, "")
+    );
+    writeFileSync(
+      config,
+      `export default ${JSON.stringify({ ...Object(written), sources: ["./lib/source.ts"], tokens: ["tokens.json"] })};\n`
+    );
+    return config;
+  };
+
+  it("adds a source's tokens to the catalogue's, the catalogue's standing and the clash reported", () => {
+    const config = withLibrary("from-source", "");
+    const list = tokensOf(config, "--limit", "10");
+    expect(list.status).toBe(0);
+    expect(list.body).toMatchObject({
+      isConfigured: true,
+      total: 2,
+      tokens: [
+        { name: "red", value: "#ee0000" },
+        { name: "blue", value: "#0000ff" }
+      ],
+      problems: [],
+      clashes: [{ name: "red", kept: "tokens.json", replaced: ["./lib/source.ts: themes/tokens.json"] }]
+    });
+    expect(tokensOf(config, "blue").body).toMatchObject({ token: { source: "lib" }, clashes: [] });
+    expect(tokensOf(config, "--nearest", "#0000ff").body).toMatchObject({
+      matches: [{ name: "blue", isExact: true }, { name: "red" }]
+    });
+  });
+
+  it("answers from a source whose module and stories cannot load", () => {
+    // what the module imports does not exist, so loading it would fail: its text is all a token needs
+    const config = withLibrary("source-broken", 'import "./missing-module";');
+    writeFileSync(join(root, "source-broken", "src", "Broken.stories.tsx"), "export const = ;\n");
+    expect(forgebook(config, ["stories", "--json"]).exitCode).not.toBe(0);
+    expect(tokensOf(config, "blue").body).toMatchObject({ token: { value: "#0000ff" } });
+  });
+
+  it("names what a source cannot give, and fails only on tokens known to be declared", () => {
+    const config = withLibrary("source-gaps", "");
+    writeFileSync(
+      join(root, "source-gaps", "lib", "source.ts"),
+      'export const source = { id: "lib", name: "Lib", files: [], tokens: ["themes/nowhere.json"] };\n'
+    );
+    const written = readFileSync(config, "utf8");
+    writeFileSync(config, written.replace('"./lib/source.ts"', '"./lib/source.ts","@nowhere/at-all"'));
+    const list = tokensOf(config);
+    expect(list.status).not.toBe(0);
+    expect(JSON.stringify(list.body)).toContain("./lib/source.ts: themes/nowhere.json");
+    expect(JSON.stringify(list.body)).toContain("@nowhere/at-all");
+    expect(tokensOf(config, "red").body).toMatchObject({ token: { value: "#ee0000" } });
+    expect(forgebook(config, ["check-code", "--json"]).stderr).toContain("themes/nowhere.json");
+  });
+
+  it("checks a change past a source it cannot read, saying so: it may hold no tokens", () => {
+    const config = withLibrary("source-unparsed", "");
+    writeFileSync(join(root, "source-unparsed", "lib", "source.ts"), "export const = ;\n");
+    const git = (...args: readonly string[]): void => {
+      const run = spawnSync("git", args, { cwd: join(root, "source-unparsed") });
+      expect(run.status).toBe(0);
+    };
+    git("init", "-q");
+    git(
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.com",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "first"
+    );
+    const check = forgebook(config, ["check-code", "--json"]);
+    expect(JSON.parse(check.stdout)).toMatchObject({
+      skipped: [expect.stringContaining("./lib/source.ts")]
+    });
+  });
+
+  it("reads a source installed in node_modules, not its prebundle", () => {
+    const config = withLibrary("installed", "");
+    const project = join(root, "installed");
+    const installed = join(project, "node_modules", "@acme", "ui");
+    mkdirSync(installed, { recursive: true });
+    writeFileSync(
+      join(installed, "package.json"),
+      JSON.stringify({ name: "@acme/ui", type: "module", exports: { "./stories": "./source.js" } })
+    );
+    writeFileSync(
+      join(installed, "tokens.json"),
+      readFileSync(join(project, "lib", "themes", "tokens.json"))
+    );
+    writeFileSync(
+      join(installed, "source.js"),
+      'export const source = { id: "acme", name: "Acme", files: [], tokens: ["tokens.json"] };\n'
+    );
+    const written = readFileSync(config, "utf8");
+    writeFileSync(config, written.replace('"./lib/source.ts"', '"@acme/ui/stories"'));
+    expect(tokensOf(config, "blue").body).toMatchObject({ token: { source: "acme" }, problems: [] });
+  });
+
+  it("reads no path a source writes outside its package, and quotes no file", () => {
+    const config = withLibrary("source-escapes", "");
+    const project = join(root, "source-escapes");
+    writeFileSync(join(project, "package.json"), "{}\n");
+    writeFileSync(join(project, "lib", "package.json"), "{}\n");
+    writeFileSync(join(project, "secret"), "API_KEY=abc\n");
+    writeFileSync(join(project, "lib", "secret"), "API_KEY=abc\n");
+    writeFileSync(
+      join(project, "lib", "source.ts"),
+      'export const source = { id: "lib", name: "Lib", files: [], tokens: ["../secret", "secret"] };\n'
+    );
+    const body = JSON.stringify(tokensOf(config).body);
+    expect(body).toContain("../secret is outside the package");
+    expect(body).toContain("./lib/source.ts: secret: it is not JSON");
+    expect(body).not.toContain("API_KEY");
+  });
+
+  it("names a subpath a package does not export, and still answers", () => {
+    const config = withLibrary("not-exported", "");
+    const project = join(root, "not-exported");
+    const installed = join(project, "node_modules", "@acme", "ui");
+    mkdirSync(installed, { recursive: true });
+    writeFileSync(
+      join(installed, "package.json"),
+      JSON.stringify({ name: "@acme/ui", type: "module", exports: { "./other": "./other.js" } })
+    );
+    const written = readFileSync(config, "utf8");
+    writeFileSync(config, written.replace('"./lib/source.ts"', '"@acme/ui/stories"'));
+    const answer = tokensOf(config, "red").body;
+    expect(answer).toMatchObject({ token: { value: "#ee0000" } });
+    expect(JSON.stringify(answer)).toContain("@acme/ui/stories");
+  });
+
   it("says a catalogue names no tokens file, not that there is no such token", () => {
     const config = catalogue(root, "no-tokens", { "A.stories.tsx": "export default { title: 'A/B' };\n" });
     expect(tokensOf(config).body).toMatchObject({ isConfigured: false, total: 0 });

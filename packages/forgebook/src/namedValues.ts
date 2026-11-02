@@ -16,6 +16,31 @@ import { type ArgValue, isChoiceList, isNamedArg, type NamedArg, type PanelArgs 
 export type NamedValues = NonNullable<StorySource["namedValues"]>;
 
 /**
+ * Whether a record holds a key itself, not through its prototype: `{}`'s `constructor` is `Object`, whose own
+ * `constructor` is `Function`.
+ *
+ * @param record - the record.
+ * @param key - the key.
+ */
+const hasOwn = (record: object, key: string): boolean => Object.hasOwn(record, key);
+
+/**
+ * The value a named value stands for, from the source's own entries only: a name the panel sent, or an address wrote,
+ * never reaches a value through an object's prototype, so `{ of: "constructor", named: "constructor" }` is not
+ * `Function`.
+ *
+ * @param namedValues - the source's named values.
+ * @param of - the type the value is offered for.
+ * @param named - the value's name.
+ * @returns the value; none when the source does not name it.
+ */
+export const namedValueOf = (namedValues: NamedValues, of: string, named: string): unknown => {
+  if (!hasOwn(namedValues, of)) return undefined;
+  const values = namedValues[of];
+  return values !== undefined && hasOwn(values, named) ? values[named] : undefined;
+};
+
+/**
  * The name of a value among the named ones, when it is one of them.
  *
  * @param value - a story's own arg.
@@ -71,7 +96,7 @@ export const storyArgsOf = (
   Object.fromEntries(
     Object.entries(args).flatMap(([name, value]): [string, unknown][] => {
       if (!isNamedArg(value)) return [[name, value]];
-      const known = namedValues[value.of]?.[value.named];
+      const known = namedValueOf(namedValues, value.of, value.named);
       return known === undefined ? [] : [[name, known]];
     })
   );

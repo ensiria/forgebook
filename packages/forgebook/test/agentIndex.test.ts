@@ -36,7 +36,7 @@ const WRITTEN: unknown = {
     }
   },
   findable: [{ id: "kit:badge", title: "Badge", keywords: ["pill"], stories: [], story: STORY_ID }],
-  tokens: { tokens: [], problems: ["no file"], isConfigured: false },
+  tokens: { tokens: [], problems: ["no file"], clashes: [], unread: [], isConfigured: false },
   problems: []
 };
 

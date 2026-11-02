@@ -56,6 +56,7 @@ export type AgentIndex = {
 export const indexProblems = (index: AgentIndex): readonly string[] => [
   ...index.problems,
   ...index.stories.problems,
+  ...index.tokens.unread,
   ...index.tokens.problems,
   ...Object.entries(index.details).flatMap(([id, detail]) =>
     detail.problems.map((problem) => `${id}: ${problem}`)
