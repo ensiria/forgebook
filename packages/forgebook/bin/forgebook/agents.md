@@ -57,6 +57,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, errors, a failed play |
 | `npx forgebook tokens --category color --json` | The design tokens, when the catalogue names a tokens file |
 | `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw value; the type comes from the value, or `--type padding` |
+| `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |
 | `npx forgebook changed --json` | The stories your change touches, through what they import |
 | `npx forgebook verify --json` | The checks on all of them, with one exit code: run it before you say a change is done |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |

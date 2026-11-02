@@ -27,7 +27,7 @@ import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
-import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
 
@@ -346,7 +346,8 @@ await defineCommands({
             writeNew: (file, exportName) =>
               newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
             check: (input) => runStoryCheck(config, options.url, input),
-            shot: (input, outDir) => runStoryShot(config, options.url, input, outDir)
+            shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
+            checkPage: (address) => runPageCheck(config, [address])
           })
         };
         let session = NEW_SESSION;

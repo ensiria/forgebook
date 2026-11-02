@@ -19,6 +19,7 @@ const TOOLS = catalogueTools({
   },
   writeNew: () => Promise.reject(new Error("not asked in these tests")),
   check: async () => "unused",
+  checkPage: async () => "unused",
   shot: async () => "unused"
 });
 
