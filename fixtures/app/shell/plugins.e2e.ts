@@ -142,6 +142,20 @@ test.describe("the Network tab", () => {
     await expect(page.getByRole("tab", { name: /^Network/ })).toContainText("1");
   });
 
+  test("mounts a story again though its request was never answered", async ({ page }) => {
+    await page.goto(story("sb:fetching-mocked--held"));
+    const greeting = frameOf(page).getByTestId("greeting");
+    await expect(greeting).toHaveText("Loading", { timeout: WORKER_START });
+    const frame = page.frameLocator("iframe.forgebook-frame-view").locator("html");
+    await expect(frame).toHaveAttribute("data-forgebook-status", "ready", { timeout: WORKER_START });
+    await frame.evaluate((root) => {
+      const view = root.ownerDocument.defaultView;
+      view?.postMessage({ type: "forgebook:play-again" }, view.location.origin);
+    });
+    await expect(greeting).toHaveCount(0);
+    await expect(greeting).toHaveText("Loading", { timeout: 10_000 });
+  });
+
   test("is not offered to a story with no handlers", async ({ page }) => {
     await page.goto(story("sb:fetching-mocked--unmocked"));
     await expect(frameOf(page).getByTestId("greeting")).toHaveText("No answer");

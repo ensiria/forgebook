@@ -60,7 +60,7 @@ type PluginReport = {
 export type PluginReports = ReadonlyMap<string, PluginReport>;
 
 /** What the plugins' tabs are built from. */
-type PluginTabsInput = {
+export type PluginTabsInput = {
   /** The plugins. */
   readonly plugins: readonly ShellPlugin[];
   /** The texts the catalogue replaces, by name. */

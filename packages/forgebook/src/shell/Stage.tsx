@@ -40,7 +40,7 @@ import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { MatrixPicker } from "./MatrixPicker.tsx";
-import { type PluginReports, pluginTabsFor, type ShellPlugin } from "./pluginTabs.tsx";
+import type { PluginReports, ShellPlugin } from "./pluginTabs.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { STRINGS } from "./strings.ts";
@@ -54,6 +54,7 @@ import {
   useFrameMessages
 } from "./useFrameMessages.ts";
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
+import { usePluginTabs } from "./usePluginTabs.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCheck } from "./useStoryCheck.ts";
 import { useStoryCode } from "./useStoryCode.ts";
@@ -349,6 +350,22 @@ export const Stage = ({
     [story, component]
   );
 
+  const pluginTabs = usePluginTabs({
+    plugins,
+    strings: catalogue.strings,
+    story: pluginStory,
+    parameters: panel.parameters,
+    reports: pluginReports,
+    isComparing: isComparing(view),
+    aside: {
+      address: frameAddress(frameUrl, story.id, view, switches),
+      width: view.width,
+      background: backgroundOf(view),
+      args: panelArgs,
+      view: liveView(view)
+    }
+  });
+
   // a tab the catalogue turns off is never shown
   const tabs = dockTabs({
     docs,
@@ -379,21 +396,7 @@ export const Stage = ({
     },
     check: storyCheck.check,
     onCheck: isComparing(view) ? undefined : storyCheck.run,
-    pluginTabs: pluginTabsFor({
-      plugins,
-      strings: catalogue.strings,
-      story: pluginStory,
-      parameters: panel.parameters,
-      reports: pluginReports,
-      isComparing: isComparing(view),
-      aside: {
-        address: frameAddress(frameUrl, story.id, view, switches),
-        width: view.width,
-        background: backgroundOf(view),
-        args: panelArgs,
-        view: liveView(view)
-      }
-    })
+    pluginTabs
   }).filter((tab) => catalogue.tabs.includes(tab.id));
 
   return (

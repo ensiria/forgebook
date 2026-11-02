@@ -91,6 +91,24 @@ describe("a list of plugins", () => {
     );
   });
 
+  it("refuses a plugin named as a language, whose fence would turn every page's code into its block", () => {
+    const ts: ForgebookPlugin = { ...plain, id: "ts", docBlocks: [{ fence: "ts", view: "@acme/block" }] };
+    expect(problemOf([ts])).toBe('the docs block "ts" is given twice');
+  });
+
+  it("says what is wrong with a plugin read as what it is not", () => {
+    const plugins = (text: string): ForgebookPlugin[] => JSON.parse(text);
+    expect(problemOf(plugins('[{ "apiVersion": 1, "id": "acme", "tabs": 1 }]'))).toBe(
+      'the plugin "acme" gives a list that is no list'
+    );
+    expect(problemOf(plugins('[{ "apiVersion": 1, "id": "acme", "tabs": [{}] }]'))).toBe(
+      'the plugin "acme" adds something with no id'
+    );
+    expect(problemOf(plugins('[{ "apiVersion": 1, "id": "acme", "frame": null }]'))).toBe(
+      'the plugin "acme" names a frame that is no specifier'
+    );
+  });
+
   it("refuses a module that is no specifier", () => {
     expect(problemOf([{ ...plain, frame: "" }])).toContain("names a module that is no specifier");
   });

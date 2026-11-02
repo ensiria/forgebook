@@ -21,6 +21,31 @@ import type { PluginsDocument } from "./agent.types.ts";
 /** The versions of the contract this Forgebook speaks. */
 export const SUPPORTED_PLUGIN_API_VERSIONS: readonly number[] = [1];
 
+/**
+ * The fences a plugin may not take: a page's own, and the languages people write code in, which would stop being code on
+ * every page of the catalogue.
+ */
+const OWN_FENCES: readonly string[] = [
+  ...[
+    "story",
+    "props",
+    "bash",
+    "c",
+    "cpp",
+    "css",
+    "diff",
+    "go",
+    "html",
+    "java",
+    "js",
+    "json",
+    "jsx",
+    "kotlin"
+  ],
+  ...["markdown", "md", "mdx", "php", "python", "py", "ruby", "rust", "scss", "sh", "shell", "sql", "swift"],
+  ...["text", "toml", "ts", "tsx", "txt", "xml", "yaml", "yml"]
+];
+
 /** A plugin's id: lower-case words and hyphens. */
 const NAME = /^[a-z][a-z0-9-]*$/;
 
@@ -75,6 +100,34 @@ const isPackageInstalled = (dir: string, name: string): boolean =>
   );
 
 /**
+ * Why a plugin's fields do not have their shape, or none: a configuration is not type-checked, and a field read as
+ * what it is not would otherwise stop the catalogue with a bare `TypeError`.
+ *
+ * @param plugin - the plugin.
+ */
+const shapeProblem = (plugin: ForgebookPlugin): string | undefined => {
+  const lists: readonly unknown[] = [
+    plugin.tabs,
+    plugin.switches,
+    plugin.docBlocks,
+    plugin.browserDependencies
+  ];
+  if (lists.some((list) => list !== undefined && !Array.isArray(list)))
+    return `the plugin "${plugin.id}" gives a list that is no list`;
+  const named: readonly unknown[] = [
+    ...(plugin.tabs ?? []).map((tab) => tab?.id),
+    ...(plugin.switches ?? []).map((each) => each?.id),
+    ...(plugin.docBlocks ?? []).map((block) => block?.fence)
+  ];
+  if (named.some((name) => typeof name !== "string"))
+    return `the plugin "${plugin.id}" adds something with no id`;
+  const { frame } = plugin;
+  const isFrame =
+    frame === undefined || typeof frame === "string" || (typeof frame === "object" && frame !== null);
+  return isFrame ? undefined : `the plugin "${plugin.id}" names a frame that is no specifier`;
+};
+
+/**
  * Why one plugin cannot be used, or none.
  *
  * @param plugin - the plugin.
@@ -122,7 +175,7 @@ export const pluginsProblem = (
   const ids = new Set<string>();
   const tabs = new Set<string>(PANEL_TAB_IDS);
   const switches = new Set<string>();
-  const fences = new Set<string>(["story", "props"]);
+  const fences = new Set<string>(OWN_FENCES);
   for (const plugin of plugins) {
     const { id } = plugin;
     if (typeof id !== "string" || !NAME.test(id))
@@ -130,6 +183,7 @@ export const pluginsProblem = (
     if (ids.has(id)) return `the plugin "${id}" is given twice`;
     ids.add(id);
     const problem =
+      shapeProblem(plugin) ??
       pluginProblem(plugin, framework, dir) ??
       namesProblem(
         id,

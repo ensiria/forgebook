@@ -41,9 +41,10 @@ export const acme = () =>
 | `frame` | The module that runs in every frame: one, or one per framework by the adapter's name (`{ react: "…" }`), since what a decorator returns is the framework's. A catalogue of a framework it does not name refuses the plugin. |
 | `browserDependencies` | What its modules import in the browser: pre-bundled, so a page never reloads to find it, and a project without it is told at once. |
 
-Tab ids, switch ids and fences are the plugin's `id`, or that, a hyphen and more (`acme-log`). So a later tab, address
-parameter or fence of Forgebook's can never collide with a plugin, and a fence never takes a language's name. Anything else
-stops the catalogue with a message that names it. A tab's id is what `?tab=<id>` and `tabs: { <id>: false }` take.
+Tab ids, switch ids and fences are the plugin's `id`, or that, a hyphen and more (`acme-log`), so two plugins cannot collide,
+and a plugin can meet a later name of Forgebook's only through its `id`: pick one that says whose it is. A fence may not be
+a common language's name. Anything else stops the catalogue with a message that names it. A tab's id is what `?tab=<id>` and
+`tabs: { <id>: false }` take.
 
 `when` is one of two:
 
@@ -127,7 +128,8 @@ export const frame = definePluginFrame(({ report }) => ({
 ```
 
 - `prepare` runs before every mount, ahead of the story's loaders, with the context of a CSF `beforeEach`. What it returns
-  runs when the story is mounted again or left, and the next mount waits for it. What it throws is shown as the story's error.
+  runs when the story is mounted again or left, and the next mount waits for it, for two seconds at most. What it throws is
+  shown as the story's error.
 - `decorators` wrap every story, outside the catalogue's own.
 - `report(value, { hint?, tab? })` tells the plugin's tabs. The value is JSON and replaces the last one, so it holds
   everything they need. `hint` is a short note beside the name of `tab`, the plugin's first by default.

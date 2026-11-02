@@ -236,7 +236,8 @@ export type PluginFrame = {
   readonly decorators?: readonly LoadedDecorator[];
   /**
    * Runs before every mount, ahead of the story's loaders, with the context of a CSF `beforeEach`; what it returns runs
-   * when the story is mounted again or left, and is waited for. What it throws is shown as the story's error.
+   * when the story is mounted again or left, and the next mount waits for it, two seconds at most. What it throws
+   * is shown as the story's error.
    */
   readonly prepare?: LoadedBeforeEach;
 };

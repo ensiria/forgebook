@@ -341,6 +341,23 @@ describe("runStory with a second framework", () => {
     expect(started).toBe(2);
   });
 
+  it("goes on after a cleanup that never ends, so a request held open cannot leave a story blank", async () => {
+    vi.useFakeTimers();
+    let prepared = 0;
+    const started = run(badge(), undefined, undefined, [
+      (): (() => Promise<void>) => {
+        prepared += 1;
+        return (): Promise<void> => new Promise(() => undefined);
+      }
+    ]);
+    await vi.advanceTimersByTimeAsync(1);
+    const { reports } = await started;
+    controlsOf(reports).playAgain();
+    await vi.advanceTimersByTimeAsync(2100);
+    vi.useRealTimers();
+    expect(prepared).toBe(2);
+  });
+
   it("undoes a plugin's preparation when the story's own cleanup throws", async () => {
     let isUndone = false;
     const { reports } = await run(

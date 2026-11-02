@@ -146,6 +146,25 @@ const clearSpies = (args: LoadedArgs): void => {
   }
 };
 
+/** How long a mount waits for the mount before it to be undone, in milliseconds. */
+const CLEANUP_WAIT = 2000;
+
+/**
+ * Waits for a cleanup, for so long: one that never ends (a mocked request held open) must not keep the story blank for
+ * good, with every later mount behind it.
+ *
+ * @param cleanup - the cleanup, running.
+ * @param wait - the most to wait, in milliseconds.
+ * @throws What the cleanup throws, in time.
+ */
+const settledWithin = async (cleanup: Promise<void>, wait: number): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, wait);
+  });
+  await Promise.race([cleanup, late]).finally(() => clearTimeout(timer));
+};
+
 /** A story before its loaders ran, or after its set-ups were undone: nothing loaded, nothing to undo. */
 const NOT_PREPARED: PreparedStory = { loaded: {}, cleanup: async (): Promise<void> => undefined };
 
@@ -347,7 +366,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     const previous = prepared;
     prepared = NOT_PREPARED;
     try {
-      await previous.cleanup();
+      await settledWithin(previous.cleanup(), CLEANUP_WAIT);
       const context = {
         ...options.identity,
         args: shownArgs(),
