@@ -86,6 +86,9 @@ node tools/bench/bench.mts --corpus primer --compare --work /some/folder
 - **Their code is data.** The clone runs no hook and installs with lifecycle scripts off. `prepare`, when a definition
   has one, is the only code of the library that runs before its stories, and only because those stories, or the
   library's own Storybook, import what it builds (Fluent's Storybook loads an addon of the monorepo from its build).
+- **Nothing left running.** Every command the harness runs in a library has its tools' daemons turned off (`NX_DAEMON`,
+  `TURBO_DAEMON`): Nx's, started by Fluent's `prepare`, kept a core busy for hours under every later run. At the end,
+  whatever still runs from `--work` and started during the run is stopped, and each process is named in a warning.
 - **Forgebook** is packed as usual and installed in `.forgebook-bench`, inside the catalogue's folder, with the corpus's
   `forgebook.config.ts` and without React: a story and the frame have to share the library's one copy, so a library on
   an older React is measured on it. What the library's Storybook adds to its bundler is in that file, passed through the
@@ -137,6 +140,7 @@ a measurement. `tail -F` reads it from anywhere.
 - `sweep.ts`: every story opened in a browser.
 - `corpora/`: the real libraries, one folder each.
 - `prepare.ts`: packing, clean installs, the project on disk.
+- `leftovers.ts`: the daemons turned off, and what a run left running, found and stopped.
 - `machine.ts`, `benchStats.ts`, `reportTable.ts`, `statusFile.ts`, `staticServer.ts`, `diskUsage.ts`: what they say.
 - `budget.ts`, `budget.json`: the check of a pull request, and its limits.
 - `targets/`: the pinned tools.

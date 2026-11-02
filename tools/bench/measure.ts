@@ -18,6 +18,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import { contentSize } from "./diskUsage.ts";
+import { NO_DAEMONS } from "./leftovers.ts";
 import { stampScript, waitForStamps } from "./stamps.ts";
 import { serveStatic } from "./staticServer.ts";
 import type { EditKind, MeasureSubject } from "./subject.ts";
@@ -74,6 +75,7 @@ export type MeasureContext = {
 /** The environment a target's command runs in: the script's, with the target's additions. */
 const environment = (io: ScriptIo, command: TargetCommand): NodeJS.ProcessEnv => ({
   ...io.env,
+  ...NO_DAEMONS,
   BROWSER: "none",
   ...command.env
 });

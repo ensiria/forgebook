@@ -16,6 +16,7 @@ import { defineScript, ScriptError } from "@ensiria/cli-kit/script";
 
 import type { BenchReport } from "./bench.types.ts";
 import { budgetLines, parseBudget } from "./budget.ts";
+import { stopLeftovers } from "./leftovers.ts";
 import { stopAllServers } from "./measure.ts";
 import { type BenchFolders, packForgebook, publishedForgebook } from "./prepare.ts";
 import { type RealRun, realTargets } from "./prepareRun.ts";
@@ -182,6 +183,7 @@ await defineScript({
     { command: "bench --metric hmr --runs 3", description: "Only the edits." }
   ],
   run: async ({ options, io, log, style, isJson, onExit }) => {
+    const startedAt = Date.now();
     onExit(stopAllServers);
     // read first: this run overwrites the last report, which could otherwise be compared with itself
     const earlier = readOptional(options.against, parseReport);
@@ -202,24 +204,34 @@ await defineScript({
     const write = statusWriter(options.status, Date.now);
     // also when the run dies: a reader must not wait for a step that will not come
     const removeEnd = onExit(() => write({ state: "finished", warnings: 0 }));
-    const report = await runBench({
-      folders,
-      targets: toolsOf(real, options.compare),
-      ...(real === undefined ? {} : { real }),
-      forgebookPackages,
-      forgebookLabel,
-      size: { components: options.components, stories: options.stories },
-      runs: options.runs,
-      edits: options.edits,
-      groups,
-      port: options.port,
-      throttle: options.throttle,
-      io,
-      onStep: (step) => {
-        write(step);
-        log.info(`${step.tool} · ${step.metric} · ${step.run}/${step.runs}`);
-      }
-    });
+    // whatever happens: a tool's daemon left running would weigh on every later run
+    const stopLeft = async (): Promise<void> => {
+      for (const left of await stopLeftovers(work, startedAt, io))
+        log.warn(`stopped a process the run left running: ${left.pid} ${left.command}`);
+    };
+    let report: Awaited<ReturnType<typeof runBench>>;
+    try {
+      report = await runBench({
+        folders,
+        targets: toolsOf(real, options.compare),
+        ...(real === undefined ? {} : { real }),
+        forgebookPackages,
+        forgebookLabel,
+        size: { components: options.components, stories: options.stories },
+        runs: options.runs,
+        edits: options.edits,
+        groups,
+        port: options.port,
+        throttle: options.throttle,
+        io,
+        onStep: (step) => {
+          write(step);
+          log.info(`${step.tool} · ${step.metric} · ${step.run}/${step.runs}`);
+        }
+      });
+    } finally {
+      await stopLeft();
+    }
     removeEnd();
     write({ state: "finished", warnings: report.warnings.length });
     const reportFile = real === undefined ? "report.json" : `report-${real.corpus.name}.json`;
