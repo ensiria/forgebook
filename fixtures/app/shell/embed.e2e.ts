@@ -287,9 +287,9 @@ test.describe("the Embed button", () => {
     await expect(panel.getByRole("textbox", { name: "HTML" })).toHaveValue(/^<iframe src="/);
     // a dev server's address reaches nobody else, and the panel says so
     await expect(panel).toContainText("opens only on this computer");
-    await expect(panel.getByRole("textbox", { name: "HTML" })).not.toHaveValue(/<script>/);
+    expect(await panel.getByRole("textbox", { name: "HTML" }).inputValue()).not.toContain("<script>");
     await panel.getByRole("switch", { name: "Follow the story's height" }).check();
-    await expect(panel.getByRole("textbox", { name: "HTML" })).toHaveValue(/<script>/);
+    await expect.poll(() => panel.getByRole("textbox", { name: "HTML" }).inputValue()).toContain("<script>");
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
     await expect(button).toBeFocused();
@@ -304,7 +304,7 @@ test.describe("the Embed button", () => {
     await expect(panel).toBeInViewport({ ratio: 1 });
     // pressed for real: a panel clipped by the pane around it would not take the press
     await panel.getByRole("switch", { name: "Follow the story's height" }).check();
-    await expect(panel.getByRole("textbox", { name: "HTML" })).toHaveValue(/<script>/);
+    await expect.poll(() => panel.getByRole("textbox", { name: "HTML" }).inputValue()).toContain("<script>");
   });
 
   for (const [width, height] of [
