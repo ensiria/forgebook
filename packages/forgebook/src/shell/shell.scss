@@ -722,13 +722,14 @@
     gap: $space-3;
   }
 
-  // the device frame's toggle at the start of the width it sets, as small as the icon it stands in for, and its menu
-  // while a device is shown
+  // the device frame's toggle at the start of the width it sets, and its menu while a device is shown: it takes no
+  // more of the bar than the icon it stands in for, its pressable room reaching into the gaps around it, so a bar
+  // that held the width before still holds it
   .forgebook-device-menu {
     display: inline-flex;
     align-items: center;
     gap: $space-1;
-    margin-inline-end: -$space-1-5;
+    margin-inline: -$space-1 (-$space-2-5);
   }
 
   .forgebook-device-toggle {
