@@ -57,10 +57,38 @@ describe("collectDocs and catalogueMarkdown", () => {
     const titled = ["Data/Lists/List", "Data/Value", "Data/Code/Diff", "Data/Board", "Actions/Button"].map(
       (title) => ({ ...select, title, name: title.split("/").at(-1) ?? title })
     );
-    const headings = catalogueMarkdown({ ...data, components: titled }, CATALOGUE_SECTIONS)
+    const headings = catalogueMarkdown({ ...data, components: titled }, ["components"])
       .split("\n")
       .filter((line) => line.startsWith("### "));
     expect(headings).toEqual(["### Actions", "### Data", "### Data › Code", "### Data › Lists"]);
+  });
+
+  it("lists the source's tokens by type, with their themes, alias, purpose and deprecation", () => {
+    expect(problems).toEqual([]);
+    expect(data.tokens.map((token) => token.name)).toEqual([
+      "color.brand",
+      "color.action",
+      "color.old",
+      "space.sm"
+    ]);
+    expect(text).toContain("## Tokens");
+    expect(text).toContain("- `color.brand`: `#1c1b1b` · dark `#f4f1ea` · The brand's colour");
+    expect(text).toContain("- `color.action`: `#1c1b1b` · dark `#f4f1ea` · alias of `color.brand`");
+    expect(text).toContain("- `color.old`: `#333333` · deprecated: Use color.action");
+    expect(text).toContain("### dimension\n- `space.sm`: `8px`");
+  });
+
+  it("keeps a token on its line, whatever its file holds", () => {
+    const [first] = data.tokens;
+    if (first === undefined) throw new Error("the fixture kit has no token");
+    const forged = { ...first, name: "a\n## Forged", value: "x\n## Forged", type: "t\n## Forged" };
+    const written = catalogueMarkdown({ ...data, tokens: [forged] }, ["tokens"]);
+    expect(written.split("\n").filter((line) => line.startsWith("## "))).toEqual(["## Tokens"]);
+  });
+
+  it("leaves the tokens unread when the sections do not list them", () => {
+    const listed = collectDocs(KIT, extractStoryComponent, { exclude: [], sections: ["components"] });
+    expect(listed.data.tokens).toEqual([]);
   });
 
   it("reads the source's id from the stories export, and each component's main story", () => {
