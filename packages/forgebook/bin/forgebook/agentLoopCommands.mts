@@ -28,8 +28,9 @@ import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentT
 import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
 import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
-import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
+import { storyCheckCommands } from "./storyCheckCommands.mts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { BASELINES_FOLDER, updateBaselines } from "./visualCommands.mts";
 
 /**
  * The catalogue the errors are asked of: only frames open in a browser report to a running dev server, so without one
@@ -88,66 +89,7 @@ const changedOf = async (
 export const agentLoopCommands = (
   forgebook: CommandScope<ForgebookOptions>
 ): Readonly<Record<string, CommandNode>> => ({
-  check: forgebook.command({
-    summary: "Run the catalogue's checks on a story in a browser: accessibility, spills, overlays, errors.",
-    json: true,
-    options: {
-      view: {
-        type: "string",
-        multiple: true,
-        valueName: "query",
-        description:
-          "A view to check it in, as the catalogue's address writes it (theme=dark&width=360); the default view when none."
-      },
-      "all-variants": {
-        type: "boolean",
-        description: "Check every variant the catalogue's browser tests check."
-      },
-      semantic: {
-        type: "boolean",
-        description: "Also ask the configured model, sending it each story's tree and picture."
-      },
-      ...SEMANTIC_OPTIONS,
-      url: {
-        type: "string",
-        env: "FORGEBOOK_URL",
-        valueName: "address",
-        description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
-      }
-    },
-    positionals: [
-      { name: "id", description: "A story's id, or a component's for its listed stories.", required: true }
-    ],
-    examples: [
-      {
-        command: `${COMMAND} check kit:inputs-select--overview`,
-        description: "One story, in the default view."
-      },
-      {
-        command: `${COMMAND} check kit:inputs-select --view "theme=dark" --json`,
-        description: "Every story of a component, in the dark theme, as JSON."
-      }
-    ],
-    run: async ({ args, options, io, isJson, style }): Promise<void> => {
-      const config = await configOf(options.config);
-      const report = await runStoryCheck(
-        config,
-        options.url,
-        {
-          id: args.id,
-          views: options.view ?? [],
-          isAllVariants: options["all-variants"] === true,
-          isSemantic: options.semantic === true
-        },
-        semanticModelOf(options)
-      );
-      if (typeof report === "string") throw new ScriptError(report);
-      io.stdout.write(isJson ? formatJson(report) : `${checkText(report, style)}\n`);
-      const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
-      if (problems > 0)
-        throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
-    }
-  }),
+  ...storyCheckCommands(forgebook),
   find: forgebook.command({
     summary: "Find components by what they are for, in your own words.",
     json: true,
@@ -347,11 +289,14 @@ export const agentLoopCommands = (
         type: "boolean",
         description: "Picture every variant the catalogue's browser tests check."
       },
+      update: {
+        type: "boolean",
+        description: `Store them as the baselines forgebook diff compares with: ${BASELINES_FOLDER} beside the configuration, or --out.`
+      },
       out: {
         type: "string",
-        default: "forgebook-shots",
         valueName: "folder",
-        description: "The folder the pictures go in."
+        description: "The folder the pictures go in; forgebook-shots by default."
       },
       url: {
         type: "string",
@@ -375,12 +320,15 @@ export const agentLoopCommands = (
     ],
     run: async ({ args, options, io, isJson, style }): Promise<void> => {
       const config = await configOf(options.config);
-      const report = await runStoryShot(
-        config,
-        options.url,
-        { id: args.id, views: options.view ?? [], isAllVariants: options["all-variants"] === true },
-        resolve(options.out)
-      );
+      const input = {
+        id: args.id,
+        views: options.view ?? [],
+        isAllVariants: options["all-variants"] === true
+      };
+      const report =
+        options.update === true
+          ? await updateBaselines(config, options.url, input, options.out)
+          : await runStoryShot(config, options.url, input, resolve(options.out ?? "forgebook-shots"));
       if (typeof report === "string") throw new ScriptError(report);
       io.stdout.write(
         isJson ? formatJson(report) : `${shotText(report, (file) => relative(process.cwd(), file), style)}\n`

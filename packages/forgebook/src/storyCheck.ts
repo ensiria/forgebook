@@ -162,6 +162,8 @@ export type StoryShot = {
   readonly frame: string;
   /** The picture, a PNG file's absolute path. */
   readonly file: string;
+  /** Why the story did not draw (`error`, or `silent` when it never said); none when it did. */
+  readonly status?: "error" | "silent";
 };
 
 /** The pictures taken. */
@@ -171,6 +173,63 @@ export type StoryShotReport = {
   /** One picture per story and view. */
   readonly shots: readonly StoryShot[];
 };
+
+/** What a comparison with the baselines is asked. */
+export type StoryDiffRequest = StoryShotRequest & {
+  /** The folder the baselines are in, absolute; never the folder the pictures go in. */
+  readonly baselines: string;
+  /** The component asked for, when one was: its baselines with no story left are reported. */
+  readonly component?: string;
+};
+
+/** How a picture compares with its baseline. */
+export type StoryDiffStatus = "same" | "changed" | "resized" | "new" | "broken" | "removed";
+
+/** One story in one view against its baseline. */
+export type StoryDiff = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view's name; empty for the default view. */
+  readonly view: string;
+  /**
+   * How it compares: `new` has no baseline yet, `resized` cannot be compared pixel by pixel, `broken` did not draw so it
+   * proves nothing, and `removed` is a baseline whose story is gone.
+   */
+  readonly status: StoryDiffStatus;
+  /** The pixels that changed. */
+  readonly changedPixels: number;
+  /** Their share of the picture, 0 to 100; 100 when it was resized. */
+  readonly percent: number;
+  /** The smallest box that holds them, in CSS px at the picture's scale. */
+  readonly region?: { x: number; y: number; width: number; height: number };
+  /** The baseline's file. */
+  readonly baseline: string;
+  /** The new picture's file. */
+  readonly current: string;
+  /** The new picture with what changed marked. */
+  readonly diff?: string;
+};
+
+/** The comparison's results. */
+export type StoryDiffReport = {
+  /** The shape's version. */
+  readonly schema: 1;
+  /** One result per story and view. */
+  readonly results: readonly StoryDiff[];
+};
+
+/**
+ * Whether what the testing package answered is a comparison's report.
+ *
+ * @param value - the answer.
+ */
+export const isStoryDiffReport = (value: unknown): value is StoryDiffReport =>
+  typeof value === "object" &&
+  value !== null &&
+  "schema" in value &&
+  value.schema === 1 &&
+  "results" in value &&
+  Array.isArray(value.results);
 
 /**
  * Whether what the testing package answered is a picture run's report.

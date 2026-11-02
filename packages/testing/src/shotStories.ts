@@ -18,13 +18,22 @@ import type { StoryShot, StoryShotReport, StoryShotRequest } from "forgebook/sto
 
 import { eachStoryPage, openedStory, type StoryPage } from "./storyPages.ts";
 
+/** A text with no hyphens at its ends; a loop, since a regular expression slows on a long run of them. */
+const trimmedHyphens = (text: string): string => {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "-") start += 1;
+  while (end > start && text[end - 1] === "-") end -= 1;
+  return text.slice(start, end);
+};
+
 /**
  * A picture's file name: the story's id and the view's name, each kept to letters, digits and hyphens.
  *
  * @param storyPage - the story and the view.
  */
 export const shotName = (storyPage: Pick<StoryPage, "story" | "name">): string => {
-  const safe = (text: string): string => text.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  const safe = (text: string): string => trimmedHyphens(text.replace(/[^a-zA-Z0-9-]+/g, "-"));
   return `${safe(storyPage.story.id)}--${safe(storyPage.name) || "default"}.png`;
 };
 
@@ -37,7 +46,7 @@ export const shotName = (storyPage: Pick<StoryPage, "story" | "name">): string =
 export const shotStories = async (request: StoryShotRequest): Promise<StoryShotReport> => {
   mkdirSync(request.outDir, { recursive: true });
   const shots = await eachStoryPage(request, async (page, storyPage): Promise<StoryShot> => {
-    await openedStory(page, storyPage);
+    const status = await openedStory(page, storyPage);
     const file = join(request.outDir, shotName(storyPage));
     // the story at its own height, not the window's: the body's, as the shell sizes a frame
     const size = await page.evaluate(() => ({
@@ -50,7 +59,13 @@ export const shotStories = async (request: StoryShotRequest): Promise<StoryShotR
       clip: { x: 0, y: 0, ...size },
       animations: "disabled"
     });
-    return { storyId: storyPage.story.id, view: storyPage.name, frame: storyPage.frame, file };
+    return {
+      storyId: storyPage.story.id,
+      view: storyPage.name,
+      frame: storyPage.frame,
+      file,
+      ...(status === "ready" ? {} : { status })
+    };
   });
   return { schema: 1, shots };
 };

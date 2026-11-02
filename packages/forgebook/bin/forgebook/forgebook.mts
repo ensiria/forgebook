@@ -28,9 +28,10 @@ import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
-import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { runPageCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
+import { baselinesOf, visualCommands, visualDiffTool } from "./visualCommands.mts";
 
 await defineCommands({
   name: "forgebook",
@@ -313,6 +314,7 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...visualCommands(forgebook),
     ...initCommands(forgebook),
     mcp: forgebook.command({
       summary:
@@ -343,14 +345,22 @@ await defineCommands({
         const server = {
           info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
           instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
-          tools: catalogueTools({
-            ask: client.ask,
-            writeNew: (file, exportName) =>
-              newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
-            check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
-            shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
-            checkPage: (address) => runPageCheck(config, [address])
-          })
+          tools: [
+            visualDiffTool((input, outDir) =>
+              runStoryDiff(config, options.url, input, {
+                baselines: baselinesOf(config.dir),
+                outDir
+              })
+            ),
+            ...catalogueTools({
+              ask: client.ask,
+              writeNew: (file, exportName) =>
+                newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
+              check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
+              shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
+              checkPage: (address) => runPageCheck(config, [address])
+            })
+          ]
         };
         let session = NEW_SESSION;
         // stdout carries only the protocol's messages, one per line, answered in the order they came
