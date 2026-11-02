@@ -7,6 +7,7 @@
  */
 
 import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
+import { embedAddressOf } from "../embedCode.ts";
 import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
 import { isLiveErrorReport } from "../liveErrors.ts";
 import {
@@ -51,7 +52,8 @@ export type CataloguePages = {
  */
 export const storyLinks = (pages: CataloguePages, id: string, view: string): StoryLinks => ({
   address: storyAddressOf(pages.page, id, view),
-  frame: frameAddressOf(pages.frame, id, view)
+  frame: frameAddressOf(pages.frame, id, view),
+  embed: embedAddressOf(pages.page, id, view)
 });
 
 /** A story of the tree as the documents give it. */

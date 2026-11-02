@@ -59,6 +59,7 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["File", document.component.file],
     ["Opens at", document.story.links.address],
     ["Frame", document.story.links.frame],
+    ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
     ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")]
   ];

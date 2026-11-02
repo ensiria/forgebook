@@ -15,11 +15,12 @@ import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } 
 
 import { type PanelArgTypes, panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import type { ArgValue, PanelArgs, ShellMessage } from "../messages.ts";
+import { type ArgValue, type PanelArgs, panelArgsParam, type ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
+import type { ViewSwitch } from "../switches.ts";
 import {
   frameAddress,
   isComparing,
@@ -29,6 +30,7 @@ import {
   type StageHeight,
   type StageWidth,
   type ViewState,
+  viewParams,
   type Zoom
 } from "../viewState.ts";
 import type { CheckState } from "./A11yTab.tsx";
@@ -37,6 +39,7 @@ import { useCatalogue } from "./catalogueContext.ts";
 import { compareVariants } from "./compareVariants.ts";
 import { Dock } from "./Dock.tsx";
 import { dockTabs } from "./dockTabs.tsx";
+import { EmbedButton } from "./EmbedButton.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { MatrixPicker } from "./MatrixPicker.tsx";
@@ -192,6 +195,30 @@ const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
  */
 const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
+
+/**
+ * What an embed of the story keeps of the page: its view and the values set in the panel.
+ *
+ * @param view - the reader's view, without what the story fixes, which the story fixes again.
+ * @param panelArgs - the values set in the panel.
+ * @param switches - the catalogue's switches.
+ */
+const embedQuery = (view: ViewState, panelArgs: PanelArgs, switches: readonly ViewSwitch[]): string => {
+  const params = viewParams(view, switches);
+  const args = panelArgsParam(panelArgs);
+  if (args !== "") params.set("args", args);
+  return params.toString();
+};
+
+/**
+ * The height an embed's iframe starts at: as tall as the frame is on the stage.
+ *
+ * @param view - the view, with the height set on the stage.
+ * @param contentHeight - the story's content, in CSS px.
+ * @param story - the story, with the height its scene declares.
+ */
+const embedHeight = (view: ViewState, contentHeight: number, story: Pick<TreeStory, "height">): number =>
+  view.height === "auto" ? Math.max(contentHeight, story.height ?? 0) : view.height;
 
 /**
  * The stage.
@@ -409,6 +436,12 @@ export const Stage = ({
               ) : null}
               {hasClock ? <ClockControls controls={clockControls} /> : null}
               <CopyIdButton storyId={story.id} />
+              <EmbedButton
+                storyId={story.id}
+                title={title}
+                query={embedQuery(ownView, panelArgs, switches)}
+                height={embedHeight(view, reportedHeight ?? lastHeight, story)}
+              />
               <a
                 className="forgebook-button forgebook-button--icon"
                 href={frameAddress(frameUrl, story.id, view, switches)}

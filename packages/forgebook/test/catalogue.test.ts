@@ -52,6 +52,13 @@ describe("catalogueSettings", () => {
   });
 });
 
+describe("the Embed button", () => {
+  it("is offered unless a catalogue turns it off", () => {
+    expect(catalogueSettings("A", DEFAULT_SWITCHES).hasEmbed).toBe(true);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { controls: { embed: false } }).hasEmbed).toBe(false);
+  });
+});
+
 describe("mergedLists", () => {
   it("takes the catalogue's single values over its presets', and merges the entries by id", () => {
     const merged = mergedLists([
