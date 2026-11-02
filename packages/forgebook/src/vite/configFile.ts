@@ -17,6 +17,7 @@ import { pathToFileURL } from "node:url";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
+import { mergedThemes, shellThemeCss, shellThemeProblems, themeValueProblem } from "../shellTheme.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
@@ -26,6 +27,24 @@ export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "for
 
 /** The names a preview may have beside the configuration, in the order they are looked for. */
 const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebook.preview.js"];
+
+/** The shell's look, ready for its page. */
+export type ResolvedShell = {
+  /** The theme, as CSS; empty for none. */
+  readonly themeCss: string;
+  /** The style sheets it loads after its own, absolute, the presets' first. */
+  readonly styleSheets: readonly string[];
+  /** What in the theme will not work, for a warning. */
+  readonly problems: readonly string[];
+};
+
+/** A tokens file, its path absolute. */
+export type ResolvedTokensFile = {
+  /** The file's absolute path. */
+  readonly path: string;
+  /** The theme it belongs to; none for the base. */
+  readonly mode: string | undefined;
+};
 
 /** A configuration ready for the pages: its folder, its presets merged, its paths absolute. */
 export type ResolvedConfig = {
@@ -51,6 +70,10 @@ export type ResolvedConfig = {
   readonly previews: readonly string[];
   /** The tags for every frame's `<head>`. */
   readonly head: string;
+  /** The shell's look, the presets' and the catalogue's merged. */
+  readonly shell: ResolvedShell;
+  /** The tokens files, absolute, the base first. */
+  readonly tokens: readonly ResolvedTokensFile[];
   /** The folders the dev server watches for new story files, absolute. */
   readonly watch: readonly string[];
   /** The lists (widths, backgrounds, story groups…), the presets' and the catalogue's merged. */
@@ -209,6 +232,12 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
   const switches = declared.some((list) => list !== undefined) ? mergedById(declared) : undefined;
   const problem = switches === undefined ? undefined : switchesProblem(switches);
   if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
+  const theme = mergedThemes([
+    ...presets.map((preset) => preset.shell?.theme ?? {}),
+    config.shell?.theme ?? {}
+  ]);
+  const themeProblem = themeValueProblem(theme);
+  if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
   const ownPreview =
     config.preview === undefined
       ? PREVIEW_FILES.map((name) => resolve(dir, name)).find((file) => existsSync(file))
@@ -230,6 +259,19 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     head: [...presets.map((preset) => preset.head ?? ""), config.head ?? ""]
       .filter((tags) => tags !== "")
       .join("\n"),
+    shell: {
+      themeCss: shellThemeCss(theme),
+      styleSheets: [
+        ...presets.flatMap((preset) => (preset.shell?.css === undefined ? [] : [preset.shell.css])),
+        ...(config.shell?.css === undefined ? [] : [absolute(config.shell.css)])
+      ],
+      problems: shellThemeProblems(theme)
+    },
+    tokens: (config.tokens ?? []).map((each) =>
+      typeof each === "string"
+        ? { path: absolute(each), mode: undefined }
+        : { path: absolute(each.file), mode: each.mode }
+    ),
     watch: (config.watch ?? []).map(absolute),
     lists: mergedLists([...presets, config]),
     hasPlayTools: hasPlayToolsIn(dir)

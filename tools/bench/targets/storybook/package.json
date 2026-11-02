@@ -1,0 +1,17 @@
+{
+  "name": "bench-target-storybook",
+  "private": true,
+  "description": "The Storybook measured, as its documentation installs it for React and Vite.",
+  "dependencies": {
+    "@storybook/addon-docs": "10.6.5",
+    "@storybook/react-vite": "10.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "storybook": "10.6.5",
+    "typescript": "6.0.3",
+    "vite": "8.3.5"
+  }
+}
