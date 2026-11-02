@@ -13,7 +13,9 @@
  *
  * @module
  */
+
 import { statSync } from "node:fs";
+import { availableParallelism, totalmem } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
@@ -95,11 +97,28 @@ export type DocsExtractor = {
  */
 const WORKER_URL = new URL(`./docsWorker${extname(import.meta.url)}`, import.meta.url);
 
+/** The memory a machine needs for a build to read the docs and "Used in" in two workers at once, in bytes. */
+const TWO_READERS_MEMORY = 16 * 1024 ** 3;
+
 /**
- * The worker's young generation, in MB. V8 sizes it for throughput, and the heap of a program, which survives, never
- * needs one this large: left alone it is half the worker's memory, and reading a program takes no longer without it.
+ * Whether a build may read the docs and "Used in" in two workers at once: each holds a program of the whole library, so
+ * two need room, and a second core to run on.
+ */
+const hasRoomForTwoReaders = (): boolean => totalmem() >= TWO_READERS_MEMORY && availableParallelism() > 2;
+
+/**
+ * The worker's young generation on a dev server, in MB. V8 sizes it for throughput, and the heap of a program, which
+ * survives, never needs one this large: left alone it is half the worker's memory, and reading one program takes no
+ * longer without it.
  */
 const YOUNG_GENERATION_MB = 8;
+
+/**
+ * The worker's young generation in a build, in MB: a build reads every story's docs and every group's "Used in", and
+ * with the dev server's 8 MB a third of Fluent UI's build went to collecting garbage (66 s, against 41 s with this, for
+ * about a hundred MB more at the peak; 128 MB was no faster).
+ */
+const BUILD_YOUNG_GENERATION_MB = 64;
 
 /**
  * How long the worker stays with nothing to do, in milliseconds. Its programs are the heaviest thing the server holds,
@@ -140,13 +159,12 @@ const stampOf = (docsModule: string): string =>
   [docsModule, ...[WORKER_URL.href, docsModule].map((url) => statSync(fileURLToPath(url)).mtimeMs)].join(" ");
 
 /**
- * A docs extractor with its worker, started on its first request.
+ * One reader of the docs and "Used in", in a worker of its own.
  *
- * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).
- * @param options - where answers are kept, and how it is used.
- * @returns the extractor.
+ * @param docsModule - the framework's docs module.
+ * @param options - where to keep what it read, and whether it reads every file.
  */
-export const createDocsExtractor = (
+const readerOf = (
   docsModule: string,
   { cacheFolder, readsEverything = false }: DocsExtractorOptions = {}
 ): DocsExtractor => {
@@ -182,7 +200,9 @@ export const createDocsExtractor = (
     const workerData: DocsWorkerData = { docsModule, readsEverything };
     const created = new Worker(WORKER_URL, {
       workerData,
-      resourceLimits: { maxYoungGenerationSizeMb: YOUNG_GENERATION_MB }
+      resourceLimits: {
+        maxYoungGenerationSizeMb: readsEverything ? BUILD_YOUNG_GENERATION_MB : YOUNG_GENERATION_MB
+      }
     });
     created.unref();
     created.on("message", (message: unknown): void => {
@@ -257,6 +277,32 @@ export const createDocsExtractor = (
       worker = undefined;
       if (running === undefined) return;
       await running.terminate();
+    }
+  };
+};
+
+/**
+ * A docs extractor with its worker, started on its first request.
+ *
+ * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).
+ * @param options - where answers are kept, and how it is used.
+ * @returns the extractor.
+ */
+export const createDocsExtractor = (
+  docsModule: string,
+  options: DocsExtractorOptions = {}
+): DocsExtractor => {
+  const reader = readerOf(docsModule, options);
+  // a build reads "Used in" in a worker of its own, beside the docs', on a machine with room for both: each reads every
+  // file of the library, and one after the other they were most of a build's time (Fluent UI: about 2 GB more at the
+  // peak); a dev server keeps one worker, which is lighter
+  if (options.readsEverything !== true || !hasRoomForTwoReaders()) return reader;
+  const usageReader = readerOf(docsModule, options);
+  return {
+    ...reader,
+    usage: usageReader.usage,
+    close: async (): Promise<void> => {
+      await Promise.all([reader.close(), usageReader.close()]);
     }
   };
 };

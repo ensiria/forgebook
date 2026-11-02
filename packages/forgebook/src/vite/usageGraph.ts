@@ -24,6 +24,7 @@ import {
   dropUsagePrograms,
   programDependencies,
   programFor,
+  resolutionHost,
   usageProgramFor
 } from "./docsProgram.ts";
 
@@ -299,7 +300,7 @@ const importsOf = (
       specifier,
       source.fileName,
       program.getCompilerOptions(),
-      ts.sys,
+      resolutionHost,
       cache
     ).resolvedModule;
     if (resolved !== undefined && !resolved.isExternalLibraryImport) targets.push(resolved.resolvedFileName);

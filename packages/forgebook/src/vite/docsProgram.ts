@@ -88,10 +88,54 @@ export const readAskedFilesOnly = (): void => {
  */
 const parsedConfigs = new Map<string, ts.ParsedCommandLine | undefined>();
 
+/**
+ * What the file system answered the programs' module resolution, until a source changes: in a monorepo every
+ * configuration's program resolves the same thousands of imports, and asking the disk again for each one was most of a
+ * build's time, in `stat`, `open` and `realpath`.
+ */
+const answered = {
+  files: new Map<string, boolean>(),
+  folders: new Map<string, boolean>(),
+  realPaths: new Map<string, string>()
+};
+
+/**
+ * An answer of the file system, asked once until a source changes.
+ *
+ * @param kept - the answers kept.
+ * @param path - the path asked about.
+ * @param ask - asks the file system.
+ */
+const remembered = <TValue>(
+  kept: Map<string, TValue>,
+  path: string,
+  ask: (path: string) => TValue
+): TValue => {
+  const known = kept.get(path);
+  if (known !== undefined) return known;
+  const value = ask(path);
+  kept.set(path, value);
+  return value;
+};
+
+/** The file system as module resolution asks it outside a program ("Used in"), with the same answers kept. */
+export const resolutionHost: ts.ModuleResolutionHost = {
+  fileExists: (path: string): boolean => remembered(answered.files, path, ts.sys.fileExists),
+  readFile: (path: string): string | undefined => ts.sys.readFile(path),
+  directoryExists: (path: string): boolean => remembered(answered.folders, path, ts.sys.directoryExists),
+  realpath: (path: string): string =>
+    remembered(answered.realPaths, path, ts.sys.realpath ?? ((same: string): string => same)),
+  getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
+  getDirectories: (path: string): string[] => ts.sys.getDirectories(path)
+};
+
 /** Marks every program as maybe holding an edited file: each is renewed on its next read. */
 export const markSourcesChanged = (): void => {
   for (const configPath of programs.keys()) outdated.add(configPath);
   parsedConfigs.clear();
+  answered.files.clear();
+  answered.folders.clear();
+  answered.realPaths.clear();
 };
 
 /**
@@ -126,6 +170,12 @@ const isDependencyTypes = (fileName: string, libraryFolder: string): boolean =>
 const keepingHost = (options: ts.CompilerOptions, isOwnOnly: boolean): ts.CompilerHost => {
   const host = ts.createCompilerHost(options);
   const parse = host.getSourceFile;
+  const { fileExists, directoryExists, realpath } = host;
+  host.fileExists = (path: string): boolean => remembered(answered.files, path, fileExists);
+  if (directoryExists !== undefined)
+    host.directoryExists = (path: string): boolean => remembered(answered.folders, path, directoryExists);
+  if (realpath !== undefined)
+    host.realpath = (path: string): string => remembered(answered.realPaths, path, realpath);
   const libraryFolder = dirname(ts.getDefaultLibFilePath(options));
   // shared by every configuration that parses alike: in a monorepo whose paths lead every package to every other's
   // sources, each package's program holds the same thousands of files, and parsing them per package made a
@@ -139,7 +189,8 @@ const keepingHost = (options: ts.CompilerOptions, isOwnOnly: boolean): ts.Compil
     onError?: (message: string) => void,
     shouldCreate?: boolean
   ): ts.SourceFile | undefined => {
-    const time = ts.sys.getModifiedTime?.(fileName)?.getTime();
+    // a build reads every file once and changes none: a file's time is asked only where files change, on a dev server
+    const time = askedFiles === undefined ? undefined : ts.sys.getModifiedTime?.(fileName)?.getTime();
     const version = typeof languageVersion === "object" ? languageVersion : { languageVersion };
     const entry = `${fileName}|${version.languageVersion}|${version.impliedNodeFormat ?? ""}`;
     const known = kept.get(entry);
@@ -323,17 +374,24 @@ export const usageProgramFor = (file: string): DocsProgram | string => {
 };
 
 /**
- * Lets every program go, the files they parsed with them: "Used in" reads a whole configuration, and holding the docs'
- * programs beside it would add the two. A later read makes its program again, and the docs on disk answer meanwhile.
+ * Lets every program go, and on a dev server the files they parsed with them: "Used in" reads a whole configuration, and
+ * holding the docs' programs beside it would add the two. A later read makes its program again, and the docs on disk
+ * answer meanwhile. A build keeps the parsed files: it reads every story's docs and every group's "Used in" in one
+ * worker, interleaved, and parsing a monorepo's files again after each group was most of its time (React Spectrum's
+ * build parsed its 8,800 files about ten times), for no lower peak.
  */
 export const dropPrograms = (): void => {
   programs.clear();
-  parsedFiles.clear();
+  if (askedFiles !== undefined) parsedFiles.clear();
   outdated.clear();
 };
 
-/** Lets the files "Used in" parsed go, once a group's usage is read: kept until then, since its programs share them. */
+/**
+ * Lets the files "Used in" parsed go, once a group's usage is read: kept until then, since its programs share them; a
+ * build keeps them for the next group (`dropPrograms`).
+ */
 export const dropUsageFiles = (): void => {
+  if (askedFiles === undefined) return;
   for (const key of [...parsedFiles.keys()].filter((each) => each.endsWith(USAGE_KEY)))
     parsedFiles.delete(key);
 };

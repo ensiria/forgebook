@@ -557,6 +557,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const watched = [...(config?.watch ?? []), ...(options.watch ?? [])];
       if (watched.length > 0) server.watcher.add(watched);
       const refresh = (file: string): void => {
+        // a source added or removed changes what an import resolves to
+        renewOnChange(server, file);
         const renewed = modulesListing(file);
         if (renewed === undefined) return;
         const graph = server.environments.client.moduleGraph;
