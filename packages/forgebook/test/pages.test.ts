@@ -30,7 +30,8 @@ const CONFIG: ResolvedConfig = {
   watch: [],
   lists: {},
   hasPlayTools: false,
-  plugins: []
+  plugins: [],
+  build: { readableNames: false }
 };
 
 describe("the generated pages", () => {

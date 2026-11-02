@@ -68,6 +68,13 @@ describe("resolveConfig", () => {
     expect(resolved.head).toBe('<meta name="acme" />\n<link rel="stylesheet" href="/fonts.css" />');
   });
 
+  it("names a build's chunks by their hash alone unless the configuration asks for readable names", () => {
+    expect(resolveConfig(BASE, "/catalogue").build).toEqual({ readableNames: false });
+    expect(resolveConfig({ ...BASE, build: { readableNames: true } }, "/catalogue").build).toEqual({
+      readableNames: true
+    });
+  });
+
   it("leaves the switches to the default ones when neither the configuration nor a preset declares any", () => {
     expect(resolveConfig(BASE, "/catalogue").switches).toBeUndefined();
   });

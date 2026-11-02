@@ -29,7 +29,8 @@ const CONFIG: ResolvedConfig = {
   watch: [],
   lists: {},
   plugins: [],
-  hasPlayTools: false
+  hasPlayTools: false,
+  build: { readableNames: false }
 };
 
 /**

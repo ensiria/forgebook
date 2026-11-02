@@ -464,8 +464,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
                 rolldownOptions: {
                   input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") },
                   // a catalogue names each file several times over, once per loader: a name of its hash alone is a
-                  // tenth of what the index weighs, and nobody reads a build's chunks by name
-                  output: { chunkFileNames: "assets/[hash].js" }
+                  // tenth of what the index weighs; a catalogue whose builds are read by name keeps Vite's names
+                  ...(config.build.readableNames ? {} : { output: { chunkFileNames: "assets/[hash].js" } })
                 }
               }
             };

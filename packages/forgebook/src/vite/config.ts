@@ -85,6 +85,18 @@ export type ForgebookConfig = CatalogueLists & {
   readonly presets?: readonly ForgebookPreset[];
   /** The plugins, in order (`[figma()]`): a package adds nothing to the catalogue until it is listed here. */
   readonly plugins?: readonly ForgebookPlugin[];
+  /** How `forgebook build` writes the catalogue. */
+  readonly build?: BuildOptions;
+};
+
+/** How `forgebook build` writes the catalogue. */
+export type BuildOptions = {
+  /**
+   * Whether each chunk's file is named after its module as well as its hash (`Button-3f9a1c.js`), for whoever reads a
+   * build's files; `false` by default: a name of its hash alone, since a catalogue names each file once per loader and
+   * the names are a tenth of what its index weighs. `forgebook build --readable-names` turns it on for one build.
+   */
+  readonly readableNames?: boolean;
 };
 
 /**
