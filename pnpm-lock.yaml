@@ -143,9 +143,6 @@ importers:
       '@forgebook/typescript-config':
         specifier: workspace:*
         version: link:../../config/typescript
-      '@forgebook/vue':
-        specifier: workspace:*
-        version: link:../../packages/vue
       '@testing-library/dom':
         specifier: 10.4.2
         version: 10.4.2

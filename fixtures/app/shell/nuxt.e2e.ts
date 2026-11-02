@@ -105,6 +105,12 @@ test.describe("what a Nuxt component finds", () => {
 });
 
 test.describe("the panel on a Nuxt story", () => {
+  test("writes the story as a template, with the writer this package gives the page", async ({ page }) => {
+    await page.goto(story("blog-blog-post--from-story-data", "tab=code"));
+    await isReady(page);
+    await expect(page.getByText("<BlogPost />")).toBeVisible();
+  });
+
   test("lists the router's moves among the events, and the play's route", async ({ page }) => {
     await page.goto(story("layout-site-nav--home", "tab=events"));
     await isReady(page);

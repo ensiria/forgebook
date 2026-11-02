@@ -31,6 +31,7 @@
     "./app/head": "./src/app/head.ts",
     "./app/router": "./src/app/router.ts",
     "./app/state": "./src/app/state.ts",
+    "./code": "./src/storyCode.ts",
     "./docs": "./src/vite/extractDocs.ts",
     "./project": "./src/pageProject.ts",
     "./renderer": "./src/renderer.ts",
@@ -103,6 +104,10 @@
       "./app/state": {
         "types": "./dist/src/app/state.d.ts",
         "default": "./dist/src/app/state.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyCode.d.ts",
+        "default": "./dist/src/storyCode.js"
       },
       "./docs": {
         "types": "./dist/src/vite/extractDocs.d.ts",

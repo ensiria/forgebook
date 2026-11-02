@@ -8,12 +8,12 @@ import { join } from "node:path";
 
 import { heldStoryClock } from "@forgebook/story-format/clock";
 import { describeAdapter, THROWING_NAME } from "@forgebook/testing/conformance";
-import { codeOf } from "@forgebook/vue/code";
 import type { StoryDrawing } from "forgebook/renderer";
 import { type LoadedDecorator, readStory } from "forgebook/story-module";
 import { createCommentVNode, defineComponent, h, isVNode, ref, type VNode } from "vue";
 
 import { createNuxtRenderer } from "../src/nuxtRenderer.ts";
+import { codeOf } from "../src/storyCode.ts";
 import { extractStoryComponent } from "../src/vite/extractDocs.ts";
 import { project } from "./project.ts";
 

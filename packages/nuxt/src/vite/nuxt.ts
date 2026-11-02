@@ -29,7 +29,8 @@ export const nuxt = (options: NuxtOptions = {}): FrameworkAdapter => {
     name: "nuxt",
     // beside this module, with its extension: `.ts` in the sources, `.js` once built for npm
     docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
-    pages: { frame: FRAME_MODULE, code: base.pages.code },
+    // both are this package's: a catalogue resolves only the packages it installs, and it need not install Vue's adapter
+    pages: { frame: FRAME_MODULE, code: "@forgebook/nuxt/code" },
     browserDependencies: [...(base.browserDependencies ?? []), "vue-router", "forgebook/frame"],
     ...(base.componentFiles === undefined ? {} : { componentFiles: base.componentFiles }),
     vitePlugins: async (): Promise<readonly PluginOption[]> => [
