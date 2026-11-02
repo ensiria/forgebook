@@ -32,6 +32,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   A story reads it as `context.globals.touch` (`"mouse"` or `"touch"`) or fixes it with
   `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
   catalogue draws it with a finger and offers a toggle to turn that off.
+- A link may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the props the
+  story's panel can set, with a value of their type; to show a story with other values, write a story with those
+  args rather than a link.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
 - A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook
   (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`
