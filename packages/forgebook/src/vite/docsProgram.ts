@@ -51,7 +51,7 @@ const FALLBACK_OPTIONS: ts.CompilerOptions = {
 /**
  * A program from its root files, the one kept under the same key reused while no source changed.
  *
- * @param key - the program's key: its configuration file, or the story file a program of its own is made for.
+ * @param key - the program's key: its configuration file, or what the files no configuration holds share.
  * @param rootNames - its root files.
  * @param options - its compiler options.
  */
@@ -68,27 +68,52 @@ const keptProgram = (key: string, rootNames: readonly string[], options: ts.Comp
   return program;
 };
 
+/** The extensions a project's sources have. */
+const SOURCE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
+
+/** The folders that hold no sources of the project. */
+const NOT_SOURCES = ["**/node_modules", "**/dist", "**/build"];
+
+/** The folder a file's project sits in: its nearest `package.json`'s, or its own. */
+const projectFolder = (file: string): string => {
+  const manifest = ts.findConfigFile(dirname(file), ts.sys.fileExists, "package.json");
+  return manifest === undefined ? dirname(file) : dirname(manifest);
+};
+
 /**
- * A program of the story file alone, from which its imports reach the component: for a file no configuration holds.
+ * The program of files no configuration holds, from which their imports reach the component: every source of the
+ * project at once, as a `tsconfig.json` would list them. A program holds the standard library's types and all that its
+ * files import, so one per file, or one rebuilt for each new file, filled the heap with what the last rebuild left:
+ * gigabytes in a project of a hundred stories with no `tsconfig.json`, up to Node's limit.
  *
  * @param file - the story file.
  * @param options - the options of the configuration above it, when there is one; JavaScript is allowed on top.
  */
-const fileProgram = (file: string, options: ts.CompilerOptions): DocsProgram => {
-  const program = keptProgram(`${file}#own`, [file], { ...options, allowJs: true, noEmit: true });
+const looseProgram = (file: string, options: ts.CompilerOptions): DocsProgram => {
+  const merged = { ...options, allowJs: true, noEmit: true };
+  const folder = projectFolder(file);
+  const key = `${folder}#loose#${JSON.stringify(merged)}`;
+  const kept = programs.get(key);
+  // a file the program does not hold is new: reading the folder again finds it, and whatever else came with it
+  if (kept !== undefined && kept.getSourceFile(file) === undefined) outdated.add(key);
+  const files =
+    kept === undefined || outdated.has(key)
+      ? ts.sys.readDirectory(folder, SOURCE_EXTENSIONS, NOT_SOURCES)
+      : [];
+  const program = keptProgram(key, files.includes(file) ? files : [...files, file], merged);
   return { program, checker: program.getTypeChecker() };
 };
 
 /**
- * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, a
- * program of the file alone (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
+ * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, the one
+ * the files no configuration holds share (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
  *
  * @param file - an absolute path to a source file.
  * @returns the program, or a message when the configuration above it cannot be read.
  */
 export const programFor = (file: string): DocsProgram | string => {
   const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
-  if (configPath === undefined) return fileProgram(file, FALLBACK_OPTIONS);
+  if (configPath === undefined) return looseProgram(file, FALLBACK_OPTIONS);
   const parsed = ts.getParsedCommandLineOfConfigFile(
     configPath,
     {},
@@ -99,7 +124,7 @@ export const programFor = (file: string): DocsProgram | string => {
   );
   if (parsed === undefined) return `${configPath} could not be read`;
   const program = keptProgram(configPath, parsed.fileNames, parsed.options);
-  if (program.getSourceFile(file) === undefined) return fileProgram(file, parsed.options);
+  if (program.getSourceFile(file) === undefined) return looseProgram(file, parsed.options);
   return { program, checker: program.getTypeChecker() };
 };
 
