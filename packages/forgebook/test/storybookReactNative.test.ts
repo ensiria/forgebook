@@ -101,7 +101,28 @@ describe("Storybook's React Native frameworks", () => {
       babel: { plugins: ["react-native-reanimated/plugin"] }
     });
     expect(reading?.notes[0]).toMatch(/ran on webpack/);
-    expect(reading?.notes[1]).toMatch(/given as a function is not written/);
+    expect(reading?.notes[1]).toMatch(/is not a name/);
+    // options that are not plain values would be rewritten by JSON: left out, with a note
+    const regex = storybookFramework(
+      {
+        framework: {
+          name: "@storybook/react-native-web-vite",
+          options: {
+            pluginReactOptions: {
+              babel: {
+                plugins: [
+                  ["x-plugin", { only: /a/ }],
+                  ["y-plugin", { on: true }]
+                ]
+              }
+            }
+          }
+        }
+      },
+      false
+    );
+    expect(regex?.framework.options).toEqual({ babel: { plugins: [["y-plugin", { on: true }]] } });
+    expect(regex?.notes[0]).toMatch(/a regular expression/);
   });
 
   it("reads on-device Storybook, which names no framework, and says what does not draw in a browser", () => {

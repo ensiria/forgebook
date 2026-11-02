@@ -119,6 +119,22 @@ const texts = (value: unknown, field: string): { readonly values: string[]; read
 };
 
 /**
+ * Whether a value is written as it is in JSON: texts, finite numbers, booleans, `null`, and lists and objects of them.
+ *
+ * @param value - the value.
+ */
+const isPlain = (value: unknown): boolean => {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isPlain);
+  return (
+    isRecord(value) &&
+    Object.getPrototypeOf(value) === Object.prototype &&
+    Object.values(value).every(isPlain)
+  );
+};
+
+/**
  * Babel's plugins or presets as the configuration writes them: a name, or a name and plain options.
  *
  * @param value - the list, as `main` writes it.
@@ -132,13 +148,42 @@ const babelItems = (
   const values = list.filter(
     (item) =>
       typeof item === "string" ||
-      (Array.isArray(item) && item.length === 2 && typeof item[0] === "string" && isRecord(item[1]))
+      (Array.isArray(item) &&
+        item.length === 2 &&
+        typeof item[0] === "string" &&
+        isRecord(item[1]) &&
+        isPlain(item[1]))
   );
   const notes =
     values.length === list.length
       ? []
-      : [`${field}: a plugin given as a function is not written; name it by its module instead`];
+      : [
+          `${field}: an item that is not a name, or a name with plain options (a function, a regular expression, a third element), is not written; copy it by hand`
+        ];
   return { values, notes };
+};
+
+/**
+ * The notes on Storybook options that are not read at all: the deprecated `pluginBabelOptions`, and a `babel` that is
+ * not a plain object.
+ *
+ * @param options - the framework's options.
+ * @param react - its `pluginReactOptions`.
+ */
+const shapeNotes = (
+  options: Readonly<Record<string, unknown>>,
+  react: Readonly<Record<string, unknown>>
+): string[] => {
+  const notes: string[] = [];
+  if (options["pluginBabelOptions"] !== undefined)
+    notes.push(
+      "pluginBabelOptions is not read (Storybook no longer reads it either): name Babel's plugins in babel"
+    );
+  if (react["babel"] !== undefined && !isRecord(react["babel"]))
+    notes.push(
+      "pluginReactOptions.babel is not a plain object: copy its plugins and presets into babel by hand"
+    );
+  return notes;
 };
 
 /**
@@ -158,6 +203,7 @@ export const reactNativeWebOptions = (options: Readonly<Record<string, unknown>>
   const exclude = texts(react["exclude"], "pluginReactOptions.exclude");
   const jsxImportSource = react["jsxImportSource"];
   const notes = [
+    ...shapeNotes(options, react),
     ...nativePackages.notes,
     ...plugins.notes,
     ...presets.notes,
