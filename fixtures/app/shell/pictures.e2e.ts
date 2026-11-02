@@ -49,6 +49,8 @@ test.describe("comparing pictures", () => {
   });
 
   test("reads a picture past what one message holds, and marks a change in it", async ({ page }) => {
+    // 80 million pixels through a canvas, more than a two-core runner does in the suite's 30 s
+    test.setTimeout(180_000);
     const size = { width: 1280, height: 16_000 };
     const difference = await comparePictures(
       page,
