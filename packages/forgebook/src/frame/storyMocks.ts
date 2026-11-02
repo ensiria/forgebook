@@ -46,8 +46,49 @@ const handlersOf = (parameters: Readonly<Record<string, unknown>>): readonly unk
   return isRecord(handlers) ? Object.values(handlers).flat() : [];
 };
 
+/** How every story's worker starts. */
+const WORKER_OPTIONS = {
+  serviceWorker: { url: WORKER_FILE },
+  onUnhandledRequest: "bypass",
+  quiet: true
+} as const;
+
 /** Nothing to undo. */
 const NOTHING = (): void => undefined;
+
+/** How long a page waits for a worker to take it over, in milliseconds. */
+const TAKEOVER_WAIT = 500;
+
+/** Where a frame notes the reload it did for its worker, so it does one at most. */
+const RELOADED_KEY = "forgebook:mocks-reloaded";
+
+/** Whether the service worker serves this page, waiting briefly for it to take the page over. */
+const isServedByWorker = async (): Promise<boolean> => {
+  const { serviceWorker } = navigator;
+  if (serviceWorker.controller !== null) return true;
+  await new Promise<void>((resolve) => {
+    serviceWorker.addEventListener("controllerchange", () => resolve(), { once: true });
+    setTimeout(resolve, TAKEOVER_WAIT);
+  });
+  return serviceWorker.controller !== null;
+};
+
+/**
+ * Reloads a page the worker did not take over, once.
+ *
+ * @remarks
+ * MSW's script unregisters itself when its last page closes. When that page is the one this story replaces, the new
+ * page can end up with an active registration that never claims it: `start` resolves and every request goes to the
+ * network, however many times it starts again. A new document is served from its first request.
+ *
+ * @returns whether the page is going away, which leaves the story nothing to draw.
+ */
+const reloadForWorker = (): boolean => {
+  if (sessionStorage.getItem(RELOADED_KEY) !== null) return false;
+  sessionStorage.setItem(RELOADED_KEY, "1");
+  location.reload();
+  return true;
+};
 
 /**
  * Starts a story's mocks, before its loaders.
@@ -68,10 +109,8 @@ export const startStoryMocks = async (
   }
   const { setupWorker } = await load();
   const worker = setupWorker(...handlers);
-  await worker.start({
-    serviceWorker: { url: WORKER_FILE },
-    onUnhandledRequest: "bypass",
-    quiet: true
-  });
+  await worker.start(WORKER_OPTIONS);
+  if (await isServedByWorker()) sessionStorage.removeItem(RELOADED_KEY);
+  else if (reloadForWorker()) await new Promise<never>(() => undefined);
   return (): void => worker.stop();
 };

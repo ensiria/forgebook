@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type MockTools, type MockWorker, startStoryMocks } from "../src/frame/storyMocks.ts";
 
@@ -25,6 +25,26 @@ const TOOLS: MockTools = {
     };
   }
 };
+
+/** What a fake page's reloads were. */
+let reloads = 0;
+
+/** Stubs the page's worker state: `controller` is what serves it, a null when nothing does. */
+const stubPage = (controller: unknown): void => {
+  const stored = new Map<string, string>();
+  vi.stubGlobal("navigator", { serviceWorker: { controller, addEventListener: (): void => undefined } });
+  vi.stubGlobal("location", { reload: (): void => void reloads++ });
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string): string | null => stored.get(key) ?? null,
+    setItem: (key: string, value: string): void => void stored.set(key, value),
+    removeItem: (key: string): void => void stored.delete(key)
+  });
+};
+
+beforeEach(() => {
+  reloads = 0;
+  stubPage({ state: "activated" });
+});
 
 describe("startStoryMocks", () => {
   it("never loads MSW for a story with no handlers", async () => {
@@ -57,5 +77,30 @@ describe("startStoryMocks", () => {
     await expect(startStoryMocks({ msw: { handlers: ["a"] } }, undefined)).rejects.toThrow(
       "npm install --save-dev msw"
     );
+  });
+
+  it("reloads a page the worker did not take over, and never draws its story there", async () => {
+    vi.useFakeTimers();
+    stubPage(null);
+    let isStarted = false;
+    void startStoryMocks({ msw: { handlers: ["a"] } }, async () => TOOLS).then(() => {
+      isStarted = true;
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    vi.useRealTimers();
+    expect(reloads).toBe(1);
+    expect(isStarted).toBe(false);
+  });
+
+  it("reloads once at most, so a page no worker can serve still draws its story", async () => {
+    vi.useFakeTimers();
+    stubPage(null);
+    void startStoryMocks({ msw: { handlers: ["a"] } }, async () => TOOLS);
+    await vi.advanceTimersByTimeAsync(1000);
+    const second = startStoryMocks({ msw: { handlers: ["a"] } }, async () => TOOLS);
+    await vi.advanceTimersByTimeAsync(1000);
+    vi.useRealTimers();
+    await expect(second).resolves.toBeTypeOf("function");
+    expect(reloads).toBe(1);
   });
 });
