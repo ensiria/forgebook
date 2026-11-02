@@ -25,6 +25,7 @@ import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
+import { prebundle, prebundleInChild } from "./prebundleRun.ts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
@@ -72,14 +73,15 @@ await defineCommands({
         const port = options.port === undefined ? undefined : Number(options.port);
         if (port !== undefined && !Number.isInteger(port))
           throw new ScriptError(`--port ${options.port} is not a port`);
+        const prebundling = prebundleInChild(config.dir, options.config, options.force === true);
         const { createServer } = await import("vite");
+        await prebundling;
         const server = await createServer(
           await catalogueVite(config, {
             server: {
               ...(port === undefined ? {} : { port, strictPort: true }),
               ...(options.host === undefined ? {} : { host: options.host })
-            },
-            ...(options.force === true ? { optimizeDeps: { force: true } } : {})
+            }
           })
         );
         await server.listen();
@@ -93,6 +95,12 @@ await defineCommands({
           });
         });
       }
+    }),
+    prebundle: forgebook.command({
+      summary: "Pre-bundle the catalogue's dependencies: what `dev` does on a first start.",
+      options: { force: { type: "boolean", description: "Pre-bundle them again, ignoring Vite's cache." } },
+      examples: [{ command: `${COMMAND} prebundle`, description: "Before the first start, in CI." }],
+      run: async ({ options }): Promise<void> => prebundle(await configOf(options.config), options.force)
     }),
     build: forgebook.command({
       summary: "Build the catalogue into static files.",

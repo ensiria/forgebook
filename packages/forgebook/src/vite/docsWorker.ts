@@ -1,5 +1,5 @@
 /**
- * The worker thread that reads the story files' component docs: TypeScript's program for a package takes seconds to
+ * The process that reads the story files' component docs: TypeScript's program for a package takes seconds to
  * build, and built on the dev server's own thread it held every other answer (a frame, a documentation file) until
  * it was done.
  *
@@ -12,12 +12,22 @@
  *
  * @module
  */
-import { parentPort, workerData } from "node:worker_threads";
 
 import { type ExtractStoryComponent, isDocsModule } from "./adapter.ts";
 import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
 import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
 import { docsDependencies, usageDependencies, usageGraph } from "./usageGraph.ts";
+
+/** What the extractor started this process with, as JSON. */
+const workerData: unknown = JSON.parse(process.argv[2] ?? "null");
+
+/** Answers the extractor, while it is there to read it. */
+const answer = (response: DocsResponse): void => {
+  process.send?.(response);
+};
+
+// a server that dies leaves nobody to send a request, or to end this process
+process.once("disconnect", () => process.exit());
 
 /** Whether the worker's data names a docs module. */
 const isWorkerData = (value: unknown): value is DocsWorkerData =>
@@ -64,7 +74,7 @@ const usage = (files: Parameters<typeof usageGraph>[0]): ReturnType<typeof usage
   }
 };
 
-parentPort?.on("message", (request: DocsRequest): void => {
+process.on("message", (request: DocsRequest): void => {
   if (request.kind === "changed") {
     markSourcesChanged();
     return;
@@ -73,12 +83,12 @@ parentPort?.on("message", (request: DocsRequest): void => {
     const result = usage(request.files);
     const dependencies = typeof result === "string" ? [] : usageDependencies(request.files);
     const response: DocsResponse = { kind: "usage", id: request.id, result, dependencies };
-    parentPort?.postMessage(response);
+    answer(response);
     return;
   }
   void extracted(request.storyFile).then((result) => {
     const dependencies = typeof result === "string" ? [] : docsDependencies(request.storyFile);
     const response: DocsResponse = { kind: "extract", id: request.id, result, dependencies };
-    parentPort?.postMessage(response);
+    answer(response);
   });
 });

@@ -1,20 +1,21 @@
 /**
- * The story files' component docs, and the facts "Used in" is joined from (`usageGraph.ts`), read in a worker thread
- * (`docsWorker.ts`) so the dev server keeps answering while a package's TypeScript program is built.
+ * The story files' component docs, and the facts "Used in" is joined from (`usageGraph.ts`), read in a process of
+ * their own (`docsWorker.ts`) so the dev server keeps answering while a package's TypeScript program is built.
  *
  * @remarks
- * One worker per plugin, started on the first request and kept: its programs make every later read quick, until a
+ * One worker per plugin, started on the first request: its programs make every later read quick, until a
  * source file changes (`changed`, which the dev server's watcher sends). Nothing starts it ahead of a request, and a
- * request the disk answers (`diskCache.ts`) starts nothing: a TypeScript program is half the server's memory. Requests
- * are answered in order. The worker never keeps the process alive (`unref`), and `close` ends it when the build or the
+ * request the disk answers (`diskCache.ts`) starts nothing: a TypeScript program is half the server's memory. A worker
+ * left with nothing to do ends, for the same reason: a process, since a thread that ends gives almost none of its
+ * memory back. Requests are answered in order. The worker never keeps the server alive (`unref`), and `close` ends it when the build or the
  * server ends.
  *
  * @module
  */
+import { type ChildProcess, fork } from "node:child_process";
 import { statSync } from "node:fs";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Worker } from "node:worker_threads";
 
 import type { StoryComponentResult } from "./adapter.ts";
 import { type DiskCache, diskCache } from "./diskCache.ts";
@@ -94,10 +95,20 @@ export type DocsExtractor = {
 const WORKER_URL = new URL(`./docsWorker${extname(import.meta.url)}`, import.meta.url);
 
 /**
- * The worker's young generation, in MB. V8 sizes it for throughput and the heap of a program, which survives, never
- * needs one this large: left alone it is half the worker's memory, and reading a program takes no longer without it.
+ * The worker's semi-spaces, in MB. V8 sizes them for throughput, and the heap of a program, which survives, never needs
+ * them this large: left alone they are half the worker's memory, and reading a program takes no longer without them.
  */
-const YOUNG_GENERATION_MB = 8;
+const SEMI_SPACE_MB = 1;
+
+/**
+ * How long the worker stays with nothing to do, in milliseconds. Its programs are the heaviest thing the server holds,
+ * and one edit needs them once: the next read rebuilds them in under a second, and meanwhile the memory goes back.
+ */
+const IDLE_MS = 30_000;
+
+/** Whether a message of the worker is an answer. */
+const isDocsResponse = (message: unknown): message is DocsResponse =>
+  typeof message === "object" && message !== null && "kind" in message && "id" in message;
 
 /** What the worker is started with: the framework's docs module, which it loads before its first answer. */
 export type DocsWorkerData = {
@@ -148,27 +159,43 @@ export const createDocsExtractor = (
       : diskCache(join(cacheFolder, kind), stamp, isValue);
   const docsCache = cacheOf<Exclude<DocsResult, string>>("docs", isCachedDocs);
   const usageCache = cacheOf<UsageGraph>("usage", isCachedUsage);
-  let worker: Worker | undefined;
+  let worker: ChildProcess | undefined;
   let nextId = 0;
   // every request sent and not answered yet
   const pending = new Map<number, (response: DocsResponse | string) => void>();
-  const started = (): Worker => {
+  let idle: NodeJS.Timeout | undefined;
+  const stopWhenIdle = (): void => {
+    clearTimeout(idle);
+    if (pending.size > 0) return;
+    worker?.channel?.unref();
+    idle = setTimeout(() => {
+      const running = worker;
+      worker = undefined;
+      running?.kill();
+    }, IDLE_MS);
+    idle.unref();
+  };
+  const started = (): ChildProcess => {
+    clearTimeout(idle);
     if (worker !== undefined) return worker;
     const workerData: DocsWorkerData = { docsModule, readsEverything };
-    const created = new Worker(WORKER_URL, {
-      workerData,
-      resourceLimits: { maxYoungGenerationSizeMb: YOUNG_GENERATION_MB }
+    const created = fork(WORKER_URL, [JSON.stringify(workerData)], {
+      execArgv: [`--max-semi-space-size=${SEMI_SPACE_MB}`],
+      stdio: ["ignore", "ignore", "inherit", "ipc"]
     });
     created.unref();
-    created.on("message", (response: DocsResponse): void => {
-      pending.get(response.id)?.(response);
-      pending.delete(response.id);
+    created.channel?.unref();
+    created.on("message", (message: unknown): void => {
+      if (!isDocsResponse(message)) return;
+      pending.get(message.id)?.(message);
+      pending.delete(message.id);
+      stopWhenIdle();
     });
     // a worker that dies answers every request still waiting with why, and the next request starts a new one
-    created.on("error", (error: Error): void => {
-      for (const resolve of pending.values()) resolve(`The docs' worker stopped: ${error.message}`);
+    created.once("exit", (code: number | null): void => {
+      for (const resolve of pending.values()) resolve(`The docs' worker stopped (${code ?? "signal"})`);
       pending.clear();
-      worker = undefined;
+      if (worker === created) worker = undefined;
     });
     worker = created;
     return created;
@@ -177,7 +204,10 @@ export const createDocsExtractor = (
   const send = (request: DocsRequest, resolve: (response: DocsResponse | string) => void): void => {
     if (request.kind === "changed") return;
     pending.set(request.id, resolve);
-    started().postMessage(request);
+    const running = started();
+    // an answer on its way keeps the process alive; nothing else of the worker does
+    running.channel?.ref();
+    running.send(request);
   };
   const extract = (storyFile: string, resolve: (result: DocsResult) => void): void => {
     const kept = docsCache?.read(storyFile);
@@ -219,12 +249,17 @@ export const createDocsExtractor = (
     changed: (): void => {
       // a worker not started yet has no program to renew
       const request: DocsRequest = { kind: "changed" };
-      worker?.postMessage(request);
+      worker?.send(request);
     },
     close: async (): Promise<void> => {
+      clearTimeout(idle);
       const running = worker;
       worker = undefined;
-      await running?.terminate();
+      if (running === undefined) return;
+      await new Promise((resolve) => {
+        running.once("exit", resolve);
+        running.kill();
+      });
     }
   };
 };
