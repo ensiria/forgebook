@@ -8,19 +8,18 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { flushCompileCache } from "node:module";
 import { relative, resolve } from "node:path";
-import { createInterface } from "node:readline";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
 import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
-import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
 import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { catalogueClient, previewServer } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { pluginsText, storiesText, storyText } from "./agentText.ts";
+import { builtCatalogueServer, serveMcp, settleAgentIndex } from "./builtCatalogue.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
@@ -114,6 +113,10 @@ await defineCommands({
           type: "string",
           valueName: "path",
           description: "The path the catalogue is served under (/pr-12/); the root by default."
+        },
+        "agent-index": {
+          type: "boolean",
+          description: "Also write what agents read, for forgebook mcp --from: props, docs, tokens, public."
         }
       },
       examples: [
@@ -126,12 +129,14 @@ await defineCommands({
       run: async ({ options, log }): Promise<void> => {
         const config = await configOf(options.config);
         const { build } = await import("vite");
+        const outDir = resolve(config.dir, options.out ?? "dist");
         await build(
           await catalogueVite(config, {
             ...(options.base === undefined ? {} : { base: options.base }),
-            build: { outDir: resolve(config.dir, options.out ?? "dist") }
+            build: { outDir }
           })
         );
+        await settleAgentIndex(config, outDir, options["agent-index"] === true, log);
         log.success(`${config.title} built`);
       }
     }),
@@ -349,15 +354,29 @@ await defineCommands({
           valueName: "address",
           description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
         },
+        from: {
+          type: "string",
+          valueName: "address or folder",
+          description: "A catalogue built with --agent-index: read-only, with no server and no repository."
+        },
         ...SEMANTIC_OPTIONS
       },
       examples: [
         {
           command: `${COMMAND} mcp`,
           description: "What an agent's MCP configuration runs (npx forgebook mcp)."
+        },
+        {
+          command: `${COMMAND} mcp --from https://ui.example.com`,
+          description: "A published library's catalogue, for a team that consumes it."
         }
       ],
       run: async ({ options, io, log }): Promise<void> => {
+        if (options.from !== undefined) {
+          const version = readPackageVersion(import.meta.dirname);
+          await serveMcp(await builtCatalogueServer(options.from, version), io);
+          return;
+        }
         const config = await configOf(options.config);
         // kept for the server's life: an agent's questions in a row each answer at once
         const client = await catalogueClient(config, options.url);
@@ -387,14 +406,7 @@ await defineCommands({
             })
           ]
         };
-        let session = NEW_SESSION;
-        // stdout carries only the protocol's messages, one per line, answered in the order they came
-        for await (const line of createInterface({ input: io.stdin })) {
-          if (line.trim() === "") continue;
-          const step = await answerMcpMessage(line, session, server);
-          session = step.session;
-          if (step.reply !== undefined) io.stdout.write(`${step.reply}\n`);
-        }
+        await serveMcp(server, io);
         await preview.close();
         await client.close();
       }

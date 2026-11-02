@@ -676,6 +676,11 @@ in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed 
 reference the base; a `$ref` reaches only its own file.
 
 An agent that cannot find a component writes a new one, often because the code and the designers use different words.
+`forgebook build --agent-index` adds `forgebook-agent.json` to the built catalogue, and `forgebook mcp --from <address or
+folder>` serves it with no dev server and no repository: a team that consumes a published library gives its agents
+`list_stories`, `get_story`, `story_address`, `find_component` and the token tools. It holds your stories' props, docs and
+tokens, and anyone who reaches the site can read it, so it is written only when asked. From a folder, links are paths.
+
 `forgebook find` and `find_component` search names, the meta's `keywords`, titles and stories, with the usual synonyms
 (`modal` finds a `Dialog`): write `keywords: ["radio tile group"]` on `OptionCards` and it is found.
 `forgebook search` and `search_catalogue` read the rest, with the same ranking: a prop's name, a sentence of a docs page,
