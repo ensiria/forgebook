@@ -74,7 +74,10 @@ export const writeResults = async (
   );
   if (!isWriting) return undefined;
   const folder = existsSync(desktop) ? desktop : paths.home;
-  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
+  const now = new Date();
+  const two = (value: number): string => String(value).padStart(2, "0");
+  // the person's own clock: the file is theirs to find on the Desktop
+  const stamp = `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}`;
   const file = join(folder, `forgebook-bench-${state.profile ?? "risultati"}-${stamp}.zip`);
   writeFileSync(file, zipArchive(entries, new Date()));
   asker.log.success(`Risultati salvati in ${file}`);
