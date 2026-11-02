@@ -13,9 +13,11 @@
  *
  * @module
  */
-import { relative, resolve } from "node:path";
+import { relative } from "node:path";
 
-import type { HmrContext, ModuleNode, Plugin, UserConfig } from "vite";
+import type { HmrContext, ModuleNode, Plugin, ResolvedConfig } from "vite";
+
+import { isForgebookFile } from "./forgebookFiles.ts";
 
 /** A style sheet PostCSS runs on: not one imported as text or as an address. */
 const STYLE_SHEET = /\.css(?:$|\?)/;
@@ -104,17 +106,21 @@ export const projectPostcss = (): Plugin => {
   return {
     name: "forgebook:react-native-web-postcss",
     enforce: "pre",
-    config: (config: UserConfig): void => {
-      root = resolve(config.root ?? ".");
+    configResolved: (config: ResolvedConfig): void => {
+      root = config.root;
     },
     transform: {
       filter: { id: STYLE_SHEET },
       async handler(code: string, id: string): Promise<{ code: string; map: null } | null> {
-        if (NOT_COMPILED.test(id) || id.includes("/node_modules/")) return null;
-        postcss ??= loadPostcss(root);
+        const file = id.split("?", 1)[0] ?? id;
+        if (NOT_COMPILED.test(id) || file.includes("/node_modules/") || isForgebookFile(file)) return null;
+        // a configuration that failed to load is read again with the next style sheet, once it is mended
+        postcss ??= loadPostcss(root).catch((error: unknown) => {
+          postcss = undefined;
+          throw error;
+        });
         const project = await postcss;
         if (project === undefined) return null;
-        const file = id.split("?", 1)[0] ?? id;
         const result = await project.process(code, file);
         const { dirs, files } = dependenciesOf(result.messages);
         for (const dependency of files) this.addWatchFile(dependency);

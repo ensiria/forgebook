@@ -94,7 +94,8 @@ Fonts and icons work as in an Expo web app: `useFonts` and `@expo/vector-icons` 
 | `include`, `exclude` | `pluginReactOptions.include`, `.exclude` | The files React's plugin (Fast Refresh) and Babel apply to; the project's scripts outside `node_modules` by default |
 
 A project's `postcss.config` is run on its style sheets, as Expo does on the web (Forgebook otherwise compiles CSS
-with Lightning CSS alone); `postcss` is then the project's to install.
+with Lightning CSS alone); `postcss` is then the project's to install, and `jiti` or `tsx` too for a
+`postcss.config.ts`.
 
 ### Reanimated
 
@@ -118,6 +119,9 @@ naming `tailwindcss`, a style sheet with Tailwind's directives imported by the p
 ```ts
 reactNativeWeb({ jsxImportSource: "nativewind" });
 ```
+
+NativeWind's Babel preset (`nativewind/babel`), which Metro needs, is not needed here and is best left out: it
+compiles JSX itself, for Forgebook's own linked files too, and adds Reanimated's plugin a second time.
 
 ```tsx
 // forgebook.preview.tsx
@@ -150,7 +154,9 @@ export const Charged: Story<typeof BatteryBadge> = {
 For every story, the same goes in the preview's `beforeEach`. An Expo module of the app's own
 (`requireNativeModule("HarbourBattery")`) throws on the web unless the module has a web file, as Expo's modules
 do: `HarbourBatteryModule.web.ts`, exporting `registerWebModule(...)` of a class that answers in the browser, which
-the catalogue reads before the native file. A component whose web version differs more than a stand-in can cover
+the catalogue reads before the native file. On the dev server's Node side, where the agents read the stories,
+Expo's `requireNativeModule` gives an empty object rather than throwing, so a missing stand-in fails there at the
+first call. A component whose web version differs more than a stand-in can cover
 gets a `.web.tsx` file the same way.
 
 ## What does not work in a browser

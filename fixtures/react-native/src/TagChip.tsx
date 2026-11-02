@@ -25,7 +25,10 @@ export const TagChip = ({ label, isMain = false }: TagChipProps): ReactNode => (
     testID="tag-chip"
     className={`self-start rounded-full border-2 border-harbour px-3 py-1 ${isMain ? "bg-harbour" : "bg-foam dark:bg-slate-800"}`}
   >
-    <Text testID="tag-label" className={`text-sm font-semibold ${isMain ? "text-white" : "text-harbour"}`}>
+    <Text
+      testID="tag-label"
+      className={`text-sm font-semibold ${isMain ? "text-white" : "text-harbour dark:text-sky-200"}`}
+    >
       {label}
     </Text>
   </View>

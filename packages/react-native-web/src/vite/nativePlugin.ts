@@ -220,7 +220,9 @@ export const nativePlugins = (options: ReactNativeWebOptions): Plugin[] => {
       transform: {
         filter: { id: JSX_SCRIPT },
         handler: (code: string, id: string): Rolldown.TransformResult => {
-          if (jsxImportSource === undefined || JSX_PRAGMA.test(code) || !isProjectSource(id)) return null;
+          // a file run as a program starts with its interpreter's line, before which nothing may go
+          if (jsxImportSource === undefined || code.startsWith("#!") || JSX_PRAGMA.test(code)) return null;
+          if (!isProjectSource(id)) return null;
           return { code: `/** @jsxImportSource ${jsxImportSource} */ ${code}`, map: null };
         }
       }

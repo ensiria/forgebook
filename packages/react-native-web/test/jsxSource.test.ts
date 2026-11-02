@@ -74,3 +74,11 @@ describe("Babel", () => {
     expect(plugins).toHaveLength(1);
   });
 });
+
+describe("a JSX import source that is not a package's name", () => {
+  it("is refused when the adapter is made, since it is written into the project's files", async () => {
+    const { reactNativeWeb } = await import("../src/vite/reactNativeWeb.ts");
+    expect(() => reactNativeWeb({ jsxImportSource: "x */ alert(1) /*" })).toThrow(/takes a package's name/);
+    expect(() => reactNativeWeb({ jsxImportSource: "@acme/jsx" })).not.toThrow();
+  });
+});

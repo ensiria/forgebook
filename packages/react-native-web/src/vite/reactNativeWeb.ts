@@ -21,6 +21,9 @@ import { babelPlugins } from "./babelPlugins.ts";
 import { nativePlugins } from "./nativePlugin.ts";
 import { projectPostcss } from "./projectPostcss.ts";
 
+/** A package's name, scoped or not, as npm allows it. */
+const PACKAGE_NAME = /^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/;
+
 /** Which files an option applies to: a path pattern, a regular expression, or a list of them. */
 export type FilePattern = string | RegExp | readonly (string | RegExp)[];
 
@@ -31,7 +34,10 @@ export type BabelItem = string | readonly [name: string, options: Readonly<Recor
 export type BabelOptions = {
   /** The plugins (`"react-native-worklets/plugin"` for Reanimated 4, `"react-native-reanimated/plugin"` for 3). */
   readonly plugins?: readonly BabelItem[];
-  /** The presets (`"nativewind/babel"`). */
+  /**
+   * The presets. NativeWind needs none: its JSX runtime (`jsxImportSource`) is enough, and its Babel preset compiles
+   * JSX itself and adds Reanimated's plugin a second time.
+   */
   readonly presets?: readonly BabelItem[];
 };
 
@@ -85,8 +91,14 @@ const reactPlugin = async (options: ReactNativeWebOptions): Promise<PluginOption
  *
  * @param options - the other packages written for React Native, the JSX import source, Babel's plugins and presets.
  * @returns the adapter.
+ * @throws when `jsxImportSource` is not a package's name.
  */
 export const reactNativeWeb = (options: ReactNativeWebOptions = {}): FrameworkAdapter => {
+  // it is written into a comment of every project file and imported by name: a package's name, nothing else
+  if (options.jsxImportSource !== undefined && !PACKAGE_NAME.test(options.jsxImportSource))
+    throw new Error(
+      `reactNativeWeb({ jsxImportSource }) takes a package's name: ${options.jsxImportSource} is not one`
+    );
   const base = react();
   return {
     name: "react-native-web",

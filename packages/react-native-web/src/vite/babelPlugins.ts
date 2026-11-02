@@ -6,7 +6,9 @@
  * Metro runs Babel on every file; Vite runs none. Most of what Babel does for React Native, Vite does faster
  * (`nativePlugin.ts`), but a library's own Babel plugin rewrites code no other tool understands: Reanimated's turns a
  * function into a worklet. So the catalogue names the plugins it needs, as Storybook's React Native Web framework asks
- * (`pluginReactOptions.babel`), and they run on the project's own scripts by default. `@babel/core` and
+ * (`pluginReactOptions.babel`), and they run on the scripts outside `node_modules` by default: the project's, and
+Forgebook's own only where they are linked rather than installed (a monorepo that develops Forgebook), where a plugin
+meant for the project's code reads them too. `@babel/core` and
  * `@rolldown/plugin-babel` are optional peers: a catalogue without Babel installs neither.
  *
  * @module
