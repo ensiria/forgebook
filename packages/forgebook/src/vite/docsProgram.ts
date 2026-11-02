@@ -53,9 +53,16 @@ const keepProgram = (key: string, program: ts.Program): void => {
  */
 const outdated = new Set<string>();
 
+/**
+ * Each configuration as read, until a source changes. Reading one lists every file of its project, so reading it again
+ * for each story file is quadratic in the library's size: minutes of `readdir` on thousands of stories.
+ */
+const parsedConfigs = new Map<string, ts.ParsedCommandLine | undefined>();
+
 /** Marks every program as maybe holding an edited file: each is renewed on its next read. */
 export const markSourcesChanged = (): void => {
   for (const configPath of programs.keys()) outdated.add(configPath);
+  parsedConfigs.clear();
 };
 
 /**
@@ -132,6 +139,22 @@ const looseProgram = (file: string, options: ts.CompilerOptions): DocsProgram =>
 };
 
 /**
+ * A configuration as read, once until a source changes.
+ *
+ * @param configPath - the `tsconfig.json`.
+ */
+const parsedConfig = (configPath: string): ts.ParsedCommandLine | undefined => {
+  if (parsedConfigs.has(configPath)) return parsedConfigs.get(configPath);
+  const parsed = ts.getParsedCommandLineOfConfigFile(
+    configPath,
+    {},
+    { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined }
+  );
+  parsedConfigs.set(configPath, parsed);
+  return parsed;
+};
+
+/**
  * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, the one
  * the files no configuration holds share (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
  *
@@ -141,14 +164,7 @@ const looseProgram = (file: string, options: ts.CompilerOptions): DocsProgram =>
 export const programFor = (file: string): DocsProgram | string => {
   const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
   if (configPath === undefined) return looseProgram(file, FALLBACK_OPTIONS);
-  const parsed = ts.getParsedCommandLineOfConfigFile(
-    configPath,
-    {},
-    {
-      ...ts.sys,
-      onUnRecoverableConfigFileDiagnostic: () => undefined
-    }
-  );
+  const parsed = parsedConfig(configPath);
   if (parsed === undefined) return `${configPath} could not be read`;
   const program = keptProgram(configPath, parsed.fileNames, parsed.options);
   if (program.getSourceFile(file) === undefined) return looseProgram(file, parsed.options);

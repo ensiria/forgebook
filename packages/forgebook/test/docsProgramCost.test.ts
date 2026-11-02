@@ -1,5 +1,5 @@
 /**
- * How many TypeScript programs the docs keep: one per `tsconfig.json`, each holding what its package reaches, so a
+ * What the docs keep of a library: one TypeScript program per `tsconfig.json`, each holding what its package reaches, so a
  * monorepo must not keep them all.
  *
  * @module
@@ -8,9 +8,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import ts from "typescript-6";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { KEPT_PROGRAMS, programFor } from "../src/vite/docsProgram.ts";
+import { KEPT_PROGRAMS, markSourcesChanged, programFor } from "../src/vite/docsProgram.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "forgebook-docs-programs-"));
 
@@ -37,6 +38,19 @@ const program = (file: string): unknown => {
 afterAll(() => rmSync(ROOT, { recursive: true, force: true }));
 
 describe("programFor", () => {
+  it("reads a configuration's files once per change: once per story file is quadratic in a library's size", () => {
+    const file = packageFile("read-once");
+    const readDirectory = vi.spyOn(ts.sys, "readDirectory");
+    program(file);
+    program(file);
+    program(file);
+    expect(readDirectory).toHaveBeenCalledTimes(1);
+    markSourcesChanged();
+    program(file);
+    expect(readDirectory).toHaveBeenCalledTimes(2);
+    readDirectory.mockRestore();
+  });
+
   it("keeps the programs read last and lets the oldest go, whose memory a monorepo cannot afford", () => {
     const files = Array.from({ length: KEPT_PROGRAMS + 1 }, (_, index) => packageFile(`package-${index}`));
     const [first = "", second = "", ...others] = files;
