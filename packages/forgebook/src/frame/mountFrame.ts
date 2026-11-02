@@ -254,14 +254,19 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       if (controls !== undefined) answerShell(event.data, controls, storyId, catalogue.a11y, config.axeUrl);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them)
-    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => {
+    // (a language the source gives as a loader is loaded as it is shown)
+    const shownFor = async (
+      live: Pick<LiveView, "switches">
+    ): Promise<Pick<StoryDrawing, "texts" | "globals">> => {
       const switchesShown = { switches: { ...live.switches, ...fixed.switches } };
       return {
-        texts: shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
+        texts: await shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
         globals: { ...preview.globals, ...codeGlobalsOf(switchesShown, switches) }
       };
     };
-    const shown = shownFor(view);
+    const shown = await shownFor(view);
+    // the view the reader chose last: a language that loads slower than the next one chosen is never drawn
+    let shownCount = 0;
     const { texts } = shown;
     // what the panel shows of the story; told again when an edit of its file changes it
     const tellReady = (): void => {
@@ -302,7 +307,15 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         reportSize();
         document.documentElement.setAttribute(STATUS_ATTRIBUTE, "ready");
         tellReady();
-        changeShown = (live: LiveView): void => running.setShown(shownFor(live));
+        changeShown = (live: LiveView): void => {
+          shownCount += 1;
+          const count = shownCount;
+          shownFor(live)
+            .then((next) => {
+              if (count === shownCount) running.setShown(next);
+            })
+            .catch((error: unknown) => reportError(error instanceof Error ? error.message : String(error)));
+        };
       },
       onError: reportError,
       onTrace: (trace: PlayTrace): void => {

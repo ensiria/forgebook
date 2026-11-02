@@ -13,6 +13,7 @@
  * @module
  */
 import type { StoryDesign, StoryGroup } from "./csf.ts";
+import type { StoryTextTable } from "./texts.ts";
 
 /** The props the panel can set for a story: every adjustable one, or only the named ones (none for fixed examples). */
 export type StoryControlsSetting = "all" | readonly string[];
@@ -94,6 +95,9 @@ export type StorySheets = {
   /** Loaded with Styles › Restyled, instead of the theme: a consumer's own look through the public hooks. */
   readonly restyled: readonly string[];
 };
+
+/** A language's texts in a source: the table, keyed by text key, or a loader of the module whose default it is. */
+export type StoryTexts = StoryTextTable | (() => Promise<{ readonly default: StoryTextTable }>);
 
 /**
  * A language a catalogue offers (the View menu's Language row): its id and name, and whether its texts are a
@@ -255,9 +259,10 @@ export type StorySource = {
   /**
    * The texts inside the stories, by language id (the ids of the catalogue's languages; `en` the one every key is in):
    * the package's `stories/locales/<id>.json`. A story reads them with `useStoryText()` or `context.text()`; none by
-   * default.
+   * default. Each language is its table, or a loader of it (`en: () => import("./locales/en.json")`): a loader keeps
+   * the texts out of the catalogue's page, which never shows them, and a frame loads only the languages it draws in.
    */
-  readonly texts?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  readonly texts?: Readonly<Record<string, StoryTexts>>;
   /**
    * What the source needs before any of its stories renders (a polyfill to load), awaited by the frame and by the
    * server tests; nothing by default.

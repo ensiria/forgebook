@@ -25,7 +25,7 @@ import {
   readPreview,
   readStory
 } from "forgebook/story-module";
-import { BASE_LANGUAGE, withStoryTexts } from "forgebook/story-texts";
+import { BASE_LANGUAGE, textTable, withStoryTexts } from "forgebook/story-texts";
 import { storyTree, testedStoryLocations } from "forgebook/story-tree";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -118,7 +118,7 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
         it.each(passes)(`${story.name} renders on the server ($name)`, async (pass) => {
           const loaded = await loadedStory(source, component.file, story.exportName, preview);
           // the stories' own texts: what the catalogue shows when no language is chosen
-          const texts = source.texts?.[BASE_LANGUAGE] ?? {};
+          const texts = await textTable(source.texts?.[BASE_LANGUAGE]);
           const args = withStoryTexts(loaded.args, storyTextOf(texts));
           // a Live story renders at its start, as the frame's tests picture it
           const clock = heldFrameClock(loaded.clockStart ?? 0);
