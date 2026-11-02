@@ -27,6 +27,7 @@ import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
+import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
@@ -325,7 +326,8 @@ await defineCommands({
           env: "FORGEBOOK_URL",
           valueName: "address",
           description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
-        }
+        },
+        ...SEMANTIC_OPTIONS
       },
       examples: [
         {
@@ -354,7 +356,7 @@ await defineCommands({
               ask: client.ask,
               writeNew: (file, exportName) =>
                 newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
-              check: (input) => runStoryCheck(config, options.url, input),
+              check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
               shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
               checkPage: (address) => runPageCheck(config, [address])
             })

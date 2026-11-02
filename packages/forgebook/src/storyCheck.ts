@@ -54,6 +54,26 @@ export type StoryCheckRequest = {
   readonly views: readonly string[];
   /** Check every variant the catalogue's browser tests check instead of the views given. */
   readonly isAllVariants: boolean;
+  /** The model that judges what axe cannot see; none leaves the pages on this machine. */
+  readonly semantic?: SemanticModel;
+};
+
+/** A model to judge stories with, as the user configured it. */
+export type SemanticModel = {
+  /** The address of an OpenAI-compatible API (`https://api.example.com/v1`). */
+  readonly url: string;
+  /** The model's name. */
+  readonly name: string;
+  /** Its key, when it needs one; only ever sent to `url`. */
+  readonly key?: string;
+};
+
+/** What a model judged wrong: an opinion to read, never a fact, so it does not fail a check. */
+export type StoryJudgement = {
+  /** The criterion it names (`WCAG 2.4.6`); empty when it named none. */
+  readonly criterion: string;
+  /** What it found. */
+  readonly message: string;
 };
 
 /** One story in one view, and its problems. */
@@ -66,6 +86,8 @@ export type StoryCheckResult = {
   readonly frame: string;
   /** The problems; none when it passes. */
   readonly problems: readonly StoryProblem[];
+  /** What the model judged, when one was asked; a text says why it could not. */
+  readonly judgements?: readonly StoryJudgement[] | string;
 };
 
 /** What a check found. */
