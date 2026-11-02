@@ -24,6 +24,7 @@ const CONFIG: ResolvedConfig = {
   previews: ["/catalogue/forgebook.preview.tsx"],
   head: '<link rel="stylesheet" href="/fonts.css" />',
   shell: { themeCss: "", styleSheets: [], problems: [] },
+  tokens: [],
   watch: [],
   lists: {},
   hasPlayTools: false

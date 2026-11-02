@@ -12,7 +12,7 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
 - `packages/react` (`@forgebook/react`), `packages/story-format` (`@forgebook/story-format`, no dependencies),
   `packages/testing` (`@forgebook/testing`).
 - `fixtures/`: the kit, the stories written the Storybook way, and the catalogue the shell's browser tests run on.
-- `tools/`: the repository's own commands (`package-build`, `check-commits`).
+- `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
 
 ## Before you say a change is done
 

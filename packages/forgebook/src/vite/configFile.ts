@@ -38,6 +38,14 @@ export type ResolvedShell = {
   readonly problems: readonly string[];
 };
 
+/** A tokens file, its path absolute. */
+export type ResolvedTokensFile = {
+  /** The file's absolute path. */
+  readonly path: string;
+  /** The theme it belongs to; none for the base. */
+  readonly mode: string | undefined;
+};
+
 /** A configuration ready for the pages: its folder, its presets merged, its paths absolute. */
 export type ResolvedConfig = {
   /** The folder the configuration file is in: Vite's root. */
@@ -64,6 +72,8 @@ export type ResolvedConfig = {
   readonly head: string;
   /** The shell's look, the presets' and the catalogue's merged. */
   readonly shell: ResolvedShell;
+  /** The tokens files, absolute, the base first. */
+  readonly tokens: readonly ResolvedTokensFile[];
   /** The folders the dev server watches for new story files, absolute. */
   readonly watch: readonly string[];
   /** The lists (widths, backgrounds, story groups…), the presets' and the catalogue's merged. */
@@ -257,6 +267,11 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
       ],
       problems: shellThemeProblems(theme)
     },
+    tokens: (config.tokens ?? []).map((each) =>
+      typeof each === "string"
+        ? { path: absolute(each), mode: undefined }
+        : { path: absolute(each.file), mode: each.mode }
+    ),
     watch: (config.watch ?? []).map(absolute),
     lists: mergedLists([...presets, config]),
     hasPlayTools: hasPlayToolsIn(dir)

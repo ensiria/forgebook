@@ -34,6 +34,9 @@ export type ForgebookPreset = CatalogueLists & {
   readonly shell?: ShellOptions;
 };
 
+/** A tokens file: its path from the configuration's folder, with its theme when it is a theme's. */
+export type TokensFile = string | { readonly file: string; readonly mode: string };
+
 /** A catalogue's configuration: the lists of `CatalogueLists` (widths, backgrounds, story groups…) besides these. */
 export type ForgebookConfig = CatalogueLists & {
   /** The framework its stories are written for (`react()` of `@forgebook/react/vite`). */
@@ -57,6 +60,11 @@ export type ForgebookConfig = CatalogueLists & {
   readonly languages?: readonly StoryLanguage[];
   /** The shell's look: a theme of colours, fonts and corners, and an escape hatch. */
   readonly shell?: ShellOptions;
+  /**
+   * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of
+   * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from.
+   */
+  readonly tokens?: readonly TokensFile[];
   /** Its preview's path from the configuration's folder; `forgebook.preview.ts` (or `.tsx`) beside it when there. */
   readonly preview?: string;
   /** Tags for every frame's `<head>` (a font's link); none by default. */
