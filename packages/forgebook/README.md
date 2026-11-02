@@ -559,6 +559,21 @@ where `forgebook dev` runs.
 `get_story` gives a story's design too (`design`, [above](#design-links)), so an agent can read the node with a Figma tool
 and compare it with `story_shot`.
 
+#### Inline previews
+
+A client that renders [MCP Apps](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
+gets one more tool, `story_preview`, and the page `ui://forgebook/story-preview` to show its answer in: the story, live,
+inside the conversation, with a button that opens it in the catalogue. Any other client gets the answers it always got:
+the tool is not listed, and `story_shot` is how it sees a story. Nothing runs until the tool is called: a client may read
+the page ahead of time, and that starts no server and loads no story. When no `forgebook dev` runs, one is started for the
+first preview and kept for the session.
+
+The story comes from a local server, and the host decides whether it gets in. A browser refuses a public page's frame to
+a local address (Chromium's Local Network Access), so a host whose app runs on a public origin, as a web client's does,
+shows the story's picture instead: the page asks the host to run `story_shot`, and needs Playwright as that tool does. The
+page's words are replaceable as the shell's are (`strings`): `previewOpen`, `previewWaiting`, `previewLoading`,
+`previewTakingPicture`, `previewUnavailable`, `previewCancelled`, `previewPicture`, `previewFrame`.
+
 A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
 `@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
 The most common mistake of an agent working on a design system is a colour or a size written by hand. Name your

@@ -18,12 +18,13 @@ import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/v
 import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
 import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
-import { catalogueClient } from "./agentClient.ts";
+import { catalogueClient, previewServer } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { pluginsText, storiesText, storyText } from "./agentText.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
+import { previewResource } from "./mcpPreview.ts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { pagesCommands } from "./pagesCommands.mts";
@@ -364,9 +365,11 @@ await defineCommands({
         log.debug(
           client.runningAt === undefined ? "Answering from a server of its own" : `Asking ${client.runningAt}`
         );
+        const version = readPackageVersion(import.meta.dirname);
+        const preview = previewServer(config, client.runningAt);
         const server = {
-          info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
-          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides.`,
+          info: { name: "forgebook", version },
+          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
           tools: catalogueTools({
             ask: client.ask,
             writeNew: (file, exportName) =>
@@ -374,8 +377,16 @@ await defineCommands({
             check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
             shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
             checkPage: (address) => runPageCheck(config, [address]),
-            plugins: pluginsDocument(config.plugins)
-          })
+            plugins: pluginsDocument(config.plugins),
+            servePreview: preview.serve
+          }),
+          apps: [
+            previewResource({
+              origin: preview.origin,
+              strings: config.lists.strings ?? {},
+              version
+            })
+          ]
         };
         let session = NEW_SESSION;
         // stdout carries only the protocol's messages, one per line, answered in the order they came
@@ -385,6 +396,7 @@ await defineCommands({
           session = step.session;
           if (step.reply !== undefined) io.stdout.write(`${step.reply}\n`);
         }
+        await preview.close();
         await client.close();
       }
     }),
