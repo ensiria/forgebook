@@ -35,6 +35,7 @@ import {
   stringListOf,
   unwrapped
 } from "./indexFields.ts";
+import { playField } from "./storyPlay.ts";
 
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
@@ -462,7 +463,8 @@ export const indexStoryFile = (
     const fields = storyFields(story.fields, metaTags);
     if (fields instanceof Error) return `${file}: story ${exportName}: ${fields.message}`;
     const description = leadingSentence(text, comments, start) ?? docsDescription(story.fields, "story");
-    stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }) });
+    const played = playField(local, top, meta("play"));
+    stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }), ...played });
   }
   const metaFields = metaFieldsOf(meta);
   if (metaFields instanceof Error) return `${file}: the meta's ${metaFields.message}`;

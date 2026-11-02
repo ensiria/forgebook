@@ -35,7 +35,8 @@ const storyOf = (id: string, isLogic: boolean): TreeStory => ({
   isLogic,
   height: undefined,
   design: undefined,
-  tags: []
+  tags: [],
+  hasPlay: false
 });
 
 /**

@@ -15,7 +15,7 @@ import { catalogueMarkdown } from "../bin/forgebook-docs/catalogueMarkdown.ts";
 import { llmsText } from "../bin/forgebook-docs/llmsText.ts";
 import { type DocBlock, isDocPage, linkedHtml } from "../src/docPages.ts";
 import { NO_PREVIEW } from "../src/frame/storyModule.ts";
-import { findPage, pageGroups } from "../src/pageTree.ts";
+import { findPage, pageGroups, pagesAbout } from "../src/pageTree.ts";
 import { foundPages, searchWords } from "../src/shell/treeSearch.ts";
 import { sourcePages } from "../src/sourceFiles.ts";
 import { storyTree } from "../src/storyTree.ts";
@@ -176,6 +176,19 @@ describe("the page tree", () => {
     const tree = storyTree([sourceWith({ "./a.md": page("Start") })]);
     expect(findPage(tree, "kit:start")?.page.file).toBe("./a.md");
     expect(findPage(tree, "kit:gone")).toBeUndefined();
+  });
+
+  it("finds the pages that show a component, by a story or by its table", () => {
+    const tree = storyTree([
+      sourceWith({
+        "./a.md": { ...page("Stories"), stories: ["kit:select--overview"] },
+        "./b.md": { ...page("Table"), components: ["kit:select"] },
+        "./c.md": page("Other")
+      })
+    ]);
+    const shown = pagesAbout(tree, "kit:select", ["kit:select--overview"]);
+    expect(shown.map((each) => each.name)).toEqual(["Stories", "Table"]);
+    expect(pagesAbout(tree, "kit:badge", [])).toEqual([]);
   });
 
   it("merges a source's groups of pages", () => {

@@ -54,9 +54,26 @@ describe("storyLinks", () => {
   it("opens the story's page and its frame in the view asked for, the shell's own parameters off the frame", () => {
     expect(storyLinks(PAGES, "kit:actions-button--primary", "theme=dark&lang=it&panel=props")).toEqual({
       address: "http://localhost:5173/?theme=dark&lang=it&panel=props&story=kit%3Aactions-button--primary",
+      component: "http://localhost:5173/?theme=dark&lang=it&panel=props&component=kit%3Aactions-button",
       frame: "http://localhost:5173/frame.html?theme=dark&lang=it&story=kit%3Aactions-button--primary",
       embed: "http://localhost:5173/?embed&theme=dark&lang=it&story=kit%3Aactions-button--primary"
     });
+  });
+});
+
+describe("a source with `--` in its id", () => {
+  it("still names the component's page", () => {
+    expect(storyLinks(PAGES, "my--lib:button--primary", "").component).toBe(
+      "http://localhost:5173/?component=my--lib%3Abutton"
+    );
+  });
+});
+
+describe("an audience in the view", () => {
+  it("opens the component's page for them, and leaves the story's frame alone", () => {
+    const links = storyLinks(PAGES, "kit:actions-button--primary", "audience=designer");
+    expect(links.component).toBe("http://localhost:5173/?audience=designer&component=kit%3Aactions-button");
+    expect(links.frame).toBe("http://localhost:5173/frame.html?story=kit%3Aactions-button--primary");
   });
 });
 
@@ -123,6 +140,9 @@ describe("storyDocument", () => {
       "Its component's docs failed: no program"
     ]);
     expect(document.story.links.frame).toContain("theme=dark");
+    expect(document.story.links.component).toContain("theme=dark");
+    expect(document.story.links.component).toContain("component=");
+    expect(document.story.links.component).not.toContain("--");
   });
 });
 

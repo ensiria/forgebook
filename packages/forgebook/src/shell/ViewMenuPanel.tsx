@@ -22,6 +22,7 @@ import {
   useState
 } from "react";
 
+import type { AudienceId } from "../audiences.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { PlacedControl } from "../toolbarLayout.ts";
 import { DEFAULT_VIEW, hasViewChanges, type ViewState } from "../viewState.ts";
@@ -48,11 +49,13 @@ const SHIFT_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
  * @param view - the view.
  * @param switches - the catalogue's switches.
  * @param ids - the controls' ids.
+ * @param defaultAudience - the audience the catalogue starts with.
  */
 const withDefaults = (
   view: ViewState,
   switches: readonly ViewSwitch[],
-  ids: readonly string[]
+  ids: readonly string[],
+  defaultAudience: AudienceId
 ): ViewState => ({
   ...view,
   switches: {
@@ -63,7 +66,8 @@ const withDefaults = (
   },
   backdrop: ids.includes("backdrop") ? DEFAULT_VIEW.backdrop : view.backdrop,
   sheets: ids.includes("sheets") ? DEFAULT_VIEW.sheets : view.sheets,
-  text: ids.includes("text") ? DEFAULT_VIEW.text : view.text
+  text: ids.includes("text") ? DEFAULT_VIEW.text : view.text,
+  audience: ids.includes("audience") ? defaultAudience : view.audience
 });
 
 /** A row being dragged: which, where the pointer and the row were when it was grabbed, and where the pointer is. */
@@ -209,7 +213,8 @@ export const ViewMenuPanel = ({
   panelId,
   ...context
 }: ViewMenuPanelProps): ReactNode => {
-  const { switches } = useCatalogue();
+  const catalogue = useCatalogue();
+  const { switches } = catalogue;
   const listRef = useRef<HTMLOListElement>(null);
   const drag = useRef<Drag | undefined>(undefined);
   const [draggedId, setDraggedId] = useState<string | undefined>(undefined);
@@ -337,7 +342,7 @@ export const ViewMenuPanel = ({
               count={shown.length}
               isDragged={each.control.id === draggedId}
               isMoved={movedIds.includes(each.control.id)}
-              isChanged={hasViewChanges(ownView, switches, [each.control.id])}
+              isChanged={hasViewChanges(ownView, switches, [each.control.id], catalogue.audience)}
               layout={layout}
               hintId={hintId}
               onGrab={grab}
@@ -371,7 +376,9 @@ export const ViewMenuPanel = ({
         <button
           type="button"
           className="forgebook-text-button"
-          onClick={(): void => context.onViewChange(withDefaults(context.view, switches, ids))}
+          onClick={(): void =>
+                context.onViewChange(withDefaults(context.view, switches, ids, catalogue.audience))
+              }
         >
           {STRINGS.resetView}
         </button>

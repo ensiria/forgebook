@@ -9,6 +9,7 @@
  *
  * @module
  */
+
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, resolve } from "node:path";
@@ -16,6 +17,7 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
+import { AUDIENCE_IDS } from "../audiences.ts";
 import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import {
@@ -163,6 +165,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
   ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar }),
   ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn }),
+  ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance })
 });
 
@@ -289,6 +292,13 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     ...presets.map((preset) => preset.shell?.theme ?? {}),
     config.shell?.theme ?? {}
   ]);
+  const lists = mergedLists([...presets, config]);
+  // the page reads it as one of the ids, and a configuration is written by JavaScript too, which no type stops
+  if (lists.audience !== undefined && !AUDIENCE_IDS.includes(lists.audience)) {
+    throw new Error(
+      `${resolve(dir, "forgebook.config")}: the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`
+    );
+  }
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
   const ownPreview =
@@ -327,7 +337,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
         : { path: absolute(each.file), mode: each.mode }
     ),
     watch: (config.watch ?? []).map(absolute),
-    lists: mergedLists([...presets, config]),
+    lists,
     hasPlayTools: hasPlayToolsIn(dir),
     plugins
   };

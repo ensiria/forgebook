@@ -12,6 +12,7 @@
  * @module
  */
 
+import { type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
 import type { CatalogueView } from "./namedViews.ts";
@@ -42,10 +43,10 @@ export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
 
 /**
  * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the background, the
- * style sheets, the text size and the stage's width. Their ids are the address's own parameters, so no switch takes
- * one.
+ * style sheets, the text size, the stage's width and who a component's page is read by. Their ids are the address's
+ * own parameters, so no switch takes one.
  */
-export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width"] as const;
+export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width", "audience"] as const;
 
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
@@ -112,6 +113,12 @@ export type CatalogueLists = {
    */
   readonly usedIn?: boolean;
   /**
+   * Who a component's page is read by before a person picks: `designer`, `coder` or `tester` reorder and filter the
+   * page for them, and `everyone` (the default) draws all of it. The address's `audience` wins, so a link keeps its view;
+   * with `controls: { audience: false }` the catalogue's choice is the only one.
+   */
+  readonly audience?: AudienceId;
+  /**
    * The shell's appearance before a reader picks one; `story` follows the colour scheme of the story shown, for a
    * library that wants one page with its stories: `system` (the default) follows the system's light or dark. A
    * reader's choice, kept in their browser, wins over it; the frames follow the view's switches, never this.
@@ -172,6 +179,8 @@ export type CatalogueSettings = {
   readonly hasUsedIn: boolean;
   /** Whether the story bar offers the Embed button. */
   readonly hasEmbed: boolean;
+  /** Who a component's page is read by when the address does not say. */
+  readonly audience: AudienceId;
   /** The shell's appearance before a reader picks one. */
   readonly appearance: Appearance;
   /** The keys that cycle the controls, by control id. */
@@ -289,6 +298,7 @@ export const catalogueSettings = (
   lists: CatalogueLists = {},
   pluginTabs: readonly string[] = []
 ): CatalogueSettings => {
+  const { audience = DEFAULT_AUDIENCE } = lists;
   const builtIn = lists.backgrounds?.builtIn;
   const offered =
     builtIn === false
@@ -324,6 +334,7 @@ export const catalogueSettings = (
     toolbar,
     hasUsedIn: lists.usedIn !== false,
     hasEmbed: controlsOff.embed !== false,
+    audience,
     appearance: lists.appearance ?? "system",
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
     views: catalogueViews(switches, lists.views)

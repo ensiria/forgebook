@@ -86,7 +86,8 @@ const RESERVED_IDS = [
   "tools",
   "args",
   "matrix",
-  "clock"
+  "clock",
+  "audience"
 ];
 
 /**

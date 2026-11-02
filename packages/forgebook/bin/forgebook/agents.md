@@ -61,6 +61,19 @@ Guides live in Markdown files, listed in the catalogue's Docs section. Read one 
 fence named `story <id>` for a live story and `props <component id>` for an API table, both at the page's top level, and
 links to other pages by their file (`./colours.md#brand`). A page never holds a story's code: show the story.
 
+### Links for a person
+
+Every story's `links` hold its page (`address`), its frame (`frame`) and its component's page (`component`). A component's
+page can be drawn for who reads it: add an audience to the view, and send that link. `designer` shows usage guidance first
+and no code, `coder` the API first with the code open, `tester` what the stories cover and their accessibility check:
+
+```sh
+npx forgebook story <id> --view audience=designer --json   # links.component opens the page for a designer
+```
+
+Each story also says whether a `play` function acts on it (`hasPlay`), and `tags` holds `!test` when the generated tests
+leave it out.
+
 ### Commands
 
 | Command | What it is for |

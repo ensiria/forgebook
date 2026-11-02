@@ -32,6 +32,19 @@ const FALLBACK_HEIGHT = 160;
 /** The demo's height before its story reports its own, in CSS px: the demo is the page's first, larger frame. */
 const DEMO_FALLBACK_HEIGHT = 280;
 
+/** The least height of a demo an audience draws larger, in CSS px: its room, never a scale, so its sizes stay true. */
+const LARGE_DEMO_HEIGHT = 360;
+
+/** How a page's audience draws its examples. */
+export type ExampleReading = {
+  /** Whether the examples offer their code. */
+  readonly hasCode: boolean;
+  /** Whether their code starts open. */
+  readonly isCodeOpen: boolean;
+  /** Whether the demo is drawn larger, with more room around it. */
+  readonly isDemoLarge: boolean;
+};
+
 /** What every example of the page shares: the frames' address, view and reports, the code, how to open a story. */
 export type ExampleContext = {
   /** The component. */
@@ -66,10 +79,12 @@ export type ExampleContext = {
   readonly heightOf: (storyId: string) => number | undefined;
   /** The colour the stories' page has, which each box waits on. */
   readonly background: string | undefined;
+  /** How the page's audience draws its examples. */
+  readonly reading: ExampleReading;
 };
 
 /** A link to a story's own page, opened in place unless the user asks for another tab. */
-const StoryLink = ({
+export const StoryLink = ({
   story,
   hrefOf,
   onOpen,
@@ -285,6 +300,40 @@ const ExampleBar = ({
 };
 
 /**
+ * An example's code: what it shows, whether its audience offers it, and whether it is open: the audience's default until
+ * the person says otherwise, so changing audience opens or closes what they left alone.
+ *
+ * @param story - the story.
+ * @param context - what every example shares.
+ */
+const useExampleCode = (
+  story: TreeStory,
+  context: Pick<ExampleContext, "code" | "componentName" | "argsOf" | "reading">
+): {
+  readonly source: StoryCodeSource | undefined;
+  readonly hasCode: boolean;
+  readonly isCodeShown: boolean;
+  readonly setIsCodeShown: (isShown: boolean) => void;
+} => {
+  const [ownCodeShown, setIsCodeShown] = useState<boolean | undefined>(undefined);
+  const source: StoryCodeSource | undefined =
+    context.code.status === "ready"
+      ? {
+          code: context.code.value,
+          exportName: story.exportName,
+          componentName: context.componentName,
+          args: context.argsOf(story.id)
+        }
+      : undefined;
+  return {
+    source,
+    hasCode: source !== undefined && context.reading.hasCode,
+    isCodeShown: ownCodeShown ?? context.reading.isCodeOpen,
+    setIsCodeShown
+  };
+};
+
+/**
  * One example: its title and description (the demo has none: it opens the page), its story in a frame, and a bar
  * that shows its code and opens the story on its own page.
  *
@@ -303,7 +352,8 @@ export const Example = ({
   readonly isMounted: boolean;
   readonly observe?: (element: HTMLElement | null) => void;
 }): ReactNode => {
-  const [isCodeShown, setIsCodeShown] = useState(false);
+  const { source, hasCode, isCodeShown, setIsCodeShown } = useExampleCode(story, context);
+  const leastHeight = isDemo && context.reading.isDemoLarge ? LARGE_DEMO_HEIGHT : 0;
   const codeId = useId();
   const full = useFullPage();
   const { touch } = useCatalogue();
@@ -317,17 +367,9 @@ export const Example = ({
   // scene needs, which its frame has from the start
   const fallbackHeight = Math.max(
     story.height ?? 0,
-    context.heightOf(story.id) ?? (isDemo ? DEMO_FALLBACK_HEIGHT : FALLBACK_HEIGHT)
+    context.heightOf(story.id) ?? (isDemo ? DEMO_FALLBACK_HEIGHT : FALLBACK_HEIGHT),
+    leastHeight
   );
-  const source: StoryCodeSource | undefined =
-    context.code.status === "ready"
-      ? {
-          code: context.code.value,
-          exportName: story.exportName,
-          componentName: context.componentName,
-          args: context.argsOf(story.id)
-        }
-      : undefined;
   return (
     <article
       ref={observe}
@@ -359,7 +401,7 @@ export const Example = ({
                 settled={context.settled}
                 fallbackHeight={fallbackHeight}
                 // over the page, the story fills the room it has
-                sceneHeight={sceneHeightOf(story, full.stageHeight)}
+                sceneHeight={Math.max(sceneHeightOf(story, full.stageHeight) ?? 0, leastHeight)}
               />
             ) : (
               // the frame's room until its turn comes, so the page does not jump when it loads
@@ -370,14 +412,16 @@ export const Example = ({
         <ExampleBar
           story={story}
           context={context}
-          hasCode={source !== undefined}
+          hasCode={hasCode}
           isCodeShown={isCodeShown}
           onCodeShownChange={setIsCodeShown}
           codeId={codeId}
           full={full}
           boxWidth={boxWidth}
         />
-        {source === undefined ? null : <ExampleCode id={codeId} source={source} isShown={isCodeShown} />}
+        {source === undefined || !hasCode ? null : (
+          <ExampleCode id={codeId} source={source} isShown={isCodeShown} />
+        )}
       </div>
     </article>
   );

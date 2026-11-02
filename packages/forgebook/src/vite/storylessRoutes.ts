@@ -106,6 +106,22 @@ const tokenSummary = (token: DesignToken): AgentTokenSummary => {
   };
 };
 
+/**
+ * The tokens' module, for a designer's page: what a list gives, and what could not be read.
+ *
+ * @param config - the catalogue's configuration.
+ * @param watch - adds a file whose edit renews the module.
+ */
+export const tokensModule = async (
+  config: ResolvedConfig,
+  watch: (file: string) => void
+): Promise<{ code: string; moduleType: "js" }> => {
+  for (const { path } of config.tokens) watch(path);
+  const { tokens, problems } = await catalogueTokens(config);
+  const value = { tokens: tokens.map(tokenSummary), problems };
+  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
+};
+
 /** The tokens, of a category when one is asked for, up to a limit, with how many there are. */
 const tokensAnswer = async (
   config: ResolvedConfig,

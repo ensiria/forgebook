@@ -24,6 +24,34 @@ describe("indexStoryFile", () => {
     });
   });
 
+  it("notes a story with a play function, its own or the meta's", () => {
+    const own = `export default { title: "A" }; export const X = { play: async () => undefined }; export const Y = {};`;
+    expect(indexStoryFile("A.stories.tsx", own)).toEqual({
+      title: "A",
+      stories: [{ exportName: "X", hasPlay: true }, { exportName: "Y" }]
+    });
+    const spread = `export default { title: "A" }; export const X = { play: async () => undefined };
+      export const Y = { ...X, args: {} }; export const Z = { ...X, play: undefined }; export const W = {};
+      W.play = async () => undefined;`;
+    expect(indexStoryFile("A.stories.tsx", spread)).toMatchObject({
+      stories: [
+        { exportName: "X", hasPlay: true },
+        { exportName: "Y", hasPlay: true },
+        { exportName: "Z" },
+        { exportName: "W", hasPlay: true }
+      ]
+    });
+    const looped = `export default { title: "A" }; export const X = { ...Y }; export const Y = { ...X };`;
+    expect(indexStoryFile("A.stories.tsx", looped)).toEqual({
+      title: "A",
+      stories: [{ exportName: "X" }, { exportName: "Y" }]
+    });
+    const shared = `export default { title: "A", play: async () => undefined }; export const X = {};`;
+    expect(indexStoryFile("A.stories.tsx", shared)).toMatchObject({
+      stories: [{ exportName: "X", hasPlay: true }]
+    });
+  });
+
   it("reads a meta held in a constant of the file (`export default meta`)", () => {
     const text = "const meta = { title: 'A/B' } satisfies Meta; export default meta; export const X = {};";
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({ title: "A/B", stories: [{ exportName: "X" }] });

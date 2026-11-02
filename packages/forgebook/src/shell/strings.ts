@@ -3,7 +3,7 @@
  * its words together keeps them consistent and ready for a translation.
  *
  * @remarks
- * A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
+ * Only `audienceTexts.ts` lives elsewhere, to stay out of the first load. A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
  * its configuration): the shell applies the replacements once, before it draws (`configureStrings`), as a translation
  * is set up, so every module keeps reading `STRINGS`. A text that takes values (`allStories(count)`) stays the shell's.
  *
@@ -191,6 +191,9 @@ const shellStrings = {
   backToPlace: "Back to its place",
   backToPlaceNamed: (name: string): string => `Put ${name} back in its place`,
   examples: "Examples",
+  audience: "Reading for",
+  audiences: { everyone: "Everyone", designer: "Designers", coder: "Coders", tester: "Testers" },
+  audienceElsewhere: "Changes a component's page",
   pageError: "The component's page could not be read",
   storyLabel: "Story",
   frameTitle: (component: string, story: string): string => `${component}: ${story}`,
@@ -250,6 +253,9 @@ export type ShellStrings = typeof shellStrings;
 /** The shell's texts, as shown. */
 export const STRINGS: ShellStrings = shellStrings;
 
+/** The catalogue's replacements, for the texts that load after it set them. */
+let catalogueReplacements: Readonly<Record<string, string>> = {};
+
 /**
  * Whether a value is a group of texts (`tabs`), whose members a path can name.
  *
@@ -283,5 +289,23 @@ const replaceText = (texts: Record<string, unknown>, path: readonly string[], te
  * @param replacements - the new texts, by their path (`tabs.props`).
  */
 export const configureStrings = (replacements: Readonly<Record<string, string>>): void => {
+  catalogueReplacements = replacements;
   for (const [path, text] of Object.entries(replacements)) replaceText(STRINGS, path.split("."), text);
+};
+
+/**
+ * Texts kept out of the first load, with the catalogue's replacements applied as those of `STRINGS` are.
+ *
+ * @param group - their name among the texts (`audienceTexts`): a replacement's path starts with it.
+ * @param texts - the texts.
+ * @returns the same texts, changed in place.
+ */
+export const textsOfGroup = <TTexts extends Record<string, unknown>>(
+  group: string,
+  texts: TTexts
+): TTexts => {
+  for (const [path, text] of Object.entries(catalogueReplacements)) {
+    replaceText({ [group]: texts }, path.split("."), text);
+  }
+  return texts;
 };

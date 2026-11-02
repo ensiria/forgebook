@@ -49,6 +49,8 @@ export type TreeStory = {
   readonly design: FigmaLink | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
+  /** Whether a `play` function acts on it. */
+  readonly hasPlay: boolean;
 };
 
 /** One component (one story file). */
@@ -392,7 +394,8 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
         story.design === undefined
           ? design
           : designLink(story.design, `${where}: story ${story.exportName}`, problems),
-      tags: story.tags ?? []
+      tags: story.tags ?? [],
+      hasPlay: story.hasPlay === true
     }));
     groupAt(families, family, group).components.push({
       name,

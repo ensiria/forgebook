@@ -56,7 +56,8 @@ import {
   pageHtml,
   STORIES_SOURCE_FILE,
   shellEntry,
-  storiesSourceModule
+  storiesSourceModule,
+  TOKENS_MODULE
 } from "./pages.ts";
 import { pluginFences } from "./pluginConfig.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
@@ -69,6 +70,7 @@ import {
   storyFilesModule,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
+import { tokensModule } from "./storylessRoutes.ts";
 import { storyReach } from "./storyReach.ts";
 import { joinedUsage } from "./usageModule.ts";
 
@@ -243,6 +245,7 @@ const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
  */
 const virtualId = (source: string): string | undefined => {
   if (source === CONFIG_MODULE) return CONFIG_ID;
+  if (source === TOKENS_MODULE) return TOKENS_ID;
   return source.startsWith(USAGE_PREFIX) ? `\0${source}` : undefined;
 };
 
@@ -292,6 +295,9 @@ const usageModule = async (
 
 /** The resolved id of the configuration's data module. */
 const CONFIG_ID = `\0${CONFIG_MODULE}`;
+
+/** The resolved id of the design tokens' module. */
+const TOKENS_ID = `\0${TOKENS_MODULE}`;
 
 /**
  * The page a request names, when it names one: `/` is the shell's.
@@ -446,6 +452,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     id: string,
     watch: (file: string) => void
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
+    if (id === TOKENS_ID && config !== undefined) return tokensModule(config, watch);
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
       return usageModule(id, watch, extractor().usage, isServing());

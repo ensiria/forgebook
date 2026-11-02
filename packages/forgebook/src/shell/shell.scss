@@ -2013,6 +2013,18 @@
     font: $text-body;
   }
 
+  // a page drawn for one audience says so, quietly, above what it shows
+  .forgebook-audience-note {
+    margin: 0;
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  // a designer's page gives the demo the room a wider column has; the frames' width follows it live
+  .forgebook-doc[data-audience="designer"] {
+    max-width: 72rem;
+  }
+
   .forgebook-doc__lead {
     margin: 0;
     font-size: 1.0625rem;

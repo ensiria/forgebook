@@ -53,7 +53,8 @@ export const ViewMenu = ({
   readonly ownView: ViewState;
 }): ReactNode => {
   const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
-  const { switches } = useCatalogue();
+  const catalogue = useCatalogue();
+  const { switches } = catalogue;
   const [panel, setPanel] = useState<{ readonly component: typeof ViewMenuPanel } | undefined>(undefined);
   const ids = menuControlIds(layout.placed, movedIds);
   const toggle = (event: MouseEvent<HTMLButtonElement>): void => {
@@ -80,7 +81,7 @@ export const ViewMenu = ({
       >
         <Icon name="sliders" size={14} />
         {STRINGS.view}
-        {hasViewChanges(ownView, switches, ids) ? (
+        {hasViewChanges(ownView, switches, ids, catalogue.audience) ? (
           <span className="forgebook-dot" role="img" aria-label={STRINGS.viewChanged} />
         ) : null}
         <Icon name="chevronDown" size={12} />

@@ -101,6 +101,8 @@ export type ShellConfig = {
   readonly lists?: CatalogueLists;
   /** The plugins with views (the generated page passes them); none by default. */
   readonly plugins?: readonly ShellPlugin[];
+  /** Loads the catalogue's design tokens, on first use; none when it has none. */
+  readonly loadTokens?: () => Promise<unknown>;
 };
 
 /** A docs page, loaded on first use: a catalogue may have none. */
@@ -212,17 +214,17 @@ const readAddress = (catalogue: ViewCatalogue): Address => {
   };
 };
 
+/** What an address's query reads of the catalogue. */
+type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience">;
+
 /**
  * The query of an address.
  *
  * @param address - the page, the view, the panel's values and the matrix's axes.
- * @param switches - the catalogue's switches, for the view's values.
+ * @param catalogue - the catalogue's switches and default audience, for the view's values.
  */
-const addressQuery = (
-  { page, view, panelArgs, matrix }: Address,
-  switches: readonly ViewSwitch[]
-): string => {
-  const params = viewParams(view, switches);
+const addressQuery = ({ page, view, panelArgs, matrix }: Address, catalogue: AddressCatalogue): string => {
+  const params = viewParams(view, catalogue.switches, catalogue.audience);
   if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
   if (page.kind === "page") params.set("page", page.id);
@@ -549,7 +551,6 @@ type AddressState = {
 
 /** The address, read again when the history goes back or forth. */
 const useAddress = (catalogue: CatalogueSettings): AddressState => {
-  const { switches } = catalogue;
   const [address, setAddress] = useState<Address>(() => readAddress(catalogue));
   const [visit, setVisit] = useState<PageVisit>(() => visitOf(address, false));
   useEffect(() => {
@@ -574,19 +575,19 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
     pageAddress,
     openPage: (page: Page): void => {
       const next = pageAddress(page);
-      window.history.pushState(null, "", addressQuery(next, switches));
+      window.history.pushState(null, "", addressQuery(next, catalogue));
       setAddress(next);
       setVisit(visitOf(next, false));
     },
     openAnchor: (anchor: string): void => {
       if (address.page.kind !== "page") return;
       const next = { ...address, page: { ...address.page, anchor } };
-      window.history.pushState(null, "", addressQuery(next, switches));
+      window.history.pushState(null, "", addressQuery(next, catalogue));
       setAddress(next);
       setVisit({ ...visitOf(next, false), isInPage: true });
     },
     replaceAddress: (next: Address): void => {
-      window.history.replaceState(null, "", addressQuery(next, switches));
+      window.history.replaceState(null, "", addressQuery(next, catalogue));
       setAddress(next);
     }
   };
@@ -605,7 +606,8 @@ const ShellPage = ({
   heights,
   sources,
   frameUrl,
-  plugins = NO_PLUGINS
+  plugins = NO_PLUGINS,
+  loadTokens
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const {
@@ -615,7 +617,6 @@ const ShellPage = ({
     setIsOpen: setIsSidebarOpen
   } = useSidebarLayout();
   const catalogue = useCatalogue();
-  const { switches } = catalogue;
   const { address, visit, pageAddress, openPage, openAnchor, replaceAddress } = useAddress(catalogue);
   // each page's last scroll position, kept across the component pages and the stage
   const scrollPositions = useRef(new Map<string, number>());
@@ -674,7 +675,7 @@ const ShellPage = ({
 
   const source = sources.find((candidate) => candidate.id === location?.source.id);
   const files = source === undefined ? undefined : sourceFiles(source);
-  const storyHrefOf = (story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches);
+  const storyHrefOf = (story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), catalogue);
   const columnHeightOf = (storyId: string): number | undefined =>
     knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH));
   const header = (
@@ -699,7 +700,7 @@ const ShellPage = ({
       related={
         <RelatedLinks
           related={relatedComponents(tree, location)}
-          hrefOf={(page: Page): string => addressQuery(pageAddress(page), switches)}
+          hrefOf={(page: Page): string => addressQuery(pageAddress(page), catalogue)}
           onOpen={openPage}
         />
       }
@@ -718,14 +719,14 @@ const ShellPage = ({
         hasBranding={hasBranding !== false}
         tree={tree}
         isHome={shown.kind === "home"}
-        homeHref={addressQuery(pageAddress(HOME), switches)}
+        homeHref={addressQuery(pageAddress(HOME), catalogue)}
         onOpenHome={(): void => openPage(HOME)}
         current={sidebarCurrent(location, shownStoryId)}
         currentPageId={shownPageLocation?.page.id}
-        pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), switches)}
+        pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), catalogue)}
         onOpenPage={(id: string): void => openPage({ kind: "page", id })}
         componentHref={(sourceId: string, componentTitle: string): string =>
-          addressQuery(pageAddress(componentPage(sourceId, componentTitle)), switches)
+          addressQuery(pageAddress(componentPage(sourceId, componentTitle)), catalogue)
         }
         onOpenComponent={(sourceId: string, componentTitle: string): void =>
           openPage(componentPage(sourceId, componentTitle))
@@ -738,6 +739,7 @@ const ShellPage = ({
           view={shownView}
           onViewChange={changeShownView}
           isStoryPage={shown.kind === "story"}
+          isComponentPage={shown.kind === "component"}
           isLogic={isLogicPage(shown)}
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
@@ -749,7 +751,7 @@ const ShellPage = ({
             tree={tree}
             sources={sources}
             recent={recent}
-            hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
+            hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), catalogue)}
             onOpen={(page: RecentPage): void => openPage(page)}
             header={header}
           />
@@ -776,9 +778,15 @@ const ShellPage = ({
             header={header}
             scroll={scroll}
             usedIn={usedInLinks(source, catalogue.hasUsedIn, tree, {
-              hrefOf: (page: Page): string => addressQuery(pageAddress(page), switches),
+              hrefOf: (page: Page): string => addressQuery(pageAddress(page), catalogue),
               onOpen: openPage
             })}
+            onViewChange={changeView}
+            tree={tree}
+            componentId={componentId(shown.location.source.id, shown.location.component.title)}
+            pageHrefOf={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), catalogue)}
+            onOpenPage={(id: string): void => openPage({ kind: "page", id })}
+            loadTokens={loadTokens}
           />
         ) : null}
         {shown.kind === "page" ? (
@@ -798,7 +806,7 @@ const ShellPage = ({
               storyHrefOf={storyHrefOf}
               onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
               pageHrefOf={(id: string, anchor: string | undefined): string =>
-                addressQuery(pageAddress({ kind: "page", id, anchor }), switches)
+                addressQuery(pageAddress({ kind: "page", id, anchor }), catalogue)
               }
               onOpenPage={(id: string): void => openPage({ kind: "page", id })}
               onOpenAnchor={openAnchor}

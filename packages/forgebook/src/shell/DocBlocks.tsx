@@ -142,6 +142,7 @@ const StoryBlock = ({
       componentName={location.component.name}
       heightOf={context.heightOf}
       background={context.backgroundOf(location.source)}
+      reading={{ hasCode: true, isCodeOpen: false, isDemoLarge: false }}
       story={location.story}
       isDemo={true}
       isMounted={isMounted}

@@ -870,7 +870,8 @@ test.describe("the toolbar each person arranges", () => {
       "touch",
       "backdrop",
       "sheets",
-      "text"
+      "text",
+      "audience"
     ]);
     await expect(page.getByRole("button", { name: "Reset toolbar" })).toBeDisabled();
   });
