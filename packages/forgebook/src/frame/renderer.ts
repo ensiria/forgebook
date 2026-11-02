@@ -43,6 +43,11 @@ export type StoryDrawing = {
   readonly globals: Readonly<Record<string, string>>;
   /** What the story's loaders returned: its `context.loaded`. */
   readonly loaded: Readonly<Record<string, unknown>>;
+  /**
+   * Lists a call among the story's events, beside its args' handlers: a call a framework's mock receives (a router's
+   * `push`), by name, with what it was called with. None outside a catalogue (a test's server render).
+   */
+  readonly report?: (name: string, values: readonly unknown[]) => void;
 };
 
 /** What the frame keeps of a story drawn in a canvas. */

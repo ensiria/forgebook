@@ -79,4 +79,19 @@ describe("the tabs of a story's panel", () => {
   it("gives a story about its looks its props and events, and no signature", () => {
     expect(dockTabs(inputOf(false)).map((tab) => tab.id)).toEqual(["props", "events", "a11y"]);
   });
+
+  it("gives a component with no events an Events tab once a framework reported a call (a router's)", () => {
+    const { signature: _signature, ...component } = HOOK_DOCS;
+    const quiet: ComponentDocs = { ...component, props: [] };
+    const input: DockTabsInput = { ...inputOf(false), docs: { status: "ready", value: quiet } };
+    expect(dockTabs(input).map((tab) => tab.id)).toEqual(["a11y"]);
+    const call = {
+      storyId: "kit:nav--default",
+      name: "goto",
+      values: ['"/about"'],
+      details: [null],
+      time: 0
+    };
+    expect(dockTabs({ ...input, calls: [call] }).map((tab) => tab.id)).toEqual(["events", "a11y"]);
+  });
 });

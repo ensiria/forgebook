@@ -127,13 +127,13 @@ const eventsOf = (props: readonly PropDocs[], actions: readonly string[]): reado
 };
 
 /**
- * The Events tab, when the story has an event or an action.
+ * The Events tab, when the story has an event or an action, or made a call a framework reports (a router's `push`).
  *
  * @param input - what the tabs are built from.
  * @param events - the events and actions.
  */
 const eventsTab = (input: DockTabsInput, events: readonly PropDocs[]): DockTab[] =>
-  events.length === 0
+  events.length === 0 && input.calls.length === 0
     ? []
     : [
         {

@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
+import type { MountedStory, StoryDrawing, StoryRenderer } from "../src/frame/renderer.ts";
 import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun.ts";
 import type { PanelArgs } from "../src/messages.ts";
@@ -56,7 +57,8 @@ const badge = (extra: Record<string, unknown> = {}): LoadedStory =>
 const run = async (
   story: LoadedStory,
   playTools?: PlayToolsLoader,
-  onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined
+  onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
+  renderer: StoryRenderer = domRenderer
 ): Promise<{ readonly container: HTMLElement; readonly reports: Reports }> => {
   const container = document.createElement("div");
   document.body.append(container);
@@ -66,7 +68,7 @@ const run = async (
     story,
     identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
     ...(playTools === undefined ? {} : { playTools }),
-    renderer: domRenderer,
+    renderer,
     clock: heldFrameClock(0),
     texts: {},
     decorators: [],
@@ -280,6 +282,22 @@ describe("runStory with a second framework", () => {
     );
     expect(calls).toEqual(["onPress(a)", "onClose(b)"]);
     expect(wasCalled).toBe(true);
+  });
+
+  it("lists the calls a framework reports (a router's) among the story's events", async () => {
+    const calls: string[] = [];
+    const reporting: StoryRenderer = {
+      ...domRenderer,
+      mount: (canvas: HTMLElement, first: StoryDrawing, onError: (error: Error) => void): MountedStory => {
+        first.report?.("goto", ["/about"]);
+        return domRenderer.mount(canvas, first, onError);
+      }
+    };
+    const record = (name: string, values: readonly unknown[]): void => {
+      calls.push(`${name}(${values.join(", ")})`);
+    };
+    await run(badge(), undefined, record, reporting);
+    expect(calls).toEqual(["goto(/about)"]);
   });
 
   it("mounts the story anew for another matrix only, and clears its spies before each mount", async () => {
