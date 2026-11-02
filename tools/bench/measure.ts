@@ -35,6 +35,9 @@ const EDIT_PAUSE = 150;
 /** How long a page has to stay unchanged after a story shows, or a reload could replace it, in milliseconds. */
 const SETTLE = 1500;
 
+/** How long a page may take to go quiet, in milliseconds: some never do, and that must not cost the metric. */
+const QUIET_TIMEOUT = 30_000;
+
 /** How often the server's memory is read, in milliseconds. */
 const MEMORY_INTERVAL = 250;
 
@@ -177,6 +180,11 @@ const settledStamps = async (page: Page, keys: readonly string[], deadline: numb
     if (again.join() === times.join()) return times;
     times = again;
   }
+};
+
+/** Waits for the network to go quiet, for as long as it is worth waiting: a page that keeps asking is measured as it is. */
+const quiet = async (page: Page): Promise<void> => {
+  await page.waitForLoadState("networkidle", { timeout: QUIET_TIMEOUT }).catch(() => undefined);
 };
 
 /** Removes the tool's caches, as a first start finds them. */
@@ -345,7 +353,7 @@ export const measureMemory = async (context: MeasureContext, address: string): P
   try {
     await waitForServer(server, baseOf(context));
     await page.goto(address);
-    await page.waitForLoadState("networkidle");
+    await quiet(page);
     await new Promise((resolve) => setTimeout(resolve, SETTLE * 2));
     return peak;
   } finally {
@@ -416,7 +424,7 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
   try {
     await page.goto(context.subject.storyAddress(server.base));
     await waitForStamps(page, [context.subject.storyKey], Date.now() + SAMPLE_TIMEOUT);
-    await page.waitForLoadState("networkidle");
+    await quiet(page);
     const total = (paths: ReadonlySet<string>): number =>
       [...paths].reduce((sum, path) => sum + server.gzippedSize(path), 0);
     return {

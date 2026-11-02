@@ -16,7 +16,10 @@
     ]
   ],
   "folder": "packages/react",
-  "expected": { "files": 173, "stories": 657 },
+  "expected": {
+    "files": 173,
+    "stories": 657
+  },
   "measured": {
     "forgebookStory": "stories:components-button--default",
     "forgebookComponent": "stories:components-button",
@@ -33,10 +36,13 @@
       "replace": "onClick={action('onClick')}>{edit}"
     },
     "component": {
-      "file": "src/components/Button/Button.tsx",
-      "find": "{iconOnlyImage ?? children}",
-      "replace": "{iconOnlyImage ?? children} {edit}"
+      "file": "src/components/Button/ButtonBase.tsx",
+      "find": "    assistiveText,\n    children,\n",
+      "replace": "    assistiveText,\n    children,\n    '{edit}',\n"
     }
   },
-  "storybook": { "folder": "packages/react", "configDir": ".storybook" }
+  "storybook": {
+    "folder": "packages/react",
+    "configDir": ".storybook"
+  }
 }

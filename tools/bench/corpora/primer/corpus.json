@@ -5,27 +5,32 @@
   "licence": "MIT",
   "install": ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"],
   "folder": "packages/react",
-  "expected": { "files": 248, "stories": 1198 },
+  "expected": {
+    "files": 248,
+    "stories": 1198
+  },
   "measured": {
-    "forgebookStory": "stories:components-button--playground",
-    "forgebookComponent": "stories:components-button",
-    "text": "Button",
-    "pageText": "Button",
+    "forgebookStory": "stories:components-banner--default",
+    "forgebookComponent": "stories:components-banner",
+    "text": "now required",
+    "pageText": "now required",
     "sidebar": "Components",
-    "storybookStory": "components-button--playground",
-    "storybookDocs": "components-button--docs"
+    "storybookStory": "components-banner--default"
   },
   "edits": {
     "story": {
-      "file": "src/Button/Button.stories.tsx",
-      "find": "<Button {...args}>Button</Button>",
-      "replace": "<Button {...args}>Button {edit}</Button>"
+      "file": "src/Banner/Banner.stories.tsx",
+      "find": "now required",
+      "replace": "now required {edit}"
     },
     "component": {
-      "file": "src/Button/Button.tsx",
-      "find": "      {children}\n",
-      "replace": "      {children} {edit}\n"
+      "file": "src/Banner/Banner.tsx",
+      "find": "{description}",
+      "replace": "{description} {edit}"
     }
   },
-  "storybook": { "folder": "packages/react", "configDir": ".storybook" }
+  "storybook": {
+    "folder": "packages/react",
+    "configDir": ".storybook"
+  }
 }

@@ -38,7 +38,14 @@ const packageAliases = () => {
   const paths = Object.entries(compilerOptions.paths).flatMap(([name, [path]]) =>
     name.includes("*") ? [] : [{ find: new RegExp(`^${name}$`), replacement: resolve(ROOT, path) }]
   );
-  return [...paths, ...readdirSync(DEPRECATED).map(deprecatedAlias)];
+  // webpack's mark of a package in a Sass import
+  const sass = { find: /^~/, replacement: "" };
+  // the migration stories import the older library by its built folder, which is its sources' layout
+  const older = {
+    find: /^@fluentui\/react\/lib\/(.*)$/,
+    replacement: `${resolve(ROOT, "packages/react/src")}/$1`
+  };
+  return [sass, older, ...paths, ...readdirSync(DEPRECATED).map(deprecatedAlias)];
 };
 
 /** What Fluent's Storybook sets in webpack. */
@@ -59,6 +66,9 @@ export default defineConfig({
     vitePlugins: async () => [fluentVite, ...((await framework.vitePlugins?.()) ?? [])]
   },
   title: "Fluent UI",
+  // "Used in" holds one TypeScript program per package at once: here that fills the docs worker's heap and stops it,
+  // and with it every story's docs still waiting
+  usedIn: false,
   stories: [
     "../../../packages/react-components/!(react-headless-components-preview)/stories/src/**/index.stories.@(ts|tsx)",
     "../src/**/index.stories.@(ts|tsx)"
