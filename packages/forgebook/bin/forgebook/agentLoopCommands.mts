@@ -30,6 +30,7 @@ import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { BASELINES_FOLDER, updateBaselines } from "./visualCommands.mts";
 
 /**
  * The catalogue the errors are asked of: only frames open in a browser report to a running dev server, so without one
@@ -347,11 +348,14 @@ export const agentLoopCommands = (
         type: "boolean",
         description: "Picture every variant the catalogue's browser tests check."
       },
+      update: {
+        type: "boolean",
+        description: `Store them as the baselines forgebook diff compares with: ${BASELINES_FOLDER} beside the configuration, or --out.`
+      },
       out: {
         type: "string",
-        default: "forgebook-shots",
         valueName: "folder",
-        description: "The folder the pictures go in."
+        description: "The folder the pictures go in; forgebook-shots by default."
       },
       url: {
         type: "string",
@@ -375,12 +379,15 @@ export const agentLoopCommands = (
     ],
     run: async ({ args, options, io, isJson, style }): Promise<void> => {
       const config = await configOf(options.config);
-      const report = await runStoryShot(
-        config,
-        options.url,
-        { id: args.id, views: options.view ?? [], isAllVariants: options["all-variants"] === true },
-        resolve(options.out)
-      );
+      const input = {
+        id: args.id,
+        views: options.view ?? [],
+        isAllVariants: options["all-variants"] === true
+      };
+      const report =
+        options.update === true
+          ? await updateBaselines(config, options.url, input, options.out)
+          : await runStoryShot(config, options.url, input, resolve(options.out ?? "forgebook-shots"));
       if (typeof report === "string") throw new ScriptError(report);
       io.stdout.write(
         isJson ? formatJson(report) : `${shotText(report, (file) => relative(process.cwd(), file), style)}\n`

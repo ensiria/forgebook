@@ -26,12 +26,17 @@ import { initCommands } from "./initCommands.mts";
 import { previewResource } from "./mcpPreview.ts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
+<<<<<<< ours
 import { pagesCommands } from "./pagesCommands.mts";
 import { prebundle, prebundleInChild } from "./prebundleRun.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+=======
+import { runPageCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
+>>>>>>> theirs
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
+import { baselinesOf, visualCommands, visualDiffTool } from "./visualCommands.mts";
 
 await defineCommands({
   name: "forgebook",
@@ -341,7 +346,11 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+<<<<<<< ours
     ...pagesCommands(forgebook),
+=======
+    ...visualCommands(forgebook),
+>>>>>>> theirs
     ...initCommands(forgebook),
     mcp: forgebook.command({
       summary:
@@ -386,6 +395,7 @@ await defineCommands({
         const version = readPackageVersion(import.meta.dirname);
         const preview = previewServer(config, client.runningAt);
         const server = {
+<<<<<<< ours
           info: { name: "forgebook", version },
           instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides, search_catalogue finds a prop or a sentence anywhere in it.`,
           tools: catalogueTools({
@@ -403,6 +413,24 @@ await defineCommands({
               origin: preview.origin,
               strings: config.lists.strings ?? {},
               version
+=======
+          info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
+          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
+          tools: [
+            visualDiffTool((input, outDir) =>
+              runStoryDiff(config, options.url, input, {
+                baselines: baselinesOf(config.dir),
+                outDir
+              })
+            ),
+            ...catalogueTools({
+              ask: client.ask,
+              writeNew: (file, exportName) =>
+                newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
+              check: (input) => runStoryCheck(config, options.url, input),
+              shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
+              checkPage: (address) => runPageCheck(config, [address])
+>>>>>>> theirs
             })
           ]
         };
