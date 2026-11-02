@@ -22,6 +22,7 @@ import type {
   AgentComponent,
   AgentStory,
   AgentUsingComponent,
+  CheckedCodeDocument,
   ErrorsDocument,
   NearestTokensDocument,
   StoriesDocument,
@@ -345,4 +346,15 @@ export const isNearestTokensDocument = (value: unknown): value is NearestTokensD
   isRecord(value) &&
   value["schema"] === 1 &&
   Array.isArray(value["matches"]) &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is the code check's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isCheckedCodeDocument = (value: unknown): value is CheckedCodeDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  typeof value["since"] === "string" &&
   Array.isArray(value["problems"]);

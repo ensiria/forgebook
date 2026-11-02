@@ -1,6 +1,6 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `list_tokens`, `get_token`
+ * `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`
  * and `nearest_token`.
  *
  * @module
@@ -63,6 +63,19 @@ type Check = (input: StoryCheckInput) => Promise<StoryCheckReport | string>;
 /** Takes a story's pictures into a folder: the report, or why they could not be taken. */
 type Shot = (input: StoryCheckInput, outDir: string) => Promise<StoryShotReport | string>;
 
+/** An answer as a tool's result that fails on what it found, as the command of the same name does. */
+const problemsResult = (answer: AgentAnswer): McpToolResult => {
+  const result = resultOf(answer);
+  const body = answer.body;
+  const hasProblems =
+    typeof body === "object" &&
+    body !== null &&
+    "problems" in body &&
+    Array.isArray(body.problems) &&
+    body.problems.length > 0;
+  return { ...result, isError: result.isError || hasProblems };
+};
+
 /** What the tools reach the catalogue through. */
 export type CatalogueReach = {
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
@@ -81,6 +94,23 @@ export type CatalogueReach = {
  * @param reach - what they reach the catalogue through.
  */
 export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): readonly McpTool[] => [
+  {
+    name: "check_code",
+    description:
+      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "The commit to compare with; HEAD by default, so what is not committed."
+        }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
+  },
   {
     name: "list_tokens",
     description:

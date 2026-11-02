@@ -324,6 +324,77 @@ describe("forgebook tokens", { timeout: SERVER_TIMEOUT }, () => {
   });
 });
 
+describe("forgebook check-code", { timeout: SERVER_TIMEOUT }, () => {
+  it("names what a change adds, with the token to use, and fails; a clean change passes", () => {
+    const config = catalogue(root, "checking", { "A.stories.tsx": "export default { title: 'A/B' };\n" });
+    const project = join(root, "checking");
+    const written: unknown = JSON.parse(
+      readFileSync(config, "utf8")
+        .replace(/^export default /, "")
+        .replace(/;\s*$/, "")
+    );
+    writeFileSync(
+      config,
+      `export default ${JSON.stringify({ ...Object(written), tokens: ["tokens.json"] })};\n`
+    );
+    writeFileSync(
+      join(project, "tokens.json"),
+      readFileSync(join(import.meta.dirname, "fixtures", "tokens.json"))
+    );
+    writeFileSync(join(project, ".gitignore"), "node_modules/\n.vite/\n");
+    writeFileSync(join(project, "src", "a.css"), "body { margin: 0; }\n");
+    const git = (...args: readonly string[]): void => {
+      spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
+        cwd: project
+      });
+    };
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-q", "-m", "first");
+    const check = (): ScriptProcessRun =>
+      runScriptProcess(ENTRY, ["check-code", "--config", config, "--url", NO_SERVER, "--json"]);
+    expect(check().exitCode).toBe(0);
+    writeFileSync(join(project, "src", "a.css"), "body { margin: 0; color: #1c1b1b; }\n");
+    const run = check();
+    expect(run.exitCode).not.toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      skipped: [],
+      problems: [{ rule: "raw-color", file: "src/a.css", line: 1, fix: "color.brand.ink" }]
+    });
+
+    // a new file, which `git diff` does not show, and what an agent writes most
+    writeFileSync(
+      join(project, "src", "New.tsx"),
+      'export const New = () => <p style={{ color: "#1c1b1b" }} />;\n'
+    );
+    expect(JSON.parse(check().stdout).problems).toContainEqual(
+      expect.objectContaining({ rule: "raw-color", file: "src/New.tsx", line: 1 })
+    );
+
+    // an option in the place of a commit reaches git as nothing, and a file stays as it is
+    const precious = join(project, "precious.txt");
+    writeFileSync(precious, "keep\n");
+    const refused = runScriptProcess(ENTRY, [
+      "check-code",
+      `--since=--output=${precious}`,
+      "--config",
+      config,
+      "--url",
+      NO_SERVER,
+      "--json"
+    ]);
+    expect(refused.exitCode).not.toBe(0);
+    expect(refused.stderr).toContain("names no commit");
+    expect(readFileSync(precious, "utf8")).toBe("keep\n");
+
+    // tokens that were asked for and cannot be read stop the check, or it would pass having checked less
+    writeFileSync(join(project, "tokens.json"), "{ broken");
+    const broken = check();
+    expect(broken.exitCode).not.toBe(0);
+    expect(broken.stderr).toContain("tokens files have problems");
+  });
+});
+
 describe("forgebook agents", () => {
   it("prints the instructions, with the commands that check a story", () => {
     const run = runScriptProcess(ENTRY, ["agents", "--print"]);

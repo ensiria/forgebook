@@ -22,6 +22,7 @@ import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
 import { agentsSkill, withAgentsSection } from "./agentsText.ts";
 import { checkText, errorsOutput, shotText } from "./agentText.ts";
 import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 
@@ -108,6 +109,34 @@ export const agentLoopCommands = (
       const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
       if (problems > 0)
         throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
+    }
+  }),
+  "check-code": forgebook.command({
+    summary: "Check what a change adds against the design system, with an exit code for CI.",
+    json: true,
+    options: {
+      since: {
+        type: "string",
+        valueName: "ref",
+        description: "The commit to compare with; HEAD by default, so what is not committed."
+      },
+      url: {
+        type: "string",
+        env: "FORGEBOOK_URL",
+        valueName: "address",
+        description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+      }
+    },
+    examples: [
+      { command: `${COMMAND} check-code`, description: "Your uncommitted work." },
+      {
+        command: `${COMMAND} check-code --since origin/develop --json`,
+        description: "A pull request, in CI."
+      }
+    ],
+    run: async ({ options, io, log, isJson }): Promise<void> => {
+      const config = await configOf(options.config);
+      await runCheckCode({ config, url: options.url, context: { io, log, isJson } }, options.since);
     }
   }),
   errors: forgebook.command({

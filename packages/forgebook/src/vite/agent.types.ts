@@ -12,6 +12,7 @@
 
 import type { ComponentDocs } from "../componentDocs.ts";
 import type { LiveError } from "../liveErrors.ts";
+import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { NearestTokens } from "./nearestToken.ts";
 
@@ -160,6 +161,20 @@ export type NearestTokensDocument = NearestTokens & {
   readonly value: string;
   /** What in the tokens files could not be read. */
   readonly problems: readonly string[];
+};
+
+/** What a change adds that breaks the design system. */
+export type CheckedCodeDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** What the change is measured from. */
+  readonly since: string;
+  /** What was checked. Props, imports and deprecated components never are: a clean answer says no more than this. */
+  readonly checked: readonly CodeRule[];
+  /** What was not, and why: an agent must not read an empty list as all clear when these were skipped. */
+  readonly skipped: readonly string[];
+  /** What it found, by file and line. */
+  readonly problems: readonly CodeProblem[];
 };
 
 /** What the open frames reported while someone edited, and the story index's problems. */
