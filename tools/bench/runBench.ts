@@ -77,13 +77,20 @@ export type BenchRequest = {
   readonly onStep: (step: RunStep) => void;
 };
 
-/** How many samples a group takes per tool, for the status's progress. */
-const groupSteps = (group: MetricGroup, runs: number, hasPage: boolean): number => {
+/**
+ * How many samples a group takes per tool, for the status's progress.
+ *
+ * @param group - the group.
+ * @param runs - the runs of each time.
+ * @param hasPage - whether the tool has a page of a component's stories.
+ */
+export const groupSteps = (group: MetricGroup, runs: number, hasPage: boolean): number => {
   if (group === "install") return 1;
   if (group === "start") return runs * 2 + 1;
   if (group === "hmr") return 3;
   if (group === "page") return hasPage ? runs + 2 : 0;
-  if (group === "memory") return MEMORY_RUNS * (hasPage ? 2 : 1) + 1;
+  // a warm-up, then a story's page, a component's where there is one, and a first start
+  if (group === "memory") return MEMORY_RUNS * (hasPage ? 3 : 2) + 1;
   if (group === "sweep") return 1;
   return runs + 1;
 };

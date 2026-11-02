@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { roundOrder } from "./runBench.ts";
+import { groupSteps, roundOrder } from "./runBench.ts";
 
 const TOOLS = ["a", "b", "c"];
 const ROUNDS = [1, 2, 3, 4, 5, 6].map((run) => roundOrder(TOOLS, run));
@@ -28,5 +28,12 @@ describe("roundOrder", () => {
       });
     }
     for (const tool of TOOLS) expect(after.get(tool)?.size).toBe(2);
+  });
+});
+
+describe("groupSteps", () => {
+  it("counts every memory sample: a warm-up, a story's page, a component's, a first start", () => {
+    expect(groupSteps("memory", 5, true)).toBe(10);
+    expect(groupSteps("memory", 5, false)).toBe(7);
   });
 });
