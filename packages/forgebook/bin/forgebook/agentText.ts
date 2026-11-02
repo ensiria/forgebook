@@ -23,6 +23,7 @@ import type {
   TokensDocument
 } from "../../src/vite/agent.types.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
+import type { TokenClash } from "../../src/vite/tokenClashes.ts";
 
 /** The style with no width to fit, so no cell is cut. */
 const uncut = (style: OutputStyle): OutputStyle => ({ ...style, width: Number.POSITIVE_INFINITY });
@@ -178,7 +179,7 @@ export const diffText = (
  */
 export const tokensText = (document: TokensDocument): string => {
   if (!document.isConfigured)
-    return 'No tokens file: name one in forgebook.config.ts (`tokens: ["tokens.json"]`).';
+    return 'No tokens file: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
   if (document.total === 0) return "No tokens here.";
   const lines = document.tokens.map((token) => tokenLine(token));
   const more = document.total - document.tokens.length;
@@ -205,8 +206,17 @@ export const tokenText = (token: DesignToken): string =>
   [
     tokenLine(token),
     ...(token.alias === undefined ? [] : [`alias of ${token.alias}`]),
+    ...(token.source === undefined ? [] : [`from ${token.source}`]),
     ...(token.description === undefined ? [] : [token.description])
   ].join("\n");
+
+/**
+ * A clash as a person reads it: which file's value stands, and which it replaced.
+ *
+ * @param clash - the clash.
+ */
+export const clashText = ({ name, mode, kept, replaced }: TokenClash): string =>
+  `${name}${mode === undefined ? "" : ` (${mode})`}: ${kept} replaces ${replaced.join(", ")}`;
 
 /**
  * The tokens nearest a value as a person reads them, saying which are really near.

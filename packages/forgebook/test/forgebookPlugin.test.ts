@@ -8,7 +8,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
@@ -109,10 +111,13 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
     await hooks.closeBundle();
     const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
     expect(code).toContain('"./src/Select.stories.tsx":{"title":"Inputs/Selection/Select"');
-    expect(code).toContain(`() => import(${JSON.stringify(join(KIT, "src", "Select.stories.tsx"))})`);
+    // in Vite's form, which the queries' ids come back to the plugin in: forward slashes on Windows too
+    expect(code).toContain(
+      `() => import(${JSON.stringify(VITE_PATHS.join(KIT, "src", "Select.stories.tsx"))})`
+    );
     expect(code).toContain("?forgebook-docs");
     expect(code).toContain("?forgebook-code");
-    expect(hooks.watched).toContain(join(KIT, "src", "Select.stories.tsx"));
+    expect(hooks.watched).toContain(VITE_PATHS.join(KIT, "src", "Select.stories.tsx"));
   });
 
   it("names a pattern that climbs out of its folder without a `..` in the id, which a URL path would collapse", async () => {
@@ -134,6 +139,53 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
   it("leaves every other import to Vite", () => {
     const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
     expect(hooks.resolveId("./src/Select.tsx", join(KIT, "stories.ts"))).toBeNull();
+  });
+});
+
+describe("forgebookPlugin's pages", () => {
+  /** A catalogue whose folder is named as Vite names it on Windows: its ids have forward slashes. */
+  const config: ResolvedConfig = {
+    dir: "C:/Users/ada/app",
+    framework: STUB_FRAMEWORK,
+    title: "Catalogue",
+    logo: undefined,
+    heights: undefined,
+    stories: ["src/**/*.stories.tsx"],
+    sources: [],
+    switches: undefined,
+    languages: [],
+    previews: [],
+    head: "",
+    shell: { themeCss: "", styleSheets: [], problems: [] },
+    tokens: [],
+    watch: [],
+    lists: {},
+    hasMocks: false,
+    hasPlayTools: false
+  };
+
+  it("resolves the pages' entries by their address to their path in the folder, and answers them", async () => {
+    const hooks = hooksOf(forgebookPlugin({ config }));
+    expect(hooks.resolveId("/.forgebook-shell.ts", "C:/Users/ada/app/index.html")).toBe(
+      "C:/Users/ada/app/.forgebook-shell.ts"
+    );
+    expect(hooks.resolveId("/frame.html", "")).toBe("C:/Users/ada/app/frame.html");
+    const shell = await hooks.load("C:/Users/ada/app/.forgebook-shell.ts");
+    const code = typeof shell === "object" && shell !== null && "code" in shell ? String(shell.code) : "";
+    expect(code).toContain("mountShell(root");
+    expect(code).toContain('from "C:/Users/ada/app/.forgebook-stories.ts";');
+  });
+
+  it("answers the project's stories' source by the path the entry imports it with", async () => {
+    const hooks = hooksOf(forgebookPlugin({ config }));
+    const id = hooks.resolveId(
+      "C:/Users/ada/app/.forgebook-stories.ts",
+      "C:/Users/ada/app/.forgebook-shell.ts"
+    );
+    expect(id).toBe("C:/Users/ada/app/.forgebook-stories.ts");
+    const source = await hooks.load(String(id));
+    const code = typeof source === "object" && source !== null && "code" in source ? String(source.code) : "";
+    expect(code).toContain('"./src/**/*.stories.tsx?forgebook-files"');
   });
 });
 

@@ -6,7 +6,7 @@
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 import { describe, expect, it } from "vitest";
 
-import { storiesText } from "../bin/forgebook/agentText.ts";
+import { clashText, storiesText } from "../bin/forgebook/agentText.ts";
 import type { StoriesDocument } from "../src/vite/agent.types.ts";
 
 /** A narrow terminal without colours. */
@@ -48,5 +48,13 @@ describe("storiesText", () => {
     const text = storiesText(DOCUMENT, NARROW);
     expect(text).toContain("kit:inputs-selection-select--overlay-in-room");
     expect(text).toContain("Inputs/Selection/Select › Overlay in room (unlisted)");
+  });
+});
+
+describe("clashText", () => {
+  it("says which file stands, in which theme", () => {
+    expect(
+      clashText({ name: "a", mode: "dark", kept: "own.json", replaced: ["lib: a.json", "b.json"] })
+    ).toBe("a (dark): own.json replaces lib: a.json, b.json");
   });
 });
