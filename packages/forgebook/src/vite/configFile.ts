@@ -16,11 +16,13 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
-import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
+import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
+import type { ForgebookPlugin } from "../plugin.ts";
 import { mergedThemes, shellThemeCss, shellThemeProblems, themeValueProblem } from "../shellTheme.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
+import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
@@ -80,15 +82,9 @@ export type ResolvedConfig = {
   readonly lists: CatalogueLists;
   /** Whether the project installs Testing Library, whose `canvas` and `userEvent` every play then receives. */
   readonly hasPlayTools: boolean;
-  /** Whether the project installs MSW, which a story's `parameters.msw` then mocks its API with. */
-  readonly hasMocks: boolean;
+  /** The plugins, checked, in the configuration's order. */
+  readonly plugins: readonly ForgebookPlugin[];
 };
-
-/** MSW's browser module, for a story's mocked API. */
-export const MOCKS_MODULE = "msw/browser";
-
-/** Its package's manifest, what tells it is installed: the module itself cannot be resolved from Node. */
-const MOCKS_MANIFEST = "msw/package.json";
 
 /** The packages of the play tools: both installed, or the plays get neither. */
 export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/user-event"] as const;
@@ -167,7 +163,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
  * @param all - the presets' lists, then the catalogue's.
  */
 export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
-  const tabs: Partial<Record<PanelTabId, false>> = {};
+  const tabs: Record<string, false> = {};
   const controls: Partial<Record<TurnedOffControl, false>> = {};
   const strings: Record<string, string> = {};
   const keys: Record<string, string | false> = {};
@@ -227,6 +223,20 @@ const configProblem = (config: unknown): string | undefined => {
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
 
 /**
+ * A configuration's plugins, once they can be used.
+ *
+ * @param config - the configuration.
+ * @param dir - the folder of its file.
+ * @throws when they cannot.
+ */
+const checkedPlugins = (config: ForgebookConfig, dir: string): readonly ForgebookPlugin[] => {
+  const plugins = config.plugins ?? [];
+  const problem = pluginsProblem(plugins, config.framework.name);
+  if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
+  return plugins;
+};
+
+/**
  * A configuration with its presets merged and its paths made absolute.
  *
  * @param config - the configuration.
@@ -237,7 +247,11 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
   const presets = config.presets ?? [];
   const absolute = (path: string): string => (isAbsolute(path) ? path : resolve(dir, path));
   const declared = [...presets.map((preset) => preset.switches), config.switches];
-  const switches = declared.some((list) => list !== undefined) ? mergedById(declared) : undefined;
+  const plugins = checkedPlugins(config, dir);
+  const switches = withPluginSwitches(
+    declared.some((list) => list !== undefined) ? mergedById(declared) : undefined,
+    plugins
+  );
   const problem = switches === undefined ? undefined : switchesProblem(switches);
   if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
   const theme = mergedThemes([
@@ -283,7 +297,7 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     watch: (config.watch ?? []).map(absolute),
     lists: mergedLists([...presets, config]),
     hasPlayTools: hasPlayToolsIn(dir),
-    hasMocks: packageResolver(dir)(MOCKS_MANIFEST) !== undefined
+    plugins
   };
 };
 

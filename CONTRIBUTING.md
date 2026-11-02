@@ -38,7 +38,7 @@ pnpm --filter @fixture/app exec playwright install chromium
 pnpm --filter @fixture/app test:shell                      # the shell's browser tests on the fixture catalogue
 ```
 
-The repository is a pnpm workspace: `packages/` holds the four published packages, `fixtures/` the fixture kit, the
+The repository is a pnpm workspace: `packages/` holds the six published packages, `fixtures/` the fixture kit, the
 Storybook-style stories and the catalogue the tests run on, `tools/` the repository's own commands (`package-build`,
 `check-commits`).
 

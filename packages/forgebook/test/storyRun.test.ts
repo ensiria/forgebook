@@ -56,7 +56,8 @@ const badge = (extra: Record<string, unknown> = {}): LoadedStory =>
 const run = async (
   story: LoadedStory,
   playTools?: PlayToolsLoader,
-  onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined
+  onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
+  pluginSetups: StoryRunOptions["pluginSetups"] = []
 ): Promise<{ readonly container: HTMLElement; readonly reports: Reports }> => {
   const container = document.createElement("div");
   document.body.append(container);
@@ -66,6 +67,7 @@ const run = async (
     story,
     identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
     ...(playTools === undefined ? {} : { playTools }),
+    pluginSetups,
     renderer: domRenderer,
     clock: heldFrameClock(0),
     texts: {},
@@ -280,6 +282,68 @@ describe("runStory with a second framework", () => {
     );
     expect(calls).toEqual(["onPress(a)", "onClose(b)"]);
     expect(wasCalled).toBe(true);
+  });
+
+  it("runs a plugin's preparation ahead of the story's loaders, and undoes it after the story's set-ups", async () => {
+    const order: string[] = [];
+    const { reports } = await run(
+      badge({
+        loaders: [
+          (): undefined => {
+            order.push("loader");
+            return undefined;
+          }
+        ],
+        beforeEach: [
+          (): (() => void) => {
+            order.push("set-up");
+            return (): void => void order.push("story undone");
+          }
+        ]
+      }),
+      undefined,
+      undefined,
+      [
+        (): (() => void) => {
+          order.push("plugin");
+          return (): void => void order.push("plugin undone");
+        }
+      ]
+    );
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order.slice(0, 5)).toEqual(["plugin", "loader", "set-up", "story undone", "plugin undone"]);
+  });
+
+  it("shows what a plugin's preparation throws as the story's error", async () => {
+    const { reports } = await run(badge(), undefined, undefined, [
+      (): undefined => {
+        throw new Error("No worker");
+      }
+    ]);
+    expect(reports.errors).toEqual(["No worker"]);
+  });
+
+  it("undoes a plugin's preparation when the story's own set-up fails", async () => {
+    let isUndone = false;
+    const { reports } = await run(
+      badge({
+        beforeEach: [
+          (): undefined => {
+            throw new Error("No data");
+          }
+        ]
+      }),
+      undefined,
+      undefined,
+      [
+        (): (() => void) => (): void => {
+          isUndone = true;
+        }
+      ]
+    );
+    expect(reports.errors).toEqual(["No data"]);
+    expect(isUndone).toBe(true);
   });
 
   it("mounts the story anew for another matrix only, and clears its spies before each mount", async () => {

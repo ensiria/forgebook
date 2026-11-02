@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { ForgebookPlugin } from "../src/plugin.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { configModule, frameEntry, pageHtml, shellEntry, storiesSourceModule } from "../src/vite/pages.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
@@ -27,8 +28,8 @@ const CONFIG: ResolvedConfig = {
   tokens: [],
   watch: [],
   lists: {},
-  hasMocks: false,
-  hasPlayTools: false
+  hasPlayTools: false,
+  plugins: []
 };
 
 describe("the generated pages", () => {
@@ -72,16 +73,53 @@ describe("the generated pages", () => {
   });
 });
 
-describe("a story's mocked API", () => {
-  it("names MSW in the frame's entry only for a project that installs it, and only as a dynamic import", () => {
-    expect(frameEntry(CONFIG)).not.toContain("msw");
-    const entry = frameEntry({ ...CONFIG, hasMocks: true });
-    expect(entry).toContain('mockTools: () => import("msw/browser"),');
-    expect(entry).not.toContain('from "msw');
+describe("a catalogue's plugins", () => {
+  const plugin: ForgebookPlugin = {
+    apiVersion: 1,
+    id: "acme",
+    frame: "@acme/plugin/frame",
+    tabs: [{ id: "acme", label: "Acme", view: "@acme/plugin/tab", when: { parameter: "acme" } }]
+  };
+  const listed: ResolvedConfig = { ...CONFIG, plugins: [plugin] };
+
+  it("adds nothing to either page for a catalogue that lists none", () => {
+    expect(shellEntry(CONFIG)).not.toContain("plugins");
+    expect(frameEntry(CONFIG)).not.toContain("plugin");
   });
 
-  it("keeps it out of the shell", () => {
-    expect(shellEntry({ ...CONFIG, hasMocks: true })).not.toContain("msw");
+  it("adds nothing to a page a plugin has nothing for", () => {
+    const switchesOnly: ResolvedConfig = {
+      ...CONFIG,
+      plugins: [{ apiVersion: 1, id: "acme", switches: [] }]
+    };
+    expect(shellEntry(switchesOnly)).toBe(shellEntry(CONFIG));
+    expect(frameEntry(switchesOnly)).toBe(frameEntry(CONFIG));
+  });
+
+  it("loads a tab's view only when it opens: a dynamic import of the module it names", () => {
+    const entry = shellEntry(listed);
+    expect(entry).toContain('load: () => import("@acme/plugin/tab")');
+    expect(entry).toContain('when: {"parameter":"acme"}');
+    expect(entry).not.toMatch(/^import .*@acme\/plugin/m);
+  });
+
+  it("keeps a plugin's frame module out of the shell, and its tabs out of the frame", () => {
+    expect(shellEntry(listed)).not.toContain("@acme/plugin/frame");
+    expect(frameEntry(listed)).not.toContain("@acme/plugin/tab");
+  });
+
+  it("hands the frame each plugin's frame module, by its id", () => {
+    const entry = frameEntry(listed);
+    expect(entry).toContain('import { frame as pluginFrame0 } from "@acme/plugin/frame";');
+    expect(entry).toContain('plugins: [{ id: "acme", create: pluginFrame0 }],');
+  });
+
+  it("writes what a configuration names as text, whatever it holds", () => {
+    const entry = shellEntry({
+      ...CONFIG,
+      plugins: [{ ...plugin, tabs: [{ id: "acme", label: 'A "quoted" name', view: "@acme/tab" }] }]
+    });
+    expect(entry).toContain('label: "A \\"quoted\\" name"');
   });
 });
 

@@ -255,3 +255,34 @@ export type ErrorsDocument = {
   /** The story index's problems now (a broken story file, a title taken twice). */
   readonly problems: readonly string[];
 };
+
+/** A plugin as the documents give it. */
+export type AgentPlugin = {
+  /** Its id. */
+  readonly id: string;
+  /** The panel tabs it adds. */
+  readonly tabs: readonly {
+    /** The tab's id: `tab=<id>` in a view opens it. */
+    readonly id: string;
+    /** Its name. */
+    readonly label: string;
+    /** The story parameter it is offered for; none for every story. */
+    readonly parameter?: string;
+  }[];
+  /** The ids of the switches it adds: `<id>=<value>` in a view sets one. */
+  readonly switches: readonly string[];
+  /** The fences of the docs blocks it adds. */
+  readonly docBlocks: readonly string[];
+  /** Whether it runs code around every story. */
+  readonly runsInFrames: boolean;
+};
+
+/** What `forgebook plugins` and `list_plugins` answer. */
+export type PluginsDocument = {
+  /** The version of this document. */
+  readonly schema: 1;
+  /** The plugin API this Forgebook speaks. */
+  readonly apiVersion: number;
+  /** The plugins the configuration lists, in order. */
+  readonly plugins: readonly AgentPlugin[];
+};

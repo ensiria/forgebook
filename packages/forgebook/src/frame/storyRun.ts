@@ -27,8 +27,7 @@ import type { MountedStory, StoryDrawing, StoryIdentity, StoryRenderer } from ".
 import { animationsSettled } from "./settle.ts";
 import { storyCanvas } from "./storyCanvas.ts";
 import { type PreparedStory, prepareStory } from "./storyHooks.ts";
-import { type MockToolsLoader, startStoryMocks } from "./storyMocks.ts";
-import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
+import type { LoadedArgs, LoadedBeforeEach, LoadedStory } from "./storyModule.ts";
 
 /** What the shell can do to a running story. */
 export type StoryControls = {
@@ -61,8 +60,8 @@ export type StoryRunOptions = {
   readonly identity: StoryIdentity;
   /** Loads the play tools the project installed, for the first play; none without them. */
   readonly playTools?: PlayToolsLoader;
-  /** Loads MSW, for a story that mocks its API; none when the project does not install it. */
-  readonly mockTools?: MockToolsLoader;
+  /** What the plugins prepare before every mount, ahead of the story's loaders. */
+  readonly pluginSetups: readonly LoadedBeforeEach[];
   /** The framework that draws it. */
   readonly renderer: StoryRenderer;
   /** The story clock the story reads: running from its start for a Live story, held otherwise. */
@@ -348,20 +347,25 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     prepared = NOT_PREPARED;
     try {
       await previous.cleanup();
-      const stopMocks = await startStoryMocks(story.parameters, options.mockTools);
-      const hooks = await prepareStory(story, {
+      const context = {
         ...options.identity,
         args: shownArgs(),
         text,
         clock,
         globals,
         parameters: story.parameters
+      };
+      // ahead of the story's loaders, which may depend on them: a mocked API answers a loader's fetch
+      const plugins = await prepareStory({ loaders: [], beforeEach: options.pluginSetups }, context);
+      const hooks = await prepareStory(story, context).catch(async (error: unknown) => {
+        await plugins.cleanup();
+        throw error;
       });
       const next: PreparedStory = {
         ...hooks,
         cleanup: async (): Promise<void> => {
           await hooks.cleanup();
-          stopMocks();
+          await plugins.cleanup();
         }
       };
       // a later mount started while this one loaded: its set-ups are undone, the later one draws

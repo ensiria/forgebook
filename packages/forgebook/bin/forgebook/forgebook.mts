@@ -11,17 +11,18 @@ import { relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
-import { readPackageVersion } from "@ensiria/cli-kit/files";
+import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 import { build, createServer } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
 import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
+import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import { catalogueDocs } from "../forgebook-docs/catalogueDocs.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
-import { storiesText, storyText } from "./agentText.ts";
+import { pluginsText, storiesText, storyText } from "./agentText.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
@@ -167,6 +168,15 @@ await defineCommands({
         if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
         const document = filteredStories(body, { source: options.source, component: options.component });
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
+      }
+    }),
+    plugins: forgebook.command({
+      summary: "List the plugins the catalogue lists, and what each adds.",
+      json: true,
+      examples: [{ command: `${COMMAND} plugins --json`, description: "As an agent reads them." }],
+      run: async ({ options, io, isJson }): Promise<void> => {
+        const document = pluginsDocument((await configOf(options.config)).plugins);
+        io.stdout.write(isJson ? formatJson(document) : `${pluginsText(document)}\n`);
       }
     }),
     tokens: forgebook.command({
@@ -347,7 +357,8 @@ await defineCommands({
               newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
             check: (input) => runStoryCheck(config, options.url, input),
             shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
-            checkPage: (address) => runPageCheck(config, [address])
+            checkPage: (address) => runPageCheck(config, [address]),
+            plugins: pluginsDocument(config.plugins)
           })
         };
         let session = NEW_SESSION;

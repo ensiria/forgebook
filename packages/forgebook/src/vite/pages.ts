@@ -14,7 +14,7 @@
 import { join } from "node:path";
 
 import type { PageConfig } from "../pageConfig.ts";
-import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -115,6 +115,26 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
 };
 
 /**
+ * The shell's list of the plugins' tabs, each with the import that loads its view when it first opens; nothing for a
+ * catalogue without tabs, whose entry is then what it would be with no plugin.
+ *
+ * @param config - the configuration.
+ */
+const pluginTabLines = (config: ResolvedConfig): string[] => {
+  const plugins = config.plugins.filter((plugin) => (plugin.tabs ?? []).length > 0);
+  if (plugins.length === 0) return [];
+  const lines = plugins.map((plugin) => {
+    const tabs = (plugin.tabs ?? []).map(
+      (tab) =>
+        `{ id: ${JSON.stringify(tab.id)}, label: ${JSON.stringify(tab.label)}, ` +
+        `when: ${JSON.stringify(tab.when)}, load: () => import(${JSON.stringify(tab.view)}) }`
+    );
+    return `      { id: ${JSON.stringify(plugin.id)}, tabs: [${tabs.join(", ")}] },`;
+  });
+  return ["    plugins: [", ...lines, "    ],"];
+};
+
+/**
  * The shell's entry: the shell mounted with the configuration's data, the logo, the sources and the code writer.
  *
  * @param config - the configuration.
@@ -139,6 +159,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    ...pluginTabLines(config),
     "    codeOf",
     "  });",
     ""
@@ -166,11 +187,15 @@ const playToolsLoader = (): string => {
  */
 export const frameEntry = (config: ResolvedConfig): string => {
   const sources = sourcesCode(config);
+  const frames = config.plugins.flatMap((plugin) => (plugin.frame === undefined ? [] : [plugin]));
   return [
     `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
     ...sources.imports,
     ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
+    ...frames.map(
+      (plugin, index) => `import { frame as pluginFrame${index} } from ${JSON.stringify(plugin.frame)};`
+    ),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  void mountFrame(root, {",
@@ -179,7 +204,13 @@ export const frameEntry = (config: ResolvedConfig): string => {
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
-    ...(config.hasMocks ? [`    mockTools: () => import(${JSON.stringify(MOCKS_MODULE)}),`] : []),
+    ...(frames.length === 0
+      ? []
+      : [
+          `    plugins: [${frames
+            .map((plugin, index) => `{ id: ${JSON.stringify(plugin.id)}, create: pluginFrame${index} }`)
+            .join(", ")}],`
+        ]),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ""

@@ -54,7 +54,7 @@ test.describe("the Design tab", () => {
     const tab = page.getByRole("tab", { name: "Design" });
     await expect(tab).toBeVisible();
     await expect(page.locator("iframe.forgebook-frame-view")).toBeVisible();
-    expect(modules.filter((url) => /DesignTab\.tsx|designTab\.scss/.test(url))).toEqual([]);
+    expect(modules.filter((url) => /DesignTab\.tsx|designTab\.css/.test(url))).toEqual([]);
     expect(asked).toEqual([]);
 
     await tab.click();

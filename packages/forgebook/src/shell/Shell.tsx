@@ -36,6 +36,7 @@ import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
 import { HomePage } from "./HomePage.tsx";
 import { Icon } from "./icons.tsx";
 import { LogicMark } from "./LogicMark.tsx";
+import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
@@ -84,6 +85,8 @@ export type ShellConfig = {
   readonly switches?: readonly ViewSwitch[];
   /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
   readonly lists?: CatalogueLists;
+  /** The plugins with tabs (the generated page passes them); none by default. */
+  readonly plugins?: readonly ShellPlugin[];
 };
 
 /** The page an address names: one story, a component's page, or the home (an address that names none). */
@@ -94,6 +97,9 @@ type Page =
 
 /** No languages: a catalogue that offers none. */
 const NO_LANGUAGES: readonly StoryLanguage[] = [];
+
+/** No plugins: a catalogue that lists none. */
+const NO_PLUGINS: readonly ShellPlugin[] = [];
 
 /** The home. */
 const HOME: Page = { kind: "home" };
@@ -501,7 +507,14 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
  *
  * @param props - the configuration.
  */
-const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): ReactNode => {
+const ShellPage = ({
+  title,
+  logo,
+  heights,
+  sources,
+  frameUrl,
+  plugins = NO_PLUGINS
+}: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const {
     width: sidebarWidth,
@@ -682,6 +695,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
             matrixAxes={address.matrix}
             onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
             frameUrl={frameUrl}
+            plugins={plugins}
             loadCode={files?.code[shown.location.component.file]}
             loadDocs={files?.docs[shown.location.component.file]}
             namedValues={source?.namedValues}
@@ -712,10 +726,16 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
  * @param props - the configuration.
  */
 export const Shell = (props: ShellConfig): ReactNode => {
-  const { title, switches, languages = NO_LANGUAGES, lists } = props;
+  const { title, switches, languages = NO_LANGUAGES, lists, plugins = NO_PLUGINS } = props;
   const catalogue = useMemo(
-    () => catalogueSettings(title, catalogueSwitches(switches, languages, lists?.controls), lists),
-    [title, switches, languages, lists]
+    () =>
+      catalogueSettings(
+        title,
+        catalogueSwitches(switches, languages, lists?.controls),
+        lists,
+        plugins.flatMap((plugin) => plugin.tabs.map((tab) => tab.id))
+      ),
+    [title, switches, languages, lists, plugins]
   );
   return (
     <CatalogueContext.Provider value={catalogue}>

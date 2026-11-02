@@ -225,10 +225,11 @@ export const Danger: Story<typeof Button> = {
 };
 ```
 
-The component's header then links to Figma, and the story's panel has a **Design** tab with the node embedded and
-**Compare with the story**, the story and its design side by side over the page, at the story's width and with the
-panel's values. Comparing is for your eyes: Forgebook draws no overlay and gives no match percentage, because Figma and
-a browser render differently and such a number would mislead. The tab loads, with Figma, only when opened.
+The component's header then links to Figma. With [`@forgebook/plugin-figma`](https://www.npmjs.com/package/@forgebook/plugin-figma)
+listed in `plugins`, the story's panel has a **Design** tab with the node embedded and **Compare with the story**, the
+story and its design side by side over the page, at the story's width and with the panel's values. Comparing is for your
+eyes: Forgebook draws no overlay and gives no match percentage, because Figma and a browser render differently and such a
+number would mislead. The tab loads, with Figma, only when opened.
 
 Write the link plainly, as a string: the index reads it without running the file, so a link written by code is a problem.
 A link that is not `https` on `figma.com`, or does not name a `design`, `file`, `proto`, `board`, `slides` or `deck`, is
@@ -324,23 +325,58 @@ browser tests run in CI.
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
 ## Mocking an API
-A story that fetches gets its answers from [MSW](https://mswjs.io), an optional peer. Install it and write its worker into
-the catalogue's public folder:
+
+A story that fetches gets its answers from [MSW](https://mswjs.io), through
+[`@forgebook/plugin-msw`](https://www.npmjs.com/package/@forgebook/plugin-msw). Install both, list the plugin, and write
+MSW's worker into the catalogue's public folder:
+
 ```sh
-npm install --save-dev msw
+npm install --save-dev msw @forgebook/plugin-msw
 npx msw init public
 ```
+
+```ts
+// forgebook.config.ts
+import { msw } from "@forgebook/plugin-msw";
+
+export default defineConfig({ /* … */ plugins: [msw()] });
+```
+
 ```tsx
 import { http, HttpResponse } from "msw";
+
 /** The list, from a mocked API. */
 export const Loaded: Story<typeof Users> = {
   parameters: {
     msw: { handlers: [http.get("/api/users", () => HttpResponse.json([{ name: "Ada" }]))] }
   }
 };
+```
+
 `parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
-unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
-on the dev server and in a static build.
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. The panel's
+**Network** tab lists the story's handlers and its requests, each answered by a mock or by the network. It works on the dev
+server and in a static build. Without the plugin listed, `parameters.msw` does nothing, and a story's requests reach the
+network.
+
+## Plugins
+
+A plugin is a package a catalogue lists; until it is listed, it adds nothing and costs nothing:
+
+```ts
+import { figma } from "@forgebook/plugin-figma";
+import { msw } from "@forgebook/plugin-msw";
+
+export default defineConfig({ /* … */ plugins: [figma(), msw()] });
+```
+
+A plugin can add a panel tab, a toolbar switch, a docs block, and what runs around a story in its frame; it cannot rearrange
+the shell. Turn a plugin's tab off like any other (`tabs: { design: false }`), rename it (`strings: { "tabs.design": "Figma" }`)
+or translate its texts (`strings: { "plugin.figma.compare": "Confronta" }`). `forgebook plugins --json` and `list_plugins`
+say what a catalogue has.
+
+The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
+
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
@@ -464,6 +500,8 @@ and its JSON lists every story for a script.
 | [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react) | React's story types, renderer and props reader |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing) | Tests generated from the stories |
+| [`@forgebook/plugin-figma`](https://www.npmjs.com/package/@forgebook/plugin-figma) | A story's design in the panel, and beside the story |
+| [`@forgebook/plugin-msw`](https://www.npmjs.com/package/@forgebook/plugin-msw) | A story's API answered by its handlers, and a Network tab |
 
 ## Contributing
 

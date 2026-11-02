@@ -14,6 +14,23 @@ import {
   previewValue
 } from "../src/messages.ts";
 
+describe("a plugin's report", () => {
+  const report = { type: "forgebook:plugin", storyId: "a", plugin: "msw", hint: "2" };
+
+  it("carries any JSON value, with or without its note", () => {
+    expect(isFrameMessage({ ...report, value: { handlers: [{ label: "GET /a" }], n: 1 } })).toBe(true);
+    expect(isFrameMessage({ ...report, value: null, hint: null })).toBe(true);
+  });
+
+  it("refuses what would not stay what it was, and a message that names no plugin", () => {
+    expect(isFrameMessage({ ...report, value: { when: new Date(0) } })).toBe(false);
+    expect(isFrameMessage({ ...report, value: [Number.NaN] })).toBe(false);
+    expect(isFrameMessage({ ...report, value: undefined })).toBe(false);
+    expect(isFrameMessage({ ...report, value: 1, plugin: 1 })).toBe(false);
+    expect(isFrameMessage({ ...report, value: 1, hint: 2 })).toBe(false);
+  });
+});
+
 describe("messages", () => {
   it("accepts well-formed messages and refuses others", () => {
     const ready = {
@@ -25,9 +42,11 @@ describe("messages", () => {
       argTypes: {},
       controls: "all",
       actions: ["onPress"],
-      fixed: { switches: { theme: "dark" }, width: 360 }
+      fixed: { switches: { theme: "dark" }, width: 360 },
+      parameters: ["msw"]
     };
     expect(isFrameMessage({ ...ready, args: { size: "sm" } })).toBe(true);
+    expect(isFrameMessage({ ...ready, args: {}, parameters: "msw" })).toBe(false);
     expect(isFrameMessage({ ...ready, args: { sizes: ["sm", 2] } })).toBe(true);
     expect(isFrameMessage({ ...ready, args: { sizes: ["sm", {}] } })).toBe(false);
     expect(

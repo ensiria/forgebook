@@ -7,7 +7,6 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentDocs } from "../src/componentDocs.ts";
-import type { DesignTabProps } from "../src/shell/DesignTab.tsx";
 import { type DockTabsInput, dockTabs } from "../src/shell/dockTabs.tsx";
 
 /** A hook whose options carry a value and a callback, so a component would get Props and Events. */
@@ -60,7 +59,7 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   onPlayAgain: (): undefined => undefined,
   check: { status: "idle" },
   onCheck: undefined,
-  design: undefined
+  pluginTabs: []
 });
 
 describe("the tabs of a story's panel", () => {
@@ -82,25 +81,15 @@ describe("the tabs of a story's panel", () => {
     expect(dockTabs(inputOf(false)).map((tab) => tab.id)).toEqual(["props", "events", "a11y"]);
   });
 
-  it("offers the Design tab only to a story with a design, a story about logic too", () => {
-    const design: DesignTabProps = {
-      link: { url: "https://www.figma.com/design/File1/Kit", kind: "design", fileKey: "File1" },
-      title: "Select › Small",
-      frame: {
-        address: "/frame.html?story=a",
-        width: "fill",
-        background: undefined,
-        args: {},
-        view: undefined
-      }
-    };
-    expect(dockTabs({ ...inputOf(false), design }).map((tab) => tab.id)).toEqual([
+  it("sets a plugin's tab after Code and before Accessibility, on a story about logic too", () => {
+    const pluginTabs = [{ id: "design", label: "Design", content: null }];
+    expect(dockTabs({ ...inputOf(false), pluginTabs }).map((tab) => tab.id)).toEqual([
       "props",
       "events",
       "design",
       "a11y"
     ]);
-    expect(dockTabs({ ...inputOf(true), design }).map((tab) => tab.id)).toEqual([
+    expect(dockTabs({ ...inputOf(true), pluginTabs }).map((tab) => tab.id)).toEqual([
       "signature",
       "design",
       "a11y"

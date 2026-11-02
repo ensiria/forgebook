@@ -1,9 +1,10 @@
-// The Design tab's own styles: they load with the tab, so a catalogue that never opens it pays nothing for them.
-
-@use "../styles/tokens" as *;
+/*
+ * The Design tab's own styles: they load with the tab, so a catalogue that never opens it pays nothing for them. Colours
+ * come from the shell's public theme, so the tab follows the catalogue's look.
+ */
 
 @layer catalogue {
-  // at least the panel's height; the panel scrolls when a narrow bar leaves the design too little room
+  /* at least the panel's height; the panel scrolls when a narrow bar leaves the design too little room */
   .forgebook-design {
     display: flex;
     flex-direction: column;
@@ -12,25 +13,26 @@
 
   .forgebook-design__bar {
     display: flex;
-    flex-wrap: wrap;
     flex: none;
-    gap: $space-2;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     align-items: center;
-    padding: $space-2 $space-3-5;
+    padding: 0.5rem 0.875rem;
   }
 
   .forgebook-design__note {
     flex: 1 1 16rem;
     margin: 0;
-    font: $text-caption;
-    color: $text-secondary;
+    font-size: 0.75rem;
+    color: var(--forgebook-text-secondary);
   }
 
   .forgebook-design__heading {
     flex: 1 1 16rem;
     margin: 0;
-    font: $text-row-compact;
-    color: $text;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--forgebook-text);
   }
 
   .forgebook-design__embed {
@@ -40,7 +42,6 @@
     min-height: 0;
   }
 
-  // a width set on the stage holds as far as the room allows
   .forgebook-design__frame {
     display: block;
     flex: 0 1 100%;
@@ -48,40 +49,41 @@
     max-width: 100%;
     height: 100%;
     min-height: 0;
-    margin-inline: auto;
     border: 0;
   }
 
-  // over the whole page, whatever the panel's height, since a design needs the room
+  /* over the whole page, whatever the panel's height, since a design needs the room */
   .forgebook-design__compare {
     width: 100%;
     max-width: none;
     height: 100%;
     max-height: none;
     padding: 0;
-    color: $text;
-    background: $window;
+    color: var(--forgebook-text);
+    background: var(--forgebook-window);
     border: 0;
+  }
 
-    &[open] {
-      display: flex;
-      flex-direction: column;
-    }
+  .forgebook-design__compare[open] {
+    display: flex;
+    flex-direction: column;
+  }
 
-    &::backdrop {
-      background: $window;
-    }
+  .forgebook-design__compare::backdrop {
+    background: var(--forgebook-window);
   }
 
   .forgebook-design__panes {
     display: grid;
     flex: 1;
     grid-template-columns: 1fr 1fr;
-    gap: $space-2;
+    gap: 0.5rem;
     min-height: 0;
-    padding: 0 $space-3-5 $space-3-5;
+    padding: 0 0.875rem 0.875rem;
+  }
 
-    @media (width <= 720px) {
+  @media (width <= 720px) {
+    .forgebook-design__panes {
       grid-template-rows: 1fr 1fr;
       grid-template-columns: minmax(0, 1fr);
     }
@@ -97,15 +99,15 @@
 
   .forgebook-design__caption {
     flex: none;
-    padding-bottom: $space-1-5;
-    font: $text-caption;
-    color: $text-secondary;
+    padding-bottom: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--forgebook-text-secondary);
   }
 
   .forgebook-design__story {
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    border: 1px solid $separator;
+    border: 1px solid var(--forgebook-separator);
   }
 }

@@ -38,8 +38,10 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   that tries it. The catalogue documents its signature from its types and TSDoc (`@param`, `@returns`), and the tests
   check it once instead of in every look. A title like `Hooks/useUndo` puts it in a Hooks section.
 - `parameters.design: { figma: "<node link>" }` on the meta links a component to its design in Figma; a story writes its
-  own over it. The catalogue adds a Design tab, and `forgebook story` returns it as `design` (the link, `fileKey`,
-  `nodeId`, and the `address` to hand a person).
+  own over it. `forgebook story` returns it as `design` (the link, `fileKey`, `nodeId`, and the `address` to hand a
+  person); with `@forgebook/plugin-figma` listed the panel adds a Design tab.
+- `parameters.msw: { handlers: [...] }` answers a story's requests, with `@forgebook/plugin-msw` listed in the
+  configuration's `plugins`, which also adds a Network tab; without the plugin the parameter does nothing.
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.
 - Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic` and `design.figma` as plain values: the catalogue reads them without running
@@ -59,6 +61,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, errors, a failed play |
+| `npx forgebook plugins --json` | The plugins the catalogue lists: their tabs (`tab=<id>` in a view opens one), switches and docs blocks |
 | `npx forgebook tokens --category color --json` | The design tokens, when the catalogue names a tokens file |
 | `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw value; the type comes from the value, or `--type padding` |
 | `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |

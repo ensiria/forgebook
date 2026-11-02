@@ -18,6 +18,7 @@ import type {
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
+  PluginsDocument,
   StoriesDocument,
   StoryDocument,
   TokensDocument
@@ -222,4 +223,27 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
     ...(lines.length === 0 ? ["Nothing to report."] : lines),
     ...document.skipped.map((each) => `Not checked: ${each}`)
   ].join("\n");
+};
+
+/**
+ * The catalogue's plugins, one per line.
+ *
+ * @param document - the answer.
+ */
+export const pluginsText = (document: PluginsDocument): string => {
+  if (document.plugins.length === 0)
+    return "No plugins: list them in forgebook.config.ts (`plugins: [figma()]`).";
+  return document.plugins
+    .map((plugin) => {
+      const parts = [
+        ...plugin.tabs.map(
+          (tab) => `tab ${tab.id}${tab.parameter === undefined ? "" : ` (${tab.parameter})`}`
+        ),
+        ...plugin.switches.map((id) => `switch ${id}`),
+        ...plugin.docBlocks.map((fence) => `docs block ${fence}`),
+        ...(plugin.runsInFrames ? ["runs in frames"] : [])
+      ];
+      return `${plugin.id}: ${parts.join(", ")}`;
+    })
+    .join("\n");
 };

@@ -1,12 +1,11 @@
 /**
- * Tests for a design's link: what is accepted as Figma's, and the embed's address made from it.
+ * Tests for a design's link: what is accepted as Figma's.
  *
  * @module
  */
 import { describe, expect, it } from "vitest";
 
 import { type FigmaLink, figmaLink } from "../src/figmaLink.ts";
-import { figmaEmbedAddress } from "../src/shell/figmaEmbed.ts";
 
 /**
  * Reads a link that must be valid.
@@ -80,29 +79,5 @@ describe("figmaLink's link", () => {
     expect(message).not.toContain("\n");
     expect(message).not.toContain("\u001b");
     expect(String(message).length).toBeLessThan(200);
-  });
-});
-
-describe("figmaEmbedAddress", () => {
-  it("frames the node from Figma's embed host, named as Figma requires, in the shell's scheme", () => {
-    const address = new URL(
-      figmaEmbedAddress(valid("https://www.figma.com/design/AbC123/Kit?node-id=12-34&t=x1"), true)
-    );
-    expect(address.origin).toBe("https://embed.figma.com");
-    expect(address.pathname).toBe("/design/AbC123");
-    expect(Object.fromEntries(address.searchParams)).toEqual({
-      "embed-host": "forgebook",
-      theme: "dark",
-      "node-id": "12:34"
-    });
-  });
-
-  it("names a design by the kind the embed knows, and keeps a branch", () => {
-    expect(figmaEmbedAddress(valid("https://www.figma.com/file/AbC123/Kit"), false)).toBe(
-      "https://embed.figma.com/design/AbC123?embed-host=forgebook&theme=light"
-    );
-    expect(
-      figmaEmbedAddress(valid("https://www.figma.com/design/AbC123/branch/Br4nch/Kit"), false)
-    ).toContain("/design/AbC123/branch/Br4nch?");
   });
 });

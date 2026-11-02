@@ -14,6 +14,7 @@
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import type { CatalogueLists } from "../catalogue.ts";
+import type { ForgebookPlugin } from "../plugin.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
@@ -73,6 +74,8 @@ export type ForgebookConfig = CatalogueLists & {
   readonly watch?: readonly string[];
   /** The libraries' presets, in order; the configuration's own values win over theirs. */
   readonly presets?: readonly ForgebookPreset[];
+  /** The plugins, in order (`[figma()]`): a package adds nothing to the catalogue until it is listed here. */
+  readonly plugins?: readonly ForgebookPlugin[];
 };
 
 /**
