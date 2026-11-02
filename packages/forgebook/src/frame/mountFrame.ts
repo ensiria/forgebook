@@ -30,6 +30,7 @@ import {
 } from "../messages.ts";
 import { panelArgsOf, storyArgsOf } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
+import { safeAreaProperties } from "../safeAreaParameter.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { isClockHeldIn } from "../storyClock.ts";
 import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGlobals.ts";
@@ -148,6 +149,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const preview = mergedPreviews((config.previews ?? []).map(readPreview));
   const view = parseView(window.location.search, catalogue);
   applyView(document.documentElement, view, catalogue);
+  // a story drawn edge to edge in a device is told its safe areas, which `env()` cannot give a frame
+  for (const [name, value] of safeAreaProperties(window.location.search))
+    document.documentElement.style.setProperty(name, value);
   // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
   // sees touch
   followTouch(document);

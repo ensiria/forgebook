@@ -202,3 +202,44 @@ export const deviceScreen = (model: DeviceModel, orientation: DeviceOrientation)
   orientation === "portrait"
     ? { width: model.width, height: model.height, safeArea: model.safeArea.portrait }
     : { width: model.height, height: model.width, safeArea: model.safeArea.landscape };
+
+/** No room on any side. */
+const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/** The part of a device's screen a story is drawn in, and the safe areas it is told. */
+export type StoryArea = {
+  /** Its width: the story's viewport, in CSS px. */
+  readonly width: number;
+  /** Its height, in CSS px. */
+  readonly height: number;
+  /** The room around it on the screen, which the status bar, the camera's cut and the home indicator take. */
+  readonly around: Insets;
+  /** The safe areas the story is told: the screen's for a story drawn edge to edge, none for one inside them. */
+  readonly safeArea: Insets;
+};
+
+/**
+ * The part of a device's screen a story is drawn in: inside the safe areas, as a page in a phone's browser or an app
+ * that respects them is, so nothing the device draws covers it; or the whole screen for a story drawn edge to edge,
+ * told the safe areas to pad itself with.
+ *
+ * @param model - the model.
+ * @param orientation - how it is held.
+ * @param isEdgeToEdge - whether the story draws edge to edge.
+ */
+export const storyArea = (
+  model: DeviceModel,
+  orientation: DeviceOrientation,
+  isEdgeToEdge: boolean
+): StoryArea => {
+  const screen = deviceScreen(model, orientation);
+  if (isEdgeToEdge)
+    return { width: screen.width, height: screen.height, around: NO_INSETS, safeArea: screen.safeArea };
+  const { top, right, bottom, left } = screen.safeArea;
+  return {
+    width: screen.width - left - right,
+    height: screen.height - top - bottom,
+    around: screen.safeArea,
+    safeArea: NO_INSETS
+  };
+};

@@ -206,6 +206,19 @@ turn that off for it, as for a story marked for a phone, and a device that shoul
 | iPad mini | `ipad-mini` | 744 × 1133 |
 | iPad Pro 13″ | `ipad-pro-13` | 1032 × 1376 |
 
+The story is drawn inside the device's safe areas, as a page in a phone's browser is: the status bar, the camera's cut
+and the home indicator take their room around it (59 and 34 px on an iPhone 16 upright, the sides on its side), and
+the story's viewport is what is left (393 × 759). A story that draws edge to edge, as a full-screen app does, says
+`edgeToEdge: true`: it gets the whole screen, and the frame tells it the safe areas as custom properties on its root,
+`--forgebook-safe-area-top`, `-right`, `-bottom` and `-left`, since browsers keep `env(safe-area-inset-*)` at zero in
+a frame. Read them with the real insets as the fallback, so the same CSS works on a phone:
+
+```css
+.screen {
+  padding-top: var(--forgebook-safe-area-top, env(safe-area-inset-top));
+}
+```
+
 An id names a model for good: it is never renamed or removed, and a new model gets a new id.
 
 A story meant for a device says so, on its page and on its component's page:
@@ -220,6 +233,9 @@ export default {
 
 export const Landscape: Story<typeof Settings> = { parameters: { device: { orientation: "landscape" } } };
 
+// under the status bar, padded with the safe areas the frame tells it
+export const FullScreen: Story<typeof Settings> = { parameters: { device: { edgeToEdge: true } } };
+
 // in the iPhone, with the mouse
 export const Pointer: Story<typeof Settings> = { parameters: { device: { touch: false } } };
 ```
@@ -231,8 +247,7 @@ choice wins over both: turned off, a framed story shows without its device.
 The device is the shell's: the story's own document is the same, so the generated tests and `forgebook shot` stay
 unframed, unless a view names a model (`forgebook shot <id> --view "iphone-16"`, or `"dark pixel-9 landscape"`), which
 gives the picture framed (`portrait` and `landscape` need a model beside them; a catalogue's switch with a value
-named like a model keeps the word, so write `forgebook.device=phone` then). A frame does not set `env(safe-area-inset-*)`, which browsers keep at zero in a frame: keep
-content clear of the status bar the device draws. The drawing and its styles load the first time a device is shown.
+named like a model keeps the word, so write `forgebook.device=phone` then). The drawing and its styles load the first time a device is shown.
 
 ## Hooks and functions
 

@@ -39,7 +39,8 @@ test.describe("device frames", () => {
     await page.goto(screen("phone"));
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveAttribute("data-model", "iphone-16");
     await ready(page);
-    expect(await frameSize(page)).toEqual({ width: 393, height: 852 });
+    // inside the safe areas: the status bar and the home indicator take 59 and 34 px of the 852
+    expect(await frameSize(page)).toEqual({ width: 393, height: 759 });
     // the device control says what is shown; the width's presets are only widths, off while the device sets it
     await expect(page.getByRole("combobox", { name: "Device", exact: true })).toHaveValue("iphone-16");
     await expect(page.getByRole("radio", { name: "Fill" })).toBeDisabled();
@@ -64,10 +65,10 @@ test.describe("device frames", () => {
       .evaluate((html) => html.setAttribute("data-kept", "yes"));
     await page.getByRole("combobox", { name: "Device", exact: true }).selectOption("pixel-9");
     await expect(page).toHaveURL(/forgebook\.device=pixel-9/);
-    expect(await frameSize(page)).toEqual({ width: 412, height: 923 });
+    expect(await frameSize(page)).toEqual({ width: 412, height: 923 - 48 - 24 });
     await page.getByRole("button", { name: "Turn the device" }).click();
     await expect(page).toHaveURL(/forgebook\.orientation=landscape/);
-    expect(await frameSize(page)).toEqual({ width: 923, height: 412 });
+    expect(await frameSize(page)).toEqual({ width: 923 - 48, height: 412 - 24 - 16 });
     await page.getByRole("combobox", { name: "Device", exact: true }).selectOption({ label: "No frame" });
     await expect(page).toHaveURL(/forgebook\.device=off/);
     await expect(page.locator(".forgebook-device[data-framed]")).toHaveCount(0);
@@ -178,5 +179,35 @@ test.describe("device frames", () => {
       .locator(".forgebook-arrange")
       .evaluateAll((each) => each.map((row) => (row as HTMLElement).dataset["control"] ?? ""));
     expect(rows.indexOf("forgebook.device")).toBeGreaterThanOrEqual(0);
+  });
+
+  test("a story sits below the status bar by default, and one drawn edge to edge is told the safe areas", async ({
+    page
+  }) => {
+    /** Where the story's frame starts in its device's screen, and the safe area its root is told. */
+    const placed = async (): Promise<{ top: number; told: string }> => {
+      await ready(page);
+      const top = await page.evaluate(() => {
+        const screen = document.querySelector(".forgebook-story .forgebook-device__screen");
+        const frame = screen?.querySelector("iframe");
+        return (frame?.getBoundingClientRect().top ?? 0) - (screen?.getBoundingClientRect().top ?? 0);
+      });
+      const told = await page
+        .frameLocator(".forgebook-story iframe.forgebook-frame-view")
+        .locator("html")
+        .evaluate((html) => getComputedStyle(html).getPropertyValue("--forgebook-safe-area-top"));
+      return { top: Math.round(top), told };
+    };
+    await page.goto("/?story=kit:layouts-form--signup&panel=closed&forgebook.device=iphone-16");
+    expect(await placed()).toEqual({ top: 59, told: "" });
+    await page.goto(screen("edge-to-edge"));
+    expect(await placed()).toEqual({ top: 0, told: "59px" });
+    expect(await frameSize(page)).toEqual({ width: 393, height: 852 });
+    // the status bar over a story drawn edge to edge never takes its pointer
+    const top = await storyFrame(page).evaluate((frame) => {
+      const box = frame.getBoundingClientRect();
+      return document.elementFromPoint(box.left + 60, box.top + 20)?.tagName;
+    });
+    expect(top).toBe("IFRAME");
   });
 });

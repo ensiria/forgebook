@@ -22,8 +22,9 @@ import {
   type DeviceShape,
   deviceDrawing
 } from "../../deviceDrawing.ts";
-import { deviceModel } from "../../devices.ts";
+import { deviceModel, type StoryArea, storyArea } from "../../devices.ts";
 import type { ShownDevice } from "../../deviceView.ts";
+import { withSafeArea } from "../../safeAreaParameter.ts";
 import { APPEARANCE_ATTRIBUTE } from "../useAppearance.ts";
 
 /**
@@ -33,6 +34,24 @@ import { APPEARANCE_ATTRIBUTE } from "../useAppearance.ts";
  */
 export const drawingOf = (shown: ShownDevice): ReturnType<typeof deviceDrawing> =>
   deviceDrawing(deviceModel(shown.model), shown.orientation);
+
+/**
+ * The part of a device's screen a story is drawn in.
+ *
+ * @param shown - the device and how it is held.
+ * @param isEdgeToEdge - whether the story draws edge to edge.
+ */
+export const areaOf = (shown: ShownDevice, isEdgeToEdge: boolean): StoryArea =>
+  storyArea(deviceModel(shown.model), shown.orientation, isEdgeToEdge);
+
+/**
+ * A story frame's address in its device: told the safe areas when it draws edge to edge, as it is otherwise.
+ *
+ * @param address - the frame's address.
+ * @param area - the story's area.
+ */
+export const addressIn = (address: string, area: StoryArea): string =>
+  Object.values(area.safeArea).some((inset) => inset > 0) ? withSafeArea(address, area.safeArea) : address;
 
 /** Calls back when the shell's appearance changes on the root. */
 const subscribeAppearance = (onChange: () => void): (() => void) => {
@@ -135,7 +154,7 @@ export type DeviceFraming = {
     readonly "data-orientation": string;
     readonly style: CSSProperties;
   };
-  /** The screen's place and shape in the drawing, on the story's page colour while it loads. */
+  /** The screen's place and shape in the drawing, on the story's page colour, the story inside its area. */
   readonly screen: CSSProperties;
   /** The hardware, under the screen. */
   readonly under: ReactNode;
@@ -151,11 +170,15 @@ export type DeviceFraming = {
  * @param background - the story's page colour.
  */
 export const deviceFraming = (
-  framed: { readonly shown: ShownDevice; readonly drawing: ReturnType<typeof deviceDrawing> },
+  framed: {
+    readonly shown: ShownDevice;
+    readonly drawing: ReturnType<typeof deviceDrawing>;
+    readonly area: StoryArea;
+  },
   scheme: "light" | "dark",
   background: string | undefined
 ): DeviceFraming => {
-  const { drawing, shown } = framed;
+  const { drawing, shown, area } = framed;
   return {
     root: {
       "data-framed": "",
@@ -169,7 +192,12 @@ export const deviceFraming = (
       width: drawing.screen.width,
       height: drawing.screen.height,
       borderRadius: drawing.screen.radius,
-      backgroundColor: background
+      backgroundColor: background,
+      // the story inside the safe areas: the status bar, the camera's cut and the home indicator draw around it
+      paddingTop: area.around.top,
+      paddingRight: area.around.right,
+      paddingBottom: area.around.bottom,
+      paddingLeft: area.around.left
     },
     under: <DeviceLayer key="under" drawing={drawing} layer="under" />,
     over: <DeviceLayer key="over" drawing={drawing} layer="over" scheme={scheme} />

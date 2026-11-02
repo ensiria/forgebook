@@ -16,7 +16,14 @@ import { type BoxWidth, BoxWidthControl, useBoxWidth } from "./BoxWidth.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { useCodeWriter } from "./codeWriter.ts";
-import { DeviceSlot, inkScheme, roomSizing, useFramedDevice } from "./DeviceSlot.tsx";
+import {
+  DeviceSlot,
+  deviceAddress,
+  inkScheme,
+  isWaitingForDevice,
+  roomSizing,
+  useFramedDevice
+} from "./DeviceSlot.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { StageViewport } from "./StageViewport.tsx";
@@ -315,7 +322,8 @@ export const Example = ({
   const catalogue = useCatalogue();
   const { touch } = catalogue;
   // a device sets the story's width and height, over the page as in the list
-  const framed = useFramedDevice(shownDevice(context.view, deviceDefaultOf(catalogue.device, story.device)));
+  const shown = shownDevice(context.view, deviceDefaultOf(catalogue.device, story.device));
+  const framed = useFramedDevice(shown);
   const scheme = inkScheme(schemeOf(context.view, context.switches), useSystemDark());
   // the frame loads with the story's finger as it is then; a change after reaches it live, keeping the story's state
   const loadedView = useLoadedView(
@@ -364,22 +372,25 @@ export const Example = ({
             })}
           >
             <DeviceSlot framed={framed} scheme={scheme} background={context.background}>
-              {isMounted ? (
+              {isMounted && !isWaitingForDevice(shown, framed) ? (
                 <FrameView
                   title={STRINGS.frameTitle(context.component.name, story.name)}
-                  address={frameAddress(context.frameUrl, story.id, loadedView, context.switches)}
+                  address={deviceAddress(
+                    frameAddress(context.frameUrl, story.id, loadedView, context.switches),
+                    framed
+                  )}
                   heights={context.heights}
                   settled={context.settled}
                   fallbackHeight={fallbackHeight}
                   // over the page, the story fills the room it has
                   sceneHeight={sceneHeightOf(story, full.stageHeight)}
-                  fixedHeight={framed?.drawing.screen.height}
+                  fixedHeight={framed?.area.height}
                 />
               ) : (
                 // the frame's room until its turn comes, so the page does not jump when it loads
                 <div
                   className="forgebook-frame-placeholder"
-                  style={{ height: framed?.drawing.screen.height ?? fallbackHeight }}
+                  style={{ height: framed?.area.height ?? fallbackHeight }}
                 />
               )}
             </DeviceSlot>

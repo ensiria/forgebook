@@ -62,9 +62,9 @@ const deviceFields = (value: ESTree.Expression): Map<string, ESTree.Expression> 
   for (const property of value.properties) {
     const name = property.type === "Property" && !property.computed ? keyName(property.key) : undefined;
     if (property.type !== "Property" || name === undefined) return new Error(DEVICE_PROBLEM);
-    if (!["frame", "model", "orientation", "touch"].includes(name))
+    if (!["frame", "model", "orientation", "touch", "edgeToEdge"].includes(name))
       return new Error(
-        `\`parameters.device\` has no field \`${name}\`: it takes frame, model, orientation and touch`
+        `\`parameters.device\` has no field \`${name}\`: it takes frame, model, orientation, touch and edgeToEdge`
       );
     fields.set(name, unwrapped(property.value));
   }
@@ -85,6 +85,8 @@ const deviceOf = (value: ESTree.Expression | undefined): StoryDeviceSetting | un
   if (frame instanceof Error) return frame;
   const touch = booleanOf(fields.get("touch"), "parameters.device.touch");
   if (touch instanceof Error) return touch;
+  const edgeToEdge = booleanOf(fields.get("edgeToEdge"), "parameters.device.edgeToEdge");
+  if (edgeToEdge instanceof Error) return edgeToEdge;
   const model = stringOf(fields.get("model"), "model");
   if (model instanceof Error) return model;
   const orientation = stringOf(fields.get("orientation"), "orientation");
@@ -97,7 +99,8 @@ const deviceOf = (value: ESTree.Expression | undefined): StoryDeviceSetting | un
     ...(frame === undefined ? {} : { frame }),
     ...(model === undefined ? {} : { model }),
     ...(orientation === undefined ? {} : { orientation }),
-    ...(touch === undefined ? {} : { touch })
+    ...(touch === undefined ? {} : { touch }),
+    ...(edgeToEdge === undefined ? {} : { edgeToEdge })
   };
   const problem = deviceSettingProblem(setting);
   return problem === undefined ? setting : new Error(`\`parameters.device\`: ${problem}`);

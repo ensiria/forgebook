@@ -287,7 +287,7 @@ describe("indexStoryFile", () => {
       );
     expect(index("PHONE")).toMatch(/story X: `parameters.device` must be written as a plain object/);
     expect(index("{ size: 3 }")).toMatch(
-      /`parameters.device` has no field `size`: it takes frame, model, orientation and touch/
+      /`parameters.device` has no field `size`: it takes frame, model, orientation, touch and edgeToEdge/
     );
     expect(index('{ model: "nokia-3310" }')).toMatch(/`parameters.device`: "nokia-3310" is no device model/);
     expect(index('{ orientation: "flat" }')).toMatch(/"flat" is no orientation/);

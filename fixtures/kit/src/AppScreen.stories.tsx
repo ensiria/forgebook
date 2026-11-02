@@ -27,3 +27,6 @@ export const PixelLandscape: Story<typeof AppScreen> = {
 
 /** The same screen in its iPhone, touched with the mouse: its device says so. */
 export const Mouse: Story<typeof AppScreen> = { parameters: { device: { touch: false } } };
+
+/** The screen edge to edge, as a full-screen app: it draws under the status bar and pads itself with the safe areas. */
+export const EdgeToEdge: Story<typeof AppScreen> = { parameters: { device: { edgeToEdge: true } } };

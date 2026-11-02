@@ -31,6 +31,7 @@
   // the screen clips the story to its corners, as glass does; isolated, so the frame's own layers stay inside it
   .forgebook-device[data-framed] > .forgebook-device__screen {
     position: absolute;
+    box-sizing: border-box;
     overflow: hidden;
     isolation: isolate;
   }

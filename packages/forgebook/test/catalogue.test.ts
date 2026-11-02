@@ -150,7 +150,8 @@ describe("configureStrings", () => {
       isFramed: false,
       model: "phone",
       orientation: "portrait",
-      isTouch: true
+      isTouch: true,
+      isEdgeToEdge: false
     });
     expect(
       catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { frame: true, model: "pixel-9" } }).device
@@ -158,7 +159,8 @@ describe("configureStrings", () => {
       isFramed: true,
       model: "pixel-9",
       orientation: "portrait",
-      isTouch: true
+      isTouch: true,
+      isEdgeToEdge: false
     });
     expect(
       catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { model: "nokia-3310" } }).device.model

@@ -102,6 +102,8 @@ export type DeviceDefault = {
   readonly orientation: DeviceOrientation;
   /** Whether a story shown in the device is touched with a simulated finger, as a phone is. */
   readonly isTouch: boolean;
+  /** Whether the story draws edge to edge, told the safe areas, instead of sitting inside them. */
+  readonly isEdgeToEdge: boolean;
 };
 
 /** The default when no one sets one: no frame, the generic phone upright, touched once framed. */
@@ -109,7 +111,8 @@ export const NO_DEVICE: DeviceDefault = {
   isFramed: false,
   model: DEFAULT_DEVICE,
   orientation: "portrait",
-  isTouch: true
+  isTouch: true,
+  isEdgeToEdge: false
 };
 
 /** The device a story is shown in: a model, held one way. */
@@ -124,6 +127,8 @@ export type ShownDevice = {
 export type StoryDevice = ShownDevice & {
   /** Whether the story is touched with a simulated finger, unless the reader turns it off. */
   readonly isTouch: boolean;
+  /** Whether the story draws edge to edge, told the safe areas. */
+  readonly isEdgeToEdge: boolean;
 };
 
 /**
@@ -156,7 +161,8 @@ export const deviceDefaultOf = (
   isFramed: setting?.frame ?? base.isFramed,
   model: isDeviceId(setting?.model) ? setting.model : base.model,
   orientation: isDeviceOrientation(setting?.orientation) ? setting.orientation : base.orientation,
-  isTouch: setting?.touch ?? base.isTouch
+  isTouch: setting?.touch ?? base.isTouch,
+  isEdgeToEdge: setting?.edgeToEdge ?? base.isEdgeToEdge
 });
 
 /**
@@ -191,7 +197,8 @@ export const shownDevice = (view: DeviceView, story: DeviceDefault): StoryDevice
   return {
     model: view.device === "auto" ? story.model : view.device,
     orientation: view.orientation === "auto" ? story.orientation : view.orientation,
-    isTouch: story.isTouch
+    isTouch: story.isTouch,
+    isEdgeToEdge: story.isEdgeToEdge
   };
 };
 

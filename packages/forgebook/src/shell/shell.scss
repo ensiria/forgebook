@@ -726,9 +726,9 @@
   .forgebook-toolbar__control.forgebook-device-control {
     gap: $space-1-5;
 
-    // as wide as most names need: the longest is cut rather than widening the bar for every model
+    // as wide as the longest name, so every model reads whole and the bar keeps its width from one to another
     .forgebook-select {
-      max-width: 8.5rem;
+      min-width: 10.5rem;
     }
   }
 

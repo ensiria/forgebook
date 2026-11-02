@@ -12,7 +12,7 @@
  */
 import { chromium, type Page } from "@playwright/test";
 import { catalogueSettings } from "forgebook/catalogue";
-import { deviceViewport, type NamedDevice, namedDevice } from "forgebook/device-picture";
+import { deviceFrameAddress, deviceViewport, type NamedDevice, namedDevice } from "forgebook/device-picture";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryCheckRequest, StoryCheckStory } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
@@ -42,6 +42,8 @@ export type StoryPage = {
    * story's own default device never counts, so the tests and the pictures stay unframed unless asked.
    */
   readonly device: NamedDevice | undefined;
+  /** Whether the story draws edge to edge in that device: the whole screen, told the safe areas; inside them otherwise. */
+  readonly isEdgeToEdge: boolean;
   /** The frame's address in that view, its clock held. */
   readonly frame: string;
 };
@@ -87,13 +89,17 @@ export const storyPagesOf = (request: StoryCheckRequest): StoryPage[] => {
   return request.stories.flatMap((story) =>
     (story.isLogic === true ? logicViews : views).map(({ name, view, width }) => {
       const shown: ViewState = { ...view, backdrop: "plain" };
+      const device = namedDevice(view);
+      const isEdgeToEdge = story.isEdgeToEdge === true;
+      const frame = heldClockAddress(frameAddress(request.frameUrl, story.id, shown, request.switches));
       return {
         story,
         name,
         view: shown,
         width,
-        device: namedDevice(view),
-        frame: heldClockAddress(frameAddress(request.frameUrl, story.id, shown, request.switches))
+        device,
+        isEdgeToEdge,
+        frame: device === undefined ? frame : deviceFrameAddress(frame, device, isEdgeToEdge)
       };
     })
   );
@@ -106,7 +112,8 @@ export const storyPagesOf = (request: StoryCheckRequest): StoryPage[] => {
  * @param storyPage - the story and the view.
  */
 export const openedStory = async (page: Page, storyPage: StoryPage): Promise<FrameStatus> => {
-  const screen = storyPage.device === undefined ? undefined : deviceViewport(storyPage.device);
+  const screen =
+    storyPage.device === undefined ? undefined : deviceViewport(storyPage.device, storyPage.isEdgeToEdge);
   await page.setViewportSize(
     screen === undefined
       ? { width: storyPage.width ?? WINDOW.width, height: WINDOW.height }

@@ -36,7 +36,14 @@ import {
 import type { CheckState } from "./A11yTab.tsx";
 import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
-import { DeviceSlot, inkScheme, roomSizing, useFramedDevice } from "./DeviceSlot.tsx";
+import {
+  DeviceSlot,
+  deviceAddress,
+  inkScheme,
+  isWaitingForDevice,
+  roomSizing,
+  useFramedDevice
+} from "./DeviceSlot.tsx";
 import { Dock } from "./Dock.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
@@ -339,18 +346,17 @@ export const Stage = ({
   const hasClock = clocked === story.id && !isComparing(view);
   // the frame loads again only for another story or style sheets; the rest of the view (the switches, the language
   // among them) is sent live
-  const address = frameAddress(
-    frameUrl,
-    story.id,
-    useLoadedView(`${story.id}|${view.sheets}`, view),
-    switches
+  // a device sets the story's width and height in place of the stage's own, and its story area is the toolbar's width
+  const shown = shownDevice(view, deviceDefaultOf(catalogue.device, story.device));
+  const framed = useFramedDevice(shown);
+  const address = deviceAddress(
+    frameAddress(frameUrl, story.id, useLoadedView(`${story.id}|${view.sheets}`, view), switches),
+    framed
   );
   useLiveView(storyRef, view, !isComparing(view));
   useScrollMemory(storyRef, scroll);
-  // a device sets the story's width and height in place of the stage's own, and its screen is the toolbar's width
-  const framed = useFramedDevice(shownDevice(view, deviceDefaultOf(catalogue.device, story.device)));
   const isSystemDark = useSystemDark();
-  const screenWidth = framed?.drawing.screen.width;
+  const screenWidth = framed?.area.width;
   useEffect(() => {
     if (screenWidth !== undefined) onShownWidthChange(screenWidth);
   }, [screenWidth, onShownWidthChange]);
@@ -461,17 +467,19 @@ export const Stage = ({
                     scheme={inkScheme(schemeOf(view, switches), isSystemDark)}
                     background={backgroundOf(view)}
                   >
-                    <FrameView
-                      ref={frameRef}
-                      key={story.id}
-                      title={title}
-                      address={address}
-                      heights={heights}
-                      settled={settled}
-                      fallbackHeight={measuredHeight ?? lastHeight}
-                      sceneHeight={story.height}
-                      fixedHeight={framed?.drawing.screen.height ?? fixedHeight}
-                    />
+                    {isWaitingForDevice(shown, framed) ? null : (
+                      <FrameView
+                        ref={frameRef}
+                        key={story.id}
+                        title={title}
+                        address={address}
+                        heights={heights}
+                        settled={settled}
+                        fallbackHeight={measuredHeight ?? lastHeight}
+                        sceneHeight={story.height}
+                        fixedHeight={framed?.area.height ?? fixedHeight}
+                      />
+                    )}
                   </DeviceSlot>
                 )}
               </StageViewport>

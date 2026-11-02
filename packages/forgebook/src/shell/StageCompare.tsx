@@ -10,7 +10,7 @@ import type { TreeStory } from "../storyTree.ts";
 import { frameAddress, schemeOf, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { compareVariants } from "./compareVariants.ts";
-import { DeviceSlot, type FramedDevice, inkScheme } from "./DeviceSlot.tsx";
+import { DeviceSlot, deviceAddress, type FramedDevice, inkScheme } from "./DeviceSlot.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { useSystemDark } from "./useSystemDark.ts";
 
@@ -76,12 +76,12 @@ export const StageCompare = ({
             >
               <FrameView
                 title={`${title} · ${variant.label}`}
-                address={frameAddress(frameUrl, story.id, cellView, switches)}
+                address={deviceAddress(frameAddress(frameUrl, story.id, cellView, switches), framed)}
                 heights={heights}
                 settled={settled}
                 fallbackHeight={fallbackHeight}
                 sceneHeight={story.height}
-                fixedHeight={framed?.drawing.screen.height}
+                fixedHeight={framed?.area.height}
               />
             </DeviceSlot>
           </figure>

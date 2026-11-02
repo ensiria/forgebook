@@ -38,6 +38,8 @@ export type StoryCheckStory = {
   readonly height?: number;
   /** Whether it is about logic, not looks (`parameters.logic`): every variant then means its default view only. */
   readonly isLogic?: boolean;
+  /** Whether it draws edge to edge in a device (`parameters.device.edgeToEdge`), for a view that names one. */
+  readonly isEdgeToEdge?: boolean;
 };
 
 /** What a check is asked to do. */

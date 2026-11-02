@@ -14,7 +14,8 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import type { DeviceDrawing } from "../deviceDrawing.ts";
-import type { ShownDevice } from "../deviceView.ts";
+import type { StoryArea } from "../devices.ts";
+import type { ShownDevice, StoryDevice } from "../deviceView.ts";
 import type * as DevicePartsModule from "./device/deviceParts.tsx";
 import type { StageViewportProps } from "./StageViewport.tsx";
 
@@ -66,6 +67,8 @@ export type FramedDevice = {
   readonly shown: ShownDevice;
   /** Its drawing. */
   readonly drawing: DeviceDrawing;
+  /** The part of its screen the story is drawn in: its viewport, and the safe areas it is told. */
+  readonly area: StoryArea;
 };
 
 /**
@@ -73,18 +76,45 @@ export type FramedDevice = {
  *
  * @param shown - the device shown; none for no device.
  */
-export const useFramedDevice = (shown: ShownDevice | undefined): FramedDevice | undefined => {
+export const useFramedDevice = (shown: StoryDevice | undefined): FramedDevice | undefined => {
   const parts = useDeviceParts(shown !== undefined);
   const model = shown?.model;
   const orientation = shown?.orientation;
+  const isEdgeToEdge = shown?.isEdgeToEdge === true;
   return useMemo(
     () =>
       parts === undefined || model === undefined || orientation === undefined
         ? undefined
-        : { parts, shown: { model, orientation }, drawing: parts.drawingOf({ model, orientation }) },
-    [parts, model, orientation]
+        : {
+            parts,
+            shown: { model, orientation },
+            drawing: parts.drawingOf({ model, orientation }),
+            area: parts.areaOf({ model, orientation }, isEdgeToEdge)
+          },
+    [parts, model, orientation, isEdgeToEdge]
   );
 };
+
+/**
+ * Whether a story's frame waits for its device's parts before it loads: a story drawn edge to edge is told its safe
+ * areas in its address, which only the parts know, and loading it first would load it twice.
+ *
+ * @param shown - the device shown; none for none.
+ * @param framed - the device once its parts are there.
+ */
+export const isWaitingForDevice = (
+  shown: StoryDevice | undefined,
+  framed: FramedDevice | undefined
+): boolean => shown?.isEdgeToEdge === true && framed === undefined;
+
+/**
+ * A story frame's address in its device: with the safe areas a story drawn edge to edge is told; as it is otherwise.
+ *
+ * @param address - the frame's address.
+ * @param framed - the device; none for none.
+ */
+export const deviceAddress = (address: string, framed: FramedDevice | undefined): string =>
+  framed === undefined ? address : framed.parts.addressIn(address, framed.area);
 
 /** The slot's props. */
 export type DeviceSlotProps = {

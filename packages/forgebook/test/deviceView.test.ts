@@ -18,7 +18,13 @@ import {
 } from "../src/deviceView.ts";
 
 /** A story framed in an iPhone 16 upright by default. */
-const FRAMED: DeviceDefault = { isFramed: true, model: "iphone-16", orientation: "portrait", isTouch: true };
+const FRAMED: DeviceDefault = {
+  isFramed: true,
+  model: "iphone-16",
+  orientation: "portrait",
+  isTouch: true,
+  isEdgeToEdge: false
+};
 
 /** The view that follows the story. */
 const AUTO: DeviceView = { device: "auto", orientation: "auto" };
@@ -31,7 +37,8 @@ describe("deviceDefaultOf", () => {
       isFramed: false,
       model: "iphone-16",
       orientation: "landscape",
-      isTouch: false
+      isTouch: false,
+      isEdgeToEdge: false
     });
   });
 
@@ -47,11 +54,17 @@ describe("deviceDefaultOf", () => {
 describe("shownDevice", () => {
   it("follows the story's default while the view says auto", () => {
     expect(shownDevice(AUTO, NO_DEVICE)).toBeUndefined();
-    expect(shownDevice(AUTO, FRAMED)).toEqual({ model: "iphone-16", orientation: "portrait", isTouch: true });
+    expect(shownDevice(AUTO, FRAMED)).toEqual({
+      model: "iphone-16",
+      orientation: "portrait",
+      isTouch: true,
+      isEdgeToEdge: false
+    });
     expect(shownDevice({ device: "auto", orientation: "landscape" }, FRAMED)).toEqual({
       model: "iphone-16",
       orientation: "landscape",
-      isTouch: true
+      isTouch: true,
+      isEdgeToEdge: false
     });
   });
 
@@ -60,7 +73,8 @@ describe("shownDevice", () => {
     expect(shownDevice({ device: "pixel-9", orientation: "auto" }, NO_DEVICE)).toEqual({
       model: "pixel-9",
       orientation: "portrait",
-      isTouch: true
+      isTouch: true,
+      isEdgeToEdge: false
     });
   });
 });
@@ -89,7 +103,8 @@ describe("pageDeviceDefault", () => {
       isFramed: true,
       model: "pixel-9",
       orientation: "portrait",
-      isTouch: true
+      isTouch: true,
+      isEdgeToEdge: false
     });
     expect(pageDeviceDefault(NO_DEVICE, [undefined, { model: "pixel-9" }])).toEqual(NO_DEVICE);
     const framed = pageDeviceDefault(NO_DEVICE, [{ frame: true, model: "iphone-16" }]);

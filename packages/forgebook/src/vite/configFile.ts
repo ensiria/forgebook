@@ -237,7 +237,8 @@ const DEVICE_FIELDS: Readonly<Record<string, "boolean" | "string">> = {
   frame: "boolean",
   model: "string",
   orientation: "string",
-  touch: "boolean"
+  touch: "boolean",
+  edgeToEdge: "boolean"
 };
 
 /**

@@ -36,8 +36,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - A screen meant for a phone or a tablet can be shown in a drawn device by default:
   `parameters: { device: { frame: true, model: "iphone-16" } }` (on the meta for every story; `orientation:
   "landscape"` turns it; a story in a device is touched as a phone is, unless `touch: false`). The models: `iphone-16`, `iphone-16-pro-max`, `iphone-16e`, `pixel-9`, `galaxy-s24`, `phone`
-  (generic), `ipad-mini`, `ipad-pro-13`. The story gets the model's viewport; the status bar and the camera's cut sit
-  over its top, so keep content clear of the safe area. `get_story` returns the setting as `device`. Pictures and
+  (generic), `ipad-mini`, `ipad-pro-13`. The status bar, the camera's cut and the home indicator sit
+  around it: the story is drawn inside the safe areas. A screen drawn edge to edge says `edgeToEdge: true` and pads
+  itself with `var(--forgebook-safe-area-top, env(safe-area-inset-top))` (and `-bottom`, `-left`, `-right`). `get_story` returns the setting as `device`. Pictures and
   tests stay unframed unless a view names a model: `forgebook shot <id> --view "iphone-16"` (or `"dark pixel-9
   landscape"`) gives a framed picture.
 - A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook

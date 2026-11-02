@@ -15,6 +15,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { deviceDefaultOf, NO_DEVICE } from "../../src/deviceView.ts";
 import {
   isStoryCheckReport,
   isStoryShotReport,
@@ -144,12 +145,14 @@ const runOnStories = async (
     if (typeof document === "string") return document;
     const stories = storiesNamed(document, input.id);
     if (stories.length === 0) return `No story or component "${input.id}"`;
+    const catalogueDevice = deviceDefaultOf(NO_DEVICE, config.lists.device);
     const request: StoryCheckRequest = {
       frameUrl: `${served.origin}/frame.html`,
       stories: stories.map((story) => ({
         id: story.id,
         ...(story.height === undefined ? {} : { height: story.height }),
-        ...(story.isLogic ? { isLogic: true } : {})
+        ...(story.isLogic ? { isLogic: true } : {}),
+        ...(deviceDefaultOf(catalogueDevice, story.device).isEdgeToEdge ? { isEdgeToEdge: true } : {})
       })),
       switches,
       lists: config.lists,

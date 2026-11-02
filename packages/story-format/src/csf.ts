@@ -75,6 +75,12 @@ export type StoryDeviceSetting = {
    * `true` by default. The reader can still turn touch off for it.
    */
   readonly touch?: boolean;
+  /**
+   * Whether the story draws edge to edge, under the status bar and the home indicator, as a full-screen app does; it
+   * then pads itself with the safe areas the frame writes as custom properties (`--forgebook-safe-area-top`…), since
+   * `env(safe-area-inset-*)` stays zero in a frame. `false` by default: the story sits inside the safe areas.
+   */
+  readonly edgeToEdge?: boolean;
 };
 
 /**

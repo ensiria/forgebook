@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deviceDrawing } from "../src/deviceDrawing.ts";
-import { DEVICE_MODELS, deviceModel, deviceScreen } from "../src/devices.ts";
+import { DEVICE_MODELS, deviceModel, deviceScreen, storyArea } from "../src/devices.ts";
 import { DEVICE_IDS, DEVICE_ORIENTATIONS } from "../src/deviceView.ts";
 
 describe("the device models", () => {
@@ -60,5 +60,22 @@ describe("deviceDrawing", () => {
       (shape) => shape.kind === "circle"
     );
     expect(hole?.kind === "circle" && hole.cx < 60).toBe(true);
+  });
+});
+
+describe("storyArea", () => {
+  it("puts a story inside the safe areas, or edge to edge on the whole screen, told them", () => {
+    const pixel = deviceModel("pixel-9");
+    expect(storyArea(pixel, "landscape", false)).toEqual({
+      width: 923 - 48,
+      height: 412 - 24 - 16,
+      around: { top: 24, right: 0, bottom: 16, left: 48 },
+      safeArea: { top: 0, right: 0, bottom: 0, left: 0 }
+    });
+    expect(storyArea(pixel, "portrait", true)).toMatchObject({
+      width: 412,
+      height: 923,
+      safeArea: { top: 48, bottom: 24 }
+    });
   });
 });

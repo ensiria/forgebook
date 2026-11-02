@@ -19,8 +19,9 @@ import {
   type DeviceShape,
   deviceDrawing
 } from "./deviceDrawing.ts";
-import { deviceModel, deviceScreen } from "./devices.ts";
+import { deviceModel, storyArea } from "./devices.ts";
 import { type DeviceView, NO_DEVICE, type ShownDevice, shownDevice } from "./deviceView.ts";
+import { withSafeArea } from "./safeAreaParameter.ts";
 
 /** A text made safe inside markup. */
 const escaped = (text: string): string =>
@@ -72,19 +73,34 @@ export type FramedPicture = {
   readonly height: number;
 };
 
+/** What a framed picture is made of. */
+export type PictureRequest = {
+  /** The device and how it is held. */
+  readonly shown: NamedDevice;
+  /** Whether the story draws edge to edge (`parameters.device.edgeToEdge`); inside the safe areas otherwise. */
+  readonly isEdgeToEdge: boolean;
+  /** The story's picture at its area's size (`deviceViewport`), a PNG as base64. */
+  readonly picture: string;
+  /** The story's scheme, which the hardware and the status bar's ink follow. */
+  readonly scheme: "light" | "dark";
+  /** The colour of the story's page, which fills the screen around a story inside the safe areas, as a CSS colour. */
+  readonly background: string;
+};
+
+/** A CSS colour as the browser computes one (`rgb(242, 242, 247)`, `#fff`); anything else is drawn transparent. */
+const safeColour = (colour: string): string => (/^[#a-z0-9(),.%\s]+$/i.test(colour) ? colour : "transparent");
+
 /**
- * The page that draws a story's picture in a device.
+ * The page that draws a story's picture in a device: the story in its area of the screen, the screen around it on
+ * the story's page colour.
  *
- * @param shown - the device and how it is held.
- * @param picture - the story's picture at the device's viewport, a PNG as base64.
- * @param scheme - the story's scheme, which the hardware and the status bar's ink follow.
+ * @param request - the device, the picture, the story's scheme and page colour.
  */
-export const framedPicture = (
-  shown: ShownDevice,
-  picture: string,
-  scheme: "light" | "dark"
-): FramedPicture => {
-  const drawing = deviceDrawing(deviceModel(shown.model), shown.orientation);
+export const framedPicture = (request: PictureRequest): FramedPicture => {
+  const { shown, scheme } = request;
+  const model = deviceModel(shown.model);
+  const drawing = deviceDrawing(model, shown.orientation);
+  const area = storyArea(model, shown.orientation, request.isEdgeToEdge);
   const paints = DEVICE_PAINTS[scheme];
   const paint = (name: DevicePaint): string => (name === "ink" ? DEVICE_INK[scheme] : paints[name]);
   const { screen } = drawing;
@@ -93,7 +109,9 @@ export const framedPicture = (
     '<html><body style="margin:0;background:transparent">',
     `<div style="position:relative;width:${drawing.width}px;height:${drawing.height}px">`,
     layerMarkup(drawing, drawing.under, paint),
-    `<img alt="" src="data:image/png;base64,${picture}" style="position:absolute;left:${screen.x}px;top:${screen.y}px;width:${screen.width}px;height:${screen.height}px;border-radius:${screen.radius}px">`,
+    `<div style="position:absolute;overflow:hidden;left:${screen.x}px;top:${screen.y}px;width:${screen.width}px;height:${screen.height}px;border-radius:${screen.radius}px;background:${safeColour(request.background)}">`,
+    `<img alt="" src="data:image/png;base64,${request.picture}" style="position:absolute;left:${area.around.left}px;top:${area.around.top}px;width:${area.width}px;height:${area.height}px">`,
+    "</div>",
     layerMarkup(drawing, drawing.over, paint),
     "</div></body></html>"
   ].join("");
@@ -112,11 +130,27 @@ export const namedDevice = (view: DeviceView): NamedDevice | undefined => {
 };
 
 /**
- * The viewport a device gives a story, held as shown.
+ * The viewport a device gives a story, held as shown: inside the safe areas, or the whole screen edge to edge.
  *
  * @param shown - the device and how it is held.
+ * @param isEdgeToEdge - whether the story draws edge to edge.
  */
-export const deviceViewport = (shown: NamedDevice): { readonly width: number; readonly height: number } => {
-  const { width, height } = deviceScreen(deviceModel(shown.model), shown.orientation);
+export const deviceViewport = (
+  shown: NamedDevice,
+  isEdgeToEdge: boolean
+): { readonly width: number; readonly height: number } => {
+  const { width, height } = storyArea(deviceModel(shown.model), shown.orientation, isEdgeToEdge);
   return { width, height };
 };
+
+/**
+ * A story frame's address in a device: told the safe areas when it draws edge to edge, as it is otherwise.
+ *
+ * @param address - the frame's address.
+ * @param shown - the device and how it is held.
+ * @param isEdgeToEdge - whether the story draws edge to edge.
+ */
+export const deviceFrameAddress = (address: string, shown: NamedDevice, isEdgeToEdge: boolean): string =>
+  isEdgeToEdge
+    ? withSafeArea(address, storyArea(deviceModel(shown.model), shown.orientation, true).safeArea)
+    : address;
