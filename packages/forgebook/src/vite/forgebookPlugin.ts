@@ -24,7 +24,7 @@ import { dirname, join, resolve } from "node:path";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 import ts from "typescript-6";
-import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from "vite";
+import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
@@ -520,6 +520,11 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (page !== undefined) return pagePath(page) ?? null;
       if (!source.endsWith(FILES_QUERY) || importer === undefined) return null;
       return filesId(dirname(importer), source.slice(0, -FILES_QUERY.length));
+    },
+    // a warning and not a failure: a theme a reader can still use must not stop a catalogue from building
+    configResolved: (resolved: { readonly logger: Logger }): void => {
+      for (const problem of config?.shell.problems ?? [])
+        resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
     },
     configureServer: (server: ViteDevServer): void => {
       server.httpServer?.on("close", (): void => void docs?.close());

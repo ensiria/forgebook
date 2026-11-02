@@ -1,6 +1,6 @@
 /**
  * The instructions `forgebook agents` gives a project's coding agents: Forgebook's section of the project's
- * `AGENTS.md`, and the same text as a Claude Code skill.
+ * `AGENTS.md`, and the same text as an Agent Skill, in the folder the standard names and in Claude Code's.
  *
  * @remarks
  * The section sits between two markers, so running the command again replaces its own text and leaves the rest of the
@@ -36,7 +36,13 @@ export const withAgentsSection = (existing: string | undefined, section: string)
 };
 
 /**
- * The instructions as a Claude Code skill: its name and when to use it, then the text.
+ * Where the skill is written, from the project's root: `.agents/skills` is the Agent Skills standard's folder, which
+ * Codex and others read; Claude Code reads its own. A skill's folder is named after it, as the standard requires.
+ */
+export const SKILL_FOLDERS = [".agents/skills/forgebook", ".claude/skills/forgebook"] as const;
+
+/**
+ * The instructions as an Agent Skill: its name and when to use it, then the text.
  *
  * @param section - the instructions.
  */

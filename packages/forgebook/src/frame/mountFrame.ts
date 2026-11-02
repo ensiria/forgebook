@@ -46,8 +46,9 @@ import type { PlayToolsLoader } from "./playStory.ts";
 import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
+import type { MockToolsLoader } from "./storyMocks.ts";
 import { mergedPreviews, readPreview, readStory } from "./storyModule.ts";
-import { runStory, type StoryControls } from "./storyRun.ts";
+import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
 import { followTouch } from "./touchLayer.ts";
 
 /** What an app passes to the frame. */
@@ -69,6 +70,8 @@ export type FrameConfig = {
   readonly lists?: CatalogueLists;
   /** Loads the play tools, when the project installs Testing Library (the generated frame passes it then). */
   readonly playTools?: PlayToolsLoader;
+  /** Loads MSW, for a story that mocks its API; none when the project does not install it. */
+  readonly mockTools?: MockToolsLoader;
 };
 
 /**
@@ -120,6 +123,15 @@ const answerShell = (
       );
   }
 };
+
+/** The tools a project installed, for a story that uses them. */
+const optionalTools = ({
+  playTools,
+  mockTools
+}: FrameConfig): Pick<StoryRunOptions, "playTools" | "mockTools"> => ({
+  ...(playTools === undefined ? {} : { playTools }),
+  ...(mockTools === undefined ? {} : { mockTools })
+});
 
 /**
  * Shows the story the address names in the given element.
@@ -228,7 +240,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       container,
       story,
       identity: { id: storyId, name: location.story.name, title: location.component.title },
-      ...(config.playTools === undefined ? {} : { playTools: config.playTools }),
+      ...optionalTools(config),
       renderer: config.renderer,
       clock,
       decorators: preview.decorators,
