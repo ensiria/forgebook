@@ -92,6 +92,9 @@ export const storyFileKeys = (root: string, patterns: readonly string[]): string
  */
 export const USAGE_PREFIX = "virtual:forgebook-usage:";
 
+/** What a group's "Used in" id ends with to ask for what each story reaches instead (`storyReach.ts`). */
+export const REACH_QUERY = "?reach";
+
 /**
  * The id prefix of a group's search index: the group follows (`storyFilesGroupText`). The plugin answers it
  * (`searchModule.ts`) only when a page asks, on the first search.
@@ -161,6 +164,7 @@ export const indexedStoryFiles = (
  * @param watch - adds a file whose edit renews the module (each story file: its index is in the module).
  * @param hasUsage - whether the group offers its "Used in" loader (the catalogue did not turn it off).
  * @param cache - the indexes kept between starts.
+ * @param hasReach - whether the group offers what each story reaches, for a dev server's tools.
  * @returns the module's code, or a message saying which file cannot be indexed.
  */
 export const storyFilesModule = (
@@ -168,7 +172,8 @@ export const storyFilesModule = (
   pattern: string,
   watch: (file: string) => void,
   hasUsage = true,
-  cache?: DiskCache<KeptIndex>
+  cache?: DiskCache<KeptIndex>,
+  hasReach = false
 ): string => {
   const files = indexedStoryFiles(root, pattern, watch, cache);
   const keys = files.map((file) => file.key);
@@ -201,8 +206,16 @@ export const storyFilesModule = (
     "code: column(3),",
     "pages: column(4),",
     `search: () => import(${search}).then((module) => module.default)${hasUsage ? "," : ""}`,
-    ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
-    ...(hasUsage ? [`reach: () => import(${usage}).then((module) => module.reach)`] : []),
+    ...(hasUsage
+      ? [`usage: () => import(${usage}).then((module) => module.default)${hasReach ? "," : ""}`]
+      : []),
+    // a module of its own, which only the dev server's tools load: in a large library every story reaches thousands of
+    // files, hundreds of megabytes the page would otherwise download with "Used in"
+    ...(hasUsage && hasReach
+      ? [
+          `reach: () => import(${JSON.stringify(`${JSON.parse(usage)}${REACH_QUERY}`)}).then((module) => module.default)`
+        ]
+      : []),
     "};"
   ].join("\n");
 };

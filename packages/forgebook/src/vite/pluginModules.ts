@@ -12,6 +12,7 @@ import type { PackJson } from "./packedModule.ts";
 import {
   indexedStoryFiles,
   type KeptIndex,
+  REACH_QUERY,
   storyFilesGroupOf,
   storyFilesModule,
   USAGE_PREFIX
@@ -55,16 +56,18 @@ export const docsModule = (
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param hasUsage - whether the group offers its "Used in" loader.
  * @param cache - the indexes kept between starts.
+ * @param isServing - whether a dev server runs: only its tools ask what each story reaches.
  * @throws when a story file cannot be indexed.
  */
 export const patternModule = (
   id: string,
   watch: (file: string) => void,
   hasUsage: boolean,
-  cache: DiskCache<KeptIndex> | undefined
+  cache: DiskCache<KeptIndex> | undefined,
+  isServing: boolean
 ): { code: string; moduleType: "js" } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  return { code: storyFilesModule(root, pattern, watch, hasUsage, cache), moduleType: "js" };
+  return { code: storyFilesModule(root, pattern, watch, hasUsage, cache, isServing), moduleType: "js" };
 };
 
 /**
@@ -81,7 +84,9 @@ export const usageModule = async (
   isServing: boolean,
   pack: PackJson
 ): Promise<{ code: string; moduleType: "js" }> => {
-  const { root, pattern } = storyFilesGroupOf(id.slice(USAGE_ID_PREFIX.length));
+  const isReach = id.endsWith(REACH_QUERY);
+  const group = id.slice(USAGE_ID_PREFIX.length, isReach ? -REACH_QUERY.length : undefined);
+  const { root, pattern } = storyFilesGroupOf(group);
   const files = indexedStoryFiles(root, pattern, watch);
   const graph = await usage(
     files.map((file) => ({
@@ -89,6 +94,17 @@ export const usageModule = async (
       exports: file.index.stories.map((story) => story.exportName)
     }))
   );
+  if (isReach) {
+    // on the dev server only: a static build has no tools to ask, and this would ship every story's files to the reader
+    const reach =
+      isServing && typeof graph !== "string"
+        ? storyReach(
+            graph,
+            files.map((file) => ({ storyFile: file.file, title: file.index.title }))
+          )
+        : [];
+    return { code: `export default ${JSON.stringify(reach)};`, moduleType: "js" };
+  }
   const answer =
     typeof graph === "string"
       ? { error: graph }
@@ -102,16 +118,7 @@ export const usageModule = async (
             }))
           )
         );
-  // on the dev server only: a static build has no tools to ask, and this would ship every story's files to the reader
-  const reach =
-    isServing && typeof graph !== "string"
-      ? storyReach(
-          graph,
-          files.map((file) => ({ storyFile: file.file, title: file.index.title }))
-        )
-      : [];
-  const code = `export default ${pack(JSON.stringify(answer))};\nexport const reach = ${JSON.stringify(reach)};`;
-  return { code, moduleType: "js" };
+  return { code: `export default ${pack(JSON.stringify(answer))};`, moduleType: "js" };
 };
 
 /**

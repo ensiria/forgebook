@@ -355,7 +355,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    return patternModule(id, watch, config?.lists.usedIn !== false, indexCache());
+    return patternModule(id, watch, config?.lists.usedIn !== false, indexCache(), isServing());
   };
   /**
    * The modules a file added or removed changes; none when it changes no list.
