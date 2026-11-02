@@ -7,6 +7,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { normalizePath } from "vite";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -195,8 +196,12 @@ describe("extractComponentDocs", () => {
   it("names the files its docs come from, its parts' too, so the catalogue renews them when one is edited", () => {
     const component = extractStoryComponent(join(KIT, "Select.stories.tsx"));
     if (typeof component === "string" || !("sources" in component)) throw new Error(String(component));
-    expect(component.file).toBe(join(KIT, "Select.tsx"));
-    expect(component.sources).toEqual([join(KIT, "Select.tsx"), join(KIT, "SelectGroup.tsx")]);
+    // TypeScript names files with forward slashes on every system, as Vite does
+    expect(component.file).toBe(normalizePath(join(KIT, "Select.tsx")));
+    expect(component.sources).toEqual([
+      normalizePath(join(KIT, "Select.tsx")),
+      normalizePath(join(KIT, "SelectGroup.tsx"))
+    ]);
   });
 
   it("answers no component for a page without one", () => {
