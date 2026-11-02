@@ -108,7 +108,8 @@ export type CatalogueLists = {
    */
   readonly usedIn?: boolean;
   /**
-   * The shell's appearance before a reader picks one: `system` (the default) follows the system's light or dark. A
+   * The shell's appearance before a reader picks one; `story` follows the colour scheme of the story shown, for a
+   * library that wants one page with its stories: `system` (the default) follows the system's light or dark. A
    * reader's choice, kept in their browser, wins over it; the frames follow the view's switches, never this.
    */
   readonly appearance?: Appearance;
@@ -125,11 +126,11 @@ export type CatalogueLists = {
   readonly views?: readonly CatalogueView[];
 };
 
-/** The shell's own appearance: light, dark, or the system's. */
-export type Appearance = "light" | "dark" | "system";
+/** The shell's own appearance: light, dark, the system's, or the colour scheme of the story shown. */
+export type Appearance = "light" | "dark" | "system" | "story";
 
 /** The appearances, in the order the reader is offered them. */
-export const APPEARANCES: readonly Appearance[] = ["light", "dark", "system"];
+export const APPEARANCES: readonly Appearance[] = ["light", "dark", "system", "story"];
 
 /** A catalogue's lists with the defaults filled in, and its switches: what the shell and the frame read. */
 export type CatalogueSettings = {

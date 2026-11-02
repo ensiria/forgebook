@@ -1,6 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors` and `story_shot`.
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `list_tokens`, `get_token`
+ * and `nearest_token`.
  *
  * @module
  */
@@ -106,6 +107,103 @@ export const catalogueTools = ({
         ? { structured: { error: report }, isError: true }
         : { structured: report, isError: false };
     }
+  },
+  {
+    name: "changed_stories",
+    description:
+      "The stories a change touches: every story that reaches a file git says changed, through the imports. Call it after editing, then run check_story on what it lists.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "The commit to compare with; HEAD by default, so what is not committed."
+        }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("changed", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
+  },
+  {
+    name: "find_component",
+    description:
+      'The components a description fits, best first, in your own words ("modal", "radio tile group"): call it before writing a component that may already exist. Each with the words it matched and missed, when to use it, and its first story.',
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", description: "What you are looking for, in any words." } },
+      required: ["query"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("find", new URLSearchParams({ query: textOf(args, "query") ?? "" })))
+  },
+  {
+    name: "list_tokens",
+    description:
+      "The design tokens of this catalogue, to use instead of a colour, size or duration written by hand: how many of each type, and the first of them. To replace a raw value, call nearest_token; for one token's description, get_token.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          description: "A token type (color) or a first group (space); none for all."
+        },
+        limit: { type: "number", description: "The most tokens to give; 100 by default." }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(
+        await ask(
+          "tokens",
+          new URLSearchParams({
+            category: textOf(args, "category") ?? "",
+            limit: String(args["limit"] ?? "")
+          })
+        )
+      )
+  },
+  {
+    name: "get_token",
+    description:
+      "One design token: its value in each theme, what it is for, the token it aliases, and why not to use it if deprecated.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "The token's name, as list_tokens gives it." } },
+      required: ["name"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("token", new URLSearchParams({ name: textOf(args, "name") ?? "" })))
+  },
+  {
+    name: "nearest_token",
+    description:
+      "The tokens nearest a value written by hand, nearest first: call it before writing a raw colour or size. Use a match only when `isClose` or `isExact` is true; otherwise no token fits, so say so rather than force one. Deprecated tokens are left out.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: {
+          type: "string",
+          description: "The value, as code writes it: #1c1b1b, rgb(1 2 3), 16px, 200ms."
+        },
+        type: {
+          type: "string",
+          description:
+            "What to compare with: color, dimension, duration, number, fontWeight, or a CSS property (background, padding, font-size). Read from the value when left out."
+        }
+      },
+      required: ["value"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(
+        await ask(
+          "nearest-token",
+          new URLSearchParams({ value: textOf(args, "value") ?? "", type: textOf(args, "type") ?? "" })
+        )
+      )
   },
   {
     name: "list_stories",

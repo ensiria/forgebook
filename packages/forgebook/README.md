@@ -238,17 +238,94 @@ become switches. It reads React on Vite (`@storybook/react-vite`) only, never re
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
-| `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and a Claude Code skill with `--skill`) |
+| `forgebook changed` | Lists the stories a change touches, through what they import |
+| `forgebook verify` | Runs the checks on every story a change touches, with one exit code |
+| `forgebook find` | Finds components by what they are for, in your own words |
+| `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
+| `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+## Mocking an API
+A story that fetches gets its answers from [MSW](https://mswjs.io), an optional peer. Install it and write its worker into
+the catalogue's public folder:
+```sh
+npm install --save-dev msw
+npx msw init public
+```
+```tsx
+import { http, HttpResponse } from "msw";
+/** The list, from a mocked API. */
+export const Loaded: Story<typeof Users> = {
+  parameters: {
+    msw: { handlers: [http.get("/api/users", () => HttpResponse.json([{ name: "Ada" }]))] }
+  }
+};
+`parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
+on the dev server and in a static build.
+## A preview for every pull request
+`forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
+for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
+artefact; the last step is yours, and any host works:
+```yaml
+# .github/workflows/catalogue-preview.yml
+name: catalogue preview
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx forgebook build --out preview --base "/pr-${{ github.event.number }}/"
+      - uses: actions/upload-artifact@v4
+          name: catalogue-preview
+          path: preview
+      # then publish the folder, for example:
+      # GitHub Pages:  actions/upload-pages-artifact, then actions/deploy-pages (one site, so without --base per PR)
+      # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
+      # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
+A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+## Your look in the shell
+The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
+written into the page at build, and the frames are left alone, since they belong to your stories.
+```ts
+// forgebook.config.ts
+shell: {
+  theme: {
+    light: { accent: "#7036c4", "accent-text": "#5a2aa0" },
+    dark: { accent: "#b28bff" },
+    fonts: { sans: "Inter, sans-serif" },
+    radius: { control: "4px", card: "8px" }
+}
+Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
+`window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,
+`danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
+theme too, and the catalogue's wins role by role.
+The reader's Appearance menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
+dark shell. It stays on the system's while comparing, since several themes share the stage. `appearance: "story"` makes
+it the catalogue's default; a reader's own choice always wins.
+When the catalogue starts, a role that does not exist is named, and so is a hex colour that leaves a text or code under
+4.5:1 on its ground, or the accent, which draws the keyboard's focus, under 3:1. Other colour notations are not checked.
+Fonts are yours to load: a web font goes in a style sheet of your own, `shell.css`, with `@font-face`. That sheet loads
+after the shell's. It is also an escape hatch, since the shell's class names are not public API and can change in any
+release. Layout is not themable, though a font does change how wide text runs.
+
 ## For agents
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
 and the commands that check one, as a section of `AGENTS.md` (renewed in place when it runs again; `--skill` writes
-the same as a Claude Code skill).
+the same as an Agent Skill any agent can load).
 
 A coding agent can use the catalogue while it works: find a story's id, read a story's args and its component's
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for
@@ -258,10 +335,30 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers eight tools: `check_page`, which checks a real page of the application, `list_stories`, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers thirteen tools: `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
+
+A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
+`@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
+The most common mistake of an agent working on a design system is a colour or a size written by hand. Name your
+[DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and each theme in a file of
+its own, and agents can ask what to write instead:
+```ts
+tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
+```
+```sh
+npx forgebook tokens --category color --json
+npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whether each is really close
+`forgebook mcp` offers the same as `list_tokens`, `get_token` and `nearest_token`. References (`{a.b}`, `$ref`), `$extends`
+and `$root` are followed, and a base alias follows what a theme overrides. Deprecated tokens are never suggested. Colours
+in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed but counted as `uncompared`. A theme can
+reference the base; a `$ref` reaches only its own file.
+
+An agent that cannot find a component writes a new one, often because the code and the designers use different words.
+`forgebook find` and `find_component` search names, the meta's `keywords`, titles and stories, with the usual synonyms
+(`modal` finds a `Dialog`): write `keywords: ["radio tile group"]` on `OptionCards` and it is found.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
 component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),

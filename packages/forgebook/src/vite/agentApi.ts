@@ -22,10 +22,15 @@ import type {
   AgentComponent,
   AgentStory,
   AgentUsingComponent,
+  ChangedStoriesDocument,
   ErrorsDocument,
+  FoundComponentsDocument,
+  NearestTokensDocument,
   StoriesDocument,
   StoryDocument,
-  StoryLinks
+  StoryLinks,
+  TokenDocument,
+  TokensDocument
 } from "./agent.types.ts";
 
 /** Where the catalogue is served, for the links: its page and its frame page. */
@@ -313,3 +318,55 @@ export const isStoriesDocument = (value: unknown): value is StoriesDocument =>
  */
 export const isStoryDocument = (value: unknown): value is StoryDocument =>
   isRecord(value) && value["schema"] === 1 && isRecord(value["story"]) && Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is the tokens document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isTokensDocument = (value: unknown): value is TokensDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["tokens"]) &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is one token's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isTokenDocument = (value: unknown): value is TokenDocument =>
+  isRecord(value) && value["schema"] === 1 && isRecord(value["token"]) && Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is the nearest tokens' document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isNearestTokensDocument = (value: unknown): value is NearestTokensDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["matches"]) &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is an intent search's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isFoundComponentsDocument = (value: unknown): value is FoundComponentsDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  typeof value["query"] === "string" &&
+  Array.isArray(value["components"]);
+
+/**
+ * Whether a value is the changed stories' document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isChangedStoriesDocument = (value: unknown): value is ChangedStoriesDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["stories"]) &&
+  Array.isArray(value["files"]);

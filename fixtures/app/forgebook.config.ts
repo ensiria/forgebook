@@ -29,6 +29,10 @@ export default defineConfig({
   backgrounds: { custom: [{ id: "paper", label: "Paper", light: { color: "#f5efe0" } }] },
   strings: { "tabs.parts": "Parts and hooks" },
   gridStep: 4,
+  // a theme of the shell, so its tests see it reach the page and stay out of the frames
+  shell: {
+    theme: { light: { "accent-text": "#5a2aa0" }, dark: { accent: "#b28bff" }, radius: { card: "10px" } }
+  },
   // a view offered to every reader, so the shell's tests pick one the catalogue declares
   views: [{ name: "Dark phone", view: "theme=dark&width=360" }]
 });

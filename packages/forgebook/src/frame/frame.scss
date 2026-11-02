@@ -9,6 +9,7 @@
   // the catalogue's own colours (its error message) in the light palette: the frame's look is the view's, never the
   // shell's appearance
   :root {
+    @include mixins.look;
     @include mixins.palette($light);
   }
 
