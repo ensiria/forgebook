@@ -186,16 +186,42 @@ const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   return { status: 200, body: storyDocument(location, parts, pages, view, usage) };
 };
 
+/**
+ * The commit a change is measured from: the point the branch left `since`, so what `since` gained afterwards is not read
+ * as this change's. Resolved first, since `since` comes from a request and git would take `--output=…` as an option.
+ *
+ * @param dir - the catalogue's folder.
+ * @param since - a commit, as asked.
+ * @returns the commit's hash, or none when it names no commit.
+ */
+const changeBase = async (dir: string, since: string): Promise<string | undefined> => {
+  const git = async (...args: readonly string[]): Promise<string> =>
+    (await run("git", [...args], { cwd: dir })).stdout.trim();
+  try {
+    const commit = await git("rev-parse", "--verify", "--quiet", "--end-of-options", `${since}^{commit}`);
+    return await git("merge-base", commit, "HEAD");
+  } catch {
+    return undefined;
+  }
+};
+
 /** The files git says changed since a commit, tracked or new, absolute, and relative to the repository. */
 const changedFiles = async (
   dir: string,
-  since: string
+  base: string
 ): Promise<{ readonly root: string; readonly files: readonly string[] }> => {
   const git = async (...args: readonly string[]): Promise<string> =>
     (await run("git", [...args], { cwd: dir })).stdout.trim();
   const root = await git("rev-parse", "--show-toplevel");
-  const tracked = await git("diff", "--name-only", since);
-  const untracked = await git("ls-files", "--others", "--exclude-standard", "--full-name");
+  const tracked = await git("-c", "core.quotePath=false", "diff", "--no-ext-diff", "--name-only", base, "--");
+  const untracked = await git(
+    "-c",
+    "core.quotePath=false",
+    "ls-files",
+    "--others",
+    "--exclude-standard",
+    "--full-name"
+  );
   const files = [...tracked.split("\n"), ...untracked.split("\n")].filter((file) => file !== "");
   return { root, files: [...new Set(files)] };
 };
@@ -217,7 +243,9 @@ const changedAnswer = async ({
   view
 }: RouteContext): Promise<AgentAnswer> => {
   const since = params.get("since") || "HEAD";
-  const { root, files } = await changedFiles(config.dir, since);
+  const base = await changeBase(config.dir, since);
+  if (base === undefined) return { status: 400, body: { error: `"${since}" names no commit here` } };
+  const { root, files } = await changedFiles(config.dir, base);
   const reaches = await Promise.all(
     loaded.sources.flatMap((source) =>
       source.files.map(async (group) => {

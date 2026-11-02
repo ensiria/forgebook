@@ -202,6 +202,22 @@ describe("forgebook changed", { timeout: 60_000 }, () => {
     expect(run.exitCode).toBe(0);
     const body: unknown = JSON.parse(run.stdout);
     expect(body).toMatchObject({ files: ["src/helper.ts"], stories: [{ title: "Layout/Card" }] });
+
+    // what asks is a request: an option in the place of a commit must reach git as nothing
+    const precious = join(project, "precious.txt");
+    writeFileSync(precious, "keep\n");
+    const refused = runScriptProcess(ENTRY, [
+      "changed",
+      `--since=--output=${precious}`,
+      "--config",
+      config,
+      "--url",
+      NO_SERVER,
+      "--json"
+    ]);
+    expect(refused.exitCode).not.toBe(0);
+    expect(refused.stderr).toContain("names no commit");
+    expect(readFileSync(precious, "utf8")).toBe("keep\n");
   });
 });
 
