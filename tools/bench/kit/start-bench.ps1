@@ -130,7 +130,8 @@ function Remove-Kit([string] $Node) {
   Set-Location -LiteralPath $env:USERPROFILE
   foreach ($child in Get-ChildItem -LiteralPath $KitHome -Force) {
     if ($child.Name -eq 'tools') { continue }
-    & $Node -e 'require("fs").rmSync(process.argv[1], { recursive: true, force: true })' $child.FullName
+    # single quotes inside: Windows PowerShell passes a native program an argument's double quotes stripped
+    & $Node -e 'require(''fs'').rmSync(process.argv[1], { recursive: true, force: true })' $child.FullName
   }
   Remove-Item -LiteralPath $KitHome -Recurse -Force
   Say "Cartella $KitHome cancellata."
