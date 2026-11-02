@@ -10,12 +10,15 @@
  *
  * @module
  */
+import { join, relative } from "node:path";
+
 import type { ToolName } from "./bench.types.ts";
 import type { CorpusComponent, StoryForm } from "./corpus.ts";
+import type { CorpusStorybook } from "./realCorpus.types.ts";
 
 /** A command, from a target's folder. */
 export type TargetCommand = {
-  /** The program, in the project's `node_modules/.bin`. */
+  /** The program, in the project's `node_modules/.bin`, or an absolute path. */
   readonly bin: string;
   /** Its arguments. */
   readonly args: readonly string[];
@@ -186,6 +189,35 @@ export const LADLE: Target = {
   build: (out) => ({ bin: "ladle", args: ["build", "--outDir", out] }),
   storyUrl: (base, component) =>
     `${base}?story=${component.group.toLowerCase()}--${component.name.toLowerCase()}--${firstStory(component).toLowerCase()}`
+};
+
+/**
+ * A library's own Storybook: its version, its configuration and its addons, as its users start it. Its builder is
+ * whichever the library chose, so a comparison on a real library says what that library's people wait for, not how
+ * two tools compare on equal terms.
+ *
+ * @param storybook - how it runs.
+ * @param clone - the clone's root, whose `node_modules/.bin` holds the program.
+ */
+export const libraryStorybook = (storybook: CorpusStorybook, clone: string): Target => {
+  const { configDir, env, folder } = storybook;
+  const directory = join(clone, folder);
+  const bin = join(clone, "node_modules/.bin/storybook");
+  const inClone = (cache: string): string => relative(directory, join(clone, cache));
+  const variables = { STORYBOOK_DISABLE_TELEMETRY: "1", ...env };
+  return {
+    ...STORYBOOK,
+    configFiles: {},
+    caches: [...STORYBOOK.caches, inClone("node_modules/.vite"), inClone("node_modules/.cache")],
+    dev: (port) => {
+      const { args } = STORYBOOK.dev(port);
+      return { bin, args: [...args, "--config-dir", configDir], env: variables };
+    },
+    build: (out) => {
+      const { args } = STORYBOOK.build(out);
+      return { bin, args: [...args, "--config-dir", configDir], env: variables };
+    }
+  };
 };
 
 /** Every tool, in report order. */

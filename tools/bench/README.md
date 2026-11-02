@@ -1,8 +1,8 @@
 # bench
 
 Forgebook says it is light and fast, so it has to show it. This command measures what a user actually gets, on a
-generated library of components, and with `--compare` runs Storybook and Ladle on the same library through the same
-definitions. It is a repository tool: nothing here is published, and it adds nothing to the packages' install.
+generated library of components or on a real design system at a pinned commit, and with `--compare` runs Storybook and
+Ladle on the same library through the same definitions. It is a repository tool: nothing here is published, and it adds nothing to the packages' install.
 
 ## What it measures
 
@@ -28,6 +28,7 @@ fully shown, by then painted, a fade included: waiting from outside would measur
 | `installSize` | `node_modules` on disk of a TypeScript project with Vite, React and the tool |
 | `installAdded` | what the tool adds to that project, installed there: a tool with its own Vite keeps both |
 | `packages`, `directDependencies` | the packages installed, and what the tool's main package declares |
+| `storiesListed`, `storiesDrawn` | the stories the catalogue lists, and those whose frame drew, on a real library |
 
 Times are the median and range of `--runs` samples; HMR has `--edits` samples and a p95, which needs at least 20 to mean
 anything. A metric a tool cannot have is `n/a`, never a zero. A metric that fails is recorded, the run goes on, and the
@@ -69,6 +70,41 @@ slow page and not of a slow computer.
 median moved more than 10 % or a metric went missing, which is how the numbers are shown to be reproducible. Keep a copy
 of the report: `report.json` is overwritten, and a run cannot be compared with itself.
 
+## Real libraries
+
+A generated library shows how a tool scales and nothing about what it cannot read. `--corpus <name>` runs on a public
+design system at a pinned commit instead, a name under `corpora/` or a folder holding a `corpus.json`:
+
+```sh
+node tools/bench/bench.mts --corpus primer --compare --work /some/folder
+```
+
+- **Pinned.** A definition holds a full commit and an `https` repository, and refuses a branch, a tag or anything that
+  would ask for credentials. The clone lands in `--work`, outside this repository, shallow and without large files.
+- **Their code is data.** The clone runs no hook and installs with lifecycle scripts off. `prepare`, when a definition
+  has one, is the only code of the library that runs before its stories, and only because those stories import what it
+  builds.
+- **Forgebook** is packed as usual and installed in `.forgebook-bench`, inside the catalogue's folder, with the corpus's
+  `forgebook.config.ts` and without React: a story and the frame have to share the library's one copy, so a library on
+  an older React is measured on it. What the library's Storybook adds to its bundler is in that file, passed through the
+  framework's plugins since the configuration has no key for Vite: comparing a tool with none of it would compare a page
+  of errors.
+- **Storybook**, with `--compare`, is the library's own: its version, its configuration, its addons, from its own install.
+  Its builder is the library's choice, so these numbers say what that library's people wait for, not how two tools
+  compare on equal terms: the generated library is for that. A library whose Storybook cannot run from the clone has none
+  in its definition, and is measured with Forgebook alone. Ladle has no place here: it does not draw object stories.
+- **Every story is opened.** The `sweep` group, first on a real library, starts a dev server, opens each story's frame and
+  groups what fails by cause, in the report's `sweep`. A build that exits 0 says nothing about the stories.
+- **`expected`** is what Storybook's own indexer counts at that commit, with the library's own globs. A run that lists
+  fewer stories, or draws fewer than it lists, fails at the end with the difference; the timings are still in the report.
+- **The install metrics** are absent: what the tool adds to a library is measured on the generated one.
+
+Each report is `report-<name>.json` in `--work`. A corpus's edits write `bench-edit-<n>` into text the story shows, and put
+the file back; a definition whose text is no longer in the pinned file fails on the first edit.
+
+To add one: count its stories with Storybook's indexer on its own globs, pin the commit, write the definition, and move
+what `viteFinal` does into its `forgebook.config.ts`.
+
 ## The budget
 
 `--budget <file>` fails a run when a metric of Forgebook is over its limit, or was not measured: a check that passes by
@@ -93,6 +129,11 @@ a measurement. `tail -F` reads it from anywhere.
 - `stamps.ts`: the time, taken inside the page.
 - `targets.ts`: everything that differs between the tools.
 - `corpus.ts`: the generated library, pure.
+- `subject.ts`: what a measurement is taken on, for a generated library and a real one.
+- `realCorpus.ts`, `realCorpus.types.ts`: a real corpus's definition, read and checked.
+- `prepareCorpus.ts`: the clone, the library's install, Forgebook beside its stories.
+- `sweep.ts`: every story opened in a browser.
+- `corpora/`: the real libraries, one folder each.
 - `prepare.ts`: packing, clean installs, the project on disk.
 - `machine.ts`, `benchStats.ts`, `reportTable.ts`, `statusFile.ts`, `staticServer.ts`, `diskUsage.ts`: what they say.
 - `budget.ts`, `budget.json`: the check of a pull request, and its limits.

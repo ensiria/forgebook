@@ -1,0 +1,42 @@
+{
+  "name": "carbon",
+  "repository": "https://github.com/carbon-design-system/carbon.git",
+  "commit": "6351ab562240c27aa28783dfeea4d4b4cbbc9052",
+  "licence": "Apache-2.0",
+  "install": ["node", ".yarn/releases/yarn-4.10.3.cjs", "install", "--immutable", "--mode=skip-build"],
+  "prepare": [
+    [
+      "node_modules/.bin/lerna",
+      "run",
+      "build",
+      "--include-dependencies",
+      "--no-private",
+      "--scope",
+      "@carbon/react"
+    ]
+  ],
+  "folder": "packages/react",
+  "expected": { "files": 173, "stories": 657 },
+  "measured": {
+    "forgebookStory": "stories:components-button--default",
+    "forgebookComponent": "stories:components-button",
+    "text": "Button",
+    "pageText": "Button",
+    "sidebar": "Components",
+    "storybookStory": "components-button--default",
+    "storybookDocs": "components-button--overview"
+  },
+  "edits": {
+    "story": {
+      "file": "src/components/Button/Button.stories.js",
+      "find": "onClick={action('onClick')}>",
+      "replace": "onClick={action('onClick')}>{edit}"
+    },
+    "component": {
+      "file": "src/components/Button/Button.tsx",
+      "find": "{iconOnlyImage ?? children}",
+      "replace": "{iconOnlyImage ?? children} {edit}"
+    }
+  },
+  "storybook": { "folder": "packages/react", "configDir": ".storybook" }
+}

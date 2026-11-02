@@ -9,18 +9,15 @@
  *
  * @module
  */
-import { join } from "node:path";
-
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { chromium } from "@playwright/test";
 
 import type { BenchReport, MachineReading, MetricResult, ToolName } from "./bench.types.ts";
 import { summary } from "./benchStats.ts";
-import { buildCorpus, type CorpusSize } from "./corpus.ts";
+import type { CorpusSize } from "./corpus.ts";
 import { machineInfo, noiseWarnings, readMachine } from "./machine.ts";
 import {
   baseOf,
-  type MeasureContext,
   measureBuild,
   measureComponentPage,
   measureEdits,
@@ -28,30 +25,27 @@ import {
   measureMemory,
   measureStart
 } from "./measure.ts";
+import { type BenchFolders, directDependencies } from "./prepare.ts";
 import {
-  type BenchFolders,
-  directDependencies,
-  type InstallResult,
-  installedVersion,
-  installOnBare,
-  installTarget,
-  targetSource,
-  writeProject
-} from "./prepare.ts";
+  type PreparedRun,
+  prepareGenerated,
+  prepareReal,
+  type RealRun,
+  realCorpusInfo,
+  type ToolRun
+} from "./prepareRun.ts";
 import type { RunStep } from "./statusFile.ts";
+import { type SweepResult, sweepStories } from "./sweep.ts";
 import type { Target } from "./targets.ts";
 
 /** The groups of metrics, as `--metric` names them. */
-export const METRIC_GROUPS = ["install", "start", "hmr", "page", "memory", "build"] as const;
+export const METRIC_GROUPS = ["install", "start", "hmr", "page", "memory", "build", "sweep"] as const;
 
 /** A group of metrics. */
 export type MetricGroup = (typeof METRIC_GROUPS)[number];
 
 /** Runs of the memory metrics: a peak is steadier than a time. */
 const MEMORY_RUNS = 3;
-
-/** The first port of a run; each tool takes the next, so a server that lingers cannot answer for another. */
-const FIRST_PORT = 62_100;
 
 /** What a benchmark is asked to do. */
 export type BenchRequest = {
@@ -63,8 +57,10 @@ export type BenchRequest = {
   readonly forgebookPackages: Readonly<Record<string, string>>;
   /** What the report says was measured of Forgebook. */
   readonly forgebookLabel: string;
-  /** The corpus's size. */
+  /** The generated corpus's size. */
   readonly size: CorpusSize;
+  /** The real library, when the run is on one. */
+  readonly real?: RealRun;
   /** Runs of each time. */
   readonly runs: number;
   /** Edits of each file. */
@@ -86,6 +82,7 @@ const groupSteps = (group: MetricGroup, runs: number, hasPage: boolean): number 
   if (group === "hmr") return 3;
   if (group === "page") return hasPage ? runs + 2 : 0;
   if (group === "memory") return MEMORY_RUNS * (hasPage ? 2 : 1) + 1;
+  if (group === "sweep") return 1;
   return runs + 1;
 };
 
@@ -95,18 +92,6 @@ const measured = (unit: "ms" | "bytes" | "count", values: readonly number[]): Me
   unit,
   summary: summary(values)
 });
-
-/** A tool's state during a run. */
-type ToolRun = {
-  /** How it is measured. */
-  readonly context: MeasureContext;
-  /** Its metrics so far. */
-  readonly metrics: Record<string, MetricResult>;
-  /** Its install, measured. */
-  readonly install: InstallResult;
-  /** The bytes it adds to a project with Vite and React. */
-  readonly onBare: number;
-};
 
 /** The steps a group goes through: a sample taken of each tool in turn. */
 type Turns = {
@@ -208,12 +193,11 @@ const warmUp = (
 ): Promise<unknown> => inTurns(tools, group, metric, 1, turns, (tool) => measureStart(tool.context, false));
 
 /** The address of a tool's component page. */
-const pageAddress = ({ context }: ToolRun): string =>
-  context.target.componentUrl?.(baseOf(context), context.component) ?? "";
+const pageAddress = ({ context }: ToolRun): string => context.subject.pageAddress?.(baseOf(context)) ?? "";
 
 /** Records why the tools without a page of a component's stories have none of a group's metrics. */
 const markPageless = (tools: readonly ToolRun[], metrics: readonly string[]): readonly ToolRun[] => {
-  const paged = tools.filter((tool) => tool.context.target.componentUrl !== undefined);
+  const paged = tools.filter((tool) => tool.context.subject.pageAddress !== undefined);
   for (const tool of tools.filter((each) => !paged.includes(each))) {
     for (const metric of metrics) {
       const { name } = tool.context.target;
@@ -228,9 +212,13 @@ const installGroup = async ({ tools, turns }: GroupRun): Promise<void> => {
   for (const tool of tools) {
     turns.step(tool, "install", 1, 1);
     const { target, directory } = tool.context;
-    tool.metrics["installSize"] = measured("bytes", [tool.install.size]);
-    tool.metrics["installAdded"] = measured("bytes", [tool.onBare]);
-    tool.metrics["packages"] = measured("count", [tool.install.packages]);
+    if (tool.install === undefined) {
+      tool.metrics["installSize"] = { kind: "absent", reason: "measured on the generated library" };
+      continue;
+    }
+    tool.metrics["installSize"] = measured("bytes", [tool.install.result.size]);
+    tool.metrics["installAdded"] = measured("bytes", [tool.install.onBare]);
+    tool.metrics["packages"] = measured("count", [tool.install.result.packages]);
     tool.metrics["directDependencies"] = measured("count", [
       await directDependencies(directory, target.mainPackage)
     ]);
@@ -283,7 +271,7 @@ const pageGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promise
 const memoryGroup = async ({ tools, turns }: GroupRun): Promise<void> => {
   await warmUp("memory", tools, "serverMemory", turns);
   const story = await inTurns(tools, "memory", "serverMemory", MEMORY_RUNS, turns, (tool) =>
-    measureMemory(tool.context, tool.context.target.storyUrl(baseOf(tool.context), tool.context.component))
+    measureMemory(tool.context, tool.context.subject.storyAddress(baseOf(tool.context)))
   );
   record(story, "serverMemory", "bytes", (sample) => sample);
   const paged = markPageless(tools, ["serverMemoryDocs"]);
@@ -311,8 +299,31 @@ const buildGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promis
   }
 };
 
+/** The stories that draw, Forgebook's alone: Storybook is what a story is read against. */
+const sweepGroup =
+  (found: { result?: SweepResult }) =>
+  async ({ tools, turns }: GroupRun): Promise<void> => {
+    for (const tool of tools) {
+      const { name } = tool.context.target;
+      if (name !== "forgebook") {
+        tool.metrics["storiesDrawn"] = { kind: "absent", reason: `${name} is what a story is read against` };
+        continue;
+      }
+      turns.step(tool, "storiesDrawn", 1, 1);
+      try {
+        const result = await sweepStories(tool.context, () => undefined);
+        found.result = result;
+        tool.metrics["storiesListed"] = measured("count", [result.listed]);
+        tool.metrics["storiesDrawn"] = measured("count", [result.drawn]);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        tool.metrics["storiesDrawn"] = { kind: "failed", reason };
+      }
+    }
+  };
+
 /** Each group's work. */
-const GROUPS: Readonly<Record<MetricGroup, (run: GroupRun) => Promise<void>>> = {
+const GROUPS: Readonly<Record<Exclude<MetricGroup, "sweep">, (run: GroupRun) => Promise<void>>> = {
   install: installGroup,
   start: startGroup,
   hmr: hmrGroup,
@@ -328,56 +339,20 @@ const GROUPS: Readonly<Record<MetricGroup, (run: GroupRun) => Promise<void>>> = 
  * @returns the report.
  */
 export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
-  const { folders, targets, size, io, groups, runs } = request;
+  const { folders, targets, size, io, groups, runs, real } = request;
   const startedAt = new Date().toISOString();
-  const corpus = buildCorpus(size);
-  const bareSource = targetSource(folders.repository, "bare");
-  const bare = await installTarget(bareSource, join(folders.work, "bare"), undefined, io);
-  const forgebookOnly = (target: Target): Readonly<Record<string, string>> | undefined =>
-    target.name === "forgebook" ? request.forgebookPackages : undefined;
-
   const browser = await chromium.launch();
   const report: Partial<Record<ToolName, Record<string, MetricResult>>> = {};
   const versions: Partial<Record<ToolName, Record<string, string>>> = {};
-  const tools: ToolRun[] = [];
-  for (const [index, target] of targets.entries()) {
-    const directory = join(folders.work, target.name);
-    const metrics: Record<string, MetricResult> = {};
-    report[target.name] = metrics;
-    try {
-      const source = targetSource(folders.repository, target.name);
-      const install = await installTarget(source, directory, forgebookOnly(target), io);
-      const onBare = await installOnBare(source, bareSource, join(folders.work, `${target.name}-on-bare`), {
-        packages: forgebookOnly(target),
-        bareSize: bare.size,
-        io
-      });
-      await writeProject(target, corpus, directory);
-      const named = await Promise.all(
-        target.packages.map(async (name) => [name, await installedVersion(directory, name)] as const)
-      );
-      versions[target.name] = Object.fromEntries(named);
-      tools.push({
-        context: {
-          target,
-          directory,
-          browser,
-          port: FIRST_PORT + index,
-          component: corpus.measured,
-          throttle: request.throttle,
-          io
-        },
-        metrics,
-        install,
-        onBare
-      });
-    } catch (error) {
-      metrics["install"] = { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
-    }
-  }
+  const prepared: PreparedRun = { browser, report, versions, tools: [] };
+  const measuredName =
+    real === undefined
+      ? await prepareGenerated(request, prepared)
+      : await prepareReal(request, real, prepared);
+  const { tools } = prepared;
 
   const total = tools.reduce((all, tool) => {
-    const hasPage = tool.context.target.componentUrl !== undefined;
+    const hasPage = tool.context.subject.pageAddress !== undefined;
     return all + groups.reduce((sum, group) => sum + groupSteps(group, runs, hasPage), 0);
   }, 0);
   let done = 0;
@@ -389,6 +364,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
   };
   const readings: MachineReading[] = [];
   const warnings: string[] = [];
+  const swept: { result?: SweepResult } = {};
   const readNow = async (moment: string): Promise<void> => {
     const reading = await readMachine(folders.work, io);
     if (reading === undefined) return;
@@ -398,7 +374,8 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
   try {
     for (const group of groups) {
       await readNow(group);
-      await GROUPS[group]({ tools, request, turns });
+      const work = group === "sweep" ? sweepGroup(swept) : GROUPS[group];
+      await work({ tools, request, turns });
     }
     await readNow("end");
   } finally {
@@ -408,8 +385,8 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
     version: 1,
     startedAt,
     forgebook: request.forgebookLabel,
-    corpus: size,
-    measured: corpus.measured.name,
+    corpus: real === undefined ? size : realCorpusInfo(real.corpus),
+    measured: measuredName,
     runs,
     throttle: request.throttle,
     machine: machineInfo(process.version),
@@ -420,6 +397,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
         target.name,
         { versions: versions[target.name] ?? {}, metrics: report[target.name] ?? {} }
       ])
-    )
+    ),
+    ...(swept.result === undefined ? {} : { sweep: swept.result })
   };
 };

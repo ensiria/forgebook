@@ -18,10 +18,12 @@ import type { BenchReport } from "./bench.types.ts";
 import { budgetLines, parseBudget } from "./budget.ts";
 import { stopAllServers } from "./measure.ts";
 import { type BenchFolders, packForgebook, publishedForgebook } from "./prepare.ts";
+import { type RealRun, realTargets } from "./prepareRun.ts";
+import { corpusPaths, DEFINITION_FILE, definitionFolder, parseCorpus } from "./realCorpus.ts";
 import { parseReport, reportMarkdown, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
 import { statusWriter } from "./statusFile.ts";
-import { FORGEBOOK, TARGETS } from "./targets.ts";
+import { FORGEBOOK, TARGETS, type Target } from "./targets.ts";
 
 /** The share two runs' medians may differ by and still count as reproduced. */
 const REPRODUCIBLE_WITHIN = 0.1;
@@ -44,13 +46,46 @@ const readOptional = <TResult,>(
   parse: (text: string) => TResult
 ): TResult | undefined => (path === undefined ? undefined : parse(readFileSync(path, "utf8")));
 
+/** The folder of this repository's corpora. */
+const CORPORA = join(import.meta.dirname, "corpora");
+
+/** The groups a real library is measured on when none is named: its install is the library's, not the tool's. */
+const REAL_GROUPS: readonly MetricGroup[] = ["sweep", "start", "hmr", "page", "memory", "build"];
+
+/** The real library `--corpus` names, read and checked before any work. */
+const realRun = (argument: string | undefined, work: string): RealRun | undefined => {
+  if (argument === undefined) return undefined;
+  const definition = definitionFolder(argument, CORPORA, process.cwd());
+  const file = join(definition, DEFINITION_FILE);
+  const corpus = parseCorpus(readFileSync(file, "utf8"), file);
+  return { corpus, paths: corpusPaths(corpus, definition, work) };
+};
+
+/** Why a run on a real library found another number of stories than its definition states; nothing when it agrees. */
+const countProblems = ({ sweep, corpus }: BenchReport): readonly string[] => {
+  if (sweep === undefined || corpus.real === undefined) return [];
+  const missing = corpus.stories - sweep.listed;
+  const lost = sweep.listed - sweep.drawn;
+  return [
+    ...(missing === 0 ? [] : [`${missing} of ${corpus.stories} stories were not listed`]),
+    ...(lost === 0 ? [] : [`${lost} of ${sweep.listed} stories did not draw`])
+  ];
+};
+
+/** The tools a run measures. */
+const toolsOf = (real: RealRun | undefined, isCompared: boolean): readonly Target[] => {
+  if (real !== undefined) return realTargets(real.corpus, real.paths.clone, isCompared);
+  return isCompared ? TARGETS : [FORGEBOOK];
+};
+
 /** The groups a run measures: the ones named, or all of them. */
-const metricGroups = (words: readonly string[]): MetricGroup[] => {
+const metricGroups = (words: readonly string[], isReal: boolean): MetricGroup[] => {
   const unknown = words.filter((word) => !isGroup(word));
   if (unknown.length > 0) {
     throw new ScriptError(`unknown --metric: ${unknown.join(", ")}`, { hint: METRIC_GROUPS.join(", ") });
   }
-  return words.length === 0 ? [...METRIC_GROUPS] : words.filter(isGroup);
+  if (words.length > 0) return words.filter(isGroup);
+  return isReal ? [...REAL_GROUPS] : METRIC_GROUPS.filter((group) => group !== "sweep");
 };
 
 /** The Forgebook measured: a published release, or this checkout, packed and named by its commit. */
@@ -74,7 +109,17 @@ await defineScript({
   icon: "check",
   json: true,
   options: {
-    compare: { type: "boolean", description: "Also measure Storybook and Ladle on the same library." },
+    compare: {
+      type: "boolean",
+      description:
+        "Also measure Storybook and Ladle on the same library; on --corpus, the library's own Storybook."
+    },
+    corpus: {
+      type: "string",
+      valueName: "name-or-folder",
+      description:
+        "Run on a real library at a pinned commit: a name under tools/bench/corpora, or a folder holding corpus.json."
+    },
     components: { type: "number", default: 100, description: "Components of the generated library." },
     stories: { type: "number", default: 500, description: "Stories of the generated library." },
     runs: { type: "number", default: 5, description: "Runs of each time." },
@@ -121,15 +166,20 @@ await defineScript({
   examples: [
     { command: "bench", description: "Forgebook alone, every metric." },
     { command: "bench --compare --json", description: "The three tools, as a report." },
+    {
+      command: "bench --corpus primer --work /tmp/bench",
+      description: "Forgebook on Primer's stories: every story opened, then the timings."
+    },
     { command: "bench --metric hmr --runs 3", description: "Only the edits." }
   ],
   run: async ({ options, io, log, style, isJson, onExit }) => {
     onExit(stopAllServers);
-    const groups = metricGroups(options.metric);
     // read first: this run overwrites the last report, which could otherwise be compared with itself
     const earlier = readOptional(options.against, parseReport);
     const budget = readOptional(options.budget, parseBudget);
     const work = resolve(options.work ?? join(REPOSITORY, "..", "forgebook-bench"));
+    const real = realRun(options.corpus, work);
+    const groups = metricGroups(options.metric, real !== undefined);
     mkdirSync(work, { recursive: true });
     const folders = { repository: REPOSITORY, work };
     const version = options["forgebook-version"];
@@ -144,7 +194,8 @@ await defineScript({
     const removeEnd = onExit(() => write({ state: "finished", warnings: 0 }));
     const report = await runBench({
       folders,
-      targets: options.compare ? TARGETS : [FORGEBOOK],
+      targets: toolsOf(real, options.compare),
+      ...(real === undefined ? {} : { real }),
       forgebookPackages,
       forgebookLabel,
       size: { components: options.components, stories: options.stories },
@@ -160,7 +211,8 @@ await defineScript({
     });
     removeEnd();
     write({ state: "finished", warnings: report.warnings.length });
-    writeFileSync(join(work, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+    const reportFile = real === undefined ? "report.json" : `report-${real.corpus.name}.json`;
+    writeFileSync(join(work, reportFile), `${JSON.stringify(report, null, 2)}\n`);
     for (const warning of report.warnings) log.warn(`not a quiet machine: ${warning}`);
     if (options.markdown) {
       io.stdout.write(`${reportMarkdown(report)}\n`);
@@ -169,12 +221,13 @@ await defineScript({
     }
     const problems = [
       ...reportProblems(report, earlier, REPRODUCIBLE_WITHIN),
-      ...budgetLines(report, budget)
+      ...budgetLines(report, budget),
+      ...countProblems(report)
     ];
     for (const problem of problems) log.error(problem);
     if (problems.length > 0) {
       throw new ScriptError(`${problems.length} problems with this run`, {
-        hint: `The report is in ${join(work, "report.json")}`
+        hint: `The report is in ${join(work, reportFile)}`
       });
     }
     return report;

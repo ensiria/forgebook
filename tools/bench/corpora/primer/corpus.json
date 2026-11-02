@@ -1,0 +1,31 @@
+{
+  "name": "primer",
+  "repository": "https://github.com/primer/react.git",
+  "commit": "6826a6a0665e81e19723ddd4e0c9418f1f9e5d44",
+  "licence": "MIT",
+  "install": ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"],
+  "folder": "packages/react",
+  "expected": { "files": 248, "stories": 1198 },
+  "measured": {
+    "forgebookStory": "stories:components-button--playground",
+    "forgebookComponent": "stories:components-button",
+    "text": "Button",
+    "pageText": "Button",
+    "sidebar": "Components",
+    "storybookStory": "components-button--playground",
+    "storybookDocs": "components-button--docs"
+  },
+  "edits": {
+    "story": {
+      "file": "src/Button/Button.stories.tsx",
+      "find": "<Button {...args}>Button</Button>",
+      "replace": "<Button {...args}>Button {edit}</Button>"
+    },
+    "component": {
+      "file": "src/Button/Button.tsx",
+      "find": "      {children}\n",
+      "replace": "      {children} {edit}\n"
+    }
+  },
+  "storybook": { "folder": "packages/react", "configDir": ".storybook" }
+}
