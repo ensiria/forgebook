@@ -41,6 +41,7 @@ import { type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
+import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
   agentSourcesModule,
@@ -323,29 +324,34 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
    * @param resolveSource - finds the file of a source's module.
+   * @param pack - writes a module's JSON as its value.
    * @throws when a story file cannot be indexed.
    */
   const storiesModule = async (
     id: string,
     watch: (file: string) => void,
-    resolveSource: (specifier: string) => Promise<string | undefined>
+    resolveSource: (specifier: string) => Promise<string | undefined>,
+    pack: PackJson
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id === TOKENS_ID && config !== undefined) return tokensModule(config, watch, resolveSource);
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
-      return usageModule(id, watch, extractor().usage, isServing());
+      return usageModule(id, watch, extractor().usage, isServing(), pack);
     }
     if (id.startsWith(SEARCH_ID_PREFIX)) {
       searchModules.add(id);
       const { root, pattern } = storyFilesGroupOf(id.slice(SEARCH_ID_PREFIX.length));
       const { storySearchModule } = await import("./searchModule.ts");
-      return { code: await storySearchModule(root, pattern, watch, docsOf, isServing()), moduleType: "js" };
+      return {
+        code: await storySearchModule(root, pattern, watch, docsOf, isServing(), pack),
+        moduleType: "js"
+      };
     }
     if (id.startsWith(PAGES_SEARCH_ID_PREFIX)) {
       docsModules.add(id);
       const { root, pattern } = storyFilesGroupOf(id.slice(PAGES_SEARCH_ID_PREFIX.length));
       const { pagesSearchModule } = await import("./searchModule.ts");
-      return { code: pagesSearchModule(root, pattern, watch), moduleType: "js" };
+      return { code: pagesSearchModule(root, pattern, watch, pack), moduleType: "js" };
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
@@ -361,6 +367,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (STORY_FILE.test(file)) return [...filesModules, ...usageModules, ...searchModules];
     return DOCS_PAGE_FILE.test(file) && docsModules.size > 0 ? [...docsModules] : undefined;
   };
+  const packFor = (context: { readonly emitFile: Parameters<typeof packedJsonOf>[0] }): PackJson =>
+    isServing() ? inlineJson : packedJsonOf((asset) => context.emitFile(asset));
   const pagePath = (page: PageFile): string | undefined =>
     config === undefined ? undefined : join(config.dir, page);
   const entryPath = (page: PageFile): string | undefined =>
@@ -421,7 +429,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
               },
               build: {
                 rolldownOptions: {
-                  input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") }
+                  input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") },
+                  // a catalogue names each file several times over, once per loader: a name of its hash alone is a
+                  // tenth of what the index weighs, and nobody reads a build's chunks by name
+                  output: { chunkFileNames: "assets/[hash].js" }
                 }
               }
             };
@@ -525,7 +536,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       try {
         const resolveSource = async (specifier: string): Promise<string | undefined> =>
           (await this.resolve(specifier))?.id;
-        return (await storiesModule(id, watch, resolveSource)) ?? null;
+        return (await storiesModule(id, watch, resolveSource, packFor(this))) ?? null;
       } catch (error) {
         this.error(error instanceof Error ? error.message : String(error));
       }

@@ -13,6 +13,7 @@ import { componentPage } from "../src/vite/componentPage.ts";
 import { compiledDocPage } from "../src/vite/docPageMarkdown.ts";
 import { docPagesModule } from "../src/vite/docPagesModule.ts";
 import type { DocsResult } from "../src/vite/docsExtractor.ts";
+import { inlineJson } from "../src/vite/packedModule.ts";
 import {
   blockSections,
   htmlSections,
@@ -104,7 +105,9 @@ describe("the modules", () => {
 
   it("indexes every docs page, with the anchors the page draws", () => {
     const watched: string[] = [];
-    const index = indexOf(pagesSearchModule(KIT_DIR, "docs/**/*.md", (file) => watched.push(file)));
+    const index = indexOf(
+      pagesSearchModule(KIT_DIR, "docs/**/*.md", (file) => watched.push(file), inlineJson)
+    );
     const key = "./docs/guides/theming.md";
     const sections = index.pages?.[key] ?? [];
     expect(watched).toContain(join(KIT_DIR, "docs/guides/theming.md"));
@@ -133,7 +136,8 @@ describe("the modules", () => {
         const read: unknown = { docs, file: "/x/Select.tsx", sources: ["/x/Select.tsx"] };
         return isRead(read) ? read : "unreadable";
       },
-      true
+      true,
+      inlineJson
     );
     const entry = indexOf(code).components?.["./src/Select.stories.tsx"];
     expect(entry?.lead).toBe("What it is. Few options. Old.");
@@ -162,7 +166,8 @@ describe("the modules", () => {
         const read: unknown = { docs, file: "/x/Select.tsx", sources: [] };
         return isRead(read) ? read : "unreadable";
       },
-      true
+      true,
+      inlineJson
     );
     expect(indexOf(code).components?.["./src/Select.stories.tsx"]?.props).toBeUndefined();
   });
@@ -192,7 +197,8 @@ describe("the modules", () => {
         const read: unknown = { docs, file: "/x/useUndo.ts", sources: [] };
         return isRead(read) ? read : "unreadable";
       },
-      true
+      true,
+      inlineJson
     );
     expect(indexOf(code).components?.["./src/useUndo.stories.tsx"]?.props).toEqual([
       { name: "initial", text: "The first value." }
@@ -200,7 +206,14 @@ describe("the modules", () => {
   });
 
   it("indexes a component's documentation file, with its headings' anchors", async () => {
-    const code = await storySearchModule(KIT_DIR, "./src/Select.stories.tsx", () => undefined, noDocs, true);
+    const code = await storySearchModule(
+      KIT_DIR,
+      "./src/Select.stories.tsx",
+      () => undefined,
+      noDocs,
+      true,
+      inlineJson
+    );
     const sections = indexOf(code).components?.["./src/Select.stories.tsx"]?.sections ?? [];
     const html = componentPage(join(KIT_DIR, "src/Select.stories.tsx"))?.html ?? "";
     expect(sections.length).toBeGreaterThan(0);
@@ -216,7 +229,8 @@ describe("the modules", () => {
         "./src/Select.stories.tsx",
         () => undefined,
         async () => "no program",
-        true
+        true,
+        inlineJson
       )
     );
     expect(index.problems).toEqual(["./src/Select.stories.tsx: no program"]);
@@ -229,14 +243,15 @@ describe("the modules", () => {
       "./src/Select.stories.tsx",
       () => undefined,
       async () => "/home/me/x.tsx cannot be read",
-      false
+      false,
+      inlineJson
     );
     expect(code).not.toContain("/home/me");
   });
 
   it("leaves out a component with nothing to add", async () => {
     const index = indexOf(
-      await storySearchModule(KIT_DIR, "./src/Form.stories.tsx", () => undefined, noDocs, true)
+      await storySearchModule(KIT_DIR, "./src/Form.stories.tsx", () => undefined, noDocs, true, inlineJson)
     );
     expect(index.components).toEqual({});
   });

@@ -141,10 +141,6 @@ export const indexedStoryFiles = (
   return files;
 };
 
-/** An object literal of a key per file, each value written by `value`. */
-const objectOf = (keys: readonly string[], value: (key: string) => string): string =>
-  `{${keys.map((key) => `${JSON.stringify(key)}: ${value(key)}`).join(",\n")}}`;
-
 /**
  * The code of the module for one pattern.
  *
@@ -172,13 +168,26 @@ export const storyFilesModule = (
   // absolute paths: the module has no folder of its own; Vite serves them under /@fs/ in development
   const path = (key: string): string => JSON.stringify(resolve(root, key));
   const query = (key: string, name: string): string => JSON.stringify(`${resolve(root, key)}?${name}`);
+  // one row per file: a name written once, not once per loader, which is a tenth of a large catalogue's first load
+  const rows = keys.map(
+    (key) =>
+      `[${[
+        JSON.stringify(key),
+        `() => import(${path(key)})`,
+        `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`,
+        `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`,
+        `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`
+      ].join(", ")}]`
+  );
   return [
+    `const rows = [${rows.join(",\n")}];`,
+    "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
     "export default {",
     `index: ${JSON.stringify(index)},`,
-    `stories: ${objectOf(keys, (key) => `() => import(${path(key)})`)},`,
-    `docs: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`)},`,
-    `code: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`)},`,
-    `pages: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`)},`,
+    "stories: column(1),",
+    "docs: column(2),",
+    "code: column(3),",
+    "pages: column(4),",
     `search: () => import(${search}).then((module) => module.default)${hasUsage ? "," : ""}`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasUsage ? [`reach: () => import(${usage}).then((module) => module.reach)`] : []),

@@ -16,6 +16,7 @@ import type axe from "axe-core";
 
 import type { Violation } from "../a11y.ts";
 import type { A11ySettings } from "../catalogue.ts";
+import { unpackedScript } from "../packedText.ts";
 
 /** Whether a value is axe: the global its script sets. */
 const isAxe = (value: unknown): value is typeof axe =>
@@ -26,13 +27,8 @@ const isAxe = (value: unknown): value is typeof axe =>
  *
  * @param axeUrl - the script's address.
  */
-const scriptAddress = async (axeUrl: string): Promise<string> => {
-  if (!axeUrl.endsWith(".bin")) return axeUrl;
-  const response = await fetch(axeUrl);
-  if (!response.ok || response.body === null) throw new Error(`${axeUrl} could not be loaded`);
-  const text = await new Response(response.body.pipeThrough(new DecompressionStream("gzip"))).blob();
-  return URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
-};
+const scriptAddress = async (axeUrl: string): Promise<string> =>
+  axeUrl.endsWith(".bin") ? unpackedScript(axeUrl) : axeUrl;
 
 /**
  * axe, from its script.

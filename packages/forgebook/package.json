@@ -72,6 +72,7 @@
     "./story-check": "./src/storyCheck.ts",
     "./spills": "./src/spills.ts",
     "./real-touch": "./src/realTouch.ts",
+    "./packed-text": "./src/packedText.ts",
     "./shell-theme": "./src/shellTheme.types.ts",
     "./plugin": "./src/plugin.ts",
     "./plugin-react": "./src/pluginReact.tsx",
@@ -280,6 +281,10 @@
       "./real-touch": {
         "types": "./dist/src/realTouch.d.ts",
         "default": "./dist/src/realTouch.js"
+      },
+      "./packed-text": {
+        "types": "./dist/src/packedText.d.ts",
+        "default": "./dist/src/packedText.js"
       },
       "./shell-theme": {
         "types": "./dist/src/shellTheme.types.d.ts",

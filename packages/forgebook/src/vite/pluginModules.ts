@@ -7,6 +7,7 @@
 
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult } from "./docsExtractor.ts";
+import type { PackJson } from "./packedModule.ts";
 import {
   indexedStoryFiles,
   type KeptIndex,
@@ -76,7 +77,8 @@ export const usageModule = async (
   id: string,
   watch: (file: string) => void,
   usage: DocsExtractor["usage"],
-  isServing: boolean
+  isServing: boolean,
+  pack: PackJson
 ): Promise<{ code: string; moduleType: "js" }> => {
   const { root, pattern } = storyFilesGroupOf(id.slice(USAGE_ID_PREFIX.length));
   const files = indexedStoryFiles(root, pattern, watch);
@@ -105,7 +107,7 @@ export const usageModule = async (
           files.map((file) => ({ storyFile: file.file, title: file.index.title }))
         )
       : [];
-  const code = `export default ${JSON.stringify(answer)};\nexport const reach = ${JSON.stringify(reach)};`;
+  const code = `export default ${pack(JSON.stringify(answer))};\nexport const reach = ${JSON.stringify(reach)};`;
   return { code, moduleType: "js" };
 };
 
