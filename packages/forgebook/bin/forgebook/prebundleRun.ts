@@ -11,27 +11,12 @@
  * @module
  */
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { findConfigFile, type ResolvedConfig } from "../../src/vite/configFile.ts";
-import { catalogueVite } from "./catalogueVite.ts";
-
-/**
- * Vite's cache folder for a root: beside the nearest `package.json`, as Vite places it.
- *
- * @param root - the root.
- */
-const viteCacheFolder = (root: string): string => {
-  let folder = root;
-  while (!existsSync(join(folder, "package.json"))) {
-    const parent = dirname(folder);
-    if (parent === folder) return join(root, ".vite");
-    folder = parent;
-  }
-  return join(folder, "node_modules", ".vite");
-};
+import { catalogueVite, unresolvedFile, viteCacheFolder } from "./catalogueVite.ts";
 
 /** The child's entry, beside this module and with its extension. */
 const CHILD_URL = new URL(`./prebundleChild${extname(import.meta.url)}`, import.meta.url);
@@ -85,13 +70,45 @@ export const prebundleEarly = (args: readonly string[]): void => {
   if (configFile !== undefined) void prebundleInChild(configFile, args.includes("--force"));
 };
 
+/** A line of Vite's error about imports it cannot resolve: the name, then the file that imports it. */
+const UNRESOLVED_LINE = /^\s+(\S+) \(imported by /gm;
+
+/**
+ * The imports Vite's error names as unresolved, when it is that error.
+ *
+ * @param error - what `optimizeDeps` threw.
+ */
+export const unresolvedOf = (error: unknown): string[] =>
+  error instanceof Error
+    ? [...error.message.matchAll(UNRESOLVED_LINE)].flatMap((match) => match[1] ?? [])
+    : [];
+
 /**
  * Pre-bundles a catalogue's dependencies in this process: the `prebundle` command, what the child runs.
+ *
+ * @remarks
+ * Vite's `optimizeDeps` fails on an import it cannot resolve (Spectrum's stories import packages that are not
+ * installed), where a dev server only warns and pre-bundles the rest. So a failure that names such imports is tried
+ * once more with them left out (`unresolvedFile`), which is what the server would have done; any other failure leaves
+ * the work to the server, as it always could.
  *
  * @param config - the catalogue's configuration, read.
  * @param isForced - whether to pre-bundle whatever is there.
  */
 export const prebundle = async (config: ResolvedConfig, isForced: boolean | undefined): Promise<void> => {
   const { optimizeDeps, resolveConfig } = await import("vite");
-  await optimizeDeps(await resolveConfig(await catalogueVite(config, {}), "serve"), isForced);
+  // read again on every first start: a package installed since is pre-bundled like any other
+  const file = unresolvedFile(config.dir);
+  rmSync(file, { force: true });
+  try {
+    await optimizeDeps(await resolveConfig(await catalogueVite(config, {}), "serve"), isForced);
+  } catch (error) {
+    const unresolved = unresolvedOf(error);
+    if (unresolved.length === 0) throw error;
+    // kept where the server's configuration reads it too: what is left out changes the pre-bundle's hash, and a server
+    // whose hash differed would pre-bundle everything again itself
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(unresolved));
+    await optimizeDeps(await resolveConfig(await catalogueVite(config, {}), "serve"), isForced);
+  }
 };
