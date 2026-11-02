@@ -1,11 +1,12 @@
 /**
- * What `forgebook-docs` reads from a package: its exports, their TSDoc and types, its stories, its Sass modules and
- * style sheets.
+ * What `forgebook-docs` reads from a package: its exports, their TSDoc and types, its stories, its Sass modules, its
+ * style sheets and the design tokens its source declares.
  *
  * @remarks
  * The package's `exports` (the source map, `./src/…`) say what is public; its `*.stories.tsx` say which components
  * exist and where they sit. Components are read with the catalogue's extractor (the props panel's data), modules with
- * TypeScript 6, Sass modules and style sheets from their text. The development-only `./stories` export is left out.
+ * TypeScript 6, Sass modules and style sheets from their text. The development-only `./stories` export is left out of
+ * the lists; the id and the tokens of the source it declares are read from its text.
  *
  * @module
  */
@@ -15,7 +16,9 @@ import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
+import type { DesignToken } from "../../src/vite/designTokens.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
+import { readTokenFiles, type SourceTokens, sourceTokensIn } from "../../src/vite/sourceTokens.ts";
 import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type {
   CatalogueComponent,
@@ -27,13 +30,12 @@ import type {
 import { type CatalogueOptions, isExcluded } from "./catalogueOptions.ts";
 import { moduleDocs } from "./moduleDocs.ts";
 import { sassMembers, styleSheetSummary } from "./sassDocs.ts";
-import { sourceIdOf } from "./sourceId.ts";
 
 /** What was read, and what could not be. */
 export type CollectedDocs = {
   /** The catalogue's data. */
   readonly data: CatalogueData;
-  /** One message per file that could not be read. */
+  /** One message per thing that could not be read: a file, a token. */
   readonly problems: readonly string[];
 };
 
@@ -134,16 +136,28 @@ const manifestText = (manifest: unknown, key: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
-/** The id the package's stories carry, from its `./stories` export's module, when it writes it plainly. */
-const sourceIdIn = (packageDir: string, exports: Readonly<Record<string, string>>): string | undefined => {
+/** What the package's `./stories` export declares, its tokens files named from the package's folder. */
+const declaredIn = (
+  packageDir: string,
+  exports: Readonly<Record<string, string>>
+): SourceTokens | undefined => {
   const source = exports[STORIES_SUBPATH];
   if (source === undefined) return undefined;
-  const file = VITE_PATHS.resolve(packageDir, source);
-  try {
-    return sourceIdOf(file, readFileSync(file, "utf8"));
-  } catch {
-    return undefined;
-  }
+  const declared = sourceTokensIn(VITE_PATHS.resolve(packageDir, source), STORIES_SUBPATH);
+  return {
+    ...declared,
+    files: declared.files.map((file) => ({ ...file, label: VITE_PATHS.relative(packageDir, file.path) }))
+  };
+};
+
+/** The package's tokens, with what could not be read of them; nothing is read for a section left out. */
+const collectTokens = (
+  declared: SourceTokens | undefined,
+  sections: CatalogueOptions["sections"] | undefined
+): { readonly tokens: readonly DesignToken[]; readonly problems: readonly string[] } => {
+  if (declared === undefined || sections?.includes("tokens") === false) return { tokens: [], problems: [] };
+  const { tokens, problems } = readTokenFiles(declared.files);
+  return { tokens, problems: [...declared.problems, ...problems] };
 };
 
 /**
@@ -151,12 +165,13 @@ const sourceIdIn = (packageDir: string, exports: Readonly<Record<string, string>
  *
  * @param packageDir - the package's folder.
  * @param extractStoryComponent - the framework's reading of a story file's component (its docs module).
- * @param options - the package's catalogue options: the subpaths it leaves out.
+ * @param options - the package's catalogue options: the subpaths it leaves out, and the sections it lists, which leave
+ *   the tokens unread when they do not name them (every section by default).
  */
 export const collectDocs = (
   packageDir: string,
   extractStoryComponent: ExtractStoryComponent,
-  options: Pick<CatalogueOptions, "exclude">
+  options: Pick<CatalogueOptions, "exclude"> & Partial<Pick<CatalogueOptions, "sections">>
 ): CollectedDocs => {
   const manifest: unknown = JSON.parse(readFileSync(VITE_PATHS.join(packageDir, "package.json"), "utf8"));
   const packageName = manifestText(manifest, "name") ?? packageDir;
@@ -183,9 +198,19 @@ export const collectDocs = (
     if (entry.kind === "problem") problems.push(entry.message);
   }
   const description = manifestText(manifest, "description");
-  const sourceId = sourceIdIn(packageDir, exports);
+  const declared = declaredIn(packageDir, exports);
+  const { tokens, problems: tokenProblems } = collectTokens(declared, options.sections);
   return {
-    data: { packageName, description, sourceId, components, modules, sassModules, styleSheets },
-    problems
+    data: {
+      packageName,
+      description,
+      sourceId: declared?.id,
+      components,
+      modules,
+      sassModules,
+      styleSheets,
+      tokens
+    },
+    problems: [...problems, ...tokenProblems]
   };
 };
