@@ -238,7 +238,7 @@ become switches. It reads React on Vite (`@storybook/react-vite`) only, never re
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
-| `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and a Claude Code skill with `--skill`) |
+| `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
@@ -248,7 +248,7 @@ Each command prints its options with `--help`; `stories` and `story` print JSON 
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
 and the commands that check one, as a section of `AGENTS.md` (renewed in place when it runs again; `--skill` writes
-the same as a Claude Code skill).
+the same as an Agent Skill any agent can load).
 
 A coding agent can use the catalogue while it works: find a story's id, read a story's args and its component's
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for

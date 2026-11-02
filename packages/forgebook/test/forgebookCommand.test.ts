@@ -343,9 +343,9 @@ describe("forgebook agents", () => {
     const text = readFileSync(join(project, "AGENTS.md"), "utf8");
     expect(text.startsWith("# Ours\n\nKeep this.\n")).toBe(true);
     expect(text.split("## Stories (Forgebook)")).toHaveLength(2);
-    expect(readFileSync(join(project, ".claude", "skills", "forgebook", "SKILL.md"), "utf8")).toContain(
-      "name: forgebook"
-    );
+    const skill = readFileSync(join(project, ".agents", "skills", "forgebook", "SKILL.md"), "utf8");
+    expect(skill).toContain("name: forgebook");
+    expect(readFileSync(join(project, ".claude", "skills", "forgebook", "SKILL.md"), "utf8")).toBe(skill);
   });
 });
 
