@@ -41,7 +41,7 @@ import { type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
-import { FILES_MODULE_HOT, renewedModuleHot, storyFileHotHooks } from "./hotSnippets.ts";
+import { FILES_MODULE_HOT, renewedModule, storyFileHotHooks } from "./hotSnippets.ts";
 import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
@@ -382,19 +382,6 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const filesModule = (id: string, watch: (file: string) => void): ReturnType<typeof patternModule> =>
     patternModule(id, watch, config?.lists.usedIn !== false, indexCache(), isServing());
   /**
-   * A query's module as served: on a dev server, a story file's docs, code or page module hands its edit to the shell.
-   *
-   * @param id - the module's id.
-   * @param module - the module.
-   */
-  const renewing = (
-    id: string,
-    module: { code: string; moduleType: "js" }
-  ): { code: string; moduleType: "js" } =>
-    isServing() && RENEWED_QUERIES.some((query) => id.endsWith(query))
-      ? { ...module, code: `${module.code}\n${renewedModuleHot(id)}` }
-      : module;
-  /**
    * The patterns' modules an edit of a story file changed (a story added or renamed, a title), which the open pages
    * read once: the file alone is indexed again. One that cannot be read yet (an edit half typed) changes nothing: its
    * module shows the error, and the next edit is read again.
@@ -589,7 +576,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const resolved = await this.resolve(specifier, importer);
         return resolved?.id;
       });
-      if (answered !== undefined) return renewing(id, answered);
+      if (answered !== undefined) return renewedModule(id, answered, RENEWED_QUERIES, isServing());
       try {
         const resolveSource = async (specifier: string): Promise<string | undefined> =>
           (await this.resolve(specifier))?.id;

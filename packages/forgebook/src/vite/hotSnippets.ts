@@ -58,6 +58,24 @@ export const renewedModuleHot = (id: string): string =>
   ].join("\n");
 
 /**
+ * A module as a dev server serves it: a story file's docs, code or page module hands its edit to the shell.
+ *
+ * @param id - the module's id.
+ * @param module - the module.
+ * @param queries - the queries of the modules that hand their edits on.
+ * @param isServing - whether a dev server serves it: a build has no hot updates.
+ */
+export const renewedModule = <TModule extends { readonly code: string }>(
+  id: string,
+  module: TModule,
+  queries: readonly string[],
+  isServing: boolean
+): TModule =>
+  isServing && queries.some((query) => id.endsWith(query))
+    ? { ...module, code: `${module.code}\n${renewedModuleHot(id)}` }
+    : module;
+
+/**
  * What a pattern's files module runs: it takes the edits its story files hand on, which change nothing it holds. An
  * edit that changes its list reloads the pages from the server, and its pages keep the module they read.
  */
