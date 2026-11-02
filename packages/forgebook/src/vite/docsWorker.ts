@@ -17,7 +17,7 @@ import { parentPort, workerData } from "node:worker_threads";
 import { type ExtractStoryComponent, isDocsModule } from "./adapter.ts";
 import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
 import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
-import { docsDependencies, usageGraph } from "./usageGraph.ts";
+import { docsDependencies, usageDependencies, usageGraph } from "./usageGraph.ts";
 
 /** Whether the worker's data names a docs module. */
 const isWorkerData = (value: unknown): value is DocsWorkerData =>
@@ -38,7 +38,8 @@ const loadExtractor = async (): Promise<ExtractStoryComponent | string> => {
   }
 };
 
-readAskedFilesOnly();
+// a build reads every story file: a program of the files asked so far would only be built again and again
+if (isWorkerData(workerData) && !workerData.readsEverything) readAskedFilesOnly();
 
 /** The framework's extractor, loaded once, before the first answer. */
 const extractor = loadExtractor();
@@ -69,7 +70,9 @@ parentPort?.on("message", (request: DocsRequest): void => {
     return;
   }
   if (request.kind === "usage") {
-    const response: DocsResponse = { kind: "usage", id: request.id, result: usage(request.files) };
+    const result = usage(request.files);
+    const dependencies = typeof result === "string" ? [] : usageDependencies(request.files);
+    const response: DocsResponse = { kind: "usage", id: request.id, result, dependencies };
     parentPort?.postMessage(response);
     return;
   }

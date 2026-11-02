@@ -19,11 +19,11 @@ describe("createDocsExtractor with a cache", () => {
   it("keeps what the worker read, and a later extractor answers the same from disk", async () => {
     const folder = mkdtempSync(join(tmpdir(), "forgebook-docs-"));
     const storyFile = join(KIT, "Select.stories.tsx");
-    const first = createDocsExtractor(STUB_FRAMEWORK.docsModule, folder);
+    const first = createDocsExtractor(STUB_FRAMEWORK.docsModule, { cacheFolder: folder });
     const read = await first.extract(storyFile);
     await first.close();
     expect(readdirSync(join(folder, "docs"))).toHaveLength(1);
-    const second = createDocsExtractor(STUB_FRAMEWORK.docsModule, folder);
+    const second = createDocsExtractor(STUB_FRAMEWORK.docsModule, { cacheFolder: folder });
     expect(await second.extract(storyFile)).toEqual(read);
     await second.close();
     rmSync(folder, { recursive: true });

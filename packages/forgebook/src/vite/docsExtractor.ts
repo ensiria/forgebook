@@ -71,6 +71,8 @@ export type DocsResponse =
       readonly id: number;
       /** The facts, or why they cannot be read. */
       readonly result: UsageResult;
+      /** The files they can change with; none when they cannot be read. */
+      readonly dependencies: readonly string[];
     };
 
 /** The docs, read off the dev server's thread. */
@@ -101,39 +103,58 @@ const YOUNG_GENERATION_MB = 8;
 export type DocsWorkerData = {
   /** The URL of the module exporting the framework's `extractStoryComponent`. */
   readonly docsModule: string;
+  /** Whether every story file will be read, as in a build, so a program may as well hold them all at once. */
+  readonly readsEverything: boolean;
+};
+
+/** How an extractor is used. */
+export type DocsExtractorOptions = {
+  /** Where answers are kept between starts; none reads every time. */
+  readonly cacheFolder?: string | undefined;
+  /** Whether every story file will be read (`DocsWorkerData`). */
+  readonly readsEverything?: boolean;
 };
 
 /** Whether what a cache file holds is an answer: docs of a story file, and never a message. */
 const isCachedDocs = (value: unknown): value is Exclude<DocsResult, string> =>
   typeof value === "object" && value !== null && "docs" in value;
 
-/**
- * The docs kept on disk, by what made them: a new install of Forgebook or of its framework's package is a new stamp.
- *
- * @param folder - the cache's folder.
- * @param docsModule - the URL of the framework's docs module.
- */
-const docsCache = (folder: string, docsModule: string): DiskCache<Exclude<DocsResult, string>> => {
-  const made = [WORKER_URL.href, docsModule].map((url) => statSync(fileURLToPath(url)).mtimeMs);
-  return diskCache(join(folder, "docs"), [docsModule, ...made].join(" "), isCachedDocs);
-};
+/** Whether what a cache file holds is a group's usage, and never a message. */
+const isCachedUsage = (value: unknown): value is UsageGraph =>
+  typeof value === "object" && value !== null && "files" in value && "imports" in value;
+
+/** What made a kept answer: the times of the code that wrote it, so a new install is a miss. */
+const stampOf = (docsModule: string): string =>
+  [docsModule, ...[WORKER_URL.href, docsModule].map((url) => statSync(fileURLToPath(url)).mtimeMs)].join(" ");
 
 /**
  * A docs extractor with its worker, started on its first request.
  *
  * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).
- * @param cacheFolder - where docs are kept between starts; none reads every time.
+ * @param options - where answers are kept, and how it is used.
  * @returns the extractor.
  */
-export const createDocsExtractor = (docsModule: string, cacheFolder?: string): DocsExtractor => {
-  const cache = cacheFolder === undefined ? undefined : docsCache(cacheFolder, docsModule);
+export const createDocsExtractor = (
+  docsModule: string,
+  { cacheFolder, readsEverything = false }: DocsExtractorOptions = {}
+): DocsExtractor => {
+  const stamp = cacheFolder === undefined ? undefined : stampOf(docsModule);
+  const cacheOf = <TValue>(
+    kind: string,
+    isValue: (value: unknown) => value is TValue & {}
+  ): DiskCache<TValue> | undefined =>
+    cacheFolder === undefined || stamp === undefined
+      ? undefined
+      : diskCache(join(cacheFolder, kind), stamp, isValue);
+  const docsCache = cacheOf<Exclude<DocsResult, string>>("docs", isCachedDocs);
+  const usageCache = cacheOf<UsageGraph>("usage", isCachedUsage);
   let worker: Worker | undefined;
   let nextId = 0;
   // every request sent and not answered yet
   const pending = new Map<number, (response: DocsResponse | string) => void>();
   const started = (): Worker => {
     if (worker !== undefined) return worker;
-    const workerData: DocsWorkerData = { docsModule };
+    const workerData: DocsWorkerData = { docsModule, readsEverything };
     const created = new Worker(WORKER_URL, {
       workerData,
       resourceLimits: { maxYoungGenerationSizeMb: YOUNG_GENERATION_MB }
@@ -159,9 +180,9 @@ export const createDocsExtractor = (docsModule: string, cacheFolder?: string): D
     started().postMessage(request);
   };
   const extract = (storyFile: string, resolve: (result: DocsResult) => void): void => {
-    const cached = cache?.read(storyFile);
-    if (cached !== undefined) {
-      resolve(cached);
+    const kept = docsCache?.read(storyFile);
+    if (kept !== undefined) {
+      resolve(kept);
       return;
     }
     send({ kind: "extract", id: nextId++, storyFile }, (response) => {
@@ -170,7 +191,7 @@ export const createDocsExtractor = (docsModule: string, cacheFolder?: string): D
         return;
       }
       const { result, dependencies } = response;
-      if (typeof result !== "string") cache?.write(storyFile, result, dependencies);
+      if (typeof result !== "string") docsCache?.write(storyFile, result, dependencies);
       resolve(result);
     });
   };
@@ -178,13 +199,23 @@ export const createDocsExtractor = (docsModule: string, cacheFolder?: string): D
     extract: (storyFile: string): Promise<DocsResult> =>
       new Promise((resolve) => extract(storyFile, resolve)),
     usage: (files: readonly UsageRequestFile[]): Promise<UsageResult> =>
-      new Promise((resolve) =>
-        send({ kind: "usage", id: nextId++, files }, (response) =>
-          resolve(
-            typeof response === "string" || response.kind !== "usage" ? String(response) : response.result
-          )
-        )
-      ),
+      new Promise((resolve) => {
+        const key = files.map((file) => file.storyFile).join("\n");
+        const kept = usageCache?.read(key);
+        if (kept !== undefined) {
+          resolve(kept);
+          return;
+        }
+        send({ kind: "usage", id: nextId++, files }, (response) => {
+          if (typeof response === "string" || response.kind !== "usage") {
+            resolve(String(response));
+            return;
+          }
+          const { result, dependencies } = response;
+          if (typeof result !== "string") usageCache?.write(key, result, dependencies);
+          resolve(result);
+        });
+      }),
     changed: (): void => {
       // a worker not started yet has no program to renew
       const request: DocsRequest = { kind: "changed" };

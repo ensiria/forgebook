@@ -283,7 +283,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const framework = config?.framework ?? options.framework;
     if (framework === undefined)
       throw new Error("Forgebook has no framework: add forgebook.config.ts, or give the plugin `framework`");
-    docs ??= createDocsExtractor(framework.docsModule, cacheFolder);
+    docs ??= createDocsExtractor(framework.docsModule, { cacheFolder, readsEverything: !isServing() });
     return docs;
   };
   /**

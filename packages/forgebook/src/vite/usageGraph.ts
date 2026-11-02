@@ -357,6 +357,31 @@ export const docsDependencies = (storyFile: string): string[] => {
 };
 
 /**
+ * The files a group of story files' usage can change with: each one's dependencies at once, as `docsDependencies`.
+ *
+ * @param requests - the story files.
+ */
+export const usageDependencies = (requests: readonly UsageRequestFile[]): string[] => {
+  const docsPrograms = requests.flatMap((request) => {
+    const docsProgram = programFor(request.storyFile, true);
+    return typeof docsProgram === "string" ? [] : [{ file: request.storyFile, ...docsProgram }];
+  });
+  const programs = [...new Set(docsPrograms.map(({ program }) => program))];
+  return [
+    ...new Set([
+      ...Object.keys(
+        reachedImports(
+          requests.map((request) => request.storyFile),
+          programs,
+          true
+        )
+      ),
+      ...docsPrograms.slice(0, 1).flatMap(({ file, program }) => programDependencies(file, program))
+    ])
+  ];
+};
+
+/**
  * The facts of a group of story files: what each story renders, and the import graph the rendered components reach.
  *
  * @param requests - the story files and their stories' exports.
