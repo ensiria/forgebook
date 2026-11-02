@@ -77,6 +77,14 @@ describe("prebundled", () => {
     expect(names).toContain(STUB_FRAMEWORK.pages.frame);
     expect(prebundled(CONFIG, LINKED, LINKED)).not.toContain("forgebook/shell");
   });
+
+  it("adds the written home's module only for a catalogue with a written home", () => {
+    const installed: Resolve = (name: string): string => `/app/node_modules/${name}/index.js`;
+    expect(prebundled(CONFIG, installed, LINKED)).not.toContain("forgebook/shell/home");
+    expect(prebundled({ ...CONFIG, home: "/app/forgebook.home.md" }, installed, LINKED)).toContain(
+      "forgebook/shell/home"
+    );
+  });
 });
 
 describe("a project with MSW", () => {

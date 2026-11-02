@@ -123,7 +123,9 @@ describe("bodySegments", () => {
     expect(read(":::note\nText.\n::::").notes).toEqual([
       "line 3, column 1: `::::` does not match `:::note` (line 1): close it with 3 colons"
     ]);
-    expect(read("Text.\n:::").notes).toEqual(["line 2, column 1: `:::` closes no block"]);
+    const stray = read("Text.\n:::");
+    expect(stray.notes).toEqual(["line 2, column 1: `:::` closes no block"]);
+    expect(stray.segments.map(shape)).toEqual(["Text.\n:::"]);
   });
 
   it("notes an inner block left open when its parent closes", () => {
@@ -154,5 +156,29 @@ describe("bodySegments", () => {
       "line 5, column 3: a block written after spaces is not read: start it at the line's start, outside lists"
     ]);
     expect(segments.every((segment) => segment.type === "markdown")).toBe(true);
+  });
+
+  it("reads an alert only at a line's start and on a quote's first line, as GitHub does", () => {
+    const indented = read("- item\n  > [!NOTE]\n  > Text.");
+    expect(indented.segments.every((segment) => segment.type === "markdown")).toBe(true);
+    expect(indented.notes).toEqual([
+      "line 2, column 3: a block written after spaces is not read: start it at the line's start, outside lists"
+    ]);
+    expect(read("> Intro.\n> [!NOTE]\n> Text.").segments.map(shape)).toEqual([
+      "> Intro.\n> [!NOTE]\n> Text."
+    ]);
+  });
+
+  it("names a code fence left open, which swallows the closing lines after it", () => {
+    expect(read(":::note\n```ts\ncode\n:::").notes).toEqual([
+      "line 2, column 1: this code fence is never closed: it holds the rest of the page",
+      "line 1, column 1: `:::note` is never closed: add a line of 3 colons"
+    ]);
+  });
+
+  it("opens no fence where Markdown opens none: a backtick fence whose line holds a backtick", () => {
+    expect(read("```a`b\n:::note\nText.\n:::").segments.map(shape)).toContainEqual(
+      expect.objectContaining({ container: "note" })
+    );
   });
 });

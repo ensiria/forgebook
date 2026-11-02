@@ -46,11 +46,18 @@ export const ALERT_KINDS = ["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"] as
 /** A kind of GitHub alert. */
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
-/** A directive's attributes, by key: a key written alone has the empty text. */
-export type DirectiveAttributes = ReadonlyMap<
-  string,
-  { readonly value: string; readonly position: SourcePosition }
->;
+/** A directive's attribute: its value, where it starts and where its value starts. */
+export type DirectiveAttribute = {
+  /** Its value; the empty text for a key written alone. */
+  readonly value: string;
+  /** Where its key starts. */
+  readonly position: SourcePosition;
+  /** Where its value starts, inside its quotes: for a note about what the value holds. */
+  readonly valuePosition: SourcePosition;
+};
+
+/** A directive's attributes, by key. */
+export type DirectiveAttributes = ReadonlyMap<string, DirectiveAttribute>;
 
 /** A directive as its line writes it. */
 export type Directive = {
@@ -64,6 +71,8 @@ export type Directive = {
   readonly attributes: DirectiveAttributes;
   /** Where its colons start. */
   readonly position: SourcePosition;
+  /** The line it was read from: a block that means nothing stays as this text. */
+  readonly line: SourceLine;
 };
 
 /** A piece of a page's body. */
@@ -133,8 +142,11 @@ const LEAF = /^::([a-z][a-z0-9-]*)(.*)$/;
 /** A directive written after spaces: Markdown would take it as a list item's text, so it is not read. */
 const INDENTED_DIRECTIVE = /^\s+(:{2,})[a-z]/;
 
-/** An alert's first line: a quote holding only `[!KIND]`. */
-const ALERT_OPEN = /^( {0,3}>\s?)\[!([A-Za-z]+)\]\s*$/;
+/** An alert's first line: a quote holding only `[!KIND]`, at the line's start as a block is. */
+const ALERT_OPEN = /^(>\s?)\[!([A-Za-z]+)\]\s*$/;
+
+/** An alert written after spaces: Markdown takes it as a quote in a list item, so it is not read. */
+const INDENTED_ALERT = /^\s+>\s?\[![A-Za-z]+\]\s*$/;
 
 /** A quote's line: up to three spaces, `>`, and the space after it when there is one. */
 const QUOTE_LINE = /^ {0,3}> ?/;
@@ -179,7 +191,7 @@ const quotedEnd = (text: string, start: number, quote: string): number => {
 const unescaped = (value: string): string => value.replace(/\\(.)/g, "$1");
 
 /** An attribute's value read, and the place after it; none when it cannot be read, with a note. */
-type ReadValue = { readonly value: string; readonly next: number } | undefined;
+type ReadValue = { readonly value: string; readonly start: number; readonly next: number } | undefined;
 
 /**
  * An attribute's value after its `=`: quoted, or bare up to the next space.
@@ -204,18 +216,18 @@ const attributeValue = (
   if (quote === '"' || quote === "'") {
     const close = quotedEnd(text, start + 1, quote);
     if (close !== -1 && close < end)
-      return { value: unescaped(text.slice(start + 1, close)), next: close + 1 };
+      return { value: unescaped(text.slice(start + 1, close)), start: start + 1, next: close + 1 };
     notes.push({ position, message: `the value of "${key}" never ends: close its quote` });
     return undefined;
   }
   const bare = /^[^\s"'=]+/.exec(text.slice(start, end))?.[0] ?? "";
-  if (bare !== "") return { value: bare, next: start + bare.length };
+  if (bare !== "") return { value: bare, start, next: start + bare.length };
   notes.push({ position, message: `"${key}=" has no value` });
   return undefined;
 };
 
 /** A directive's attributes, as they are read. */
-type Attributes = Map<string, { readonly value: string; readonly position: SourcePosition }>;
+type Attributes = Map<string, DirectiveAttribute>;
 
 /**
  * The attributes between a directive's braces: `key="value"`, `key='value'`, `key=value` or `key` alone.
@@ -246,10 +258,10 @@ const attributesOf = (line: SourceLine, start: number, end: number, notes: PageN
     const read: ReadValue =
       text.charAt(index) === "="
         ? attributeValue(line, index + 1, end, key, position, notes)
-        : { value: "", next: index };
+        : { value: "", start: index, next: index };
     if (read === undefined) return attributes;
     if (attributes.has(key)) notes.push({ position, message: `"${key}" is written twice` });
-    attributes.set(key, { value: read.value, position });
+    attributes.set(key, { value: read.value, position, valuePosition: positionIn(line, read.start) });
     index = read.next;
   }
   return attributes;
@@ -326,7 +338,7 @@ const directiveOf = (line: SourceLine, name: string, restStart: number, notes: P
       message: `"${trailing}" after the block's name is not read: a label goes in [ ], attributes in { }`
     });
   }
-  return { name, label, labelPosition, attributes, position: positionIn(line, 0) };
+  return { name, label, labelPosition, attributes, position: positionIn(line, 0), line };
 };
 
 /** A container being read: its directive, its colons and what it holds so far. */
@@ -337,12 +349,20 @@ type OpenContainer = {
 };
 
 /** A code fence that is open: its character and its length. */
-type OpenFence = { readonly marker: string; readonly length: number };
+type OpenFence = { readonly marker: string; readonly length: number; readonly position: SourcePosition };
 
 /** The code fence a line opens, when it opens one. */
-const fenceOpened = (text: string): OpenFence | undefined => {
-  const marker = FENCE_OPEN.exec(text)?.[1];
-  return marker === undefined ? undefined : { marker: marker.charAt(0), length: marker.length };
+const fenceOpened = (line: SourceLine): OpenFence | undefined => {
+  const match = FENCE_OPEN.exec(line.text);
+  const marker = match?.[1];
+  if (match === null || marker === undefined) return undefined;
+  // as Markdown reads it: a backtick fence whose line holds another backtick opens nothing
+  if (marker.startsWith("`") && line.text.slice(match[0].length).includes("`")) return undefined;
+  return {
+    marker: marker.charAt(0),
+    length: marker.length,
+    position: positionIn(line, match[0].length - marker.length)
+  };
 };
 
 /** Whether a line closes a fence: the same character, at least as many, nothing after. */
@@ -416,7 +436,7 @@ const readFenceLine = (reader: BodyReader, line: SourceLine): boolean => {
     if (isFenceClose(line.text, reader.fence)) reader.fence = undefined;
     return true;
   }
-  const opened = fenceOpened(line.text);
+  const opened = fenceOpened(line);
   if (opened === undefined) return false;
   reader.fence = opened;
   reader.markdown.push(line);
@@ -453,6 +473,7 @@ const readClosing = (reader: BodyReader, line: SourceLine): boolean => {
   const depth = open.findLastIndex((container) => container.colons === colonText.length);
   if (innermost === undefined) {
     notes.push({ position: positionIn(line, 0), message: `\`${colonText}\` closes no block` });
+    reader.markdown.push(line);
     return true;
   }
   if (depth === -1) {
@@ -495,6 +516,9 @@ const readAlert = (reader: BodyReader, lines: readonly SourceLine[], index: numb
   const line = lines[index];
   const [, mark, written] = line === undefined ? [] : (ALERT_OPEN.exec(line.text) ?? []);
   if (line === undefined || mark === undefined || written === undefined) return undefined;
+  // as GitHub reads it: only a quote's first line makes it an alert
+  const before = reader.markdown.at(-1);
+  if (before !== undefined && QUOTE_LINE.test(before.text)) return undefined;
   const position = positionIn(line, mark.length);
   const kind = ALERT_KINDS.find((each) => each === written.toUpperCase());
   if (kind === undefined) {
@@ -527,14 +551,20 @@ export const bodySegments = (lines: readonly SourceLine[], notes: PageNote[]): B
       index = last;
       continue;
     }
-    if (INDENTED_DIRECTIVE.test(line.text)) {
+    if (INDENTED_DIRECTIVE.test(line.text) || INDENTED_ALERT.test(line.text)) {
       notes.push({
-        position: positionIn(line, line.text.search(/:/)),
+        position: positionIn(line, line.text.search(/\S/)),
         message: "a block written after spaces is not read: start it at the line's start, outside lists"
       });
     }
     reader.markdown.push(line);
   }
+  // a fence left open swallows what follows, the closing lines of its blocks included: it is the mistake to name
+  if (reader.fence !== undefined)
+    notes.push({
+      position: reader.fence.position,
+      message: "this code fence is never closed: it holds the rest of the page"
+    });
   for (let container = reader.open.at(-1); container !== undefined; container = reader.open.at(-1)) {
     notes.push({
       position: container.directive.position,

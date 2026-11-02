@@ -69,8 +69,22 @@ const KNOWN_LEAVES = ["link-card", ...HOME_PIECES].map((name) => `::${name}`);
 /** The pieces of the home that take a heading of their own. */
 const LABELLED_PIECES: readonly HomePiece[] = ["recent", "families", "pages"];
 
-/** The addresses a link card may open: another site, an address of the catalogue, or a page by its file. */
-const CARD_ADDRESS = /^(https?:|mailto:|\?|#|\/)/i;
+/** The addresses a link card may open: another site, or an address of the catalogue; never `//host`, another site in disguise. */
+const CARD_ADDRESS = /^(https?:|mailto:|\?|#|\/(?!\/))/i;
+
+/** The asides other tools name otherwise, by those names. */
+const OTHER_NAMES: Readonly<Record<string, AsideTone>> = {
+  warning: "caution",
+  info: "note",
+  error: "danger",
+  success: "tip"
+};
+
+/** A hint at the aside another tool's name means, for the note about it; empty for any other name. */
+const similarTo = (name: string): string => {
+  const tone = OTHER_NAMES[name];
+  return tone === undefined ? "" : ` (for this aside, write \`:::${tone}\`)`;
+};
 
 /** Whether a tone is an aside's. */
 const isTone = (name: string): name is AsideTone => ASIDE_TONES.some((tone) => tone === name);
@@ -110,19 +124,29 @@ const attributeOf = (directive: Directive, key: string): string | undefined =>
  */
 const labelText = (directive: Directive, reading: PageReading): string | undefined => {
   const { label, labelPosition } = directive;
-  if (label === undefined) return undefined;
-  return label.replace(/\{\{\s*([A-Za-z][\w-]*)\s*\}\}/g, (written: string, name: string, offset: number) => {
+  return label === undefined ? undefined : valuesIn(label, labelPosition, reading);
+};
+
+/**
+ * A plain text of a block (its label, a card's description) with `{{version}}` written in, another value kept for the
+ * shell to fill, and a name no page can use reported.
+ *
+ * @param text - the text.
+ * @param start - where it starts, for the notes; none when unknown.
+ * @param reading - the reading.
+ */
+const valuesIn = (text: string, start: SourcePosition | undefined, reading: PageReading): string =>
+  text.replace(/\{\{\s*([A-Za-z][\w-]*)\s*\}\}/g, (written: string, name: string, offset: number) => {
     if (!isPageValue(name)) {
-      if (labelPosition !== undefined)
+      if (start !== undefined)
         reading.notes.push({
-          position: { line: labelPosition.line, column: labelPosition.column + offset },
+          position: { line: start.line, column: start.column + offset },
           message: `\`${written}\` is not a value a page can show`
         });
       return written;
     }
     return name === "version" ? (reading.version() ?? "") : written;
   });
-};
 
 /** A Markdown segment read. */
 const markdownNode = (lines: readonly SourceLine[], reading: PageReading): PageNode => {
@@ -137,7 +161,7 @@ const nodesOf = (segments: readonly BodySegment[], reading: PageReading): PageNo
 
 /** A `tabs` block read: its `:::tab` blocks, anything else reported. */
 const tabsNode = (directive: Directive, children: readonly BodySegment[], reading: PageReading): PageNode => {
-  checkAttributes(directive, ["sync"], reading);
+  checkAttributes(directive, ["syncKey"], reading);
   const tabs: { label: string; children: PageNode[] }[] = [];
   for (const child of children) {
     if (isBlank(child)) continue;
@@ -162,7 +186,7 @@ const tabsNode = (directive: Directive, children: readonly BodySegment[], readin
   }
   if (tabs.length === 0)
     reading.notes.push({ position: directive.position, message: "`tabs` holds no `:::tab`" });
-  const sync = attributeOf(directive, "sync");
+  const sync = attributeOf(directive, "syncKey");
   return { type: "tabs", ...(sync === undefined || sync === "" ? {} : { sync }), tabs };
 };
 
@@ -261,7 +285,9 @@ const linkCardNodes = (directive: Directive, reading: PageReading): PageNode[] =
     );
   const href = cardAddress(written, directive.attributes.get("href")?.position ?? position, reading);
   if (href === undefined) return [];
-  const description = attributeOf(directive, "description");
+  const described = directive.attributes.get("description");
+  const description =
+    described === undefined ? undefined : valuesIn(described.value, described.valuePosition, reading);
   return [{ type: "link-card", title, href, ...(description === undefined ? {} : { description }) }];
 };
 
@@ -301,11 +327,11 @@ const leafNodes = (directive: Directive, reading: PageReading): PageNode[] => {
       `\`::${name}\` is a block that holds others: write \`:::${name}\`, then a line of \`:::\``,
       reading
     );
-  return problemAt(
+  reading.notes.push({
     position,
-    `\`::${name}\` is not a block Forgebook knows: ${KNOWN_LEAVES.join(", ")}; or a container, ${KNOWN_BLOCKS.join(", ")}`,
-    reading
-  );
+    message: `\`::${name}\` is not a block Forgebook knows: ${KNOWN_LEAVES.join(", ")}; or a container, ${KNOWN_BLOCKS.join(", ")}; it stays as text`
+  });
+  return [markdownNode([directive.line], reading)];
 };
 
 /** A container directive read. */
@@ -346,7 +372,7 @@ const containerNodes = (
         position,
         message: isLeaf
           ? `\`${name}\` stands alone: write \`::${name}\` on one line, with no closing line`
-          : `\`:::${name}\` is not a block Forgebook knows: ${KNOWN_BLOCKS.join(", ")}; its content is drawn as it is`
+          : `\`:::${name}\` is not a block Forgebook knows${similarTo(name)}: ${KNOWN_BLOCKS.join(", ")}; its content is drawn as it is`
       });
       return nodesOf(children, reading);
     }

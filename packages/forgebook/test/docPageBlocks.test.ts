@@ -70,7 +70,7 @@ describe("the blocks of a page", () => {
 
   it("draws tabs, steps and cards with what each holds", () => {
     const body = [
-      '::::tabs{sync="pm"}',
+      '::::tabs{syncKey="pm"}',
       ":::tab[npm]",
       "```sh\nnpm i\n```",
       ":::",
@@ -130,6 +130,10 @@ describe("the blocks of a page", () => {
       docPageIndex(FILE, withFront('::link-card[Gone]{href="./gone.md"}'), () => undefined).notes
     ).toEqual(['line 4, column 19: the card links to "./gone.md", which is not there']);
     expect(notesOf('::link-card[Odd]{href="odd.txt"}')[0]).toContain("is no page or address");
+    expect(notesOf('::link-card[Away]{href="//evil.example"}')[0]).toContain("is no page or address");
+    expect(notesOf('::link-card[A]{href="?page=kit:a" description="{{nope}}"}')).toEqual([
+      "line 4, column 48: `{{nope}}` is not a value a page can show"
+    ]);
   });
 
   it("reports what a block cannot take, at its place, and still draws what it holds", () => {
@@ -149,10 +153,12 @@ describe("the blocks of a page", () => {
     ]);
   });
 
-  it("draws a leaf it does not know as a problem in place, and keeps the home's pieces to the home", () => {
-    expect(blocksOf("::nothing")).toEqual([
-      { kind: "problem", message: expect.stringMatching(/^line 4, column 1: `::nothing` is not a block/) }
-    ]);
+  it("keeps a leaf it does not know as text, and the home's pieces to the home", () => {
+    expect(blocksOf("::before the colon")).toEqual([{ kind: "text", html: "<p>::before the colon</p>\n" }]);
+    expect(notesOf("::before the colon")[0]).toMatch(
+      /^line 4, column 1: `::before` is not a block .*; it stays as text$/
+    );
+    expect(notesOf(":::warning\nCareful.\n:::")[0]).toContain("(for this aside, write `:::caution`)");
     expect(blocksOf("::families")).toEqual([
       { kind: "problem", message: "line 4, column 1: `::families` is drawn only on the catalogue's home" }
     ]);

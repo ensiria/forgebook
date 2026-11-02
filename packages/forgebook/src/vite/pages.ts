@@ -114,6 +114,9 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
   };
 };
 
+/** The module the entry loads the written home's view from, on first use. */
+export const WRITTEN_HOME_MODULE = "forgebook/shell/home";
+
 /**
  * The shell's written home, as the entry writes it: loaded as the home opens, with its text, so a catalogue without
  * one pays nothing for it, and the shell's own code holds nothing of it.
@@ -123,7 +126,7 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
 const writtenHomeCode = (home: string): string =>
   [
     "lazy(() =>",
-    '      import("forgebook/shell/home").then((module) => ({',
+    `      import(${JSON.stringify(WRITTEN_HOME_MODULE)}).then((module) => ({`,
     `        default: module.writtenHome(() => import(${JSON.stringify(`${home}${HOME_QUERY}`)}).then((page) => page.default))`,
     "      }))",
     "    )"

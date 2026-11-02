@@ -265,8 +265,8 @@ See [the colours](./colours.md#brand), or [every state](?component=acme:actions-
 ### Blocks
 
 Blocks are written as Starlight, Docusaurus and VitePress write them, so a page reads well on GitHub too: `:::name`
-opens a block, a line of the same colons closes it, `[label]` gives it a title and `{key="value"}` its attributes. A block
-inside another has fewer colons than its parent. Everything is drawn at build time; the tabs alone bring a few lines of
+opens a block, a line of the same colons closes it, `[label]` gives it a title (plain text, values included) and
+`{key="value"}` its attributes. A block inside another has fewer colons than its parent. Everything is drawn at build time; the tabs alone bring a few lines of
 script, with the docs pages' code, which only a page that opens loads.
 
 ````md
@@ -280,7 +280,7 @@ Anything Markdown holds goes in a block, a story too:
 > [!WARNING]
 > GitHub's alerts are asides too: NOTE, TIP, IMPORTANT, WARNING (a caution) and CAUTION (a danger).
 
-::::tabs{sync="package-manager"}
+::::tabs{syncKey="package-manager"}
 :::tab[pnpm]
 ```sh
 pnpm add @acme/ui
@@ -314,13 +314,14 @@ Every component follows the theme.
 |---|---|
 | `:::note`, `:::tip`, `:::important`, `:::caution`, `:::danger` | An aside in its tone's colour; `[label]` replaces the tone's name as its title. |
 | `> [!NOTE]` … `> [!CAUTION]` | The same asides, as GitHub writes them. |
-| `::::tabs{sync="…"}` around `:::tab[Label]` | One panel at a time, keys ← → Home End. Tabs with the same `sync` switch together, on every page, and the browser keeps the choice. |
+| `::::tabs{syncKey="…"}` around `:::tab[Label]` | One panel at a time, keys ← → Home End. Tabs with the same `syncKey` (as Starlight names it) switch together, on every page, and the browser keeps the choice. |
 | `:::steps` around one numbered list | Numbered steps; a step may hold code and stories. |
 | `::::cards` around `:::card[Title]` and `::link-card` | Cards side by side, as many to a row as fit. |
 | `::link-card[Title]{href="…" description="…"}` | A card that links to a page by its file, to an address of the catalogue (`?component=…`), or to another site. |
 
-A block the page cannot read stays as text, and the problem names its line and column: a name Forgebook does not know,
-an attribute a block does not take, a closing line with the wrong number of colons, a block never closed. A block starts at
+A block the page cannot read is reported with its line and column, and what it holds still draws: a name Forgebook does
+not know (a `::` line it does not know stays as text; `:::warning` is pointed to `:::caution`), an attribute a block does
+not take, a closing line with the wrong number of colons, a block never closed. A block starts at
 a line's start; written after spaces, as under a list item, it is not read.
 
 ### Code
@@ -344,9 +345,10 @@ export const Save = () => (
 ````
 
 `title="…"` names the code (a file, most often); `{1,4-6}` marks lines, `ins={…}` and `del={…}` mark them inserted or
-deleted; a `diff` fence reads its `+` and `-` lines and colours the rest in its `lang`; `wrap` wraps long lines instead of
-scrolling. The lines are `<mark>`, `<ins>` and `<del>` elements, so a screen reader says what changed, and Copy copies the
-code as it reads after the change: no diff signs, no deleted lines. A word the line does not read is a problem, with its
+deleted; `wrap` wraps long lines instead of scrolling. A `diff` fence marks its `+` and `-` lines: with `lang="tsx"` it is
+code, its signs taken off and the rest coloured in that language; without, it is a patch, shown and copied as written. The
+lines are `<mark>`, `<ins>` and `<del>` elements, so a screen reader says what changed, and Copy copies code as it reads
+after the change: no diff signs, no deleted lines. A word the line does not read is a problem, with its
 column.
 
 ### A home of your own
@@ -392,7 +394,7 @@ Read [Getting started](./docs/getting-started.md), then pick a component.
 
 The title is the front matter's `title`, else the file's opening `#` heading, else the catalogue's name; `description` is
 the lead under it. Values work in docs pages too, and a value is never read inside code, so a page can show `{{title}}`
-itself in backticks. The pieces belong to the home: on a docs page they are a problem. A link to a `.md` file opens that
+itself in backticks; a name that is not a value (`{{name}}`) stays as written and is reported. The pieces belong to the home: on a docs page they are a problem. A link to a `.md` file opens that
 page of the catalogue's own `docs`; a library's page is linked by its address (`?page=acme:guides-theming`). Problems in
 the file are listed above the home and by `forgebook pages`, and `forgebook page home` reads it as an agent would. Restart
 `forgebook dev` after adding or removing the file.

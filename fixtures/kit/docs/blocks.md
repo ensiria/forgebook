@@ -48,7 +48,7 @@ A danger says what breaks.
 
 ## Tabs
 
-::::tabs{sync="package-manager"}
+::::tabs{syncKey="package-manager"}
 :::tab[pnpm]
 ```sh
 pnpm add @fixture/kit
@@ -63,7 +63,7 @@ npm install @fixture/kit
 
 The same choice, kept by a second set of tabs:
 
-::::tabs{sync="package-manager"}
+::::tabs{syncKey="package-manager"}
 :::tab[pnpm]
 pnpm keeps one store for every project.
 :::

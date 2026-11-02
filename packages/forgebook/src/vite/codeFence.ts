@@ -62,6 +62,9 @@ const fenceWords = (info: string): FenceWord[] => {
   return words;
 };
 
+/** The highest line a fence may name. */
+const MAX_LINE = 100_000;
+
 /**
  * The lines a range list names: `1,4-6` is 1, 4, 5 and 6.
  *
@@ -75,7 +78,8 @@ const rangeLines = (text: string): Set<number> | undefined => {
     if (range?.[1] === undefined) return undefined;
     const from = Number(range[1]);
     const to = range[2] === undefined ? from : Number(range[2]);
-    if (from < 1 || to < from) return undefined;
+    // a range no code can hold is a mistake, and would fill the set with millions of lines
+    if (from < 1 || to < from || to > MAX_LINE) return undefined;
     for (let line: number = from; line <= to; line += 1) lines.add(line);
   }
   return lines;
@@ -182,7 +186,9 @@ export const fenceInfo = (info: string, start: SourcePosition, notes: PageNote[]
   const words = fenceWords(info);
   const first = words[0];
   const named =
-    first !== undefined && !first.text.includes("=") && !/^[{"]/.test(first.text) ? first.text : undefined;
+    first !== undefined && first.text !== "wrap" && !first.text.includes("=") && !/^[{"]/.test(first.text)
+      ? first.text
+      : undefined;
   const isDiff = named === "diff";
   const reading: FenceReading = {
     language: isDiff ? undefined : named,
@@ -229,20 +235,28 @@ type LineKind = "mark" | "ins" | "del" | "plain";
 /** The kind of line each sign of a diff starts. */
 const DIFF_SIGNS: Readonly<Record<string, LineKind>> = { "+": "ins", "-": "del" };
 
+/** A patch's file headers (`--- a/x`, `+++ b/x`): plain lines, never a deletion or an insertion. */
+const PATCH_HEADER = /^(---|\+\+\+)( |$)/;
+
 /**
- * A diff's code without its signs, and the kind of each line.
+ * A diff's lines and the kind of each. A diff in a language (`lang="tsx"`) is code whose signs come off, so it is
+ * coloured and copied as code; one without is a patch, kept as written, so what is copied still applies.
  *
  * @param code - the diff.
+ * @param isCode - whether its signs come off.
  */
-const diffLines = (code: string): { readonly code: string; readonly kinds: LineKind[] } => {
+const diffLines = (code: string, isCode: boolean): { readonly code: string; readonly kinds: LineKind[] } => {
   const kinds: LineKind[] = [];
   const lines = code.split("\n").map((line) => {
     const sign = line.charAt(0);
-    kinds.push(DIFF_SIGNS[sign] ?? "plain");
-    return sign === "+" || sign === "-" || sign === " " ? line.slice(1) : line;
+    kinds.push(PATCH_HEADER.test(line) ? "plain" : (DIFF_SIGNS[sign] ?? "plain"));
+    return isCode && (sign === "+" || sign === "-" || sign === " ") ? line.slice(1) : line;
   });
   return { code: lines.join("\n"), kinds };
 };
+
+/** Whether a fence is a diff of code in a language, whose signs come off: a diff without one is a patch. */
+const isCodeDiff = (info: FenceInfo): boolean => info.isDiff && info.language !== undefined;
 
 /** A line as an element of its kind. */
 const lineElement = (html: string, kind: LineKind): string => {
@@ -251,12 +265,38 @@ const lineElement = (html: string, kind: LineKind): string => {
 };
 
 /**
+ * Each line coloured, the code before the change and after it apart: a deleted line that leaves a string or a comment
+ * open would otherwise colour the inserted line after it as part of it.
+ *
+ * @param code - the code, its diff signs taken off.
+ * @param kinds - each line's kind.
+ * @param language - the language it is coloured in.
+ */
+const coloredLines = (code: string, kinds: readonly LineKind[], language: string | undefined): string[] => {
+  const lines = code.split("\n");
+  if (!kinds.includes("del")) return htmlLines(highlightCode(code, language));
+  const version = (left: LineKind): { readonly places: number[]; readonly html: string[] } => {
+    const places = lines.flatMap((_line, index) => (kinds[index] === left ? [] : [index]));
+    const html = htmlLines(highlightCode(places.map((index) => lines[index] ?? "").join("\n"), language));
+    return { places, html };
+  };
+  const coloured: string[] = [];
+  for (const { places, html } of [version("ins"), version("del")]) {
+    places.forEach((index, at) => {
+      coloured[index] ??= html[at] ?? "";
+    });
+  }
+  return lines.map((_line, index) => coloured[index] ?? "");
+};
+
+/**
  * A diff's code without its signs, or the code itself.
  *
  * @param code - the code as the fence holds it.
  * @param info - what its fence's line says.
  */
-const shownCode = (code: string, info: FenceInfo): string => (info.isDiff ? diffLines(code).code : code);
+const shownCode = (code: string, info: FenceInfo): string =>
+  info.isDiff ? diffLines(code, isCodeDiff(info)).code : code;
 
 /**
  * The first line a fence names that its code does not have; none when every line it names is there.
@@ -281,7 +321,7 @@ export const missingLine = (
  * @param info - what its fence's line says.
  */
 export const fencedCode = (code: string, info: FenceInfo): FencedCode => {
-  const diff = info.isDiff ? diffLines(code) : undefined;
+  const diff = info.isDiff ? diffLines(code, isCodeDiff(info)) : undefined;
   const plain = shownCode(code, info);
   const base = { language: info.language, title: info.title, isWrapped: info.isWrapped };
   if (diff === undefined && info.marked.size + info.inserted.size + info.deleted.size === 0) {
@@ -294,12 +334,16 @@ export const fencedCode = (code: string, info: FenceInfo): FencedCode => {
     if (info.marked.has(line)) return "mark";
     return diff?.kinds[index] ?? "plain";
   });
-  const html = htmlLines(highlightCode(plain, info.language))
+  const html = coloredLines(plain, kinds, info.language)
     .map((line, index) => lineElement(line, kinds[index] ?? "plain"))
     .join("\n");
-  const text = plain
-    .split("\n")
-    .filter((_line, index) => kinds[index] !== "del")
-    .join("\n");
+  // a patch is copied whole, to apply; code is copied as it reads after the change
+  const isPatch = info.isDiff && !isCodeDiff(info);
+  const text = isPatch
+    ? plain
+    : plain
+        .split("\n")
+        .filter((_line, index) => kinds[index] !== "del")
+        .join("\n");
   return { ...base, text, html };
 };

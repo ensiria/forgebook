@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -269,8 +269,8 @@ const homeOf = (config: ForgebookConfig, dir: string): string | undefined => {
     return existsSync(beside) ? beside : undefined;
   }
   const home = isAbsolute(config.home) ? config.home : resolve(dir, config.home);
-  if (!existsSync(home))
-    throw new Error(`${resolve(dir, "forgebook.config")}: its home "${config.home}" is not there`);
+  if (!existsSync(home) || !statSync(home).isFile())
+    throw new Error(`${resolve(dir, "forgebook.config")}: its home "${config.home}" is not a file there`);
   return home;
 };
 

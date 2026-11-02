@@ -100,9 +100,13 @@ describe("the written home", () => {
     expect(resolveConfig({ ...BASE, home: false }, dir).home).toBeUndefined();
   });
 
+  it("refuses an empty home, which names no file", () => {
+    expect(() => resolveConfig({ ...BASE, home: "" }, folder())).toThrow(/is not a file there/);
+  });
+
   it("names a home that is not there", () => {
     expect(() => resolveConfig({ ...BASE, home: "gone.md" }, folder())).toThrow(
-      /its home "gone.md" is not there/
+      /its home "gone.md" is not a file there/
     );
   });
 

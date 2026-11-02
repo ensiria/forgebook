@@ -1,5 +1,5 @@
 /**
- * The tab a set of docs tabs shows, shared by every set with the same `sync` name: picking "pnpm" in one picks it in
+ * The tab a set of docs tabs shows, shared by every set with the same `syncKey`: picking "pnpm" in one picks it in
  * each, on this page and the next, and the browser keeps it for the next visit.
  *
  * @remarks

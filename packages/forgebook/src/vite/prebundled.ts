@@ -15,6 +15,7 @@
 import { dirname, join } from "node:path";
 
 import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { WRITTEN_HOME_MODULE } from "./pages.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
 const CORE_BROWSER_DEPENDENCIES = [
@@ -51,7 +52,13 @@ const isInstalled = (file: string): boolean => file.split(/[\\/]/).includes("nod
  * @param resolveOwn - resolves a package from the core's own folder.
  */
 export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn: Resolve): string[] => {
-  const pageModules = [...PAGE_MODULES, config.framework.pages.frame, config.framework.pages.code];
+  const pageModules = [
+    ...PAGE_MODULES,
+    // imported on first use, so the scanner never sees it: named, or the first home would wait for the optimizer
+    ...(config.home === undefined ? [] : [WRITTEN_HOME_MODULE]),
+    config.framework.pages.frame,
+    config.framework.pages.code
+  ];
   const candidates = [
     ...CORE_BROWSER_DEPENDENCIES,
     ...(config.framework.browserDependencies ?? []),

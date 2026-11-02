@@ -80,6 +80,32 @@ describe("fencedCode", () => {
   });
 });
 
+describe("a diff", () => {
+  it("keeps a patch as written, its headers plain, and copies it whole so it still applies", () => {
+    const patch = "--- a/x.ts\n+++ b/x.ts\n@@ -1 +1 @@\n-old\n+new";
+    const drawn = fencedCode(patch, infoOf("diff").read);
+    expect(drawn.text).toBe(patch);
+    expect(drawn.html.split("\n").slice(0, 2)).toEqual([
+      '<span class="forgebook-code-line">--- a/x.ts</span>',
+      '<span class="forgebook-code-line">+++ b/x.ts</span>'
+    ]);
+    expect(drawn.html).toContain('<del class="forgebook-code-line">-old</del>');
+  });
+
+  it("colours the code before and after the change apart, so a deleted line never colours the next", () => {
+    const drawn = fencedCode("-const a = `x\n+const b = 1;", infoOf('diff lang="ts"').read);
+    expect(drawn.html.split("\n")[1]).toContain('<span class="forgebook-hl-keyword">const</span>');
+  });
+
+  it("takes wrap alone as a word, not as a language", () => {
+    expect(infoOf("wrap").read).toMatchObject({ language: undefined, isWrapped: true });
+  });
+
+  it("refuses a range no code can hold", () => {
+    expect(infoOf("ts {1-100000000}").notes).toHaveLength(1);
+  });
+});
+
 describe("missingLine", () => {
   it("names the first line a fence marks that its code does not have", () => {
     expect(missingLine("one\ntwo", infoOf("txt {1,5} ins={3}").read)).toEqual({ line: 3, count: 2 });
