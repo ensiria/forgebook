@@ -53,6 +53,9 @@ const whileEdited = async (
 };
 
 test.describe("a story file edited while its story is open", () => {
+  // one at a time: a test that ran twice at once would edit the same file under itself
+  test.describe.configure({ mode: "serial" });
+
   test("draws the edit in place: the text typed in the story stays, and Code shows the edit", async ({
     page
   }) => {
