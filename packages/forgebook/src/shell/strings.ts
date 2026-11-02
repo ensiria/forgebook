@@ -15,7 +15,7 @@ import type { SheetsChoice, TextScale } from "../viewState.ts";
 // biome-ignore lint/nursery/useExplicitType: the texts' type is their own shape (`ShellStrings`); a written one would repeat every key
 const shellStrings = {
   searchPlaceholder: "Search",
-  searchLabel: "Search components, stories and docs",
+  searchLabel: "Search components, stories, props and docs",
   componentsNav: "Components",
   docsNav: "Docs",
   pageContents: "On this page",
@@ -27,7 +27,7 @@ const shellStrings = {
   showSidebar: "Show the sidebar",
   storiesNav: "Stories",
   allStories: (count: number): string => `All ${count} stories`,
-  noMatch: "No component matches",
+  noMatch: "No name matches",
   aliasPlace: (family: string): string => `in ${family}`,
   aliasHint: (place: string): string => `Lives in ${place}: listed here too`,
   alsoIn: (places: string): string => `also listed in ${places}`,
@@ -235,6 +235,9 @@ export type ShellStrings = typeof shellStrings;
 /** The shell's texts, as shown. */
 export const STRINGS: ShellStrings = shellStrings;
 
+/** What the catalogue replaces, kept for the texts that load later (`configureGroup`). */
+let given: Readonly<Record<string, string>> = {};
+
 /**
  * Whether a value is a group of texts (`tabs`), whose members a path can name.
  *
@@ -268,5 +271,17 @@ const replaceText = (texts: Record<string, unknown>, path: readonly string[], te
  * @param replacements - the new texts, by their path (`tabs.props`).
  */
 export const configureStrings = (replacements: Readonly<Record<string, string>>): void => {
+  given = replacements;
   for (const [path, text] of Object.entries(replacements)) replaceText(STRINGS, path.split("."), text);
+};
+
+/**
+ * Applies the catalogue's replacements to a group of texts loaded on first use, which `configureStrings` could not reach:
+ * the first screen does not carry the words of a feature below it.
+ *
+ * @param name - the group's name, what its paths start with (`search`, for `search.kindPage`).
+ * @param group - its texts.
+ */
+export const configureGroup = (name: string, group: Record<string, unknown>): void => {
+  for (const [path, text] of Object.entries(given)) replaceText({ [name]: group }, path.split("."), text);
 };

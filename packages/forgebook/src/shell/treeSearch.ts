@@ -6,12 +6,21 @@
  * @remarks
  * Case and accents are ignored. A component whose own name, title and search words hold every word is found whole; otherwise only
  * the stories that hold the words the component lacks are kept. An alias entry is found by its name, the place
- * it is listed in and the place it lives in, whole or not at all: its stories are picked on its page. Pure.
+ * it is listed in and the place it lives in, whole or not at all: its stories are picked on its page. Pure. Loaded with
+ * the search's list: a tree nobody filters needs none of it.
  *
  * @module
  */
 import type { TreePage } from "../pageTree.ts";
-import type { TreeAlias, TreeComponent, TreeFamily, TreeGroup, TreeStory } from "../storyTree.ts";
+import type {
+  StoryTree,
+  TreeAlias,
+  TreeComponent,
+  TreeFamily,
+  TreeGroup,
+  TreeSource,
+  TreeStory
+} from "../storyTree.ts";
 
 /**
  * A text as the search compares it: lower case, without accents.
@@ -106,3 +115,46 @@ export const foundPages = (pages: readonly TreePage[], words: readonly string[])
     : pages.filter((page) =>
         holdsEvery(folded(`${page.title.replaceAll("/", " ")} ${page.description ?? ""}`), words)
       );
+
+/** What the tree shows of a source's components. */
+export type ShownSource = {
+  /** The source. */
+  readonly source: TreeSource;
+  /** Its families, with what the search finds. */
+  readonly families: readonly TreeFamily[];
+};
+
+/** What the tree shows of a source's docs pages. */
+export type ShownPages = {
+  /** The source. */
+  readonly source: TreeSource;
+  /** Its pages the search finds. */
+  readonly pages: readonly TreePage[];
+};
+
+/** What the tree shows. */
+export type ShownTree = {
+  /** Each source with its families. */
+  readonly sources: readonly ShownSource[];
+  /** The sources with pages to show. */
+  readonly pages: readonly ShownPages[];
+};
+
+/**
+ * What the tree shows for a query.
+ *
+ * @param tree - the tree.
+ * @param query - what the user typed.
+ */
+export const shownTree = (tree: StoryTree, query: string): ShownTree => {
+  const words = searchWords(query);
+  return {
+    sources: tree.sources.map((source) => ({
+      source,
+      families: source.families.flatMap((family) => foundFamily(family, words) ?? [])
+    })),
+    pages: tree.sources
+      .map((source) => ({ source, pages: foundPages(source.pages, words) }))
+      .filter((entry) => entry.pages.length > 0)
+  };
+};

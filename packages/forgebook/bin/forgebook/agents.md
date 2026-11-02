@@ -58,6 +58,7 @@ links to other pages by their file (`./colours.md#brand`). A page never holds a 
 | Command | What it is for |
 |---|---|
 | `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
+| `npx forgebook search onValueChange --json` | The whole catalogue by its text: which component has a prop, where the docs say something, with the address of the exact heading or prop |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it |

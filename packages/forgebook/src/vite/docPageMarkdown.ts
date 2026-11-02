@@ -22,7 +22,7 @@ import { Marked, type Token, type Tokens } from "marked";
 import { ASSET_SCHEME, type DocBlock, type DocHeading, type DocPage, PAGE_LINK_SCHEME } from "../docPages.ts";
 import { pageSlug } from "../pageAddress.ts";
 import { storyName } from "../storyTree.ts";
-import { codeHtml } from "./componentPage.ts";
+import { codeHtml, headingAnchors } from "./componentPage.ts";
 import { escapeHtml, highlightCode } from "./highlightCode.ts";
 
 /** Reads a linked page's text: none when it is not there. */
@@ -311,25 +311,12 @@ const plainText = (tokens: readonly Token[]): string =>
  *
  * @remarks
  * A heading links to itself rather than holding a separate "link to this section" control: the heading's own words
- * name the link for a screen reader, so the HTML, made at build time, holds no text of the shell's. Anchors are made
- * as GitHub makes them (`tokens`, `tokens-1`), so a link written for a repository's reader keeps working here.
+ * name the link for a screen reader, so the HTML, made at build time, holds no text of the shell's.
  *
  * @param headings - receives the page's second- and third-level headings.
  */
 const pageRenderer = (headings: DocHeading[]): Marked => {
-  const seen = new Set<string>();
-  const anchorOf = (text: string): string => {
-    const slug =
-      text
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, "-")
-        .replace(/^-|-$/g, "") || "section";
-    let anchor = slug;
-    // "Tokens", "Tokens", "Tokens 1": counting alone would give the last two the same anchor
-    for (let count = 1; seen.has(anchor); count += 1) anchor = `${slug}-${count}`;
-    seen.add(anchor);
-    return anchor;
-  };
+  const anchorOf = headingAnchors();
   return new Marked({
     async: false,
     gfm: true,

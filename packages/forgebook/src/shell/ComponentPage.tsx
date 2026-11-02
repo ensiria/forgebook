@@ -11,7 +11,7 @@
  *
  * @module
  */
-import { type ReactNode, useMemo, useRef } from "react";
+import { lazy, type ReactNode, Suspense, useMemo, useRef } from "react";
 
 import { groupLabel } from "../catalogue.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
@@ -38,10 +38,21 @@ import { usePageFrames } from "./usePageFrames.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCode } from "./useStoryCode.ts";
 
+/** What opens the page at an anchor, loaded with the first one: most pages open at their top. */
+const AnchorScroll = lazy(() =>
+  import("./AnchorScroll.tsx").then(
+    (module) => ({ default: module.AnchorScroll }),
+    // a chunk gone after a new deployment costs the place on the page, never the page
+    () => ({ default: (): ReactNode => null })
+  )
+);
+
 /** The component page's props. */
 export type ComponentPageProps = {
   /** The component. */
   readonly component: TreeComponent;
+  /** The heading or the prop the address names; none when it names none. */
+  readonly anchor: string | undefined;
   /** The view. */
   readonly view: ViewState;
   /** What the user chose for each story marked for a phone. */
@@ -118,6 +129,7 @@ const Prose = ({ page }: { readonly page: Loaded<PageDoc> }): ReactNode => {
  */
 export const ComponentPage = ({
   component,
+  anchor,
   view,
   touchOverrides,
   onTouchChange,
@@ -172,6 +184,16 @@ export const ComponentPage = ({
   return (
     <div className="forgebook-workspace">
       {header}
+      {anchor === undefined ? null : (
+        <Suspense fallback={null}>
+          <AnchorScroll
+            pageRef={pageRef}
+            anchor={anchor}
+            visit={scroll.visit}
+            isReady={docs.status !== "loading" && page.status !== "loading"}
+          />
+        </Suspense>
+      )}
       <div ref={pageRef} className="forgebook-scroll">
         {/* keyed by the component, so another component's page comes in with its own entrance */}
         <div key={`${component.file}|${component.title}`} className="forgebook-doc">

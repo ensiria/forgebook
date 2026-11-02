@@ -22,14 +22,16 @@ const typeText = (prop: PropDocs): string =>
 /**
  * A table of props or events: the Default column only when one of them has a default.
  *
- * @param props - the props or the events, and which of the two they are.
+ * @param props - the props or the events, which of the two they are, and the part they belong to: each row says its name, for an address to open it.
  */
 const PropTable = ({
   props,
-  isEvents
+  isEvents,
+  part
 }: {
   readonly props: readonly PropDocs[];
   readonly isEvents: boolean;
+  readonly part: string | undefined;
 }): ReactNode => {
   const hasDefaults = !isEvents && props.some((prop) => prop.defaultValue !== undefined);
   return (
@@ -45,7 +47,7 @@ const PropTable = ({
         </thead>
         <tbody>
           {props.map((prop) => (
-            <tr key={prop.name}>
+            <tr key={prop.name} data-prop={part === undefined ? prop.name : `${part}.${prop.name}`}>
               <th scope="row">
                 <code className="forgebook-api__name">{prop.name}</code>
                 {prop.isRequired ? (
@@ -81,25 +83,27 @@ const PropTable = ({
 /**
  * A component's or a part's props, then its events under their own heading.
  *
- * @param props - the props, and the level of the events' heading: under the section's, or under a part's.
+ * @param props - the props, the level of the events' heading (under the section's, or under a part's) and the part they belong to.
  */
 const PropsAndEvents = ({
   props,
-  eventsLevel
+  eventsLevel,
+  part
 }: {
   readonly props: readonly PropDocs[];
   readonly eventsLevel: 3 | 4;
+  readonly part?: string;
 }): ReactNode => {
   const EventsHeading = eventsLevel === 3 ? "h3" : "h4";
   const values = props.filter((prop) => prop.kind !== "event");
   const events = props.filter((prop) => prop.kind === "event");
   return (
     <>
-      {values.length === 0 ? null : <PropTable props={values} isEvents={false} />}
+      {values.length === 0 ? null : <PropTable props={values} isEvents={false} part={part} />}
       {events.length === 0 ? null : (
         <>
           <EventsHeading>{STRINGS.events}</EventsHeading>
-          <PropTable props={events} isEvents={true} />
+          <PropTable props={events} isEvents={true} part={part} />
         </>
       )}
     </>
@@ -112,7 +116,7 @@ const PropsAndEvents = ({
  * @param props - the part's docs.
  */
 const SubcomponentReference = ({ docs }: { readonly docs: SubcomponentDocs }): ReactNode => (
-  <section className="forgebook-api__subcomponent" aria-label={docs.name}>
+  <section className="forgebook-api__subcomponent" aria-label={docs.name} data-prop={docs.name}>
     <h3>
       <code className="forgebook-inline-code">{docs.name}</code>
     </h3>
@@ -121,7 +125,7 @@ const SubcomponentReference = ({ docs }: { readonly docs: SubcomponentDocs }): R
         <CodeText text={docs.description} />
       </p>
     )}
-    <PropsAndEvents props={docs.props} eventsLevel={4} />
+    <PropsAndEvents props={docs.props} eventsLevel={4} part={docs.name} />
   </section>
 );
 

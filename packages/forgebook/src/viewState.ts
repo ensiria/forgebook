@@ -504,3 +504,18 @@ export const docPageAddressOf = (pageUrl: string, id: string, search: string): s
   params.set("page", id);
   return `${pageUrl}?${params.toString()}`;
 };
+
+/**
+ * The address of a component's page in the catalogue, in the view a search string names.
+ *
+ * @param pageUrl - the catalogue's page.
+ * @param id - the component's id.
+ * @param search - the view's query.
+ */
+export const componentAddressOf = (pageUrl: string, id: string, search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("page");
+  params.delete("story");
+  params.set("component", id);
+  return `${pageUrl}?${params.toString()}`;
+};
