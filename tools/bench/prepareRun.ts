@@ -180,15 +180,9 @@ export const prepareReal = async (
 };
 
 /** The tools a real library is measured with: Forgebook, and with `--compare` its own Storybook when it can run. */
-export const realTargets = (
-  { name, storybook }: RealCorpus,
-  clone: string,
-  isCompared: boolean
-): Target[] => [
+export const realTargets = ({ storybook }: RealCorpus, clone: string, isCompared: boolean): Target[] => [
   FORGEBOOK,
-  ...(isCompared && storybook !== undefined
-    ? [libraryStorybook(storybook, clone, join(clone, "..", `${name}-storybook-build`))]
-    : [])
+  ...(isCompared && storybook !== undefined ? [libraryStorybook(storybook, clone)] : [])
 ];
 
 /** What a report says of a real corpus. */

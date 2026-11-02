@@ -56,11 +56,6 @@ export type Target = {
   /** The table of props on a component's page, when the tool has one, in whichever document it draws. */
   readonly propsTable?: string;
   /**
-   * Where its build writes, as an absolute path, when not `bench-build` in its folder: a library's own Storybook writes
-   * outside its sources, which its globs may read.
-   */
-  readonly buildFolder?: string;
-  /**
    * A page that answers only once the tool can draw a story, waited for before a page opens: a bundler that builds on
    * the first request answers 404 meanwhile, and a frame opened then is never reloaded.
    */
@@ -216,9 +211,8 @@ export const LADLE: Target = {
  *
  * @param storybook - how it runs.
  * @param clone - the clone's root, whose `node_modules/.bin` holds the program.
- * @param buildFolder - where its build writes: outside the clone, so nothing of the project can read a past build.
  */
-export const libraryStorybook = (storybook: CorpusStorybook, clone: string, buildFolder: string): Target => {
+export const libraryStorybook = (storybook: CorpusStorybook, clone: string): Target => {
   const { configDir, env, folder } = storybook;
   const directory = join(clone, folder);
   const bin = join(clone, "node_modules/.bin/storybook");
@@ -227,7 +221,6 @@ export const libraryStorybook = (storybook: CorpusStorybook, clone: string, buil
   return {
     ...STORYBOOK,
     configFiles: {},
-    buildFolder,
     // Spectrum's Storybook builds its preview with Parcel on the first request, answering 404 until then
     readyPath: "iframe.html",
     caches: [...STORYBOOK.caches, inClone("node_modules/.vite"), inClone("node_modules/.cache")],
