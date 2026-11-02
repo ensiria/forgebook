@@ -20,7 +20,7 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 import ts from "typescript-6";
@@ -38,7 +38,6 @@ import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { highlightCode } from "./highlightCode.ts";
 import {
-  AGENT_SOURCES_FILE,
   agentSourcesModule,
   CONFIG_MODULE,
   configModule,
@@ -47,7 +46,8 @@ import {
   PAGE_FILES,
   type PageFile,
   pageHtml,
-  STORIES_SOURCE_FILE,
+  pageModuleOf,
+  pageModulePath,
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
@@ -63,6 +63,7 @@ import {
 import { componentImport } from "./storyMeta.ts";
 import { storyReach } from "./storyReach.ts";
 import { joinedUsage } from "./usageModule.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /**
  * A file's text, or none when it cannot be read.
@@ -364,16 +365,30 @@ const generatedModule = (
   config: ResolvedConfig
 ): { code: string; moduleType: "js" } | string | undefined => {
   if (id === CONFIG_ID) return { code: configModule(config), moduleType: "js" };
-  if (id === join(config.dir, PAGE_ENTRIES["index.html"]))
-    return { code: shellEntry(config), moduleType: "js" };
-  if (id === join(config.dir, PAGE_ENTRIES["frame.html"]))
-    return { code: frameEntry(config), moduleType: "js" };
-  if (id === join(config.dir, STORIES_SOURCE_FILE))
-    return { code: storiesSourceModule(config), moduleType: "js" };
-  if (id === join(config.dir, AGENT_SOURCES_FILE))
-    return { code: agentSourcesModule(config), moduleType: "js" };
-  const page = PAGE_FILES.find((candidate) => id === join(config.dir, candidate));
-  return page !== undefined && !existsSync(id) ? pageHtml(page, config) : undefined;
+  const named = pageModuleOf(id, config.dir);
+  if (named === undefined) return undefined;
+  if (named.kind === "entry") {
+    const code = named.page === "index.html" ? shellEntry(config) : frameEntry(config);
+    return { code, moduleType: "js" };
+  }
+  if (named.kind === "stories-source") return { code: storiesSourceModule(config), moduleType: "js" };
+  if (named.kind === "agent-sources") return { code: agentSourcesModule(config), moduleType: "js" };
+  return existsSync(id) ? undefined : pageHtml(named.page, config);
+};
+
+/**
+ * The id of a module the plugin generates for a catalogue's pages, when an import names one: a page or an entry by
+ * its address (`/index.html`, `/.forgebook-shell.ts`) or by its path, a source by its path.
+ *
+ * @param source - the import's specifier.
+ * @param dir - the configuration's folder.
+ */
+const generatedId = (source: string, dir: string): string | undefined => {
+  const byAddress = PAGE_FILES.find((page) => source === `/${PAGE_ENTRIES[page]}`);
+  if (byAddress !== undefined) return pageModulePath(dir, PAGE_ENTRIES[byAddress]);
+  const pageByAddress = PAGE_FILES.find((page) => source === `/${page}`);
+  if (pageByAddress !== undefined) return pageModulePath(dir, pageByAddress);
+  return pageModuleOf(source, dir) === undefined ? undefined : VITE_PATHS.normalize(source);
 };
 
 /**
@@ -439,14 +454,6 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     filesModules.add(id);
     return patternModule(id, watch, extractor().warm, config?.lists.usedIn !== false);
   };
-  const pagePath = (page: PageFile): string | undefined =>
-    config === undefined ? undefined : join(config.dir, page);
-  const entryPath = (page: PageFile): string | undefined =>
-    config === undefined ? undefined : join(config.dir, PAGE_ENTRIES[page]);
-  const storiesSource = (): string | undefined =>
-    config === undefined ? undefined : join(config.dir, STORIES_SOURCE_FILE);
-  const agentSources = (): string | undefined =>
-    config === undefined ? undefined : join(config.dir, AGENT_SOURCES_FILE);
   /**
    * A module a story file's query asks for (`?forgebook-docs`, `-code`, `-page`, `-markdown`), when the id is one.
    *
@@ -493,7 +500,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
               },
               build: {
                 rolldownOptions: {
-                  input: { index: join(config.dir, "index.html"), frame: join(config.dir, "frame.html") }
+                  input: {
+                    index: pageModulePath(config.dir, "index.html"),
+                    frame: pageModulePath(config.dir, "frame.html")
+                  }
                 }
               }
             };
@@ -509,17 +519,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     resolveId(source: string, importer: string | undefined): string | null {
       const virtual = virtualId(source);
       if (virtual !== undefined) return virtual;
-      const entry = PAGE_FILES.find(
-        (page) => source === `/${PAGE_ENTRIES[page]}` || source === entryPath(page)
-      );
-      if (entry !== undefined) return entryPath(entry) ?? null;
-      if (source === storiesSource() || source === agentSources()) return source;
-      const page = PAGE_FILES.find(
-        (candidate) => source === pagePath(candidate) || source === `/${candidate}`
-      );
-      if (page !== undefined) return pagePath(page) ?? null;
+      const generated = config === undefined ? undefined : generatedId(source, config.dir);
+      if (generated !== undefined) return generated;
       if (!source.endsWith(FILES_QUERY) || importer === undefined) return null;
-      return filesId(dirname(importer), source.slice(0, -FILES_QUERY.length));
+      return filesId(VITE_PATHS.dirname(importer), source.slice(0, -FILES_QUERY.length));
     },
     // a warning and not a failure: a theme a reader can still use must not stop a catalogue from building
     configResolved: (resolved: { readonly logger: Logger }): void => {
@@ -581,7 +584,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = config === undefined ? undefined : generatedModule(id, config);
       if (generated !== undefined) return generated;
-      const watch = (file: string): void => this.addWatchFile(file);
+      // in Vite's form, the text Vite's module graph knows a file by: a Node path on Windows (`C:\app\x.md`) is another
+      const watch = (file: string): void => this.addWatchFile(VITE_PATHS.normalize(file));
       const answered = await queryModule(id, watch, async (specifier: string, importer: string) => {
         const resolved = await this.resolve(specifier, importer);
         return resolved?.id;
