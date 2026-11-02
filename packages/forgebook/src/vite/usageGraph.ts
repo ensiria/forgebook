@@ -20,6 +20,7 @@ import ts from "typescript-6";
 
 import {
   dropPrograms,
+  dropUsageFiles,
   dropUsagePrograms,
   programDependencies,
   programFor,
@@ -438,6 +439,7 @@ export const usageReading = (requests: readonly UsageRequestFile[]): UsageReadin
     }
   } finally {
     dropUsagePrograms();
+    dropUsageFiles();
   }
   return { graph: { files, imports }, dependencies: [...dependencies] };
 };

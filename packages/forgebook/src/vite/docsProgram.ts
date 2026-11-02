@@ -9,8 +9,9 @@
  * A program is the largest thing the dev server holds, so three things keep it small. A dev server's programs hold the
  * files that were asked for (`readAskedFilesOnly`), not every file of the configuration. Each configuration keeps its
  * parsed files between programs, since a renewed program reuses a file only when its host hands back the same object;
- * without that every renewal parses everything again. And the standard library is parsed without its documentation,
- * most of `lib.dom.d.ts`, which no component's docs read: a component's own props never come from it.
+ * without that every renewal parses everything again. And the dependencies' declarations, the standard library's
+ * among them, are parsed without their documentation: a component's own props never come from `node_modules`
+ * (`extractDocs` leaves those out), and that documentation is most of what `lib.dom.d.ts` and React's types weigh.
  *
  * @module
  */
@@ -51,7 +52,6 @@ const keepProgram = (key: string, program: ts.Program): void => {
   for (const oldest of programs.keys()) {
     if (programs.size <= KEPT_PROGRAMS) break;
     programs.delete(oldest);
-    parsedFiles.delete(oldest);
     outdated.delete(oldest);
   }
 };
@@ -62,7 +62,10 @@ const keepProgram = (key: string, program: ts.Program): void => {
  */
 const outdated = new Set<string>();
 
-/** The parsed files of each program's key, by file name, with the file's time when it was parsed. */
+/** What tells which configurations parse a file alike, as TypeScript's language service groups them. */
+const DOCUMENT_REGISTRY = ts.createDocumentRegistry();
+
+/** The parsed files of each way of parsing, by file name and version, with the file's time when it was parsed. */
 const parsedFiles = new Map<
   string,
   Map<string, { readonly time: number | undefined; readonly file: ts.SourceFile | undefined }>
@@ -117,16 +120,19 @@ const isDependencyTypes = (fileName: string, libraryFolder: string): boolean =>
 /**
  * A compiler host that keeps the files it parsed: handing back the same object is what lets a new program reuse a file.
  *
- * @param key - the program's key.
  * @param options - its compiler options.
  * @param isOwnOnly - whether a dependency's declarations are left empty (`usageProgramFor`).
  */
-const keepingHost = (key: string, options: ts.CompilerOptions, isOwnOnly: boolean): ts.CompilerHost => {
+const keepingHost = (options: ts.CompilerOptions, isOwnOnly: boolean): ts.CompilerHost => {
   const host = ts.createCompilerHost(options);
   const parse = host.getSourceFile;
   const libraryFolder = dirname(ts.getDefaultLibFilePath(options));
-  const kept = parsedFiles.get(key) ?? new Map();
-  parsedFiles.set(key, kept);
+  // shared by every configuration that parses alike: in a monorepo whose paths lead every package to every other's
+  // sources, each package's program holds the same thousands of files, and parsing them per package made a
+  // monorepo's docs and "Used in" quadratic in its size
+  const shared = `${DOCUMENT_REGISTRY.getKeyForCompilationSettings(options)}${isOwnOnly ? USAGE_KEY : ""}`;
+  const kept = parsedFiles.get(shared) ?? new Map();
+  parsedFiles.set(shared, kept);
   host.getSourceFile = (
     fileName: string,
     languageVersion: ts.ScriptTarget | ts.CreateSourceFileOptions,
@@ -134,20 +140,24 @@ const keepingHost = (key: string, options: ts.CompilerOptions, isOwnOnly: boolea
     shouldCreate?: boolean
   ): ts.SourceFile | undefined => {
     const time = ts.sys.getModifiedTime?.(fileName)?.getTime();
-    const known = kept.get(fileName);
-    if (known !== undefined && known.time === time && shouldCreate !== true) return known.file;
     const version = typeof languageVersion === "object" ? languageVersion : { languageVersion };
-    if (isOwnOnly && isDependencyTypes(fileName, libraryFolder))
-      return ts.createSourceFile(fileName, "", version);
+    const entry = `${fileName}|${version.languageVersion}|${version.impliedNodeFormat ?? ""}`;
+    const known = kept.get(entry);
+    if (known !== undefined && known.time === time && shouldCreate !== true) return known.file;
+    if (isOwnOnly && isDependencyTypes(fileName, libraryFolder)) {
+      const empty = ts.createSourceFile(fileName, "", version);
+      kept.set(entry, { time, file: empty });
+      return empty;
+    }
     const file = parse(
       fileName,
-      dirname(fileName) === libraryFolder
+      isDependencyTypes(fileName, libraryFolder)
         ? { ...version, jsDocParsingMode: ts.JSDocParsingMode.ParseNone }
         : version,
       onError,
       shouldCreate
     );
-    kept.set(fileName, { time, file });
+    kept.set(entry, { time, file });
     return file;
   };
   return host;
@@ -177,7 +187,7 @@ const keptProgram = (
   const program = ts.createProgram({
     rootNames,
     options,
-    host: keepingHost(key, options, isOwnOnly),
+    host: keepingHost(options, isOwnOnly),
     ...(oldProgram === undefined ? {} : { oldProgram })
   });
   keepProgram(key, program);
@@ -322,11 +332,16 @@ export const dropPrograms = (): void => {
   outdated.clear();
 };
 
+/** Lets the files "Used in" parsed go, once a group's usage is read: kept until then, since its programs share them. */
+export const dropUsageFiles = (): void => {
+  for (const key of [...parsedFiles.keys()].filter((each) => each.endsWith(USAGE_KEY)))
+    parsedFiles.delete(key);
+};
+
 /** Lets the programs "Used in" read go: a group's usage is read once, and they would hold the worker's memory. */
 export const dropUsagePrograms = (): void => {
   for (const key of [...programs.keys()].filter((each) => each.endsWith(USAGE_KEY))) {
     programs.delete(key);
-    parsedFiles.delete(key);
     outdated.delete(key);
   }
 };
