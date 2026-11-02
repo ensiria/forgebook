@@ -44,7 +44,8 @@ describe("the direction switch", () => {
       "backdrop",
       "sheets",
       "text",
-      "width"
+      "width",
+      "audience"
     ]);
   });
 

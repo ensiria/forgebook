@@ -25,6 +25,9 @@ export type PageFile = (typeof PAGE_FILES)[number];
 /** The module the pages read the configuration's data from. */
 export const CONFIG_MODULE = "virtual:forgebook/config";
 
+/** The module the shell reads the design tokens from, imported on first use: a page that shows none never loads it. */
+export const TOKENS_MODULE = "virtual:forgebook/tokens";
+
 /**
  * The entries the pages load, by page: file names in the configuration's folder, never written to disk. Named as
  * files rather than virtual modules because the build names a page's chunk and its style sheet after its entry, and a
@@ -140,6 +143,9 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    ...(config.tokens.length === 0
+      ? []
+      : [`    loadTokens: () => import(${JSON.stringify(TOKENS_MODULE)}).then((module) => module.default),`]),
     "    codeOf",
     "  });",
     ""

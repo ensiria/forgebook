@@ -28,6 +28,8 @@ export type FrameQueue = {
   readonly observerOf: (storyId: string, place?: number) => (element: HTMLElement | null) => void;
   /** Records a story whose frame finished loading. */
   readonly markReady: (storyId: string) => void;
+  /** Loads every frame of the page, wherever it is, still a few at a time. */
+  readonly loadAll: () => void;
 };
 
 /**
@@ -43,6 +45,9 @@ export const useFrameQueue = (
   const [near, setNear] = useState<ReadonlySet<Element>>(new Set());
   const [ready, setReady] = useState<ReadonlySet<string>>(new Set());
   const [mounted, setMounted] = useState<ReadonlySet<string>>(new Set());
+  // the list asked for in full: another page's stories wait for their own turn again
+  const [wholeList, setWholeList] = useState<readonly string[] | undefined>(undefined);
+  const isEveryStoryNear = wholeList === storyIds;
   const observerRef = useRef<IntersectionObserver | undefined>(undefined);
   const elements = useRef(new Map<Element, string>());
   const observers = useRef(new Map<string, (element: HTMLElement | null) => void>());
@@ -71,11 +76,11 @@ export const useFrameQueue = (
     setMounted((current) => {
       const nearIds = new Set([...near].map((element) => elements.current.get(element)));
       const loading = [...current].filter((id) => storyIds.includes(id) && !ready.has(id)).length;
-      const waiting = storyIds.filter((id) => nearIds.has(id) && !current.has(id));
+      const waiting = storyIds.filter((id) => (isEveryStoryNear || nearIds.has(id)) && !current.has(id));
       const next = waiting.slice(0, Math.max(0, MAX_LOADING - loading));
       return next.length === 0 ? current : new Set([...current, ...next]);
     });
-  }, [storyIds, near, ready]);
+  }, [storyIds, near, ready, isEveryStoryNear]);
 
   const observerOf = useCallback((storyId: string, place = 0) => {
     const key = `${storyId}\n${place}`;
@@ -108,5 +113,7 @@ export const useFrameQueue = (
     []
   );
 
-  return { mounted, observerOf, markReady };
+  const loadAll = useCallback((): void => setWholeList(storyIds), [storyIds]);
+
+  return { mounted, observerOf, markReady, loadAll };
 };

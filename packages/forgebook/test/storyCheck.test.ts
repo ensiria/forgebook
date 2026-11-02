@@ -11,7 +11,7 @@ import { storiesNamed } from "../bin/forgebook/storyCheckRun.ts";
 import { isStoryCheckReport, type StoryCheckReport } from "../src/storyCheck.ts";
 import type { StoriesDocument } from "../src/vite/agent.types.ts";
 
-const LINKS = { address: "", frame: "" };
+const LINKS = { address: "", component: "", frame: "" };
 
 const DOCUMENT: StoriesDocument = {
   schema: 1,
@@ -32,6 +32,7 @@ const DOCUMENT: StoriesDocument = {
           tags: [],
           isUnlisted: false,
           isLogic: false,
+          hasPlay: false,
           links: LINKS,
           height: 120
         },
@@ -43,6 +44,7 @@ const DOCUMENT: StoriesDocument = {
           tags: ["!dev"],
           isUnlisted: true,
           isLogic: false,
+          hasPlay: false,
           links: LINKS
         }
       ]

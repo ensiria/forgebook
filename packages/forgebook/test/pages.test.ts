@@ -115,6 +115,13 @@ describe("a catalogue's theme", () => {
     expect(pageHtml("index.html", CONFIG)).not.toContain("<style>");
   });
 
+  it("gives the shell the tokens' module to load on first use, only when the catalogue has tokens", () => {
+    expect(shellEntry(CONFIG)).not.toContain("loadTokens");
+    const entry = shellEntry({ ...CONFIG, tokens: [{ path: "/catalogue/tokens.json", mode: undefined }] });
+    expect(entry).toContain('loadTokens: () => import("virtual:forgebook/tokens")');
+    expect(entry).not.toContain('from "virtual:forgebook/tokens"');
+  });
+
   it("imports the catalogue's style sheet into the shell only", () => {
     const styled: ResolvedConfig = {
       ...CONFIG,

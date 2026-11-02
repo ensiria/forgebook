@@ -859,7 +859,8 @@ test.describe("the toolbar each person arranges", () => {
       "touch",
       "backdrop",
       "sheets",
-      "text"
+      "text",
+      "audience"
     ]);
     await expect(page.getByRole("button", { name: "Reset toolbar" })).toBeDisabled();
   });
@@ -921,7 +922,7 @@ test.describe("the toolbar each person arranges", () => {
     await page.keyboard.press("ArrowUp");
     await expect(handle).toBeFocused();
     expect((await menuRows(page)).slice(0, 4)).toEqual(["theme", "contrast", "motion", "width"]);
-    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 12");
+    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 13");
     expect(await barControls(page)).toEqual(["theme", "contrast", "motion", "width"]);
     // by pointer: the theme dragged below the contrast
     const grip = page.getByRole("button", { name: "Move Theme" });

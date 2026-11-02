@@ -26,7 +26,8 @@ const storyOf = (isLogic: boolean): TreeStory => ({
   isTouch: false,
   isLogic,
   height: undefined,
-  tags: []
+  tags: [],
+  hasPlay: false
 });
 
 describe("a story about logic", () => {

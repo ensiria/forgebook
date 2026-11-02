@@ -22,6 +22,8 @@ import type { StoryGroup } from "@forgebook/story-format/csf";
 import type { StoryControlsSetting, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import { type ESTree, parseSync } from "vite";
 
+import { playField } from "./storyPlay.ts";
+
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
   /** The title from the file's path (`Inputs/Select`); none when the file's place gives none. */
@@ -595,7 +597,8 @@ export const indexStoryFile = (
     const fields = storyFields(story.fields, metaTags);
     if (fields instanceof Error) return `${file}: story ${exportName}: ${fields.message}`;
     const description = leadingSentence(text, comments, start) ?? docsDescription(story.fields, "story");
-    stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }) });
+    const played = playField(local, top, meta("play"));
+    stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }), ...played });
   }
   const metaFields = metaFieldsOf(meta);
   if (metaFields instanceof Error) return `${file}: the meta's ${metaFields.message}`;

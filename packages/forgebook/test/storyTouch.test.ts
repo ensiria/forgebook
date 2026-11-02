@@ -32,7 +32,8 @@ const storyOf = (id: string, isTouch: boolean): TreeStory => ({
   isTouch,
   isLogic: false,
   height: undefined,
-  tags: []
+  tags: [],
+  hasPlay: false
 });
 
 const PHONE = storyOf("phone", true);

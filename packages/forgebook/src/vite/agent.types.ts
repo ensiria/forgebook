@@ -25,6 +25,8 @@ export type AgentSchema = 1;
 export type StoryLinks = {
   /** Its page in the catalogue (the shell, the story selected). */
   readonly address: string;
+  /** Its component's page, where an audience in the view (`audience=designer`) reorders and filters what is drawn. */
+  readonly component: string;
   /** Its frame alone: the story's own document, as the tests open it. */
   readonly frame: string;
 };
@@ -47,6 +49,8 @@ export type AgentStory = {
   readonly height?: number;
   /** Whether it is about logic, not looks (`parameters.logic`): a hook's or a function's scene. */
   readonly isLogic: boolean;
+  /** Whether a `play` function acts on it. */
+  readonly hasPlay: boolean;
   /** Where it opens. */
   readonly links: StoryLinks;
 };

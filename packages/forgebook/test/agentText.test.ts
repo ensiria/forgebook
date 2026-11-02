@@ -32,8 +32,10 @@ const DOCUMENT: StoriesDocument = {
           tags: [],
           isUnlisted: true,
           isLogic: false,
+          hasPlay: false,
           links: {
             address: "http://localhost:5173/?story=x",
+            component: "http://localhost:5173/?component=x",
             frame: "http://localhost:5173/frame.html?story=x"
           }
         }

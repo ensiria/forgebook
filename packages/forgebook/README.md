@@ -130,7 +130,7 @@ It adds about a dozen packages to a React and Vite project.
 ## The toolbar
 
 The View menu holds every control: the catalogue's switches, and Forgebook's own (the background, the style sheets, the
-text size, the story's width). The catalogue says which start on the toolbar and which it does without; each reader
+text size, the story's width, [who a page is read by](#who-reads-a-page)). The catalogue says which start on the toolbar and which it does without; each audience
 then pins, orders and hides them, and that arrangement stays in their browser, per catalogue, never in the address
 (a link shares the values, not someone's toolbar).
 
@@ -140,7 +140,7 @@ export default defineConfig({
   framework: react(),
   title: "My components",
   stories: ["src/**/*.stories.tsx"],
-  // what starts on the toolbar, in this order: a switch's id, or "backdrop", "sheets", "text", "width"
+  // what starts on the toolbar, in this order: a switch's id, or "backdrop", "sheets", "text", "width", "audience"
   toolbar: ["theme", "contrast", "width", "text"],
   // Forgebook's own controls this catalogue does without (direction: false drops the direction switch)
   controls: { sheets: false }
@@ -208,6 +208,45 @@ panel opens on Signature, with no tab of args (its scene takes none), and the ba
 Compare: the story is drawn once, never compared. A section of its own is a title's
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
+
+## Who reads a page
+
+A component's page holds what a designer, a coder and a tester each want, in an order that suits none of them. **Reading
+for**, in the View menu, draws the same page for one of them. It is not another page: the frames stay where they are and
+keep their state, and what goes around them is reordered and filtered.
+
+| Reading for | First | Left out | Added |
+|---|---|---|---|
+| Everyone | The page as it always was | Nothing | Nothing |
+| Designers | When to use it, then a larger demo | Code, the API reference, the sections on parts and test ids | Docs pages that show it, its design tokens |
+| Coders | The API reference, parts and styling | Nothing | Every example's code, open |
+| Testers | What the stories cover: each story, its group, its play function, whether the generated tests run it | The API reference, sections that are not about testing, "Used in" | A check of every story's accessibility, on request |
+
+The address keeps it (`?component=…&audience=designer`), so a link opens the page as it was read, and the page says so with
+a way back to all of it; it is not part of a named view, which holds how stories are drawn. A catalogue can start with another audience, pin the control, give it a key or do without it:
+
+```ts
+// forgebook.config.ts
+export default defineConfig({
+  framework: react(),
+  title: "My components",
+  stories: ["src/**/*.stories.tsx"],
+  audience: "designer",
+  toolbar: ["theme", "audience"],
+  keys: { audience: "r" }
+});
+```
+
+With `controls: { audience: false }` the catalogue's `audience` is the only one, whatever an address says, and the page
+offers no way back. Names change
+through `strings` (`"audiences.coder": "Developers"`, and `"audienceTexts.coverage"` for what the pages add).
+
+A designer's guidance comes from the component's TSDoc (`@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
+`@replacedBy`). Tokens are those named after the component (`select.border`, `component.select.height`), the rest closed
+under them, and load only when such a page is drawn. A play function is noted when the file writes it for the story: its
+own, the meta's, or from a story of the file it spreads. In a documentation file, sections are told apart by the English
+words of their `##` headings: parts, styling, test ids, hooks, API and props are left out for a designer, with every code
+block; a tester gets accessibility, keyboard, states and test ids, or the whole file when no heading says any of them.
 
 ## Docs pages
 
@@ -428,7 +467,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers sixteen tools: `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers sixteen tools: `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.

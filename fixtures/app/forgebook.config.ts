@@ -33,6 +33,8 @@ export default defineConfig({
   shell: {
     theme: { light: { "accent-text": "#5a2aa0" }, dark: { accent: "#b28bff" }, radius: { card: "10px" } }
   },
+  // invented tokens, so a designer's page has some to show
+  tokens: ["tokens.json", { file: "tokens.dark.json", mode: "dark" }],
   // a view offered to every reader, so the shell's tests pick one the catalogue declares
   views: [{ name: "Dark phone", view: "theme=dark&width=360" }]
 });

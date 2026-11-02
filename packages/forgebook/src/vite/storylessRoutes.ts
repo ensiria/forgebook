@@ -47,7 +47,10 @@ const catalogueTokens = async (config: ResolvedConfig): Promise<ParsedTokens> =>
       try {
         return [{ label: relative(config.dir, path), mode, file: JSON.parse(await readFile(path, "utf8")) }];
       } catch (error) {
-        unread.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+        // the name the configuration gives it: this text reaches a static build, where a path of the machine must not
+        unread.push(
+          `${relative(config.dir, path)}: ${error instanceof Error ? error.message : String(error)}`
+        );
         return [];
       }
     })
@@ -74,6 +77,22 @@ const tokenSummary = (token: DesignToken): AgentTokenSummary => {
     ...(deprecated === undefined ? {} : { deprecated }),
     ...(isThemeOnly === undefined ? {} : { isThemeOnly })
   };
+};
+
+/**
+ * The tokens' module, for a designer's page: what a list gives, and what could not be read.
+ *
+ * @param config - the catalogue's configuration.
+ * @param watch - adds a file whose edit renews the module.
+ */
+export const tokensModule = async (
+  config: ResolvedConfig,
+  watch: (file: string) => void
+): Promise<{ code: string; moduleType: "js" }> => {
+  for (const { path } of config.tokens) watch(path);
+  const { tokens, problems } = await catalogueTokens(config);
+  const value = { tokens: tokens.map(tokenSummary), problems };
+  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
 };
 
 /** The tokens, of a category when one is asked for, up to a limit, with how many there are. */

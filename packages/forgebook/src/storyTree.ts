@@ -46,6 +46,8 @@ export type TreeStory = {
   readonly height: number | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
+  /** Whether a `play` function acts on it. */
+  readonly hasPlay: boolean;
 };
 
 /** One component (one story file). */
@@ -361,7 +363,8 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       isTouch: story.isTouch ?? entry.isTouch ?? false,
       isLogic: story.isLogic ?? entry.isLogic ?? false,
       height: story.height ?? entry.height,
-      tags: story.tags ?? []
+      tags: story.tags ?? [],
+      hasPlay: story.hasPlay === true
     }));
     groupAt(families, family, group).components.push({
       name,

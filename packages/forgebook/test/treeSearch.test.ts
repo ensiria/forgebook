@@ -26,7 +26,8 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--danger",
@@ -39,7 +40,8 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--long",
@@ -52,7 +54,8 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     }
   ],
   unlisted: [],

@@ -47,6 +47,11 @@ export type StoryIndexEntry = {
   readonly description?: string;
   /** The story's tags, the meta's then its own, a `!name` taking `name` away (Storybook's tags). */
   readonly tags?: readonly string[];
+  /**
+   * Whether the file writes a `play` for the story: its own, one from a story of the file it spreads, or the meta's.
+   * Left out when it writes none, as far as reading the file without running it can tell.
+   */
+  readonly hasPlay?: boolean;
 };
 
 /** One story file, read statically: what the catalogue shows before loading it. */

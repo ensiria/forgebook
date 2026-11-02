@@ -35,6 +35,9 @@ export type SelectProps = Omit<ComponentProps<"div">, "onChange"> & {
 /**
  * Lets the user pick one value from a list.
  *
+ * @useWhen The list is short and its values are known.
+ * @avoidWhen Most of the choices should stay in sight: use radio buttons.
+ * @alternatives Combobox, RadioGroup
  * @param props - the select's props.
  */
 export const Select = ({
