@@ -50,9 +50,6 @@ export type MetricGroup = (typeof METRIC_GROUPS)[number];
 /** Runs of the memory metrics: a peak is steadier than a time. */
 const MEMORY_RUNS = 3;
 
-/** The first port of a run; each tool takes the next, so a server that lingers cannot answer for another. */
-const FIRST_PORT = 62_100;
-
 /** What a benchmark is asked to do. */
 export type BenchRequest = {
   /** Where to work. */
@@ -63,6 +60,8 @@ export type BenchRequest = {
   readonly forgebookPackages: Readonly<Record<string, string>>;
   /** What the report says was measured of Forgebook. */
   readonly forgebookLabel: string;
+  /** The first port of the run; each tool takes the next, so a server that lingers cannot answer for another. */
+  readonly port: number;
   /** The corpus's size. */
   readonly size: CorpusSize;
   /** Runs of each time. */
@@ -362,7 +361,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
           target,
           directory,
           browser,
-          port: FIRST_PORT + index,
+          port: request.port + index,
           component: corpus.measured,
           throttle: request.throttle,
           io

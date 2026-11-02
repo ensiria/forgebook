@@ -57,12 +57,16 @@ const metricGroups = (words: readonly string[]): MetricGroup[] => {
 const forgebookUnderTest = async (
   version: string | undefined,
   folders: BenchFolders,
-  io: ScriptIo
+  io: ScriptIo,
+  warn: (message: string) => void
 ): Promise<{ readonly packages: Readonly<Record<string, string>>; readonly label: string }> => {
   if (version !== undefined) return { packages: publishedForgebook(version), label: version };
   const packages = await packForgebook(folders, io);
   const { stdout: commit } = await exec("git", ["rev-parse", "--short", "HEAD"], { cwd: REPOSITORY, io });
   const { stdout: changes } = await exec("git", ["status", "--porcelain"], { cwd: REPOSITORY, io });
+  // a published number names a commit: what makes it not one is said, or nobody can tell why
+  if (changes.trim() !== "")
+    warn(`the checkout has changes, so the report reads -dirty:\n${changes.trimEnd()}`);
   return { packages, label: `${commit.trim()}${changes.trim() === "" ? "" : "-dirty"}` };
 };
 
@@ -78,6 +82,11 @@ await defineScript({
     components: { type: "number", default: 100, description: "Components of the generated library." },
     stories: { type: "number", default: 500, description: "Stories of the generated library." },
     runs: { type: "number", default: 5, description: "Runs of each time." },
+    port: {
+      type: "number",
+      default: 62_100,
+      description: "The first port the tools' servers listen on: two runs on one machine need their own."
+    },
     edits: { type: "number", default: 60, description: "Edits of each file, for HMR." },
     markdown: { type: "boolean", description: "Print the results as a Markdown table." },
     work: {
@@ -137,7 +146,8 @@ await defineScript({
     const { packages: forgebookPackages, label: forgebookLabel } = await forgebookUnderTest(
       version,
       folders,
-      io
+      io,
+      (message) => log.warn(message)
     );
     const write = statusWriter(options.status, Date.now);
     // also when the run dies: a reader must not wait for a step that will not come
@@ -151,6 +161,7 @@ await defineScript({
       runs: options.runs,
       edits: options.edits,
       groups,
+      port: options.port,
       throttle: options.throttle,
       io,
       onStep: (step) => {
