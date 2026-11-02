@@ -43,6 +43,13 @@ export type Target = {
   readonly storyUrl: (base: string, component: CorpusComponent) => string;
   /** The page of a component's stories, when the tool has one. */
   readonly componentUrl?: (base: string, component: CorpusComponent) => string;
+  /** The search of the tool's page, when it loads on first use and so can be weighed on its own. */
+  readonly search?: {
+    /** The field. */
+    readonly field: string;
+    /** What shows once the whole index arrived. */
+    readonly ready: string;
+  };
   /** The table of props on a component's page, when the tool has one, in whichever document it draws. */
   readonly propsTable?: string;
   /** The package whose direct dependencies a report counts. */
@@ -133,6 +140,7 @@ export const FORGEBOOK: Target = {
   storyUrl: (base, component) =>
     `${base}?story=${forgebookComponent(component)}--${firstStory(component).toLowerCase()}`,
   componentUrl: (base, component) => `${base}?component=${forgebookComponent(component)}`,
+  search: { field: ".forgebook-search input", ready: ".forgebook-search-panel[data-ready]" },
   propsTable: ".forgebook-api__table"
 };
 

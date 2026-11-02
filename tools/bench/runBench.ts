@@ -304,9 +304,12 @@ const buildGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promis
   record(loads, "shellJs", "bytes", (sample) => sample.shell);
   record(loads, "frameJs", "bytes", (sample) => sample.frame);
   record(loads, "firstLoadJs", "bytes", (sample) => sample.total);
+  record(loads, "searchJs", "bytes", (sample) => sample.search);
   for (const [tool, samples] of loads) {
-    if (samples[0]?.frame !== undefined) continue;
     const { name } = tool.context.target;
+    if (samples[0]?.search === undefined)
+      tool.metrics["searchJs"] = { kind: "absent", reason: `${name} loads its search with its page` };
+    if (samples[0]?.frame !== undefined) continue;
     tool.metrics["frameJs"] = { kind: "absent", reason: `${name} draws stories in its own page` };
   }
 };
