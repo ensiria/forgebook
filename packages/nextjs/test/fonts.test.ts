@@ -138,7 +138,7 @@ describe("buildFontModule", () => {
     const fetched = context({
       fetcher: async (url: string): Promise<Response> => {
         asked.push(url);
-        if (url.startsWith("https://fonts.googleapis.com"))
+        if (new URL(url).host === "fonts.googleapis.com")
           return new Response(
             "@font-face { font-family: 'Inter'; src: url(https://fonts.gstatic.com/s/inter/v1/a.woff2) format('woff2'); }"
           );
