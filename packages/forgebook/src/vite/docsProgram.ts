@@ -6,6 +6,9 @@
  * The repo type-checks with TypeScript 7, whose native compiler has no JavaScript API; TypeScript 6 (the version
  * typescript-eslint uses too) reads the same configurations.
  *
+ * A framework whose components are not TypeScript (Svelte's `.svelte`) hands the text TypeScript reads in a component's
+ * place (`ProgramSources`): its programs are kept apart from the plain ones, under the same configuration.
+ *
  * @module
  */
 import { dirname } from "node:path";
@@ -18,6 +21,54 @@ export type DocsProgram = {
   readonly program: ts.Program;
   /** Its type checker. */
   readonly checker: ts.TypeChecker;
+};
+
+/**
+ * What TypeScript reads in place of files it cannot read itself: a framework's components, each written as the
+ * TypeScript it amounts to, under a name beside the component (`Badge.svelte.ts` for `Badge.svelte`), so an import of the
+ * component resolves to it as TypeScript resolves any import.
+ */
+export type ProgramSources = {
+  /** The sources' name, which keeps their programs apart from the plain ones (`svelte`). */
+  readonly name: string;
+  /**
+   * The text of a file that is not on disk.
+   *
+   * @param fileName - the file TypeScript asks for.
+   * @returns its text, or none for a file read from disk.
+   */
+  readonly textOf: (fileName: string) => string | undefined;
+  /** The declarations every program holds besides its sources, which the written text refers to. */
+  readonly roots: readonly string[];
+  /** Compiler options over the configuration's (JavaScript allowed, for components written without TypeScript). */
+  readonly options: ts.CompilerOptions;
+};
+
+/**
+ * A compiler host that reads the sources' files as if they were on disk.
+ *
+ * @param options - the program's compiler options.
+ * @param sources - the files to read in place.
+ */
+const sourcesHost = (options: ts.CompilerOptions, sources: ProgramSources): ts.CompilerHost => {
+  const host = ts.createCompilerHost(options, true);
+  const { fileExists, readFile, getSourceFile } = host;
+  return {
+    ...host,
+    fileExists: (fileName: string): boolean => sources.textOf(fileName) !== undefined || fileExists(fileName),
+    readFile: (fileName: string): string | undefined => sources.textOf(fileName) ?? readFile(fileName),
+    getSourceFile: (
+      fileName: string,
+      languageVersion: ts.ScriptTarget | ts.CreateSourceFileOptions,
+      onError?: (message: string) => void,
+      shouldCreate?: boolean
+    ): ts.SourceFile | undefined => {
+      const text = sources.textOf(fileName);
+      return text === undefined
+        ? getSourceFile(fileName, languageVersion, onError, shouldCreate)
+        : ts.createSourceFile(fileName, text, languageVersion, true);
+    }
+  };
 };
 
 /** The last program of each configuration, reused by the next read. */
@@ -54,19 +105,30 @@ const FALLBACK_OPTIONS: ts.CompilerOptions = {
  * @param key - the program's key: its configuration file, or what the files no configuration holds share.
  * @param rootNames - its root files.
  * @param options - its compiler options.
+ * @param sources - the files read in place of a framework's components; none for a plain program.
  */
-const keptProgram = (key: string, rootNames: readonly string[], options: ts.CompilerOptions): ts.Program => {
+const keptProgram = (
+  key: string,
+  rootNames: readonly string[],
+  options: ts.CompilerOptions,
+  sources: ProgramSources | undefined
+): ts.Program => {
   const oldProgram = programs.get(key);
   if (oldProgram !== undefined && !outdated.has(key)) return oldProgram;
   outdated.delete(key);
   const program = ts.createProgram({
-    rootNames,
+    rootNames: sources === undefined ? rootNames : [...rootNames, ...sources.roots],
     options,
+    ...(sources === undefined ? {} : { host: sourcesHost(options, sources) }),
     ...(oldProgram === undefined ? {} : { oldProgram })
   });
   programs.set(key, program);
   return program;
 };
+
+/** What a program's key adds for the sources it reads: nothing for a plain program. */
+const sourcesKey = (sources: ProgramSources | undefined): string =>
+  sources === undefined ? "" : `#${sources.name}`;
 
 /** The extensions a project's sources have. */
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
@@ -88,11 +150,16 @@ const projectFolder = (file: string): string => {
  *
  * @param file - the story file.
  * @param options - the options of the configuration above it, when there is one; JavaScript is allowed on top.
+ * @param sources - the files read in place of a framework's components; none for a plain program.
  */
-const looseProgram = (file: string, options: ts.CompilerOptions): DocsProgram => {
-  const merged = { ...options, allowJs: true, noEmit: true };
+const looseProgram = (
+  file: string,
+  options: ts.CompilerOptions,
+  sources: ProgramSources | undefined
+): DocsProgram => {
+  const merged = { ...options, ...sources?.options, allowJs: true, noEmit: true };
   const folder = projectFolder(file);
-  const key = `${folder}#loose#${JSON.stringify(merged)}`;
+  const key = `${folder}#loose#${sourcesKey(sources)}${JSON.stringify(merged)}`;
   const kept = programs.get(key);
   // a file the program does not hold is new: reading the folder again finds it, and whatever else came with it
   if (kept !== undefined && kept.getSourceFile(file) === undefined) outdated.add(key);
@@ -100,7 +167,7 @@ const looseProgram = (file: string, options: ts.CompilerOptions): DocsProgram =>
     kept === undefined || outdated.has(key)
       ? ts.sys.readDirectory(folder, SOURCE_EXTENSIONS, NOT_SOURCES)
       : [];
-  const program = keptProgram(key, files.includes(file) ? files : [...files, file], merged);
+  const program = keptProgram(key, files.includes(file) ? files : [...files, file], merged, sources);
   return { program, checker: program.getTypeChecker() };
 };
 
@@ -108,12 +175,13 @@ const looseProgram = (file: string, options: ts.CompilerOptions): DocsProgram =>
  * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, the one
  * the files no configuration holds share (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
  *
- * @param file - an absolute path to a source file.
+ * @param file - an absolute path to a source file, or to a file the sources write.
+ * @param sources - the files read in place of a framework's components; none for a plain program.
  * @returns the program, or a message when the configuration above it cannot be read.
  */
-export const programFor = (file: string): DocsProgram | string => {
+export const programFor = (file: string, sources?: ProgramSources): DocsProgram | string => {
   const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
-  if (configPath === undefined) return looseProgram(file, FALLBACK_OPTIONS);
+  if (configPath === undefined) return looseProgram(file, FALLBACK_OPTIONS, sources);
   const parsed = ts.getParsedCommandLineOfConfigFile(
     configPath,
     {},
@@ -123,8 +191,9 @@ export const programFor = (file: string): DocsProgram | string => {
     }
   );
   if (parsed === undefined) return `${configPath} could not be read`;
-  const program = keptProgram(configPath, parsed.fileNames, parsed.options);
-  if (program.getSourceFile(file) === undefined) return looseProgram(file, parsed.options);
+  const options = { ...parsed.options, ...sources?.options };
+  const program = keptProgram(`${configPath}${sourcesKey(sources)}`, parsed.fileNames, options, sources);
+  if (program.getSourceFile(file) === undefined) return looseProgram(file, parsed.options, sources);
   return { program, checker: program.getTypeChecker() };
 };
 
