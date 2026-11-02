@@ -1,5 +1,5 @@
 /**
- * The process that reads the story files' component docs: TypeScript's program for a package takes seconds to
+ * The worker thread that reads the story files' component docs: TypeScript's program for a package takes seconds to
  * build, and built on the dev server's own thread it held every other answer (a frame, a documentation file) until
  * it was done.
  *
@@ -13,21 +13,17 @@
  * @module
  */
 
+import { parentPort, workerData } from "node:worker_threads";
+
 import { type DocsModule, isDocsModule } from "./adapter.ts";
 import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
 import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
 import { docsDependencies, type UsageReading, usageReading } from "./usageGraph.ts";
 
-/** What the extractor started this process with, as JSON. */
-const workerData: unknown = JSON.parse(process.argv[2] ?? "null");
-
-/** Answers the extractor, while it is there to read it. */
+/** Answers the extractor. */
 const answer = (response: DocsResponse): void => {
-  process.send?.(response);
+  parentPort?.postMessage(response);
 };
-
-// a server that dies leaves nobody to send a request, or to end this process
-process.once("disconnect", () => process.exit());
 
 /** Whether the worker's data names a docs module. */
 const isWorkerData = (value: unknown): value is DocsWorkerData =>
@@ -74,7 +70,7 @@ const usage = (files: Parameters<typeof usageReading>[0]): UsageReading | string
   }
 };
 
-process.on("message", (request: DocsRequest): void => {
+parentPort?.on("message", (request: DocsRequest): void => {
   if (request.kind === "changed") {
     markSourcesChanged();
     void docsModule.then((module): void => {

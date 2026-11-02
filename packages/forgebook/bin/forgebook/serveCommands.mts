@@ -13,7 +13,7 @@ import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types"
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { settleAgentIndex } from "./builtCatalogue.ts";
-import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { COMMAND, configOf, configPathOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { catalogueVite } from "./catalogueVite.ts";
 import { prebundle, prebundleInChild } from "./prebundleRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
@@ -61,7 +61,9 @@ export const serveCommands = (
       const port = options.port === undefined ? undefined : Number(options.port);
       if (port !== undefined && !Number.isInteger(port))
         throw new ScriptError(`--port ${options.port} is not a port`);
-      const prebundling = prebundleInChild(config.dir, options.config, options.force === true);
+      const configFile = configPathOf(options.config);
+      const prebundling =
+        configFile === undefined ? Promise.resolve() : prebundleInChild(configFile, options.force === true);
       const { createServer } = await import("vite");
       await prebundling;
       const server = await createServer(
