@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { estimate, formatDuration, phaseTiming, profileItems, type Reference } from "./kitPlan.ts";
 import { anonymize, HOST_PLACEHOLDER, leaks, USER_PLACEHOLDER } from "./kitResults.ts";
-import { failedMetrics } from "./kitRunner.ts";
+import { buildMedian, failedMetrics } from "./kitRunner.ts";
 import { parseState } from "./kitState.ts";
 import { leftoverPids, parsePsCommands, programName } from "./leftovers.ts";
 import { zipArchive } from "./zipArchive.ts";
@@ -73,6 +73,17 @@ describe("estimate", () => {
     expect(result.highMs).toBeGreaterThan(result.totalMs);
   });
 
+  it("scales measuring by the calibration's build when both machines built", () => {
+    const withBuild = { ...reference, calibration: { ...reference.calibration, buildMs: 1000 } };
+    // a measuring phase ten times longer, from a failed metric's timeout, does not count: the build is 3 times slower
+    const result = estimate(
+      withBuild,
+      { prepareMs: 60_000, measureMs: 200_000, buildMs: 3000 },
+      profileItems("quick", "linux")
+    );
+    expect(result.totalMs).toBe(120_000 + 1_800_000);
+  });
+
   it("says which parts the reference never ran instead of counting them as nothing", () => {
     const result = estimate(reference, reference.calibration, profileItems("full", "win32"));
     expect(result.items.filter(({ ms }) => ms === undefined).map(({ id }) => id)).toEqual([
@@ -80,6 +91,18 @@ describe("estimate", () => {
       "carbon",
       "fluentui"
     ]);
+  });
+});
+
+describe("buildMedian", () => {
+  it("reads Forgebook's build time, and nothing when it did not build", () => {
+    const summary = { median: 725, min: 725, max: 725, samples: 1 };
+    const built = {
+      version: 1,
+      tools: { forgebook: { versions: {}, metrics: { build: { kind: "measured", unit: "ms", summary } } } }
+    };
+    expect(buildMedian(JSON.stringify(built))).toBe(725);
+    expect(buildMedian(JSON.stringify({ version: 1, tools: {} }))).toBeUndefined();
   });
 });
 
@@ -161,7 +184,7 @@ describe("parseState", () => {
     const state = {
       commit: "abc",
       machine: "win32-x64|cpu|8|1",
-      calibration: { prepareMs: 1, measureMs: 2 },
+      calibration: { prepareMs: 1, measureMs: 2, buildMs: 3 },
       profile: "quick",
       items: { generated: { outcome: "problems", exitCode: 1, timing: { prepareMs: 3, measureMs: 4 } } }
     };

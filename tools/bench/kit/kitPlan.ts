@@ -6,6 +6,8 @@
  * Forgebook alone. A run has two phases with different bottlenecks, so each is scaled by its own ratio: preparing
  * (packing, installs, clones: the network and the disk) and measuring (servers, builds, the browser: the CPU). The
  * calibration cannot tell how a large monorepo's install compares with a small project's, so the estimate is a range.
+ * Measuring is scaled by the calibration's build when both machines have one: a phase that holds a failed metric's
+ * timeout (Forgebook's dev server on Windows) says nothing of the machine's speed, and a build does.
  * Everything here is pure.
  *
  * @module
@@ -131,12 +133,18 @@ export const phaseTiming = (startedAt: number, endedAt: number, status: string):
   return { prepareMs: Math.max(0, measuring - startedAt), measureMs: Math.max(0, endedAt - measuring) };
 };
 
+/** A calibration's durations: its phases, and its build's time when it built. */
+export type CalibrationTiming = PhaseTiming & {
+  /** The build's time, in milliseconds. */
+  readonly buildMs?: number;
+};
+
 /** A reference machine's durations, against which this one is scaled. */
 export type Reference = {
   /** The machine, described for a person. */
   readonly machine: string;
   /** Its calibration. */
-  readonly calibration: PhaseTiming;
+  readonly calibration: CalibrationTiming;
   /** Each part's phases there. */
   readonly items: Readonly<Partial<Record<KitItemId, PhaseTiming>>>;
 };
@@ -168,11 +176,15 @@ const ratio = (here: number, there: number): number => (there > 0 ? here / there
  */
 export const estimate = (
   reference: Reference,
-  calibration: PhaseTiming,
+  calibration: CalibrationTiming,
   items: readonly KitItem[]
 ): Estimate => {
   const prepare = ratio(calibration.prepareMs, reference.calibration.prepareMs);
-  const measure = ratio(calibration.measureMs, reference.calibration.measureMs);
+  const builds = { here: calibration.buildMs, there: reference.calibration.buildMs };
+  const measure =
+    builds.here !== undefined && builds.there !== undefined
+      ? ratio(builds.here, builds.there)
+      : ratio(calibration.measureMs, reference.calibration.measureMs);
   const parts = items.map(({ id }) => {
     const timing = reference.items[id];
     return {

@@ -19,7 +19,8 @@ Linux desktop. They copy this folder, double-click one file, answer two question
    two tools when the permission is refused.
 3. **Calibrates**: Forgebook alone, a start and a build on 100 stories, a few minutes. Its two phases, preparing
    (packing, installs) and measuring, scale the durations a reference machine recorded in `reference.json`, so each
-   profile gets an estimate, shown as a range before the question.
+   profile gets an estimate, shown as a range before the question. Measuring scales by the calibration's build when
+   both machines built: a phase holding a failed metric's timeout says nothing of the machine's speed.
 4. **Asks the profile**: `quick` is the generated library of 500 stories with Forgebook, Storybook and Ladle; `full`
    adds Primer, Carbon and Fluent UI against their own Storybooks, and Spectrum on Linux. Spectrum is left out on
    Windows, and the kit says why: its Storybook builds its preview with Parcel on a fixed port (3000) and opens a Unix
@@ -53,7 +54,8 @@ start-bench.cmd --profile quick --yes  # no questions: the defaults, for a test
 - **Node and MinGit**: their version, address and SHA-256 in `kit.pins`, copied from `SHASUMS256.txt` and from the
   release's assets. Never a digest computed from a download.
 - **The reference**: run the full profile with `--write-reference tools/bench/kit/reference.json` on a quiet machine,
-  and keep its description in the file.
+  and keep its description in the file. The one here has no Spectrum: its Storybook needs port 3000, which another
+  program held on the machine that recorded it, so Linux's full estimate leaves Spectrum out and says so.
 
 ## The files
 

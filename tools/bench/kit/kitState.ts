@@ -8,7 +8,7 @@
  *
  * @module
  */
-import type { KitItemId, KitProfile, PhaseTiming } from "./kitPlan.ts";
+import type { CalibrationTiming, KitItemId, KitProfile, PhaseTiming } from "./kitPlan.ts";
 
 /** How a part ended. */
 export type ItemOutcome =
@@ -36,7 +36,7 @@ export type KitState = {
   /** The machine the calibration was taken on, so a copied folder does not reuse another's. */
   readonly machine: string;
   /** This machine's calibration, once taken. */
-  readonly calibration?: PhaseTiming;
+  readonly calibration?: CalibrationTiming;
   /** The profile of the current run, once chosen. */
   readonly profile?: KitProfile;
   /** When the current run started, as an ISO date. */
@@ -53,11 +53,27 @@ export type KitState = {
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** A phase timing, checked. */
-const timingOf = (value: unknown): PhaseTiming | undefined =>
+/**
+ * A phase timing, checked.
+ *
+ * @param value - what was saved.
+ */
+export const timingOf = (value: unknown): PhaseTiming | undefined =>
   isRecord(value) && typeof value["prepareMs"] === "number" && typeof value["measureMs"] === "number"
     ? { prepareMs: value["prepareMs"], measureMs: value["measureMs"] }
     : undefined;
+
+/**
+ * A calibration's timing, checked.
+ *
+ * @param value - what was saved.
+ */
+export const calibrationOf = (value: unknown): CalibrationTiming | undefined => {
+  const timing = timingOf(value);
+  if (timing === undefined || !isRecord(value)) return undefined;
+  const build = value["buildMs"];
+  return typeof build === "number" ? { ...timing, buildMs: build } : timing;
+};
 
 /** The parts' ids. */
 const ITEM_IDS: readonly KitItemId[] = ["generated", "primer", "carbon", "fluentui", "spectrum"];
@@ -98,7 +114,7 @@ export const parseState = (text: string): KitState | undefined => {
     const item = itemOf(savedItems[id]);
     if (item !== undefined) items[id] = item;
   }
-  const calibration = timingOf(value["calibration"]);
+  const calibration = calibrationOf(value["calibration"]);
   const profile = (["quick", "full"] as const).find((each) => each === value["profile"]);
   const { startedAt, estimateMs, archive } = value;
   return {

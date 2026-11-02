@@ -16,7 +16,14 @@ import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { parseReport } from "../reportTable.ts";
-import { CALIBRATION_ARGS, formatDuration, type KitItem, type PhaseTiming, phaseTiming } from "./kitPlan.ts";
+import {
+  CALIBRATION_ARGS,
+  type CalibrationTiming,
+  formatDuration,
+  type KitItem,
+  type PhaseTiming,
+  phaseTiming
+} from "./kitPlan.ts";
 import { BENCH, ITEM_NAMES, type KitPaths, PORT, REPOSITORY } from "./kitSession.ts";
 import type { ItemOutcome, ItemState } from "./kitState.ts";
 import { stopLeftovers } from "./leftovers.ts";
@@ -145,7 +152,7 @@ export const runBenchmark = (request: BenchRequest, io: ScriptIo, log: Logger): 
   });
 
 /** The calibration, run once per machine and commit. */
-export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Promise<PhaseTiming> => {
+export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Promise<CalibrationTiming> => {
   log.step("Calibrazione: una prova breve per stimare quanto dura il resto (qualche minuto).");
   const startedAt = Date.now();
   const run = await runBenchmark(
@@ -170,7 +177,8 @@ export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Pro
       }
     );
   }
-  const failed = failedMetrics(readFileSync(report, "utf8"));
+  const text = readFileSync(report, "utf8");
+  const failed = failedMetrics(text);
   if (failed.length > 0) {
     log.warn(
       `Nella calibrazione alcune misure di Forgebook non sono riuscite (${failed.join(", ")}): la stima sarà ` +
@@ -180,7 +188,19 @@ export const calibrate = async (paths: KitPaths, io: ScriptIo, log: Logger): Pro
   log.success(
     `Calibrazione fatta: preparazione ${formatDuration(run.timing.prepareMs)}, misure ${formatDuration(run.timing.measureMs)}.`
   );
-  return run.timing;
+  const buildMs = buildMedian(text);
+  return buildMs === undefined ? run.timing : { ...run.timing, buildMs };
+};
+
+/**
+ * Forgebook's build time in a report, the median of its runs.
+ *
+ * @param text - the report's text.
+ * @returns the time in milliseconds, or nothing when it did not build.
+ */
+export const buildMedian = (text: string): number | undefined => {
+  const build = parseReport(text).tools.forgebook?.metrics["build"];
+  return build?.kind === "measured" ? build.summary.median : undefined;
 };
 
 /**

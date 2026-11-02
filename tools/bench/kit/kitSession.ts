@@ -21,7 +21,7 @@ import {
   type Reference,
   requirements
 } from "./kitPlan.ts";
-import { type KitState, parseState } from "./kitState.ts";
+import { calibrationOf, type KitState, parseState, timingOf } from "./kitState.ts";
 
 /** The repository's root, from this file. */
 export const REPOSITORY = resolve(import.meta.dirname, "../../..");
@@ -133,23 +133,14 @@ export const loadReference = (): Reference | undefined => {
   if (!existsSync(REFERENCE_FILE)) return undefined;
   const value: unknown = JSON.parse(readFileSync(REFERENCE_FILE, "utf8"));
   if (typeof value !== "object" || value === null) return undefined;
-  const timing = (entry: unknown): PhaseTiming | undefined =>
-    typeof entry === "object" &&
-    entry !== null &&
-    "prepareMs" in entry &&
-    "measureMs" in entry &&
-    typeof entry.prepareMs === "number" &&
-    typeof entry.measureMs === "number"
-      ? { prepareMs: entry.prepareMs, measureMs: entry.measureMs }
-      : undefined;
-  const calibration = "calibration" in value ? timing(value.calibration) : undefined;
+  const calibration = "calibration" in value ? calibrationOf(value.calibration) : undefined;
   const machine = "machine" in value && typeof value.machine === "string" ? value.machine : undefined;
   if (calibration === undefined || machine === undefined) return undefined;
   const items: Partial<Record<KitItemId, PhaseTiming>> = {};
   const saved =
     "items" in value && typeof value.items === "object" && value.items !== null ? value.items : {};
   for (const id of ["generated", "primer", "carbon", "fluentui", "spectrum"] as const) {
-    const entry = id in saved ? timing(Reflect.get(saved, id)) : undefined;
+    const entry = id in saved ? timingOf(Reflect.get(saved, id)) : undefined;
     if (entry !== undefined) items[id] = entry;
   }
   return { machine, calibration, items };
