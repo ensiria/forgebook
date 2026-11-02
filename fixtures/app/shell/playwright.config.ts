@@ -4,8 +4,8 @@
  *
  * @remarks
  * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT`, so two worktrees can run
- * the tests at once. The Vue fixture catalogue runs beside the fixture app, for what a catalogue of another framework
- * must do (`vue.e2e.ts`).
+ * the tests at once. The Vue and Web Components fixture catalogues run beside the fixture app, for what a catalogue of
+ * another framework must do (`vue.e2e.ts`, `webComponents.e2e.ts`).
  *
  * @module
  */
@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { SHELL_PORT, VUE_PORT } from "./ports";
+import { SHELL_PORT, VUE_PORT, WEB_COMPONENTS_PORT } from "./ports";
 
 /**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
@@ -36,7 +36,8 @@ export default defineConfig({
   reporter: [["list"]],
   webServer: [
     catalogueServer(join(import.meta.dirname, ".."), SHELL_PORT),
-    catalogueServer(join(import.meta.dirname, "..", "..", "vue"), VUE_PORT)
+    catalogueServer(join(import.meta.dirname, "..", "..", "vue"), VUE_PORT),
+    catalogueServer(join(import.meta.dirname, "..", "..", "web-components"), WEB_COMPONENTS_PORT)
   ],
   use: {
     browserName: "chromium",
