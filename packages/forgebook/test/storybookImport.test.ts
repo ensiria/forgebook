@@ -149,9 +149,9 @@ describe("importStorybook", () => {
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/vue3-vite" };\n'
     );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads Storybook's React stories on Vite (@storybook/react-vite); this project uses @storybook/vue3-vite"
+      "Forgebook reads Storybook's @storybook/react-vite, @storybook/react-native-web-vite, on-device @storybook/react-native; this project uses @storybook/vue3-vite"
     );
-    expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
+    expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main");
     // Storybook's monorepo template writes the framework as a path to its package
     const monorepo = join(scratch, "monorepo");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(monorepo, ".storybook"), { recursive: true });
@@ -168,6 +168,7 @@ describe("initConfigText", () => {
   it("writes the configuration as a person would, with the switches read from the preview", () => {
     const text = initConfigText(
       {
+        framework: { packageName: "@forgebook/react", adapter: "react" },
         title: "acme-ui",
         stories: ["src/**/*.stories.tsx"],
         preview: ".storybook/preview.tsx",
@@ -184,13 +185,22 @@ describe("initConfigText", () => {
       },
       "Storybook"
     );
+    expect(text).toContain('import { react } from "@forgebook/react/vite";');
+    expect(text).toContain("  framework: react(),");
     expect(text).toContain('import { defineConfig } from "forgebook";');
     expect(text).toContain('  title: "acme-ui",');
     expect(text).toContain('  preview: ".storybook/preview.tsx",');
     expect(text).toContain('      id: "density",');
     expect(text).toMatch(/\n {2}\]\n\}\);\n$/);
     const plain = initConfigText(
-      { title: "x", stories: ["src/*.stories.tsx"], preview: undefined, switches: undefined, notes: [] },
+      {
+        framework: { packageName: "@forgebook/react", adapter: "react" },
+        title: "x",
+        stories: ["src/*.stories.tsx"],
+        preview: undefined,
+        switches: undefined,
+        notes: []
+      },
       "Storybook"
     );
     expect(plain).toContain('  stories: [\n    "src/*.stories.tsx"\n  ]\n});');
