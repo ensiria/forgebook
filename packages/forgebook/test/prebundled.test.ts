@@ -23,6 +23,7 @@ const CONFIG: ResolvedConfig = {
   previews: [],
   head: "",
   shell: { themeCss: "", styleSheets: [], problems: [] },
+  tokens: [],
   watch: [],
   lists: {},
   hasPlayTools: false
