@@ -301,7 +301,8 @@ export const agentAnswer = async (
     if (route === "pages") return pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context);
-    if (route === "agent-index") return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
+    if (route === "agent-index")
+      return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };

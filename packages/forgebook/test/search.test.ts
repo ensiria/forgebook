@@ -27,7 +27,9 @@ const story = (name: string, description?: string): TreeStory => ({
   isTouch: false,
   isLogic: false,
   height: undefined,
-  tags: []
+  design: undefined,
+  tags: [],
+  hasPlay: false
 });
 
 /** A component. */
@@ -39,6 +41,7 @@ const component = (
   name: title.split("/").at(-1) ?? title,
   title,
   file: `./${title}.stories.tsx`,
+  design: undefined,
   stories,
   unlisted: [],
   alsoIn: [],

@@ -13,3 +13,9 @@ export const PAGE_QUERY = "?forgebook-page";
 
 /** The query a source's Markdown file is imported with (its introduction on the home), answered with its HTML. */
 export const MARKDOWN_QUERY = "?forgebook-markdown";
+
+/** The query that asks for one docs page: its text, compiled. */
+export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
+
+/** The id prefix of a group's search of its docs pages: its group follows, as in a pattern's module. */
+export const PAGES_SEARCH_PREFIX = "virtual:forgebook-search-pages:";

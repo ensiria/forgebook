@@ -5,7 +5,8 @@
  */
 import { parseSync } from "vite";
 
-import { metaObject, propertyValue, topLevelOf } from "./indexStoryFile.ts";
+import { propertyValue } from "./indexFields.ts";
+import { metaObject, topLevelOf } from "./indexStoryFile.ts";
 
 /**
  * The module a story file imports its meta's component from (`./Button`), read from the file alone: no program, so it

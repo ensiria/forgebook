@@ -11,8 +11,8 @@
  * @module
  */
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { createServer as createNetServer } from "node:net";
+import { resolve } from "node:path";
 
 import { createServer, type ViteDevServer } from "vite";
 

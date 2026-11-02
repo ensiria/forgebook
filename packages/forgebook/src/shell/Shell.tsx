@@ -7,17 +7,7 @@
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
-import {
-  lazy,
-  type MouseEvent,
-  type ReactNode,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
@@ -117,7 +107,10 @@ export type ShellConfig = {
 };
 
 /** A docs page, loaded on first use: a catalogue may have none. */
-const DocPage = lazy(() => import("./DocPage.tsx").then((module) => ({ default: module.DocPage })));
+const DocPage = deferred(
+  async () => (await import("./DocPage.tsx")).DocPage,
+  ({ header }): ReactNode => <div className="forgebook-workspace">{header}</div>
+);
 
 /**
  * The page an address names: one story, a component's page or a docs page with the heading or prop it opens at, or the
@@ -587,7 +580,7 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
   });
   const open = (page: Page, movesFocus: boolean): void => {
     const next = pageAddress(page);
-    window.history.pushState(null, "", addressQuery(next, switches));
+    window.history.pushState(null, "", addressQuery(next, catalogue));
     setAddress(next);
     setVisit({ ...visitOf(next, false), movesFocus });
   };
@@ -636,7 +629,6 @@ const ShellPage = ({
   } = useSidebarLayout();
   const showSidebar = useCallback((): void => setIsSidebarOpen(true), [setIsSidebarOpen]);
   const catalogue = useCatalogue();
-  const { switches } = catalogue;
   const { address, visit, pageAddress, openPage, openFound, openAnchor, replaceAddress } =
     useAddress(catalogue);
   // each page's last scroll position, kept across the component pages and the stage
@@ -741,7 +733,7 @@ const ShellPage = ({
         hasBranding={hasBranding !== false}
         tree={tree}
         sources={sources}
-        searchHref={(target: SearchTarget): string => addressQuery(pageAddress(target), switches)}
+        searchHref={(target: SearchTarget): string => addressQuery(pageAddress(target), catalogue)}
         onOpenResult={openFound}
         isHome={shown.kind === "home"}
         homeHref={addressQuery(pageAddress(HOME), catalogue)}
@@ -816,7 +808,7 @@ const ShellPage = ({
           />
         ) : null}
         {shown.kind === "page" ? (
-          <Suspense fallback={<div className="forgebook-workspace">{header}</div>}>
+          <>
             {/* keyed by the page: its frames, its text and its scrolling element are that page's alone */}
             <DocPage
               key={shown.location.page.id}
@@ -844,7 +836,7 @@ const ShellPage = ({
               header={header}
               scroll={scroll}
             />
-          </Suspense>
+          </>
         ) : null}
         {shown.kind === "story" ? (
           <Stage

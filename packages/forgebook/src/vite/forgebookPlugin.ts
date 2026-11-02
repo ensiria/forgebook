@@ -19,10 +19,8 @@
  *
  * @module
  */
-import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
-import { gzipSync } from "node:zlib";
 
 import {
   type ConfigEnv,
@@ -34,18 +32,17 @@ import {
 } from "vite";
 
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
-import type { ComponentFiles, FrameworkAdapter } from "./adapter.ts";
+import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
+import { axeAddress, axeBuildAsset } from "./axeScript.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
-import { DOCS_PAGE_QUERY, docPageModule, docPagesModule, PAGES_SEARCH_PREFIX } from "./docPagesModule.ts";
 import { type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, type DocsResult } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import {
   AGENT_SOURCES_FILE,
-  type AxeAddress,
   agentSourcesModule,
   CONFIG_MODULE,
   configModule,
@@ -60,21 +57,31 @@ import {
   TOKENS_MODULE
 } from "./pages.ts";
 import { pluginFences } from "./pluginConfig.ts";
-import { prebundled, scannedEntries } from "./prebundled.ts";
-import { pagesSearchModule, storySearchModule } from "./searchModule.ts";
-import { CODE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 import {
-  indexedStoryFiles,
+  DOCS_PAGES_PREFIX,
+  docsModule,
+  docsModuleOf,
+  FILES_PREFIX,
+  patternModule,
+  USAGE_ID_PREFIX,
+  usageModule
+} from "./pluginModules.ts";
+import { prebundled, scannedEntries } from "./prebundled.ts";
+import {
   type KeptIndex,
   SEARCH_PREFIX,
   storyFilesGroupOf,
   storyFilesGroupText,
-  storyFilesModule,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { tokensModule } from "./storylessRoutes.ts";
-import { storyReach } from "./storyReach.ts";
-import { joinedUsage } from "./usageModule.ts";
+import {
+  CODE_QUERY,
+  DOCS_PAGE_QUERY,
+  MARKDOWN_QUERY,
+  PAGE_QUERY,
+  PAGES_SEARCH_PREFIX
+} from "./textQueries.ts";
 
 /**
  * A file's text, or none when it cannot be read.
@@ -111,33 +118,14 @@ const isKeptIndex = (value: unknown): value is KeptIndex => typeof value === "ob
 /** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
 const FILES_QUERY = "?forgebook-files";
 
-/** The id of a pattern's module: virtual, with the declaring module's folder and the pattern after it. */
-const FILES_PREFIX = "\0forgebook-files:";
-
 /** The query that asks for the docs pages a pattern matches (`./docs/*.md?forgebook-docs-pages`). */
 const DOCS_PAGES_QUERY = "?forgebook-docs-pages";
-
-/** The id of a pattern's docs pages: virtual, with the declaring module's folder and the pattern after it. */
-const DOCS_PAGES_PREFIX = "\0forgebook-docs-pages:";
 
 /** A docs page, whose file added or removed changes what the sidebar lists. */
 const DOCS_PAGE_FILE = /\.md$/;
 
 /** A TypeScript source file, whose edit may change a component's docs. */
 const SOURCE_FILE = /\.tsx?$/;
-
-/**
- * The text a component's file opens with, as TypeScript reads it: a framework's own kind of file (`.vue`) by its script.
- *
- * @param file - the file's absolute path.
- * @param componentFiles - the framework's own kind of file; none when it has none.
- */
-const scriptOfFile = (file: string, componentFiles: ComponentFiles | undefined): string => {
-  const text = readFileSync(file, "utf8");
-  return componentFiles !== undefined && file.endsWith(componentFiles.extension)
-    ? componentFiles.scriptOf(text)
-    : text;
-};
 
 /** The query that asks for a story file's component docs. */
 const DOCS_QUERY = "?forgebook-docs";
@@ -177,25 +165,6 @@ export type ForgebookPluginOptions = {
 };
 
 /**
- * The module that answers a `?forgebook-docs` import: the story file's component docs, or `{ error }` for the panel.
- *
- * @param component - what the extractor read for the story file.
- * @param watch - adds a file whose edit renews the module.
- */
-const docsModule = (
-  component: DocsResult,
-  watch: (file: string) => void
-): { code: string; moduleType: "js" } => {
-  // the docs come from the component's files, not the story file the id names: Vite renews them on an edit only if
-  // it watches those files too
-  if (typeof component !== "string" && "sources" in component) {
-    for (const file of component.sources) watch(file);
-  }
-  const value = typeof component === "string" ? { error: component } : component.docs;
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
-};
-
-/**
  * The id of a `?forgebook-files` module: its prefix, then its group (`storyFilesGroupText`), which holds no `..`.
  *
  * @param folder - the importing module's folder.
@@ -217,28 +186,6 @@ const patternId = (source: string, folder: string): string | null => {
   return `${DOCS_PAGES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
 };
 
-/**
- * The module of a `?forgebook-files` pattern: every matched story file's index and loaders.
- *
- * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
- * @param watch - adds a file whose edit renews the module (each story file).
- * @param hasUsage - whether the group offers its "Used in" loader.
- * @param cache - the indexes kept between starts.
- * @throws when a story file cannot be indexed.
- */
-const patternModule = (
-  id: string,
-  watch: (file: string) => void,
-  hasUsage: boolean,
-  cache: DiskCache<KeptIndex> | undefined
-): { code: string; moduleType: "js" } => {
-  const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  return { code: storyFilesModule(root, pattern, watch, hasUsage, cache), moduleType: "js" };
-};
-
-/** The resolved id of a group's "Used in" module: Rollup's mark of a virtual module, then its import's specifier. */
-const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
-
 /** The resolved id of a group of story files' search index. */
 const SEARCH_ID_PREFIX = `\0${SEARCH_PREFIX}`;
 
@@ -259,50 +206,6 @@ const virtualId = (source: string): string | undefined => {
     : undefined;
 };
 
-/**
- * A group's "Used in" module: its story files indexed, what their stories render read in the docs worker, joined.
- *
- * @param id - the module's id (`USAGE_ID_PREFIX`, then the group: `storyFilesGroupText`).
- * @param watch - adds a file whose edit renews the module (each story file).
- * @param usage - reads the facts in the docs worker.
- */
-const usageModule = async (
-  id: string,
-  watch: (file: string) => void,
-  usage: DocsExtractor["usage"],
-  isServing: boolean
-): Promise<{ code: string; moduleType: "js" }> => {
-  const { root, pattern } = storyFilesGroupOf(id.slice(USAGE_ID_PREFIX.length));
-  const files = indexedStoryFiles(root, pattern, watch);
-  const graph = await usage(
-    files.map((file) => ({
-      storyFile: file.file,
-      exports: file.index.stories.map((story) => story.exportName)
-    }))
-  );
-  const answer =
-    typeof graph === "string"
-      ? { error: graph }
-      : joinedUsage(
-          graph,
-          files.map((file) => ({
-            storyFile: file.file,
-            title: file.index.title,
-            related: file.index.related ?? []
-          }))
-        );
-  // on the dev server only: a static build has no tools to ask, and this would ship every story's files to the reader
-  const reach =
-    isServing && typeof graph !== "string"
-      ? storyReach(
-          graph,
-          files.map((file) => ({ storyFile: file.file, title: file.index.title }))
-        )
-      : [];
-  const code = `export default ${JSON.stringify(answer)};\nexport const reach = ${JSON.stringify(reach)};`;
-  return { code, moduleType: "js" };
-};
-
 /** The resolved id of the configuration's data module. */
 const CONFIG_ID = `\0${CONFIG_MODULE}`;
 
@@ -318,58 +221,6 @@ const requestedPage = (url: string): PageFile | undefined => {
   const path = url.split("?")[0] ?? "";
   const name = path === "/" ? "index.html" : path.replace(/^\//, "");
   return PAGE_FILES.find((page) => page === name);
-};
-
-/** axe's script, in the core's dependencies; none when it cannot be found. */
-const axeScript = (): string | undefined => packageResolver(PACKAGE_DIR)("axe-core/axe.min.js");
-
-/**
- * A build's compressed copy of axe's script: its name, from its text, so a new version of axe is a new file.
- *
- * @remarks
- * axe is most of what a static catalogue weighs, and is fetched only for an accessibility check, so it is kept
- * compressed and the frame unpacks it (`checkStory.ts`). `.bin`, as `.gz` would make some hosts set `Content-Encoding`.
- *
- * @param text - the script's text.
- */
-const axeBuildFile = (text: Buffer): string =>
-  `assets/axe-${createHash("sha256").update(text).digest("hex").slice(0, 8)}.bin`;
-
-/**
- * How the frame's entry gets axe's address: Vite serves the file on a dev server, and a build writes it compressed.
- *
- * @param command - whether a dev server runs, or a build.
- */
-const axeAddress = (command: ConfigEnv["command"]): AxeAddress | undefined => {
-  const file = axeScript();
-  if (file === undefined) return undefined;
-  if (command === "serve")
-    return { imports: [`import axeUrl from ${JSON.stringify(`${file}?url`)};`], value: "axeUrl" };
-  const name = axeBuildFile(readFileSync(file));
-  return { imports: [], value: `import.meta.env.BASE_URL + ${JSON.stringify(name)}` };
-};
-
-/**
- * A docs pages' module, when the id is a pattern's or a page's.
- *
- * @param id - the module's id.
- * @param watch - adds a file whose edit renews the module.
- * @param isServing - whether a dev server runs.
- * @param fences - the fences the catalogue's plugins draw.
- */
-const docsModuleOf = (
-  id: string,
-  watch: (file: string) => void,
-  isServing: boolean,
-  fences: readonly string[]
-): { code: string; moduleType: "js" } | undefined => {
-  if (id.endsWith(DOCS_PAGE_QUERY)) {
-    const file = id.slice(0, -DOCS_PAGE_QUERY.length);
-    return { code: docPageModule(file, watch, isServing, fences), moduleType: "js" };
-  }
-  if (!id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
-  const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
-  return { code: docPagesModule(root, pattern, watch, isServing), moduleType: "js" };
 };
 
 /**
@@ -389,7 +240,7 @@ const generatedModule = (
   if (id === join(config.dir, PAGE_ENTRIES["index.html"]))
     return { code: shellEntry(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["frame.html"]))
-    return { code: frameEntry(config, axeAddress(command)), moduleType: "js" };
+    return { code: frameEntry(config, axeAddress(command, PACKAGE_DIR)), moduleType: "js" };
   if (id === join(config.dir, STORIES_SOURCE_FILE))
     return { code: storiesSourceModule(config), moduleType: "js" };
   if (id === join(config.dir, AGENT_SOURCES_FILE))
@@ -471,13 +322,15 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    *
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
+   * @param resolveSource - finds the file of a source's module.
    * @throws when a story file cannot be indexed.
    */
   const storiesModule = async (
     id: string,
-    watch: (file: string) => void
+    watch: (file: string) => void,
+    resolveSource: (specifier: string) => Promise<string | undefined>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
-    if (id === TOKENS_ID && config !== undefined) return tokensModule(config, watch);
+    if (id === TOKENS_ID && config !== undefined) return tokensModule(config, watch, resolveSource);
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
       return usageModule(id, watch, extractor().usage, isServing());
@@ -485,11 +338,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (id.startsWith(SEARCH_ID_PREFIX)) {
       searchModules.add(id);
       const { root, pattern } = storyFilesGroupOf(id.slice(SEARCH_ID_PREFIX.length));
+      const { storySearchModule } = await import("./searchModule.ts");
       return { code: await storySearchModule(root, pattern, watch, docsOf, isServing()), moduleType: "js" };
     }
     if (id.startsWith(PAGES_SEARCH_ID_PREFIX)) {
       docsModules.add(id);
       const { root, pattern } = storyFilesGroupOf(id.slice(PAGES_SEARCH_ID_PREFIX.length));
+      const { pagesSearchModule } = await import("./searchModule.ts");
       return { code: pagesSearchModule(root, pattern, watch), moduleType: "js" };
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
@@ -533,7 +388,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       // imported here: the highlighter and the TypeScript compiler it splits code with are the server's heaviest
       // modules, and a story's page never asks for one of these
       const { textModule } = await import("./textModules.ts");
-      return textModule(id, watch, resolveImport, cacheFolder, (config?.framework ?? options.framework)?.componentFiles);
+      return textModule(
+        id,
+        watch,
+        resolveImport,
+        cacheFolder,
+        (config?.framework ?? options.framework)?.componentFiles
+      );
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
     return docsModuleOf(id, watch, isServing(), pluginFences(config?.plugins ?? []));
@@ -644,10 +505,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       server.watcher.on("unlink", refresh);
     },
     generateBundle(): void {
-      const file = axeScript();
-      if (config === undefined || file === undefined) return;
-      const text = readFileSync(file);
-      this.emitFile({ type: "asset", fileName: axeBuildFile(text), source: gzipSync(text, { level: 9 }) });
+      const file = config === undefined ? undefined : axeBuildAsset(PACKAGE_DIR);
+      if (file !== undefined) this.emitFile({ type: "asset", ...file });
     },
     closeBundle: async (): Promise<void> => {
       await docs?.close();
@@ -664,7 +523,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       });
       if (answered !== undefined) return answered;
       try {
-        return (await storiesModule(id, watch)) ?? null;
+        const resolveSource = async (specifier: string): Promise<string | undefined> =>
+          (await this.resolve(specifier))?.id;
+        return (await storiesModule(id, watch, resolveSource)) ?? null;
       } catch (error) {
         this.error(error instanceof Error ? error.message : String(error));
       }

@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { SHELL_PORT, VUE_PORT } from "./ports";
+import { SHELL_PORT, VUE_PORT, WHITE_LABEL_PORT } from "./ports";
 
 /**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
@@ -28,9 +28,6 @@ const catalogueServer = (folder: string, port: number) => ({
   url: `http://127.0.0.1:${port}/`,
   reuseExistingServer: false
 });
-
-/** The port the white-label catalogue listens on: the next one, so worktrees that set the first stay apart. */
-const WHITE_LABEL_PORT = SHELL_PORT + 2;
 
 export default defineConfig({
   testDir: import.meta.dirname,

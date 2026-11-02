@@ -6,9 +6,13 @@
  */
 import { setTimeout as sleep } from "node:timers/promises";
 
+import type { Logger } from "@ensiria/cli-kit/log.types";
+import { ScriptError } from "@ensiria/cli-kit/script";
+
 import type { ErrorsDocument } from "../../src/vite/agent.types.ts";
 import { isErrorsDocument } from "../../src/vite/agentApi.ts";
-import type { CatalogueClient } from "./agentClient.ts";
+import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
+import { COMMAND, type configOf } from "./catalogueCommands.ts";
 
 /** How often a follower asks for new errors, in ms. */
 const FOLLOW_MS = 1000;
@@ -80,4 +84,32 @@ export const followErrors = async (
     }
   }
   return undefined;
+};
+
+/**
+ * The catalogue the errors are asked of: only frames open in a browser report to a running dev server, so without one
+ * there is nothing to list (said) and nothing ever to follow (refused).
+ *
+ * @param config - the catalogue's configuration.
+ * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param isFollowing - whether the errors are followed.
+ * @param log - the command's logger.
+ */
+export const errorsClient = async (
+  config: Awaited<ReturnType<typeof configOf>>,
+  url: string | undefined,
+  isFollowing: boolean,
+  log: Logger
+): Promise<CatalogueClient> => {
+  const client = await catalogueClient(config, url);
+  if (client.runningAt !== undefined) return client;
+  if (isFollowing) {
+    // nothing can ever report to a server of the command's own: following it would wait forever
+    await client.close();
+    throw new ScriptError("No catalogue running there to follow", {
+      hint: `Start ${COMMAND} dev, then follow its errors (or give --url where it runs)`
+    });
+  }
+  log.warn("No catalogue running there: only frames open in a browser report, so there is nothing to list");
+  return client;
 };

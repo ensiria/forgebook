@@ -15,6 +15,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 import { AGENT_INDEX_FILE, indexProblems, isAgentIndex } from "../../src/vite/agentIndex.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { answerMcpMessage, type McpServer, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
+import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import { catalogueClient, indexClient } from "./agentClient.ts";
 import { catalogueTools } from "./mcpTools.ts";
 
@@ -77,7 +78,9 @@ export const builtCatalogueServer = async (from: string, version: string): Promi
     writeNew: unreachable,
     check: unreachable,
     checkPage: unreachable,
-    shot: unreachable
+    shot: unreachable,
+    servePreview: unreachable,
+    plugins: pluginsDocument([])
   }).filter((tool) => READ_ONLY_TOOLS.has(tool.name));
   return {
     info: { name: "forgebook", version },

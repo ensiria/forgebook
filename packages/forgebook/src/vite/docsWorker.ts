@@ -90,7 +90,9 @@ process.on("message", (request: DocsRequest): void => {
     return;
   }
   void extracted(request.storyFile).then((result) => {
-    const dependencies = typeof result === "string" ? [] : docsDependencies(request.storyFile);
+    // what the framework itself says it read counts too: a `.vue` file is no import TypeScript follows
+    const read = typeof result !== "string" && "sources" in result ? result.sources : [];
+    const dependencies = typeof result === "string" ? [] : [...docsDependencies(request.storyFile), ...read];
     const response: DocsResponse = { kind: "extract", id: request.id, result, dependencies };
     answer(response);
   });

@@ -8,9 +8,7 @@ import type { StorySource } from "@forgebook/story-format/source";
 import {
   type ChangeEvent,
   type KeyboardEvent,
-  lazy,
   type ReactNode,
-  Suspense,
   useEffect,
   useId,
   useRef,
@@ -19,6 +17,7 @@ import {
 
 import type { SearchTarget } from "../search.ts";
 import type { StoryTree } from "../storyTree.ts";
+import { deferred } from "./deferred.tsx";
 import { Icon } from "./icons.tsx";
 import { isTyping } from "./keyboard.ts";
 import type { SearchPanelKeys } from "./SearchPanel.tsx";
@@ -26,11 +25,11 @@ import { STRINGS } from "./strings.ts";
 import type { shownTree } from "./treeSearch.ts";
 
 /** The results, loaded on first use: most visits never search. */
-const SearchPanel = lazy(() =>
+const SearchPanel = deferred(() =>
   import("./SearchPanel.tsx").then(
-    (module) => ({ default: module.SearchPanel }),
+    (module) => module.SearchPanel,
     // a chunk gone after a new deployment must not take the page with it: the field simply finds nothing more
-    () => ({ default: (): ReactNode => null })
+    () => (): ReactNode => null
   )
 );
 
@@ -174,22 +173,20 @@ export const SidebarSearch = ({
       </label>
       {isUsed ? (
         // the field works before the list arrives: the tree filters meanwhile
-        <Suspense fallback={null}>
-          <SearchPanel
-            id={listId}
-            tree={tree}
-            sources={sources}
-            query={query}
-            isOpen={isListOpen}
-            field={inputRef}
-            sidebarWidth={sidebarWidth}
-            onFilterReady={onFilterReady}
-            hrefOf={searchHref}
-            onOpen={openResult}
-            onActiveChange={setActiveId}
-            keysRef={keysRef}
-          />
-        </Suspense>
+        <SearchPanel
+          id={listId}
+          tree={tree}
+          sources={sources}
+          query={query}
+          isOpen={isListOpen}
+          field={inputRef}
+          sidebarWidth={sidebarWidth}
+          onFilterReady={onFilterReady}
+          hrefOf={searchHref}
+          onOpen={openResult}
+          onActiveChange={setActiveId}
+          keysRef={keysRef}
+        />
       ) : null}
     </>
   );

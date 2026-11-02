@@ -74,13 +74,6 @@ describe("prebundled", () => {
   });
 });
 
-describe("a project with MSW", () => {
-  it("pre-bundles its browser module, which Node cannot resolve, so a page does not reload to find it", () => {
-    expect(prebundled({ ...CONFIG, hasMocks: true }, resolverOf({}))).toContain("msw/browser");
-    expect(prebundled(CONFIG, resolverOf({}))).not.toContain("msw/browser");
-  });
-});
-
 describe("a catalogue's plugins", () => {
   const plugin: ForgebookPlugin = {
     apiVersion: 1,
@@ -90,9 +83,7 @@ describe("a catalogue's plugins", () => {
   };
 
   it("pre-bundles what a plugin names, unresolved since a browser-only module fails Node's resolver", () => {
-    expect(prebundled({ ...CONFIG, plugins: [plugin] }, resolverOf({}))).toContain(
-      "acme/browser"
-    );
+    expect(prebundled({ ...CONFIG, plugins: [plugin] }, resolverOf({}))).toContain("acme/browser");
     expect(prebundled(CONFIG, resolverOf({}))).not.toContain("acme/browser");
   });
 

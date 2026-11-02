@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import { AUDIENCE_IDS } from "../audiences.ts";
-import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
+import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import {
   frameThemeCss,

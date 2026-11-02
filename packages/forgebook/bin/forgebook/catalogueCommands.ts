@@ -50,6 +50,14 @@ export const FORGEBOOK_OPTIONS: ForgebookOptions = {
 /** The command, as the hints print it. */
 export const COMMAND = "forgebook";
 
+/** Where `forgebook dev` runs, for the commands that ask it. */
+export const URL_OPTION = {
+  type: "string",
+  env: "FORGEBOOK_URL",
+  valueName: "address",
+  description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+} as const;
+
 /**
  * The catalogue's configuration: the file given, or the one in the folder the command runs in.
  *

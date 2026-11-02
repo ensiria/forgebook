@@ -30,8 +30,9 @@ import {
 } from "./audiencePage.ts";
 import { CodeText } from "./CodeText.tsx";
 import { Lead, PageApi } from "./ComponentPage.tsx";
+import { styleHooks } from "./dockHints.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
-import { PartsTab, styleHooks } from "./PartsTab.tsx";
+import { PartsTab } from "./PartsTab.tsx";
 import { StoryCoverage, type StoryCoverageProps } from "./StoryCoverage.tsx";
 import { STRINGS } from "./strings.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";

@@ -258,7 +258,7 @@ export const collectDocs = (
     data: {
       packageName,
       description,
-      sourceId,
+      sourceId: declared?.id,
       components,
       pages: collectPages(packageDir, exports, problems),
       modules,

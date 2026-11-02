@@ -16,15 +16,7 @@ import type { DocPageIndex } from "@forgebook/story-format/source";
 
 import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
 import { storyFileKeys, storyFilesGroupText } from "./storyFilesModule.ts";
-
-/** The query that asks for one docs page, rendered. */
-export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
-
-/**
- * The id prefix of a docs pages' search index: the group follows (`storyFilesGroupText`). The plugin answers it
- * (`searchModule.ts`) only when a page asks, on the first search.
- */
-export const PAGES_SEARCH_PREFIX = "virtual:forgebook-search-pages:";
+import { DOCS_PAGE_QUERY, PAGES_SEARCH_PREFIX } from "./textQueries.ts";
 
 /** A page a pattern matches, with its key and its index. */
 export type IndexedDocPage = {

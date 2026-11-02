@@ -377,8 +377,8 @@ export const ViewMenuPanel = ({
           type="button"
           className="forgebook-text-button"
           onClick={(): void =>
-                context.onViewChange(withDefaults(context.view, switches, ids, catalogue.audience))
-              }
+            context.onViewChange(withDefaults(context.view, switches, ids, catalogue.audience))
+          }
         >
           {STRINGS.resetView}
         </button>

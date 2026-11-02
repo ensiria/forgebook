@@ -35,9 +35,11 @@ import {
   type Zoom
 } from "../viewState.ts";
 import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
+import { CopyIdButton } from "./CopyIdButton.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { compareVariants } from "./compareVariants.ts";
 import { Dock } from "./Dock.tsx";
+import { takesArgs } from "./dockHints.ts";
 import { dockTabs } from "./dockTabs.tsx";
 import { EmbedButton } from "./EmbedButton.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
@@ -48,7 +50,6 @@ import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { STRINGS } from "./strings.ts";
 import { useComponentDocs } from "./useComponentDocs.ts";
-import { useCopy } from "./useCopy.ts";
 import {
   type CheckResult,
   type EventCall,
@@ -149,36 +150,6 @@ export type StageProps = {
   /** Where its scrolling part starts: the shell's visit of the page and every page's last position. */
   readonly scroll: PageScroll;
 };
-
-/**
- * Copies the story's id (`kit:inputs-selection-select--overview`), the name tests and tools address it by; the id
- * shows as the button's tooltip.
- *
- * @param props - the story's id.
- */
-const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
-  const { isCopied, copy } = useCopy();
-  return (
-    <button
-      type="button"
-      className="forgebook-button forgebook-button--icon"
-      title={`${STRINGS.copyStoryId}: ${storyId}`}
-      aria-label={isCopied ? STRINGS.copied : STRINGS.copyStoryId}
-      onClick={(): void => copy(storyId)}
-    >
-      <Icon name={isCopied ? "check" : "hash"} size={14} />
-    </button>
-  );
-};
-
-/**
- * Whether a story's args change what it draws: not for a story of fixed examples, nor for one about logic, whose scene
- * takes none.
- *
- * @param story - the story.
- */
-const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
-  !story.isLogic && (story.controls === "all" || story.controls.length > 0);
 
 /**
  * What an embed of the story keeps of the page: its view and the values set in the panel.

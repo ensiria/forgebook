@@ -9,6 +9,7 @@ import { createContext, useContext, useMemo } from "react";
 
 import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
 import { catalogueSwitches, DEFAULT_SWITCHES, type ViewSwitch } from "../switches.ts";
+import type { ShellPlugin } from "./pluginTabs.tsx";
 
 /** The catalogue's settings; the defaults until the shell provides its own. */
 export const CatalogueContext = createContext<CatalogueSettings>(catalogueSettings("", DEFAULT_SWITCHES));

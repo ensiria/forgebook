@@ -10,3 +10,6 @@ export const SHELL_PORT = Number(process.env["FORGEBOOK_SHELL_PORT"] ?? "41721")
 
 /** The port the Vue fixture catalogue listens on. */
 export const VUE_PORT = SHELL_PORT + 1;
+
+/** The port of the white-label catalogue (`white-label/forgebook.config.ts`): the one after the Vue fixture's. */
+export const WHITE_LABEL_PORT = SHELL_PORT + 2;

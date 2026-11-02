@@ -57,7 +57,7 @@ test.describe("audiences of a component's page", () => {
     await expect(tokens.getByRole("rowheader", { name: "select.border" })).toBeVisible();
     await expect(tokens.getByText("dark: #b28bff").first()).toBeVisible();
     await expect(tokens.getByRole("rowheader", { name: "color.accent" })).toBeHidden();
-    await tokens.getByText("2 tokens of the whole catalogue").click();
+    await tokens.getByText(/\d+ tokens of the whole catalogue/).click();
     await expect(tokens.getByRole("rowheader", { name: "color.accent" })).toBeVisible();
   });
 

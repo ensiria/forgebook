@@ -22,7 +22,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { type ESTree, parseSync } from "vite";
 
 import { type ParsedTokens, readTokens, type TokensInput } from "./designTokens.ts";
-import { propertyValue, unwrapped } from "./indexStoryFile.ts";
+import { propertyValue, unwrapped } from "./indexFields.ts";
 
 /** What a source's module says of its tokens, its paths as written. */
 export type DeclaredSource = {

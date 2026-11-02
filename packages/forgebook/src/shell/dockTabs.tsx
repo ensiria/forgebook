@@ -15,8 +15,6 @@ import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { CheckState } from "./A11yTab.tsx";
-import type { DesignTabProps } from "./DesignTab.tsx";
-import { DesignTabLoader } from "./DesignTabLoader.tsx";
 import type { DockTab } from "./Dock.tsx";
 import { deferred } from "./deferred.tsx";
 import { a11yHint, interactionsHint, styleHooks } from "./dockHints.ts";

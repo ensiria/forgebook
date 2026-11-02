@@ -10,14 +10,16 @@ import type { AddressInfo } from "node:net";
 
 import { test as base, expect, type FrameLocator, type Page } from "@playwright/test";
 
+import { WHITE_LABEL_PORT } from "./ports";
+
 /**
- * The white-label catalogue's address: the port after the fixture app's.
+ * The white-label catalogue's address.
  *
  * @param baseURL - the fixture app's address.
  */
 const whiteLabel = (baseURL: string | undefined): string => {
   const address = new URL(baseURL ?? "");
-  address.port = String(Number(address.port) + 1);
+  address.port = String(WHITE_LABEL_PORT);
   return address.href;
 };
 

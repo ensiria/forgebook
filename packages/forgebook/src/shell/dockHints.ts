@@ -6,6 +6,7 @@
  */
 import type { ComponentDocs } from "../componentDocs.ts";
 import type { PlayTrace } from "../playTrace.ts";
+import type { TreeStory } from "../storyTree.ts";
 import type { CheckState } from "./A11yTab.tsx";
 import { STRINGS } from "./strings.ts";
 
@@ -38,3 +39,12 @@ export const a11yHint = (check: CheckState): string | undefined => {
  * @param trace - the trace.
  */
 export const interactionsHint = (trace: PlayTrace): string => STRINGS.playStatus[trace.status];
+
+/**
+ * Whether a story's args change what it draws: not for a story of fixed examples, nor for one about logic, whose scene
+ * takes none.
+ *
+ * @param story - the story.
+ */
+export const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
+  !story.isLogic && (story.controls === "all" || story.controls.length > 0);

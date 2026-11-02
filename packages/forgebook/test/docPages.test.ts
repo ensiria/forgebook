@@ -23,14 +23,10 @@ import { storyAddressOf } from "../src/viewState.ts";
 import { isPageDocument, isPagesDocument } from "../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../src/vite/agentRoutes.ts";
 import { compiledDocPage } from "../src/vite/docPageMarkdown.ts";
-import {
-  DOCS_PAGE_QUERY,
-  docPageModule,
-  docPagesModule,
-  indexedDocPages
-} from "../src/vite/docPagesModule.ts";
+import { docPageModule, docPagesModule, indexedDocPages } from "../src/vite/docPagesModule.ts";
 import { pageAnswer, pagesDocument } from "../src/vite/docPagesRoute.ts";
 import { pluginsDocument } from "../src/vite/pluginConfig.ts";
+import { DOCS_PAGE_QUERY } from "../src/vite/textQueries.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
 /** Where the catalogue is served in these tests. */
@@ -373,6 +369,7 @@ describe("agents", () => {
       check: async () => "unused",
       checkPage: async () => "unused",
       shot: async () => "unused",
+      servePreview: async () => "unused",
       plugins: pluginsDocument([])
     });
     const tool = (name: string): (typeof tools)[number] => {
@@ -409,7 +406,8 @@ describe("CATALOG.md and llms.txt", () => {
     pages,
     modules: [],
     sassModules: [],
-    styleSheets: []
+    styleSheets: [],
+    tokens: []
   };
 
   it("lists a package's pages, each with its id", () => {

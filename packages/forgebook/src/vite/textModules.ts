@@ -118,7 +118,8 @@ const pageModule = async (
     : undefined;
   if (page !== undefined) watch(page.file);
   if (componentFile !== undefined) watch(componentFile);
-  const summary = componentFile === undefined ? "" : moduleSummaryOfText(scriptOfFile(componentFile, componentFiles));
+  const summary =
+    componentFile === undefined ? "" : moduleSummaryOfText(scriptOfFile(componentFile, componentFiles));
   const value = { html: page?.html ?? "", summary };
   return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
 };

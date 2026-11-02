@@ -12,7 +12,7 @@
  *
  * @module
  */
-import { lazy, type ReactNode, Suspense, useMemo, useRef } from "react";
+import { type ReactNode, useMemo, useRef } from "react";
 
 import { groupLabel } from "../catalogue.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
@@ -29,6 +29,7 @@ import { ApiReference } from "./ApiReference.tsx";
 import type { AudienceSectionsProps } from "./AudienceSections.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
+import { deferred } from "./deferred.tsx";
 import { Example, type ExampleContext, type ExampleReading } from "./Example.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
@@ -42,11 +43,11 @@ import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCode } from "./useStoryCode.ts";
 
 /** What opens the page at an anchor, loaded with the first one: most pages open at their top. */
-const AnchorScroll = lazy(() =>
+const AnchorScroll = deferred(() =>
   import("./AnchorScroll.tsx").then(
-    (module) => ({ default: module.AnchorScroll }),
+    (module) => module.AnchorScroll,
     // a chunk gone after a new deployment costs the place on the page, never the page
-    () => ({ default: (): ReactNode => null })
+    () => (): ReactNode => null
   )
 );
 
@@ -99,9 +100,7 @@ export type ComponentPageProps = {
 };
 
 /** What a page drawn for one audience adds around its frames, split from the shell. */
-const AudienceSections = lazy(() =>
-  import("./AudienceSections.tsx").then((module) => ({ default: module.AudienceSections }))
-);
+const AudienceSections = deferred(async () => (await import("./AudienceSections.tsx")).AudienceSections);
 
 /**
  * The page's lead: what the component is and does, from its file's `@module` comment (its own TSDoc is often a bare
@@ -159,14 +158,7 @@ const AudienceSlot = ({
   readonly place: AudienceSectionsProps["place"];
   readonly audience: AudienceProps | undefined;
   readonly children: ReactNode;
-}): ReactNode =>
-  audience === undefined ? (
-    children
-  ) : (
-    <Suspense fallback={null}>
-      <AudienceSections place={place} {...audience} />
-    </Suspense>
-  );
+}): ReactNode => (audience === undefined ? children : <AudienceSections place={place} {...audience} />);
 
 /**
  * The API reference; nothing without props, or a signature for what is about logic.
@@ -287,14 +279,12 @@ export const ComponentPage = ({
     <div className="forgebook-workspace">
       {header}
       {anchor === undefined ? null : (
-        <Suspense fallback={null}>
-          <AnchorScroll
-            pageRef={pageRef}
-            anchor={anchor}
-            visit={scroll.visit}
-            isReady={docs.status !== "loading" && page.status !== "loading"}
-          />
-        </Suspense>
+        <AnchorScroll
+          pageRef={pageRef}
+          anchor={anchor}
+          visit={scroll.visit}
+          isReady={docs.status !== "loading" && page.status !== "loading"}
+        />
       )}
       <div ref={pageRef} className="forgebook-scroll">
         {/* keyed by the component, so another component's page comes in with its own entrance */}

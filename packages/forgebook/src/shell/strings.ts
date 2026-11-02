@@ -318,5 +318,6 @@ export const textsOfGroup = <TTexts extends Record<string, unknown>>(
  * @param group - its texts.
  */
 export const configureGroup = (name: string, group: Record<string, unknown>): void => {
-  for (const [path, text] of Object.entries(catalogueReplacements)) replaceText({ [name]: group }, path.split("."), text);
+  for (const [path, text] of Object.entries(catalogueReplacements))
+    replaceText({ [name]: group }, path.split("."), text);
 };

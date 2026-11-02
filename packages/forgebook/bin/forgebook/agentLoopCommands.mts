@@ -22,51 +22,21 @@ import type { StoryCheckReport } from "../../src/storyCheck.ts";
 import type { ChangedStoriesDocument } from "../../src/vite/agent.types.ts";
 import { isChangedStoriesDocument, isFoundComponentsDocument } from "../../src/vite/agentApi.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
-import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
 import { agentsSkill, SKILL_FOLDERS, withAgentsSection } from "./agentsText.ts";
 import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentText.ts";
-import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
+import {
+  askCatalogue,
+  COMMAND,
+  configOf,
+  type ForgebookOptions,
+  printAnswer,
+  URL_OPTION
+} from "./catalogueCommands.ts";
 import { runCheckCode } from "./checkCodeRun.ts";
-import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
+import { askErrors, errorsClient, followErrors, sinceOf } from "./errorsRun.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 import { BASELINES_FOLDER, updateBaselines } from "./visualCommands.mts";
-
-/**
- * The catalogue the errors are asked of: only frames open in a browser report to a running dev server, so without one
- * there is nothing to list (said) and nothing ever to follow (refused).
- *
- * @param config - the catalogue's configuration.
- * @param url - where `forgebook dev` runs, when not at Vite's default address.
- * @param isFollowing - whether the errors are followed.
- * @param log - the command's logger.
- */
-const errorsClient = async (
-  config: Awaited<ReturnType<typeof configOf>>,
-  url: string | undefined,
-  isFollowing: boolean,
-  log: Logger
-): Promise<CatalogueClient> => {
-  const client = await catalogueClient(config, url);
-  if (client.runningAt !== undefined) return client;
-  if (isFollowing) {
-    // nothing can ever report to a server of the command's own: following it would wait forever
-    await client.close();
-    throw new ScriptError("No catalogue running there to follow", {
-      hint: `Start ${COMMAND} dev, then follow its errors (or give --url where it runs)`
-    });
-  }
-  log.warn("No catalogue running there: only frames open in a browser report, so there is nothing to list");
-  return client;
-};
-
-/** Where `forgebook dev` runs, for the commands that ask it. */
-const URL_OPTION = {
-  type: "string",
-  env: "FORGEBOOK_URL",
-  valueName: "address",
-  description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
-} as const;
 
 /** The stories a change touches, as the catalogue answers. */
 const changedOf = async (

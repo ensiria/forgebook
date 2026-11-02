@@ -53,7 +53,8 @@ describe("catalogueMarkdown", () => {
         components: [component],
         modules: [],
         sassModules: [],
-        styleSheets: []
+        styleSheets: [],
+        tokens: []
       },
       ["components"]
     );
