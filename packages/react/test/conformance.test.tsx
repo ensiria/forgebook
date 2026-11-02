@@ -9,13 +9,16 @@ import { join } from "node:path";
 import { heldStoryClock } from "@forgebook/story-format/clock";
 import { describeAdapter, THROWING_NAME } from "@forgebook/testing/conformance";
 import type { StoryDrawing } from "forgebook/renderer";
-import { readStory } from "forgebook/story-module";
-import { type ReactNode, useState } from "react";
+import { type LoadedDecorator, readStory } from "forgebook/story-module";
+import { isValidElement, type ReactNode, useState } from "react";
 
 import { reactRenderer } from "../src/reactRenderer.tsx";
 import { codeOf } from "../src/storyJsx.ts";
 import { extractComponentDocs } from "../src/vite/extractDocs.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
+
+/** What a decorator's `story()` gave, typed `unknown` by the frame. */
+const asNode = (value: unknown): ReactNode => (isValidElement(value) ? value : null);
 
 /** The subject's story: a greeting with a counter of its own. */
 const Greeting = ({ name }: { readonly name?: unknown }): ReactNode => {
@@ -54,6 +57,9 @@ describeAdapter({
   name: "React",
   renderer: reactRenderer,
   drawing,
+  decorator:
+    (label: string): LoadedDecorator =>
+    (story: () => unknown): ReactNode => <section data-decorator={label}>{asNode(story())}</section>,
   codeOf,
   docsOf: () => extractComponentDocs(join(KIT_DIR, "src", "Select.stories.tsx"))
 });

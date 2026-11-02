@@ -302,10 +302,9 @@ await defineCommands({
         },
         framework: {
           type: "string",
-          default: "react",
           valueName: "name",
           description:
-            "The framework the stories are written for: its package, @forgebook/<name>, reads the props."
+            "The framework the stories are written for: its package, @forgebook/<name>, reads the props. The catalogue's by default, else react."
         },
         print: { type: "boolean", description: "Print the file instead of writing it." },
         force: { type: "boolean", description: "Replace a stories file that exists." }

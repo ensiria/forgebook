@@ -9,16 +9,17 @@
  * @module
  */
 import type { StoryDrawing, StoryRenderer } from "forgebook/renderer";
+import { storyContextOf } from "forgebook/renderer";
 import { renderToString } from "react-dom/server";
 
-import { contextOf, inProviders, reactFrameRenderer } from "./reactFrameRenderer.tsx";
+import { inProviders, reactFrameRenderer } from "./reactFrameRenderer.tsx";
 import { storyElement } from "./storyElement.ts";
 
 /** React, as a page draws with it and as a server does. */
 export const reactRenderer: StoryRenderer = {
   ...reactFrameRenderer,
   renderToString: (drawing: StoryDrawing): string => {
-    const context = contextOf(drawing, () => document.body);
+    const context = storyContextOf(drawing, drawing.args, () => document.body);
     return renderToString(inProviders(drawing, storyElement(drawing.story, context, drawing.decorators)));
   }
 };

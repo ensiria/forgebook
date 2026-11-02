@@ -301,3 +301,28 @@ export const tagOf = (symbol: ts.Symbol, checker: ts.TypeChecker, name: string):
     .trim()
     .replace(/^`(.*)`$/, "$1");
 };
+
+/**
+ * The component asked for among a file's: the one named, or the only one.
+ *
+ * @param components - the names of the components the file exports.
+ * @param exportName - the export asked for; the file's only component when none.
+ * @param file - the file, for the message.
+ * @returns the name, or a message naming the components when there is none or several.
+ */
+export const chosenExport = (
+  components: readonly string[],
+  exportName: string | undefined,
+  file: string
+): string | { readonly problem: string } => {
+  const chosen = exportName === undefined ? components : components.filter((each) => each === exportName);
+  const [only] = chosen;
+  if (only !== undefined && chosen.length === 1) return only;
+  const names = components.join(", ") || "none";
+  return {
+    problem:
+      exportName === undefined
+        ? `${file} exports ${components.length === 0 ? "no component" : `several components (${names})`}: name one`
+        : `${file} exports no component ${exportName} (its components: ${names})`
+  };
+};

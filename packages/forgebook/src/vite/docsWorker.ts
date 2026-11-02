@@ -13,7 +13,7 @@
  * @module
  */
 
-import { type ExtractStoryComponent, isDocsModule } from "./adapter.ts";
+import { type DocsModule, isDocsModule } from "./adapter.ts";
 import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
 import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
 import { docsDependencies, usageDependencies, usageGraph } from "./usageGraph.ts";
@@ -36,12 +36,12 @@ const isWorkerData = (value: unknown): value is DocsWorkerData =>
   "docsModule" in value &&
   typeof value.docsModule === "string";
 
-/** The framework's extractor, or why it could not be loaded: every request is then answered with that. */
-const loadExtractor = async (): Promise<ExtractStoryComponent | string> => {
+/** The framework's docs module, or why it could not be loaded: every request is then answered with that. */
+const loadDocsModule = async (): Promise<DocsModule | string> => {
   if (!isWorkerData(workerData)) return "The docs' worker was started without a docs module";
   try {
     const module: unknown = await import(workerData.docsModule);
-    if (isDocsModule(module)) return module.extractStoryComponent;
+    if (isDocsModule(module)) return module;
     return `${workerData.docsModule} exports no extractStoryComponent`;
   } catch (error) {
     return `${workerData.docsModule} could not be loaded: ${error instanceof Error ? error.message : String(error)}`;
@@ -51,15 +51,15 @@ const loadExtractor = async (): Promise<ExtractStoryComponent | string> => {
 // a build reads every story file: a program of the files asked so far would only be built again and again
 if (isWorkerData(workerData) && !workerData.readsEverything) readAskedFilesOnly();
 
-/** The framework's extractor, loaded once, before the first answer. */
-const extractor = loadExtractor();
+/** The framework's docs module, loaded once, before the first answer. */
+const docsModule = loadDocsModule();
 
 /** The extractor's result, or why it threw: a throw would end the worker and every request waiting on it. */
 const extracted = async (storyFile: string): Promise<DocsResult> => {
-  const extract = await extractor;
-  if (typeof extract === "string") return extract;
+  const module = await docsModule;
+  if (typeof module === "string") return module;
   try {
-    return extract(storyFile);
+    return module.extractStoryComponent(storyFile);
   } catch (error) {
     return `${storyFile}: the docs could not be read: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -77,6 +77,9 @@ const usage = (files: Parameters<typeof usageGraph>[0]): ReturnType<typeof usage
 process.on("message", (request: DocsRequest): void => {
   if (request.kind === "changed") {
     markSourcesChanged();
+    void docsModule.then((module): void => {
+      if (typeof module !== "string") module.sourcesChanged?.();
+    });
     return;
   }
   if (request.kind === "usage") {

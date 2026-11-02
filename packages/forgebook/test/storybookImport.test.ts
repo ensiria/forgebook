@@ -141,15 +141,26 @@ describe("importStorybook", () => {
     );
   });
 
-  it("refuses a framework Forgebook does not read, saying what it reads", async () => {
+  it("reads a Vue project's Storybook as Vue", async () => {
     const project = join(scratch, "vue");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
     writeFileSync(
       join(project, ".storybook", "main.ts"),
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/vue3-vite" };\n'
     );
+    const imported = await importStorybook(project);
+    expect(typeof imported === "string" ? imported : imported.framework).toBe("vue");
+  });
+
+  it("refuses a framework Forgebook does not read, saying what it reads", async () => {
+    const project = join(scratch, "angular");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(project, ".storybook", "main.ts"),
+      'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
+    );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads Storybook's React stories on Vite (@storybook/react-vite); this project uses @storybook/vue3-vite"
+      "Forgebook reads Storybook's stories on Vite (@storybook/react-vite, @storybook/vue3-vite); this project uses @storybook/angular"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package
@@ -168,6 +179,7 @@ describe("initConfigText", () => {
   it("writes the configuration as a person would, with the switches read from the preview", () => {
     const text = initConfigText(
       {
+        framework: "react",
         title: "acme-ui",
         stories: ["src/**/*.stories.tsx"],
         preview: ".storybook/preview.tsx",
@@ -190,10 +202,33 @@ describe("initConfigText", () => {
     expect(text).toContain('      id: "density",');
     expect(text).toMatch(/\n {2}\]\n\}\);\n$/);
     const plain = initConfigText(
-      { title: "x", stories: ["src/*.stories.tsx"], preview: undefined, switches: undefined, notes: [] },
+      {
+        framework: "react",
+        title: "x",
+        stories: ["src/*.stories.tsx"],
+        preview: undefined,
+        switches: undefined,
+        notes: []
+      },
       "Storybook"
     );
     expect(plain).toContain('  stories: [\n    "src/*.stories.tsx"\n  ]\n});');
     expect(plain).not.toContain("switches");
+  });
+
+  it("names the framework the stories are written for", () => {
+    const text = initConfigText(
+      {
+        framework: "vue",
+        title: "x",
+        stories: ["src/*.stories.ts"],
+        preview: undefined,
+        switches: undefined,
+        notes: []
+      },
+      "Storybook"
+    );
+    expect(text).toContain('import { vue } from "@forgebook/vue/vite";');
+    expect(text).toContain("  framework: vue(),");
   });
 });

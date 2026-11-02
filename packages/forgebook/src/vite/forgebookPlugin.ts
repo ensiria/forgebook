@@ -21,7 +21,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 
 import {
@@ -34,7 +34,7 @@ import {
 } from "vite";
 
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
-import type { FrameworkAdapter } from "./adapter.ts";
+import type { ComponentFiles, FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
@@ -121,6 +121,19 @@ const DOCS_PAGE_FILE = /\.md$/;
 
 /** A TypeScript source file, whose edit may change a component's docs. */
 const SOURCE_FILE = /\.tsx?$/;
+
+/**
+ * The text a component's file opens with, as TypeScript reads it: a framework's own kind of file (`.vue`) by its script.
+ *
+ * @param file - the file's absolute path.
+ * @param componentFiles - the framework's own kind of file; none when it has none.
+ */
+const scriptOfFile = (file: string, componentFiles: ComponentFiles | undefined): string => {
+  const text = readFileSync(file, "utf8");
+  return componentFiles !== undefined && file.endsWith(componentFiles.extension)
+    ? componentFiles.scriptOf(text)
+    : text;
+};
 
 /** The query that asks for a story file's component docs. */
 const DOCS_QUERY = "?forgebook-docs";
@@ -413,7 +426,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param file - the edited file.
    */
   const renewOnChange = (server: ViteDevServer, file: string): void => {
-    if (!SOURCE_FILE.test(file)) return;
+    const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+    if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
     const graph = server.environments.client.moduleGraph;
     for (const id of usageModules) {
@@ -477,7 +491,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       // imported here: the highlighter and the TypeScript compiler it splits code with are the server's heaviest
       // modules, and a story's page never asks for one of these
       const { textModule } = await import("./textModules.ts");
-      return textModule(id, watch, resolveImport, cacheFolder);
+      return textModule(id, watch, resolveImport, cacheFolder, (config?.framework ?? options.framework)?.componentFiles);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
     return docsModuleOf(id, watch, isServing(), pluginFences(config?.plugins ?? []));

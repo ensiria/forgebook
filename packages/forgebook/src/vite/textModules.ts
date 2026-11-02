@@ -14,6 +14,7 @@ import { join } from "node:path";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 
+import type { ComponentFiles } from "./adapter.ts";
 import { componentImport } from "./componentImport.ts";
 import { diskCache } from "./diskCache.ts";
 import { moduleSummaryOfText } from "./moduleSummary.ts";
@@ -80,6 +81,19 @@ const componentFileOf = async (
 };
 
 /**
+ * The text a component's file opens with: a framework's own kind of file (`.vue`) by its script.
+ *
+ * @param file - the file's absolute path.
+ * @param componentFiles - the framework's own kind of file; none when it has none.
+ */
+const scriptOfFile = (file: string, componentFiles: ComponentFiles | undefined): string => {
+  const text = readFileSync(file, "utf8");
+  return componentFiles !== undefined && file.endsWith(componentFiles.extension)
+    ? componentFiles.scriptOf(text)
+    : text;
+};
+
+/**
  * The module that answers a `?forgebook-page` import: the component's documentation file as HTML (empty without
  * one), and its file's summary, the first paragraph of its `@module` comment, for the page's lead.
  *
@@ -90,11 +104,13 @@ const componentFileOf = async (
  * @param storyFile - the story file's absolute path.
  * @param componentFile - the component's file, as the story file's import resolves; none when it names none.
  * @param watch - adds a file whose edit renews the module (the documentation file, the component's file).
+ * @param componentFiles - the framework's own kind of component file; none when it has none.
  */
 const pageModule = async (
   storyFile: string,
   componentFile: string | undefined,
-  watch: (file: string) => void
+  watch: (file: string) => void,
+  componentFiles: ComponentFiles | undefined
 ): Promise<{ code: string; moduleType: "js" }> => {
   // Markdown and the highlighter load for a component that has a page to read
   const page = existsSync(pageFileOf(storyFile))
@@ -102,7 +118,7 @@ const pageModule = async (
     : undefined;
   if (page !== undefined) watch(page.file);
   if (componentFile !== undefined) watch(componentFile);
-  const summary = componentFile === undefined ? "" : moduleSummaryOfText(readFileSync(componentFile, "utf8"));
+  const summary = componentFile === undefined ? "" : moduleSummaryOfText(scriptOfFile(componentFile, componentFiles));
   const value = { html: page?.html ?? "", summary };
   return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
 };
@@ -130,19 +146,21 @@ const markdownModule = async (
  * @param watch - adds a file whose edit renews the module.
  * @param resolveImport - resolves an import of a file as the app resolves it.
  * @param cacheFolder - where answers are kept between starts; none reads every time.
+ * @param componentFiles - the framework's own kind of component file; none when it has none.
  */
 export const textModule = async (
   id: string,
   watch: (file: string) => void,
   resolveImport: (specifier: string, importer: string) => Promise<string | undefined>,
-  cacheFolder: string | undefined
+  cacheFolder: string | undefined,
+  componentFiles: ComponentFiles | undefined
 ): Promise<{ code: string; moduleType: "js" } | undefined> => {
   if (id.endsWith(PAGE_QUERY)) {
     const storyFile = id.slice(0, -PAGE_QUERY.length);
     const componentFile = await componentFileOf(storyFile, (specifier: string) =>
       resolveImport(specifier, storyFile)
     );
-    return pageModule(storyFile, componentFile, watch);
+    return pageModule(storyFile, componentFile, watch, componentFiles);
   }
   if (id.endsWith(CODE_QUERY)) return codeModule(id.slice(0, -CODE_QUERY.length), cacheFolder);
   if (id.endsWith(MARKDOWN_QUERY)) return markdownModule(id.slice(0, -MARKDOWN_QUERY.length), watch);

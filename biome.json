@@ -194,11 +194,26 @@
       }
     },
     {
-      "includes": ["**/*.stories.tsx"],
+      "includes": ["**/*.stories.tsx", "**/*.stories.ts", "**/forgebook.preview.ts"],
       "linter": {
         "rules": {
           "style": {
             "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.vue"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off",
+            "useHookAtTopLevel": "off"
+          },
+          "style": {
+            "useVueMultiWordComponentNames": "off"
           }
         }
       }
@@ -220,7 +235,7 @@
       }
     },
     {
-      "includes": ["packages/testing/src/playwrightConfig.ts", "fixtures/app/shell/playwright.config.ts"],
+      "includes": ["packages/testing/src/playwrightConfig.ts", "fixtures/app/shell/ports.ts"],
       "linter": {
         "rules": {
           "style": {

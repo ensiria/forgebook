@@ -22,6 +22,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   export const Default: Story<typeof Badge> = { args: { label: "New" }, parameters: { main: true } };
   ```
 
+- In a Vue project, the same with `Badge.vue` and `Badge.stories.ts`: the types from `@forgebook/vue`, the component by its
+  default import, a slot as the arg `#name` (`"#default": "Text"`) and an event as its listener (`onRemove`). Open a `.vue`
+  file's script with its TSDoc block: that comment is the component's.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
@@ -63,7 +66,7 @@ links to other pages by their file (`./colours.md#brand`). A page never holds a 
 | Command | What it is for |
 |---|---|
 | `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
-| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props |
+| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |

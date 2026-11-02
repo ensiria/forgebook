@@ -6,7 +6,7 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React stories on Vite only, so another framework is refused with what Forgebook supports.
+ * instead. Forgebook reads React and Vue stories on Vite only, so another framework is refused with what Forgebook supports.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
@@ -20,8 +20,13 @@ import ts from "typescript-6";
 import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 
+/** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
+export type ImportedFramework = "react" | "vue";
+
 /** What a configuration takes from another tool's files. */
 export type ImportedConfig = {
+  /** The Forgebook framework the stories are written for. */
+  readonly framework: ImportedFramework;
   /** The catalogue's name: the package's, or the folder's. */
   readonly title: string;
   /** The story files, as globs from the project's folder. */
@@ -34,8 +39,11 @@ export type ImportedConfig = {
   readonly notes: readonly string[];
 };
 
-/** The framework Forgebook reads Storybook's stories for. */
-const REACT_VITE = "@storybook/react-vite";
+/** The Forgebook frameworks a project's Storybook can move to, by Storybook's framework on Vite. */
+const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
+  "@storybook/react-vite": "react",
+  "@storybook/vue3-vite": "vue"
+};
 
 /** Storybook's own default for a `stories` entry given as a folder. */
 const DEFAULT_FILES = "**/*.@(mdx|stories.@(js|jsx|mjs|ts|tsx))";
@@ -342,14 +350,19 @@ const loadedMain = async (
 };
 
 /**
- * Whether `main`'s framework is React on Vite: its name, or a path to its package, as Storybook's monorepo template
- * writes it (`getAbsolutePath("@storybook/react-vite")`).
+ * The Forgebook framework for `main`'s framework: by its name, or a path to its package, as Storybook's monorepo
+ * template writes it (`getAbsolutePath("@storybook/react-vite")`).
  *
  * @param framework - the framework's name or path.
+ * @returns the framework, or none for one Forgebook does not read.
  */
-const isReactVite = (framework: string | undefined): boolean =>
-  framework !== undefined &&
-  (framework === REACT_VITE || framework.split("\\").join("/").endsWith(`/${REACT_VITE}`));
+const importedFramework = (framework: string | undefined): ImportedFramework | undefined => {
+  if (framework === undefined) return undefined;
+  const path = framework.split("\\").join("/");
+  return Object.entries(STORYBOOK_FRAMEWORKS).find(
+    ([name]) => path === name || path.endsWith(`/${name}`)
+  )?.[1];
+};
 
 /**
  * Reads a project's Storybook configuration.
@@ -363,9 +376,12 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   if (mainFile === undefined) return `No .storybook/main file in ${projectDir}`;
   const main = await loadedMain(mainFile, projectDir);
   if (typeof main === "string") return main;
-  const framework = frameworkName(main);
-  if (!isReactVite(framework))
-    return `Forgebook reads Storybook's React stories on Vite (${REACT_VITE}); this project uses ${framework ?? "no framework"}`;
+  const storybookFramework = frameworkName(main);
+  const framework = importedFramework(storybookFramework);
+  if (framework === undefined) {
+    const supported = Object.keys(STORYBOOK_FRAMEWORKS).join(", ");
+    return `Forgebook reads Storybook's stories on Vite (${supported}); this project uses ${storybookFramework ?? "no framework"}`;
+  }
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
   if (globs.length === 0) return `${relative(projectDir, mainFile)} names no story file Forgebook reads`;
@@ -377,6 +393,7 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
       ? { switches: undefined, notes: [] }
       : previewSwitches(readFileSync(previewFile, "utf8"), previewFile);
   return {
+    framework,
     title: projectTitle(projectDir),
     stories: globs,
     preview: previewFile === undefined ? undefined : relative(projectDir, previewFile),
