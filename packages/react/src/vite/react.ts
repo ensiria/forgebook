@@ -8,6 +8,8 @@ import { extname } from "node:path";
 import type { FrameworkAdapter } from "forgebook/vite/adapter";
 import type { PluginOption } from "vite";
 
+import { refreshThroughCasts } from "./refreshThroughCasts.ts";
+
 /**
  * React, as the plugin reads its components: the docs module the docs' worker loads is this package's
  * `extractDocs.ts` (the props from the first parameter's type, events as `on*` props); the generated pages draw with
@@ -27,6 +29,6 @@ export const react = (): FrameworkAdapter => ({
     const { default: plugin } = await import("@vitejs/plugin-react");
     // story files too: Fast Refresh renews what React mounts, and the frame draws the stories anew, since it calls them
     // and React never mounts them (forgebook's `hotModules.ts`)
-    return [plugin()];
+    return [refreshThroughCasts(), plugin()];
   }
 });
