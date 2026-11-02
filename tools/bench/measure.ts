@@ -381,8 +381,16 @@ export type BuildSample = {
   readonly size: number;
 };
 
-/** The folder a build writes to, from the project's root. */
+/** The folder a build writes to, from the project's root, unless the tool names its own (`Target.buildFolder`). */
 const BUILD_FOLDER = "bench-build";
+
+/**
+ * The folder a tool's build writes to.
+ *
+ * @param context - the measurement's context.
+ */
+const buildFolderOf = (context: MeasureContext): string =>
+  context.target.buildFolder ?? join(context.directory, BUILD_FOLDER);
 
 /**
  * Builds the catalogue from nothing: no output and no cache.
@@ -390,10 +398,10 @@ const BUILD_FOLDER = "bench-build";
  * @param context - the measurement's context.
  */
 export const measureBuild = async (context: MeasureContext): Promise<BuildSample> => {
-  const out = join(context.directory, BUILD_FOLDER);
+  const out = buildFolderOf(context);
   await rm(out, { recursive: true, force: true });
   await removeCaches(context);
-  const command = context.target.build(BUILD_FOLDER);
+  const command = context.target.build(out);
   const start = Date.now();
   await exec(programOf(context, command), [...command.args], {
     cwd: context.directory,
@@ -424,7 +432,7 @@ export type LoadSample = {
  * @param context - the measurement's context.
  */
 export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSample> => {
-  const server = await serveStatic(join(context.directory, BUILD_FOLDER), HOST, context.port);
+  const server = await serveStatic(buildFolderOf(context), HOST, context.port);
   const { browserContext, page } = await openPage(context, VIEWPORT);
   const main = new Set<string>();
   const frames = new Set<string>();

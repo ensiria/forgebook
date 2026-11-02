@@ -55,6 +55,11 @@ export type Target = {
   };
   /** The table of props on a component's page, when the tool has one, in whichever document it draws. */
   readonly propsTable?: string;
+  /**
+   * Where its build writes, as an absolute path, when not `bench-build` in its folder: a library's own Storybook writes
+   * outside its sources, which its globs may read.
+   */
+  readonly buildFolder?: string;
   /** The package whose direct dependencies a report counts. */
   readonly mainPackage: string;
 };
@@ -206,8 +211,9 @@ export const LADLE: Target = {
  *
  * @param storybook - how it runs.
  * @param clone - the clone's root, whose `node_modules/.bin` holds the program.
+ * @param buildFolder - where its build writes: outside the clone, so nothing of the project can read a past build.
  */
-export const libraryStorybook = (storybook: CorpusStorybook, clone: string): Target => {
+export const libraryStorybook = (storybook: CorpusStorybook, clone: string, buildFolder: string): Target => {
   const { configDir, env, folder } = storybook;
   const directory = join(clone, folder);
   const bin = join(clone, "node_modules/.bin/storybook");
@@ -216,6 +222,7 @@ export const libraryStorybook = (storybook: CorpusStorybook, clone: string): Tar
   return {
     ...STORYBOOK,
     configFiles: {},
+    buildFolder,
     caches: [...STORYBOOK.caches, inClone("node_modules/.vite"), inClone("node_modules/.cache")],
     dev: (port) => {
       const { args } = STORYBOOK.dev(port);
