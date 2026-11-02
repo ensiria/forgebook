@@ -15,7 +15,7 @@ import { chromium } from "@playwright/test";
 import type { BenchReport, FramesMode, MachineReading, MetricResult, ToolName } from "./bench.types.ts";
 import { summary } from "./benchStats.ts";
 import type { CorpusSize } from "./corpus.ts";
-import { machineInfo, noiseWarnings, readMachine } from "./machine.ts";
+import { machineInfo, noiseWarnings, readMachine, systemName } from "./machine.ts";
 import {
   baseOf,
   measureBuild,
@@ -404,7 +404,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
     runs,
     throttle: request.throttle,
     frames: request.frames,
-    machine: machineInfo(process.version),
+    machine: machineInfo(process.version, await systemName(io)),
     readings,
     warnings,
     tools: Object.fromEntries(

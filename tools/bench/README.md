@@ -70,11 +70,26 @@ command exits non-zero at the end.
 
 ## The machine
 
-A timing is only as good as the machine's quiet. On macOS every group of metrics starts by reading the charger, the
-thermal state, Time Machine, Spotlight and the idle CPU, and so does the end of the run; the readings go in the report
-and anything suspicious is a warning. A noisy run is flagged, never silently kept. A cold start means the tool's caches
-are cold, not the system's: its file cache cannot be emptied without root, and the first start after an install reads
-higher than the rest.
+A timing is only as good as the machine's quiet. Every group of metrics starts by reading the machine, and so does the
+end of the run; the readings go in the report and anything suspicious is a warning. A noisy run is flagged, never
+silently kept. Each system is read with what it has, and a reading it cannot give is left out:
+
+- **macOS**: the charger, the thermal state, Time Machine, Spotlight on the volume, the idle CPU and the load.
+- **Windows**: the mains or the battery, the idle CPU, the antivirus Windows knows and whether it scans files as they
+  are opened, the CPU the antivirus, the indexer and Windows Update take, and the power plan. The shares come from
+  two snapshots of the raw process counters a second apart, which read the same in every language of Windows.
+- **Linux**: the mains or the battery, the idle CPU, the load, and the CPU the indexer (Tracker, Baloo), an antivirus
+  (ClamAV) and the updates (apt, PackageKit) take, from `/proc` and `/sys`.
+
+The report also names the system (`os`) on Windows and Linux, whose `system` is a kernel's number.
+
+A cold start means the tool's caches are cold, not the system's: its file cache cannot be emptied without root, and the
+first start after an install reads higher than the rest.
+
+On Windows a package's command is a `.cmd` shim, which Node cannot start without a shell: the benchmark reads the shim
+and runs its script with Node (`programs.ts`), so the server's process is Node itself. A server's tree is stopped with
+`taskkill /T` there, and its memory is the working set summed over the tree, read by one PowerShell that stays open for
+the measurement (`processes.ts`).
 
 `--throttle 4` slows the browser's CPU, for the metrics of a page. Node is not slowed, so the result is an indication of a
 slow page and not of a slow computer.
@@ -165,6 +180,8 @@ a measurement. `tail -F` reads it from anywhere.
 - `leftovers.ts`: what a run left running, found and stopped.
 - `serverOutput.ts`: what a server printed, kept to say why it stopped: its first error and its last lines.
 - `machine.ts`, `benchStats.ts`, `reportTable.ts`, `statusFile.ts`, `staticServer.ts`, `diskUsage.ts`: what they say.
+- `programs.ts`, `processes.ts`, `powershell.ts`: how a program, a process tree and PowerShell are run on each system.
+- `kit/`: the bench kit, which installs and runs all this on a machine that has nothing (its own README).
 - `budget.ts`, `budget.json`: the check of a pull request, and its limits.
 - `targets/`: the pinned tools.
 
