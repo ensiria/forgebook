@@ -38,6 +38,7 @@ import {
   readTokens,
   type TokensInput
 } from "./designTokens.ts";
+import { findAnswer } from "./findRoute.ts";
 import { nearestTokens } from "./nearestToken.ts";
 import { AGENT_SOURCES_FILE } from "./pages.ts";
 
@@ -72,7 +73,9 @@ const agentModuleOf = (module: unknown): AgentModule => {
 };
 
 /** A loader's value, or why it failed. */
-const settled = async (load: (() => Promise<unknown>) | undefined): Promise<LoadedStoryParts["docs"]> => {
+export const settled = async (
+  load: (() => Promise<unknown>) | undefined
+): Promise<LoadedStoryParts["docs"]> => {
   if (load === undefined) return { value: { name: null } };
   try {
     return { value: await load() };
@@ -117,7 +120,7 @@ export const ROOT_HEADER = "forgebook-root";
 export const rootHeaderValue = (dir: string): string => encodeURIComponent(dir);
 
 /** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
-type RouteContext = {
+export type RouteContext = {
   /** The sources and the preview, as the dev server loaded them. */
   readonly loaded: AgentModule;
   /** The sources' story tree. */
@@ -317,6 +320,7 @@ export const agentAnswer = async (
     if (route === "errors") return errorsAnswer(context, live);
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
+    if (route === "find") return await findAnswer(context);
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };

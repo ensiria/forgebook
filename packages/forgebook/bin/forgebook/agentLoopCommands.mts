@@ -18,10 +18,11 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { isFoundComponentsDocument } from "../../src/vite/agentApi.ts";
 import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
 import { agentsSkill, SKILL_FOLDERS, withAgentsSection } from "./agentsText.ts";
-import { checkText, errorsOutput, shotText } from "./agentText.ts";
-import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentText.ts";
+import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 
@@ -108,6 +109,32 @@ export const agentLoopCommands = (
       const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
       if (problems > 0)
         throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
+    }
+  }),
+  find: forgebook.command({
+    summary: "Find components by what they are for, in your own words.",
+    json: true,
+    positionals: [{ name: "query", description: "What you are looking for.", required: true }],
+    options: {
+      url: {
+        type: "string",
+        env: "FORGEBOOK_URL",
+        valueName: "address",
+        description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+      }
+    },
+    examples: [
+      { command: `${COMMAND} find modal`, description: "Whatever this catalogue calls a modal." },
+      { command: `${COMMAND} find "radio tile group" --json`, description: "As an agent asks." }
+    ],
+    run: async ({ options, args, io, log, isJson }): Promise<void> => {
+      const config = await configOf(options.config);
+      const params = new URLSearchParams({ query: args.query });
+      const body = await askCatalogue(config, options.url, "find", params, log);
+      if (!isFoundComponentsDocument(body)) {
+        throw new ScriptError("The catalogue's answer has an unexpected shape");
+      }
+      printAnswer(foundComponentsText(body), body, [], { io, log, isJson });
     }
   }),
   errors: forgebook.command({

@@ -13,6 +13,7 @@ import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import type {
+  FoundComponentsDocument,
   NearestTokensDocument,
   StoriesDocument,
   StoryDocument,
@@ -117,7 +118,13 @@ export const askCatalogue = async (
  */
 export const printAnswer = (
   text: string,
-  document: StoriesDocument | StoryDocument | TokensDocument | TokenDocument | NearestTokensDocument,
+  document:
+    | StoriesDocument
+    | StoryDocument
+    | TokensDocument
+    | TokenDocument
+    | NearestTokensDocument
+    | FoundComponentsDocument,
   problems: readonly string[],
   context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
 ): void => {
