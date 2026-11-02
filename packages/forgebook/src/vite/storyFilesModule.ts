@@ -146,13 +146,15 @@ export const storyFilesModule = (
 ): string => {
   const files = indexedStoryFiles(root, pattern, watch);
   const keys = files.map((file) => file.key);
+  // the group's id in Vite's form, as the plugin names the declaring module's folder
+  const folder = VITE_PATHS.normalize(root);
   const index: Record<string, StoryFileIndex> = Object.fromEntries(
     files.map((file) => [file.key, file.index])
   );
-  const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(root, pattern)}`);
+  const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   // absolute paths in Vite's form: the module has no folder of its own, Vite serves them under /@fs/ in development,
   // and the queries' ids come back to the plugin as written here
-  const absolute = (key: string): string => VITE_PATHS.resolve(root, key);
+  const absolute = (key: string): string => VITE_PATHS.resolve(folder, key);
   const path = (key: string): string => JSON.stringify(absolute(key));
   const query = (key: string, name: string): string => JSON.stringify(`${absolute(key)}?${name}`);
   return [
