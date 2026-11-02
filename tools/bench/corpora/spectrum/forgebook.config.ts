@@ -27,8 +27,8 @@ const INTL_GLOB = /\*\.json$/;
 /** What Parcel writes before a file it imports as text. */
 const TEXT_PREFIX = "bundle-text:";
 
-/** Where a style sheet is a CSS module that does not say so: imported by Spectrum's components. */
-const MODULE_IMPORTER = /\/packages\/@(adobe|react-spectrum)\//;
+/** Where a style sheet is a CSS module that does not say so: anywhere in the monorepo's packages. */
+const MODULE_IMPORTER = /\/packages\//;
 
 /** The translations of a folder, as Parcel's glob resolver gives them: by file name, without its extension. */
 const intlModule = (folder) => {
