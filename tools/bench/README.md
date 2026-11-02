@@ -22,6 +22,7 @@ fully shown, by then painted, a fade included: waiting from outside would measur
 | `firstPropsTable` | page opened on a fresh server → the props table visible |
 | `serverMemory` | peak resident memory of the dev server's process tree, a start and a story's page |
 | `serverMemoryDocs` | the same with a component's page, where the props are read |
+| `serverMemoryCold` | as `serverMemory`, every cache removed first: a first start's peak, pre-bundling included |
 | `build`, `buildSize` | the static build with no output and no cache, and the bytes of its output |
 | `shellJs`, `frameJs` | JavaScript a first load of the build fetches, gzipped: by the top page, by the frames |
 | `firstLoadJs` | the same in all, each file once: a chunk both fetch counts in both columns above |

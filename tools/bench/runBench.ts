@@ -281,6 +281,11 @@ const memoryGroup = async ({ tools, turns }: GroupRun): Promise<void> => {
     measureMemory(tool.context, pageAddress(tool))
   );
   record(docs, "serverMemoryDocs", "bytes", (sample) => sample);
+  // last, since it empties the caches the two above were measured with
+  const cold = await inTurns(tools, "memory", "serverMemoryCold", MEMORY_RUNS, turns, (tool) =>
+    measureMemory(tool.context, tool.context.subject.storyAddress(baseOf(tool.context)), true)
+  );
+  record(cold, "serverMemoryCold", "bytes", (sample) => sample);
 };
 
 /** The build, and what a first load of it fetches. */

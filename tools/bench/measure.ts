@@ -338,9 +338,15 @@ const treeMemory = async (rootPid: number, io: ScriptIo): Promise<number> => {
  *
  * @param context - the measurement's context.
  * @param address - the page visited.
+ * @param isCold - whether the tool's caches are removed first, as a first start finds them.
  * @returns the peak, in bytes.
  */
-export const measureMemory = async (context: MeasureContext, address: string): Promise<number> => {
+export const measureMemory = async (
+  context: MeasureContext,
+  address: string,
+  isCold = false
+): Promise<number> => {
+  if (isCold) await removeCaches(context);
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
   const server = await startServer(context);
   let peak = 0;
