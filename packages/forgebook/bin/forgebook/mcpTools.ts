@@ -354,6 +354,11 @@ export const catalogueTools = ({
         allVariants: {
           type: "boolean",
           description: "Check every variant the catalogue's browser tests check."
+        },
+        semantic: {
+          type: "boolean",
+          description:
+            "Also ask the model the user configured whether headings, labels and alternatives say the right thing. Its judgements are opinions, in `judgements`."
         }
       },
       required: ["id"],
@@ -366,7 +371,8 @@ export const catalogueTools = ({
       const report = await check({
         id: textOf(args, "id") ?? "",
         views,
-        isAllVariants: args["allVariants"] === true
+        isAllVariants: args["allVariants"] === true,
+        isSemantic: args["semantic"] === true
       });
       if (typeof report === "string") return { structured: { error: report }, isError: true };
       return { structured: report, isError: report.results.some((result) => result.problems.length > 0) };

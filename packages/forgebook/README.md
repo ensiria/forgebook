@@ -398,6 +398,12 @@ An agent that cannot find a component writes a new one, often because the code a
 `forgebook find` and `find_component` search names, the meta's `keywords`, titles and stories, with the usual synonyms
 (`modal` finds a `Dialog`): write `keywords: ["radio tile group"]` on `OptionCards` and it is found.
 
+`forgebook check <id> --semantic` also asks a model what axe cannot see: whether a heading describes its section, an
+image's text says what it shows, a label says what its control does. It is off unless asked, and sends each story's
+accessibility tree and picture to the OpenAI-compatible API in `FORGEBOOK_SEMANTIC_URL`, with `FORGEBOOK_SEMANTIC_MODEL` and,
+when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and no key is stored. What it answers lands in
+`judgements`, apart from the problems, as an opinion: it does not fail the check.
+
 `forgebook check-code` and `check_code` read what a change adds, new files included, from where it left `--since`: a colour
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
