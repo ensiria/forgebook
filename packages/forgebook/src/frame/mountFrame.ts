@@ -84,6 +84,11 @@ const tellDevServer = (report: LiveErrorReport): void => {
   import.meta.hot?.send(LIVE_ERROR_EVENT, report);
 };
 
+// a story that threw is gone from its frame, so a hot update has nothing to update: the fix shows only in a new page
+import.meta.hot?.on("vite:afterUpdate", (): void => {
+  if (document.documentElement.getAttribute(STATUS_ATTRIBUTE) === "error") window.location.reload();
+});
+
 /** Tells the shell, which is the parent page on the same origin. */
 const tellShell = (message: FrameMessage): void => {
   if (window.parent !== window) window.parent.postMessage(message, window.location.origin);

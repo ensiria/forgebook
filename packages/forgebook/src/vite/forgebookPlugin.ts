@@ -20,14 +20,14 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 import ts from "typescript-6";
 import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
-import type { FrameworkAdapter } from "./adapter.ts";
+import type { ComponentFiles, FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { componentPage, markdownHtml } from "./componentPage.ts";
@@ -107,6 +107,19 @@ const MARKDOWN_QUERY = "?forgebook-markdown";
 
 /** A TypeScript source file, whose edit may change a component's docs. */
 const SOURCE_FILE = /\.tsx?$/;
+
+/**
+ * The text a component's file opens with, as TypeScript reads it: a framework's own kind of file (`.vue`) by its script.
+ *
+ * @param file - the file's absolute path.
+ * @param componentFiles - the framework's own kind of file; none when it has none.
+ */
+const scriptOfFile = (file: string, componentFiles: ComponentFiles | undefined): string => {
+  const text = readFileSync(file, "utf8");
+  return componentFiles !== undefined && file.endsWith(componentFiles.extension)
+    ? componentFiles.scriptOf(text)
+    : text;
+};
 
 /** The query that asks for a story file's component docs. */
 const DOCS_QUERY = "?forgebook-docs";
@@ -189,11 +202,13 @@ const componentFileOf = async (
  * @param storyFile - the story file's absolute path.
  * @param componentFile - the component's file, as the story file's import resolves; none when it names none.
  * @param watch - adds a file whose edit renews the module (the documentation file, the component's file).
+ * @param componentFiles - the framework's own kind of component file; none when it has none.
  */
 const pageModule = (
   storyFile: string,
   componentFile: string | undefined,
-  watch: (file: string) => void
+  watch: (file: string) => void,
+  componentFiles: ComponentFiles | undefined
 ): { code: string; moduleType: "js" } => {
   const page = componentPage(storyFile);
   if (page !== undefined) watch(page.file);
@@ -204,7 +219,7 @@ const pageModule = (
       : moduleSummaryOf(
           ts.createSourceFile(
             componentFile,
-            readFileSync(componentFile, "utf8"),
+            scriptOfFile(componentFile, componentFiles),
             ts.ScriptTarget.Latest,
             true
           )
@@ -412,7 +427,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param file - the edited file.
    */
   const renewOnChange = (server: ViteDevServer, file: string): void => {
-    if (!SOURCE_FILE.test(file)) return;
+    const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+    if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
     const graph = server.environments.client.moduleGraph;
     for (const id of usageModules) {
@@ -467,7 +483,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const componentFile = await componentFileOf(storyFile, (specifier: string) =>
         resolveImport(specifier, storyFile)
       );
-      return pageModule(storyFile, componentFile, watch);
+      const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+      return pageModule(storyFile, componentFile, watch, componentFiles);
     }
     return textModule(id, watch);
   };

@@ -35,7 +35,7 @@ const sourceOf = (value: unknown, indent: string): string =>
  */
 export const initConfigText = (imported: ImportedConfig, tool: string): string => {
   const fields = [
-    "  framework: react(),",
+    `  framework: ${imported.framework}(),`,
     `  title: ${JSON.stringify(imported.title)},`,
     `  stories: ${sourceOf(imported.stories, "  ")},`,
     ...(imported.preview === undefined ? [] : [`  preview: ${JSON.stringify(imported.preview)},`]),
@@ -55,7 +55,7 @@ export const initConfigText = (imported: ImportedConfig, tool: string): string =
     " *",
     " * @module",
     " */",
-    'import { react } from "@forgebook/react/vite";',
+    `import { ${imported.framework} } from "@forgebook/${imported.framework}/vite";`,
     'import { defineConfig } from "forgebook";',
     "",
     "export default defineConfig({",
