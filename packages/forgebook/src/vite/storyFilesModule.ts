@@ -150,7 +150,8 @@ export const storyFilesModule = (
     `docs: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`)},`,
     `code: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`)},`,
     `pages: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`)}${hasUsage ? "," : ""}`,
-    ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default)`] : []),
+    ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
+    ...(hasUsage ? [`reach: () => import(${usage}).then((module) => module.reach)`] : []),
     "};"
   ].join("\n");
 };

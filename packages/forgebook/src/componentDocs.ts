@@ -95,6 +95,23 @@ export type SubcomponentDocs = {
   readonly props: readonly PropDocs[];
 };
 
+/**
+ * When to use a component and when not, as its TSDoc says: the rule a person knows and an agent has no way to guess.
+ * Tags: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`, `@replacedBy`.
+ */
+export type UsageGuidance = {
+  /** The situations it is for, one per `@useWhen`. */
+  readonly useWhen?: readonly string[];
+  /** The situations it is not for, one per `@avoidWhen`. */
+  readonly avoidWhen?: readonly string[];
+  /** Components to consider instead, from `@alternatives`, comma-separated. */
+  readonly alternatives?: readonly string[];
+  /** Why not to use it any more, from `@deprecated`. */
+  readonly deprecated?: string;
+  /** What to use instead, from `@replacedBy`. */
+  readonly replacedBy?: string;
+};
+
 /** A story file's component. */
 export type ComponentDocs = {
   /** The component's name. */
@@ -115,6 +132,8 @@ export type ComponentDocs = {
   readonly parts: readonly string[];
   /** The parts the meta names in `subcomponents`, in the order it writes them; empty when it names none. */
   readonly subcomponents: readonly SubcomponentDocs[];
+  /** When to use it and when not, from its TSDoc; left out when it says nothing. */
+  readonly guidance?: UsageGuidance;
   /**
    * Its call signature, when it has one: the parameters and the return value a story about logic shows first (the
    * meta's `component` is then the hook or the function).

@@ -2,7 +2,7 @@
 
 This project's components have stories, shown by [Forgebook](https://github.com/ensiria/forgebook) (`forgebook dev`).
 When you add or change a component, add or change its stories, then check them with the commands below: they answer
-in JSON with `--json`, and every answer carries the links that open a story for a person.
+in JSON with `--json`, and every answer about a story carries the links that open it for a person.
 
 ### Writing a story file
 
@@ -42,15 +42,28 @@ in JSON with `--json`, and every answer carries the links that open a story for 
 - Write `title`, `parameters.main`, `group`, `height`, `touch` and `logic` as plain values: the catalogue reads them without running
   the file.
 
+- Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
+  `@replacedBy`. `forgebook story` returns them as `docs.guidance`: read them before using a component, and never use a
+  deprecated one.
+
 ### Commands
 
 | Command | What it is for |
 |---|---|
+| `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, errors, a failed play |
+| `npx forgebook tokens --category color --json` | The design tokens, when the catalogue names a tokens file |
+| `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw value; the type comes from the value, or `--type padding` |
+| `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |
+| `npx forgebook changed --json` | The stories your change touches, through what they import |
+| `npx forgebook verify --json` | The checks on all of them, with one exit code: run it before you say a change is done |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`) |
+
+Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
+`isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.
 
 Run `npx forgebook <command> --help` for the options. With an MCP client, `npx forgebook mcp` offers the same as tools.
