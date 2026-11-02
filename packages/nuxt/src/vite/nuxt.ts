@@ -15,7 +15,13 @@ import { vue } from "@forgebook/vue/vite";
 import type { FrameworkAdapter } from "forgebook/vite/adapter";
 import type { PluginOption } from "vite";
 
-import { FRAME_MODULE, type NuxtOptions, nuxtPlugins } from "./nuxtPlugin.ts";
+import { FRAME_MODULE, nuxtPlugins } from "./nuxtPlugin.ts";
+
+/** The options of `nuxt()`. */
+export type NuxtOptions = {
+  /** The Nuxt project's folder, from the catalogue's; the catalogue's own folder by default. */
+  readonly dir?: string;
+};
 
 /**
  * Nuxt, as the plugin reads and draws its components.

@@ -52,8 +52,8 @@ export const Published: Story<typeof BlogPost> = {
 
 | `parameters.nuxt` | What it sets |
 |---|---|
-| `route` | Where the story starts: a path (`/blog/hello?tab=1`) or a location (`{ name: "blog-slug", params: { slug: "hello" } }`), as `router.push` takes it; `/` by default |
-| `data` | What `useAsyncData` and `useFetch` return, by key, without calling their handler. `useFetch`'s key is its URL (`/api/products`), with its method when not GET, unless it is given one |
+| `route` | Where the story starts: a path (`/blog/hello?tab=1`), or a location by path (`{ path, query, hash }`) or by a page's name (`{ name: "blog-slug", params: { slug: "hello" } }`); `/` by default |
+| `data` | What `useAsyncData` and `useFetch` return, by key, without calling their handler. `useFetch`'s key is the request as it is made, unless it is given one: its URL with its query (`/api/products?page=2`), the method before it when not GET, the body after it (`POST /api/cart {"id":1}`) |
 | `state` | What `useState` starts with, by key |
 | `cookies` | What `useCookie` reads, by name |
 | `runtimeConfig.public` | The runtime config's public values, over the project's |
@@ -82,6 +82,10 @@ export const GoesToAbout: Story<typeof SiteNav> = {
 | `@forgebook/nuxt/vite` | `nuxt()`, the framework adapter of `forgebook.config.ts`: Vue's plugin and this package's |
 | `@forgebook/nuxt/story` | `storyNuxt()`: the story's route, its calls to Nuxt, its state, cookies and data |
 | `@forgebook/nuxt/renderer` | `nuxtRenderer`, for the generated server tests (`storyServerTests(source, { renderer: nuxtRenderer })`) |
+
+`@forgebook/nuxt/app/*`, `@forgebook/nuxt/project` and `@forgebook/nuxt/code` are internal: the code the plugin
+writes and the catalogue's pages import them, so they may change in any release. A component imports Nuxt's names as it
+does in the app (auto-imported, or from `#imports`).
 
 ## What a component gets
 

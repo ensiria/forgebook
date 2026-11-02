@@ -9,6 +9,9 @@
  * target other than `_self`) is drawn as Nuxt draws it, and its click is recorded instead of followed, so the story's
  * frame stays where it is.
  *
+ * Internal: the code the plugin writes imports it (`#imports`, `#app`, `#components`); a story or a component imports
+ * Nuxt's names as in the app, never this module, whose exports may change in any release.
+ *
  * @module
  */
 import {
@@ -86,6 +89,40 @@ const routerLinkProps = (props: NuxtLinkProps, to: RouteLocationRaw): RouterLink
 });
 
 /**
+ * Whether a click would open a link in another tab or window: a modifier key held, or a button other than the first.
+ *
+ * @param event - the click.
+ */
+const isOtherWindowClick = (event: MouseEvent): boolean =>
+  event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
+
+/**
+ * What a link does with a click the story's frame must not follow: one that would open another tab (for a link inside
+ * the app, the catalogue's own page at that path), and any click on a link out of the app. The click is recorded among
+ * the story's events instead.
+ *
+ * @param href - where the link goes.
+ * @param isExternal - whether it goes out of the app, so even a plain click stays.
+ * @param record - records a call.
+ */
+const keptClicks = (
+  href: string,
+  isExternal: boolean,
+  record: (name: string, values: readonly unknown[]) => void
+): { readonly onClick: (event: MouseEvent) => void; readonly onAuxclick: (event: MouseEvent) => void } => {
+  const keep = (event: MouseEvent): void => {
+    event.preventDefault();
+    record("navigateTo", [href, isOtherWindowClick(event) ? { open: true } : { external: true }]);
+  };
+  return {
+    onClick: (event: MouseEvent): void => {
+      if (isExternal || isOtherWindowClick(event)) keep(event);
+    },
+    onAuxclick: keep
+  };
+};
+
+/**
  * A link outside the app, drawn as Nuxt draws it, its click recorded instead of followed.
  *
  * @param props - the link's props.
@@ -100,17 +137,21 @@ const externalLink = (
   record: (name: string, values: readonly unknown[]) => void
 ): VNode => {
   const rel = props.noRel === true ? undefined : (props.rel ?? "noopener noreferrer");
-  const navigate = (event?: MouseEvent): void => {
-    event?.preventDefault();
-    record("navigateTo", [href, { external: true }]);
-  };
+  const clicks = keptClicks(href, true, record);
   if (props.custom === true)
     return h(
       "span",
       { style: "display: contents" },
-      slots["default"]?.({ href, navigate, rel, target: props.target, isExternal: true, isActive: false })
+      slots["default"]?.({
+        href,
+        navigate: clicks.onClick,
+        rel,
+        target: props.target,
+        isExternal: true,
+        isActive: false
+      })
     );
-  return h("a", { href, rel, target: props.target, onClick: navigate }, slots["default"]?.());
+  return h("a", { href, rel, target: props.target, ...clicks }, slots["default"]?.());
 };
 
 /** A link, inside the app or outside it, as Nuxt's `NuxtLink`. */
@@ -119,28 +160,31 @@ export const NuxtLink = defineComponent(
     const store = useNuxtStore();
     return (): VNode => {
       const to = props.to ?? props.href ?? "";
-      if (!isLinkExternal(props, to)) return h(RouterLink, routerLinkProps(props, to), slots);
-      const href = typeof to === "string" ? to : store.router.resolve(to).href;
-      return externalLink(props, href, slots, store.record);
+      const isExternal = isLinkExternal(props, to);
+      const href = typeof to === "string" && isExternal ? to : store.router.resolve(to).href;
+      if (isExternal) return externalLink(props, href, slots, store.record);
+      // a click RouterLink leaves to the browser (another tab) is kept: it would open the catalogue at that path
+      const clicks = props.custom === true ? {} : keptClicks(href, false, store.record);
+      return h(RouterLink, { ...routerLinkProps(props, to), ...clicks }, slots);
     };
   },
   {
     name: "NuxtLink",
-    props: [
-      "to",
-      "href",
-      "external",
-      "target",
-      "rel",
-      "noRel",
-      "replace",
-      "activeClass",
-      "exactActiveClass",
-      "ariaCurrentValue",
-      "custom",
-      "prefetch",
-      "noPrefetch"
-    ]
+    props: {
+      to: { type: null, required: false },
+      href: { type: null, required: false },
+      external: { type: Boolean, default: false },
+      target: { type: String, required: false },
+      rel: { type: String, required: false },
+      noRel: { type: Boolean, default: false },
+      replace: { type: Boolean, default: false },
+      activeClass: { type: String, required: false },
+      exactActiveClass: { type: String, required: false },
+      ariaCurrentValue: { type: null, required: false },
+      custom: { type: Boolean, default: false },
+      prefetch: { type: Boolean, default: undefined },
+      noPrefetch: { type: Boolean, default: false }
+    }
   }
 );
 

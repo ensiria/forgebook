@@ -2,6 +2,9 @@
  * Nuxt's `define…` helpers in a catalogue: each returns what it is given, as Nuxt's do once its compiler has read them,
  * so a component, a plugin or the app config written with one loads as it is.
  *
+ * Internal: the code the plugin writes imports it (`#imports`, `#app`, `#components`); a story or a component imports
+ * Nuxt's names as in the app, never this module, whose exports may change in any release.
+ *
  * @module
  */
 import { defineComponent } from "vue";

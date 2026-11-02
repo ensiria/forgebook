@@ -2,6 +2,9 @@
  * Nuxt's head composables in a catalogue: `useHead`, `useSeoMeta` and their server and safe forms take what a
  * component sets and leave the frame's document alone, since the frame's head is the catalogue's.
  *
+ * Internal: the code the plugin writes imports it (`#imports`, `#app`, `#components`); a story or a component imports
+ * Nuxt's names as in the app, never this module, whose exports may change in any release.
+ *
  * @module
  */
 

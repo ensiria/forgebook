@@ -126,6 +126,18 @@ export const resolvedPath = (path: string, rootDir: string, srcDir: string): str
 };
 
 /**
+ * A folder of `imports.dirs`: an alias as Nuxt resolves it, anything else from the sources' folder, as Nuxt reads it.
+ *
+ * @param path - the folder, as written.
+ * @param rootDir - the project's folder.
+ * @param srcDir - its sources' folder.
+ */
+const importsDir = (path: string, rootDir: string, srcDir: string): string => {
+  const resolved = resolvedPath(path, rootDir, srcDir);
+  return isAbsolute(resolved) && resolved !== resolve(rootDir, path) ? resolved : resolve(srcDir, path);
+};
+
+/**
  * The components' folders a config gives: `components/` of the sources by default, none for `false`, else each entry
  * of the list (or of `dirs`), a path or `{ path, prefix, pathPrefix }`.
  *
@@ -136,7 +148,10 @@ export const resolvedPath = (path: string, rootDir: string, srcDir: string): str
 const componentsDirsOf = (value: unknown, rootDir: string, srcDir: string): ComponentsDir[] => {
   if (value === false) return [];
   const entries: unknown = isRecord(value) ? value["dirs"] : value;
-  const list: readonly unknown[] = Array.isArray(entries) ? entries : ["~/components"];
+  // Nuxt's own: the islands' and the global folders inside the components' one, each scanned before it
+  const list: readonly unknown[] = Array.isArray(entries)
+    ? entries
+    : ["~/components/islands", "~/components/global", "~/components"];
   return list.flatMap((entry: unknown): ComponentsDir[] => {
     if (typeof entry === "string")
       return [{ path: resolvedPath(entry, rootDir, srcDir), prefix: "", pathPrefix: true }];
@@ -196,7 +211,7 @@ export const readNuxtConfig = (
       join(rootDir, "shared", "utils"),
       ...(Array.isArray(extraImports)
         ? extraImports.flatMap((each: unknown) =>
-            typeof each === "string" ? [resolvedPath(each, rootDir, srcDir)] : []
+            typeof each === "string" ? [importsDir(each, rootDir, srcDir)] : []
           )
         : [])
     ],

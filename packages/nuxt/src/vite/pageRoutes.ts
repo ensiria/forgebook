@@ -4,8 +4,8 @@
  *
  * @remarks
  * Pure: paths in, routes out. A story needs a page's route to set its params and its name, so `useRoute()` returns
- * what the page would see; it draws its own component, not the page, so the routes are flat: a page that has a folder
- * of children is left out, and its children carry their full paths. `definePageMeta`'s `path` and `name` are not
+ * what the page would see; it draws its own component, not the page, so the routes are flat: a parent page and its
+ * children are each a route with its full path, the parent left out when an `index` child takes its path. `definePageMeta`'s `path` and `name` are not
  * read: they need the page's code run.
  *
  * @module
@@ -43,17 +43,19 @@ const tokensOf = (segment: string): Token[] => {
 };
 
 /**
- * A segment as vue-router writes it.
+ * A segment as vue-router writes it: a catch-all takes the rest of the path when it ends it, else what is left of its
+ * own segment, as Nuxt writes it.
  *
  * @param tokens - the segment's pieces.
+ * @param isLast - whether the segment ends the path.
  */
-const pathOfTokens = (tokens: readonly Token[]): string =>
+const pathOfTokens = (tokens: readonly Token[], isLast: boolean): string =>
   tokens
     .map((token) => {
       if (token.kind === "text") return token.value;
       if (token.kind === "param") return `:${token.value}()`;
       if (token.kind === "optional") return `:${token.value}?`;
-      return `:${token.value}(.*)*`;
+      return isLast ? `:${token.value}(.*)*` : `:${token.value}([^/]*)*`;
     })
     .join("");
 
@@ -70,7 +72,7 @@ const routeOf = (file: string): ProjectRoute | undefined => {
   const kept = segments.filter((segment) => !/^\(.*\)$/.test(segment));
   const isIndex = kept.at(-1) === "index";
   const named = isIndex ? kept.slice(0, -1) : kept;
-  const path = `/${named.map((segment) => pathOfTokens(tokensOf(segment))).join("/")}`;
+  const path = `/${named.map((segment, index) => pathOfTokens(tokensOf(segment), index === named.length - 1)).join("/")}`;
   const name = named.map((segment) => segment.replace(/\[\[?(\.\.\.)?|\]\]?/g, "")).join("-");
   return { path, name: name === "" ? "index" : name };
 };
@@ -79,20 +81,20 @@ const routeOf = (file: string): ProjectRoute | undefined => {
  * The routes of a project's pages.
  *
  * @param files - the pages' paths from the pages' folder, with `/` (`blog/[slug].vue`).
- * @returns the routes, a page that has a folder of children left out.
+ * @returns the routes; a page whose folder has an `index` page is left out, since that page carries its path and name,
+ * as in Nuxt, where the parent keeps neither.
  */
 export const pageRoutes = (files: readonly string[]): ProjectRoute[] => {
   const pages = files.filter((file) => PAGE_EXTENSIONS.test(file));
-  // every folder that holds a page, however deep: a page named as one has children
-  const folders = new Set(
+  const indexed = new Set(
     pages.flatMap((file) => {
-      const parts = file.split("/").slice(0, -1);
-      return parts.map((_part, index) => parts.slice(0, index + 1).join("/"));
+      const parts = file.replace(PAGE_EXTENSIONS, "").split("/");
+      return parts.length > 1 && parts.at(-1) === "index" ? [parts.slice(0, -1).join("/")] : [];
     })
   );
   const routes = new Map<string, ProjectRoute>();
   for (const file of pages) {
-    if (folders.has(file.replace(PAGE_EXTENSIONS, ""))) continue;
+    if (indexed.has(file.replace(PAGE_EXTENSIONS, ""))) continue;
     const route = routeOf(file);
     if (route !== undefined && !routes.has(route.name)) routes.set(route.name, route);
   }

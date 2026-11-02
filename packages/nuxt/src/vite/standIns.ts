@@ -38,13 +38,11 @@ const STAND_INS: Readonly<Record<string, readonly string[]>> = {
   "@forgebook/nuxt/app/data": [
     "useAsyncData",
     "useLazyAsyncData",
-    "useFetch",
-    "useLazyFetch",
     "refreshNuxtData",
     "clearNuxtData",
-    "useNuxtData",
-    "$fetch"
+    "useNuxtData"
   ],
+  "@forgebook/nuxt/app/fetch": ["useFetch", "useLazyFetch", "$fetch"],
   "@forgebook/nuxt/app/state": [
     "useState",
     "clearNuxtState",

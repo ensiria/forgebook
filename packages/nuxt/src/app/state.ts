@@ -10,6 +10,9 @@
  *
  * The page has no request: `useRequestHeaders` returns none and `useRequestEvent` nothing, as in Nuxt's browser code.
  *
+ * Internal: the code the plugin writes imports it (`#imports`, `#app`, `#components`); a story or a component imports
+ * Nuxt's names as in the app, never this module, whose exports may change in any release.
+ *
  * @module
  */
 import { onMounted, type Ref, ref } from "vue";
@@ -17,6 +20,18 @@ import { onMounted, type Ref, ref } from "vue";
 import { type NuxtAppStandIn, useNuxtStore } from "../nuxtStore.ts";
 import type { PublicRuntimeConfig } from "../project.ts";
 import type { StoryFetch } from "../storyFetch.ts";
+
+/**
+ * The first of two arguments that is a function: the one a call gives where the key may come first or not.
+ *
+ * @param first - the first argument.
+ * @param second - the second.
+ */
+const firstFunction = (first: unknown, second: unknown): (() => unknown) | undefined => {
+  if (typeof first === "function") return (): unknown => Reflect.apply(first, undefined, []);
+  if (typeof second === "function") return (): unknown => Reflect.apply(second, undefined, []);
+  return undefined;
+};
 
 /**
  * A value shared by every component of the story under a key, starting with the story's value for the key, else
@@ -32,13 +47,15 @@ export function useState<TValue>(key: string, init?: () => TValue): Ref<TValue>;
  * @param init - the value it starts with.
  */
 export function useState<TValue>(init?: () => TValue): Ref<TValue>;
-export function useState(first?: string | (() => unknown), second?: () => unknown): Ref<unknown> {
+export function useState(first?: string | (() => unknown), second?: (() => unknown) | string): Ref<unknown> {
   const store = useNuxtStore();
-  const key = typeof first === "string" ? first : store.nextKey("state");
-  const init = typeof first === "function" ? first : second;
+  // a text after the init is the key the plugin wrote for the call's place
+  const placeKey = typeof second === "string" ? second : undefined;
+  const key = typeof first === "string" ? first : (placeKey ?? store.nextKey("state"));
+  const init = firstFunction(first, second);
   const known = store.state.get(key);
   if (known !== undefined) return known;
-  const value = ref(key in store.storyState ? store.storyState[key] : init?.());
+  const value = ref(Object.hasOwn(store.storyState, key) ? store.storyState[key] : init?.());
   store.state.set(key, value);
   return value;
 }
@@ -81,7 +98,7 @@ export function useCookie(name: string, options: CookieOptions<unknown> = {}): R
   const { cookies, storyCookies } = useNuxtStore();
   const known = cookies.get(name);
   if (known !== undefined) return known;
-  const value = ref(name in storyCookies ? storyCookies[name] : options.default?.());
+  const value = ref(Object.hasOwn(storyCookies, name) ? storyCookies[name] : options.default?.());
   cookies.set(name, value);
   return value;
 }
@@ -113,15 +130,21 @@ export const tryUseNuxtApp = (): NuxtAppStandIn => useNuxtStore().nuxtApp;
 /**
  * Runs a function once for the story, as Nuxt runs one once for a request.
  *
- * @param key - the key it runs once under; none for one of its own.
- * @param run - the function.
+ * @param first - the key it runs once under, or the function, keyed by its place in the code.
+ * @param second - the function, or the key the plugin wrote for the call's place.
+ * @param third - the key the plugin wrote for the call's place, after the options.
  */
-export const callOnce = async (key: string | (() => unknown), run?: () => unknown): Promise<void> => {
+export const callOnce = async (
+  first: string | (() => unknown),
+  second?: (() => unknown) | Readonly<Record<string, unknown>> | string,
+  third?: string
+): Promise<void> => {
   const { once, nextKey } = useNuxtStore();
-  const name = typeof key === "string" ? key : nextKey("once");
-  const work = typeof key === "function" ? key : run;
-  if (once.has(name) || work === undefined) return;
-  once.add(name);
+  const placeKey = typeof second === "string" ? second : third;
+  const key = typeof first === "string" ? first : (placeKey ?? nextKey("once"));
+  const work = firstFunction(first, second);
+  if (once.has(key) || work === undefined) return;
+  once.add(key);
   await work();
 };
 

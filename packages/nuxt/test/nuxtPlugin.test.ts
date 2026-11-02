@@ -7,6 +7,13 @@
 import MagicString from "magic-string";
 import { describe, expect, it } from "vitest";
 
+import * as data from "../src/app/data.ts";
+import * as define from "../src/app/define.ts";
+import * as errors from "../src/app/errors.ts";
+import * as fetch from "../src/app/fetch.ts";
+import * as head from "../src/app/head.ts";
+import * as router from "../src/app/router.ts";
+import * as state from "../src/app/state.ts";
 import type { ProjectComponent } from "../src/vite/componentNames.ts";
 import { withComponentImports } from "../src/vite/nuxtPlugin.ts";
 import { NUXT_STAND_INS } from "../src/vite/standIns.ts";
@@ -43,14 +50,17 @@ describe("a template's components", () => {
 });
 
 describe("the stand-ins", () => {
-  it("are each exported by the module the plugin imports them from", async () => {
-    const modules = new Map<string, Readonly<Record<string, unknown>>>();
-    for (const { from } of NUXT_STAND_INS)
-      if (!modules.has(from))
-        modules.set(from, await import(`../src/app/${from.split("/").at(-1) ?? ""}.ts`));
-    const missing = NUXT_STAND_INS.filter(
-      ({ name, from }) => typeof modules.get(from)?.[name] !== "function"
-    );
+  it("are each exported by the module the plugin imports them from", () => {
+    const modules: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+      "@forgebook/nuxt/app/router": router,
+      "@forgebook/nuxt/app/data": data,
+      "@forgebook/nuxt/app/fetch": fetch,
+      "@forgebook/nuxt/app/state": state,
+      "@forgebook/nuxt/app/errors": errors,
+      "@forgebook/nuxt/app/head": head,
+      "@forgebook/nuxt/app/define": define
+    };
+    const missing = NUXT_STAND_INS.filter(({ name, from }) => typeof modules[from]?.[name] !== "function");
     expect(missing).toEqual([]);
   });
 });

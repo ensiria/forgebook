@@ -4,86 +4,19 @@
  *
  * @module
  */
-import { heldStoryClock } from "@forgebook/story-format/clock";
-import type { StoryDrawing } from "forgebook/renderer";
-import { readStory } from "forgebook/story-module";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick, type VNode } from "vue";
 
 import { NuxtLink } from "../src/app/components.ts";
-import { useAsyncData, useFetch } from "../src/app/data.ts";
+import { useAsyncData } from "../src/app/data.ts";
+import { useFetch } from "../src/app/fetch.ts";
 import { navigateTo, useRoute } from "../src/app/router.ts";
 import { useAppConfig, useCookie, useRuntimeConfig, useState } from "../src/app/state.ts";
-import { createNuxtRenderer } from "../src/nuxtRenderer.ts";
 import { storyNuxt } from "../src/storyNuxt.ts";
-import { project } from "./project.ts";
-
-/** The renderer over the tests' project. */
-const renderer = createNuxtRenderer(project);
-
-/** The canvases of the running test. */
-const canvases: HTMLElement[] = [];
-
-/** A canvas in the page. */
-const canvas = (): HTMLElement => {
-  const element = document.createElement("div");
-  document.body.append(element);
-  canvases.push(element);
-  return element;
-};
-
-/**
- * A drawing of a story that draws a component, with Nuxt parameters.
- *
- * @param render - what the story draws.
- * @param nuxt - its `parameters.nuxt`.
- * @param report - where its calls are told.
- */
-const drawing = (
-  render: () => VNode,
-  nuxt: Readonly<Record<string, unknown>> = {},
-  report?: (name: string, values: readonly unknown[]) => void
-): StoryDrawing => {
-  const story = readStory(
-    { default: { title: "Shop/Thing" }, Plain: { render, parameters: { nuxt } } },
-    "Plain"
-  );
-  if (typeof story === "string") throw new Error(story);
-  return {
-    identity: { id: "shop:shop-thing--plain", name: "Plain", title: "Shop/Thing" },
-    story,
-    args: {},
-    texts: {},
-    clock: heldStoryClock(0),
-    decorators: [],
-    globals: {},
-    loaded: {},
-    ...(report === undefined ? {} : { report })
-  };
-};
-
-/**
- * Draws a story and waits until it is drawn.
- *
- * @param story - the story.
- */
-const drawn = async (story: StoryDrawing): Promise<HTMLElement> => {
-  const element = canvas();
-  await renderer.mount(element, story, (error) => {
-    throw error;
-  }).drawn;
-  await nextTick();
-  return element;
-};
-
-/** Waits for what a component fetches to be drawn. */
-const settled = async (): Promise<void> => {
-  for (let turn = 0; turn < 5; turn += 1) await new Promise((resolve) => setTimeout(resolve, 0));
-  await nextTick();
-};
+import { drawing, drawn, renderer, settled, takeAway } from "./drawStory.ts";
 
 afterEach(() => {
-  for (const each of canvases.splice(0)) each.remove();
+  takeAway();
   vi.unstubAllGlobals();
 });
 
@@ -96,23 +29,20 @@ const RouteReader = defineComponent(() => {
 
 describe("the route", () => {
   it("starts where the story says, by a page's name and params or by a path", async () => {
-    expect(
-      (await drawn(drawing(() => h(RouteReader), { route: { name: "blog-slug", params: { slug: "a" } } })))
-        .textContent
-    ).toBe("/blog/a a");
-    expect((await drawn(drawing(() => h(RouteReader), { route: "/blog/b?x=1#top" }))).textContent).toBe(
-      "/blog/b b"
-    );
-    await settled();
-    // the route stays where the story set it once the router is ready, its search and hash with it
-    expect(storyNuxt().route.fullPath).toBe("/blog/b?x=1#top");
+    /** The text a story at a route draws, the story taken away after. */
+    const textAt = async (route: unknown): Promise<string> => {
+      const text = (await drawn(drawing(() => h(RouteReader), { route }))).textContent ?? "";
+      await settled();
+      const read = `${text} ${storyNuxt().route.fullPath}`;
+      takeAway();
+      return read;
+    };
+    expect(await textAt({ name: "blog-slug", params: { slug: "a" } })).toBe("/blog/a a /blog/a");
+    // the route keeps its search and hash once the router is ready
+    expect(await textAt("/blog/b?x=1#top")).toBe("/blog/b b /blog/b?x=1#top");
     // a path no page has still moves the route; a name no page has stays home
-    expect((await drawn(drawing(() => h(RouteReader), { route: "/elsewhere" }))).textContent).toBe(
-      "/elsewhere none"
-    );
-    expect((await drawn(drawing(() => h(RouteReader), { route: { name: "nothing" } }))).textContent).toBe(
-      "/ none"
-    );
+    expect(await textAt("/elsewhere")).toBe("/elsewhere none /elsewhere");
+    expect(await textAt({ name: "nothing" })).toBe("/ none /");
   });
 
   it("moves when a link is clicked, and tells the catalogue", async () => {
@@ -184,7 +114,7 @@ describe("the data", () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it("fetches with useFetch, its key its URL, and keeps a failure as Nuxt's error", async () => {
+  it("fetches with useFetch, its key the request as made, and keeps a failure as Nuxt's error", async () => {
     const fetched: string[] = [];
     vi.stubGlobal("fetch", async (url: string): Promise<Response> => {
       fetched.push(url);
@@ -204,7 +134,7 @@ describe("the data", () => {
     const element = await drawn(drawing(() => h(Reader)));
     expect(element.textContent).toBe("Anvil 404 error");
     expect(fetched).toEqual(["/api/products?page=2", "/api/missing"]);
-    expect(storyNuxt().data).toMatchObject({ "/api/products": [{ name: "Anvil" }] });
+    expect(storyNuxt().data).toMatchObject({ "/api/products?page=2": [{ name: "Anvil" }] });
   });
 
   it("calls no handler on the server, and draws the story's data there", async () => {

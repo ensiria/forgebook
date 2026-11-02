@@ -7,6 +7,9 @@
  * What Nuxt does with a page (its meta, its layout, its middleware, preloading its code) has no page to act on in a
  * story, so those functions take their arguments and do nothing, and a story's component is drawn as it is.
  *
+ * Internal: the code the plugin writes imports it (`#imports`, `#app`, `#components`); a story or a component imports
+ * Nuxt's names as in the app, never this module, whose exports may change in any release.
+ *
  * @module
  */
 import { hasInjectionContext } from "vue";
@@ -57,15 +60,18 @@ export const navigateTo = async (
   const store = useNuxtStore();
   const target = to ?? "/";
   const path = typeof target === "string" ? target : store.router.resolve(target).fullPath;
-  store.record("navigateTo", options.replace === true ? [path, { replace: true }] : [path]);
-  if (options.open !== undefined) return undefined;
-  if (isExternal(target)) {
-    if (options.external !== true)
-      throw new Error(
-        "Navigating to an external URL is not allowed by default. Use `navigateTo(url, { external: true })`."
-      );
-    return undefined;
-  }
+  const flags = {
+    ...(options.replace === true ? { replace: true } : {}),
+    ...(options.external === true ? { external: true } : {}),
+    ...(options.open === undefined ? {} : { open: true })
+  };
+  store.record("navigateTo", Object.keys(flags).length === 0 ? [path] : [path, flags]);
+  // a new window, or a navigation that leaves the app (a full page load), would leave the story's frame
+  if (options.open !== undefined || options.external === true) return undefined;
+  if (isExternal(target))
+    throw new Error(
+      "Navigating to an external URL is not allowed by default. Use `navigateTo(url, { external: true })`."
+    );
   return store.move(target, options.replace === true);
 };
 

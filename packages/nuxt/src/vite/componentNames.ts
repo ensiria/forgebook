@@ -75,11 +75,12 @@ export const componentName = (file: string, prefix: string, pathPrefix: boolean)
   if (!COMPONENT_EXTENSIONS.test(file) || NOT_COMPONENTS.test(file)) return undefined;
   const parts = file
     .replace(COMPONENT_EXTENSIONS, "")
-    .replace(/\.(client|server|global)$/, "")
+    .replace(/\.(client|server|global|island)$/, "")
     .split("/");
   const base = parts.at(-1) ?? "";
   const folders = parts.slice(0, -1);
-  const fileWords = base === "index" ? [] : wordsOf(base);
+  // an `index` file is named by its folder, which the folders' words then say once
+  const fileWords = wordsOf(base === "index" ? (folders.at(-1) ?? "") : base);
   const prefixWords = [...wordsOf(prefix), ...(pathPrefix ? folders.flatMap(wordsOf) : [])];
   const words = nameWords(fileWords, prefixWords);
   return words.length === 0 ? undefined : pascalOf(words);

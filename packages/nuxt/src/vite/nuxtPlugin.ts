@@ -22,10 +22,12 @@ import MagicString, { type SourceMap } from "magic-string";
 import { createUnimport, type Import, scanDirExports, toExports, type Unimport } from "unimport";
 import {
   type ConfigEnv,
+  type Logger,
   loadEnv,
   normalizePath,
   type Plugin,
   type PluginOption,
+  parseAst,
   type ResolvedConfig,
   type UserConfig,
   type ViteDevServer
@@ -33,15 +35,11 @@ import {
 
 import type { ProjectRoute } from "../project.ts";
 import { componentName, type ProjectComponent, wordsOf } from "./componentNames.ts";
+import type { NuxtOptions } from "./nuxt.ts";
 import { loadNuxtConfig, type NuxtProjectConfig, withEnvironment } from "./nuxtConfig.ts";
 import { pageRoutes } from "./pageRoutes.ts";
+import { withPlaceKeys } from "./placeKeys.ts";
 import { BUILT_IN_COMPONENT_NAMES, COMPONENTS_MODULE, NUXT_STAND_INS, ROUTER_STAND_INS } from "./standIns.ts";
-
-/** The options of `nuxt()`. */
-export type NuxtOptions = {
-  /** The Nuxt project's folder, from the catalogue's; the catalogue's own folder by default. */
-  readonly dir?: string;
-};
 
 /** The frame page's module: Forgebook's frame with the Nuxt renderer, after the project's style sheets. */
 export const FRAME_MODULE = "virtual:forgebook-nuxt/frame";
@@ -84,6 +82,9 @@ const BUILD_MODULE = /^#(build|internal|app-manifest|server)(\/|$)/;
 /** A file whose code may use what Nuxt imports for it: a script, or a single-file component's script. */
 const CODE_FILE = /\.(vue|[cm]?[jt]sx?)$/;
 
+/** A call that may need the key of its place (`placeKeys.ts`): the code is parsed only when it has one. */
+const KEYED_CALL = /\b(useState|useAsyncData|useLazyAsyncData|callOnce)\s*\(/;
+
 /** A template's look-up of a component by name, as Vue's compiler writes it. */
 const RESOLVE_COMPONENT = /(?<![\w$])_?resolveComponent\(\s*(["'`])([^"'`]+)\1\s*(?:,\s*true\s*)?\)/g;
 
@@ -101,7 +102,12 @@ type ProjectState = {
   readonly unimport: Unimport;
   /** What a file gets without importing it, each as its name and its module. */
   readonly importNames: readonly string[];
+  /** The component files left out, since their names are not names code can hold. */
+  readonly skipped: readonly string[];
 };
+
+/** A component's name, as `#components` and a template's import write it: a JavaScript name. */
+const COMPONENT_NAME = /^[A-Za-z_$][\w$]*$/;
 
 /**
  * Every file of a folder, as paths from it with `/`; none for a folder that is not there.
@@ -119,18 +125,30 @@ const filesOf = (dir: string): string[] => {
 };
 
 /**
- * The project's components, by name: the first folder that names one wins, as in Nuxt.
+ * The project's components, by name: the first folder that names one wins, as in Nuxt. A file whose name makes no
+ * JavaScript name (`a;b.vue`) is left out, since its name is written into code.
  *
  * @param config - the project's config.
  */
-const componentsOf = (config: NuxtProjectConfig): Map<string, ProjectComponent> => {
+export const componentsOf = (
+  config: NuxtProjectConfig
+): { readonly components: Map<string, ProjectComponent>; readonly skipped: string[] } => {
   const found = new Map<string, ProjectComponent>();
-  for (const dir of config.componentsDirs)
+  const skipped: string[] = [];
+  const seen = new Set<string>();
+  // the deepest folder first (`components/global` before `components`), and a file once, named by the first
+  const dirs = [...config.componentsDirs].sort((a, b) => b.path.length - a.path.length);
+  for (const dir of dirs)
     for (const file of filesOf(dir.path)) {
+      const path = join(dir.path, file);
+      if (seen.has(path)) continue;
+      seen.add(path);
       const name = componentName(file, dir.prefix, dir.pathPrefix);
-      if (name !== undefined && !found.has(name)) found.set(name, { name, file: join(dir.path, file) });
+      if (name === undefined || found.has(name)) continue;
+      if (COMPONENT_NAME.test(name)) found.set(name, { name, file: path });
+      else skipped.push(path);
     }
-  return found;
+  return { components: found, skipped };
 };
 
 /**
@@ -149,11 +167,13 @@ const readProject = async (
     cwd: config.rootDir
   });
   const imports: Import[] = [...NUXT_STAND_INS, ...ROUTER_STAND_INS, ...scanned];
+  const { components, skipped } = componentsOf(config);
   return {
     config,
     publicRuntimeConfig: withEnvironment(config.publicRuntimeConfig, env),
     routes: pageRoutes(filesOf(config.pagesDir)),
-    components: componentsOf(config),
+    components,
+    skipped,
     unimport: createUnimport({ presets: ["vue"], imports, addons: { vueTemplate: true } }),
     importNames: imports.map((each) => `${each.name} ${each.from}`)
   };
@@ -308,6 +328,82 @@ export const withComponentImports = (
   return code;
 };
 
+/** Nuxt 3's names for where code runs, as a project's code writes them. */
+const PROCESS_FLAG = /(?<![\w$.])process\.(client|server|browser|dev)\b/g;
+
+/**
+ * Nuxt 3's `process.client`, `process.server`, `process.browser` and `process.dev` written as their values in a
+ * project's file. Only there: given to the whole page (Vite's `define`), they would reach the libraries the frame
+ * loads, and one that reads `process.browser` would then read `process.env`, which the page does not have.
+ *
+ * @param code - the file's code, changed in place.
+ * @param isDev - whether the catalogue runs in development.
+ * @returns whether one was written.
+ */
+export const withProcessFlags = (code: MagicString, isDev: boolean): boolean => {
+  const values: Readonly<Record<string, string>> = {
+    client: "true",
+    browser: "true",
+    server: "false",
+    dev: JSON.stringify(isDev)
+  };
+  let isWritten = false;
+  for (const match of code.original.matchAll(PROCESS_FLAG)) {
+    code.overwrite(match.index, match.index + match[0].length, values[match[1] ?? ""] ?? match[0]);
+    isWritten = true;
+  }
+  return isWritten;
+};
+
+/**
+ * Whether a file is one of the project's own: inside its folder, not in a folder beside it whose name starts the same
+ * (`app-admin` beside `app`).
+ *
+ * @param file - the file, as Vite names it.
+ * @param rootDir - the project's folder.
+ */
+export const isProjectFile = (file: string, rootDir: string): boolean =>
+  file.startsWith(`${normalizePath(rootDir).replace(/\/$/, "")}/`);
+
+/**
+ * Says which component files were left out, and why.
+ *
+ * @param logger - Vite's logger.
+ * @param skipped - the files.
+ */
+const warnSkipped = (logger: Logger, skipped: readonly string[]): void => {
+  for (const file of skipped)
+    logger.warn(`[forgebook] ${file} is not a component: its name is not a name code can hold`);
+};
+
+/**
+ * A project file's code given what Nuxt's build gives it: its components' imports, Nuxt 3's flags, the keys of its
+ * calls' places and its auto-imports.
+ *
+ * @param source - the code, changed in place.
+ * @param state - the project.
+ * @param file - the file, from the project's folder: the keys are made from it.
+ * @param id - the module, as Vite names it.
+ * @param isDev - whether the catalogue runs in development.
+ * @returns whether anything was written.
+ */
+const withNuxtCode = async (
+  source: MagicString,
+  state: ProjectState,
+  file: string,
+  id: string,
+  isDev: boolean
+): Promise<boolean> => {
+  const code = source.original;
+  const hasComponents = withComponentImports(source, state.components) !== undefined;
+  const hasProcessFlags = withProcessFlags(source, isDev);
+  const hasKeys = KEYED_CALL.test(code) && withPlaceKeys(source, parseAst(code), file);
+  const result = state.config.isAutoImport
+    ? await state.unimport.injectImports(source, id, { autoImport: true })
+    : undefined;
+  return hasComponents || hasProcessFlags || hasKeys || (result !== undefined && result.imports.length > 0);
+};
+
 /**
  * The aliases of a Nuxt project: its own, then `~~`, `@@`, `~`, `@`, `#shared`, `assets` and `public` as Nuxt gives
  * them.
@@ -339,6 +435,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
   let state: ProjectState | undefined;
   let env: Readonly<Record<string, string>> = {};
   let problem: string | undefined;
+  let isDev = true;
   const project = (): ProjectState => {
     if (state === undefined) throw new Error("The Nuxt project is read when Vite's configuration is");
     return state;
@@ -353,7 +450,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
       // Nuxt's variables only: the environment's others never reach the page
       env = loadEnv(environment.mode, rootDir, "NUXT_");
       state = await readProject(loaded.config, env);
-      const isDev = environment.command === "serve";
+      isDev = environment.command === "serve";
       return {
         resolve: { alias: aliasesOf(loaded.config) },
         define: {
@@ -372,6 +469,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
     },
     configResolved: (config: ResolvedConfig): void => {
       if (problem !== undefined) config.logger.warn(`[forgebook] ${problem}`);
+      warnSkipped(config.logger, project().skipped);
     },
     resolveId: (id: string): string | undefined => {
       if (VIRTUAL_MODULES.some((name) => name === id)) return resolvedId(id);
@@ -401,6 +499,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
         if (!isWatched(file, isAddedOrRemoved)) return;
         const before = shapeOf(project());
         state = await readProject(project().config, env);
+        warnSkipped(server.config.logger, project().skipped);
         // an edit that changes no export of a composable leaves the page to its hot update
         if (shapeOf(project()) === before) return;
         for (const name of VIRTUAL_MODULES) {
@@ -427,13 +526,9 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
         if (id.startsWith("\0") || !CODE_FILE.test(file) || file.includes("/node_modules/")) return undefined;
         if (query !== "" && !query.includes("type=script")) return undefined;
         const current = project();
-        if (!file.startsWith(normalizePath(current.config.rootDir))) return undefined;
+        if (!isProjectFile(file, current.config.rootDir)) return undefined;
         const source = new MagicString(code);
-        const withComponents = withComponentImports(source, current.components);
-        const result = current.config.isAutoImport
-          ? await current.unimport.injectImports(source, id, { autoImport: true })
-          : undefined;
-        if (withComponents === undefined && (result === undefined || result.imports.length === 0))
+        if (!(await withNuxtCode(source, current, relative(current.config.rootDir, file), id, isDev)))
           return undefined;
         return { code: source.toString(), map: source.generateMap({ hires: "boundary", source: id }) };
       }

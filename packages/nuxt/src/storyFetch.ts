@@ -75,14 +75,24 @@ export type StoryFetch = <TResult = unknown>(
 export const fetchAddress = (address: string, baseURL: string, query: FetchQuery): string => {
   const isAbsolute = /^[a-z][a-z\d+.-]*:/i.test(address) || address.startsWith("//");
   const joined = isAbsolute ? address : `${baseURL.replace(/\/+$/, "")}/${address.replace(/^\/+/, "")}`;
+  return withSearch(joined, query);
+};
+
+/**
+ * An address with a query after it: a list repeats its name, `undefined` is left out.
+ *
+ * @param address - the address, which may have a search of its own.
+ * @param query - the search params.
+ */
+export const withSearch = (address: string, query: FetchQuery): string => {
   const search = new URLSearchParams();
   for (const [name, value] of Object.entries(query)) {
     if (value === undefined) continue;
     for (const item of Array.isArray(value) ? value : [value]) search.append(name, String(item));
   }
   const text = search.toString();
-  if (text === "") return joined;
-  return `${joined}${joined.includes("?") ? "&" : "?"}${text}`;
+  if (text === "") return address;
+  return `${address}${address.includes("?") ? "&" : "?"}${text}`;
 };
 
 /**

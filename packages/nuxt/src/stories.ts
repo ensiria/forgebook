@@ -3,9 +3,9 @@
  * config with (`import type { Meta, Story } from "@forgebook/nuxt"`).
  *
  * @remarks
- * Types only. `route` takes what vue-router's `push` takes, resolved against the project's pages
+ * Types only. `route` is a path or a location by path or by name, resolved against the project's pages
  * (`{ name: "blog-slug", params: { slug: "hello" } }` or `/blog/hello`); `data` is what `useAsyncData` and `useFetch`
- * return by key instead of calling their handler (`useFetch`'s key is its URL unless it is given one).
+ * return by key instead of calling their handler (`useFetch`'s key is the request as it is made, its URL with its query, unless it is given one).
  *
  * @module
  */
@@ -18,12 +18,16 @@ import type {
   Preview as VuePreview,
   Story as VueStory
 } from "@forgebook/vue";
-import type { RouteLocationRaw } from "vue-router";
+
+import type { StoryLocation } from "./parameters.ts";
 
 /** A story's Nuxt settings: where it starts, what its composables find, the config over the project's. */
 export type NuxtParameters = {
-  /** Where the story starts: a path, or a location by path or by a page's name; `/` by default. */
-  readonly route?: RouteLocationRaw;
+  /**
+   * Where the story starts: a path (`/blog/hello?tab=1`), a location by path (`{ path, query, hash }`) or by a page's
+   * name (`{ name: "blog-slug", params: { slug: "hello" } }`); `/` by default.
+   */
+  readonly route?: StoryLocation;
   /** What `useAsyncData` and `useFetch` return, by key, without calling their handler. */
   readonly data?: Readonly<Record<string, unknown>>;
   /** What `useState` starts with, by key. */

@@ -5,6 +5,9 @@
  * @remarks
  * `showError` is recorded among the story's events, so a story shows what its component would have shown the user.
  *
+ * Internal: the code the plugin writes imports it (`#imports`, `#app`, `#components`); a story or a component imports
+ * Nuxt's names as in the app, never this module, whose exports may change in any release.
+ *
  * @module
  */
 import type { Ref } from "vue";

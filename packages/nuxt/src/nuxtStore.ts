@@ -56,10 +56,16 @@ export type AsyncDataEntry = {
   readonly status: Ref<AsyncDataStatus>;
   /** What the handler threw. */
   readonly error: Ref<NuxtError | undefined>;
+  /** The data the key has before a handler returns, and after `clearNuxtData`: the first call's `default`. */
+  readonly defaultData: () => unknown;
   /** The run under way, which a second call with the key waits for instead of calling its handler again. */
   running: Promise<void> | undefined;
-  /** Runs the handler of the first call again. */
-  refresh: () => Promise<void>;
+  /** The number of the latest run: a run that is no longer the latest drops its result. */
+  runId: number;
+  /** What aborts the run under way, when a later one starts. */
+  controller: AbortController | undefined;
+  /** Runs the handler of the first call again; nothing until a call gives one. */
+  refresh: (() => Promise<void>) | undefined;
 };
 
 /** Tells the catalogue about a call: the frame's event report, when the catalogue gives one. */

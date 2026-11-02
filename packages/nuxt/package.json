@@ -28,6 +28,7 @@
     "./app/data": "./src/app/data.ts",
     "./app/define": "./src/app/define.ts",
     "./app/errors": "./src/app/errors.ts",
+    "./app/fetch": "./src/app/fetch.ts",
     "./app/head": "./src/app/head.ts",
     "./app/router": "./src/app/router.ts",
     "./app/state": "./src/app/state.ts",
@@ -92,6 +93,10 @@
       "./app/errors": {
         "types": "./dist/src/app/errors.d.ts",
         "default": "./dist/src/app/errors.js"
+      },
+      "./app/fetch": {
+        "types": "./dist/src/app/fetch.d.ts",
+        "default": "./dist/src/app/fetch.js"
       },
       "./app/head": {
         "types": "./dist/src/app/head.d.ts",

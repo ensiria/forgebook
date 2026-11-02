@@ -10,8 +10,8 @@ declare global {
   const useRoute: typeof import("@forgebook/nuxt/app/router")["useRoute"];
   const navigateTo: typeof import("@forgebook/nuxt/app/router")["navigateTo"];
   const useAsyncData: typeof import("@forgebook/nuxt/app/data")["useAsyncData"];
-  const useFetch: typeof import("@forgebook/nuxt/app/data")["useFetch"];
-  const $fetch: typeof import("@forgebook/nuxt/app/data")["$fetch"];
+  const useFetch: typeof import("@forgebook/nuxt/app/fetch")["useFetch"];
+  const $fetch: typeof import("@forgebook/nuxt/app/fetch")["$fetch"];
   const useState: typeof import("@forgebook/nuxt/app/state")["useState"];
   const useCookie: typeof import("@forgebook/nuxt/app/state")["useCookie"];
   const useRuntimeConfig: typeof import("@forgebook/nuxt/app/state")["useRuntimeConfig"];
