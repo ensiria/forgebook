@@ -5,7 +5,7 @@
     "packages": 31,
     "directDependencies": 7,
     "coldStart": 2274,
-    "shellJs": 120527,
+    "shellJs": 120974,
     "frameJs": 160332,
     "firstLoadJs": 197619
   }
