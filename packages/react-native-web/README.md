@@ -59,8 +59,9 @@ export default {
 ```
 
 A project on Storybook writes this configuration with `npx forgebook init --from storybook`: it reads
-`@storybook/react-native-web-vite` (its `modulesToTranspile` become `nativePackages`), the older
-`@storybook/addon-react-native-web`, and on-device Storybook's `.rnstorybook` folder.
+`@storybook/react-native-web-vite` (its `modulesToTranspile` and `pluginReactOptions` become the options below), the
+older `@storybook/addon-react-native-web`, and on-device Storybook (`.rnstorybook`, or `.storybook` in a project on
+`@storybook/react-native`).
 
 ## What it does
 
@@ -81,26 +82,91 @@ What Metro does for a phone, Vite does for the catalogue:
 Fonts and icons work as in an Expo web app: `useFonts` and `@expo/vector-icons` load their font files through
 `expo-font`, which runs in the browser.
 
-```ts
-reactNativeWeb({ nativePackages: ["legacy-chart"] });
+## Options
+
+`reactNativeWeb()` takes Storybook's React Native Web options, under these names:
+
+| Option | Storybook's | What it does |
+|---|---|---|
+| `nativePackages` | `modulesToTranspile` | Packages outside the families above that import `react-native` or ship JSX in `.js` or Flow |
+| `jsxImportSource` | `pluginReactOptions.jsxImportSource` | The JSX runtime of the project's files: `"nativewind"` for NativeWind. Forgebook's own pages keep React's |
+| `babel` | `pluginReactOptions.babel` | `{ plugins, presets }`, by module name (and options): run on the project's files, as Metro runs them. Needs `@rolldown/plugin-babel` and `@babel/core` |
+| `include`, `exclude` | `pluginReactOptions.include`, `.exclude` | The files React's plugin (Fast Refresh) and Babel apply to; the project's scripts outside `node_modules` by default |
+
+A project's `postcss.config` is run on its style sheets, as Expo does on the web (Forgebook otherwise compiles CSS
+with Lightning CSS alone); `postcss` is then the project's to install.
+
+### Reanimated
+
+```sh
+npm install --save-dev @rolldown/plugin-babel @babel/core
 ```
 
-`nativePackages` names a package outside those families that imports `react-native` or ships JSX in `.js` or Flow.
+```ts
+reactNativeWeb({ babel: { plugins: ["react-native-worklets/plugin"] } }); // Reanimated 4; 3 names "react-native-reanimated/plugin"
+```
+
+The plugin compiles the project's worklets (`useAnimatedStyle`, `useDerivedValue`…), and Reanimated runs them in the
+browser, as its web support does. On the dev server's Node side, where the agents read the stories, Reanimated gets
+an animation frame from a timer, since Node draws none.
+
+### NativeWind
+
+NativeWind 4 on Tailwind 3, as its web setup asks: a `tailwind.config.js` with its preset, a `postcss.config.js`
+naming `tailwindcss`, a style sheet with Tailwind's directives imported by the preview, and its JSX runtime:
+
+```ts
+reactNativeWeb({ jsxImportSource: "nativewind" });
+```
+
+```tsx
+// forgebook.preview.tsx
+import "./global.css";
+```
+
+`dark:` classes follow the catalogue's theme when Tailwind's `darkMode` is `"class"` and the theme switch sets a
+class on the frame: `switches: [{ ...themeSwitch(), apply: { kind: "class", prefix: "" } }]` (`themeSwitch` from
+`forgebook/switches`). With `darkMode: "media"`, NativeWind refuses the theme switch's changes.
+
+### A native module in a story
+
+Native code cannot run in a browser, so a story stands in for the module its component calls, as Storybook advises
+for its on-device version. react-native-web's `NativeModules` is a plain object: a story's `beforeEach` puts the
+stand-in there and returns what takes it away.
+
+```tsx
+import { NativeModules } from "react-native";
+
+export const Charged: Story<typeof BatteryBadge> = {
+  beforeEach: () => {
+    NativeModules["HarbourBattery"] = { getLevel: async () => 0.82 };
+    return () => {
+      Reflect.deleteProperty(NativeModules, "HarbourBattery");
+    };
+  }
+};
+```
+
+For every story, the same goes in the preview's `beforeEach`. An Expo module of the app's own
+(`requireNativeModule("HarbourBattery")`) throws on the web unless the module has a web file, as Expo's modules
+do: `HarbourBatteryModule.web.ts`, exporting `registerWebModule(...)` of a class that answers in the browser, which
+the catalogue reads before the native file. A component whose web version differs more than a stand-in can cover
+gets a `.web.tsx` file the same way.
 
 ## What does not work in a browser
 
 react-native-web draws React Native's components with the DOM; what needs the phone itself does not draw:
 
 - **Native modules.** A component that calls a module of native code (the camera, Bluetooth, a native SDK) through
-  `NativeModules`, TurboModules or Expo's `requireNativeModule` throws or gets nothing. Give it a `.web.tsx` file, or
-  stand in for the module in the preview.
-- **Gestures and animations of native code.** `react-native-gesture-handler`'s and Reanimated's worklets run on the
-  UI thread of a phone; Forgebook runs no Babel, so Reanimated's Babel plugin does not run either. Their web support
-  is theirs and is not tested here.
+  `NativeModules`, TurboModules or Expo's `requireNativeModule` throws or gets nothing: native code cannot run in a
+  browser. Stand in for the module in its stories (above), or give the component a `.web.tsx` file.
+- **What needs the phone's UI thread.** Reanimated's animations run, as its web support runs them, on the page's
+  thread; what has no web version (`react-native-gesture-handler`'s native gestures, a worklet run on another thread
+  with `runOnRuntime`) does not.
 - **React Native's own files** (`react-native/Libraries/…`): they have no web version, and an import of one fails with
   a message naming it.
-- **A project's Babel and Metro configurations** are not read: NativeWind's `jsxImportSource`, a Babel plugin, Metro's
-  resolver options.
+- **A project's `babel.config.js` and `metro.config.js`** are not read: the catalogue names its Babel plugins and JSX
+  source (above); Metro's resolver options have no counterpart. `jsxRuntime: "classic"` is not offered.
 - **What react-native-web leaves out**: the older `accessibilityState` is not drawn (write `aria-checked`,
   `aria-disabled`… as React Native 0.71 and later accept), and the components and APIs its
   [compatibility table](https://necolas.github.io/react-native-web/docs/react-native-compatibility/) marks as missing.

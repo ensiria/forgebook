@@ -23,7 +23,13 @@ const STORY_IDS = [
   "controls-icon-button--boat",
   "controls-icon-button--large-anchor",
   "controls-platform-note--on-the-web",
-  "screens-harbour--morning"
+  "screens-harbour--morning",
+  "crew-tag-chip--plain",
+  "crew-tag-chip--main",
+  "controls-beacon-pulse--steady",
+  "controls-battery-badge--charged",
+  "controls-battery-badge--low",
+  "controls-battery-badge--without-module"
 ];
 
 /**
@@ -167,6 +173,50 @@ test.describe("what Metro does for a phone", () => {
     await isReady(page);
     await expect(page.getByRole("button", { name: "Boats" })).toBeVisible();
     await expect.poll(() => hasLoadedFont(page, "ionicons")).toBe(true);
+  });
+});
+
+test.describe("what a Babel plugin and a style sheet's PostCSS do", () => {
+  test("NativeWind's classes style React Native's components, and its dark classes follow the theme", async ({
+    page
+  }) => {
+    await page.goto(frame("crew-tag-chip--main"));
+    await isReady(page);
+    const chip = page.getByTestId("tag-chip");
+    await expect(chip).toHaveCSS("background-color", "rgb(42, 111, 151)");
+    await expect(chip).toHaveCSS("border-radius", "9999px");
+    await expect(page.getByTestId("tag-label")).toHaveCSS("color", "rgb(255, 255, 255)");
+    await page.goto(frame("crew-tag-chip--plain"));
+    await expect(page.getByTestId("tag-chip")).toHaveCSS("background-color", "rgb(232, 243, 250)");
+    await page.goto(`${frame("crew-tag-chip--plain")}&theme=dark`);
+    await expect(page.getByTestId("tag-chip")).toHaveCSS("background-color", "rgb(30, 41, 59)");
+  });
+
+  test("a Reanimated animation runs: its worklet, compiled by the Babel plugin, moves the ring", async ({
+    page
+  }) => {
+    await page.goto(frame("controls-beacon-pulse--steady"));
+    await isReady(page);
+    const ring = page.getByTestId("beacon-ring");
+    const opacity = async (): Promise<number> =>
+      Number(await ring.evaluate((each) => getComputedStyle(each).opacity));
+    const first = await opacity();
+    await expect.poll(opacity).not.toBe(first);
+    await expect(ring).toHaveCSS("transform", /^matrix\(/);
+  });
+
+  test("a native module a story stands in for answers; without one the component says so", async ({
+    page
+  }) => {
+    await page.goto(frame("controls-battery-badge--charged"));
+    await expect(page.getByTestId("battery")).toHaveText("Battery 82%");
+    await page.goto(frame("controls-battery-badge--without-module"));
+    await expect(page.getByTestId("battery")).toHaveText("Battery: no native module");
+    // the stand-in is taken away with the story it served
+    await page.goto(story("controls-battery-badge--low"));
+    await expect(frameOf(page).getByTestId("battery")).toHaveText("Battery 7%");
+    await page.getByLabel("Stories", { exact: true }).selectOption({ label: "Without module" });
+    await expect(frameOf(page).getByTestId("battery")).toHaveText("Battery: no native module");
   });
 });
 

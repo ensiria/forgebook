@@ -111,6 +111,19 @@ export const nativeDefines = (isDevelopment: boolean): Readonly<Record<string, s
   global: "globalThis"
 });
 
+/**
+ * The globals React Native's code reads on the dev server's Node side, where the agents' answers load the stories:
+ * the browser's, and the animation frames Node has none of. Reanimated asks for a frame as it loads; without one, the
+ * request throws outside any story and stops the dev server. A frame there is a timer's turn: nothing is drawn.
+ *
+ * @param isDevelopment - whether the catalogue runs in development.
+ */
+export const serverDefines = (isDevelopment: boolean): Readonly<Record<string, string>> => ({
+  ...nativeDefines(isDevelopment),
+  requestAnimationFrame: "globalThis.setTimeout",
+  cancelAnimationFrame: "globalThis.clearTimeout"
+});
+
 /** A pragma that marks a file as Flow's: `@flow`, or `@noflow`, which may still hold types. */
 const FLOW_PRAGMA = /@(?:no)?flow\b/;
 

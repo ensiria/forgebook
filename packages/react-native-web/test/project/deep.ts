@@ -3,5 +3,4 @@
  *
  * @module
  */
-// biome-ignore lint/suspicious/noReactNativeDeepImports: the deep import the plugin must refuse
 import "react-native/Libraries/Utilities/codegenNativeComponent";

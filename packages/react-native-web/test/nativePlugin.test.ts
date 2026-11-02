@@ -112,7 +112,9 @@ describe("the dev server's pre-bundling of a package written for React Native", 
 
 describe("the configuration the plugin gives Vite", () => {
   /** The configuration for a dev server whose story files are `src/**\/*.stories.tsx`. */
-  const config: UserConfig = nativeConfig(true, ["legacy-chart"], ["src/**/*.stories.tsx"]);
+  const config: UserConfig = nativeConfig(true, { nativePackages: ["legacy-chart"] }, [
+    "src/**/*.stories.tsx"
+  ]);
 
   it("resolves exactly react-native to react-native-web, the web's files first", () => {
     expect(config.resolve?.alias).toEqual([{ find: /^react-native$/, replacement: "react-native-web" }]);

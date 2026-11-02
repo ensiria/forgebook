@@ -4,6 +4,8 @@
  *
  * @module
  */
+import "./src/global.css";
+
 import type { Preview } from "@forgebook/react-native-web";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 
