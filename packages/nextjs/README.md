@@ -70,7 +70,7 @@ done instead.
 | `next/navigation`, `next/router` | Every hook and the router, reading and moving the story's route |
 | `next/headers`, `next/cache` | The story's request; revalidation recorded |
 | `next/head`, `next/dynamic`, `next/script`, `next/config` | Tags in the frame's head; a lazy component the story waits for; Next.js's own `Script`; `publicRuntimeConfig` |
-| Variables | `NEXT_PUBLIC_` ones (environment and `.env` files) and `next.config`'s `env`, as Next.js gives the browser; nothing else of the environment reaches the page |
+| Variables | `NEXT_PUBLIC_` ones (environment and `.env` files) in the page's `process.env`; `next.config`'s `env` written into the code that reads it, as Next.js does; nothing else of the environment reaches the page |
 | `tsconfig.json` paths, CSS Modules, Sass, PostCSS | `@/…` resolved; CSS Modules and Sass (with `next.config`'s `sassOptions`) as Vite has them; the project's PostCSS, Tailwind CSS among it, run first |
 | `server-only`, `client-only` | Empty: a story draws server code in the browser on purpose |
 
@@ -96,5 +96,8 @@ honestly out of reach in a browser:
 Webpack and Turbopack configuration, Babel and SWC plugins (`styled-jsx` included: a component that uses
 `<style jsx>` draws without its styles), `next.config`'s `compiler` options, and anything Next.js does on its server.
 Storybook's `@storybook/nextjs-vite/*.mock` modules are not provided: a story asserts on `storyRoute()` instead.
+
+The package's `./next/*` exports are the modules the plugin resolves Next.js's to: a story imports `next/link`, never
+them.
 
 The rest is the catalogue's: [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).

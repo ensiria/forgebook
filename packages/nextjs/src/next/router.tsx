@@ -13,15 +13,9 @@
 import { type ComponentType, type ReactNode, useSyncExternalStore } from "react";
 
 import { appSettings } from "../appSettings.ts";
-import {
-  type Href,
-  hrefOfRoute,
-  hrefText,
-  pagesQueryOf,
-  type RouteValues,
-  type StoryRoute
-} from "../route.ts";
+import { type Href, hrefOfRoute, hrefText, pagesQueryOf, routeAfterAs, type StoryRoute } from "../route.ts";
 import { currentStore, type RouteStore } from "../routeStore.ts";
+import type { RouteValues } from "../stories.ts";
 
 /** A router event's handler: the path, and whether the move was shallow. */
 type RouterEventHandler = (url: string, options: { readonly shallow: boolean }) => void;
@@ -133,9 +127,14 @@ const move = async (
 ): Promise<boolean> => {
   const shallow = { shallow: options?.shallow === true };
   const path = `${appSettings().basePath}${hrefText(as ?? url).text}`;
-  events.emit("routeChangeStart", path, shallow);
-  const isMoved = store.navigate(method, as ?? url);
-  if (isMoved) events.emit("routeChangeComplete", path, shallow);
+  const from = store.route();
+  const to = routeAfterAs(from, url, as);
+  // a move within the page (its hash only) is a hash change, as Next.js names it
+  const isHashOnly =
+    to !== undefined && to.pathname === from.pathname && to.search === from.search && to.hash !== from.hash;
+  events.emit(isHashOnly ? "hashChangeStart" : "routeChangeStart", path, shallow);
+  const isMoved = store.navigate(method, url, as);
+  if (isMoved) events.emit(isHashOnly ? "hashChangeComplete" : "routeChangeComplete", path, shallow);
   return isMoved;
 };
 

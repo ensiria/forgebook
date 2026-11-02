@@ -162,6 +162,45 @@ describe("buildFontModule", () => {
     expect(asked).toHaveLength(2);
   });
 
+  it("leaves out an option Next.js would refuse, and keeps the same call in two folders apart", async () => {
+    const checked = context({ googleFonts: "none" });
+    const built = await buildFontModule(
+      {
+        loader: "google",
+        family: "Inter",
+        variable: "inter",
+        options: { variable: "--x}body{display:none", fallback: ["serif"] },
+        start: 0,
+        end: 0
+      },
+      "/app/fonts.ts",
+      checked
+    );
+    expect(built.code).not.toContain("variable");
+    expect(readFileSync(/import "([^"]+)"/.exec(built.code)?.[1] ?? "", "utf8")).not.toContain(
+      "display:none"
+    );
+    expect(checked.warnings[0]).toContain("is not a value Next.js accepts");
+    const local = context();
+    const first = mkdtempSync(join(tmpdir(), "forgebook-next-a-"));
+    const second = mkdtempSync(join(tmpdir(), "forgebook-next-b-"));
+    writeFileSync(join(first, "f.woff2"), "a");
+    writeFileSync(join(second, "f.woff2"), "b");
+    const call = {
+      loader: "local" as const,
+      family: undefined,
+      variable: "brand",
+      options: { src: "./f.woff2" },
+      start: 0,
+      end: 0
+    };
+    const [one, two] = await Promise.all([
+      buildFontModule(call, join(first, "fonts.ts"), local),
+      buildFontModule(call, join(second, "fonts.ts"), local)
+    ]);
+    expect(one.code).not.toBe(two.code);
+  });
+
   it("gives the classes with the fallback when Google is out of reach, not asked, or the call is wrong", async () => {
     const call = {
       loader: "google" as const,

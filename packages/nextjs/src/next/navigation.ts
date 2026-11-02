@@ -12,8 +12,9 @@
  */
 import { useSyncExternalStore } from "react";
 
-import type { RouteValues, StoryRoute } from "../route.ts";
+import type { StoryRoute } from "../route.ts";
 import { currentStore, type RouteStore } from "../routeStore.ts";
+import type { RouteValues } from "../stories.ts";
 
 /** The search params `useSearchParams` returns: read-only, as Next.js's are. */
 export class ReadonlyURLSearchParams extends URLSearchParams {

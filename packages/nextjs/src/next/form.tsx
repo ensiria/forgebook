@@ -50,7 +50,8 @@ const Form = (props: FormProps): ReactNode => {
     event.preventDefault();
     const { submitter } = event;
     currentStore().navigate(replace === true ? "replace" : "push", {
-      pathname: action,
+      // a GET form's fields replace the search its action holds, as the browser's and Next.js's do
+      pathname: action.split("?")[0] ?? action,
       query: valuesOfSearch(searchOfForm(event.currentTarget, submitter))
     });
   };

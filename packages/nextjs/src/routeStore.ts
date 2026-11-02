@@ -20,19 +20,12 @@ import {
   hrefOfRoute,
   hrefText,
   type RouteSettings,
-  routeAfter,
+  routeAfterAs,
   routeSettingsOf,
   type StoryRoute,
   storyRouteOf
 } from "./route.ts";
-
-/** A call a story made to Next.js: its function (`router.push`) and its href or arguments. */
-export type NextCall = {
-  /** The function, as the catalogue lists it (`router.push`, `cache.revalidatePath`). */
-  readonly name: string;
-  /** What it was called with. */
-  readonly values: readonly unknown[];
-};
+import type { NextCall } from "./storyRoute.ts";
 
 /** The request a story's server code reads: `headers()`, `cookies()` and `draftMode()`. */
 export type StoryRequest = {
@@ -57,7 +50,7 @@ export type RouteStore = {
    *
    * @returns whether the href is in the app: one outside it (another origin) leaves the route as it is.
    */
-  readonly navigate: (method: "push" | "replace", href: Href) => boolean;
+  readonly navigate: (method: "push" | "replace", href: Href, as?: Href) => boolean;
   /** Moves through the history, as `router.back` and `router.forward` do. */
   readonly go: (step: -1 | 1) => void;
   /** Records a call and tells the catalogue. */
@@ -69,7 +62,7 @@ export type RouteStore = {
 };
 
 /** Tells the catalogue about a call: the frame's event report, when the catalogue gives one. */
-export type CallReport = (name: string, values: readonly unknown[]) => void;
+export type EventReport = (name: string, values: readonly unknown[]) => void;
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -107,7 +100,7 @@ const requestOf = (parameters: Readonly<Record<string, unknown>>): StoryRequest 
  */
 export const createRouteStore = (
   parameters: Readonly<Record<string, unknown>>,
-  report: CallReport | undefined
+  report: EventReport | undefined
 ): RouteStore => {
   const history: StoryRoute[] = [storyRouteOf(parameters)];
   let index = 0;
@@ -130,9 +123,9 @@ export const createRouteStore = (
         listeners.delete(listener);
       };
     },
-    navigate: (method: "push" | "replace", href: Href): boolean => {
-      record(`router.${method}`, [hrefText(href).text]);
-      const next = routeAfter(route(), href);
+    navigate: (method: "push" | "replace", href: Href, as?: Href): boolean => {
+      record(`router.${method}`, [hrefText(as ?? href).text]);
+      const next = routeAfterAs(route(), href, as);
       if (next === undefined) return false;
       if (hrefOfRoute(next) === hrefOfRoute(route()) && next.route === route().route) return true;
       if (method === "push") {

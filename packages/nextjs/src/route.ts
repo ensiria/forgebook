@@ -12,46 +12,7 @@
  * @module
  */
 
-/** A value of a route's query or params: one text, or several (a catch-all segment, a repeated search param). */
-export type RouteValue = string | readonly string[];
-
-/** A route's query or params, by name. */
-export type RouteValues = Readonly<Record<string, RouteValue>>;
-
-/** The App Router's route of a story (`parameters.nextjs.navigation`), as Storybook's Next.js framework writes it. */
-export type NavigationParameters = {
-  /** The path `usePathname` returns; `/` by default. */
-  readonly pathname?: string;
-  /** The search params `useSearchParams` returns, by name; none by default. */
-  readonly query?: RouteValues;
-  /** The dynamic segments `useParams` returns (`{ slug: "hello" }`); none by default. */
-  readonly params?: RouteValues;
-  /**
-   * The segments below the layout, as Storybook writes them: a name for `useSelectedLayoutSegments`, or a
-   * `[name, value]` pair that is also a param; an object is read as params.
-   */
-  readonly segments?: readonly (string | readonly [string, RouteValue])[] | RouteValues;
-};
-
-/** The Pages Router's route of a story (`parameters.nextjs.router`), as Storybook's Next.js framework writes it. */
-export type RouterParameters = {
-  /** The page's route, its dynamic segments in brackets (`/blog/[slug]`); the path when none. */
-  readonly pathname?: string;
-  /** The path as the browser shows it (`/blog/hello?tab=1`); the route with its params filled in when none. */
-  readonly asPath?: string;
-  /** The route's params and the search params, as `router.query` holds them. */
-  readonly query?: RouteValues;
-  /** The locale `router.locale` returns, with the Pages Router's internationalised routing. */
-  readonly locale?: string;
-  /** The locales `router.locales` returns. */
-  readonly locales?: readonly string[];
-  /** The locale `router.defaultLocale` returns. */
-  readonly defaultLocale?: string;
-  /** What `router.isFallback` returns; `false` by default. */
-  readonly isFallback?: boolean;
-  /** What `router.isPreview` returns; `false` by default. */
-  readonly isPreview?: boolean;
-};
+import type { RouteValue, RouteValues } from "./stories.ts";
 
 /** Where a story's components are. */
 export type StoryRoute = {
@@ -394,8 +355,9 @@ export const hrefText = (href: Href): { readonly text: string; readonly route: s
   const dynamic = dynamicNames(pathname);
   const isRoute = dynamic.size > 0;
   const rest = Object.fromEntries(Object.entries(values).filter(([name]) => !dynamic.has(name)));
-  const query = href.query === undefined || href.query === null ? undefined : searchOf(rest);
-  const search = query ?? (href.search ?? "").replace(/^\?/, "");
+  // a search given wins over the query, as in Next.js's URL writer
+  const givenSearch = (href.search ?? "").replace(/^\?/, "");
+  const search = givenSearch === "" ? searchOf(rest) : givenSearch;
   const bareHash = (href.hash ?? "").replace(/^#/, "");
   const hash = bareHash === "" ? "" : `#${bareHash}`;
   const path = isRoute ? filledRoute(pathname, values) : pathname;
@@ -430,4 +392,20 @@ export const routeAfter = (from: StoryRoute, href: Href): StoryRoute | undefined
     segments: from.segments,
     route: isSamePath ? from.route : parsed.pathname
   };
+};
+
+/**
+ * The route a Pages Router move takes a story to: the route and its params from the href, the path shown from `as`
+ * when given, as Next.js's router takes them.
+ *
+ * @param from - where the story is.
+ * @param href - where to go: a path or a route.
+ * @param as - the path the browser shows, when the href names a route.
+ * @returns the route, or none for an href outside the app.
+ */
+export const routeAfterAs = (from: StoryRoute, href: Href, as: Href | undefined): StoryRoute | undefined => {
+  const routed = routeAfter(from, href);
+  const shown = as === undefined ? undefined : routeAfter(from, as);
+  if (routed === undefined || shown === undefined) return routed ?? shown;
+  return { ...routed, pathname: shown.pathname, search: shown.search, hash: shown.hash };
 };

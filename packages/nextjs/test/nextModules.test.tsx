@@ -173,7 +173,17 @@ describe("next/router", () => {
     Router.events.off("routeChangeComplete", listen);
     expect(canvas.textContent).toBe('/blog/[slug] /blog/b?tab=1 {"tab":"1","slug":"b"}');
     expect(events).toEqual(["/blog/b?tab=1"]);
-    expect([Router.asPath, Router.locale]).toEqual(["/blog/b?tab=1", "it"]);
+    const hashes: string[] = [];
+    const listenHash = (url: string): void => {
+      hashes.push(url);
+    };
+    Router.events.on("hashChangeComplete", listenHash);
+    await act(async () => {
+      await seen.pagesRouter?.push("#comments");
+    });
+    Router.events.off("hashChangeComplete", listenHash);
+    expect(hashes).toEqual(["#comments"]);
+    expect([Router.asPath, Router.locale]).toEqual(["/blog/b?tab=1#comments", "it"]);
   });
 });
 

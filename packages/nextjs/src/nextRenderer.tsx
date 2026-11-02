@@ -18,6 +18,7 @@ import { type ReactNode, Suspense, useEffect } from "react";
 
 import { createRouteStore, setCurrentStore } from "./routeStore.ts";
 import {
+  forgetServerResults,
   isAsyncComponent,
   isDrawable,
   serverComponentStandIn,
@@ -109,7 +110,8 @@ const withNext = (drawing: StoryDrawing, hasBoundary: boolean): StoryDrawing => 
 /** React's renderer for a Next.js project. */
 export const nextRenderer: StoryRenderer = {
   mount: (canvas: HTMLElement, first: StoryDrawing, onError: (error: Error) => void): MountedStory => {
-    setCurrentStore(createRouteStore(first.story.parameters, first.report));
+    setCurrentStore(createRouteStore(first.story.parameters, first.onEvent));
+    forgetServerResults();
     let hasFailed = false;
     const mounted = reactRenderer.mount(canvas, withNext(first, true), (error: Error): void => {
       hasFailed = true;
@@ -127,7 +129,8 @@ export const nextRenderer: StoryRenderer = {
     };
   },
   renderToString: (drawing: StoryDrawing): string => {
-    setCurrentStore(createRouteStore(drawing.story.parameters, drawing.report));
+    setCurrentStore(createRouteStore(drawing.story.parameters, drawing.onEvent));
+    forgetServerResults();
     return reactRenderer.renderToString(withNext(drawing, false));
   }
 };

@@ -105,7 +105,7 @@ const clickHandler =
         isPrevented = true;
       }
     });
-    if (!isPrevented) store.navigate(props.replace === true ? "replace" : "push", href);
+    if (!isPrevented) store.navigate(props.replace === true ? "replace" : "push", props.href, props.as);
   };
 
 /** Whether a value is an anchor's click handler. */

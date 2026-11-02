@@ -16,8 +16,17 @@
  *
  * @module
  */
-import { type RouteValues, type StoryRoute, valuesOfSearch } from "./route.ts";
-import { currentStore, type NextCall } from "./routeStore.ts";
+import { type StoryRoute, valuesOfSearch } from "./route.ts";
+import { currentStore } from "./routeStore.ts";
+import type { RouteValues } from "./stories.ts";
+
+/** A call a story made to Next.js: its function (`router.push`) and its href or arguments. */
+export type NextCall = {
+  /** The function, as the catalogue lists it (`router.push`, `cache.revalidatePath`). */
+  readonly name: string;
+  /** What it was called with. */
+  readonly values: readonly unknown[];
+};
 
 /** A story's route as a play function reads it. */
 export type StoryRouteState = Pick<StoryRoute, "pathname" | "hash" | "params"> & {

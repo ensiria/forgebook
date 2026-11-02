@@ -15,7 +15,24 @@ import { react } from "@forgebook/react/vite";
 import type { FrameworkAdapter } from "forgebook/vite/adapter";
 import type { PluginOption } from "vite";
 
-import { type NextjsOptions, nextPlugins } from "./nextPlugin.ts";
+import { nextPlugins } from "./nextPlugin.ts";
+
+/** How Google fonts are had: downloaded beside the catalogue, or not at all (the fallback fonts show). */
+export type GoogleFontsMode = "download" | "none";
+
+/** The options of `nextjs()`. */
+export type NextjsOptions = {
+  /** The Next.js project's folder, from the catalogue's; the catalogue's own folder by default. */
+  readonly dir?: string;
+  /** The project's `next.config`, from its folder; the one Next.js would find by default; `false` reads none. */
+  readonly nextConfig?: string | false;
+  /**
+   * How `next/font/google` has its fonts: downloaded from Google once and served by the catalogue (`"download"`, the
+   * default, as Next.js does), or not at all (`"none"`), the fallback fonts showing, for a catalogue that must not reach
+   * the network.
+   */
+  readonly googleFonts?: GoogleFontsMode;
+};
 
 /**
  * Next.js, as the plugin reads and draws its components.

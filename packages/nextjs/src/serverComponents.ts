@@ -48,10 +48,18 @@ export const isDrawable = (value: unknown): value is ReactNode => {
 const standIns = new WeakMap<AsyncComponent, (props: Readonly<Record<string, unknown>>) => ReactNode>();
 
 /** The results of each server component, with the props each was called with. */
-const results = new WeakMap<
+let results = new WeakMap<
   AsyncComponent,
   { readonly props: Readonly<Record<string, unknown>>; readonly result: Promise<unknown> }[]
 >();
+
+/**
+ * Forgets every server component's results: a story mounted anew calls them again, so another story's request (its
+ * cookies, its mocks) or a remount after a failure never reads an old answer.
+ */
+export const forgetServerResults = (): void => {
+  results = new WeakMap();
+};
 
 /** How many results of one component are kept: a story draws a few, a matrix one per cell. */
 const KEPT_RESULTS = 32;
@@ -62,21 +70,37 @@ const KEPT_RESULTS = 32;
  * @remarks
  * A decorator that draws the story as a component (`<Story />`) makes the story's elements anew each time React tries
  * it again, so the props of a retry are new objects holding the same values: compared by identity, each retry would
- * call the server component again and never finish.
+ * call the server component again and never finish. Plain objects, lists, dates and elements are compared by their
+ * values; functions are taken as the same.
  *
  * @param first - a value.
  * @param second - another.
  */
 const isSame = (first: unknown, second: unknown): boolean => {
   if (Object.is(first, second)) return true;
+  // a function made while rendering is new on each retry: a server component's props are data, and its functions
+  // (server actions) do not change what it draws
+  if (typeof first === "function" && typeof second === "function") return true;
   if (Array.isArray(first) && Array.isArray(second))
     return first.length === second.length && first.every((item, index) => isSame(item, second[index]));
+  if (first instanceof Date && second instanceof Date) return first.getTime() === second.getTime();
   if (
-    !isValidElement<Readonly<Record<string, unknown>>>(first) ||
-    !isValidElement<Readonly<Record<string, unknown>>>(second)
+    isValidElement<Readonly<Record<string, unknown>>>(first) &&
+    isValidElement<Readonly<Record<string, unknown>>>(second)
   )
-    return false;
-  return first.type === second.type && first.key === second.key && hasSameProps(first.props, second.props);
+    return first.type === second.type && first.key === second.key && hasSameProps(first.props, second.props);
+  return isPlainObject(first) && isPlainObject(second) && hasSameProps(first, second);
+};
+
+/**
+ * Whether a value is a plain object (written as `{ … }`), compared by its values.
+ *
+ * @param value - the value.
+ */
+const isPlainObject = (value: unknown): value is Readonly<Record<string, unknown>> => {
+  if (typeof value !== "object" || value === null || isValidElement(value)) return false;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 };
 
 /**

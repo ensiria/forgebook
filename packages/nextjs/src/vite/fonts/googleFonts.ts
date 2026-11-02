@@ -36,7 +36,7 @@ export type GoogleFontRequest = {
 };
 
 /** The `display` values Next.js accepts. */
-const DISPLAYS = ["auto", "block", "swap", "fallback", "optional"];
+export const DISPLAYS = ["auto", "block", "swap", "fallback", "optional"];
 
 /** The browser Google is asked as: one that takes WOFF2, as Next.js asks. */
 const USER_AGENT =
@@ -238,7 +238,7 @@ export const googleFontRequest = (
 /** Fetches an address: `fetch`, or a stand-in in the tests. */
 export type Fetcher = (
   url: string,
-  init: { readonly headers: Readonly<Record<string, string>> }
+  init: { readonly headers: Readonly<Record<string, string>>; readonly redirect: "error" }
 ) => Promise<Response>;
 
 /**
@@ -250,7 +250,7 @@ export type Fetcher = (
  */
 export const fetchGoogleCss = async (url: string, fetcher: Fetcher): Promise<string | Error> => {
   try {
-    const response = await fetcher(url, { headers: { "user-agent": USER_AGENT } });
+    const response = await fetcher(url, { headers: { "user-agent": USER_AGENT }, redirect: "error" });
     if (!response.ok) return new Error(`Google Fonts answered ${response.status} for ${url}`);
     return await response.text();
   } catch (error) {

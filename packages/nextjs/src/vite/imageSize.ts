@@ -127,8 +127,15 @@ const svgSize = (text: string): ImageSize | undefined => {
     .map(Number);
   const boxWidth = viewBox?.[2];
   const boxHeight = viewBox?.[3];
-  const width = svgLength(tag, "width") ?? boxWidth;
-  const height = svgLength(tag, "height") ?? boxHeight;
+  const ratio =
+    boxWidth !== undefined && boxHeight !== undefined && boxHeight > 0 ? boxWidth / boxHeight : undefined;
+  const givenWidth = svgLength(tag, "width");
+  const givenHeight = svgLength(tag, "height");
+  // one side given: the other from the viewBox's ratio, as Next.js's reader computes it
+  const width =
+    givenWidth ?? (givenHeight !== undefined && ratio !== undefined ? givenHeight * ratio : boxWidth);
+  const height =
+    givenHeight ?? (givenWidth !== undefined && ratio !== undefined ? givenWidth / ratio : boxHeight);
   if (width === undefined || height === undefined || Number.isNaN(width) || Number.isNaN(height))
     return undefined;
   return { width: Math.round(width), height: Math.round(height) };
@@ -141,14 +148,15 @@ const svgSize = (text: string): ImageSize | undefined => {
  * @returns its size, or none for a format it does not read or a file it cannot.
  */
 export const imageSize = (bytes: Uint8Array): ImageSize | undefined => {
-  if (bytes.length < 30) return svgSize(new TextDecoder().decode(bytes));
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (hasText(bytes, "\x89PNG")) return pngSize(view);
+  // each format's signature first, with the bytes its size needs: a small image is no SVG
+  if (hasText(bytes, "\x89PNG") && bytes.length >= 24) return pngSize(view);
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return jpegSize(view);
-  if (hasText(bytes, "GIF8")) return gifSize(view);
-  if (hasText(bytes, "RIFF") && hasText(bytes, "WEBP", 8)) return webpSize(bytes, view);
+  if (hasText(bytes, "GIF8") && bytes.length >= 10) return gifSize(view);
+  if (hasText(bytes, "RIFF") && hasText(bytes, "WEBP", 8) && bytes.length >= 30) return webpSize(bytes, view);
   if (hasText(bytes, "ftyp", 4)) return avifSize(bytes, view);
-  if (hasText(bytes, "BM")) return bmpSize(view);
-  if (view.getUint16(0, true) === 0 && view.getUint16(2, true) === 1) return icoSize(view);
+  if (hasText(bytes, "BM") && bytes.length >= 26) return bmpSize(view);
+  if (bytes.length >= 8 && view.getUint16(0, true) === 0 && view.getUint16(2, true) === 1)
+    return icoSize(view);
   return svgSize(new TextDecoder().decode(bytes));
 };

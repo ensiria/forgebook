@@ -13,6 +13,7 @@ import {
   hrefText,
   pagesQueryOf,
   routeAfter,
+  routeAfterAs,
   routeSettingsOf,
   storyRouteOf
 } from "../src/route.ts";
@@ -96,6 +97,7 @@ describe("hrefs", () => {
       route: "/blog/[slug]"
     });
     expect(hrefText({ pathname: "/s", search: "?q=1" }).text).toBe("/s?q=1");
+    expect(hrefText({ pathname: "/s", query: {}, search: "?q=1" }).text).toBe("/s?q=1");
     expect(filledRoute("/docs/[...path]", { path: ["a", "b"] })).toBe("/docs/a/b");
     expect(filledRoute("/docs/[[...path]]", {})).toBe("/docs");
   });
@@ -115,6 +117,15 @@ describe("hrefs", () => {
     expect(routeAfter(from, { pathname: "/blog/[slug]", query: { slug: "c" } })).toMatchObject({
       pathname: "/blog/c",
       params: { slug: "c" },
+      route: "/blog/[slug]"
+    });
+    // the Pages Router's `as`: the route and its params from the href, the path shown from `as`
+    expect(
+      routeAfterAs(from, { pathname: "/blog/[slug]", query: { slug: "d" } }, "/blog/d?ref=x")
+    ).toMatchObject({
+      pathname: "/blog/d",
+      search: "ref=x",
+      params: { slug: "d" },
       route: "/blog/[slug]"
     });
     // another origin is the browser's: the route does not move

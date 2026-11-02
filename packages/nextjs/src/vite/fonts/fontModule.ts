@@ -14,8 +14,10 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 
+import type { GoogleFontsMode } from "../nextjs.ts";
 import type { FontCall } from "./fontCalls.ts";
 import {
+  DISPLAYS,
   type Fetcher,
   fetchGoogleCss,
   googleFamily,
@@ -23,9 +25,6 @@ import {
   googleFontRequest,
   selfHostedCss
 } from "./googleFonts.ts";
-
-/** How Google fonts are had: downloaded beside the catalogue, or not at all (the fallback fonts show). */
-export type GoogleFontsMode = "download" | "none";
 
 /** What building a font's module needs. */
 export type FontModuleContext = {
@@ -70,6 +69,47 @@ const FONT_FORMATS: Readonly<Record<string, string>> = {
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** What each option written into a style sheet may hold, as Next.js checks it: nothing that leaves its declaration. */
+const SAFE_VALUES: Readonly<Record<string, RegExp>> = {
+  variable: /^--[\w-]+$/,
+  weight: /^(\d{1,4}( \d{1,4})?|normal|bold|variable)$/,
+  style: /^(normal|italic|oblique)$/,
+  fallback: /^[\w -]+$/
+};
+
+/**
+ * Whether a text is one an option may hold.
+ *
+ * @param name - the option.
+ * @param value - the text.
+ */
+const isSafe = (name: string, value: unknown): boolean => {
+  if (typeof value !== "string") return false;
+  if (name === "display") return DISPLAYS.includes(value);
+  return SAFE_VALUES[name]?.test(value) ?? true;
+};
+
+/**
+ * A call's options with every value checked before it is written into a style sheet: one that is not what Next.js
+ * accepts is left out, with a warning.
+ *
+ * @param options - the call's options.
+ * @param warn - says what was left out.
+ */
+const checkedOptions = (
+  options: Readonly<Record<string, unknown>>,
+  warn: (message: string) => void
+): Readonly<Record<string, unknown>> =>
+  Object.fromEntries(
+    Object.entries(options).flatMap(([name, value]) => {
+      if (!["variable", "weight", "style", "fallback", "display"].includes(name)) return [[name, value]];
+      const values = Array.isArray(value) ? value : [value];
+      if (values.every((each) => isSafe(name, each))) return [[name, value]];
+      warn(`next/font: ${name} ${JSON.stringify(value)} is not a value Next.js accepts, so it is left out`);
+      return [];
+    })
+  );
 
 /**
  * A short hash of a text, for file and class names.
@@ -192,8 +232,8 @@ const localFaces = (
     const file = resolve(dirname(importer), source["path"]);
     if (!existsSync(file)) return `localFont(…): ${source["path"]} is not there (from ${importer})`;
     files.push(file);
-    const weight = typeof source["weight"] === "string" ? source["weight"] : call.options["weight"];
-    const style = typeof source["style"] === "string" ? source["style"] : call.options["style"];
+    const weight = isSafe("weight", source["weight"]) ? source["weight"] : call.options["weight"];
+    const style = isSafe("style", source["style"]) ? source["style"] : call.options["style"];
     faces.push(localFace(file, family, cacheDir, { display, weight, style, declarations }));
   }
   return { css: faces.join("\n"), files };
@@ -216,7 +256,7 @@ const googleFaces = async (url: string, context: FontModuleContext): Promise<str
     googleFontFiles(css).map(async (fontUrl) => {
       const name = `google-${shortHash(fontUrl)}${extname(new URL(fontUrl).pathname) || ".woff2"}`;
       try {
-        const response = await context.fetcher(fontUrl, { headers: {} });
+        const response = await context.fetcher(fontUrl, { headers: {}, redirect: "error" });
         if (!response.ok) return;
         writeFileSync(join(context.cacheDir, name), new Uint8Array(await response.arrayBuffer()));
         saved.set(fontUrl, `./${name}`);
@@ -367,14 +407,19 @@ export const buildFontModule = async (
   importer: string,
   context: FontModuleContext
 ): Promise<BuiltFontModule> => {
-  const hash = shortHash(JSON.stringify([call.loader, call.family, call.options]));
+  const options = checkedOptions(call.options, context.warn);
+  // a local font's files are its importer's: the same call in two folders is two fonts
+  const hash = shortHash(
+    JSON.stringify([call.loader, call.family, options, call.loader === "local" ? importer : ""])
+  );
+  const checked = { ...call, options };
   mkdirSync(context.cacheDir, { recursive: true });
   const parts =
-    call.loader === "local" || call.family === undefined
-      ? localFont(call, importer, hash, context)
-      : await googleFont(call.family, call, context);
-  const stack = [familyText(parts.family), ...texts(call.options["fallback"]).map(familyText)].join(", ");
-  const built = classes(stack, hash, call.options, parts.weight, parts.style);
+    checked.loader === "local" || checked.family === undefined
+      ? localFont(checked, importer, hash, context)
+      : await googleFont(checked.family, checked, context);
+  const stack = [familyText(parts.family), ...texts(options["fallback"]).map(familyText)].join(", ");
+  const built = classes(stack, hash, options, parts.weight, parts.style);
   const sheet = join(context.cacheDir, `${hash}.css`);
   writeFileSync(sheet, `${parts.faces}\n${built.css}\n`);
   return {

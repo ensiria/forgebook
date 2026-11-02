@@ -30,24 +30,11 @@ import {
 
 import { APP_SETTINGS_KEY, type NextAppSettings } from "../appSettings.ts";
 import { type FontCall, findFontCalls, replaceFontCalls } from "./fonts/fontCalls.ts";
-import { buildFontModule, type GoogleFontsMode, shortHash } from "./fonts/fontModule.ts";
+import { buildFontModule, shortHash } from "./fonts/fontModule.ts";
 import { loadNextConfig, type NextProjectConfig, nextConfigFile } from "./nextConfig.ts";
+import type { NextjsOptions } from "./nextjs.ts";
 import { type PostcssRunner, projectPostcss, watchedFiles } from "./postcss.ts";
 import { staticImages } from "./staticImages.ts";
-
-/** The options of `nextjs()`. */
-export type NextjsOptions = {
-  /** The Next.js project's folder, from the catalogue's; the catalogue's own folder by default. */
-  readonly dir?: string;
-  /** The project's `next.config`, from its folder; the one Next.js would find by default; `false` reads none. */
-  readonly nextConfig?: string | false;
-  /**
-   * How `next/font/google` has its fonts: downloaded from Google once and served by the catalogue (`"download"`, the
-   * default, as Next.js does), or not at all (`"none"`), the fallback fonts showing, for a catalogue that must not reach
-   * the network.
-   */
-  readonly googleFonts?: GoogleFontsMode;
-};
 
 /** The modules a story gets Forgebook's stand-in for, by the stand-in's export of this package. */
 const STAND_INS: Readonly<Record<string, string>> = {
@@ -149,11 +136,14 @@ export const imageSettings = (
   } catch {
     defaults = undefined;
   }
-  const hasLoaderFile = typeof images["loaderFile"] === "string";
+  // the loader file is an alias of the build (`IMAGE_LOADER`): its path, which may be a folder of the machine, stays
+  // out of the page
+  const { loaderFile, ...shown } = images;
   return {
     ...(isRecord(defaults) ? defaults : {}),
-    ...images,
-    ...(hasLoaderFile ? { loader: "custom" } : { unoptimized: true })
+    ...shown,
+    loaderFile: "",
+    ...(typeof loaderFile === "string" ? { loader: "custom" } : { unoptimized: true })
   };
 };
 
@@ -202,6 +192,11 @@ export const nextPlugins = (options: NextjsOptions = {}): PluginOption[] => {
       const loaderFile = next.images["loaderFile"];
       const sass = sassPreprocessorOptions(next.sassOptions);
       return {
+        // `next.config`'s `env` is written into the code that reads it, as Next.js does: a value no browser code reads
+        // never reaches a page
+        define: Object.fromEntries(
+          Object.entries(next.env).map(([name, value]) => [`process.env.${name}`, JSON.stringify(value)])
+        ),
         resolve: {
           // `@/components/…`: the paths of the project's tsconfig.json, as Next.js reads them
           tsconfigPaths: true,
@@ -238,9 +233,11 @@ export const nextPlugins = (options: NextjsOptions = {}): PluginOption[] => {
         next === undefined
       )
         return [];
+      // `envDir: false` turns variables off, as it does for Vite's own
+      const publicEnv =
+        resolved.envDir === false ? {} : loadEnv(resolved.mode, resolved.envDir ?? dir, "NEXT_PUBLIC_");
       const env = {
-        ...loadEnv(resolved.mode, resolved.envDir === false ? dir : (resolved.envDir ?? dir), "NEXT_PUBLIC_"),
-        ...next.env,
+        ...publicEnv,
         // the names Next.js gives them in the browser's code
         ["NODE_ENV"]: resolved.isProduction ? "production" : "development",
         ["__NEXT_IMAGE_OPTS"]: imageSettings(dir, next.images)
@@ -301,7 +298,8 @@ export const nextPlugins = (options: NextjsOptions = {}): PluginOption[] => {
     transform: {
       filter: { id: CSS_FILE },
       async handler(code: string, id: string): Promise<{ code: string; map: null } | undefined> {
-        if (runPostcss === undefined) return undefined;
+        // `?raw` and `?url` imports are JavaScript by then, which Vite's own CSS pipeline leaves alone too
+        if (runPostcss === undefined || /[?&](raw|url)\b/.test(id)) return undefined;
         const file = id.split("?")[0] ?? id;
         const result = await runPostcss(code, file);
         // the files a plugin read (Tailwind CSS reads the components for their classes) renew the style sheet

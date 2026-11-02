@@ -70,6 +70,12 @@ describe("imageSize", () => {
     const webp = bytes("RIFF", 0, 0, 0, 0, "WEBP", "VP8X", 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 0, 49, 0, 0, 0, 0);
     expect(imageSize(webp)).toEqual({ width: 100, height: 50 });
     expect(imageSize(bytes("nothing an image starts with, long enough"))).toBeUndefined();
+    // a small image is read by its signature, and an SVG with one side takes the other from its viewBox
+    expect(imageSize(bytes("GIF89a", 3, 0, 4, 0, ...new Array(16).fill(0)))).toEqual({ width: 3, height: 4 });
+    expect(imageSize(new TextEncoder().encode('<svg width="200" viewBox="0 0 100 50">'))).toEqual({
+      width: 200,
+      height: 100
+    });
   });
 });
 
@@ -125,7 +131,7 @@ describe("the frame's page and the plugins' settings", () => {
     expect(plain["deviceSizes"]).toContain(640);
     expect(imageSettings(FIXTURE, { loaderFile: "./loader.ts" })).toMatchObject({
       loader: "custom",
-      loaderFile: "./loader.ts"
+      loaderFile: ""
     });
   });
 

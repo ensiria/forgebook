@@ -14,7 +14,46 @@ import type { AnyComponent, NoComponent, Preview as ReactPreview, ReactRenderer 
 import type { CsfMeta, CsfStory, StoryParameters, WrittenArg } from "@forgebook/story-format/csf";
 import type { ReactNode } from "react";
 
-import type { NavigationParameters, RouterParameters } from "./route.ts";
+/** A value of a route's query or params: one text, or several (a catch-all segment, a repeated search param). */
+export type RouteValue = string | readonly string[];
+
+/** A route's query or params, by name. */
+export type RouteValues = Readonly<Record<string, RouteValue>>;
+
+/** The App Router's route of a story (`parameters.nextjs.navigation`), as Storybook's Next.js framework writes it. */
+export type NavigationParameters = {
+  /** The path `usePathname` returns; `/` by default. */
+  readonly pathname?: string;
+  /** The search params `useSearchParams` returns, by name; none by default. */
+  readonly query?: RouteValues;
+  /** The dynamic segments `useParams` returns (`{ slug: "hello" }`); none by default. */
+  readonly params?: RouteValues;
+  /**
+   * The segments below the layout, as Storybook writes them: a name for `useSelectedLayoutSegments`, or a
+   * `[name, value]` pair that is also a param; an object is read as params.
+   */
+  readonly segments?: readonly (string | readonly [string, RouteValue])[] | RouteValues;
+};
+
+/** The Pages Router's route of a story (`parameters.nextjs.router`), as Storybook's Next.js framework writes it. */
+export type RouterParameters = {
+  /** The page's route, its dynamic segments in brackets (`/blog/[slug]`); the path when none. */
+  readonly pathname?: string;
+  /** The path as the browser shows it (`/blog/hello?tab=1`); the route with its params filled in when none. */
+  readonly asPath?: string;
+  /** The route's params and the search params, as `router.query` holds them. */
+  readonly query?: RouteValues;
+  /** The locale `router.locale` returns, with the Pages Router's internationalised routing. */
+  readonly locale?: string;
+  /** The locales `router.locales` returns. */
+  readonly locales?: readonly string[];
+  /** The locale `router.defaultLocale` returns. */
+  readonly defaultLocale?: string;
+  /** What `router.isFallback` returns; `false` by default. */
+  readonly isFallback?: boolean;
+  /** What `router.isPreview` returns; `false` by default. */
+  readonly isPreview?: boolean;
+};
 
 /** A story's Next.js settings: its route and the request its server code reads. */
 export type NextjsParameters = {

@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import dynamic from "../src/next/dynamic.tsx";
 import Head from "../src/next/head.tsx";
+import { cookies } from "../src/next/headers.ts";
 import { nextRenderer } from "../src/nextRenderer.tsx";
 import { storyRoute } from "../src/storyRoute.ts";
 
@@ -43,6 +44,15 @@ const Post = async ({
     {children}
   </article>
 );
+
+/** A server component reading the story's cookie, counting its calls. */
+const Reader = async ({ post }: { readonly post?: { readonly title: string } }): Promise<ReactNode> => {
+  readerCalls.count += 1;
+  return <b>{`${post?.title ?? ""} ${(await cookies()).get("user")?.value ?? ""}`}</b>;
+};
+
+/** How many times `Reader` was called. */
+const readerCalls = { count: 0 };
 
 /** A server component that fails once its data came, as one calling `notFound` does. */
 const Missing = async (): Promise<ReactNode> => {
@@ -155,6 +165,36 @@ describe("nextRenderer", () => {
     await vi.waitFor(() => expect(errors).toEqual(["No such post"]));
     await later(null);
     expect(isDrawn).toBe(false);
+  });
+
+  it("calls a server component once for props made anew on each retry, and again for another story's request", async () => {
+    const { decorators } = readPreview({
+      decorators: [
+        (Story: () => ReactNode) => (
+          <main>
+            <Story />
+          </main>
+        )
+      ]
+    });
+    const shown = (user: string): StoryDrawing => ({
+      ...drawing(
+        {
+          Shown: {
+            parameters: { nextjs: { cookies: { user } } },
+            render: () => <Reader post={{ title: "A" }} />
+          }
+        },
+        decorators
+      )
+    });
+    const ada = mount(shown("ada"));
+    await ada.drawn;
+    expect(ada.canvas.textContent).toBe("A ada");
+    expect(readerCalls.count).toBe(1);
+    const bob = mount(shown("bob"));
+    await bob.drawn;
+    expect(bob.canvas.textContent).toBe("A bob");
   });
 
   it("starts each mounted story at its own route", () => {
