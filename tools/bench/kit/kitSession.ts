@@ -137,6 +137,9 @@ export const freeDisk = (folder: string): number => {
   return bavail * bsize;
 };
 
+/** The share of installed memory a system reports at least: the firmware and the graphics keep the rest. */
+const MEMORY_SLACK = 0.9;
+
 /** Gigabytes, for a person. */
 export const gigabytes = (bytes: number): string => `${(bytes / GB).toFixed(1).replace(".", ",")} GB`;
 
@@ -155,12 +158,12 @@ export const checkMachine = async (profile: KitProfile, paths: KitPaths, asker: 
       hint: "Libera spazio sul disco e rilancia."
     });
   }
-  if (memory < needs.minimumMemory) {
+  if (memory < needs.minimumMemory * MEMORY_SLACK) {
     throw new ScriptError(
       `Memoria insufficiente per questo profilo: servono ${gigabytes(needs.minimumMemory)}.`
     );
   }
-  if (memory < needs.memory) {
+  if (memory < needs.memory * MEMORY_SLACK) {
     asker.log.warn(
       `Con meno di ${gigabytes(needs.memory)} di memoria qualche misura può fallire per memoria esaurita.`
     );

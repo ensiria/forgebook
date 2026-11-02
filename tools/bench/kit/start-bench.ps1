@@ -206,7 +206,7 @@ if (-not ((Test-Path -LiteralPath $chromium) -and ((Get-Content -LiteralPath $ch
 }
 
 Stop-Sleep
-$desktop = [Environment]::GetFolderPath('Desktop')
+$desktop = if ($env:FORGEBOOK_BENCH_DESKTOP) { $env:FORGEBOOK_BENCH_DESKTOP } else { [Environment]::GetFolderPath('Desktop') }
 $nodeExe = Join-Path $node 'node.exe'
 & $nodeExe (Join-Path $repo 'tools\bench\kit\kit.mts') --home $KitHome --desktop $desktop @KitArgs
 $status = $LASTEXITCODE

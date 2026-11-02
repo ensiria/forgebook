@@ -155,7 +155,7 @@ if [ "$system" = darwin ]; then
 elif command -v systemd-inhibit >/dev/null 2>&1 && systemd-inhibit --what=idle:sleep true >/dev/null 2>&1; then
   keep_awake=(systemd-inhibit --what=idle:sleep --who=forgebook-bench --why=benchmark)
 fi
-desktop="$( (command -v xdg-user-dir >/dev/null 2>&1 && xdg-user-dir DESKTOP) || printf '%s' "$HOME/Desktop")"
+desktop="${FORGEBOOK_BENCH_DESKTOP:-$( (command -v xdg-user-dir >/dev/null 2>&1 && xdg-user-dir DESKTOP) || printf '%s' "$HOME/Desktop")}"
 status=0
 "${keep_awake[@]+"${keep_awake[@]}"}" node "$repo/tools/bench/kit/kit.mts" --home "$KIT_HOME" --desktop "$desktop" "$@" || status=$?
 if [ -f "$KIT_HOME/clean-requested" ]; then

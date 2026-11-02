@@ -8,9 +8,9 @@ Linux desktop. They copy this folder, double-click one file, answer two question
 1. **Checks the machine**: 64-bit Windows 10 or 11, or Linux; 4 GB of memory and 6 GB of free disk to install, more for
    the full profile (`kitPlan.ts`, `requirements`).
 2. **Installs into the user's own folder**, without administrator rights: `%LOCALAPPDATA%\ForgebookBench` on Windows,
-   `${XDG_DATA_HOME:-~/.local/share}/forgebook-bench` elsewhere (`FORGEBOOK_BENCH_HOME` moves it). Node, and on
-   Windows MinGit, from their projects' own sites, each checked against the SHA-256 in `kit.pins`; pnpm through
-   corepack; Forgebook cloned over HTTPS at the commit `kit.pins` names; Playwright's Chromium. Every cache (npm, pnpm,
+   `${XDG_DATA_HOME:-~/.local/share}/forgebook-bench` elsewhere (`FORGEBOOK_BENCH_HOME` moves it, and
+   `FORGEBOOK_BENCH_DESKTOP` the results file). Node, and on Windows MinGit, from their projects' own sites, each
+   checked against the SHA-256 in `kit.pins`; pnpm through corepack; Forgebook cloned over HTTPS at the commit `kit.pins` names; Playwright's Chromium. Every cache (npm, pnpm,
    corepack, Yarn, the browsers) stays in that folder, and Git reads no configuration of the user's and never asks for
    credentials. On Linux, Git comes from the system and Chromium's system libraries must be there: installing either
    needs an administrator, and the launcher says so with the command.
