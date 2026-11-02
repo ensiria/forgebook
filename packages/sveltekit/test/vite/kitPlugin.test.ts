@@ -26,10 +26,17 @@ const FIXTURES = join(import.meta.dirname, "..", "fixtures");
  *
  * @param kit - the options.
  * @param dir - its folder.
+ * @param version - SvelteKit's major version.
  */
-const project = (kit: Readonly<Record<string, unknown>>, dir = join(FIXTURES, "kit2")): KitProject => ({
+const project = (
+  kit: Readonly<Record<string, unknown>>,
+  dir = join(FIXTURES, "kit2"),
+  version: 2 | 3 = 2
+): KitProject => ({
   dir,
   kit,
+  version,
+  extensions: [".svelte"],
   svelte: undefined,
   plugins: [],
   problem: undefined
@@ -57,9 +64,10 @@ const loaded = async (plugin: Plugin, source: string): Promise<string | undefine
  *
  * @param kit - SvelteKit's options.
  * @param dir - the project's folder.
+ * @param version - SvelteKit's major version.
  */
-const configured = (kit: Readonly<Record<string, unknown>>, dir?: string): Plugin => {
-  const plugin = kitPlugin(project(kit, dir));
+const configured = (kit: Readonly<Record<string, unknown>>, dir?: string, version: 2 | 3 = 2): Plugin => {
+  const plugin = kitPlugin(project(kit, dir, version));
   const { configResolved } = plugin;
   if (typeof configResolved !== "function") throw new Error("The plugin reads no configuration");
   const config: Pick<ResolvedConfig, "mode" | "logger"> = {
@@ -128,12 +136,34 @@ describe("the environment", () => {
   it("writes SvelteKit 3's $app/env/public from the variables src/env.ts declares public, checked by their schema", async () => {
     const declared = await declaredPublicVariables(join(FIXTURES, "kit3", "src"), {
       PUBLIC_RETRIES: "5",
+      PUBLIC_TITLE: "",
       SECRET_KEY: "hidden"
     });
-    expect(declared?.values).toEqual({ PUBLIC_RETRIES: 5, PUBLIC_TITLE: undefined });
-    const module = await loaded(configured({}, join(FIXTURES, "kit3")), "$app/env/public");
+    expect(declared?.values).toEqual({ PUBLIC_RETRIES: 5, PUBLIC_TITLE: "" });
+    // a variable with no schema must be set, as SvelteKit wants it
+    await expect(
+      declaredPublicVariables(join(FIXTURES, "kit3", "src"), { PUBLIC_RETRIES: "5" })
+    ).rejects.toThrow("PUBLIC_TITLE is missing");
+    const module = await loaded(configured({}, join(FIXTURES, "kit3"), 3), "$app/env/public");
     expect(module).toContain("export const PUBLIC_RETRIES = 3;");
     expect(module).not.toContain("hidden");
+  });
+
+  it("refuses the other SvelteKit's public environment, so SvelteKit 3 gives no variable by its prefix alone", async () => {
+    const kit3 = configured({}, join(FIXTURES, "kit3"), 3);
+    for (const name of ["$env/static/public", "$env/dynamic/public"]) {
+      const module = await loaded(kit3, name);
+      expect(module).toContain("is SvelteKit 2's");
+      expect(module).not.toContain("PUBLIC_RETRIES");
+    }
+    expect(await loaded(configured({}, join(FIXTURES, "kit3"), 2), "$app/env/public")).toContain(
+      "is SvelteKit 3's"
+    );
+    const rewritten = namedServerImports('import { PUBLIC_A } from "$env/static/public";') ?? "";
+    expect(rewritten).toContain('"$env/static/public?names=PUBLIC_A"');
+    expect(await loaded(kit3, "$env/static/public?names=PUBLIC_A")).toContain(
+      "export const PUBLIC_A = undefined;"
+    );
   });
 
   it("refuses every server-only module with why, declaring the names its importer asked for", async () => {

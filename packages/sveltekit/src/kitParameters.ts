@@ -115,8 +115,10 @@ export type KitLoadEvent = {
 export type KitLoad = (event: KitLoadEvent) => unknown;
 
 /**
- * A universal `load`, as `+page.ts` or `+layout.ts` exports it (`PageLoad`): typed by the project's own `./$types`, so
- * any function is taken, and called with what the catalogue gives (`KitLoadEvent`).
+ * A universal `load`, as `+page.ts` or `+layout.ts` exports it (`PageLoad`). Its event is typed by the project's own
+ * `./$types`, with more than a catalogue gives (`tracing`) and params by name, so no event type both takes it and
+ * types a load written in the story: any function is taken, and called with a `KitLoadEvent`. A load written in a
+ * story types its own event (`satisfies PageLoad`).
  */
 export type StoryLoad = (event: never) => unknown;
 
@@ -500,19 +502,35 @@ export const storyKitOf = (
 };
 
 /**
- * Whether a link's href is handled by an `hrefs` entry, and by which callback.
+ * Whether a key of `hrefs` matches an href: as it is, or as a regular expression; a key that is no valid one matches
+ * nothing.
+ *
+ * @param key - the key.
+ * @param isRegex - whether it is a regular expression.
+ * @param href - the link's href.
+ */
+const keyMatches = (key: string, isRegex: boolean, href: string): boolean => {
+  if (!isRegex) return key === href;
+  try {
+    return new RegExp(key).test(href);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The callbacks of the `hrefs` entries a link's href matches, in order, each of them called as Storybook's SvelteKit
+ * calls them.
  *
  * @param hrefs - the story's links handled by a callback.
  * @param href - the link's href, as written.
  */
-export const hrefCallbackOf = (
+export const hrefCallbacksOf = (
   hrefs: Readonly<Record<string, HrefParameter>>,
   href: string
-): HrefCallback | undefined => {
-  for (const [key, entry] of Object.entries(hrefs)) {
+): HrefCallback[] =>
+  Object.entries(hrefs).flatMap(([key, entry]) => {
     const callback = typeof entry === "function" ? entry : entry.callback;
-    const asRegex = typeof entry !== "function" && entry.asRegex === true;
-    if (asRegex ? new RegExp(key).test(href) : key === href) return callback;
-  }
-  return undefined;
-};
+    const isRegex = typeof entry !== "function" && entry.asRegex === true;
+    return keyMatches(key, isRegex, href) ? [callback] : [];
+  });

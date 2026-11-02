@@ -25,6 +25,10 @@ export type KitProject = {
   readonly kit: Readonly<Record<string, unknown>>;
   /** Svelte's options (`preprocess`, `compilerOptions`, `extensions`) for Svelte's Vite plugin; none to read `svelte.config.js`. */
   readonly svelte: Partial<SveltePluginOptions> | undefined;
+  /** SvelteKit's major version, as its options say: 2 holds them under `kit`, 3 has them at the top. */
+  readonly version: 2 | 3;
+  /** The extensions of the project's Svelte components (`.svelte`, `.svx`): its routes' pages may have any. */
+  readonly extensions: readonly string[];
   /** The project's other Vite plugins. */
   readonly plugins: readonly PluginOption[];
   /** Why the project's configuration could not be read; none when it was. */
@@ -34,8 +38,11 @@ export type KitProject = {
 /** SvelteKit's plugin that holds the options it read. */
 const SETUP_PLUGIN = "vite-plugin-sveltekit-setup";
 
-/** The plugins SvelteKit's `sveltekit()` makes: its own, and Svelte's, which the catalogue makes itself. */
-const KIT_PLUGIN = /^vite-plugin-svelte(kit)?([-:]|$)/;
+/**
+ * The plugins SvelteKit's `sveltekit()` makes: its own (any whose name says SvelteKit, so one it adds later is left out
+ * too, its environment's among them), and Svelte's, which the catalogue makes itself.
+ */
+const KIT_PLUGIN = /sveltekit|^vite-plugin-svelte([-:]|$)/;
 
 /** The names `svelte.config` may have, in the order SvelteKit 2 looks for them. */
 const SVELTE_CONFIGS = ["svelte.config.js", "svelte.config.mjs", "svelte.config.ts", "svelte.config.mts"];
@@ -92,19 +99,35 @@ const svelteOptionsOf = (options: Readonly<Record<string, unknown>>): Partial<Sv
  */
 const svelteConfigOptions = async (
   dir: string
-): Promise<{ readonly kit: Readonly<Record<string, unknown>>; readonly problem: string | undefined }> => {
+): Promise<{
+  readonly kit: Readonly<Record<string, unknown>>;
+  readonly config: Readonly<Record<string, unknown>>;
+  readonly problem: string | undefined;
+}> => {
   const file = SVELTE_CONFIGS.map((name) => join(dir, name)).find((path) => existsSync(path));
-  if (file === undefined) return { kit: {}, problem: undefined };
+  if (file === undefined) return { kit: {}, config: {}, problem: undefined };
   try {
     const loaded: unknown = await import(pathToFileURL(file).href);
     const config = isRecord(loaded) && isRecord(loaded["default"]) ? loaded["default"] : {};
-    return { kit: isRecord(config["kit"]) ? config["kit"] : {}, problem: undefined };
+    return { kit: isRecord(config["kit"]) ? config["kit"] : {}, config, problem: undefined };
   } catch (error) {
     return {
       kit: {},
+      config: {},
       problem: `${file} could not be loaded: ${error instanceof Error ? error.message : String(error)}`
     };
   }
+};
+
+/**
+ * The extensions of a project's Svelte components, from Svelte's options: `.svelte` by default.
+ *
+ * @param options - SvelteKit's options, or `svelte.config.js`'s default export.
+ */
+const extensionsOf = (options: Readonly<Record<string, unknown>>): string[] => {
+  const { extensions } = options;
+  const listed = Array.isArray(extensions) ? extensions.filter((item) => typeof item === "string") : [];
+  return listed.length === 0 ? [".svelte"] : listed;
 };
 
 /**
@@ -112,10 +135,12 @@ const svelteConfigOptions = async (
  *
  * @param dir - the project's folder.
  * @param viteConfig - its Vite configuration, from the folder; the one Vite would find by default; `false` reads none.
+ * @param keepPlugin - whether to keep one of the project's own plugins; every one by default.
  */
 export const loadKitProject = async (
   dir: string,
-  viteConfig: string | false | undefined
+  viteConfig: string | false | undefined,
+  keepPlugin: (plugin: Plugin) => boolean = (): boolean => true
 ): Promise<KitProject> => {
   const root = resolve(dir);
   let loaded: Awaited<ReturnType<typeof loadConfigFromFile>> = null;
@@ -134,12 +159,14 @@ export const loadKitProject = async (
   }
   const plugins = await flatPlugins(loaded?.config.plugins);
   const options = setupOptions(plugins);
-  const others = plugins.filter((plugin) => !KIT_PLUGIN.test(plugin.name));
+  const others = plugins.filter((plugin) => !KIT_PLUGIN.test(plugin.name) && keepPlugin(plugin));
   // SvelteKit 2's options hold SvelteKit's under `kit`, beside Svelte's; SvelteKit 3's are SvelteKit's alone
   if (options !== undefined)
     return {
       dir: root,
       kit: isRecord(options["kit"]) ? options["kit"] : options,
+      version: isRecord(options["kit"]) ? 2 : 3,
+      extensions: extensionsOf(options),
       svelte: svelteOptionsOf(options),
       plugins: others,
       problem
@@ -148,6 +175,8 @@ export const loadKitProject = async (
   return {
     dir: root,
     kit: fromSvelteConfig.kit,
+    version: 2,
+    extensions: extensionsOf(fromSvelteConfig.config),
     svelte: undefined,
     plugins: others,
     problem: problem ?? fromSvelteConfig.problem

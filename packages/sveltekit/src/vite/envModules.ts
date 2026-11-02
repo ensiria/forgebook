@@ -13,7 +13,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { runnerImport } from "vite";
+import { type Alias, runnerImport } from "vite";
 
 /** The modules only a server may load, with what each is. */
 export const SERVER_ONLY: Readonly<Record<string, string>> = {
@@ -33,6 +33,13 @@ export type PublicEnvModule = (typeof PUBLIC_ENV)[number];
 /** A name JavaScript takes as an export's. */
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 
+/** The words a `const` cannot be named, which a variable or an import may still be called. */
+const RESERVED = new Set(
+  "await break case catch class const continue debugger default delete do else enum export extends false finally for function if implements import in instanceof interface let new null package private protected public return static super switch this throw true try typeof var void while with yield".split(
+    " "
+  )
+);
+
 /** The names `src/env` may have, in the order SvelteKit 3 looks for them. */
 const ENV_FILES = ["env.ts", "env.js", "env.mts", "env.mjs"];
 
@@ -45,7 +52,8 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
  *
  * @param value - the value.
  */
-const written = (value: unknown): string => JSON.stringify(value) ?? "undefined";
+const written = (value: unknown): string =>
+  typeof value === "bigint" ? `${value}n` : (JSON.stringify(value) ?? "undefined");
 
 /** The query a server-only import is rewritten with, naming what it imports (`?names=SECRET,TOKEN`). */
 const NAMES_QUERY = "?names=";
@@ -58,14 +66,13 @@ const NAMED_IMPORT = /import\s*(?:[\w$]+\s*,\s*)?\{([^}]*)\}\s*from\s*(["'])([^"
  * runs it, and its error, which says why, is the one the frame shows.
  *
  * @param id - the module's name, with the names it is imported with (`$app/env/private?names=TOKEN`).
+ * @param reason - the error's message.
  */
-export const serverOnlyModule = (id: string): string => {
-  const [name = id, names = ""] = id.split(NAMES_QUERY);
-  const declared = names.split(",").filter((item) => IDENTIFIER.test(item) && item !== "default");
+export const refusedModule = (id: string, reason: string): string => {
+  const [, names = ""] = id.split(NAMES_QUERY);
+  const declared = names.split(",").filter((item) => IDENTIFIER.test(item) && !RESERVED.has(item));
   return [
-    `throw new Error(${written(
-      `${name} is ${SERVER_ONLY[name] ?? "server code"}, which only a server may load: a component drawn in a catalogue cannot import it. Give the story what it reads through its args or its page's data.`
-    )});`,
+    `throw new Error(${written(reason)});`,
     ...declared.map((item) => `export const ${item} = undefined;`),
     "export default undefined;",
     ""
@@ -73,17 +80,31 @@ export const serverOnlyModule = (id: string): string => {
 };
 
 /**
- * A module's code with its named imports of server-only modules naming what they import, for `serverOnlyModule`.
+ * A server-only module, refusing to load with why.
+ *
+ * @param id - the module's name, with the names it is imported with.
+ */
+export const serverOnlyModule = (id: string): string => {
+  const name = kitModuleName(id) ?? id;
+  return refusedModule(
+    id,
+    `${name} is ${SERVER_ONLY[name] ?? "server code"}, which only a server may load: a component drawn in a catalogue cannot import it. Give the story what it reads through its args or its page's data.`
+  );
+};
+
+/**
+ * A module's code with its named imports of SvelteKit's environment and server modules naming what they import, so a
+ * module that refuses to load (`refusedModule`) can declare them.
  *
  * @param code - the module's code.
- * @returns the code, or none when it imports no server-only module by name.
+ * @returns the code, or none when it imports none of those modules by name.
  */
 export const namedServerImports = (code: string): string | undefined => {
   let isChanged = false;
   const rewritten = code.replace(
     NAMED_IMPORT,
     (statement: string, list: string, quote: string, source: string) => {
-      if (!(source in SERVER_ONLY)) return statement;
+      if (kitModuleName(source) === undefined) return statement;
       isChanged = true;
       const names = list
         .split(",")
@@ -105,13 +126,23 @@ export const namedServerImports = (code: string): string | undefined => {
 };
 
 /**
- * The server-only module a name stands for, its query left out; none for another module.
+ * The environment or server module of SvelteKit a name stands for, its query left out; none for another module.
  *
  * @param source - an import's module.
  */
-export const serverOnlyName = (source: string): string | undefined => {
+export const kitModuleName = (source: string): string | undefined => {
   const [name = source] = source.split(NAMES_QUERY);
-  return name in SERVER_ONLY ? name : undefined;
+  return name in SERVER_ONLY || PUBLIC_ENV.some((known) => known === name) ? name : undefined;
+};
+
+/**
+ * Whether a name is a server-only module, its query left out.
+ *
+ * @param source - an import's module.
+ */
+export const isServerOnly = (source: string): boolean => {
+  const [name = source] = source.split(NAMES_QUERY);
+  return name in SERVER_ONLY;
 };
 
 /**
@@ -139,7 +170,7 @@ export const publicVariables = (
  */
 export const namedExports = (values: Readonly<Record<string, unknown>>): string =>
   Object.entries(values)
-    .filter(([name]) => IDENTIFIER.test(name))
+    .filter(([name]) => IDENTIFIER.test(name) && !RESERVED.has(name))
     .map(([name, value]) => `export const ${name} = ${written(value)};\n`)
     .join("");
 
@@ -153,7 +184,14 @@ export const namedExports = (values: Readonly<Record<string, unknown>>): string 
 const checked = async (schema: unknown, value: string | undefined, name: string): Promise<unknown> => {
   if (typeof schema === "function") return Reflect.apply(schema, undefined, [value]);
   const standard = isRecord(schema) ? schema["~standard"] : undefined;
-  if (!isRecord(standard) || typeof standard["validate"] !== "function") return value;
+  if (!isRecord(standard) || typeof standard["validate"] !== "function") {
+    // SvelteKit wants a variable with no schema set, an empty text included
+    if (value === undefined)
+      throw new Error(
+        `The public variable ${name} is missing: set it, or give it a schema that makes it optional`
+      );
+    return value;
+  }
   const result: unknown = await Reflect.apply(standard["validate"], standard, [value]);
   if (isRecord(result) && Array.isArray(result["issues"]))
     throw new Error(`The public variable ${name} is not valid: ${JSON.stringify(result["issues"])}`);
@@ -165,17 +203,21 @@ const checked = async (schema: unknown, value: string | undefined, name: string)
  *
  * @param srcDir - the project's source folder (`src`).
  * @param env - every variable, by name.
+ * @param aliases - the project's aliases.
  * @returns the values by name, and the files read; none without an env file.
  */
 export const declaredPublicVariables = async (
   srcDir: string,
-  env: Readonly<Record<string, string>>
+  env: Readonly<Record<string, string>>,
+  aliases: readonly Alias[] = []
 ): Promise<{ readonly values: Record<string, unknown>; readonly file: string } | undefined> => {
   const file = ENV_FILES.map((name) => join(srcDir, name)).find((path) => existsSync(path));
   if (file === undefined) return undefined;
+  // the project's aliases, as SvelteKit gives them to its env file (`$lib/…`)
   const { module } = await runnerImport<Record<string, unknown>>(file, {
     configFile: false,
-    logLevel: "silent"
+    logLevel: "silent",
+    resolve: { alias: [...aliases] }
   });
   const variables = module["variables"];
   const values: Record<string, unknown> = {};

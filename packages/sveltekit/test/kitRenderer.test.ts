@@ -138,6 +138,41 @@ describe("links and forms", () => {
     mounted.unmount();
   });
 
+  it("moves the page on a GET form and an SVG link, as the browser would, never the frame", async () => {
+    const element = canvas();
+    const calls: string[] = [];
+    const parameters = { sveltekit: { page: { url: "/blog/first", data: { title: "First" } } } };
+    const mounted = kitRenderer.mount(element, drawing(parameters, calls), () => undefined);
+    await mounted.drawn;
+    element.querySelector<HTMLFormElement>('form[method="GET"]')?.requestSubmit();
+    await settled(() => storyPage().pathname === "/blog/search");
+    expect(storyPage().query).toEqual({ q: "kit" });
+    element
+      .querySelector("svg text")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    await settled(() => storyPage().pathname === "/blog/drawn");
+    expect(calls).toEqual(['submit "GET" "/blog/search?q=kit"', 'link "/blog/drawn"']);
+    mounted.unmount();
+  });
+
+  it("gives a story drawn twice at once (a matrix's cells) one page, and a story drawn anew a page of its own", async () => {
+    const parameters = { sveltekit: { page: { url: "/blog/first", data: { title: "Cell" } } } };
+    const story = drawing(parameters);
+    const [first, second] = [canvas(), canvas()];
+    const cells = [
+      kitRenderer.mount(first, story, () => undefined),
+      kitRenderer.mount(second, story, () => undefined)
+    ];
+    await Promise.all(cells.map((cell) => cell.drawn));
+    first.querySelector<HTMLAnchorElement>('a[href="/blog/second"]')?.click();
+    await settled(() => textOf(second, "route") === "/blog/[slug] second /blog/second");
+    for (const cell of cells) cell.unmount();
+    const again = kitRenderer.mount(canvas(), story, () => undefined);
+    await again.drawn;
+    expect(storyPage().pathname).toBe("/blog/first");
+    again.unmount();
+  });
+
   it("answers a form with the story's result, given to the page as its form", async () => {
     const element = canvas();
     const calls: string[] = [];

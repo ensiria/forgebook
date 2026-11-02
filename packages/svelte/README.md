@@ -79,7 +79,7 @@ signature in a story about logic (`LogicMeta`).
 Svelte's own plugin is the adapter's, and it reads your `svelte.config.js`, so don't add `@sveltejs/vite-plugin-svelte` to
 a catalogue; in a Vite or Vitest configuration of your own that already has it, add `forgebookPlugin` without the
 adapter's `vitePlugins()`. `svelte({ plugin })` passes options to Svelte's plugin, over what it reads from
-`svelte.config.js`. A SvelteKit app's components, which read `$app/*`, are drawn by
+`svelte.config.js`; they are `@sveltejs/vite-plugin-svelte`'s own, so they follow its major version. A SvelteKit app's components, which read `$app/*`, are drawn by
 [`@forgebook/sveltekit`](https://www.npmjs.com/package/@forgebook/sveltekit), built on this adapter. The frame says a story is drawn once Svelte has settled, so a component that awaits (`experimental.async`)
 is drawn before its play runs. Generated server tests take `svelteRenderer` from `@forgebook/svelte/renderer` and run in
 Node (`environment: "node"`), since Svelte compiles a component apart for the server; the catalogue's

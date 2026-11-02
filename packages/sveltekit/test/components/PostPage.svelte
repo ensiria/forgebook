@@ -26,4 +26,6 @@ afterNavigate(() => {
   <input name="title" value="Draft" />
   <button type="submit">Save</button>
 </form>
+<form method="GET" action="/blog/search"><input name="q" value="kit" /><button type="submit">Find</button></form>
+<svg><a href="/blog/drawn"><text>Drawn</text></a></svg>
 <p data-testid="form">{form?.message ?? ""}</p>

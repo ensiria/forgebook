@@ -16,11 +16,14 @@
 import { svelteRenderer } from "@forgebook/svelte/renderer";
 import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
 
-import { hrefCallbackOf, type KitPage, type StoryKit } from "./kitParameters.ts";
-import { createKitStore, type DataLoader, type KitStore, setCurrentStore } from "./kitStore.ts";
-
-/** How many redirects a page's loads may throw before the catalogue gives up, as a browser does. */
-const MOST_REDIRECTS = 10;
+import { hrefCallbacksOf, type KitPage, type StoryKit } from "./kitParameters.ts";
+import {
+  createKitStore,
+  type DataLoader,
+  errorOfThrown,
+  type KitStore,
+  setCurrentStore
+} from "./kitStore.ts";
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -29,26 +32,9 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
 /** An error as the frame takes it: SvelteKit's `error(404, "…")` written with its status. */
 const toError = (error: unknown): Error => {
   if (error instanceof Error) return error;
-  if (isRecord(error) && typeof error["status"] === "number" && isRecord(error["body"])) {
-    const message = error["body"]["message"];
-    return new Error(`${error["status"]}: ${typeof message === "string" ? message : "error"}`);
-  }
-  return new Error(String(error));
+  const read = errorOfThrown(error);
+  return new Error(`${read.status ?? 500}: ${read.message}`);
 };
-
-/**
- * The address a redirect a load threw goes to (SvelteKit's `redirect(303, "/login")`), or none.
- *
- * @param thrown - what the load threw.
- */
-const redirectOf = (thrown: unknown): string | undefined =>
-  isRecord(thrown) &&
-  typeof thrown["status"] === "number" &&
-  thrown["status"] >= 300 &&
-  thrown["status"] < 400 &&
-  typeof thrown["location"] === "string"
-    ? thrown["location"]
-    : undefined;
 
 /**
  * The address a load fetches: in a page, as the frame's `fetch` reads it, so the catalogue's mocks answer a path; on a
@@ -97,25 +83,6 @@ const loaderOf = (kit: StoryKit, store: KitStore): DataLoader | undefined => {
 };
 
 /**
- * Loads a story's page data before it is drawn, following the redirects its loads throw.
- *
- * @param store - the story's page.
- */
-const loadFirst = async (store: KitStore): Promise<void> => {
-  for (let redirects = 0; ; redirects += 1) {
-    try {
-      await store.reload();
-      return;
-    } catch (thrown) {
-      const location = redirectOf(thrown);
-      if (location === undefined || redirects >= MOST_REDIRECTS) throw thrown;
-      store.record("redirect", [location]);
-      await store.navigate("goto", location);
-    }
-  }
-};
-
-/**
  * The drawing Svelte's renderer gets: a page's component given its data, form and params, unless its args give them.
  *
  * @param drawing - the drawing the frame gave.
@@ -137,50 +104,119 @@ const withPage = (drawing: StoryDrawing, store: KitStore): StoryDrawing => {
 };
 
 /**
- * Keeps a story's links in the story: a link of the app moves its page, one an `hrefs` entry names calls it, one
- * outside the app goes nowhere; each is recorded.
+ * The href of the link an event went through, as written: an `<a>` (HTML or SVG) or an `<area>`; none without one.
+ *
+ * @param event - the click.
+ */
+const linkHref = (event: Event): string | null => {
+  for (const target of event.composedPath())
+    if (target instanceof Element && (target.localName === "a" || target.localName === "area"))
+      return target.getAttribute("href") ?? target.getAttribute("xlink:href");
+  return null;
+};
+
+/**
+ * The address a form sent without `use:enhance` goes to: a GET form's action with its values as the search.
+ *
+ * @param form - the form.
+ * @param submitter - the button that sent it, or none.
+ * @param pageUrl - the story's page, the action's base.
+ */
+const formAddress = (form: HTMLFormElement, submitter: HTMLElement | null, pageUrl: URL): URL => {
+  const action = new URL(submitter?.getAttribute("formaction") ?? form.getAttribute("action") ?? "", pageUrl);
+  const values = new FormData(form);
+  action.search = new URLSearchParams(
+    [...values].map(([name, value]): [string, string] => [
+      name,
+      typeof value === "string" ? value : value.name
+    ])
+  ).toString();
+  return action;
+};
+
+/**
+ * Keeps a story in its frame: a link of the app moves the story's page, one an `hrefs` entry names calls it, one
+ * outside the app goes nowhere; a form sent without `use:enhance` is recorded, and a GET form moves the page as the
+ * browser would; each is recorded.
  *
  * @param canvas - the story's canvas.
  * @param store - the story's page.
  * @returns what stops it.
  */
-const catchLinks = (canvas: HTMLElement, store: KitStore): (() => void) => {
+const keepInStory = (canvas: HTMLElement, store: KitStore): (() => void) => {
   const onClick = (event: MouseEvent): void => {
     if (event.defaultPrevented) return;
-    const link = event.composedPath().find((target) => target instanceof HTMLAnchorElement);
-    const href = link instanceof HTMLAnchorElement ? link.getAttribute("href") : null;
+    const href = linkHref(event);
     if (href === null) return;
     // the frame's address names the story: a link never takes the frame away from it
     event.preventDefault();
     store.record("link", [href]);
-    const callback = hrefCallbackOf(store.kit.hrefs, href);
-    if (callback !== undefined) callback(href, event);
-    else void store.navigate("link", href);
+    const matched = hrefCallbacksOf(store.kit.hrefs, href);
+    for (const callback of matched) callback(href, event);
+    if (matched.length === 0) void store.navigate("link", href);
+  };
+  const onSubmit = (event: SubmitEvent): void => {
+    // `use:enhance` handles its own form first
+    if (event.defaultPrevented || !(event.target instanceof HTMLFormElement)) return;
+    event.preventDefault();
+    const form = event.target;
+    const method = (event.submitter?.getAttribute("formmethod") ?? form.method).toUpperCase();
+    const address = formAddress(form, event.submitter, store.page().url);
+    store.record("submit", [
+      method,
+      method === "GET" ? `${address.pathname}${address.search}` : address.pathname
+    ]);
+    if (method === "GET") void store.navigate("form", address);
   };
   canvas.addEventListener("click", onClick);
-  return (): void => canvas.removeEventListener("click", onClick);
+  canvas.addEventListener("submit", onSubmit);
+  return (): void => {
+    canvas.removeEventListener("click", onClick);
+    canvas.removeEventListener("submit", onSubmit);
+  };
 };
 
+/** The page of each story drawn now, by its parameters, and how many of its drawings use it. */
+const SHARED = new WeakMap<object, { readonly store: KitStore; mounts: number }>();
+
 /**
- * The store of a story about to be drawn, made the frame's current one, with its loader.
+ * The page of a story about to be drawn, made the frame's current one, with its loader: the one its other drawings use
+ * when it is drawn several times at once (a matrix's cells), since one frame shows one page; a new one otherwise.
  *
  * @param drawing - the drawing the frame gave.
+ * @returns the page, and what lets it go when the drawing is taken away.
  */
-const storeOf = (drawing: StoryDrawing): KitStore => {
-  const store = createKitStore(drawing.story.parameters, drawing.report);
-  store.setLoader(loaderOf(store.kit, store));
-  setCurrentStore(store);
-  return store;
+const storeOf = (drawing: StoryDrawing): { readonly store: KitStore; readonly release: () => void } => {
+  const key = drawing.story.parameters;
+  const shared = SHARED.get(key);
+  const entry =
+    shared !== undefined && shared.mounts > 0
+      ? shared
+      : { store: createKitStore(key, drawing.report), mounts: 0 };
+  if (entry !== shared) {
+    entry.store.setLoader(loaderOf(entry.store.kit, entry.store));
+    SHARED.set(key, entry);
+  }
+  entry.mounts += 1;
+  setCurrentStore(entry.store);
+  return {
+    store: entry.store,
+    release: (): void => {
+      entry.mounts -= 1;
+    }
+  };
 };
 
 /** Svelte's renderer for a SvelteKit project. */
 export const kitRenderer: StoryRenderer = {
   mount: (canvas: HTMLElement, first: StoryDrawing, onError: (error: Error) => void): MountedStory => {
-    const store = storeOf(first);
+    const { store, release } = storeOf(first);
     let latest = first;
     let inner: MountedStory | undefined;
     let isGone = false;
-    const stopLinks = catchLinks(canvas, store);
+    const stopKeeping = keepInStory(canvas, store);
+    // an error a load throws, then or after a move, is shown in place of the story
+    store.setErrorHandler((error: unknown) => onError(toError(error)));
     let shown = store.page();
     // a page's component follows its data, form and params, as SvelteKit gives them again after a move or an action
     const stopData = store.subscribe(() => {
@@ -198,13 +234,12 @@ export const kitRenderer: StoryRenderer = {
     const drawn =
       store.kit.loads.length === 0
         ? draw().drawn
-        : loadFirst(store).then(
-            async (): Promise<void> => (isGone ? undefined : draw().drawn),
-            (error: unknown): Promise<void> => {
-              onError(toError(error));
-              return new Promise<void>(() => undefined);
-            }
-          );
+        : store
+            .reload()
+            .then(
+              async (isLoaded: boolean): Promise<void> =>
+                isLoaded && !isGone ? draw().drawn : new Promise<void>(() => undefined)
+            );
     return {
       drawn,
       update: (next: StoryDrawing): void => {
@@ -213,15 +248,24 @@ export const kitRenderer: StoryRenderer = {
       },
       unmount: (): void => {
         isGone = true;
-        stopLinks();
+        stopKeeping();
         stopData();
+        release();
         inner?.unmount();
       }
     };
   },
   renderToString: async (drawing: StoryDrawing): Promise<string> => {
-    const store = storeOf(drawing);
-    if (store.kit.loads.length > 0) await loadFirst(store);
-    return svelteRenderer.renderToString(withPage(drawing, store));
+    const { store, release } = storeOf(drawing);
+    try {
+      let failure: unknown;
+      store.setErrorHandler((error: unknown) => {
+        failure = error;
+      });
+      if (store.kit.loads.length > 0 && !(await store.reload())) throw toError(failure);
+      return await svelteRenderer.renderToString(withPage(drawing, store));
+    } finally {
+      release();
+    }
   }
 };

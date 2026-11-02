@@ -28,11 +28,21 @@ export type SubmitInput = {
 export type SubmitResultInput = Omit<SubmitInput, "controller" | "submitter" | "cancel"> & {
   /** What the action answered. */
   readonly result: KitActionResult;
-  /** Does what SvelteKit does without a function: resets the form after a success, applies the result. */
-  readonly update: (options?: {
-    readonly reset?: boolean;
-    readonly invalidateAll?: boolean;
-  }) => Promise<void>;
+  /**
+   * Does what SvelteKit does without a function: after a success, resets the form and loads the page's data again;
+   * applies the result.
+   */
+  readonly update: (options?: UpdateOptions) => Promise<void>;
+};
+
+/** What `update` may leave out: the reset (`reset: false`), the new load (`invalidateAll` or `refreshAll: false`). */
+export type UpdateOptions = {
+  /** Whether a success resets the form; `true` by default. */
+  readonly reset?: boolean;
+  /** Whether a success loads the page's data again (SvelteKit 2's name); `true` by default. */
+  readonly invalidateAll?: boolean;
+  /** Whether a success loads the page's data again (SvelteKit 3's name); `true` by default. */
+  readonly refreshAll?: boolean;
 };
 
 /** `use:enhance`'s function. */
@@ -107,8 +117,11 @@ const listedValues = (formData: FormData): Record<string, string> =>
  */
 export const enhance = (form: HTMLFormElement, submit?: SubmitFunction): { readonly destroy: () => void } => {
   const onSubmit = async (event: SubmitEvent): Promise<void> => {
-    event.preventDefault();
     const store = currentStore();
+    // SvelteKit enhances a POST form only: another is the browser's (the story's frame keeps it, as for a link)
+    const method = (event.submitter?.getAttribute("formmethod") ?? form.method).toLowerCase();
+    if (method !== "post") return;
+    event.preventDefault();
     // only a button of this form adds its value to the form's: FormData refuses any other
     const { submitter: sent } = event;
     const submitter =
@@ -134,8 +147,12 @@ export const enhance = (form: HTMLFormElement, submit?: SubmitFunction): { reado
     });
     if (isCancelled) return;
     const result = store.kit.forms.result ?? { type: "success", status: 200 };
-    const update = async (options: { readonly reset?: boolean } = {}): Promise<void> => {
-      if (result.type === "success" && options.reset !== false) form.reset();
+    const update = async (options: UpdateOptions = {}): Promise<void> => {
+      if (result.type === "success") {
+        if (options.reset !== false) form.reset();
+        // a success loads the page's data again, as SvelteKit's does, unless told not to
+        if (options.invalidateAll !== false && options.refreshAll !== false) await store.reload();
+      }
       await applied(store, result);
     };
     if (typeof after === "function") await after({ action, formData, formElement: form, result, update });

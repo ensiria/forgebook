@@ -45,6 +45,13 @@ describe("matchRoute", () => {
     });
   });
 
+  it("chooses between routes in SvelteKit's own order", () => {
+    expect(matchRoute(["/[a]/[b]", "/[...rest]/edit"], "/x/edit")?.id).toBe("/[...rest]/edit");
+    expect(matchRoute(["/[slug]/about", "/[[lang]]/about"], "/en/about")?.id).toBe("/[[lang]]/about");
+    expect(matchRoute(["/[id]", "/[id=integer]"], "/7")?.id).toBe("/[id=integer]");
+    expect(matchRoute(["/[slug]", "/[[optional]]"], "/x")?.id).toBe("/[slug]");
+  });
+
   it("decodes a param, and matches nothing outside the routes", () => {
     expect(matchRoute(ROUTES, "/blog/caf%C3%A9")?.params).toEqual({ slug: "café" });
     expect(matchRoute(ROUTES, "/nowhere/at/all")).toBeUndefined();
@@ -54,7 +61,7 @@ describe("matchRoute", () => {
 
 describe("filledRoute and isRouteId", () => {
   it("writes a route id's path with its params, groups and empty optional params left out", () => {
-    expect(filledRoute("/blog/[slug]", { slug: "hello world" })).toBe("/blog/hello%20world");
+    expect(filledRoute("/blog/[slug]", { slug: "hello world" })).toBe("/blog/hello world");
     expect(filledRoute("/(app)/settings", {})).toBe("/settings");
     expect(filledRoute("/[[lang]]/about", {})).toBe("/about");
     expect(filledRoute("/docs/[...path]", { path: "a/b" })).toBe("/docs/a/b");

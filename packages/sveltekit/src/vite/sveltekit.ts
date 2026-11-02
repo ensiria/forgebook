@@ -14,7 +14,7 @@ import { extname } from "node:path";
 
 import { svelte } from "@forgebook/svelte/vite";
 import type { FrameworkAdapter } from "forgebook/vite/adapter";
-import type { PluginOption } from "vite";
+import type { Plugin, PluginOption } from "vite";
 
 import { kitPlugin } from "./kitPlugin.ts";
 import { loadKitProject } from "./kitProject.ts";
@@ -29,6 +29,12 @@ export type SveltekitOptions = {
    * are left out).
    */
   readonly viteConfig?: string | false;
+  /**
+   * Whether to keep one of the app's own Vite plugins (SvelteKit's are always left out); every one by default. A
+   * catalogue runs them as `vite dev` would, its build too: leave out one that only an app's build needs (a source-map
+   * upload, a service-worker generator).
+   */
+  readonly keepPlugin?: (plugin: Plugin) => boolean;
 };
 
 /**
@@ -48,7 +54,11 @@ export const sveltekit = (options: SveltekitOptions = {}): FrameworkAdapter => {
     browserDependencies: base.browserDependencies ?? [],
     ...(base.componentFiles === undefined ? {} : { componentFiles: base.componentFiles }),
     vitePlugins: async (): Promise<readonly PluginOption[]> => {
-      const project = await loadKitProject(options.dir ?? process.cwd(), options.viteConfig);
+      const project = await loadKitProject(
+        options.dir ?? process.cwd(),
+        options.viteConfig,
+        options.keepPlugin
+      );
       const withSvelte = project.svelte === undefined ? base : svelte({ plugin: project.svelte });
       return [...((await withSvelte.vitePlugins?.()) ?? []), ...project.plugins, kitPlugin(project)];
     }

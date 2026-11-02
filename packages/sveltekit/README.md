@@ -25,7 +25,9 @@ export default defineConfig({ framework: sveltekit(), title: "My app", stories: 
 
 It reads SvelteKit's options where SvelteKit keeps them (the `sveltekit()` plugin of `vite.config` in SvelteKit 3,
 `svelte.config.js` in SvelteKit 2), Svelte's options with them, and keeps the app's other Vite plugins (Tailwind CSS, an
-i18n compiler), so a component is drawn as the app draws it. `sveltekit({ dir, viteConfig })` names another folder or
+i18n compiler), so a component is drawn as the app draws it. `vite.config` is read as `vite dev` reads it, for a
+catalogue's build too, so the app's plugins run there: `keepPlugin` leaves out one only an app's build needs (a
+source-map upload, a service-worker generator). `sveltekit({ dir, viteConfig, keepPlugin })` names another folder or
 configuration; `viteConfig: false` reads only `svelte.config.js`.
 
 ## A story on a page
@@ -75,19 +77,24 @@ export const Given: Story<typeof Post> = {
 | `load` | The page's universal `load` (or a list, the layouts' first): run before the story is drawn, again after each move and on `invalidate` |
 | `serverData` | What the page's server load returned: the `data` its `load` receives, or the page's data without one |
 | `navigating`, `updated` | What `navigating` and `updated.current` hold |
-| `navigation`, `forms.enhance`, `hrefs` | Callbacks, as Storybook's SvelteKit names them: called with `goto`'s (and the others') arguments; a link whose href an `hrefs` entry names calls it instead of moving |
+| `navigation`, `forms.enhance`, `hrefs` | Callbacks, as Storybook's SvelteKit names them: called with `goto`'s (and the others') arguments; a link whose href `hrefs` entries match (by key, or as a regular expression with `asRegex`) calls each of them instead of moving |
 | `forms.result` | What an enhanced form's action answers (`{ type: "failure", status: 400, data }`); a success by default |
 
-A story that gives page data (`page.data`, `serverData`, `load`) or an action's answer (`forms.result`) is a page's: its
+`load` takes the page's own `load`, typed by its `./$types`; one written in the story types its event itself
+(`satisfies PageLoad`). A story that gives page data (`page.data`, `serverData`, `load`) or an action's answer
+(`forms.result`) is a page's: its
 component gets `data`, `form` and `params` as SvelteKit gives a `+page.svelte` them, unless its args set them. Storybook's
 `sveltekit_experimental` is read too (`state.page`, `stores.page`, `navigation`, `forms`, `hrefs`), so stories moved
 with `forgebook init --from storybook` keep their pages.
 
 ## What a story's page does
 
-The page really moves: a link of the app clicked in a story, `goto` and a redirect the first load throws change `page.url`, its
-route and params, run `beforeNavigate` (which may cancel), `onNavigate` and `afterNavigate`, and load the page's data again.
-The frame's address never changes: every link is caught, one outside the app goes nowhere. Each move and each call
+The page really moves, in SvelteKit's order: a link of the app clicked in a story, a GET form, `goto` and a redirect a
+load throws run `beforeNavigate` (which may cancel), load the page's data, run `onNavigate`, change `page.url`, its route
+and params, and run `afterNavigate`. A move a later one overtook is dropped; an error a load throws is the page's, shown
+in place of the story. The frame's address never changes: every link (an SVG one and an `<area>` too) and every form is
+caught, and one outside the app (another origin, or outside the base path) goes nowhere. One frame shows one page: a
+story drawn several times at once (a matrix) shares it. Each move and each call
 (`link`, `goto`, `invalidate`, `invalidateAll`, `refreshAll`, `pushState`, `preloadData`, `enhance`…) is listed in the
 panel's Events. A play reads where the story went:
 
@@ -103,8 +110,8 @@ export const GoesToAbout: Story<typeof SiteNav> = {
 ```
 
 An enhanced form (`use:enhance`) is sent to no server: the story's `forms.result` is the answer, and `page.form`, the
-status and the form's `form` prop follow it as `applyAction` sets them; the function `use:enhance` takes runs as in the
-app.
+status and the form's `form` prop follow it as `applyAction` sets them, a success loads the page's data again; the
+function `use:enhance` takes runs as in the app. A POST form without `use:enhance` is only listed among the events.
 
 | Module | In a story |
 |---|---|
@@ -114,10 +121,11 @@ app.
 | `$app/paths` | `base`, `assets`, `asset`, `resolve`, `resolveRoute`, `match`, from the app's `paths` and routes |
 | `$app/env`, `$app/environment` | `browser` (false in a server test), `dev`, `building` (false), `version` |
 | `$app/manifest` | The routes and the static files |
-| `$app/env/public` (SvelteKit 3) | The variables `src/env.ts` declares public, checked by their schema |
-| `$env/static/public`, `$env/dynamic/public` (SvelteKit 2) | The variables with the public prefix, from the environment and the `.env` files |
+| `$app/env/public` (SvelteKit 3) | The variables `src/env.ts` declares public, checked by their schema (one with none must be set) |
+| `$env/static/public`, `$env/dynamic/public` (SvelteKit 2) | The variables with the public prefix, from the environment and the `.env` files, fixed when a static build is made |
 | `$lib`, the `alias` option | As SvelteKit resolves them; SvelteKit 3's `#lib` is the app's own `imports` |
 | `$app/env/private`, `$env/*/private`, `$app/server`, `$service-worker` | Refused: the story fails with why, and the value never reaches the page |
+| The other SvelteKit's environment | Refused too: SvelteKit 3 has no `$env/*`, so no variable reaches its page by its prefix alone; SvelteKit 2 has no `$app/env/public` |
 
 Generated server tests take `kitRenderer` from `@forgebook/sveltekit/renderer`: a page's `load` runs first, its relative
 `fetch` read from the story's page. They answer no fetch, so a story whose load fetches is tagged `!test` there.
@@ -129,5 +137,8 @@ Remote functions (`*.remote.ts`, `query`, `form`, `command`) need SvelteKit's se
 layout. A param's matcher is not run (any value matches), the history is the story's own (`history.back()` is the
 frame's), and `beforeNavigate` sees no `leave` navigation. The `tracing` field of a load's event is not given.
 
-The rest of its exports are what the catalogue loads itself. Getting started, the catalogue's features and its commands:
+`@forgebook/sveltekit` exports the story types (`Meta`, `Story`, `Preview`, and `StorySveltekit`, `StoryPageParameters`,
+`StoryKitLoad`, `StoryActionResult` for the parameters), `@forgebook/sveltekit/vite` the adapter, `@forgebook/sveltekit/page`
+`storyPage()`. The rest of its exports (`./app/*`, `./frame`, `./code`, `./docs`, `./renderer`) are what the catalogue
+loads itself, not for stories. Getting started, the catalogue's features and its commands:
 [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).

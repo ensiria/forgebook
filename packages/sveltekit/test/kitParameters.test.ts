@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { hrefCallbackOf, pageUrl, routePath, storyKitOf } from "../src/kitParameters.ts";
+import { hrefCallbacksOf, pageUrl, routePath, storyKitOf } from "../src/kitParameters.ts";
 
 /** A project's page routes. */
 const ROUTES = ["/", "/about", "/blog/[slug]"];
@@ -88,12 +88,16 @@ describe("addresses and links", () => {
     expect(routePath("/documents", "/docs")).toBe("/documents");
   });
 
-  it("finds the callback of a link by its href, or by a regular expression", () => {
+  it("finds every callback a link's href matches, as it is or as a regular expression, a bad one matching none", () => {
     const exact = (): void => undefined;
     const pattern = (): void => undefined;
-    const hrefs = { "/about": exact, "^/blog/": { callback: pattern, asRegex: true } };
-    expect(hrefCallbackOf(hrefs, "/about")).toBe(exact);
-    expect(hrefCallbackOf(hrefs, "/blog/x")).toBe(pattern);
-    expect(hrefCallbackOf(hrefs, "/")).toBeUndefined();
+    const hrefs = {
+      "/about": exact,
+      "^/(about|blog)": { callback: pattern, asRegex: true },
+      "(": { callback: exact, asRegex: true }
+    };
+    expect(hrefCallbacksOf(hrefs, "/about")).toEqual([exact, pattern]);
+    expect(hrefCallbacksOf(hrefs, "/blog/x")).toEqual([pattern]);
+    expect(hrefCallbacksOf(hrefs, "/")).toEqual([]);
   });
 });

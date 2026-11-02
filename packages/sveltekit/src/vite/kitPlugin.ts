@@ -11,6 +11,7 @@
  *
  * @module
  */
+import { existsSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,13 +29,15 @@ import {
 import { APP_SETTINGS_KEY, type KitAppSettings, SETTINGS_CONSTANT } from "../appSettings.ts";
 import {
   declaredPublicVariables,
+  isServerOnly,
+  kitModuleName,
   namedExports,
   namedServerImports,
   PUBLIC_ENV,
   type PublicEnvModule,
   publicVariables,
-  serverOnlyModule,
-  serverOnlyName
+  refusedModule,
+  serverOnlyModule
 } from "./envModules.ts";
 import type { KitProject } from "./kitProject.ts";
 import { projectRoutes, projectStaticFiles } from "./projectFiles.ts";
@@ -122,6 +125,36 @@ export const projectAliases = (project: KitProject): Alias[] => {
 };
 
 /**
+ * Why a public environment module is not this SvelteKit's: each has its own, and the other's does not exist, so it
+ * gives nothing (SvelteKit 3 gives no variable by its prefix alone).
+ *
+ * @param module - the module.
+ * @param version - the project's SvelteKit.
+ * @returns the reason, or none for one of this SvelteKit's.
+ */
+const otherKitsModule = (module: PublicEnvModule, version: 2 | 3): string | undefined => {
+  if (module === "$app/env/public")
+    return version === 2
+      ? `${module} is SvelteKit 3's: SvelteKit 2 gives the public variables through $env/static/public and $env/dynamic/public`
+      : undefined;
+  return version === 3
+    ? `${module} is SvelteKit 2's: SvelteKit 3 gives the variables src/env.ts declares public through $app/env/public`
+    : undefined;
+};
+
+/**
+ * The `.env` files Vite reads for a mode that exist, so an edit to one writes the environment modules again.
+ *
+ * @param envDir - the folder they are in.
+ * @param mode - the mode.
+ */
+const envFiles = (envDir: string, mode: string): string[] =>
+  [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`]
+    .map((name) => join(envDir, name))
+    // a missing one is not watched: Vite would take it for an import the module makes
+    .filter((file) => existsSync(file));
+
+/**
  * The script the frame's page runs before any module: the settings the stand-ins read.
  *
  * @param settings - the settings.
@@ -149,9 +182,7 @@ export const kitPlugin = (project: KitProject): Plugin => {
     textOption(files, "routes", join(textOption(files, "src", "src"), "routes"))
   );
   const staticDir = resolve(dir, textOption(files, "assets", "static"));
-  const extensions = Array.isArray(kit["extensions"])
-    ? kit["extensions"].filter((extension) => typeof extension === "string")
-    : [".svelte"];
+  const { extensions, version } = project;
   let resolved: ResolvedConfig | undefined;
   let settings: KitAppSettings | undefined;
   const settingsNow = (): KitAppSettings => {
@@ -166,6 +197,38 @@ export const kitPlugin = (project: KitProject): Plugin => {
   };
   const allVariables = (): Record<string, string> =>
     resolved === undefined ? {} : loadEnv(resolved.mode, resolve(dir, textOption(env, "dir", ".")), "");
+  /**
+   * A public environment module: the variables this SvelteKit gives the browser, or a refusal for the other's module.
+   *
+   * @param name - the module's name, with the names it is imported with.
+   * @param module - the module.
+   * @param watch - adds a file whose edit writes the module again.
+   */
+  const publicEnvModule = async (
+    name: string,
+    module: PublicEnvModule,
+    watch: (file: string) => void
+  ): Promise<string> => {
+    const refusal = otherKitsModule(module, version);
+    if (refusal !== undefined) return refusedModule(name, refusal);
+    for (const file of envFiles(resolve(dir, textOption(env, "dir", ".")), resolved?.mode ?? "development"))
+      watch(file);
+    const variables = allVariables();
+    if (module === "$app/env/public") {
+      const declared = await declaredPublicVariables(srcDir, variables, projectAliases(project));
+      if (declared === undefined) return "";
+      watch(declared.file);
+      return namedExports(declared.values);
+    }
+    const values = publicVariables(
+      variables,
+      textOption(env, "publicPrefix", "PUBLIC_"),
+      textOption(env, "privatePrefix", "")
+    );
+    return module === "$env/static/public"
+      ? namedExports(values)
+      : `export const env = ${JSON.stringify(values)};\n`;
+  };
   return {
     name: "forgebook:sveltekit",
     enforce: "pre",
@@ -208,30 +271,14 @@ export const kitPlugin = (project: KitProject): Plugin => {
       }
     },
     resolveId: (source: string): string | undefined =>
-      serverOnlyName(source) !== undefined || PUBLIC_ENV.some((name) => name === source)
-        ? `${VIRTUAL}${source}`
-        : undefined,
+      kitModuleName(source) === undefined ? undefined : `${VIRTUAL}${source}`,
     async load(id: string): Promise<string | undefined> {
       if (!id.startsWith(VIRTUAL)) return undefined;
       const name = id.slice(VIRTUAL.length);
-      if (serverOnlyName(name) !== undefined) return serverOnlyModule(name);
-      const module = PUBLIC_ENV.find((known): known is PublicEnvModule => known === name);
+      if (isServerOnly(name)) return serverOnlyModule(name);
+      const module = PUBLIC_ENV.find((known): known is PublicEnvModule => known === kitModuleName(name));
       if (module === undefined) return undefined;
-      const variables = allVariables();
-      if (module === "$app/env/public") {
-        const declared = await declaredPublicVariables(srcDir, variables);
-        if (declared === undefined) return "";
-        this.addWatchFile(declared.file);
-        return namedExports(declared.values);
-      }
-      const values = publicVariables(
-        variables,
-        textOption(env, "publicPrefix", "PUBLIC_"),
-        textOption(env, "privatePrefix", "")
-      );
-      return module === "$env/static/public"
-        ? namedExports(values)
-        : `export const env = ${JSON.stringify(values)};\n`;
+      return publicEnvModule(name, module, (file: string): void => this.addWatchFile(file));
     }
   };
 };

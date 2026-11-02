@@ -18,6 +18,7 @@ import { createSubscriber } from "svelte/reactivity";
 
 import { appSettings, pageRouteIds } from "./appSettings.ts";
 import {
+  type KitError,
   type KitNavigation,
   type KitPage,
   type NavigationTarget,
@@ -77,7 +78,8 @@ export type KitStore = {
   /** Changes some of the page's fields (`form`, `status`, `error`, `state`, `data`). */
   readonly setPage: (fields: Partial<KitPage>) => void;
   /**
-   * Goes to an href from the page: a navigation of the app, or none for one outside it.
+   * Goes to an href from the page: a navigation of the app, or none for one outside it (another origin, or outside
+   * the base path), one a callback cancelled, or one a later navigation overtook.
    *
    * @returns whether the page moved.
    */
@@ -86,10 +88,17 @@ export type KitStore = {
     href: string | URL,
     options?: NavigateOptions
   ) => Promise<boolean>;
-  /** The data the story's loads give an href, without going there, as `preloadData` does; `{}` without loads. */
+  /** The data the story's loads give an href, without going there, as `preloadData` does; the page's without loads. */
   readonly dataAt: (href: string | URL) => Promise<Readonly<Record<string, unknown>>>;
-  /** Loads the page's data again, as `invalidate` and `refreshAll` do. */
-  readonly reload: () => Promise<void>;
+  /**
+   * Loads the page's data again, as `invalidate` and `refreshAll` do: a redirect it throws moves the page, another
+   * error goes to the error handler.
+   *
+   * @returns whether the data was loaded.
+   */
+  readonly reload: () => Promise<boolean>;
+  /** Sets what hears an error a load threw: the frame, which shows it in place of the story. */
+  readonly setErrorHandler: (handler: ((error: unknown) => void) | undefined) => void;
   /** Sets what loads the page's data, once the renderer has the story's loads. */
   readonly setLoader: (loader: DataLoader | undefined) => void;
   /** Registers a `beforeNavigate` callback; returns what removes it. */
@@ -116,6 +125,58 @@ const targetOf = (page: Pick<KitPage, "url" | "params" | "route">): NavigationTa
   route: page.route,
   url: page.url
 });
+
+/** How many redirects the page's loads may throw in a row, as a browser follows them. */
+const MOST_REDIRECTS = 20;
+
+/** Whether a value is a plain object. */
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * The address a redirect a load threw goes to (SvelteKit's `redirect(303, "/login")`), or none.
+ *
+ * @param thrown - what the load threw.
+ */
+const redirectOf = (thrown: unknown): string | undefined =>
+  isRecord(thrown) &&
+  typeof thrown["status"] === "number" &&
+  thrown["status"] >= 300 &&
+  thrown["status"] < 400 &&
+  typeof thrown["location"] === "string"
+    ? thrown["location"]
+    : undefined;
+
+/**
+ * The page's error for what a load threw: SvelteKit's `error(404, "…")` with its message, anything else as it is.
+ *
+ * @param thrown - what the load threw.
+ */
+export const errorOfThrown = (thrown: unknown): KitError => {
+  if (isRecord(thrown) && isRecord(thrown["body"]) && typeof thrown["body"]["message"] === "string")
+    return { message: thrown["body"]["message"], status: statusOfThrown(thrown) };
+  return {
+    message: thrown instanceof Error ? thrown.message : String(thrown),
+    status: statusOfThrown(thrown)
+  };
+};
+
+/**
+ * The status of what a load threw: SvelteKit's error's, or 500.
+ *
+ * @param thrown - what the load threw.
+ */
+const statusOfThrown = (thrown: unknown): number =>
+  isRecord(thrown) && typeof thrown["status"] === "number" ? thrown["status"] : 500;
+
+/**
+ * Whether a path is under the base path, so the app's.
+ *
+ * @param pathname - the path.
+ * @param base - the base path, or empty.
+ */
+const isInBase = (pathname: string, base: string): boolean =>
+  base === "" || pathname === base || pathname.startsWith(`${base}/`);
 
 /**
  * A navigation from a page to another, once every `beforeNavigate` callback let it start.
@@ -192,11 +253,87 @@ export const createKitStore = (
     };
   };
   const track = createSubscriber((update: () => void) => subscribe(update));
-  const loadData = async (at: Pick<KitPage, "url" | "params" | "route">): Promise<void> => {
-    if (loader === undefined) return;
-    const data = await loader(at);
-    page = { ...page, data };
+  /** The last navigation or reload started: one that ends after a later one started is dropped, as SvelteKit's is. */
+  let latest = 0;
+  /**
+   * What a load that threw does: a redirect moves the page (as many times as a browser follows), anything else is
+   * the page's error, shown by the catalogue.
+   *
+   * @returns whether the page moved.
+   */
+  const failed = async (thrown: unknown, redirects: number): Promise<boolean> => {
+    const location = redirectOf(thrown);
+    if (location !== undefined && redirects < MOST_REDIRECTS) {
+      record("redirect", [location]);
+      return navigate("goto", location, {}, redirects + 1);
+    }
+    const error = location === undefined ? thrown : new Error(`Too many redirects, the last to ${location}`);
+    page = { ...page, error: errorOfThrown(error), status: statusOfThrown(error) };
     changed();
+    onError?.(error);
+    return false;
+  };
+  const record = (name: string, values: readonly unknown[]): void => {
+    made.push({ name, values });
+    report?.(name, values);
+  };
+  let onError: ((error: unknown) => void) | undefined;
+  /** A new navigation or reload: the later one wins. */
+  const nextToken = (): number => {
+    latest += 1;
+    return latest;
+  };
+  /**
+   * Moves the page once its data is loaded: the `onNavigate` callbacks run, the page moves, then the `afterNavigate`
+   * ones run, what an `onNavigate` callback returned with them.
+   *
+   * @returns whether the page moved: not when a later navigation overtook this one.
+   */
+  const move = async (
+    token: number,
+    to: Pick<KitPage, "url" | "params" | "route">,
+    navigation: KitNavigation,
+    options: NavigateOptions
+  ): Promise<boolean> => {
+    // a load reads the address and the params, so every move loads the data again, as SvelteKit's does
+    const data = loader === undefined ? page.data : await loader(to);
+    if (token !== latest) return false;
+    const returned = await Promise.all([...callbacks.on].map((callback) => callback(navigation)));
+    if (token !== latest) return false;
+    page = { ...page, ...to, data, state: options.state ?? {}, form: null, error: null, status: 200 };
+    navigating = null;
+    changed();
+    for (const callback of [...callbacks.after]) callback(navigation);
+    for (const after of returned)
+      if (typeof after === "function") Reflect.apply(after, undefined, [navigation]);
+    return true;
+  };
+  /** Goes to an href: the `beforeNavigate` callbacks may cancel it, then the page's data is loaded and it moves. */
+  const navigate = async (
+    type: NavigationType,
+    href: string | URL,
+    options: NavigateOptions = {},
+    redirects = 0
+  ): Promise<boolean> => {
+    const url = new URL(href, page.url);
+    // another origin, or a path outside the base path, is not the app's: SvelteKit leaves it to the browser
+    if (url.origin !== page.url.origin || !isInBase(url.pathname, base)) return false;
+    const to = routedPage(url, pageRouteIds(), base);
+    const started = startNavigation(type, page, to, callbacks.before);
+    if (started === undefined) return false;
+    const token = nextToken();
+    navigating = started.navigation;
+    changed();
+    try {
+      return await move(token, to, started.navigation, options);
+    } catch (thrown) {
+      if (token !== latest) return false;
+      navigating = null;
+      changed();
+      return failed(thrown, redirects);
+    } finally {
+      started.complete();
+    }
   };
   return {
     kit,
@@ -214,35 +351,21 @@ export const createKitStore = (
       page = { ...page, ...fields };
       changed();
     },
-    navigate: async (
-      type: NavigationType,
-      href: string | URL,
-      options: NavigateOptions = {}
-    ): Promise<boolean> => {
-      const url = new URL(href, page.url);
-      if (url.origin !== page.url.origin) return false;
-      const to = routedPage(url, pageRouteIds(), base);
-      const started = startNavigation(type, page, to, callbacks.before);
-      if (started === undefined) return false;
-      const { navigation, complete } = started;
-      navigating = navigation;
-      changed();
-      const afterwards: unknown[] = [];
-      for (const callback of [...callbacks.on]) afterwards.push(await callback(navigation));
-      page = { ...page, ...to, state: options.state ?? {}, form: null, error: null, status: 200 };
-      // a load reads the address and the params, so every move loads the data again, as SvelteKit's does
-      await loadData(to);
-      navigating = null;
-      changed();
-      for (const after of afterwards) if (typeof after === "function") after();
-      for (const callback of [...callbacks.after]) callback(navigation);
-      complete();
-      return true;
-    },
+    navigate,
     dataAt: async (href: string | URL): Promise<Readonly<Record<string, unknown>>> =>
-      loader === undefined ? {} : loader(routedPage(new URL(href, page.url), pageRouteIds(), base)),
-    reload: async (): Promise<void> => {
-      await loadData(page);
+      loader === undefined ? page.data : loader(routedPage(new URL(href, page.url), pageRouteIds(), base)),
+    reload: async (): Promise<boolean> => {
+      if (loader === undefined) return true;
+      const token = nextToken();
+      try {
+        const data = await loader(page);
+        if (token !== latest) return false;
+        page = { ...page, data };
+        changed();
+        return true;
+      } catch (thrown) {
+        return token === latest ? failed(thrown, 0) : false;
+      }
     },
     setLoader: (next: DataLoader | undefined): void => {
       loader = next;
@@ -261,9 +384,9 @@ export const createKitStore = (
       complete: Promise.resolve(),
       ...kit.navigation.afterNavigate
     }),
-    record: (name: string, values: readonly unknown[]): void => {
-      made.push({ name, values });
-      report?.(name, values);
+    record,
+    setErrorHandler: (handler: ((error: unknown) => void) | undefined): void => {
+      onError = handler;
     },
     calls: (): readonly KitCall[] => [...made]
   };

@@ -19,12 +19,41 @@ import type {
   Story as SvelteStory
 } from "@forgebook/svelte";
 
-import type { SveltekitParameters } from "./kitParameters.ts";
+import type {
+  HrefParameter,
+  KitActionResult,
+  KitLoadEvent,
+  KitPage,
+  PageParameters,
+  StoryLoad,
+  SveltekitParameters
+} from "./kitParameters.ts";
+
+/** A story's SvelteKit settings (`parameters.sveltekit`). */
+export type StorySveltekit = SveltekitParameters;
+
+/** The page a story starts on (`parameters.sveltekit.page`). */
+export type StoryPageParameters = PageParameters;
+
+/** The page a story's components read, as `page` from `$app/state` gives it. */
+export type StoryKitPage = KitPage;
+
+/** A universal `load` a story runs (`parameters.sveltekit.load`). */
+export type StoryKitLoad = StoryLoad;
+
+/** What a story's `load` receives. */
+export type StoryKitLoadEvent = KitLoadEvent;
+
+/** An action's result, as `parameters.sveltekit.forms.result` gives it. */
+export type StoryActionResult = KitActionResult;
+
+/** An `hrefs` entry: a callback, or one with whether its key is a regular expression. */
+export type StoryHref = HrefParameter;
 
 /** A story's parameters: the catalogue's settings, and its SvelteKit ones. */
 export type SveltekitStoryParameters = StoryParameters & {
   /** The story's page, its data and what its navigation, forms and links do. */
-  readonly sveltekit?: SveltekitParameters;
+  readonly sveltekit?: StorySveltekit;
 };
 
 /** A story file's default export: `{ title, component, parameters: { sveltekit } } satisfies Meta<typeof Nav>`. */

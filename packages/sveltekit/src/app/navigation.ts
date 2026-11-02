@@ -24,15 +24,22 @@ export type GotoOptions = {
   readonly [option: string]: unknown;
 };
 
-/** What `preloadData` resolves with. */
-export type PreloadResult = {
-  /** Always `loaded`: the story's loads ran, or there are none. */
-  readonly type: "loaded";
-  /** The status: 200. */
-  readonly status: number;
-  /** The data the story's loads give the href. */
-  readonly data: Readonly<Record<string, unknown>>;
-};
+/** What `preloadData` resolves with: the data the story's loads give the href, or what they threw. */
+export type PreloadResult =
+  | {
+      /** The loads ran, or there are none. */
+      readonly type: "loaded";
+      /** The status: 200. */
+      readonly status: number;
+      /** The data. */
+      readonly data: Readonly<Record<string, unknown>>;
+    }
+  | {
+      /** A load threw. */
+      readonly type: "error";
+      /** What it threw. */
+      readonly error: unknown;
+    };
 
 /**
  * Records a call and hands it to the story's own callback, when it gives one.
@@ -98,7 +105,11 @@ export const refreshAll = async (): Promise<void> => {
 export const preloadData = async (href: string): Promise<PreloadResult> => {
   const store = currentStore();
   called(store, "preloadData", [href]);
-  return { type: "loaded", status: 200, data: await store.dataAt(href) };
+  try {
+    return { type: "loaded", status: 200, data: await store.dataAt(href) };
+  } catch (error) {
+    return { type: "error", error };
+  }
 };
 
 /**

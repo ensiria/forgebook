@@ -89,24 +89,78 @@ describe("$app/navigation and $app/state", () => {
     expect(page.url.pathname).toBe("/docs/");
   });
 
-  it("runs onNavigate and afterNavigate around a move, and loads the page's data again", async () => {
+  it("loads the data, then runs onNavigate, moves the page and runs afterNavigate, in SvelteKit's order", async () => {
     const store = story();
     const seen: string[] = [];
-    store.setLoader(async (at) => ({ path: at.url.pathname }));
+    store.setLoader(async (at) => {
+      seen.push(`load ${at.url.pathname}`);
+      return { path: at.url.pathname };
+    });
     store.onNavigate((navigation) => {
-      seen.push(`on ${navigation.to?.url.pathname ?? ""}`);
+      seen.push(`on ${navigation.to?.url.pathname ?? ""} with ${String(page.data["path"])}`);
       return (): void => {
-        seen.push("done");
+        seen.push("returned");
       };
     });
-    store.afterNavigate((navigation) => seen.push(`after ${navigation.type}`));
+    store.afterNavigate((navigation) => seen.push(`after ${navigation.type} ${page.url.pathname}`));
     await goto("/docs/blog/b");
-    expect(seen).toEqual(["on /docs/blog/b", "done", "after goto"]);
+    expect(seen).toEqual([
+      "load /docs/blog/b",
+      "on /docs/blog/b with undefined",
+      "after goto /docs/blog/b",
+      "returned"
+    ]);
     expect(page.data).toEqual({ path: "/docs/blog/b" });
     store.setLoader(async () => ({ path: "again" }));
     await invalidateAll();
     expect(page.data).toEqual({ path: "again" });
-    expect((await preloadData("/docs/blog/c")).data).toEqual({ path: "again" });
+    const preloaded = await preloadData("/docs/blog/c");
+    expect(preloaded.type === "loaded" ? preloaded.data : undefined).toEqual({ path: "again" });
+  });
+
+  it("keeps the later of two moves when the earlier one's load ends last", async () => {
+    const store = story();
+    let finishSlow = (): void => undefined;
+    store.setLoader(
+      (at) =>
+        new Promise((done) => {
+          const data = { at: at.url.pathname };
+          if (at.url.pathname.endsWith("/slow")) finishSlow = (): void => done(data);
+          else done(data);
+        })
+    );
+    const slow = store.navigate("goto", "/docs/blog/slow");
+    expect(await store.navigate("goto", "/docs/blog/fast")).toBe(true);
+    finishSlow();
+    expect(await slow).toBe(false);
+    expect(page.url.pathname).toBe("/docs/blog/fast");
+    expect(page.data).toEqual({ at: "/docs/blog/fast" });
+    expect(store.navigating()).toBeNull();
+  });
+
+  it("follows the redirects a load throws, and gives the page an error another throws, ready to move again", async () => {
+    const errors: unknown[] = [];
+    const store = story();
+    store.setErrorHandler((error) => errors.push(error));
+    store.setLoader(async (at) => {
+      if (at.url.pathname === "/docs/blog/old") throw { status: 308, location: "/docs/blog/new" };
+      if (at.url.pathname === "/docs/blog/gone") throw { status: 404, body: { message: "Gone" } };
+      return { at: at.url.pathname };
+    });
+    expect(await store.navigate("link", "/docs/blog/old")).toBe(true);
+    expect(page.url.pathname).toBe("/docs/blog/new");
+    expect(storyPage().calls.map((call) => call.name)).toEqual(["redirect"]);
+    expect(await store.navigate("link", "/docs/blog/gone")).toBe(false);
+    expect(page.error).toEqual({ message: "Gone", status: 404 });
+    expect(errors).toHaveLength(1);
+    expect(store.navigating()).toBeNull();
+    expect(await store.navigate("link", "/docs/blog/again")).toBe(true);
+  });
+
+  it("leaves a path outside the base path to the browser: the page stays", async () => {
+    const store = story();
+    expect(await store.navigate("link", "/elsewhere")).toBe(false);
+    expect(page.url.pathname).toBe("/docs/");
   });
 
   it("sets the page's state with pushState, and answers updated from the story", async () => {
@@ -150,7 +204,7 @@ describe("$app/forms", () => {
 
 describe("$app/paths", () => {
   it("writes paths under the base path, a route id's params filled in, and matches an address", async () => {
-    expect(resolve("/blog/[slug]", { slug: "a b" })).toBe("/docs/blog/a%20b");
+    expect(resolve("/blog/[slug]", { slug: "a-b" })).toBe("/docs/blog/a-b");
     expect(resolve("about?x=1")).toBe("/docs/about?x=1");
     expect(resolveRoute("/")).toBe("/docs/");
     expect(asset("favicon.png")).toBe("/docs/favicon.png");

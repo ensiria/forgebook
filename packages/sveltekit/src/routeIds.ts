@@ -11,6 +11,8 @@
  * @module
  */
 
+import { byRouteOrder } from "./routeOrder.ts";
+
 /** A route's params, by name: SvelteKit gives each as one text, a rest param's slashes included. */
 export type RouteParams = Readonly<Record<string, string>>;
 
@@ -110,41 +112,6 @@ const routePattern = (id: string): { readonly pattern: RegExp; readonly names: r
 };
 
 /**
- * How specific a route is, to choose between two that match a path as SvelteKit does: segment by segment, a text
- * before a param, a param before an optional one, an optional one before a rest; a longer route first.
- *
- * @param id - the route's id.
- * @returns a rank per segment, lower first.
- */
-const specificity = (id: string): number[] =>
-  pathSegments(id).map((segment) => {
-    const parts = segmentParts(segment);
-    if (parts.every((part) => part.kind === "text")) return 0;
-    if (parts.some((part) => part.kind === "param" && part.isRest)) return 3;
-    if (parts.some((part) => part.kind === "param" && part.isOptional)) return 2;
-    return 1;
-  });
-
-/**
- * Orders two routes, the more specific first.
- *
- * @param first - a route id.
- * @param second - another.
- */
-const bySpecificity = (first: string, second: string): number => {
-  const a = specificity(first);
-  const b = specificity(second);
-  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
-    const left = a[index];
-    const right = b[index];
-    if (left === undefined) return 1;
-    if (right === undefined) return -1;
-    if (left !== right) return left - right;
-  }
-  return first.localeCompare(second);
-};
-
-/**
  * A path's parts decoded, as SvelteKit decodes a param: a malformed escape left as it is.
  *
  * @param value - the text.
@@ -165,7 +132,7 @@ const decoded = (value: string): string => {
  * @returns the match, or none when no route matches.
  */
 export const matchRoute = (routes: readonly string[], pathname: string): RouteMatch | undefined => {
-  for (const id of [...routes].sort(bySpecificity)) {
+  for (const id of [...routes].sort(byRouteOrder)) {
     const { pattern, names } = routePattern(id);
     const found = pattern.exec(pathname);
     if (found === null) continue;
@@ -192,9 +159,8 @@ export const filledRoute = (id: string, params: RouteParams): string => {
     const text = parts
       .map((part) => {
         if (part.kind === "text") return part.text;
-        const value = params[part.name] ?? "";
-        // a rest param keeps its slashes; every other is one segment
-        return part.isRest ? value.split("/").map(encodeURIComponent).join("/") : encodeURIComponent(value);
+        // inserted as given, as SvelteKit's `resolve` does: the address the page builds from it encodes what it must
+        return params[part.name] ?? "";
       })
       .join("");
     return text === "" ? [] : [text];
