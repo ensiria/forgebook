@@ -28,6 +28,7 @@ import { initCommands } from "./initCommands.mts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
 
 await defineCommands({
@@ -95,13 +96,27 @@ await defineCommands({
     build: forgebook.command({
       summary: "Build the catalogue into static files.",
       options: {
-        out: { type: "string", valueName: "folder", description: "The folder to write; dist by default." }
+        out: { type: "string", valueName: "folder", description: "The folder to write; dist by default." },
+        base: {
+          type: "string",
+          valueName: "path",
+          description: "The path the catalogue is served under (/pr-12/); the root by default."
+        }
       },
-      examples: [{ command: `${COMMAND} build --out site`, description: "Build it into static files." }],
+      examples: [
+        { command: `${COMMAND} build --out site`, description: "Build it into static files." },
+        {
+          command: `${COMMAND} build --base /pr-12/`,
+          description: "For a host that serves it under a sub-path."
+        }
+      ],
       run: async ({ options, log }): Promise<void> => {
         const config = await configOf(options.config);
         await build(
-          await catalogueVite(config, { build: { outDir: resolve(config.dir, options.out ?? "dist") } })
+          await catalogueVite(config, {
+            ...(options.base === undefined ? {} : { base: options.base }),
+            build: { outDir: resolve(config.dir, options.out ?? "dist") }
+          })
         );
         log.success(`${config.title} built`);
       }
@@ -152,6 +167,61 @@ await defineCommands({
         if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
         const document = filteredStories(body, { source: options.source, component: options.component });
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
+      }
+    }),
+    tokens: forgebook.command({
+      summary:
+        "List the catalogue's design tokens, show one, or find the one nearest a value written by hand.",
+      json: true,
+      positionals: [{ name: "name", description: "A token's name, to see that one." }],
+      options: {
+        category: {
+          type: "string",
+          valueName: "name",
+          description: "Only a token type (color) or a first group (space)."
+        },
+        nearest: {
+          type: "string",
+          valueName: "value",
+          description: "The tokens nearest this value, as code writes it: #1c1b1b, 16px, 200ms."
+        },
+        type: {
+          type: "string",
+          valueName: "type",
+          description:
+            "With --nearest, what to compare with: color, dimension, duration, number, fontWeight, or a CSS property; read from the value when left out."
+        },
+        limit: {
+          type: "string",
+          valueName: "number",
+          description: "The most tokens a list gives; 100 by default, with the total beside them."
+        },
+        url: {
+          type: "string",
+          env: "FORGEBOOK_URL",
+          valueName: "address",
+          description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
+        }
+      },
+      examples: [
+        { command: `${COMMAND} tokens --category color`, description: "Every colour." },
+        { command: `${COMMAND} tokens color.brand.primary --json`, description: "One token." },
+        {
+          command: `${COMMAND} tokens --nearest "#1c1b1b"`,
+          description: "What to write instead of that colour."
+        },
+        {
+          command: `${COMMAND} tokens --nearest 13px --type dimension`,
+          description: "And instead of that size."
+        }
+      ],
+      run: async ({ options, args, io, log, isJson }): Promise<void> => {
+        const config = await configOf(options.config);
+        const { nearest, category, type, limit, url } = options;
+        await runTokens(
+          { config, url, context: { io, log, isJson } },
+          { name: args.name, nearest, category, type, limit }
+        );
       }
     }),
     docs: forgebook.command({

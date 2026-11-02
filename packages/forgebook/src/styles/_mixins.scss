@@ -1,5 +1,6 @@
 // The catalogue's own helpers for its shell.
 
+@use "sass:meta";
 @use "tokens" as *;
 
 /// The keyboard focus ring: an outline halo (forced colours keep it) and an inset edge, the part's shadow kept.
@@ -35,6 +36,13 @@
   font: $text-label;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/// What a catalogue's theme can replace, as custom properties: fonts and corners, the same in both appearances.
+@mixin look {
+  @each $name, $value in $look {
+    --forgebook-#{$name}: #{meta.inspect($value)};
+  }
 }
 
 /// A palette written as the custom properties the colour tokens read (`--forgebook-text`…).

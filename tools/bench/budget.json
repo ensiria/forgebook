@@ -1,0 +1,12 @@
+{
+  "corpus": { "components": 20, "stories": 100 },
+  "limits": {
+    "installAdded": 45825000,
+    "packages": 31,
+    "directDependencies": 7,
+    "coldStart": 2274,
+    "shellJs": 120527,
+    "frameJs": 160332,
+    "firstLoadJs": 197619
+  }
+}
