@@ -215,7 +215,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     decorators,
     globals,
     loaded: prepared.loaded,
-    report: options.onEvent
+    onEvent: options.onEvent
   });
 
   const clearError = (): void => {

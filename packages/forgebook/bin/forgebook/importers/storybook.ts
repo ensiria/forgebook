@@ -13,7 +13,7 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import ts from "typescript-6";
@@ -28,7 +28,7 @@ export type ImportedFramework = "react" | "nextjs";
 export type ImportedConfig = {
   /** The Forgebook framework the stories are written for. */
   readonly framework: ImportedFramework;
-  /** The framework's options, each a text (`{ nextConfig: "web/next.config.js" }`); none when there are none. */
+  /** The framework's options, each a text (`{ dir: "web", nextConfig: "next.config.js" }`); none when there are none. */
   readonly frameworkOptions: Readonly<Record<string, string>> | undefined;
   /** The catalogue's name: the package's, or the folder's. */
   readonly title: string;
@@ -395,10 +395,13 @@ const nextjsSettings = (
   if (isRecord(features) && features["experimentalRSC"] === true)
     notes.push("experimentalRSC is not needed: Forgebook draws async server components without a flag");
   const { nextConfigPath } = frameworkOf(main).options;
+  // the Next.js app's folder is where its next.config is: its tsconfig, .env files and PostCSS are there too
+  const file = typeof nextConfigPath === "string" ? resolve(projectDir, nextConfigPath) : undefined;
+  const appDir = file === undefined ? "" : relative(projectDir, dirname(file));
   const options =
-    typeof nextConfigPath === "string"
-      ? { nextConfig: relative(projectDir, resolve(projectDir, nextConfigPath)) }
-      : undefined;
+    file === undefined
+      ? undefined
+      : { ...(appDir === "" ? {} : { dir: appDir }), nextConfig: basename(file) };
   return { options, notes };
 };
 

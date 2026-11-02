@@ -193,7 +193,7 @@ describe("importStorybook", () => {
     const read = await importStorybook(webpack);
     if (typeof read === "string") throw new Error(read);
     expect(read.framework).toBe("nextjs");
-    expect(read.frameworkOptions).toEqual({ nextConfig: join("web", "next.config.mjs") });
+    expect(read.frameworkOptions).toEqual({ dir: "web", nextConfig: "next.config.mjs" });
     expect(read.notes).toEqual([
       "Storybook's Next.js framework on webpack: Forgebook runs on Vite, so webpackFinal and a Babel configuration are not read",
       "experimentalRSC is not needed: Forgebook draws async server components without a flag"
@@ -249,7 +249,7 @@ describe("initConfigText", () => {
     const text = initConfigText(
       {
         framework: "nextjs",
-        frameworkOptions: { nextConfig: "web/next.config.mjs" },
+        frameworkOptions: { dir: "web", nextConfig: "next.config.mjs" },
         title: "web",
         stories: ["app/**/*.stories.tsx"],
         preview: undefined,
@@ -259,6 +259,6 @@ describe("initConfigText", () => {
       "Storybook"
     );
     expect(text).toContain('import { nextjs } from "@forgebook/nextjs/vite";');
-    expect(text).toContain('  framework: nextjs({ nextConfig: "web/next.config.mjs" }),');
+    expect(text).toContain('  framework: nextjs({ dir: "web", nextConfig: "next.config.mjs" }),');
   });
 });
