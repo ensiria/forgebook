@@ -86,6 +86,10 @@ node tools/bench/bench.mts --corpus primer --compare --work /some/folder
 - **Their code is data.** The clone runs no hook and installs with lifecycle scripts off. `prepare`, when a definition
   has one, is the only code of the library that runs before its stories, and only because those stories, or the
   library's own Storybook, import what it builds (Fluent's Storybook loads an addon of the monorepo from its build).
+- **Nothing written in the clone** but Forgebook's folder: every tool's build goes to `--work`'s `builds/<corpus>/<tool>`.
+  A build inside the clone is read by the library's own tools: Fluent's Storybook lists the monorepo's projects, and
+  stopped on a build folder (Storybook's own output holds a `project.json`, an Nx project's file). A build folder an earlier harness
+  left there is removed.
 - **Nothing left running.** Every command the harness runs in a library has its tools' daemons turned off (`NX_DAEMON`,
   `TURBO_DAEMON`): Nx's, started by Fluent's `prepare`, kept a core busy for hours under every later run. At the end,
   whatever still runs from `--work` and started during the run is stopped, and each process is named in a warning.

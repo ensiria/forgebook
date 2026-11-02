@@ -61,6 +61,11 @@ export type MeasureContext = {
   readonly target: Target;
   /** The project's folder. */
   readonly directory: string;
+  /**
+   * Where its build is written: outside the project, which for a real library is inside its clone, where a library's
+   * own tools read every folder (Fluent UI's Storybook read another tool's build as a package of the monorepo).
+   */
+  readonly buildFolder: string;
   /** The browser. */
   readonly browser: Browser;
   /** The port its servers listen on. */
@@ -408,19 +413,16 @@ export type BuildSample = {
   readonly size: number;
 };
 
-/** The folder a build writes to, from the project's root. */
-const BUILD_FOLDER = "bench-build";
-
 /**
  * Builds the catalogue from nothing: no output and no cache.
  *
  * @param context - the measurement's context.
  */
 export const measureBuild = async (context: MeasureContext): Promise<BuildSample> => {
-  const out = join(context.directory, BUILD_FOLDER);
+  const out = context.buildFolder;
   await rm(out, { recursive: true, force: true });
   await removeCaches(context);
-  const command = context.target.build(BUILD_FOLDER);
+  const command = context.target.build(out);
   const start = Date.now();
   await exec(programOf(context, command), [...command.args], {
     cwd: context.directory,
@@ -451,7 +453,7 @@ export type LoadSample = {
  * @param context - the measurement's context.
  */
 export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSample> => {
-  const server = await serveStatic(join(context.directory, BUILD_FOLDER), HOST, context.port);
+  const server = await serveStatic(context.buildFolder, HOST, context.port);
   const { browserContext, page } = await openPage(context, VIEWPORT);
   const main = new Set<string>();
   const frames = new Set<string>();

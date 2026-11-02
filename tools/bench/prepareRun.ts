@@ -3,6 +3,7 @@
  *
  * @module
  */
+import { rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
@@ -79,6 +80,12 @@ const failedInstall = (error: unknown): MetricResult => ({
   reason: error instanceof Error ? error.message : String(error)
 });
 
+/** Where the tools' builds are written, inside the work folder and outside any project or clone. */
+const BUILDS_FOLDER = "builds";
+
+/** The folder an earlier harness wrote a build to, inside the project's folder. */
+const LEGACY_BUILD_FOLDER = "bench-build";
+
 /**
  * Prepares the tools on the generated library.
  *
@@ -114,6 +121,7 @@ export const prepareGenerated = async (request: PrepareRequest, prepared: Prepar
         context: {
           target,
           directory,
+          buildFolder: join(folders.work, BUILDS_FOLDER, "generated", target.name),
           browser: prepared.browser,
           port: request.port + index,
           subject: generatedSubject(target, corpus.measured, directory),
@@ -159,6 +167,8 @@ export const prepareReal = async (
     prepared.report[target.name] = metrics;
     const directory =
       target.name === "forgebook" ? paths.bench : join(paths.clone, corpus.storybook?.folder ?? "");
+    // what an earlier harness wrote inside the clone, which the library's tools would read as one of its folders
+    await rm(join(directory, LEGACY_BUILD_FOLDER), { recursive: true, force: true });
     const named = await Promise.all(
       target.packages.map(async (name) => [name, await resolvedVersion(directory, name)] as const)
     );
@@ -167,6 +177,7 @@ export const prepareReal = async (
       context: {
         target,
         directory,
+        buildFolder: join(folders.work, BUILDS_FOLDER, corpus.name, target.name),
         browser: prepared.browser,
         port: request.port + index,
         subject: realSubject(target, corpus, paths),
