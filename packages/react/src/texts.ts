@@ -4,7 +4,7 @@
  *
  * @remarks
  * The table and the text function are the format's (`@forgebook/story-format/texts`); this module is how a React
- * component reads them. The frame's renderer provides the table (`reactRenderer.tsx`); outside a catalogue there is
+ * component reads them. The frame's renderer provides the table (`reactFrameRenderer.tsx`); outside a catalogue there is
  * none, and a text is its key in brackets.
  *
  * @module

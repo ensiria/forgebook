@@ -43,7 +43,7 @@ import { STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import { applyTools } from "./measureTools.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
-import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
+import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import type { MockToolsLoader } from "./storyMocks.ts";
@@ -54,7 +54,7 @@ import { followTouch } from "./touchLayer.ts";
 /** What an app passes to the frame. */
 export type FrameConfig = {
   /** The framework that draws the stories (`@forgebook/react` passes its own). */
-  readonly renderer: StoryRenderer;
+  readonly renderer: FrameRenderer;
   /** The sources the shell shows, in the same order. */
   readonly sources: readonly StorySource[];
   /** The languages every story can be drawn in, as the shell's configuration gives them; none turns them off. */

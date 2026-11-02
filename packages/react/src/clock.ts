@@ -4,7 +4,7 @@
  *
  * @remarks
  * The clock itself is the format's (`@forgebook/story-format/clock`); this module is how a React component reads it.
- * The frame's renderer provides it (`reactRenderer.tsx`).
+ * The frame's renderer provides it (`reactFrameRenderer.tsx`).
  *
  * @module
  */

@@ -61,8 +61,8 @@ export type MountedStory = {
   readonly unmount: () => void;
 };
 
-/** A framework, as the frame uses it. */
-export type StoryRenderer = {
+/** A framework, as a page uses it: the frame draws, and nothing in a browser renders on a server. */
+export type FrameRenderer = {
   /**
    * Draws a story in a canvas the frame owns.
    *
@@ -75,6 +75,10 @@ export type StoryRenderer = {
     drawing: StoryDrawing,
     onError: (error: Error) => void
   ) => MountedStory;
+};
+
+/** A framework, whole: what a page draws with, and the render the generated server tests run. */
+export type StoryRenderer = FrameRenderer & {
   /**
    * The story drawn as HTML on the server, for the generated server tests; throws when the story throws.
    *
