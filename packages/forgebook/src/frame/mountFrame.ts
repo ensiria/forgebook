@@ -18,7 +18,7 @@ import { storyTextOf } from "@forgebook/story-format/texts";
 
 import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
-import { STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
+import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
 import { shownLanguage } from "../languages.ts";
 import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
 import {
@@ -158,7 +158,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const languages = config.languages ?? [];
   const switches = catalogueSwitches(config.switches, languages, config.lists?.controls);
   const catalogue = catalogueSettings("", switches, config.lists);
-  const preview = mergedPreviews((config.previews ?? []).map(readPreview));
+  // the previews' modules: an edit of one (or of what it imports) brings its successor
+  let previews: readonly unknown[] = config.previews ?? [];
+  let preview = mergedPreviews(previews.map(readPreview));
   const view = parseView(window.location.search, catalogue);
   applyView(document.documentElement, view, catalogue);
   // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
@@ -337,6 +339,21 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       story = next;
       running.setStory(next);
       if (controls !== undefined) tellReady();
+    });
+    // an edit of a preview, or of a component it imports through a library's index, draws the story anew with the new
+    // previews; the set-ups they run already ran, and stay as they were
+    window.addEventListener(PREVIEWS_EVENT, (event: Event): void => {
+      const renewal = previewsRenewalOf(event);
+      if (renewal === undefined) return;
+      previews = previews.map((module, index) => renewal.next[index] ?? module);
+      preview = mergedPreviews(previews.map(readPreview));
+      const next = readStory(shownFile, location.story.exportName, preview);
+      if (typeof next === "string") {
+        window.location.reload();
+        return;
+      }
+      story = next;
+      running.setStory(next, [...preview.decorators, ...plugins.decorators]);
     });
     // the shell opens another story by loading another page: the set-ups' cleanups run as this one goes (a page kept
     // for the back button keeps its story)

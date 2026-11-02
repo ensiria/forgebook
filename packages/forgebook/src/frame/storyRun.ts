@@ -126,8 +126,9 @@ export type RunningStory = {
    * open menu), and so do the values set in the panel. A story with a play is mounted anew, and its play runs again.
    *
    * @param next - the story, read from the edited file.
+   * @param decorators - the decorators around it, when an edit of a preview changed them; the same ones by default.
    */
-  readonly setStory: (next: LoadedStory) => void;
+  readonly setStory: (next: LoadedStory, decorators?: StoryDrawing["decorators"]) => void;
 };
 
 /** A story's handler of an event, as the frame calls it. */
@@ -185,7 +186,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   const { container, renderer, clock } = options;
   let { story } = options;
   const document = container.ownerDocument;
-  const { decorators } = options;
+  let { decorators } = options;
   let { texts, globals } = options;
   let text = storyTextOf(texts);
   let args: LoadedArgs = story.args;
@@ -453,8 +454,9 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       text = storyTextOf(texts);
       redraw();
     },
-    setStory: (next: LoadedStory): void => {
+    setStory: (next: LoadedStory, nextDecorators = decorators): void => {
       story = next;
+      decorators = nextDecorators;
       actions = actionNames(story.args, story.argTypes);
       args = { ...story.args, ...panelValues };
       // a play drives the story from its start: drawn in place, it would show a story the play never reached

@@ -89,6 +89,13 @@ describe("the generated pages", () => {
     expect(entry).toContain("previews: [preview0]");
   });
 
+  it("takes its previews' edits on a dev server, for the frame to draw the story anew instead of reloading", () => {
+    const entry = frameEntry(CONFIG);
+    expect(entry).toContain('import.meta.hot.accept(["/catalogue/forgebook.preview.tsx"], (next) =>');
+    expect(entry).toContain('new CustomEvent("forgebook:previews", { detail: { next } })');
+    expect(frameEntry({ ...CONFIG, previews: [] })).not.toContain("import.meta.hot");
+  });
+
   it("loads Testing Library for the plays only when the project installs it, and only on the first play", () => {
     expect(frameEntry(CONFIG)).not.toContain("@testing-library");
     const entry = frameEntry({ ...CONFIG, hasPlayTools: true });
