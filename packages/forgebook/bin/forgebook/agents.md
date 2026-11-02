@@ -25,6 +25,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - In a Vue project, the same with `Badge.vue` and `Badge.stories.ts`: the types from `@forgebook/vue`, the component by its
   default import, a slot as the arg `#name` (`"#default": "Text"`) and an event as its listener (`onRemove`). Open a `.vue`
   file's script with its TSDoc block: that comment is the component's.
+- In a Solid or Preact project, the same as React's, with the types from `@forgebook/solid` or `@forgebook/preact`. In
+  Solid a render runs once: read the args inside its JSX (`<Badge label={args.label} />`) or spread them
+  (`<Badge {...args} />`), never destructured, so a new value reaches the story without starting it over.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.

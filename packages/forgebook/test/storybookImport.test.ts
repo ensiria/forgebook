@@ -152,6 +152,23 @@ describe("importStorybook", () => {
     expect(typeof imported === "string" ? imported : imported.framework).toBe("vue");
   });
 
+  it("reads a Preact project's Storybook as Preact, and a Solid project's as Solid, its framework by name or path", async () => {
+    const frameworks = [
+      ["preact", '"@storybook/preact-vite"'],
+      ["solid", '{ name: "/repo/node_modules/storybook-solidjs-vite" }']
+    ];
+    for (const [expected, framework] of frameworks) {
+      const project = join(scratch, `framework-${expected}`);
+      cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+      writeFileSync(
+        join(project, ".storybook", "main.ts"),
+        `export default { stories: ["../src/**/*.stories.tsx"], framework: ${framework} };\n`
+      );
+      const imported = await importStorybook(project);
+      expect(typeof imported === "string" ? imported : imported.framework).toBe(expected);
+    }
+  });
+
   it("refuses a framework Forgebook does not read, saying what it reads", async () => {
     const project = join(scratch, "angular");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
@@ -160,7 +177,7 @@ describe("importStorybook", () => {
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
     );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads Storybook's stories on Vite (@storybook/react-vite, @storybook/vue3-vite); this project uses @storybook/angular"
+      "Forgebook reads Storybook's stories on Vite (@storybook/react-vite, @storybook/vue3-vite, @storybook/preact-vite, storybook-solidjs-vite); this project uses @storybook/angular"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package

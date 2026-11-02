@@ -14,9 +14,11 @@ This repository holds Forgebook's packages; each has its own README, which is al
 | [`forgebook`](packages/forgebook) | The catalogue: the shell, one frame per story, the Vite plugin and the commands. **Start here.** |
 | [`@forgebook/react`](packages/react) | React's story types, renderer and props reader |
 | [`@forgebook/vue`](packages/vue) | Vue's story types, renderer and props, events and slots reader |
+| [`@forgebook/solid`](packages/solid) | Solid's story types, renderer (args update in place) and props reader |
+| [`@forgebook/preact`](packages/preact) | Preact's story types, renderer (on Preact itself, no compat) and props reader |
 | [`@forgebook/story-format`](packages/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](packages/testing) | Tests generated from the stories: browser, visual and server render |
 
-Requirements: Node 22.18 or later and Vite 8; React 19 or Vue 3.5. [MIT licence](LICENSE).
+Requirements: Node 22.18 or later and Vite 8; React 19, Vue 3.5, Solid 1.9 or Preact 10.19 or 11. [MIT licence](LICENSE).
 
 Bugs, proposals and pull requests: [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md).
