@@ -239,6 +239,8 @@ export type LoadedPreview = {
   readonly argTypes: Readonly<Record<string, unknown>>;
   /** Its parameters, under every meta's. */
   readonly parameters: Readonly<Record<string, unknown>>;
+  /** The globals it starts from, under the switches': what its decorators read. */
+  readonly globals: Readonly<Record<string, string>>;
   /** What runs once before any story renders; nothing when it has none. */
   readonly setup: (() => Promise<void>) | undefined;
 };
@@ -251,17 +253,46 @@ export const NO_PREVIEW: LoadedPreview = {
   args: {},
   argTypes: {},
   parameters: {},
+  globals: {},
   setup: undefined
 };
 
 /**
- * A catalogue's preview read safely, as a story file is: from the default export of its module, or the module itself.
+ * The entries of an object whose values are texts, by the same keys.
+ *
+ * @param values - the values by key.
+ */
+const textsOf = (values: Readonly<Record<string, unknown>>): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(values).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : []))
+  );
+
+/**
+ * The globals a preview starts from, as Storybook starts them: each `globalTypes` entry's `defaultValue`, under
+ * `initialGlobals`. Its decorators read them before anyone touches a toolbar, so without them a decorator that calls
+ * `context.globals.scheme.startsWith` fails on every story. Only texts: `context.globals` holds texts.
+ *
+ * @param preview - the preview's fields.
+ */
+const previewGlobals = (preview: Readonly<Record<string, unknown>>): Record<string, string> => {
+  const types = isRecord(preview["globalTypes"]) ? preview["globalTypes"] : {};
+  const defaults = Object.fromEntries(
+    Object.entries(types).map(([id, type]) => [id, isRecord(type) ? type["defaultValue"] : undefined])
+  );
+  const initial = isRecord(preview["initialGlobals"]) ? preview["initialGlobals"] : {};
+  return { ...textsOf(defaults), ...textsOf(initial) };
+};
+
+/**
+ * A catalogue's preview read safely, as a story file is: field by field, as Storybook reads one, the default export's
+ * value or else the module's named export. A preview often writes both (`export const decorators` beside
+ * `export default preview`), and reading only one of them would drop the other's providers without a word.
  *
  * @param module - the preview's module, as `import()` gave it; none for a catalogue without one.
  */
 export const readPreview = (module: unknown): LoadedPreview => {
   if (!isRecord(module)) return NO_PREVIEW;
-  const preview = isRecord(module["default"]) ? module["default"] : module;
+  const preview = isRecord(module["default"]) ? { ...module, ...module["default"] } : module;
   const setup = preview["setup"];
   return {
     decorators: decoratorsOf(preview),
@@ -270,6 +301,7 @@ export const readPreview = (module: unknown): LoadedPreview => {
     args: isRecord(preview["args"]) ? preview["args"] : {},
     argTypes: isRecord(preview["argTypes"]) ? preview["argTypes"] : {},
     parameters: parametersOf(preview),
+    globals: previewGlobals(preview),
     setup: isFunction<() => Promise<void>>(setup) ? setup : undefined
   };
 };
@@ -292,6 +324,7 @@ export const mergedPreviews = (previews: readonly LoadedPreview[]): LoadedPrevie
       {}
     ),
     parameters: Object.fromEntries(previews.flatMap((preview) => Object.entries(preview.parameters))),
+    globals: Object.assign({}, ...previews.map((preview) => preview.globals)),
     setup:
       setups.length === 0
         ? undefined

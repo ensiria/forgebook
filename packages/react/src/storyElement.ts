@@ -3,6 +3,11 @@
  * the catalogue's (its preview's), in that order outward. The story's canvas and each cell of its matrix draw it the
  * same way.
  *
+ * @remarks
+ * The render and the decorators run inside a component (`StoryBody`), never while the element is built: Storybook's
+ * users write hooks in both, and a hook outside a render throws. The component is one module-level function, so new
+ * args draw the same component again and the story keeps its state.
+ *
  * @module
  */
 
@@ -35,6 +40,13 @@ type ReactStory = {
 const asReactStory = (story: LoadedStory): ReactStory => story as ReactStory;
 
 /**
+ * The component a story draws in: where its render's and its decorators' hooks run.
+ *
+ * @param props - the story's render, inside its decorators.
+ */
+const StoryBody = ({ draw }: { readonly draw: () => ReactNode }): ReactNode => draw();
+
+/**
  * The story with these args: its render (or the meta's component), inside its decorators.
  *
  * @param loaded - the story.
@@ -55,5 +67,5 @@ export const storyElement = (
     (inner, decorator) => (): ReactNode => decorator(inner, context),
     renderStory
   );
-  return decorated();
+  return createElement(StoryBody, { draw: decorated });
 };

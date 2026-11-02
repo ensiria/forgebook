@@ -101,6 +101,30 @@ describe("reactRenderer", () => {
     expect(canvas.textContent).toBe("");
   });
 
+  it("calls hooks in a story's render and in a decorator, which Storybook's stories do", async () => {
+    const canvas = document.createElement("div");
+    document.body.append(canvas);
+    const inSection = (story: () => ReactNode): ReactNode => {
+      const [label] = useState("wrapped");
+      return <section aria-label={label}>{story()}</section>;
+    };
+    const errors: string[] = [];
+    const hooked = {
+      ...drawing({ name: "Ada" }, readPreview({ decorators: [inSection] }).decorators),
+      story: loaded({
+        render: () => {
+          const [text] = useState("from a hook");
+          return <p>{text}</p>;
+        }
+      })
+    };
+    const mounted = reactRenderer.mount(canvas, hooked, (error) => errors.push(error.message));
+    await vi.waitFor(() => expect(canvas.textContent).toBe("from a hook"));
+    expect(canvas.querySelector("section")?.getAttribute("aria-label")).toBe("wrapped");
+    expect(errors).toEqual([]);
+    mounted.unmount();
+  });
+
   it("hands an error to the frame and draws the story again with other args", async () => {
     const canvas = document.createElement("div");
     document.body.append(canvas);

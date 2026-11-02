@@ -82,12 +82,35 @@ describe("indexStoryFile", () => {
     });
   });
 
-  it("reads re-exported stories under their exported names, never another file's", () => {
-    const text = `export default { title: "A/B" };
+  it("reads re-exported stories under their exported names, another file's too, as Storybook does", () => {
+    const text = `export default { title: "A/B", tags: ["beta"] };
       const Base = {};
       export { Base as Overview };
-      export { Other } from "./other.stories";`;
+      export { Other, Plain as Renamed } from "./other.stories";`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [
+        { exportName: "Overview", tags: ["beta"] },
+        { exportName: "Other", tags: ["beta"] },
+        { exportName: "Renamed", tags: ["beta"] }
+      ]
+    });
+  });
+
+  it("takes no type for a story, and leaves another file's stories to `excludeStories`", () => {
+    const text = `export default { title: "A/B", excludeStories: ["helper"] };
+      export type { Props } from "./types";
+      export { type Shape, helper, Story } from "./other.stories";`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [{ exportName: "Story" }]
+    });
+  });
+
+  it("reads JSX in a `.js` story file, as Storybook's own libraries write them", () => {
+    const text = `export default { title: "A/B" };
+      export const Overview = () => <Button />;`;
+    expect(indexStoryFile("A.stories.js", text)).toEqual({
       title: "A/B",
       stories: [{ exportName: "Overview" }]
     });

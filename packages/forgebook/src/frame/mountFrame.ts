@@ -231,7 +231,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       const switchesShown = { switches: { ...live.switches, ...fixed.switches } };
       return {
         texts: shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
-        globals: codeGlobalsOf(switchesShown, switches)
+        globals: { ...preview.globals, ...codeGlobalsOf(switchesShown, switches) }
       };
     };
     const shown = shownFor(view);

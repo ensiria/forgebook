@@ -21,6 +21,31 @@ const read = (module: Record<string, unknown>, exportName: string): LoadedStory 
 };
 
 describe("readStory", () => {
+  it("reads the globals a preview starts from: `initialGlobals` over `globalTypes`, the texts of both", () => {
+    const preview = readPreview({
+      globalTypes: { scheme: { defaultValue: "light" }, flags: { defaultValue: { beta: true } }, none: {} },
+      initialGlobals: { locale: "en", scheme: "dark" }
+    });
+    expect(preview.globals).toEqual({ scheme: "dark", locale: "en" });
+    const merged = mergedPreviews([
+      readPreview({ initialGlobals: { a: "1", b: "1" } }),
+      readPreview({ initialGlobals: { b: "2" } })
+    ]);
+    expect(merged.globals).toEqual({ a: "1", b: "2" });
+  });
+
+  it("reads a preview's named exports beside a default export, field by field, as Storybook does", () => {
+    const decorator = (): null => null;
+    const preview = readPreview({
+      decorators: [decorator],
+      args: { named: true },
+      default: { args: { fromDefault: true }, parameters: { layout: "centered" } }
+    });
+    expect(preview.decorators).toEqual([decorator]);
+    expect(preview.args).toEqual({ fromDefault: true });
+    expect(preview.parameters).toMatchObject({ layout: "centered" });
+  });
+
   it("reads a CSF 2 function story: the function is its render, its properties its args and parameters", () => {
     const Primary = Object.assign((): string => "drawn", {
       args: { label: "Go" },
