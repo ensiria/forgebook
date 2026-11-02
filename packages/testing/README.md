@@ -180,5 +180,5 @@ describeAdapter({ name: "Solid", renderer, drawing, decorator, codeOf, docsOf })
 
 `drawing(name)` gives a story with a button showing `Hello <name> <clicks>`, its clicks in its own state, which throws for
 `THROWING_NAME`. `decorator(label)` draws a story inside a `section` with that `data-decorator`. A renderer's
-`renderToString` may return a promise. `test/conformance.test.tsx` in `@forgebook/react` and `test/conformance.test.ts` in
-`@forgebook/vue` are complete examples.
+`renderToString` may return a promise. `test/conformance.test.tsx` in `@forgebook/react`, and `test/conformance.test.ts` in
+`@forgebook/vue` and `@forgebook/angular`, are complete examples.

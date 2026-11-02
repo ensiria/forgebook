@@ -1,0 +1,15 @@
+// The Angular fixture: components and stories, checked with Angular's compiler (`ngc`), which checks the templates too.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    "allowImportingTsExtensions": true
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true
+  },
+  "include": ["src", "stories.ts", "forgebook.preview.ts"]
+}

@@ -25,6 +25,11 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - In a Vue project, the same with `Badge.vue` and `Badge.stories.ts`: the types from `@forgebook/vue`, the component by its
   default import, a slot as the arg `#name` (`"#default": "Text"`) and an event as its listener (`onRemove`). Open a `.vue`
   file's script with its TSDoc block: that comment is the component's.
+- In an Angular or Analog project, `badge.component.ts` and `Badge.stories.ts`: the types and Storybook's helpers
+  (`applicationConfig`, `moduleMetadata`, `componentWrapperDecorator`, `argsToTemplate`) from `@forgebook/angular`, the
+  class by its name, an input or an output by the name a template binds (its alias), an output's arg a handler, projected
+  content as `#default` or `#<selector>` (`"#[icon]": "*"`), and a template in a render as
+  `({ props: args, template: "…" })`. The Code tab writes the story by the component's selector.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
@@ -54,7 +59,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | Command | What it is for |
 |---|---|
 | `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
-| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` writes `Badge.stories.ts`) |
+| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` or `badge.component.ts` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
