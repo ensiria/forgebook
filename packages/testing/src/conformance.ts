@@ -6,6 +6,8 @@
  * a greeting and counts its clicks, and throws for one name. The suite then says what the frame relies on (`renderer.ts`,
  * `adapter.ts`): a story is drawn in its canvas inside its decorators, new args keep its state, it goes away, its errors
  * reach the frame, and it can be drawn on a server, at once or in time. It runs in the adapter's own Vitest, with a simulated page.
+ * A framework whose page and server builds are different modules (Solid's `solid-js/web` resolves to one or the other)
+ * runs it twice, once in a simulated page for the page's cases and once on Node for the server's (`cases`).
  *
  * @module
  */
@@ -44,7 +46,15 @@ export type AdapterSubject = {
    * adapter with no documented types yet.
    */
   readonly docsOf?: () => unknown;
+  /**
+   * Which of the suite's cases this run holds: `"page"` those drawn in a page, with the code writer and the docs;
+   * `"server"` those drawn on a server; `"all"` by default, for a framework that draws both ways in one environment.
+   */
+  readonly cases?: AdapterCases;
 };
+
+/** Which of the suite's cases a run holds. */
+export type AdapterCases = "all" | "page" | "server";
 
 /** The canvases of the running test, emptied after it. */
 const canvases: HTMLElement[] = [];
@@ -77,14 +87,25 @@ const asyncRender = async (renderer: StoryRenderer, story: StoryDrawing): Promis
  * @param subject - the adapter's subject.
  */
 export const describeAdapter = (subject: AdapterSubject): void => {
-  const { name, renderer, drawing, decorator, codeOf, docsOf } = subject;
+  const { name, renderer, drawing, decorator, codeOf, docsOf, cases = "all" } = subject;
+  const inPage = cases !== "server";
+  const onServer = cases !== "page";
+  /** The drawing with a decorator of the story's and one of the catalogue's. */
+  const decorated = (): StoryDrawing => {
+    const plain = drawing("Ada");
+    return {
+      ...plain,
+      story: { ...plain.story, decorators: [decorator("story")] },
+      decorators: [decorator("catalogue")]
+    };
+  };
 
   describe(`the ${name} adapter`, () => {
     afterEach(() => {
       for (const each of canvases.splice(0)) each.remove();
     });
 
-    it("draws a story in its canvas, and says when it is drawn", async () => {
+    it.runIf(inPage)("draws a story in its canvas, and says when it is drawn", async () => {
       const element = canvas();
       const story = renderer.mount(element, drawing("Ada"), () => undefined);
       await story.drawn;
@@ -92,7 +113,7 @@ export const describeAdapter = (subject: AdapterSubject): void => {
       story.unmount();
     });
 
-    it("draws new args again, keeping the story's own state", async () => {
+    it.runIf(inPage)("draws new args again, keeping the story's own state", async () => {
       const element = canvas();
       const story = renderer.mount(element, drawing("Ada"), () => undefined);
       await story.drawn;
@@ -103,23 +124,16 @@ export const describeAdapter = (subject: AdapterSubject): void => {
       story.unmount();
     });
 
-    it("draws a story inside its decorators, the catalogue's outside the story's", async () => {
+    it.runIf(inPage)("draws a story inside its decorators, the catalogue's outside the story's", async () => {
       const element = canvas();
-      const plain = drawing("Ada");
-      const decorated: StoryDrawing = {
-        ...plain,
-        story: { ...plain.story, decorators: [decorator("story")] },
-        decorators: [decorator("catalogue")]
-      };
-      const story = renderer.mount(element, decorated, () => undefined);
+      const story = renderer.mount(element, decorated(), () => undefined);
       await story.drawn;
       const inner = element.querySelector('[data-decorator="catalogue"] [data-decorator="story"] button');
       expect(inner?.textContent).toContain("Hello Ada");
-      expect(await renderer.renderToString(decorated)).toContain('data-decorator="catalogue"');
       story.unmount();
     });
 
-    it("takes a story away from its canvas", async () => {
+    it.runIf(inPage)("takes a story away from its canvas", async () => {
       const element = canvas();
       const story = renderer.mount(element, drawing("Ada"), () => undefined);
       await story.drawn;
@@ -127,28 +141,39 @@ export const describeAdapter = (subject: AdapterSubject): void => {
       await settled(() => element.textContent === "");
     });
 
-    it("hands the frame an error thrown while drawing, and draws again when the args change", async () => {
-      const errors: Error[] = [];
-      const element = canvas();
-      const story = renderer.mount(element, drawing(THROWING_NAME), (error) => errors.push(error));
-      await settled(() => errors.length > 0);
-      story.update(drawing("Ada"));
-      await settled(() => element.textContent?.includes("Hello Ada") === true);
-      story.unmount();
+    it.runIf(inPage)(
+      "hands the frame an error thrown while drawing, and draws again when the args change",
+      async () => {
+        const errors: Error[] = [];
+        const element = canvas();
+        const story = renderer.mount(element, drawing(THROWING_NAME), (error) => errors.push(error));
+        await settled(() => errors.length > 0);
+        story.update(drawing("Ada"));
+        await settled(() => element.textContent?.includes("Hello Ada") === true);
+        story.unmount();
+      }
+    );
+
+    it.runIf(onServer)(
+      "draws a story as HTML on a server, and fails with what the story throws",
+      async () => {
+        expect(await renderer.renderToString(drawing("Ada"))).toContain("Ada");
+        await expect(asyncRender(renderer, drawing(THROWING_NAME))).rejects.toThrow();
+      }
+    );
+
+    it.runIf(onServer)("draws a story on a server inside its decorators", async () => {
+      const html = await renderer.renderToString(decorated());
+      expect(html).toMatch(/data-decorator="catalogue".*data-decorator="story".*Hello/s);
     });
 
-    it("draws a story as HTML on a server, and fails with what the story throws", async () => {
-      expect(await renderer.renderToString(drawing("Ada"))).toContain("Ada");
-      await expect(asyncRender(renderer, drawing(THROWING_NAME))).rejects.toThrow();
-    });
-
-    it("writes a story's args as the framework's code", () => {
+    it.runIf(inPage)("writes a story's args as the framework's code", () => {
       const code = codeOf("Greeting", { name: "Ada" });
       expect(code).toContain("Greeting");
       expect(code).toContain("Ada");
     });
 
-    it.runIf(docsOf !== undefined)("reads a component's docs in the catalogue's shape", () => {
+    it.runIf(inPage && docsOf !== undefined)("reads a component's docs in the catalogue's shape", () => {
       expect(isComponentDocs(docsOf?.())).toBe(true);
     });
   });
