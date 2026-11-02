@@ -19,8 +19,10 @@
  *
  * @module
  */
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { gzipSync } from "node:zlib";
 
 import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
 
@@ -35,6 +37,7 @@ import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import {
   AGENT_SOURCES_FILE,
+  type AxeAddress,
   agentSourcesModule,
   CONFIG_MODULE,
   configModule,
@@ -241,25 +244,53 @@ const requestedPage = (url: string): PageFile | undefined => {
   return PAGE_FILES.find((page) => page === name);
 };
 
+/** axe's script, in the core's dependencies; none when it cannot be found. */
+const axeScript = (): string | undefined => packageResolver(PACKAGE_DIR)("axe-core/axe.min.js");
+
+/**
+ * A build's compressed copy of axe's script: its name, from its text, so a new version of axe is a new file.
+ *
+ * @remarks
+ * axe is most of what a static catalogue weighs, and is fetched only for an accessibility check, so it is kept
+ * compressed and the frame unpacks it (`checkStory.ts`). `.bin`, as `.gz` would make some hosts set `Content-Encoding`.
+ *
+ * @param text - the script's text.
+ */
+const axeBuildFile = (text: Buffer): string =>
+  `assets/axe-${createHash("sha256").update(text).digest("hex").slice(0, 8)}.bin`;
+
+/**
+ * How the frame's entry gets axe's address: Vite serves the file on a dev server, and a build writes it compressed.
+ *
+ * @param command - whether a dev server runs, or a build.
+ */
+const axeAddress = (command: ConfigEnv["command"]): AxeAddress | undefined => {
+  const file = axeScript();
+  if (file === undefined) return undefined;
+  if (command === "serve")
+    return { imports: [`import axeUrl from ${JSON.stringify(`${file}?url`)};`], value: "axeUrl" };
+  const name = axeBuildFile(readFileSync(file));
+  return { imports: [], value: `import.meta.env.BASE_URL + ${JSON.stringify(name)}` };
+};
+
 /**
  * A module the plugin generates for a catalogue's pages, when the id names one: the configuration's data, an entry,
  * the project's own stories' source, or a page's HTML (unless the folder has one of its own).
  *
  * @param id - the module's id.
  * @param config - the catalogue's configuration.
+ * @param command - whether a dev server runs, or a build.
  */
 const generatedModule = (
   id: string,
-  config: ResolvedConfig
+  config: ResolvedConfig,
+  command: ConfigEnv["command"]
 ): { code: string; moduleType: "js" } | string | undefined => {
   if (id === CONFIG_ID) return { code: configModule(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["index.html"]))
     return { code: shellEntry(config), moduleType: "js" };
   if (id === join(config.dir, PAGE_ENTRIES["frame.html"]))
-    return {
-      code: frameEntry(config, packageResolver(PACKAGE_DIR)("axe-core/axe.min.js")),
-      moduleType: "js"
-    };
+    return { code: frameEntry(config, axeAddress(command)), moduleType: "js" };
   if (id === join(config.dir, STORIES_SOURCE_FILE))
     return { code: storiesSourceModule(config), moduleType: "js" };
   if (id === join(config.dir, AGENT_SOURCES_FILE))
@@ -469,11 +500,17 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       server.watcher.on("add", refresh);
       server.watcher.on("unlink", refresh);
     },
+    generateBundle(): void {
+      const file = axeScript();
+      if (config === undefined || file === undefined) return;
+      const text = readFileSync(file);
+      this.emitFile({ type: "asset", fileName: axeBuildFile(text), source: gzipSync(text, { level: 9 }) });
+    },
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
-      const generated = config === undefined ? undefined : generatedModule(id, config);
+      const generated = config === undefined ? undefined : generatedModule(id, config, command);
       if (generated !== undefined) return generated;
       const watch = (file: string): void => this.addWatchFile(file);
       const answered = await queryModule(id, watch, async (specifier: string, importer: string) => {

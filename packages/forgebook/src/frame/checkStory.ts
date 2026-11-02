@@ -6,7 +6,8 @@
  * axe is loaded only when the card asks: a frame that is never checked never downloads it. It is its own minified file,
  * loaded as a script: as a module it would pass through Vite's pre-bundling on every cold start and through the
  * minifier on every build, more than half a megabyte for a card most visits never open. Its address comes from the
- * generated page: a package's own modules are pre-bundled, where Vite cannot follow a `?url` import.
+ * generated page: a package's own modules are pre-bundled, where Vite cannot follow a `?url` import. A build keeps it
+ * gzipped (`.bin`) and the frame unpacks it, since it would otherwise be half of what a static catalogue weighs.
  *
  * @module
  */
@@ -21,6 +22,19 @@ const isAxe = (value: unknown): value is typeof axe =>
   typeof value === "object" && value !== null && "run" in value;
 
 /**
+ * The address a script tag can load: the script's own, or a compressed script's text, unpacked.
+ *
+ * @param axeUrl - the script's address.
+ */
+const scriptAddress = async (axeUrl: string): Promise<string> => {
+  if (!axeUrl.endsWith(".bin")) return axeUrl;
+  const response = await fetch(axeUrl);
+  if (!response.ok || response.body === null) throw new Error(`${axeUrl} could not be loaded`);
+  const text = await new Response(response.body.pipeThrough(new DecompressionStream("gzip"))).blob();
+  return URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
+};
+
+/**
  * axe, from its script.
  *
  * @param document - the frame's document.
@@ -30,9 +44,10 @@ const loadAxe = async (document: Document, axeUrl: string): Promise<typeof axe> 
   const view = document.defaultView;
   const known = view === null ? undefined : Reflect.get(view, "axe");
   if (isAxe(known)) return known;
+  const address = await scriptAddress(axeUrl);
   await new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = axeUrl;
+    script.src = address;
     script.onload = resolve;
     script.onerror = (): void => reject(new Error(`${axeUrl} could not be loaded`));
     document.head.append(script);

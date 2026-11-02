@@ -159,25 +159,33 @@ const playToolsLoader = (): string => {
   ].join("\n");
 };
 
+/** How a frame's entry gets the address of axe's script. */
+export type AxeAddress = {
+  /** The imports it needs. */
+  readonly imports: readonly string[];
+  /** The expression that gives the address. */
+  readonly value: string;
+};
+
 /**
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
- * @param axeScript - the file of axe's script, when it can be found: its address goes to the frame.
+ * @param axe - how the entry gets the address of axe's script, when it can be found.
  */
-export const frameEntry = (config: ResolvedConfig, axeScript?: string): string => {
+export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => {
   const sources = sourcesCode(config);
   return [
     `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
-    ...(axeScript === undefined ? [] : [`import axeUrl from ${JSON.stringify(`${axeScript}?url`)};`]),
+    ...(axe?.imports ?? []),
     ...sources.imports,
     ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  void mountFrame(root, {",
     `    sources: ${sources.list},`,
-    ...(axeScript === undefined ? [] : ["    axeUrl,"]),
+    ...(axe === undefined ? [] : [`    axeUrl: ${axe.value},`]),
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
