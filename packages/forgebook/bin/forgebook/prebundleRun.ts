@@ -16,22 +16,8 @@ import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { findConfigFile, type ResolvedConfig } from "../../src/vite/configFile.ts";
+import { catalogueCacheDir } from "./catalogueCache.ts";
 import { catalogueVite } from "./catalogueVite.ts";
-
-/**
- * Vite's cache folder for a root: beside the nearest `package.json`, as Vite places it.
- *
- * @param root - the root.
- */
-const viteCacheFolder = (root: string): string => {
-  let folder = root;
-  while (!existsSync(join(folder, "package.json"))) {
-    const parent = dirname(folder);
-    if (parent === folder) return join(root, ".vite");
-    folder = parent;
-  }
-  return join(folder, "node_modules", ".vite");
-};
 
 /** The child's entry, beside this module and with its extension. */
 const CHILD_URL = new URL(`./prebundleChild${extname(import.meta.url)}`, import.meta.url);
@@ -58,7 +44,7 @@ let started: { readonly key: string; readonly done: Promise<void> } | undefined;
 export const prebundleInChild = (configFile: string, isForced: boolean): Promise<void> => {
   const key = JSON.stringify([configFile, isForced]);
   if (started?.key === key) return started.done;
-  const isDone = existsSync(join(viteCacheFolder(dirname(configFile)), "deps", "_metadata.json"));
+  const isDone = existsSync(join(catalogueCacheDir(dirname(configFile)), "deps", "_metadata.json"));
   if (isDone && !isForced) return Promise.resolve();
   const data: PrebundleChildData = { configFile, isForced };
   const done = new Promise<void>((resolve) => {

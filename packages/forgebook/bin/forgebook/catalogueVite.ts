@@ -8,6 +8,7 @@ import type { InlineConfig } from "vite";
 
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
+import { catalogueCacheDir } from "./catalogueCache.ts";
 
 /**
  * Vite's configuration for a catalogue.
@@ -21,6 +22,7 @@ export const catalogueVite = async (
 ): Promise<InlineConfig> => ({
   ...overrides,
   root: config.dir,
+  cacheDir: catalogueCacheDir(config.dir),
   // the configuration file is Forgebook's: a vite.config beside it is not read
   configFile: false,
   plugins: [forgebookPlugin({ config }), ...((await config.framework.vitePlugins?.()) ?? [])]
