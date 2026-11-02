@@ -23,6 +23,7 @@ const CONFIG: ResolvedConfig = {
   languages: [{ id: "it", label: "Italiano" }],
   previews: ["/catalogue/forgebook.preview.tsx"],
   head: '<link rel="stylesheet" href="/fonts.css" />',
+  shell: { themeCss: "", styleSheets: [], problems: [] },
   tokens: [],
   watch: [],
   lists: {},
@@ -67,5 +68,33 @@ describe("the generated pages", () => {
     const source = storiesSourceModule(CONFIG);
     expect(source).toContain('import files0 from "./src/**/*.stories.tsx?forgebook-files";');
     expect(source).toContain('name: "Acme <UI>",');
+  });
+});
+
+describe("a catalogue's theme", () => {
+  const themed: ResolvedConfig = {
+    ...CONFIG,
+    shell: { ...CONFIG.shell, themeCss: ":root{--forgebook-font-sans:Inter}" }
+  };
+
+  it("goes in the shell's page, with no script", () => {
+    expect(pageHtml("index.html", themed)).toContain("<style>:root{--forgebook-font-sans:Inter}</style>");
+  });
+
+  it("stays out of the frames, which belong to the stories", () => {
+    expect(pageHtml("frame.html", themed)).not.toContain("--forgebook-font-sans");
+  });
+
+  it("writes nothing for a catalogue with no theme", () => {
+    expect(pageHtml("index.html", CONFIG)).not.toContain("<style>");
+  });
+
+  it("imports the catalogue's style sheet into the shell only", () => {
+    const styled: ResolvedConfig = {
+      ...CONFIG,
+      shell: { ...CONFIG.shell, styleSheets: ["/catalogue/shell.css"] }
+    };
+    expect(shellEntry(styled)).toContain('import "/catalogue/shell.css";');
+    expect(frameEntry(styled)).not.toContain("shell.css");
   });
 });

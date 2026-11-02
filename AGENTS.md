@@ -28,7 +28,7 @@ case, with the reason (`// biome-ignore lint/…: the protocol names this field`
 ## How Forgebook is built
 
 - **Independent of what it shows.** The core imports nothing of the libraries it shows: a tool that checks a library
-  must not break with it. Its look is its own (`src/styles/_tokens.scss`; the shell is always light); the frame is
+  must not break with it. Its look is its own (`src/styles/_tokens.scss`), and a catalogue can theme it (`src/shellTheme.ts`); the frame is
   left to the source's style sheets; an app passes its sources.
 - **A library carries nothing for the catalogue.** Forced states (`:hover`, `:focus`…) are a rewrite in the
   catalogue's build, never classes or attributes in a library's CSS; a story is shown, never patched.
