@@ -13,11 +13,12 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename } from "node:path";
 
 import { Marked, type Token, type Tokens } from "marked";
 
 import { highlightCode } from "./highlightCode.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** Markdown with GitHub's tables, its code blocks coloured. */
 const markdown = new Marked({
@@ -44,14 +45,14 @@ export type ComponentPageText = {
 const GENERATED_SECTIONS = ["Props"];
 
 /**
- * The documentation file beside a story file: its component's name in kebab case, with `.md`.
+ * The documentation file beside a story file: its component's name in kebab case, with `.md`, in Vite's form.
  *
  * @param storyFile - the story file's absolute path.
  */
 export const pageFileOf = (storyFile: string): string => {
   const component = basename(storyFile).replace(/\.stories\.tsx?$/, "");
   const kebab = component.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
-  return join(dirname(storyFile), `${kebab}.md`);
+  return VITE_PATHS.join(VITE_PATHS.dirname(storyFile), `${kebab}.md`);
 };
 
 /**

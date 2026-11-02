@@ -12,7 +12,6 @@
  */
 import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join, relative } from "node:path";
 
 import type { StorySource } from "@forgebook/story-format/source";
 import type { ViteDevServer } from "vite";
@@ -32,8 +31,8 @@ import {
 } from "./agentApi.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { findAnswer } from "./findRoute.ts";
-import { changeBase, changedFiles } from "./gitChange.ts";
-import { AGENT_SOURCES_FILE } from "./pages.ts";
+import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts";
+import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
@@ -189,9 +188,7 @@ const changedAnswer = async ({
       })
     )
   );
-  // git names real paths and the graph the catalogue's own, which differ in a folder reached through a link
-  const realDir = await realpath(config.dir);
-  const changed = files.map((file) => join(config.dir, relative(realDir, join(root, file))));
+  const changed = catalogueChangedFiles(config.dir, await realpath(config.dir), root, files);
   const stories = reaches.flatMap(({ source, reach }) =>
     affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
       const id = `${componentId(source, story.title)}--${kebab(story.exportName)}`;
@@ -253,7 +250,7 @@ export const agentAnswer = async (
   try {
     const answerAlone = STORYLESS_ROUTES[route];
     if (answerAlone !== undefined) return await answerAlone(config, params);
-    const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
+    const loaded = agentModuleOf(await load(pageModulePath(config.dir, AGENT_SOURCES_FILE)));
     const context: RouteContext = {
       loaded,
       tree: storyTree(loaded.sources),
