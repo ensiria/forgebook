@@ -176,6 +176,15 @@ export type StoryParameters = {
   readonly clock?: StoryClockSetting;
   /** How the story sits in its frame: padded (default), centred, or the whole frame. */
   readonly layout?: "padded" | "centered" | "fullscreen";
+  /**
+   * The story's mocked API: MSW's request handlers, which answer what the story fetches while it is shown. A list, or
+   * a record of lists as MSW's Storybook addon writes it. Typed `unknown` here, since this package depends on nothing:
+   * they are MSW's `http.get(…)` values.
+   */
+  readonly msw?: {
+    /** The handlers. */
+    readonly handlers: readonly unknown[] | Readonly<Record<string, readonly unknown[]>>;
+  };
   /** CSF's documentation block; the catalogue reads the component's one-line description from it. */
   readonly docs?: { readonly description?: { readonly component?: string } };
 };
