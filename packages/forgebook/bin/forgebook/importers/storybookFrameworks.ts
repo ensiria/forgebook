@@ -6,7 +6,9 @@
  * @remarks
  * Pure: `main`'s configuration in, the framework and the notes out; `storybook.ts` loads `main` and calls it. The
  * React Native frameworks give the packages they compile (`modulesToTranspile`) to `reactNativeWeb({ nativePackages })`;
- * their Babel options are not read, since Forgebook compiles with Vite and runs no Babel, so each is named in a note.
+ * their `pluginReactOptions` (the JSX import source, Babel's plugins and presets, the files) become the adapter's
+ * options of the same meaning; what cannot be written as a plain value (a function, a regular expression) is named
+ * in a note.
  *
  * @module
  */
@@ -83,36 +85,120 @@ const entryOf = (
   };
 };
 
-/**
- * React Native through react-native-web, with the packages a Storybook framework compiled.
- *
- * @param modulesToTranspile - the framework's `modulesToTranspile`, as written.
- */
-const reactNativeWeb = (modulesToTranspile: unknown): ImportedFramework => {
-  const nativePackages = Array.isArray(modulesToTranspile)
-    ? modulesToTranspile.filter((name) => typeof name === "string")
-    : [];
-  return {
-    packageName: "@forgebook/react-native-web",
-    adapter: "reactNativeWeb",
-    peers: ["react-native-web"],
-    ...(nativePackages.length === 0 ? {} : { options: { nativePackages } })
-  };
+/** Options read from Storybook, written into the configuration, with what could not be. */
+type ReadOptions = {
+  /** The options, plain values. */
+  readonly options: Readonly<Record<string, unknown>>;
+  /** What was left out, each a sentence. */
+  readonly notes: readonly string[];
 };
 
 /**
- * The notes on the Babel options a React Native framework or addon had.
+ * A value read as a list: a list as it is, nothing as none, anything else as a list of itself.
  *
- * @param options - its options.
- * @param fields - the fields that hold Babel's options.
+ * @param value - the value.
  */
-const babelNotes = (options: Readonly<Record<string, unknown>>, fields: readonly string[]): string[] =>
-  fields
-    .filter((field) => options[field] !== undefined)
-    .map(
-      (field) =>
-        `Its ${field} are not read: Forgebook compiles with Vite and runs no Babel, so a Babel plugin (Reanimated's, NativeWind's) does not run`
-    );
+const listOf = (value: unknown): readonly unknown[] => {
+  if (Array.isArray(value)) return value;
+  return value === undefined ? [] : [value];
+};
+
+/**
+ * The texts of a list, with a note when it holds something else (a function, a regular expression), which cannot be
+ * written as a plain value.
+ *
+ * @param value - the list, as `main` writes it.
+ * @param field - its name, for the note.
+ */
+const texts = (value: unknown, field: string): { readonly values: string[]; readonly notes: string[] } => {
+  const list = listOf(value);
+  const values = list.filter((item) => typeof item === "string");
+  const notes =
+    values.length === list.length ? [] : [`${field}: only names are written; copy the others by hand`];
+  return { values, notes };
+};
+
+/**
+ * Babel's plugins or presets as the configuration writes them: a name, or a name and plain options.
+ *
+ * @param value - the list, as `main` writes it.
+ * @param field - its name, for the note.
+ */
+const babelItems = (
+  value: unknown,
+  field: string
+): { readonly values: unknown[]; readonly notes: string[] } => {
+  const list = Array.isArray(value) ? value : [];
+  const values = list.filter(
+    (item) =>
+      typeof item === "string" ||
+      (Array.isArray(item) && item.length === 2 && typeof item[0] === "string" && isRecord(item[1]))
+  );
+  const notes =
+    values.length === list.length
+      ? []
+      : [`${field}: a plugin given as a function is not written; name it by its module instead`];
+  return { values, notes };
+};
+
+/**
+ * `reactNativeWeb()`'s options from a Storybook React Native framework's: `modulesToTranspile` as `nativePackages`,
+ * `pluginReactOptions`' JSX import source, Babel plugins and presets, and files.
+ *
+ * @param options - the framework's or the addon's options.
+ */
+export const reactNativeWebOptions = (options: Readonly<Record<string, unknown>>): ReadOptions => {
+  const react = isRecord(options["pluginReactOptions"]) ? options["pluginReactOptions"] : {};
+  const babel = isRecord(react["babel"]) ? react["babel"] : {};
+  const nativePackages = texts(options["modulesToTranspile"], "modulesToTranspile");
+  // the older addon names its Babel plugins beside its options
+  const plugins = babelItems(babel["plugins"] ?? options["babelPlugins"], "babel.plugins");
+  const presets = babelItems(babel["presets"], "babel.presets");
+  const include = texts(react["include"], "pluginReactOptions.include");
+  const exclude = texts(react["exclude"], "pluginReactOptions.exclude");
+  const jsxImportSource = react["jsxImportSource"];
+  const notes = [
+    ...nativePackages.notes,
+    ...plugins.notes,
+    ...presets.notes,
+    ...include.notes,
+    ...exclude.notes,
+    ...(react["jsxRuntime"] === "classic"
+      ? ["jsxRuntime classic is not read: JSX is compiled for the automatic runtime"]
+      : [])
+  ];
+  const written: Record<string, unknown> = {
+    ...(nativePackages.values.length === 0 ? {} : { nativePackages: nativePackages.values }),
+    ...(typeof jsxImportSource === "string" && jsxImportSource !== "react" ? { jsxImportSource } : {}),
+    ...(plugins.values.length === 0 && presets.values.length === 0
+      ? {}
+      : {
+          babel: {
+            ...(plugins.values.length === 0 ? {} : { plugins: plugins.values }),
+            ...(presets.values.length === 0 ? {} : { presets: presets.values })
+          }
+        }),
+    ...(include.values.length === 0 ? {} : { include: include.values }),
+    ...(exclude.values.length === 0 ? {} : { exclude: exclude.values })
+  };
+  return { options: written, notes };
+};
+
+/**
+ * React Native through react-native-web, with a Storybook framework's options.
+ *
+ * @param read - the options read.
+ */
+const reactNativeWeb = (read: ReadOptions): ImportedFramework => ({
+  packageName: "@forgebook/react-native-web",
+  adapter: "reactNativeWeb",
+  peers: [
+    "react-native-web",
+    // Babel runs through Rolldown's plugin, which a catalogue without Babel installs not
+    ...("babel" in read.options ? ["@rolldown/plugin-babel", "@babel/core"] : [])
+  ],
+  ...(Object.keys(read.options).length === 0 ? {} : { options: read.options })
+});
 
 /**
  * The Forgebook framework of a project's Storybook.
@@ -129,18 +215,17 @@ export const storybookFramework = (
   const framework = entryOf(main["framework"]);
   const addons = Array.isArray(main["addons"]) ? main["addons"].map(entryOf) : [];
   if (framework.name !== undefined && names(framework.name, REACT_NATIVE_WEB_VITE)) {
-    return {
-      framework: reactNativeWeb(framework.options["modulesToTranspile"]),
-      notes: babelNotes(framework.options, ["pluginReactOptions", "pluginBabelOptions"])
-    };
+    const read = reactNativeWebOptions(framework.options);
+    return { framework: reactNativeWeb(read), notes: read.notes };
   }
   const addon = addons.find((each) => each.name !== undefined && names(each.name, REACT_NATIVE_WEB_ADDON));
   if (addon !== undefined) {
+    const read = reactNativeWebOptions(addon.options);
     return {
-      framework: reactNativeWeb(addon.options["modulesToTranspile"]),
+      framework: reactNativeWeb(read),
       notes: [
         `${REACT_NATIVE_WEB_ADDON} ran on webpack: Forgebook draws React Native through react-native-web on Vite`,
-        ...babelNotes(addon.options, ["babelPlugins"])
+        ...read.notes
       ]
     };
   }
@@ -148,7 +233,7 @@ export const storybookFramework = (
     framework.name !== undefined && names(framework.name, "@storybook/react-native");
   if (isOnDeviceFramework || (framework.name === undefined && isOnDevice)) {
     return {
-      framework: reactNativeWeb(undefined),
+      framework: reactNativeWeb({ options: {}, notes: [] }),
       notes: [
         "On-device Storybook: the stories are drawn in the browser through react-native-web, so a component that needs a native module does not draw",
         ...(main["deviceAddons"] === undefined

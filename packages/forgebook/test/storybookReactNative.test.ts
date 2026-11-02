@@ -38,14 +38,22 @@ const project = (name: string, folder: string, main: string): string => {
 };
 
 describe("Storybook's React Native frameworks", () => {
-  it("moves @storybook/react-native-web-vite to react-native-web, its modulesToTranspile as nativePackages", () => {
+  it("moves @storybook/react-native-web-vite to react-native-web, with its packages, JSX source, Babel and files", () => {
     const reading = storybookFramework(
       {
         framework: {
           name: "@storybook/react-native-web-vite",
           options: {
             modulesToTranspile: ["react-native-reanimated", "@shopify/flash-list"],
-            pluginReactOptions: { babel: { plugins: ["react-native-reanimated/plugin"] } }
+            pluginReactOptions: {
+              jsxImportSource: "nativewind",
+              babel: {
+                plugins: ["@babel/plugin-proposal-export-namespace-from", "react-native-reanimated/plugin"],
+                presets: [["nativewind/babel", { mode: "web" }]]
+              },
+              include: ["src/**"],
+              exclude: [/\/legacy\//]
+            }
           }
         }
       },
@@ -54,24 +62,46 @@ describe("Storybook's React Native frameworks", () => {
     expect(reading?.framework).toEqual({
       packageName: "@forgebook/react-native-web",
       adapter: "reactNativeWeb",
-      peers: ["react-native-web"],
-      options: { nativePackages: ["react-native-reanimated", "@shopify/flash-list"] }
+      peers: ["react-native-web", "@rolldown/plugin-babel", "@babel/core"],
+      options: {
+        nativePackages: ["react-native-reanimated", "@shopify/flash-list"],
+        jsxImportSource: "nativewind",
+        babel: {
+          plugins: ["@babel/plugin-proposal-export-namespace-from", "react-native-reanimated/plugin"],
+          presets: [["nativewind/babel", { mode: "web" }]]
+        },
+        include: ["src/**"]
+      }
     });
-    expect(reading?.notes.join("\n")).toMatch(/pluginReactOptions are not read: .*runs no Babel/);
+    // a regular expression is not a plain value: named, to copy by hand
+    expect(reading?.notes).toEqual([
+      "pluginReactOptions.exclude: only names are written; copy the others by hand"
+    ]);
   });
 
   it("moves the older webpack addon to react-native-web, and says Forgebook runs on Vite", () => {
     const reading = storybookFramework(
       {
         framework: "@storybook/react-webpack5",
-        addons: [{ name: "@storybook/addon-react-native-web", options: { babelPlugins: ["x"] } }]
+        addons: [
+          {
+            name: "@storybook/addon-react-native-web",
+            options: {
+              modulesToTranspile: ["legacy-chart"],
+              babelPlugins: ["react-native-reanimated/plugin", () => 1]
+            }
+          }
+        ]
       },
       false
     );
     expect(reading?.framework.adapter).toBe("reactNativeWeb");
-    expect(reading?.framework.options).toBeUndefined();
+    expect(reading?.framework.options).toEqual({
+      nativePackages: ["legacy-chart"],
+      babel: { plugins: ["react-native-reanimated/plugin"] }
+    });
     expect(reading?.notes[0]).toMatch(/ran on webpack/);
-    expect(reading?.notes[1]).toMatch(/babelPlugins are not read/);
+    expect(reading?.notes[1]).toMatch(/given as a function is not written/);
   });
 
   it("reads on-device Storybook, which names no framework, and says what does not draw in a browser", () => {
@@ -137,12 +167,17 @@ describe("an on-device Storybook's folder", () => {
     const dir = project(
       "web-vite",
       ".storybook",
-      'export default { stories: ["../src/**/*.stories.tsx"], framework: { name: "@storybook/react-native-web-vite", options: { modulesToTranspile: ["legacy-chart"] } } };\n'
+      'export default { stories: ["../src/**/*.stories.tsx"], framework: { name: "@storybook/react-native-web-vite", options: { modulesToTranspile: ["legacy-chart"], pluginReactOptions: { jsxImportSource: "nativewind", babel: { plugins: ["react-native-worklets/plugin"] } } } } };\n'
     );
     const imported = await importStorybook(dir);
     if (typeof imported === "string") throw new Error(imported);
-    expect(initConfigText(imported, "Storybook")).toContain(
-      '  framework: reactNativeWeb({\n    nativePackages: [\n      "legacy-chart"\n    ]\n  }),'
+    const text = initConfigText(imported, "Storybook");
+    expect(text).toContain(
+      '  framework: reactNativeWeb({\n    nativePackages: [\n      "legacy-chart"\n    ],'
+    );
+    expect(text).toContain('    jsxImportSource: "nativewind",');
+    expect(text).toContain(
+      '    babel: {\n      plugins: [\n        "react-native-worklets/plugin"\n      ]\n    }\n  }),'
     );
   });
 });
