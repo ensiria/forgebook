@@ -329,7 +329,8 @@ export const isTokensDocument = (value: unknown): value is TokensDocument =>
   isRecord(value) &&
   value["schema"] === 1 &&
   Array.isArray(value["tokens"]) &&
-  Array.isArray(value["problems"]);
+  Array.isArray(value["problems"]) &&
+  Array.isArray(value["clashes"]);
 
 /**
  * Whether a value is one token's document, as a client receives it over HTTP.
@@ -337,7 +338,11 @@ export const isTokensDocument = (value: unknown): value is TokensDocument =>
  * @param value - the answer's body.
  */
 export const isTokenDocument = (value: unknown): value is TokenDocument =>
-  isRecord(value) && value["schema"] === 1 && isRecord(value["token"]) && Array.isArray(value["problems"]);
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  isRecord(value["token"]) &&
+  Array.isArray(value["problems"]) &&
+  Array.isArray(value["clashes"]);
 
 /**
  * Whether a value is the nearest tokens' document, as a client receives it over HTTP.
