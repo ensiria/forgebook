@@ -16,7 +16,7 @@
  */
 import ts from "typescript-6";
 
-import { programFor } from "./docsProgram.ts";
+import { programDependencies, programFor } from "./docsProgram.ts";
 
 /** A component, by the file that declares it and its name there. */
 export type ComponentRef = {
@@ -270,7 +270,12 @@ const isTypeOnly = (statement: ts.Statement): boolean => {
   );
 };
 
-const importsOf = (source: ts.SourceFile, program: ts.Program, cache: ts.ModuleResolutionCache): string[] => {
+const importsOf = (
+  source: ts.SourceFile,
+  program: ts.Program,
+  cache: ts.ModuleResolutionCache,
+  hasTypes = false
+): string[] => {
   const targets: string[] = [];
   for (const statement of source.statements) {
     const specifier =
@@ -280,7 +285,7 @@ const importsOf = (source: ts.SourceFile, program: ts.Program, cache: ts.ModuleR
         ? statement.moduleSpecifier.text
         : undefined;
     // a type renders nothing: a file that only takes types from another does not use its components
-    if (specifier === undefined || isTypeOnly(statement)) continue;
+    if (specifier === undefined || (isTypeOnly(statement) && !hasTypes)) continue;
     const resolved = ts.resolveModuleName(
       specifier,
       source.fileName,
@@ -298,10 +303,12 @@ const importsOf = (source: ts.SourceFile, program: ts.Program, cache: ts.ModuleR
  *
  * @param starts - the files to start from.
  * @param programs - the programs that may hold them.
+ * @param hasTypes - whether imports of types count.
  */
 const reachedImports = (
   starts: readonly string[],
-  programs: readonly ts.Program[]
+  programs: readonly ts.Program[],
+  hasTypes = false
 ): Record<string, readonly string[]> => {
   const caches = new Map(
     programs.map((program) => [
@@ -324,11 +331,29 @@ const reachedImports = (
     const targets =
       program === undefined || source === undefined || cache === undefined
         ? []
-        : importsOf(source, program, cache);
+        : importsOf(source, program, cache, hasTypes);
     imports[file] = targets;
     queue.push(...targets);
   }
   return imports;
+};
+
+/**
+ * The files a story file's docs can change with: what it reaches through its package's imports, types included, and
+ * what its program depends on (`programDependencies`).
+ *
+ * @param storyFile - the story file.
+ */
+export const docsDependencies = (storyFile: string): string[] => {
+  const docsProgram = programFor(storyFile);
+  if (typeof docsProgram === "string") return [storyFile];
+  const { program } = docsProgram;
+  return [
+    ...new Set([
+      ...Object.keys(reachedImports([storyFile], [program], true)),
+      ...programDependencies(storyFile, program)
+    ])
+  ];
 };
 
 /**
@@ -341,7 +366,7 @@ export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | 
   const files: StoryFileUsage[] = [];
   const programs = new Set<ts.Program>();
   for (const request of requests) {
-    const docsProgram = programFor(request.storyFile);
+    const docsProgram = programFor(request.storyFile, true);
     if (typeof docsProgram === "string") return docsProgram;
     programs.add(docsProgram.program);
     const usage = fileUsage(request, docsProgram.program);

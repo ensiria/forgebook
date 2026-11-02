@@ -3,6 +3,8 @@
  *
  * @module
  */
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
@@ -12,6 +14,21 @@ import { KIT_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 const KIT = join(KIT_DIR, "src");
+
+describe("createDocsExtractor with a cache", () => {
+  it("keeps what the worker read, and a later extractor answers the same from disk", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "forgebook-docs-"));
+    const storyFile = join(KIT, "Select.stories.tsx");
+    const first = createDocsExtractor(STUB_FRAMEWORK.docsModule, folder);
+    const read = await first.extract(storyFile);
+    await first.close();
+    expect(readdirSync(join(folder, "docs"))).toHaveLength(1);
+    const second = createDocsExtractor(STUB_FRAMEWORK.docsModule, folder);
+    expect(await second.extract(storyFile)).toEqual(read);
+    await second.close();
+    rmSync(folder, { recursive: true });
+  }, 60_000);
+});
 
 describe("createDocsExtractor", () => {
   const extractor = createDocsExtractor(STUB_FRAMEWORK.docsModule);

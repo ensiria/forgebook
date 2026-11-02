@@ -13,11 +13,11 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
 
 import { Marked, type Token, type Tokens } from "marked";
 
 import { highlightCode } from "./highlightCode.ts";
+import { pageFileOf } from "./pageFile.ts";
 
 /** Markdown with GitHub's tables, its code blocks coloured. */
 const markdown = new Marked({
@@ -42,17 +42,6 @@ export type ComponentPageText = {
 
 /** The Markdown sections the page draws from the component's types instead. */
 const GENERATED_SECTIONS = ["Props"];
-
-/**
- * The documentation file beside a story file: its component's name in kebab case, with `.md`.
- *
- * @param storyFile - the story file's absolute path.
- */
-export const pageFileOf = (storyFile: string): string => {
-  const component = basename(storyFile).replace(/\.stories\.tsx?$/, "");
-  const kebab = component.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
-  return join(dirname(storyFile), `${kebab}.md`);
-};
 
 /**
  * A Markdown text without its first `# ` title: the catalogue shows the name above it.

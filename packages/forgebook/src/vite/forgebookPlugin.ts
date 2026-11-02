@@ -277,11 +277,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   // the docs are read in a worker, made once the framework is known: a package's TypeScript program takes seconds to
   // build and would hold every other answer of the dev server meanwhile
   let docs: DocsExtractor | undefined;
+  /** Where the answers worth keeping between starts live: inside Vite's cache folder, once Vite has resolved it. */
+  let cacheFolder: string | undefined;
   const extractor = (): DocsExtractor => {
     const framework = config?.framework ?? options.framework;
     if (framework === undefined)
       throw new Error("Forgebook has no framework: add forgebook.config.ts, or give the plugin `framework`");
-    docs ??= createDocsExtractor(framework.docsModule);
+    docs ??= createDocsExtractor(framework.docsModule, cacheFolder);
     return docs;
   };
   /**
@@ -345,7 +347,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     // imported here: the highlighter and the TypeScript compiler it splits code with are the server's heaviest
     // modules, and a story's page never asks for one of these
     const { textModule } = await import("./textModules.ts");
-    return textModule(id, watch, resolveImport);
+    return textModule(id, watch, resolveImport, cacheFolder);
   };
   return {
     name: "forgebook",
@@ -398,7 +400,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       return filesId(dirname(importer), source.slice(0, -FILES_QUERY.length));
     },
     // a warning and not a failure: a theme a reader can still use must not stop a catalogue from building
-    configResolved: (resolved: { readonly logger: Logger }): void => {
+    configResolved: (resolved: { readonly logger: Logger; readonly cacheDir: string }): void => {
+      cacheFolder = join(resolved.cacheDir, "forgebook");
       for (const problem of config?.shell.problems ?? [])
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
     },

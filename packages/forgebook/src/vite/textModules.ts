@@ -3,19 +3,21 @@
  * (`?forgebook-page`) and a source's Markdown file (`?forgebook-markdown`).
  *
  * @remarks
- * Kept apart from the plugin, which imports this module on the first of these queries: colouring code loads
- * highlight.js and the TypeScript compiler, a tenth of a story page's memory that a story's page never uses.
+ * Colouring code takes highlight.js and the TypeScript compiler, the heaviest modules the server's thread could hold,
+ * and a story's page asks for its code on every visit. So they load only when there is code to colour and it is not
+ * on disk from an earlier start (`diskCache.ts`): most stories have no `render`, and the file changes rarely.
  *
  * @module
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 
 import { componentImport } from "./componentImport.ts";
-import { componentPage, markdownHtml } from "./componentPage.ts";
-import { highlightCode } from "./highlightCode.ts";
+import { diskCache } from "./diskCache.ts";
 import { moduleSummaryOfText } from "./moduleSummary.ts";
+import { pageFileOf } from "./pageFile.ts";
 import { storyCode } from "./storyCode.ts";
 
 /** The query that asks for a story file's code: each story's `render` as written. */
@@ -27,20 +29,46 @@ const PAGE_QUERY = "?forgebook-page";
 /** The query a source's Markdown file is imported with (its introduction on the home), answered with its HTML. */
 const MARKDOWN_QUERY = "?forgebook-markdown";
 
+/** A story file's code as its module exports it: each story's text and coloured HTML, or why it cannot be read. */
+type CodeValue = Readonly<Record<string, unknown>>;
+
+/** Whether what a cache file holds is a story file's code. */
+const isCodeValue = (value: unknown): value is CodeValue => typeof value === "object" && value !== null;
+
 /**
- * The module that answers a `?forgebook-code` import: each story's `render` text and its coloured HTML, or `{ error }`
- * for the card.
+ * Each story's `render` text and its coloured HTML, or `{ error }` for the card.
+ *
+ * @param storyFile - the story file's absolute path.
+ */
+const coloured = async (storyFile: string): Promise<CodeValue> => {
+  const code = storyCode(storyFile, readFileSync(storyFile, "utf8"));
+  if (typeof code === "string") return { error: code };
+  const entries = Object.entries(code);
+  if (entries.length === 0) return {};
+  const { highlightCode } = await import("./highlightCode.ts");
+  return Object.fromEntries(
+    entries.map(([name, text]) => [name, { text, html: highlightCode(text, "tsx") }])
+  );
+};
+
+/** What made a kept story file's code: this module's own build. */
+const CODE_STAMP = String(statSync(new URL(import.meta.url)).mtimeMs);
+
+/**
+ * The module that answers a `?forgebook-code` import.
  *
  * @param storyFile - the story file's absolute path; Vite renews the module when it changes, as the id names it.
+ * @param cacheFolder - where the code is kept between starts; none reads every time.
  */
-const codeModule = (storyFile: string): { code: string; moduleType: "js" } => {
-  const code = storyCode(storyFile, readFileSync(storyFile, "utf8"));
-  const value =
-    typeof code === "string"
-      ? { error: code }
-      : Object.fromEntries(
-          Object.entries(code).map(([name, text]) => [name, { text, html: highlightCode(text, "tsx") }])
-        );
+const codeModule = async (
+  storyFile: string,
+  cacheFolder: string | undefined
+): Promise<{ code: string; moduleType: "js" }> => {
+  const cache =
+    cacheFolder === undefined ? undefined : diskCache(join(cacheFolder, "code"), CODE_STAMP, isCodeValue);
+  const kept = cache?.read(storyFile);
+  const value = kept ?? (await coloured(storyFile));
+  if (kept === undefined) cache?.write(storyFile, value, [storyFile]);
   return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
 };
 
@@ -71,12 +99,15 @@ const componentFileOf = async (
  * @param componentFile - the component's file, as the story file's import resolves; none when it names none.
  * @param watch - adds a file whose edit renews the module (the documentation file, the component's file).
  */
-const pageModule = (
+const pageModule = async (
   storyFile: string,
   componentFile: string | undefined,
   watch: (file: string) => void
-): { code: string; moduleType: "js" } => {
-  const page = componentPage(storyFile);
+): Promise<{ code: string; moduleType: "js" }> => {
+  // Markdown and the highlighter load for a component that has a page to read
+  const page = existsSync(pageFileOf(storyFile))
+    ? (await import("./componentPage.ts")).componentPage(storyFile)
+    : undefined;
   if (page !== undefined) watch(page.file);
   if (componentFile !== undefined) watch(componentFile);
   const summary = componentFile === undefined ? "" : moduleSummaryOfText(readFileSync(componentFile, "utf8"));
@@ -90,8 +121,12 @@ const pageModule = (
  * @param file - the Markdown file's absolute path.
  * @param watch - adds a file whose edit renews the module (the Markdown file).
  */
-const markdownModule = (file: string, watch: (file: string) => void): { code: string; moduleType: "js" } => {
+const markdownModule = async (
+  file: string,
+  watch: (file: string) => void
+): Promise<{ code: string; moduleType: "js" }> => {
   watch(file);
+  const { markdownHtml } = await import("./componentPage.ts");
   const value: StoryMarkdown = { html: markdownHtml(readFileSync(file, "utf8")) };
   return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
 };
@@ -102,11 +137,13 @@ const markdownModule = (file: string, watch: (file: string) => void): { code: st
  * @param id - the module's id.
  * @param watch - adds a file whose edit renews the module.
  * @param resolveImport - resolves an import of a file as the app resolves it.
+ * @param cacheFolder - where answers are kept between starts; none reads every time.
  */
 export const textModule = async (
   id: string,
   watch: (file: string) => void,
-  resolveImport: (specifier: string, importer: string) => Promise<string | undefined>
+  resolveImport: (specifier: string, importer: string) => Promise<string | undefined>,
+  cacheFolder: string | undefined
 ): Promise<{ code: string; moduleType: "js" } | undefined> => {
   if (id.endsWith(PAGE_QUERY)) {
     const storyFile = id.slice(0, -PAGE_QUERY.length);
@@ -115,7 +152,7 @@ export const textModule = async (
     );
     return pageModule(storyFile, componentFile, watch);
   }
-  if (id.endsWith(CODE_QUERY)) return codeModule(id.slice(0, -CODE_QUERY.length));
+  if (id.endsWith(CODE_QUERY)) return codeModule(id.slice(0, -CODE_QUERY.length), cacheFolder);
   if (id.endsWith(MARKDOWN_QUERY)) return markdownModule(id.slice(0, -MARKDOWN_QUERY.length), watch);
   return undefined;
 };

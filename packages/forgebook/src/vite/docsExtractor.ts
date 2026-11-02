@@ -4,16 +4,20 @@
  *
  * @remarks
  * One worker per plugin, started on the first request and kept: its programs make every later read quick, until a
- * source file changes (`changed`, which the dev server's watcher sends). Nothing starts it ahead of a request: a
- * TypeScript program is two thirds of the server's memory, and a story's page never reads one. Requests are answered
- * in order. The worker never keeps the process alive (`unref`), and `close` ends it when the build or the server ends.
+ * source file changes (`changed`, which the dev server's watcher sends). Nothing starts it ahead of a request, and a
+ * request the disk answers (`diskCache.ts`) starts nothing: a TypeScript program is half the server's memory. Requests
+ * are answered in order. The worker never keeps the process alive (`unref`), and `close` ends it when the build or the
+ * server ends.
  *
  * @module
  */
-import { extname } from "node:path";
+import { statSync } from "node:fs";
+import { extname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import type { StoryComponentResult } from "./adapter.ts";
+import { type DiskCache, diskCache } from "./diskCache.ts";
 import type { UsageGraph, UsageRequestFile } from "./usageGraph.ts";
 
 /** What the extractor answers for a story file: its component's docs, none, or why it cannot be read. */
@@ -57,6 +61,8 @@ export type DocsResponse =
       readonly id: number;
       /** The extractor's result. */
       readonly result: DocsResult;
+      /** The files it can change with; none for a story file that cannot be read. */
+      readonly dependencies: readonly string[];
     }
   | {
       /** A group of story files' usage. */
@@ -85,19 +91,42 @@ export type DocsExtractor = {
  */
 const WORKER_URL = new URL(`./docsWorker${extname(import.meta.url)}`, import.meta.url);
 
+/**
+ * The worker's young generation, in MB. V8 sizes it for throughput and the heap of a program, which survives, never
+ * needs one this large: left alone it is half the worker's memory, and reading a program takes no longer without it.
+ */
+const YOUNG_GENERATION_MB = 8;
+
 /** What the worker is started with: the framework's docs module, which it loads before its first answer. */
 export type DocsWorkerData = {
   /** The URL of the module exporting the framework's `extractStoryComponent`. */
   readonly docsModule: string;
 };
 
+/** Whether what a cache file holds is an answer: docs of a story file, and never a message. */
+const isCachedDocs = (value: unknown): value is Exclude<DocsResult, string> =>
+  typeof value === "object" && value !== null && "docs" in value;
+
+/**
+ * The docs kept on disk, by what made them: a new install of Forgebook or of its framework's package is a new stamp.
+ *
+ * @param folder - the cache's folder.
+ * @param docsModule - the URL of the framework's docs module.
+ */
+const docsCache = (folder: string, docsModule: string): DiskCache<Exclude<DocsResult, string>> => {
+  const made = [WORKER_URL.href, docsModule].map((url) => statSync(fileURLToPath(url)).mtimeMs);
+  return diskCache(join(folder, "docs"), [docsModule, ...made].join(" "), isCachedDocs);
+};
+
 /**
  * A docs extractor with its worker, started on its first request.
  *
  * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).
+ * @param cacheFolder - where docs are kept between starts; none reads every time.
  * @returns the extractor.
  */
-export const createDocsExtractor = (docsModule: string): DocsExtractor => {
+export const createDocsExtractor = (docsModule: string, cacheFolder?: string): DocsExtractor => {
+  const cache = cacheFolder === undefined ? undefined : docsCache(cacheFolder, docsModule);
   let worker: Worker | undefined;
   let nextId = 0;
   // every request sent and not answered yet
@@ -105,7 +134,10 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
   const started = (): Worker => {
     if (worker !== undefined) return worker;
     const workerData: DocsWorkerData = { docsModule };
-    const created = new Worker(WORKER_URL, { workerData });
+    const created = new Worker(WORKER_URL, {
+      workerData,
+      resourceLimits: { maxYoungGenerationSizeMb: YOUNG_GENERATION_MB }
+    });
     created.unref();
     created.on("message", (response: DocsResponse): void => {
       pending.get(response.id)?.(response);
@@ -126,12 +158,22 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
     pending.set(request.id, resolve);
     started().postMessage(request);
   };
-  const extract = (storyFile: string, resolve: (result: DocsResult) => void): void =>
-    send({ kind: "extract", id: nextId++, storyFile }, (response) =>
-      resolve(
-        typeof response === "string" || response.kind !== "extract" ? String(response) : response.result
-      )
-    );
+  const extract = (storyFile: string, resolve: (result: DocsResult) => void): void => {
+    const cached = cache?.read(storyFile);
+    if (cached !== undefined) {
+      resolve(cached);
+      return;
+    }
+    send({ kind: "extract", id: nextId++, storyFile }, (response) => {
+      if (typeof response === "string" || response.kind !== "extract") {
+        resolve(String(response));
+        return;
+      }
+      const { result, dependencies } = response;
+      if (typeof result !== "string") cache?.write(storyFile, result, dependencies);
+      resolve(result);
+    });
+  };
   return {
     extract: (storyFile: string): Promise<DocsResult> =>
       new Promise((resolve) => extract(storyFile, resolve)),

@@ -1,0 +1,18 @@
+/**
+ * Where a component's documentation file sits: read apart from the page, so asking whether a component has one loads
+ * neither Markdown nor the highlighter.
+ *
+ * @module
+ */
+import { basename, dirname, join } from "node:path";
+
+/**
+ * The documentation file beside a story file: its component's name in kebab case, with `.md`.
+ *
+ * @param storyFile - the story file's absolute path.
+ */
+export const pageFileOf = (storyFile: string): string => {
+  const component = basename(storyFile).replace(/\.stories\.tsx?$/, "");
+  const kebab = component.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+  return join(dirname(storyFile), `${kebab}.md`);
+};

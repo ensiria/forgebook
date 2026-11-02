@@ -8,7 +8,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { componentPage, markdownHtml, pageFileOf, pageMarkdown } from "../src/vite/componentPage.ts";
+import { componentPage, markdownHtml, pageMarkdown } from "../src/vite/componentPage.ts";
+import { pageFileOf } from "../src/vite/pageFile.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
 const KIT = join(KIT_DIR, "src");
