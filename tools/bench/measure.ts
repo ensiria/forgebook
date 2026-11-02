@@ -11,7 +11,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 
 import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
@@ -422,7 +422,8 @@ export const measureBuild = async (context: MeasureContext): Promise<BuildSample
   const out = context.buildFolder;
   await rm(out, { recursive: true, force: true });
   await removeCaches(context);
-  const command = context.target.build(out);
+  // relative to the project, as every tool reads it: Ladle joins its folder to the one it runs in, an absolute one too
+  const command = context.target.build(relative(context.directory, out));
   const start = Date.now();
   await exec(programOf(context, command), [...command.args], {
     cwd: context.directory,

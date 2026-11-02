@@ -235,5 +235,22 @@ export const libraryStorybook = (storybook: CorpusStorybook, clone: string): Tar
   };
 };
 
+/**
+ * A tool with Forgebook's frames on the catalogue's origin (`forgebook dev --same-origin-frames`), to read what their
+ * own origin costs from one run of each; any other tool as it is.
+ *
+ * @param target - the tool.
+ */
+export const withSameOriginFrames = (target: Target): Target =>
+  target.name !== "forgebook"
+    ? target
+    : {
+        ...target,
+        dev: (port) => {
+          const command = target.dev(port);
+          return { ...command, args: [...command.args, "--same-origin-frames"] };
+        }
+      };
+
 /** Every tool, in report order. */
 export const TARGETS: readonly Target[] = [FORGEBOOK, STORYBOOK, LADLE];

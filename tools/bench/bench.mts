@@ -24,7 +24,7 @@ import { corpusPaths, DEFINITION_FILE, definitionFolder, parseCorpus } from "./r
 import { parseReport, reportMarkdown, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
 import { statusWriter } from "./statusFile.ts";
-import { FORGEBOOK, TARGETS, type Target } from "./targets.ts";
+import { FORGEBOOK, TARGETS, type Target, withSameOriginFrames } from "./targets.ts";
 
 /** The share two runs' medians may differ by and still count as reproduced. */
 const REPRODUCIBLE_WITHIN = 0.1;
@@ -74,9 +74,14 @@ const countProblems = ({ sweep, corpus }: BenchReport): readonly string[] => {
 };
 
 /** The tools a run measures. */
-const toolsOf = (real: RealRun | undefined, isCompared: boolean): readonly Target[] => {
-  if (real !== undefined) return realTargets(real.corpus, real.paths.clone, isCompared);
-  return isCompared ? TARGETS : [FORGEBOOK];
+const toolsOf = (
+  real: RealRun | undefined,
+  isCompared: boolean,
+  isSameOrigin: boolean
+): readonly Target[] => {
+  const generated = isCompared ? TARGETS : [FORGEBOOK];
+  const tools = real === undefined ? generated : realTargets(real.corpus, real.paths.clone, isCompared);
+  return isSameOrigin ? tools.map(withSameOriginFrames) : tools;
 };
 
 /** The groups a run measures: the ones named, or all of them. */
@@ -167,6 +172,11 @@ await defineScript({
       valueName: "file",
       description: "Fail when a metric of Forgebook is over this file's limit, or missing from the run."
     },
+    "same-origin-frames": {
+      type: "boolean",
+      description:
+        "Run Forgebook's frames on the catalogue's origin, to read the cost of their own from two runs."
+    },
     "forgebook-version": {
       type: "string",
       valueName: "version",
@@ -213,10 +223,12 @@ await defineScript({
     try {
       report = await runBench({
         folders,
-        targets: toolsOf(real, options.compare),
+        targets: toolsOf(real, options.compare, options["same-origin-frames"] === true),
         ...(real === undefined ? {} : { real }),
         forgebookPackages,
-        forgebookLabel,
+        // the report says which placement it measured: the two are compared from two reports
+        forgebookLabel:
+          options["same-origin-frames"] === true ? `${forgebookLabel} (frames same-origin)` : forgebookLabel,
         size: { components: options.components, stories: options.stories },
         runs: options.runs,
         edits: options.edits,
