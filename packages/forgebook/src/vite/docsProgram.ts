@@ -20,8 +20,32 @@ export type DocsProgram = {
   readonly checker: ts.TypeChecker;
 };
 
-/** The last program of each configuration, reused by the next read. */
+/**
+ * How many programs are kept. A program holds all its package reaches, hundreds of megabytes in a monorepo whose
+ * `tsconfig` paths lead to every package's sources, and one is made per `tsconfig.json`: kept without a limit they fill
+ * the worker's heap, it stops, and every story still waiting gets that error instead of its docs. Making one again
+ * takes a second or so, which is the cheaper of the two.
+ */
+export const KEPT_PROGRAMS = 4;
+
+/** The last program of each configuration, the one read last at the end: reused by the next read. */
 const programs = new Map<string, ts.Program>();
+
+/**
+ * Keeps a program as the one read last, and lets the oldest go past the limit.
+ *
+ * @param key - the program's key.
+ * @param program - the program.
+ */
+const keepProgram = (key: string, program: ts.Program): void => {
+  programs.delete(key);
+  programs.set(key, program);
+  for (const oldest of programs.keys()) {
+    if (programs.size <= KEPT_PROGRAMS) break;
+    programs.delete(oldest);
+    outdated.delete(oldest);
+  }
+};
 
 /**
  * The configurations whose program may hold an edited file: renewed on their next read. A program read again without
@@ -57,14 +81,17 @@ const FALLBACK_OPTIONS: ts.CompilerOptions = {
  */
 const keptProgram = (key: string, rootNames: readonly string[], options: ts.CompilerOptions): ts.Program => {
   const oldProgram = programs.get(key);
-  if (oldProgram !== undefined && !outdated.has(key)) return oldProgram;
+  if (oldProgram !== undefined && !outdated.has(key)) {
+    keepProgram(key, oldProgram);
+    return oldProgram;
+  }
   outdated.delete(key);
   const program = ts.createProgram({
     rootNames,
     options,
     ...(oldProgram === undefined ? {} : { oldProgram })
   });
-  programs.set(key, program);
+  keepProgram(key, program);
   return program;
 };
 
