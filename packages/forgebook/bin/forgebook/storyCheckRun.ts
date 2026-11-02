@@ -18,6 +18,7 @@ import { pathToFileURL } from "node:url";
 import {
   isStoryCheckReport,
   isStoryShotReport,
+  type SemanticModel,
   type StoryCheckReport,
   type StoryCheckRequest,
   type StoryShotReport
@@ -42,6 +43,8 @@ export type StoryCheckInput = {
   readonly views: readonly string[];
   /** Run every variant the catalogue's browser tests check. */
   readonly isAllVariants: boolean;
+  /** Ask the configured model too: it sends each story's tree and picture to that address. */
+  readonly isSemantic?: boolean;
 };
 
 /**
@@ -168,17 +171,21 @@ const runOnStories = async (
  * @param config - the catalogue's configuration.
  * @param url - where `forgebook dev` runs, when not at Vite's default address.
  * @param input - the id, the views and whether to check every variant.
+ * @param model - the model `isSemantic` asks, or what to set to have one.
  * @returns the report, or why the check could not run.
  */
 export const runStoryCheck = async (
   config: ResolvedConfig,
   url: string | undefined,
-  input: StoryCheckInput
+  input: StoryCheckInput,
+  model?: SemanticModel | string
 ): Promise<StoryCheckReport | string> => {
+  const semantic = input.isSemantic === true ? model : undefined;
+  if (typeof semantic === "string") return semantic;
   const answer = await runOnStories(config, url, input, {
     specifier: "@forgebook/testing/check",
     name: "checkStories",
-    extra: {}
+    extra: semantic === undefined ? {} : { semantic }
   });
   if (typeof answer === "string" || isStoryCheckReport(answer)) return answer;
   return "@forgebook/testing/check answered something that is not a check's report";

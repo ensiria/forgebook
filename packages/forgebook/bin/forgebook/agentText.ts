@@ -11,7 +11,7 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
-import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { StoryCheckReport, StoryCheckResult, StoryShotReport } from "../../src/storyCheck.ts";
 import type {
   AgentTokenSummary,
   CheckedCodeDocument,
@@ -66,6 +66,21 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
   return keyValue(entries, uncut(style));
 };
 
+/** What a model judged, each line saying it is an opinion. */
+const judgementLines = (result: StoryCheckResult): readonly string[][] => {
+  const row = (text: string): string[] => [
+    result.storyId,
+    result.view || "default",
+    `model's opinion: ${text}`
+  ];
+  const { judgements } = result;
+  if (judgements === undefined) return [];
+  if (typeof judgements === "string") return [row(judgements)];
+  return judgements.length === 0
+    ? [row("nothing to report")]
+    : judgements.map((each) => row(`${each.criterion} ${each.message}`.trim()));
+};
+
 /**
  * A check's report as a table: one row per problem, its story, its view and its kind; a story that passes in a view gets
  * one row saying so.
@@ -75,15 +90,16 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
  */
 export const checkText = (report: StoryCheckReport, style: OutputStyle): string =>
   table(
-    report.results.flatMap((result) =>
-      result.problems.length === 0
+    report.results.flatMap((result) => [
+      ...(result.problems.length === 0
         ? [[result.storyId, result.view || "default", "passes"]]
         : result.problems.map((problem) => [
             result.storyId,
             result.view || "default",
             `${problem.kind}: ${problem.message}`
-          ])
-    ),
+          ])),
+      ...judgementLines(result)
+    ]),
     { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Result" }] },
     uncut(style)
   );

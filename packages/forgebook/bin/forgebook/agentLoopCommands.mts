@@ -28,6 +28,7 @@ import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentT
 import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
 import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
+import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
 
 /**
@@ -102,6 +103,11 @@ export const agentLoopCommands = (
         type: "boolean",
         description: "Check every variant the catalogue's browser tests check."
       },
+      semantic: {
+        type: "boolean",
+        description: "Also ask the configured model, sending it each story's tree and picture."
+      },
+      ...SEMANTIC_OPTIONS,
       url: {
         type: "string",
         env: "FORGEBOOK_URL",
@@ -124,11 +130,17 @@ export const agentLoopCommands = (
     ],
     run: async ({ args, options, io, isJson, style }): Promise<void> => {
       const config = await configOf(options.config);
-      const report = await runStoryCheck(config, options.url, {
-        id: args.id,
-        views: options.view ?? [],
-        isAllVariants: options["all-variants"] === true
-      });
+      const report = await runStoryCheck(
+        config,
+        options.url,
+        {
+          id: args.id,
+          views: options.view ?? [],
+          isAllVariants: options["all-variants"] === true,
+          isSemantic: options.semantic === true
+        },
+        semanticModelOf(options)
+      );
       if (typeof report === "string") throw new ScriptError(report);
       io.stdout.write(isJson ? formatJson(report) : `${checkText(report, style)}\n`);
       const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
