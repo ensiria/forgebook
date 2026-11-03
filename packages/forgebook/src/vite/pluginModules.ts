@@ -52,7 +52,7 @@ export const docsModule = (
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param hasUsage - whether the group offers its "Used in" loader.
  * @param cache - the pattern's index kept between starts; none reads every file.
- * @param warm - starts reading the docs of a story file ahead of its request, in a build; none on a dev server.
+ * @param warm - starts reading the docs of a story file ahead of its request; none in a test run.
  * @throws when a story file cannot be indexed.
  */
 export const patternModule = (

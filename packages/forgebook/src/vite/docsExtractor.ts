@@ -4,10 +4,10 @@
  *
  * @remarks
  * One worker per plugin, started on the first request the disk cannot answer, and kept: its programs make every later
- * read quick, until a source file changes (`changed`, which the dev server's watcher sends). On a dev server nothing
- * starts it ahead of a request: a TypeScript program is the largest thing the server holds, and an answer kept on disk
- * from an earlier start (`diskCache.ts`, with the files it was read from, `docsDependencies.ts`) needs none. A build,
- * which reads every story's docs, starts it early (`warm`), one warm-up at a time and only while nothing waits. Requests are answered in
+ * read quick, until a source file changes (`changed`, which the dev server's watcher sends). A TypeScript program is
+ * the largest thing the server holds, and an answer kept on disk from an earlier start (`diskCache.ts`, with the files
+ * it was read from, `docsDependencies.ts`) needs none: a pattern's first story starts the worker early (`warm`) only
+ * when the disk keeps no docs at all (a first start, a build), one warm-up at a time and only while nothing waits. Requests are answered in
  * order. The worker never keeps the process alive (`unref`), and `close` ends it when the build or the server ends.
  *
  * @module
@@ -86,8 +86,8 @@ export type DocsExtractor = {
   /** What a group of story files' stories render, and the import graph they reach. */
   readonly usage: (files: readonly UsageRequestFile[]) => Promise<UsageResult>;
   /**
-   * Builds the program that holds a story file ahead of its first read, while the worker has nothing else to do: a
-   * build, which reads every story's docs, starts the worker while Vite still loads the pages.
+   * Builds the program that holds a story file ahead of its first read, while the worker has nothing else to do, when
+   * the disk keeps no docs: a first start, or a build, starts the worker while Vite still loads the pages.
    */
   readonly warm: (storyFile: string) => void;
   /** Tells the worker a source file changed, so the next read sees it. */
@@ -284,6 +284,9 @@ export const createDocsExtractor = (
       worker?.postMessage(request);
     },
     warm: (storyFile: string): void => {
+      // only a first start, which the disk can answer nothing for: a later one reads each page's docs from the disk
+      // and builds a program only for one it misses, so it stays without one until then
+      if (isKeptRead && docsCache !== undefined && !docsCache.isEmpty()) return;
       warmUps.push(storyFile);
       sendWarmUp();
     },

@@ -295,6 +295,11 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
+  /**
+   * Whether the server runs tests (Vitest's mode): no person waits for a page, so no docs program is warmed. A worker
+   * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
+   */
+  let isTestRun = false;
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
   /** The stamp of the plugin's own code, which makes the kept indexes and code: another version is a miss. */
@@ -363,13 +368,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    // a build reads every story's docs: its worker starts while Vite loads the pages; a dev server's waits for a page
+    // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
     return patternModule(
       id,
       watch,
       config?.lists.usedIn !== false,
       indexCache(),
-      isServing() ? undefined : extractor().warm
+      isTestRun ? undefined : extractor().warm
     );
   };
   /**
@@ -423,6 +428,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     enforce: "pre",
     config: async (userConfig: UserConfig, environment: ConfigEnv): Promise<UserConfig> => {
       command = environment.command;
+      isTestRun = environment.mode === "test";
       if (config === undefined && options.framework === undefined) {
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);

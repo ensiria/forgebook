@@ -42,6 +42,8 @@ export type DiskCache<TValue> = {
   readonly read: (key: string) => TValue | undefined;
   /** Keeps an answer under a key, with the paths it was made from, stamped (`stampPaths`). */
   readonly write: (key: string, value: TValue, stamps: readonly PathStamp[]) => void;
+  /** Whether it keeps any answer, fresh or not: none on a project's first start. */
+  readonly isEmpty: () => boolean;
 };
 
 /** A path and its stamp; `null` for a path that does not exist, which may appear later. */
@@ -210,6 +212,13 @@ export const diskCache = <TValue>(
         return;
       }
       writeWhole(path(key), JSON.stringify(entry));
+    },
+    isEmpty: (): boolean => {
+      try {
+        return !readdirSync(folder).some((name) => name.endsWith(".json"));
+      } catch {
+        return true;
+      }
     }
   };
 };

@@ -39,8 +39,10 @@ describe("diskCache", () => {
     const file = fileIn("fresh");
     const cache = diskCache(join(ROOT, "cache-fresh"), "code", isText);
     expect(cache.read("key")).toBeUndefined();
+    expect(cache.isEmpty()).toBe(true);
     cache.write("key", "answer", stampPaths([file]));
     expect(cache.read("key")).toBe("answer");
+    expect(cache.isEmpty()).toBe(false);
   });
 
   it("misses after an edit, even one that kept the modification time", () => {
