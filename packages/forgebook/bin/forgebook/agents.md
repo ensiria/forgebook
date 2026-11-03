@@ -35,6 +35,11 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - In a Solid or Preact project, the same as React's, with the types from `@forgebook/solid` or `@forgebook/preact`. In
   Solid a render runs once: read the args inside its JSX (`<Badge label={args.label} />`) or spread them
   (`<Badge {...args} />`), never destructured, so a new value reaches the story without starting it over.
+- With custom elements, `my-badge.ts` and `MyBadge.stories.ts`: the types from `@forgebook/web-components`, the element by
+  its tag (`component: "my-badge"`, the module imported for its definition) or its class. An arg's prefix says what it
+  sets: `label` the attribute, `.items` the property, `#icon` a slot (`#default` the unnamed one), `@change` an event the
+  catalogue records, which a render does not bind. A render returns a Lit template. The props come from the package's
+  `custom-elements.json`: run its analyzer after changing an element, or the docs show the old one.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.

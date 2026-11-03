@@ -14,17 +14,19 @@ per story, switches for theme, contrast, motion and language, and a props table 
 [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue), Svelte 5 through
 [`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte), Solid 1.9 through
 [`@forgebook/solid`](https://www.npmjs.com/package/@forgebook/solid), Preact 10.19 or 11 through
-[`@forgebook/preact`](https://www.npmjs.com/package/@forgebook/preact), a Next.js project's components through
-[`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs); other frameworks plug in through the same
-adapter (the catalogue's own interface is React either way, and the frame of a story in another framework loads none) ·
-npm, pnpm, yarn or bun ·
+[`@forgebook/preact`](https://www.npmjs.com/package/@forgebook/preact), Web Components with Lit 3 through
+[`@forgebook/web-components`](https://www.npmjs.com/package/@forgebook/web-components), a Next.js project's components
+through [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs); other frameworks plug in through the
+same adapter (the catalogue's own interface is React either way, and the frame of a story in another framework loads
+none) · npm, pnpm, yarn or bun ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/LICENSE)
 
 ## Install
 
 In a project with React and Vite, both packages: `forgebook` is the catalogue, `@forgebook/react` the adapter it draws
 React components with. On Vue, Svelte, Solid or Preact, `@forgebook/vue`, `@forgebook/svelte`, `@forgebook/solid` or
-`@forgebook/preact` takes its place: each README has the configuration and the stories.
+`@forgebook/preact` takes its place, and `@forgebook/web-components` for custom elements: each README has the
+configuration and the stories.
 
 ```sh
 npm install --save-dev forgebook @forgebook/react
@@ -346,11 +348,11 @@ To try it on a Storybook project, run `npx forgebook init --from storybook` in t
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
 computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
-become switches. It reads React, Vue, Svelte, Preact and Solid on Vite (`@storybook/react-vite`, `@storybook/vue3-vite`,
-`@storybook/svelte-vite`, `@storybook/sveltekit`, `@storybook/preact-vite`, `storybook-solidjs-vite`) and Next.js
-(`@storybook/nextjs-vite`, and `@storybook/nextjs` on webpack, whose stories are the same), never replaces a
-configuration without `--force`, and lists what it left out. A Next.js project gets `framework: nextjs()` and keeps its
-stories' `parameters.nextjs`:
+become switches. It reads React, Vue, Svelte, Preact, Solid and Web Components on Vite (`@storybook/react-vite`,
+`@storybook/vue3-vite`, `@storybook/svelte-vite`, `@storybook/sveltekit`, `@storybook/preact-vite`,
+`storybook-solidjs-vite`, `@storybook/web-components-vite`) and Next.js (`@storybook/nextjs-vite`, and
+`@storybook/nextjs` on webpack, whose stories are the same), never replaces a configuration without `--force`, and
+lists what it left out. A Next.js project gets `framework: nextjs()` and keeps its stories' `parameters.nextjs`:
 [`@forgebook/nextjs`](https://github.com/ensiria/forgebook/blob/develop/packages/nextjs/README.md) says what it draws.
 
 ## Monorepos
@@ -689,6 +691,7 @@ docs page that names what is not there, and its JSON lists every story for a scr
 | [`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte) | Svelte's story types, renderer and props, snippets and callback props reader |
 | [`@forgebook/solid`](https://www.npmjs.com/package/@forgebook/solid) | Solid's story types, renderer (args update in place) and props reader |
 | [`@forgebook/preact`](https://www.npmjs.com/package/@forgebook/preact) | Preact's story types, renderer (on Preact itself, no compat) and props reader |
+| [`@forgebook/web-components`](https://www.npmjs.com/package/@forgebook/web-components) | Web Components' story types, Lit renderer, and reader of the Custom Elements Manifest |
 | [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs) | A Next.js project's components outside Next.js: images, fonts, links, both routers, server components |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing) | Tests generated from the stories |

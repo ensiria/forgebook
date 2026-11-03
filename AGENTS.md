@@ -11,11 +11,12 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   `forgebook-docs`, `forgebook-texts`).
 - `packages/react` (`@forgebook/react`), `packages/vue` (`@forgebook/vue`), `packages/nextjs` (`@forgebook/nextjs`, on
   React's), `packages/svelte` (`@forgebook/svelte`), `packages/solid` (`@forgebook/solid`), `packages/preact`
-  (`@forgebook/preact`), `packages/story-format` (`@forgebook/story-format`, no dependencies), `packages/testing`
-  (`@forgebook/testing`).
+  (`@forgebook/preact`), `packages/web-components` (`@forgebook/web-components`), `packages/story-format`
+  (`@forgebook/story-format`, no dependencies), `packages/testing` (`@forgebook/testing`).
 - `fixtures/`: the kit, the stories written the Storybook way, the catalogue the shell's browser tests run on, and the
-  Vue, Svelte, Solid and Preact catalogues (`fixtures/vue`, `fixtures/svelte`, `fixtures/solid`, `fixtures/preact`) and
-  small Next.js app (`fixtures/nextjs`) whose catalogues they open beside it.
+  Vue, Svelte, Solid, Preact and Web Components catalogues (`fixtures/vue`, `fixtures/svelte`, `fixtures/solid`,
+  `fixtures/preact`, `fixtures/web-components`) and small Next.js app (`fixtures/nextjs`) whose catalogues they open
+  beside it.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
 
 ## Before you say a change is done
