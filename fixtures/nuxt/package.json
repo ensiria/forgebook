@@ -1,0 +1,38 @@
+{
+  "name": "@fixture/nuxt",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Nuxt fixture catalogue: a small Nuxt 4 app's components drawn by Forgebook with their auto-imports, aliases, router, data and state, its stories tested on the server.",
+  "type": "module",
+  "exports": {
+    "./stories": "./stories.ts"
+  },
+  "scripts": {
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "test": "vitest run",
+    "typecheck": "vue-tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@forgebook/nuxt": "workspace:*",
+    "@forgebook/plugin-msw": "workspace:*",
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "msw": "3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sass-embedded": "1.106.1",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "vue": "3.5.44",
+    "vue-router": "5.4.0",
+    "vue-tsc": "3.3.14"
+  }
+}

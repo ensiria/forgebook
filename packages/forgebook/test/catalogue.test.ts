@@ -29,6 +29,7 @@ describe("catalogueSettings", () => {
     expect(settings.tabs).toEqual(["props", "events", "play", "parts", "code", "a11y", "signature"]);
     expect(settings.gridStep).toBe(8);
     expect(settings.appearance).toBe("system");
+    expect(settings.propGroups).toEqual([]);
   });
 
   it("keeps the built-in backgrounds it names, adds its own, turns tabs off, and keeps 100 % among the steps", () => {
@@ -74,6 +75,13 @@ describe("the audience", () => {
   });
 });
 
+describe("the Embed button", () => {
+  it("is offered unless a catalogue turns it off", () => {
+    expect(catalogueSettings("A", DEFAULT_SWITCHES).hasEmbed).toBe(true);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { controls: { embed: false } }).hasEmbed).toBe(false);
+  });
+});
+
 describe("mergedLists", () => {
   it("takes the catalogue's single values over its presets', and merges the entries by id", () => {
     const merged = mergedLists([
@@ -116,6 +124,16 @@ describe("mergedLists", () => {
     expect(merged.toolbar).toEqual(["contrast", "theme"]);
     expect(mergedLists([{ toolbar: ["theme"] }, {}]).toolbar).toEqual(["theme"]);
   });
+
+  it("takes the prop groups' order the last names, as a whole list", () => {
+    expect(mergedLists([{ propGroups: ["Texts"] }, {}]).propGroups).toEqual(["Texts"]);
+    expect(
+      mergedLists([{ propGroups: ["Texts"] }, { propGroups: ["Selection", "Paging"] }]).propGroups
+    ).toEqual(["Selection", "Paging"]);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { propGroups: ["Paging"] }).propGroups).toEqual([
+      "Paging"
+    ]);
+  });
 });
 
 describe("story groups", () => {
@@ -131,9 +149,11 @@ describe("story groups", () => {
     const sections = groupedStories(
       [story("zeta"), story("behaviour"), story(undefined), story("alpha"), story("states")].map((each) => ({
         ...each,
+        file: "x.stories.tsx",
         controls: "all" as const,
         description: undefined,
         height: undefined,
+        design: undefined,
         tags: [],
         hasPlay: false,
         isMain: false,

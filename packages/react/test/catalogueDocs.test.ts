@@ -35,7 +35,7 @@ describe("collectDocs and catalogueMarkdown", () => {
   it("writes one dense line per entry", () => {
     expect(text).toContain("### Inputs › Selection");
     expect(text).toContain(
-      "- **Select** `@fixture/kit/select`: Lets the user pick one value from a list. value:string size=sm|md*|lg rows:number isDisabled onValueChange(value) options!:readonly string[] hint:ReactNode · parts: root, trigger, list · story: `kit:inputs-selection-select--in-row`"
+      "- **Select** `@fixture/kit/select`: Lets the user pick one value from a list. value:string size=sm|md*|lg rows:number isDisabled onValueChange(value) options!:readonly string[] hint:ReactNode texts:SelectTexts · parts: root, trigger, list · story: `kit:inputs-selection-select--in-row`"
     );
     expect(text).toContain(
       "- `@fixture/kit/utils/format-size` formatSize(value, unit?): A size written with its unit. Also: formatSizeOf(size), SIZES, types SizeUnit"
@@ -46,7 +46,7 @@ describe("collectDocs and catalogueMarkdown", () => {
     expect(text).toContain("- `@fixture/kit/kit.css`: The fixture kit's style sheet.");
     // a hook with stories about logic: its call, not its options as props
     expect(text).toContain(
-      "- **useUndo** `@fixture/kit/use-undo`: Keeps a value with its history. useUndo<TValue>(initial, limit?): UndoState<TValue> · story: `kit:hooks-use-undo--history`"
+      "- **useUndo** `@fixture/kit/use-undo`: Keeps a value with its history. useUndo<TValue>(initial, limit?): UndoState<TValue> · story: `kit:hooks-useundo--history`"
     );
     expect(text).not.toContain("Page");
   });
@@ -57,15 +57,44 @@ describe("collectDocs and catalogueMarkdown", () => {
     const titled = ["Data/Lists/List", "Data/Value", "Data/Code/Diff", "Data/Board", "Actions/Button"].map(
       (title) => ({ ...select, title, name: title.split("/").at(-1) ?? title })
     );
-    const headings = catalogueMarkdown({ ...data, components: titled }, CATALOGUE_SECTIONS)
+    const headings = catalogueMarkdown({ ...data, components: titled }, ["components"])
       .split("\n")
       .filter((line) => line.startsWith("### "));
     expect(headings).toEqual(["### Actions", "### Data", "### Data › Code", "### Data › Lists"]);
   });
 
+  it("lists the source's tokens by type, with their themes, alias, purpose and deprecation", () => {
+    expect(problems).toEqual([]);
+    expect(data.tokens.map((token) => token.name)).toEqual([
+      "color.brand",
+      "color.action",
+      "color.old",
+      "space.sm"
+    ]);
+    expect(text).toContain("## Tokens");
+    expect(text).toContain("- `color.brand`: `#1c1b1b` · dark `#f4f1ea` · The brand's colour");
+    expect(text).toContain("- `color.action`: `#1c1b1b` · dark `#f4f1ea` · alias of `color.brand`");
+    expect(text).toContain("- `color.old`: `#333333` · deprecated: Use color.action");
+    expect(text).toContain("### dimension\n- `space.sm`: `8px`");
+  });
+
+  it("keeps a token on its line, whatever its file holds", () => {
+    const [first] = data.tokens;
+    if (first === undefined) throw new Error("the fixture kit has no token");
+    const forged = { ...first, name: "a\n## Forged", value: "x\n## Forged", type: "t\n## Forged" };
+    const written = catalogueMarkdown({ ...data, tokens: [forged] }, ["tokens"]);
+    expect(written.split("\n").filter((line) => line.startsWith("## "))).toEqual(["## Tokens"]);
+  });
+
+  it("leaves the tokens unread when the sections do not list them", () => {
+    const listed = collectDocs(KIT, extractStoryComponent, { exclude: [], sections: ["components"] });
+    expect(listed.data.tokens).toEqual([]);
+  });
+
   it("reads the source's id from the stories export, and each component's main story", () => {
     expect(data.sourceId).toBe("kit");
     expect(data.components[0]?.mainStory).toBe("InRow");
+    expect(data.components[0]?.mainStoryId).toBe("inputs-selection-select--in-row");
   });
 
   it("leaves out the excluded subpaths and writes the sections asked for, in their order", () => {

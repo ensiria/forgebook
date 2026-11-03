@@ -69,13 +69,15 @@ const namedPlay = (name: string, top: StoryValues, seen: ReadonlySet<string>): b
  * The index's field for a `play`: set when the story has one of its own or the meta does, which runs for every story
  * of the file; left out otherwise.
  *
- * @param local - the story's local name.
+ * @param local - the story's local name; none for a story re-exported from another file, whose own `play` is not seen.
  * @param top - the file's top level.
  * @param metaPlay - the meta's `play`; none when it writes none.
  */
 export const playField = (
-  local: string,
+  local: string | undefined,
   top: StoryValues,
   metaPlay: ESTree.Expression | undefined
 ): { readonly hasPlay?: true } =>
-  namedPlay(local, top, new Set()) === true || isPlay(metaPlay) ? { hasPlay: true } : {};
+  (local !== undefined && namedPlay(local, top, new Set()) === true) || isPlay(metaPlay)
+    ? { hasPlay: true }
+    : {};

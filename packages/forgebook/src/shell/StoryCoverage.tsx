@@ -17,10 +17,10 @@ import { STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
 import type { ShellMessage } from "../messages.ts";
 import { groupedStories, type TreeStory } from "../storyTree.ts";
 import type { CheckState } from "./A11yTab.tsx";
-import { a11yHint } from "./A11yTab.tsx";
 import { AUDIENCE_TEXTS } from "./audiencePage.ts";
 import { CodeText } from "./CodeText.tsx";
 import { type ExampleContext, StoryLink } from "./Example.tsx";
+import { a11yHint } from "./tabSummaries.ts";
 import { type CheckResult, type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
 import type { FrameQueue } from "./useFrameQueue.ts";
 

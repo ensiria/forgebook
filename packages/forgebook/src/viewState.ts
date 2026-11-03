@@ -13,7 +13,7 @@
  */
 
 import { AUDIENCE_IDS, type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
-import type { CatalogueSettings, OwnControlId, PanelTabId } from "./catalogue.ts";
+import type { CatalogueSettings, OwnControlId } from "./catalogue.ts";
 import { switchValueOf, switchWithRole, type TouchChoice, type ViewSwitch } from "./switches.ts";
 
 /**
@@ -48,7 +48,7 @@ export type MeasureTool = "outline" | "grid" | "measure";
 export type Zoom = number;
 
 /** A tab of the panel under a story. */
-export type PanelTab = PanelTabId;
+export type PanelTab = string;
 
 /** The story's width on the stage: the stage's whole width, or a width in CSS px (a preset, or dragged). */
 export type StageWidth = "fill" | number;
@@ -470,6 +470,7 @@ const SHELL_PARAMETERS = [
   "args",
   "matrix",
   "component",
+  "embed",
   "audience"
 ];
 

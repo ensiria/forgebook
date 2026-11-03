@@ -1,0 +1,130 @@
+/*
+ * The Design tab's own styles: they load with the tab, so a catalogue that never opens it pays nothing for them. Colours
+ * come from the shell's public theme, so the tab follows the catalogue's look.
+ */
+
+/* at least the panel's height; the panel scrolls when a narrow bar leaves the design too little room */
+.figma-design {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.figma-design__bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0.875rem;
+}
+
+.figma-design__note {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--forgebook-text-secondary);
+}
+
+.figma-design__heading {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--forgebook-text);
+}
+
+.figma-design__embed {
+  position: relative;
+  display: flex;
+  flex: 1 0 12rem;
+  min-height: 0;
+}
+
+/* a page gives it no height of its own */
+.figma-design--block {
+  height: 24rem;
+  min-height: 0;
+  margin-block: 1rem;
+  border: 1px solid var(--forgebook-separator);
+}
+
+.figma-design__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--forgebook-text-secondary);
+}
+
+.figma-design__frame {
+  display: block;
+  flex: 0 1 100%;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+}
+
+/* over the whole page, whatever the panel's height, since a design needs the room */
+.figma-design__compare {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  color: var(--forgebook-text);
+  background: var(--forgebook-window);
+  border: 0;
+}
+
+.figma-design__compare[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.figma-design__compare::backdrop {
+  background: var(--forgebook-window);
+}
+
+.figma-design__panes {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  min-height: 0;
+  padding: 0 0.875rem 0.875rem;
+}
+
+@media (width <= 720px) {
+  .figma-design__panes {
+    grid-template-rows: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.figma-design__pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+
+.figma-design__caption {
+  flex: none;
+  padding-bottom: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--forgebook-text-secondary);
+}
+
+.figma-design__story {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--forgebook-separator);
+}

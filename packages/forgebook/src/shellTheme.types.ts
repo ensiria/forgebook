@@ -69,6 +69,11 @@ export type ShellTheme = {
   readonly light?: Partial<ShellPalette>;
   /** Colours of the dark appearance. */
   readonly dark?: Partial<ShellPalette>;
+  /**
+   * Roles taken from the catalogue's design tokens (`tokens` in its configuration), by token name: each role gets the
+   * token's value in both appearances, its `light` and `dark` themes first. `light` and `dark` above win over it.
+   */
+  readonly fromTokens?: Partial<ShellPalette>;
   /** The fonts. Forgebook ships none: a web font is loaded with `@font-face` in `css`. */
   readonly fonts?: ShellFonts;
   /** The corners. */
@@ -84,4 +89,10 @@ export type ShellOptions = {
    * hatch: it reaches the shell's class names, which are not public API and may change in any release.
    */
   readonly css?: string;
+  /**
+   * Whether Forgebook's mark stands in for a catalogue without a logo, in the sidebar and as the page's icon. `false`
+   * leaves the catalogue's own logo and title, or its title alone. On by default; the catalogue's value wins over a
+   * preset's.
+   */
+  readonly branding?: boolean;
 };

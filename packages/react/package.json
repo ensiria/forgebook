@@ -21,6 +21,7 @@
     "./clock": "./src/clock.ts",
     "./texts": "./src/texts.ts",
     "./renderer": "./src/reactRenderer.tsx",
+    "./frame-renderer": "./src/reactFrameRenderer.tsx",
     "./frame": "./src/mountFrame.ts",
     "./code": "./src/storyJsx.ts",
     "./vite": "./src/vite/react.ts",
@@ -35,8 +36,7 @@
   },
   "dependencies": {
     "@forgebook/story-format": "workspace:*",
-    "@vitejs/plugin-react": "6.1.2",
-    "typescript-6": "npm:typescript@6.0.3"
+    "@vitejs/plugin-react": "6.1.2"
   },
   "peerDependencies": {
     "react": "^18.2.0 || ^19.0.0",
@@ -75,6 +75,10 @@
       "./renderer": {
         "types": "./dist/src/reactRenderer.d.ts",
         "default": "./dist/src/reactRenderer.js"
+      },
+      "./frame-renderer": {
+        "types": "./dist/src/reactFrameRenderer.d.ts",
+        "default": "./dist/src/reactFrameRenderer.js"
       },
       "./frame": {
         "types": "./dist/src/mountFrame.d.ts",

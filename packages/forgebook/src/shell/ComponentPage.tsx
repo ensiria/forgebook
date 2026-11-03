@@ -12,10 +12,10 @@
  *
  * @module
  */
-import { lazy, type ReactNode, Suspense, useMemo, useRef } from "react";
+import { type ReactNode, useMemo, useRef } from "react";
 
 import { groupLabel } from "../catalogue.ts";
-import type { ComponentDocs } from "../componentDocs.ts";
+import { type ComponentDocs, codeNameOf } from "../componentDocs.ts";
 import {
   groupedStories,
   isLogicComponent,
@@ -30,6 +30,7 @@ import type { AudienceSectionsProps } from "./AudienceSections.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext, type ExampleReading } from "./Example.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
@@ -87,9 +88,9 @@ export type ComponentPageProps = {
   readonly loadTokens: (() => Promise<unknown>) | undefined;
 };
 
-/** What a page drawn for one audience adds around its frames, split from the shell. */
-const AudienceSections = lazy(() =>
-  import("./AudienceSections.tsx").then((module) => ({ default: module.AudienceSections }))
+/** What a page drawn for one audience adds around its frames, loaded the first time a page is drawn for one. */
+const AUDIENCE_SECTIONS = lazyModule(() =>
+  import("./AudienceSections.tsx").then((module) => module.AudienceSections)
 );
 
 /**
@@ -152,25 +153,34 @@ const AudienceSlot = ({
   audience === undefined ? (
     children
   ) : (
-    <Suspense fallback={null}>
-      <AudienceSections place={place} {...audience} />
-    </Suspense>
+    <LazyView
+      module={AUDIENCE_SECTIONS}
+      props={{ place, ...audience }}
+      loading={null}
+      failed={(message: string): ReactNode => (
+        <p className="forgebook-problems" role="alert">
+          {STRINGS.audienceError}: {message}
+        </p>
+      )}
+    />
   );
 
 /**
  * The API reference; nothing without props, or a signature for what is about logic.
  *
- * @param props - the component's docs and whether it is about logic.
+ * @param props - the component's docs, whether it is about logic, and the prop groups its meta lists first.
  */
 export const PageApi = ({
   docs,
-  isLogic
+  isLogic,
+  componentGroups
 }: {
   readonly docs: ComponentDocs | undefined;
   readonly isLogic: boolean;
+  readonly componentGroups: readonly string[];
 }): ReactNode =>
   docs === undefined || (docs.props.length === 0 && !(isLogic && docs.signature !== undefined)) ? null : (
-    <ApiReference docs={docs} isLogic={isLogic} />
+    <ApiReference docs={docs} isLogic={isLogic} componentGroups={componentGroups} />
   );
 
 /**
@@ -237,7 +247,7 @@ export const ComponentPage = ({
     switches: catalogue.switches,
     onTouchChange,
     code,
-    componentName: componentDocs?.name ?? component.name,
+    componentName: componentDocs === undefined ? component.name : codeNameOf(componentDocs),
     heightOf,
     background,
     reading
@@ -287,7 +297,7 @@ export const ComponentPage = ({
           {demo === undefined ? null : <Example {...context} story={demo} isDemo={true} isMounted={true} />}
           <AudienceSlot place="afterDemo" audience={audienceProps}>
             <Prose page={page} />
-            <PageApi docs={componentDocs} isLogic={isLogic} />
+            <PageApi docs={componentDocs} isLogic={isLogic} componentGroups={component.propGroups} />
           </AudienceSlot>
           {examples.length === 0 ? null : (
             <section className="forgebook-doc__section" aria-labelledby="forgebook-examples">

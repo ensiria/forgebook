@@ -72,23 +72,6 @@ const COMPACT_VALUES = 3;
 const isCompact = (labels: readonly string[]): boolean =>
   labels.length <= COMPACT_VALUES && labels.join("").length <= COMPACT_LETTERS;
 
-/** The name of each of Forgebook's own controls. */
-const OWN_LABELS: Readonly<Record<OwnControlId, () => string>> = {
-  backdrop: () => STRINGS.backdrop,
-  sheets: () => STRINGS.sheets,
-  text: () => STRINGS.text,
-  width: () => STRINGS.width,
-  audience: () => STRINGS.audience
-};
-
-/**
- * A control's name, as its row, its menu and its buttons' names write it.
- *
- * @param control - the control.
- */
-export const controlLabel = (control: Control): string =>
-  control.kind === "switch" ? control.switch.label : OWN_LABELS[control.id]();
-
 /** A choice drawn as segments or as a list, the same way for every control. */
 type Choice<TValue extends string | number> = {
   /** The control's name. */

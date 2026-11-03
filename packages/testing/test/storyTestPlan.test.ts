@@ -25,6 +25,7 @@ const VARIANTS: readonly StoryVariant[] = [
  */
 const storyOf = (id: string, isLogic: boolean): TreeStory => ({
   id,
+  file: "a.stories.tsx",
   name: id,
   exportName: id,
   controls: "all",
@@ -34,6 +35,7 @@ const storyOf = (id: string, isLogic: boolean): TreeStory => ({
   isTouch: false,
   isLogic,
   height: undefined,
+  design: undefined,
   tags: [],
   hasPlay: false
 });

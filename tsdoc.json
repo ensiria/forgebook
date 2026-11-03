@@ -25,6 +25,11 @@
       "tagName": "@replacedBy",
       "syntaxKind": "block",
       "allowMultiple": false
+    },
+    {
+      "tagName": "@group",
+      "syntaxKind": "block",
+      "allowMultiple": false
     }
   ]
 }

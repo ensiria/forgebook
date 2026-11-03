@@ -39,6 +39,29 @@ const frameStatus = async (page: Page): Promise<string | null> => {
   return frameOf(page).locator("html").getAttribute("data-forgebook-status");
 };
 
+/**
+ * The foot handle's box once the handle sits right under the story's room. The box around the room takes the room's
+ * height as measured, a render after the story's height changed, so until then the handle stays where the old height
+ * put it, over the story's last pixels: a press at that place would land on the story.
+ */
+const settledFootBox = async (
+  foot: Locator
+): Promise<{ x: number; y: number; width: number; height: number }> => {
+  await expect
+    .poll(() =>
+      foot.evaluate((element) => {
+        const room = element.parentElement?.querySelector(".forgebook-viewport__room");
+        return room === null || room === undefined
+          ? undefined
+          : element.getBoundingClientRect().top - room.getBoundingClientRect().bottom;
+      })
+    )
+    .toBeCloseTo(0, 0);
+  const box = await foot.boundingBox();
+  if (box === null) throw new Error("The foot handle has no box");
+  return box;
+};
+
 test.describe("pages and the address", () => {
   test("opens the home when the address names none: the library's introduction and its families", async ({
     page
@@ -450,8 +473,7 @@ test.describe("the stage", () => {
     await expect(page).toHaveURL(/height=290/);
     await expect(frame).toHaveCSS("height", "290px");
     // a drag follows the pointer one for one, and the frame's window is that height
-    const box = await foot.boundingBox();
-    if (box === null) throw new Error("The foot handle has no box");
+    const box = await settledFootBox(foot);
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 150, { steps: 5 });
@@ -535,9 +557,7 @@ test.describe("the stage", () => {
     await expect(frame).toHaveCSS("height", "777px");
     await expect(page.locator(".forgebook-frame-loading")).toBeVisible();
     // the frame's document is up and has told its height by now; the box keeps waiting at the measured one
-    await expect
-      .poll(() => frame.evaluate((element) => (element as HTMLIFrameElement).contentDocument?.body !== null))
-      .toBe(true);
+    await expect(frameOf(page).locator("body")).toBeAttached();
     await page.waitForTimeout(300);
     await expect(frame).toHaveCSS("height", "777px");
     release();
@@ -710,6 +730,43 @@ test.describe("the component's page", () => {
     await expect(page.getByRole("article", { name: "In row", exact: true })).toHaveCount(0);
   });
 
+  test("the API reference lists the props naming no group first, then each group, and unfolds an object's members", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const reference = page.getByRole("region", { name: "API reference" });
+    await expect(reference.locator(".forgebook-api__table").first().locator("tbody th")).toHaveText([
+      "value",
+      "size",
+      "options*",
+      "hint",
+      "classNames"
+    ]);
+    // the meta names Texts first, though Behaviour comes first in the props; every group starts open
+    const groups = reference.locator(":scope > .forgebook-api__group");
+    await expect(groups.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    await expect(groups.locator(".forgebook-fold__count")).toHaveText(["1 prop", "2 props"]);
+    await expect(groups.nth(1).locator("tbody th")).toHaveText(["rows", "isDisabled"]);
+    await expect(groups.nth(0)).toHaveAttribute("open");
+    await expect(groups.nth(1)).toHaveAttribute("open");
+    // a group folds from its summary
+    await groups.nth(1).locator("summary").click();
+    await expect(groups.nth(1)).not.toHaveAttribute("open");
+    await expect(groups.nth(1).getByRole("rowheader", { name: "rows" })).toBeHidden();
+    // the texts' type unfolds under its row, its members with their TSDoc and default
+    const members = reference.getByRole("button", { name: "Members of SelectTexts: 2 members" });
+    await expect(members).toHaveAttribute("aria-expanded", "false");
+    await expect(reference.getByRole("table", { name: "Members of SelectTexts" })).toHaveCount(0);
+    await members.click();
+    await expect(members).toHaveAttribute("aria-expanded", "true");
+    const table = reference.getByRole("table", { name: "Members of SelectTexts" });
+    await expect(table.locator("tbody th")).toHaveText(["empty", "listLabel"]);
+    await expect(table).toContainText("Shown in place of the list when there is no option.");
+    await expect(table).toContainText('"Nothing to pick"');
+    // the events keep their heading, after the groups
+    await expect(reference.getByRole("heading", { level: 3, name: "Events" })).toBeVisible();
+  });
+
   test("an example's box fills the page and goes back to its place, its story never loaded again", async ({
     page
   }) => {
@@ -854,6 +911,7 @@ test.describe("the toolbar each person arranges", () => {
       "motion",
       "speed",
       "press",
+      "probe",
       "lang",
       "dir",
       "touch",
@@ -908,7 +966,7 @@ test.describe("the toolbar each person arranges", () => {
     await hiddenRow.getByRole("radio", { name: "Darken", exact: true }).check({ force: true });
     await expect(page).toHaveURL(/press=darken/);
     await page.getByRole("button", { name: "Show Press" }).click();
-    expect((await menuRows(page)).slice(4, 7)).toEqual(["speed", "press", "lang"]);
+    expect((await menuRows(page)).slice(4, 7)).toEqual(["speed", "press", "probe"]);
   });
 
   test("the rows move by keyboard and by pointer, and the bar follows their order", async ({ page }) => {
@@ -1132,17 +1190,23 @@ test.describe("touch", () => {
   test("a tap sends a finger's events and a touch click, a long press the menu, and the CSS answers as a phone's", async ({
     page
   }) => {
+    await page.clock.install();
     await page.goto(touchPad());
     await frameStatus(page);
     const button = await centreOf(frameOf(page).getByRole("button", { name: "Press me" }));
     await page.mouse.move(button.x, button.y);
+    // the frame's clock, not the machine's, says how long a press lasts: paused, a tap stays a tap however long the
+    // runner takes between the press and the lift, and a long press is exactly as long as the frame waits for one
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page.mouse.down();
     await page.mouse.up();
+    // the touch click follows the real one on a timer of its own
+    await page.clock.runFor(1);
     await expect
       .poll(() => eventLog(page))
       .toEqual(["pointerdown touch", "touchstart 1", "pointerup touch", "touchend 0", "click touch"]);
     await page.mouse.down();
-    await page.waitForTimeout(650);
+    await page.clock.runFor(650);
     await page.mouse.up();
     await expect.poll(async () => (await eventLog(page)).includes("contextmenu")).toBe(true);
     await expect(frameOf(page).getByText("A phone's media")).toBeVisible();
@@ -1422,6 +1486,56 @@ test.describe("the panel", () => {
     await page.reload();
     await frameStatus(page);
     await expect(frameOf(page).locator("select")).toHaveAttribute("data-size", "lg");
+  });
+
+  test("Props lists the props naming no group by control, then each group under its name", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const tab = page.locator(".forgebook-tab-props");
+    await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    // a group's number field and toggle sit in it, and set the story as anywhere else
+    const behaviour = tab.locator(".forgebook-fold").filter({ hasText: "Behaviour" });
+    await expect(tab.locator(".forgebook-fold[open]")).toHaveCount(2);
+    await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
+    await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
+    await expect(frameOf(page).locator("select")).toBeDisabled();
+    // the toggles that name no group stay under Toggles; Select has none left there
+    await expect(tab.locator(".forgebook-prop-group__title", { hasText: "Toggles" })).toHaveCount(0);
+  });
+
+  test("a shared link's values reach the frame only for the story's props, with their types; the rest are reported", async ({
+    page
+  }) => {
+    const dialogs: string[] = [];
+    page.on("dialog", (dialog) => {
+      dialogs.push(dialog.message());
+      void dialog.dismiss();
+    });
+    const crafted = {
+      size: "lg",
+      onclick: "alert(1)",
+      innerHTML: "<img src=x onerror=alert(2)>",
+      hint: 5,
+      icon: { of: "constructor", named: "constructor" }
+    };
+    await page.goto(story("overview", `args=${encodeURIComponent(JSON.stringify(crafted))}`));
+    await frameStatus(page);
+    const select = frameOf(page).locator("select");
+    await expect(select).toHaveAttribute("data-size", "lg");
+    await select.click();
+    await expect(select).not.toHaveAttribute("onclick");
+    const note = page.locator(".forgebook-dropped-args");
+    await expect(note).toContainText("onclick not one of its props");
+    await expect(note).toContainText("innerHTML not one of its props");
+    await expect(note).toContainText("hint not of the prop's type");
+    await expect(note).toContainText("icon not one of its props");
+    expect(dialogs).toEqual([]);
+    await note.getByRole("button", { name: "Remove them from the address" }).click();
+    await expect(note).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`args=${encodeURIComponent(JSON.stringify({ size: "lg" }))}$`));
+    await expect(select).toHaveAttribute("data-size", "lg");
   });
 
   test("named views: the catalogue's picked, a reader's saved, kept after a reload, and removed", async ({

@@ -3,8 +3,8 @@
  *
  * @remarks
  * Nothing here runs in the browser: the plugin writes the theme into the shell's page at build, so a catalogue with no
- * theme gets no bytes and one with a theme no script, and the frames, which belong to the stories, get none of it. The
- * shell's sheet sits in a cascade layer, so the page's unlayered rules outrank it whatever loads first; for that reason
+ * theme gets no bytes and one with a theme no script. The frames belong to the stories and get none of it, but for the
+ * one thing of Forgebook's they draw: the box that says a story failed. The shell's sheet sits in a cascade layer, so the page's unlayered rules outrank it whatever loads first; for that reason
  * each palette is scoped to its own appearance, or a light colour would reach the dark one. The default palettes are
  * also the style sheets' (`styles/_tokens.scss`, not shipped): the contrast of a partial theme needs what it leaves
  * unset, and a test holds the two equal. Layout is not themable: it is what the shell's own tests hold.
@@ -179,6 +179,30 @@ const paletteCss = (
  */
 export const shellThemeCss = (theme: ShellTheme): string =>
   [sharedCss(theme), paletteCss(theme.light ?? {}, "light"), paletteCss(theme.dark ?? {}, "dark")].join("");
+
+/**
+ * What a frame needs of a theme: the box that says a story failed, and nothing a story could read. A frame draws in the
+ * light palette whatever the shell's appearance.
+ *
+ * @param theme - the theme.
+ * @returns the rule; empty when the theme sets nothing the box uses.
+ */
+export const frameThemeCss = (theme: ShellTheme): string =>
+  rule(
+    ".forgebook-frame-error",
+    [
+      declarations({ sans: theme.fonts?.sans, mono: theme.fonts?.mono }, "font-"),
+      declarations(
+        {
+          "danger-text": theme.light?.["danger-text"],
+          "text-secondary": theme.light?.["text-secondary"]
+        },
+        ""
+      )
+    ]
+      .filter((part) => part !== "")
+      .join(";")
+  );
 
 /**
  * Themes over each other, role by role, the last winning: a catalogue over its presets.

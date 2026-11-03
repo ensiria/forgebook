@@ -1,0 +1,6 @@
+// The docs fixture: Preact components, a function's and a class's, with the story files that name them.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/preact.json",
+  "include": ["src"]
+}

@@ -19,14 +19,22 @@ export default {
   // listed among the forms too, and linked to the page: the sidebar's alias entry and the header's related links
   alsoIn: ["Forms/Fields"],
   related: ["Foundations/Page"],
-  args: { options: ["weekly", "monthly"], value: "weekly" }
+  args: { options: ["weekly", "monthly"], value: "weekly" },
+  // its texts listed before its behaviour, though its props name Behaviour first
+  parameters: { propGroups: ["Texts"] }
 } satisfies Meta<typeof Select>;
 
 /** The default select. */
 export const Overview: Story<typeof Select> = {};
 
 /** The small size: a story drawn from its args, over the meta's. */
-export const Small: Story<typeof Select> = { args: { size: "sm" }, parameters: { group: "states" } };
+export const Small: Story<typeof Select> = {
+  args: { size: "sm" },
+  parameters: {
+    group: "states",
+    design: { figma: "https://www.figma.com/design/FixtureFile123/Kit?node-id=56-78" }
+  }
+};
 
 /**
  * The select in a row of its own: a story with a render, which the Code tab shows as written, and the component

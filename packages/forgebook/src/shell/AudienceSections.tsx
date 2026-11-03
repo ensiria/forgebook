@@ -31,9 +31,10 @@ import {
 import { CodeText } from "./CodeText.tsx";
 import { Lead, PageApi } from "./ComponentPage.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
-import { PartsTab, styleHooks } from "./PartsTab.tsx";
+import { PartsTab } from "./PartsTab.tsx";
 import { StoryCoverage, type StoryCoverageProps } from "./StoryCoverage.tsx";
 import { STRINGS } from "./strings.ts";
+import { styleHooks } from "./tabSummaries.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import type { PageDoc } from "./usePageDoc.ts";
@@ -365,7 +366,7 @@ const Section = ({ id, ...props }: AudienceSectionsProps & { readonly id: PageSe
     case "prose":
       return <AudienceProse page={page} reading={AUDIENCE_PAGES[props.audience].prose} />;
     case "api":
-      return <PageApi docs={docs} isLogic={isLogic} />;
+      return <PageApi docs={docs} isLogic={isLogic} componentGroups={component.propGroups} />;
     case "parts":
       return <PartsSection docs={docs} />;
     case "pages":

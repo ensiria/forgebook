@@ -1,0 +1,51 @@
+{
+  "name": "aksel",
+  "repository": "https://github.com/navikt/aksel.git",
+  "commit": "ca65ffba8923140138d7fc6c6aeaaa722f87843c",
+  "licence": "MIT",
+  "install": [
+    "node",
+    ".yarn/releases/yarn-4.18.0.cjs",
+    "workspaces",
+    "focus",
+    "aksel",
+    "@navikt/aksel-icons",
+    "@navikt/ds-css",
+    "@navikt/ds-react",
+    "@navikt/ds-tokens"
+  ],
+  "prepare": [
+    ["node", ".yarn/releases/yarn-4.18.0.cjs", "workspace", "@navikt/ds-tokens", "build"],
+    ["node", ".yarn/releases/yarn-4.18.0.cjs", "workspace", "@navikt/aksel-icons", "build"],
+    ["node", ".yarn/releases/yarn-4.18.0.cjs", "workspace", "@navikt/ds-react", "build"]
+  ],
+  "folder": ".",
+  "expected": {
+    "files": 117,
+    "stories": 986
+  },
+  "measured": {
+    "forgebookStory": "stories:ds-react-read-more--default",
+    "forgebookComponent": "stories:ds-react-read-more",
+    "text": "Grunnen til at vi spør om dette",
+    "pageText": "Grunnen til at vi spør om dette",
+    "sidebar": "ds-react",
+    "storybookStory": "ds-react-readmore--default"
+  },
+  "edits": {
+    "story": {
+      "file": "@navikt/core/react/src/read-more/ReadMore.stories.tsx",
+      "find": "ber om vedlegg\",",
+      "replace": "ber om vedlegg {edit}\","
+    },
+    "component": {
+      "file": "@navikt/core/react/src/read-more/ReadMore.tsx",
+      "find": "<span>{header}</span>",
+      "replace": "<span>{header} {edit}</span>"
+    }
+  },
+  "storybook": {
+    "folder": ".",
+    "configDir": ".storybook"
+  }
+}

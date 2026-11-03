@@ -33,6 +33,57 @@ const forgebook = (baseURL: string, argv: readonly string[]): { status: number |
   return { status: run.status, stdout: run.stdout };
 };
 
+test.describe("forgebook story", () => {
+  test.setTimeout(180_000);
+
+  test("gives an agent a story's design: the Figma link, the file, the node, the page to see it on", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const run = forgebook(baseURL, ["story", "kit:layouts-form--signup", "--json"]);
+    expect(run.status).toBe(0);
+    const { design } = JSON.parse(run.stdout);
+    expect(design).toEqual({
+      figma: "https://www.figma.com/design/FixtureFile123?node-id=12-34",
+      fileKey: "FixtureFile123",
+      nodeId: "12:34",
+      address: expect.stringContaining("tab=figma")
+    });
+  });
+
+  test("gives an agent each prop's group, and the members of a prop typed with a documented object", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const run = forgebook(baseURL, ["story", "kit:inputs-selection-select--overview", "--json"]);
+    expect(run.status).toBe(0);
+    const { docs } = JSON.parse(run.stdout);
+    const byName = new Map(
+      docs.props.map((prop: { readonly name: string }): [string, unknown] => [prop.name, prop])
+    );
+    expect(byName.get("rows")).toMatchObject({ group: "Behaviour" });
+    expect(byName.get("value")).not.toHaveProperty("group");
+    expect(byName.get("texts")).toMatchObject({
+      group: "Texts",
+      members: [
+        {
+          name: "empty",
+          type: "string",
+          description: "Shown in place of the list when there is no option.",
+          defaultValue: '"Nothing to pick"',
+          isRequired: false
+        },
+        {
+          name: "listLabel",
+          type: "string",
+          description: "The list's name for screen readers.",
+          isRequired: false
+        }
+      ]
+    });
+  });
+});
+
 test.describe("forgebook check-page", () => {
   test.setTimeout(180_000);
 
@@ -158,13 +209,34 @@ test.describe("forgebook errors", () => {
       typeof before === "object" && before !== null && "last" in before && typeof before.last === "number"
         ? before.last
         : 0;
-    await page.goto("frame.html?story=kit:inputs-selection-select--throws");
+    // the server keeps one list for every test that runs beside this one, and another may open the same story: a
+    // mark of this test's own in the frame's address (which the error keeps as its view) tells its error apart
+    const mark = `run=${test.info().testId}-${test.info().repeatEachIndex}-${test.info().retry}`;
+    await page.goto(`frame.html?story=kit:inputs-selection-select--throws&${mark}`);
     await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "error");
     await expect
       .poll(() => JSON.parse(forgebook(baseURL ?? "", ["errors", "--since", String(since), "--json"]).stdout))
       .toMatchObject({
-        errors: [{ kind: "render", storyId: "kit:inputs-selection-select--throws", n: since + 1 }]
+        errors: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "render",
+            storyId: "kit:inputs-selection-select--throws",
+            view: expect.stringContaining(mark)
+          })
+        ])
       });
+    // only the errors after the number given
+    const after: unknown = JSON.parse(
+      forgebook(baseURL ?? "", ["errors", "--since", String(since), "--json"]).stdout
+    );
+    const numbers =
+      typeof after === "object" && after !== null && "errors" in after && Array.isArray(after.errors)
+        ? after.errors.map((error: unknown) =>
+            typeof error === "object" && error !== null && "n" in error ? error.n : undefined
+          )
+        : [];
+    expect(numbers.length).toBeGreaterThan(0);
+    for (const n of numbers) expect(n).toBeGreaterThan(since);
   });
 });
 

@@ -17,6 +17,7 @@ import { FIXTURE_SWITCHES } from "./fixtureSwitches.ts";
  */
 const storyOf = (isLogic: boolean): TreeStory => ({
   id: "kit:a--b",
+  file: "a.stories.tsx",
   name: "B",
   exportName: "B",
   controls: "all",
@@ -26,6 +27,7 @@ const storyOf = (isLogic: boolean): TreeStory => ({
   isTouch: false,
   isLogic,
   height: undefined,
+  design: undefined,
   tags: [],
   hasPlay: false
 });

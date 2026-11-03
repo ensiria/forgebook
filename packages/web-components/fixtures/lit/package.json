@@ -1,0 +1,5 @@
+{
+  "name": "lit-fixture",
+  "private": true,
+  "description": "Lit elements with no Custom Elements Manifest: the docs are read from their TypeScript."
+}

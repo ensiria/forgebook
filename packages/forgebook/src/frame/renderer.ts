@@ -3,18 +3,18 @@
  * other args and takes it away, and how the shell writes a story drawn from its args as code.
  *
  * @remarks
- * The frame owns everything a framework does not need to know: the address and the view, the messages with the
- * shell, the style sheets, the play function, Replay, the matrix's layout, the story clock and the error shown in
- * place of a story. A framework package (`@forgebook/react`) implements this type and hands it to the frame; another
- * framework implements the same type. A story's decorators, providers and error capture are the framework's, since
- * they return or catch the framework's own output.
+ * The frame owns everything a framework does not need to know: the address and the view, the messages with the shell,
+ * the style sheets, the play function, Replay, the matrix's layout, the story clock and the error shown in place of a
+ * story. A framework package (`@forgebook/react`) implements `StoryRenderer` and hands the frame its drawing part
+ * (`FrameRenderer`); another framework implements the same types. A story's decorators, providers and error capture are
+ * the framework's, since they return or catch the framework's own output.
  *
  * @module
  */
 
 import type { StoryClock } from "@forgebook/story-format/clock";
 import type { StepFunction, StoryContext } from "@forgebook/story-format/csf";
-import type { StoryTextTable } from "@forgebook/story-format/texts";
+import { type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 
 import type { PanelArgs } from "../messages.ts";
 import type { LoadedArgs, LoadedDecorator, LoadedStory } from "./storyModule.ts";
@@ -43,6 +43,11 @@ export type StoryDrawing = {
   readonly globals: Readonly<Record<string, string>>;
   /** What the story's loaders returned: its `context.loaded`. */
   readonly loaded: Readonly<Record<string, unknown>>;
+  /**
+   * Lists a call among the story's events, beside its args' handlers: a call a framework's mock receives (a router's
+   * `push`), by name, with what it was called with. None outside a catalogue (a test's server render).
+   */
+  readonly onEvent?: (name: string, values: readonly unknown[]) => void;
 };
 
 /** What the frame keeps of a story drawn in a canvas. */
@@ -61,26 +66,37 @@ export type MountedStory = {
   readonly unmount: () => void;
 };
 
-/** A framework, as the frame uses it. */
-export type StoryRenderer = {
+/**
+ * A framework, as the frame uses it: it only draws. The frame takes this rather than a whole `StoryRenderer`, so a
+ * framework's frame page can leave its server renderer out: a static catalogue would ship it (some 200 kB for React's)
+ * and a first start would pre-bundle it, for a page that never runs it.
+ */
+export type FrameRenderer = {
   /**
    * Draws a story in a canvas the frame owns.
    *
    * @param canvas - the element the story is drawn in.
    * @param drawing - the story, its args, texts, clock and language.
-   * @param onError - called with the error when the story throws while it is drawn; the frame shows it instead.
+   * @param onError - called with the error when the story throws while it is drawn; the frame shows it instead, until
+   *   the next `update`. Only the latest drawing's error is reported: one of a drawing an `update` replaced while it was
+   *   under way would stand over the story drawn after it.
    */
   readonly mount: (
     canvas: HTMLElement,
     drawing: StoryDrawing,
     onError: (error: Error) => void
   ) => MountedStory;
+};
+
+/** A framework, as the frame draws with it and the generated server tests render with it. */
+export type StoryRenderer = FrameRenderer & {
   /**
-   * The story drawn as HTML on the server, for the generated server tests; throws when the story throws.
+   * The story drawn as HTML on the server, for the generated server tests; throws, or rejects, when the story throws.
+   * A framework whose server render is asynchronous returns a promise (Vue's waits for what `setup` awaits).
    *
    * @param drawing - the story, its args, texts, clock and language.
    */
-  readonly renderToString: (drawing: StoryDrawing) => string;
+  readonly renderToString: (drawing: StoryDrawing) => Promise<string> | string;
 };
 
 /**
@@ -99,3 +115,29 @@ export const untracedStep: StepFunction = async (
 ): Promise<void> => {
   await run();
 };
+
+/**
+ * What a render and a decorator receive.
+ *
+ * @param drawing - the story's texts, clock and switches' values.
+ * @param args - the args they read: a framework may hand reactive ones.
+ * @param canvasOf - the element the story is drawn in, read only when a story asks for it: on the server there is
+ *   none, and a story that reads it there fails as it would in a page rendered on the server.
+ */
+export const storyContextOf = (
+  drawing: StoryDrawing,
+  args: LoadedArgs,
+  canvasOf: () => HTMLElement
+): StoryContext<LoadedArgs> => ({
+  args,
+  step: untracedStep,
+  text: storyTextOf(drawing.texts),
+  clock: drawing.clock,
+  globals: drawing.globals,
+  loaded: drawing.loaded,
+  ...drawing.identity,
+  parameters: drawing.story.parameters,
+  get canvasElement(): HTMLElement {
+    return canvasOf();
+  }
+});
