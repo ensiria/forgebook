@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { findConfigFile } from "../../src/vite/configFile.ts";
 import type { FramesMode } from "./catalogueVite.ts";
-import { unresolvedImports, viteCacheDir } from "./viteCache.ts";
+import { viteCacheDir } from "./viteCache.ts";
 
 /** The child's entry, beside this module and with its extension (`.ts` in the sources, `.js` once built). */
 const CHILD_URL = new URL(`./prebundleChild${extname(import.meta.url)}`, import.meta.url);
@@ -111,35 +111,4 @@ export const prebundleEarly = (args: readonly string[]): void => {
     return;
   const configFile = findConfigFile(process.cwd());
   if (configFile !== undefined) void prebundleInChild({ configFile, isForced: false });
-};
-
-/**
- * The dev server, built while the child pre-bundles: Vite reads the pre-bundle only once the server listens, so building
- * it meanwhile takes its configuration and plugins off the first start's path. Built again, before it listens, when what
- * the child did changes its configuration: the imports it found unresolved (part of the pre-bundle's hash) differ from
- * those the server was built with, or `--force` was given and the child could not carry it out, so the server does it.
- *
- * @typeParam TServer - the server: Vite's, or what a test builds.
- * @param root - the catalogue's folder.
- * @param prebundling - the pre-bundling: whether the child pre-bundled the dependencies.
- * @param isForced - whether `--force` was given.
- * @param create - builds the server, forcing its own pre-bundling or not, with the imports to leave out; it must not
- *   listen.
- * @returns the server, not listening yet.
- */
-export const serverAfterPrebundling = async <TServer extends { readonly close: () => Promise<void> }>(
-  root: string,
-  prebundling: Promise<boolean>,
-  isForced: boolean,
-  create: (isForced: boolean, excluded: readonly string[]) => Promise<TServer>
-): Promise<TServer> => {
-  // what the server is built with, read once: the child may rewrite it meanwhile
-  const excluded = unresolvedImports(root);
-  const server = await create(false, excluded);
-  const isPrebundled = await prebundling;
-  const found = unresolvedImports(root);
-  const isExcludedAlike = JSON.stringify(found) === JSON.stringify(excluded);
-  if (isExcludedAlike && (isPrebundled || !isForced)) return server;
-  await server.close();
-  return create(isForced && !isPrebundled, found);
 };

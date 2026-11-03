@@ -15,7 +15,7 @@ import { relative, resolve } from "node:path";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
 import { ScriptError } from "@ensiria/cli-kit/script";
-import { build, createServer, type InlineConfig } from "vite";
+import { build, createServer } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
@@ -36,7 +36,7 @@ import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { pagesCommands } from "./pagesCommands.mts";
 import { prebundle } from "./prebundleRun.ts";
-import { prebundleForDev, serverAfterPrebundling } from "./prebundleStart.ts";
+import { prebundleForDev } from "./prebundleStart.ts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
 import { visualCommands } from "./visualCommands.mts";
@@ -104,23 +104,16 @@ await defineCommands({
         const port = options.port === undefined ? undefined : Number(options.port);
         if (port !== undefined && !Number.isInteger(port))
           throw new ScriptError(`--port ${options.port} is not a port`);
-        const viteOf = async (isForcedHere: boolean, excluded: readonly string[]): Promise<InlineConfig> =>
-          catalogueVite(
-            config,
-            {
-              server: {
-                ...(port === undefined ? {} : { port, strictPort: true }),
-                ...(options.host === undefined ? {} : { host: options.host })
-              },
-              ...(isForcedHere ? { optimizeDeps: { force: true } } : {})
+        // the server reads the cache folder the child writes; should the child have failed, it does the work itself
+        const isPrebundled = await prebundling;
+        const server = await createServer(
+          await catalogueVite(config, {
+            server: {
+              ...(port === undefined ? {} : { port, strictPort: true }),
+              ...(options.host === undefined ? {} : { host: options.host })
             },
-            excluded
-          );
-        const server = await serverAfterPrebundling(
-          config.dir,
-          prebundling,
-          isForced,
-          async (isForcedHere, excluded) => createServer(await viteOf(isForcedHere, excluded))
+            ...(isForced && !isPrebundled ? { optimizeDeps: { force: true } } : {})
+          })
         );
         await server.listen();
         server.printUrls();
