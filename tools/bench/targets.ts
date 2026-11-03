@@ -10,12 +10,15 @@
  *
  * @module
  */
+import { join, relative } from "node:path";
+
 import type { FramesMode, ToolName } from "./bench.types.ts";
 import type { CorpusComponent, StoryForm } from "./corpus.ts";
+import type { CorpusStorybook } from "./realCorpus.types.ts";
 
 /** A command, from a target's folder. */
 export type TargetCommand = {
-  /** The program, in the project's `node_modules/.bin`. */
+  /** The program, in the project's `node_modules/.bin`, or an absolute path. */
   readonly bin: string;
   /** Its arguments. */
   readonly args: readonly string[];
@@ -47,6 +50,11 @@ export type Target = {
   readonly componentUrl?: (base: string, component: CorpusComponent) => string;
   /** The table of props on a component's page, when the tool has one, in whichever document it draws. */
   readonly propsTable?: string;
+  /**
+   * A page that answers only once the tool can draw a story, waited for before a page opens: a bundler that builds on
+   * the first request answers 404 meanwhile, and a frame opened then is never reloaded.
+   */
+  readonly readyPath?: string;
   /** The package whose direct dependencies a report counts. */
   readonly mainPackage: string;
 };
@@ -98,11 +106,8 @@ export default {
 /** Every frames mode, as `--frames` names them. */
 export const FRAMES_MODES = ["isolated", "same-origin"] as const satisfies readonly FramesMode[];
 
-/**
- * Forgebook's configuration, as its README writes one, with the theme switch, and the option that keeps the frames on
- * the catalogue's origin when asked.
- */
-const forgebookConfig = (frames: FramesMode): string => `import { react } from "@forgebook/react/vite";
+/** Forgebook's configuration, as its README writes one, with the theme switch. */
+const FORGEBOOK_CONFIG = `import { react } from "@forgebook/react/vite";
 import { defineConfig } from "forgebook";
 import { themeSwitch } from "forgebook/switches";
 
@@ -110,7 +115,7 @@ export default defineConfig({
   framework: react(),
   title: "Bench",
   stories: ["src/components/*.stories.tsx"],
-  switches: [themeSwitch()]${frames === "same-origin" ? `,\n  frames: "same-origin"` : ""}
+  switches: [themeSwitch()]
 });
 `;
 
@@ -133,7 +138,8 @@ const forgebookComponent = (component: CorpusComponent): string =>
  *
  * @remarks
  * With its frames on an origin of their own, the dev server takes a second port for them, named so that a port taken
- * fails the sample instead of moving the frames to one that may belong to another tool.
+ * fails the sample instead of moving the frames to one that may belong to another tool. The other placement is asked on
+ * the command line, so a real library's own configuration is measured as it is in both.
  *
  * @param frames - where its frames run.
  */
@@ -142,7 +148,7 @@ export const forgebookTarget = (frames: FramesMode): Target => ({
   form: "csf3",
   packages: ["forgebook", "@forgebook/react", "vite", "react"],
   mainPackage: "forgebook",
-  configFiles: { "forgebook.config.ts": forgebookConfig(frames), "forgebook.preview.ts": FORGEBOOK_PREVIEW },
+  configFiles: { "forgebook.config.ts": FORGEBOOK_CONFIG, "forgebook.preview.ts": FORGEBOOK_PREVIEW },
   caches: ["node_modules/.vite"],
   ports: frames === "isolated" ? 2 : 1,
   dev: (port) => ({
@@ -153,7 +159,7 @@ export const forgebookTarget = (frames: FramesMode): Target => ({
       HOST,
       "--port",
       String(port),
-      ...(frames === "isolated" ? ["--frame-port", String(port + 1)] : [])
+      ...(frames === "isolated" ? ["--frame-port", String(port + 1)] : ["--frames", "same-origin"])
     ]
   }),
   build: (out) => ({ bin: "forgebook", args: ["build", "--out", out] }),
@@ -220,8 +226,63 @@ export const LADLE: Target = {
     `${base}?story=${component.group.toLowerCase()}--${component.name.toLowerCase()}--${firstStory(component).toLowerCase()}`
 };
 
+/**
+ * A library's own Storybook: its version, its configuration and its addons, as its users start it. Its builder is
+ * whichever the library chose, so a comparison on a real library says what that library's people wait for, not how
+ * two tools compare on equal terms.
+ *
+ * @param storybook - how it runs.
+ * @param clone - the clone's root, whose `node_modules/.bin` holds the program.
+ */
+export const libraryStorybook = (storybook: CorpusStorybook, clone: string): Target => {
+  const { configDir, env, folder } = storybook;
+  const directory = join(clone, folder);
+  const bin = join(clone, "node_modules/.bin/storybook");
+  const inClone = (cache: string): string => relative(directory, join(clone, cache));
+  const variables = { STORYBOOK_DISABLE_TELEMETRY: "1", ...env };
+  return {
+    ...STORYBOOK,
+    configFiles: {},
+    // Spectrum's Storybook builds its preview with Parcel on the first request, answering 404 until then
+    readyPath: "iframe.html",
+    // Parcel, when a library's Storybook builds with it, keeps its cache at the clone's root
+    caches: [
+      ...STORYBOOK.caches,
+      inClone("node_modules/.vite"),
+      inClone("node_modules/.cache"),
+      inClone(".parcel-cache")
+    ],
+    dev: (port) => {
+      const { args } = STORYBOOK.dev(port);
+      return { bin, args: [...args, "--config-dir", configDir], env: variables };
+    },
+    build: (out) => {
+      const { args } = STORYBOOK.build(out);
+      return { bin, args: [...args, "--config-dir", configDir], env: variables };
+    }
+  };
+};
+
 /** Every tool, in report order. */
 export const TARGETS: readonly Target[] = [FORGEBOOK, STORYBOOK, LADLE];
+
+/**
+ * Each tool with its first port, after the ports of the tool before, so a server that lingers cannot answer for another.
+ *
+ * @param targets - the tools, in run order.
+ * @param first - the run's first port.
+ */
+export const withPorts = <TTarget extends Pick<Target, "ports">>(
+  targets: readonly TTarget[],
+  first: number
+): { readonly target: TTarget; readonly port: number }[] => {
+  let next = first;
+  return targets.map((target) => {
+    const port = next;
+    next += target.ports;
+    return { target, port };
+  });
+};
 
 /**
  * The tools a run measures, in report order.

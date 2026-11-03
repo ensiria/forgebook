@@ -46,8 +46,14 @@ const pageOf = (stamps: Readonly<Record<string, number>> | Error): StampedPage =
 
 describe("stampScript", () => {
   it("is valid JavaScript that carries what to watch", () => {
-    const script = stampScript({ texts: ["Overlays"], selectors: [".table"] });
+    const script = stampScript({
+      texts: ["Overlays"],
+      selectors: [".table"],
+      frameTexts: ["Hello"],
+      frameMark: "bench-edit-\\d+"
+    });
     expect(() => new Function(script)).not.toThrow();
+    expect(script).toContain('"Hello"');
     expect(script).toContain('"Overlays"');
     expect(script).toContain('".table"');
   });
