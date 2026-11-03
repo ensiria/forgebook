@@ -9,11 +9,12 @@
  *
  * @module
  */
+import { DEVICE_PARAMETER } from "../deviceView.ts";
 import { switchWithRole, type ViewSwitch } from "../switches.ts";
 import type { ViewState } from "../viewState.ts";
 
 /** Forgebook's own controls that only change a story's looks. */
-const LOOK_OWN_CONTROLS: readonly string[] = ["backdrop", "sheets", "text"];
+const LOOK_OWN_CONTROLS: readonly string[] = ["backdrop", "sheets", "text", DEVICE_PARAMETER];
 
 /**
  * Whether a toolbar control only changes a story's looks.

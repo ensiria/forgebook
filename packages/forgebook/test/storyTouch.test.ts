@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { storyTouchesOf, storyViewChange, touchedView } from "../src/shell/storyTouch.ts";
+import { NO_DEVICE } from "../src/deviceView.ts";
+import { phoneStories, storyTouchesOf, storyViewChange, touchedView } from "../src/shell/storyTouch.ts";
 import type { TreeStory } from "../src/storyTree.ts";
 import { touchChoiceOf } from "../src/switches.ts";
 import { DEFAULT_VIEW, type ViewState } from "../src/viewState.ts";
@@ -33,6 +34,7 @@ const storyOf = (id: string, isTouch: boolean): TreeStory => ({
   isTouch,
   isLogic: false,
   height: undefined,
+  device: undefined,
   design: undefined,
   tags: []
 });
@@ -60,5 +62,26 @@ describe("the stories marked for a phone", () => {
     const touched: ViewState = { ...next, switches: { theme: "dark", touch: "touch" } };
     expect(storyViewChange(touched, DEFAULT_VIEW, PHONE, CHOICE)).toEqual({ view: next, isTouch: true });
     expect(storyViewChange(touched, DEFAULT_VIEW, DESK, CHOICE)).toEqual({ view: touched });
+  });
+});
+
+describe("a story shown in a device", () => {
+  const framed: TreeStory = { ...DESK, id: "framed", device: { frame: true, model: "iphone-16" } };
+  const untouched: TreeStory = { ...DESK, id: "untouched", device: { frame: true, touch: false } };
+
+  it("is touched as a phone is while its device is shown, unless its device says otherwise", () => {
+    const auto = phoneStories({ device: "auto", orientation: "auto" }, NO_DEVICE);
+    expect(storyTouchesOf([framed, untouched, DESK], new Map(), auto)).toEqual(new Map([["framed", true]]));
+    // the reader still turns it off
+    expect(storyTouchesOf([framed], new Map([["framed", false]]), auto)).toEqual(
+      new Map([["framed", false]])
+    );
+  });
+
+  it("is not once the reader turns its frame off, and any story is once the reader frames it", () => {
+    const off = phoneStories({ device: "off", orientation: "auto" }, NO_DEVICE);
+    expect(storyTouchesOf([framed], new Map(), off)).toEqual(new Map());
+    const pixel = phoneStories({ device: "pixel-9", orientation: "auto" }, NO_DEVICE);
+    expect(storyTouchesOf([DESK], new Map(), pixel)).toEqual(new Map([["desk", true]]));
   });
 });

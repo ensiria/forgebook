@@ -22,6 +22,7 @@ import {
   useState
 } from "react";
 
+import { DEVICE_PARAMETER } from "../deviceView.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { ToolbarControl as Control, PlacedControl } from "../toolbarLayout.ts";
 import { DEFAULT_VIEW, hasViewChanges, type ViewState } from "../viewState.ts";
@@ -61,7 +62,10 @@ const withDefaults = (
   },
   backdrop: ids.includes("backdrop") ? DEFAULT_VIEW.backdrop : view.backdrop,
   sheets: ids.includes("sheets") ? DEFAULT_VIEW.sheets : view.sheets,
-  text: ids.includes("text") ? DEFAULT_VIEW.text : view.text
+  text: ids.includes("text") ? DEFAULT_VIEW.text : view.text,
+  ...(ids.includes(DEVICE_PARAMETER)
+    ? { device: DEFAULT_VIEW.device, orientation: DEFAULT_VIEW.orientation }
+    : {})
 });
 
 /** A row being dragged: which, where the pointer and the row were when it was grabbed, and where the pointer is. */

@@ -72,6 +72,7 @@ const agentStory = (
   isUnlisted,
   ...(story.height === undefined ? {} : { height: story.height }),
   isLogic: story.isLogic,
+  ...(story.device === undefined ? {} : { device: story.device }),
   links: storyLinks(pages, story.id, view)
 });
 

@@ -82,6 +82,14 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   story's panel can set, with a value of their type; to show a story with other values, write a story with those
   args rather than a link.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
+- A screen meant for a phone or a tablet can be shown in a drawn device by default:
+  `parameters: { device: { frame: true, model: "iphone-16" } }` (on the meta for every story; `orientation:
+  "landscape"` turns it; a story in a device is touched as a phone is, unless `touch: false`). The models: `iphone-16`, `iphone-16-pro-max`, `iphone-16e`, `pixel-9`, `galaxy-s24`, `phone`
+  (generic), `ipad-mini`, `ipad-pro-13`. The status bar, the camera's cut and the home indicator sit
+  around it: the story is drawn inside the safe areas. A screen drawn edge to edge says `edgeToEdge: true` and pads
+  itself with `var(--forgebook-safe-area-top, env(safe-area-inset-top))` (and `-bottom`, `-left`, `-right`). `get_story` returns the setting as `device`. Pictures and
+  tests stay unframed unless a view names a model: `forgebook shot <id> --view "iphone-16"` (or `"dark pixel-9
+  landscape"`) gives a framed picture.
 - A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook
   (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`
   that tries it. The catalogue documents its signature from its types and TSDoc (`@param`, `@returns`), and the tests
@@ -137,7 +145,7 @@ links to other pages by their file (`./colours.md#brand`). A page never holds a 
 | `npx forgebook verify --json` | The checks on all of them, with one exit code: run it before you say a change is done |
 | `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
-| `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`) |
+| `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`); a model's id in the view (`iphone-16`) frames it in that device |
 | `npx forgebook story <id> --json` | Its `links`: `address` in the catalogue, `frame` alone, `embed` with no chrome, for a wiki or an iframe |
 | `npx forgebook shot <id> --update` then `npx forgebook diff <id> --json` | Baselines, then what changed against them: the region, the percentage, a marked picture |
 

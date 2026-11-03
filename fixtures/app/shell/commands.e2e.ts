@@ -275,4 +275,38 @@ test.describe("forgebook shot", () => {
       rmSync(out, { recursive: true, force: true });
     }
   });
+
+  test("frames a picture in the device a view names, and leaves a story framed by default unframed otherwise", ({
+    baseURL
+  }) => {
+    const out = mkdtempSync(join(tmpdir(), "forgebook-shots-"));
+    try {
+      const run = forgebook(baseURL ?? "", [
+        "shot",
+        "kit:layouts-app-screen--phone",
+        "--view",
+        "iphone-16",
+        "--view",
+        "",
+        "--out",
+        out,
+        "--json"
+      ]);
+      expect(run.status).toBe(0);
+      const report: unknown = JSON.parse(run.stdout);
+      const files =
+        typeof report === "object" && report !== null && "shots" in report && Array.isArray(report.shots)
+          ? report.shots.map((shot: unknown) =>
+              typeof shot === "object" && shot !== null && "file" in shot ? String(shot.file) : ""
+            )
+          : [];
+      const [framed, plain] = files.map((file: string) => readFileSync(file));
+      // the iPhone 16's viewport is 393 px wide; framed, the picture is wider by the device's band and bezel
+      expect(framed?.readUInt32BE(16)).toBeGreaterThan(393);
+      expect(framed?.readUInt32BE(20)).toBeGreaterThan(852);
+      expect(plain?.readUInt32BE(16)).toBe(1280);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
 });

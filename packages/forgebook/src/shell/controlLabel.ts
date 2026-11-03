@@ -8,6 +8,7 @@
  * @module
  */
 import type { OwnControlId } from "../catalogue.ts";
+import { DEVICE_PARAMETER } from "../deviceView.ts";
 import type { ToolbarControl as Control } from "../toolbarLayout.ts";
 import { STRINGS } from "./strings.ts";
 
@@ -16,7 +17,8 @@ const OWN_LABELS: Readonly<Record<OwnControlId, () => string>> = {
   backdrop: () => STRINGS.backdrop,
   sheets: () => STRINGS.sheets,
   text: () => STRINGS.text,
-  width: () => STRINGS.width
+  width: () => STRINGS.width,
+  [DEVICE_PARAMETER]: () => STRINGS.device
 };
 
 /**

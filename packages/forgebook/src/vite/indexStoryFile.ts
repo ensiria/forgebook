@@ -17,8 +17,8 @@
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
- * the story loads. `touch`, `logic`, `design.figma` and the meta's `propGroups` are read by the index only, so written by
- * code they are a problem.
+ * the story loads. `touch`, `logic`, `device`, `design.figma` and the meta's `propGroups` are read by the index only
+ * (`indexedParameters.ts`, `indexFields.ts`), so written by code they are a problem.
  * A `design.figma` is checked here too, so the pages never carry the checker: one that is not a link to a Figma file is
  * noted and left out, and the file keeps its stories. A title written by code, or none, is the file's path
  * (`autoTitle`, as Storybook's auto-title); one written by code is also noted, since the author meant another. A value written plainly but wrongly
@@ -30,12 +30,12 @@
 import type { FigmaLink, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import type { ESTree } from "vite";
 
+import { indexedParameters } from "./indexedParameters.ts";
 import {
   controlsOf,
   designOf,
   docsDescription,
   type Fields,
-  flagsOf,
   groupOf,
   heightOf,
   objectFields,
@@ -116,7 +116,17 @@ const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readon
 /** What the index reads of one story besides its export. */
 type StoryFields = Pick<
   StoryIndexEntry,
-  "id" | "name" | "controls" | "group" | "height" | "design" | "isMain" | "isTouch" | "isLogic" | "tags"
+  | "id"
+  | "name"
+  | "controls"
+  | "group"
+  | "height"
+  | "design"
+  | "isMain"
+  | "isTouch"
+  | "isLogic"
+  | "device"
+  | "tags"
 >;
 
 /**
@@ -171,7 +181,7 @@ const storyFields = (
   if (ownTags instanceof Error) return ownTags;
   const tags = combinedTags([metaTags, ownTags]);
   const main = parameter(fields, "main");
-  const flags = flagsOf(fields);
+  const flags = indexedParameters(fields);
   if (flags instanceof Error) return flags;
   return {
     ...identityOf(own),
@@ -420,7 +430,18 @@ const titleOf = (
 /** The meta's fields besides its title and stories, each only when set. */
 type MetaFields = Pick<
   StoryFileIndex,
-  "id" | "controls" | "height" | "design" | "alsoIn" | "related" | "keywords" | "propGroups" | "description"
+  | "id"
+  | "controls"
+  | "height"
+  | "design"
+  | "isTouch"
+  | "isLogic"
+  | "device"
+  | "alsoIn"
+  | "related"
+  | "keywords"
+  | "propGroups"
+  | "description"
 >;
 
 /**
@@ -461,7 +482,7 @@ const metaFieldsOf = (meta: Fields, notes: string[]): MetaFields | Error => {
   const propGroups = propGroupsOf(meta);
   if (propGroups instanceof Error) return propGroups;
   const description = docsDescription(meta, "component");
-  const flags = flagsOf(meta);
+  const flags = indexedParameters(meta);
   if (flags instanceof Error) return flags;
   return {
     // an empty id is none, as Storybook's `meta.id || meta.title` has it

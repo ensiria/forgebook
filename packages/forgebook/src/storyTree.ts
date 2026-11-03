@@ -13,7 +13,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryDeviceSetting, StoryGroup } from "@forgebook/story-format/csf";
 import type {
   FigmaLink,
   StoryBackground,
@@ -59,6 +59,8 @@ export type TreeStory = {
   readonly isLogic: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
+  /** The device it is shown in by default (`parameters.device`), its own fields over the meta's; none when neither sets one. */
+  readonly device: StoryDeviceSetting | undefined;
   /** Its design (`parameters.design.figma`): its own, else the meta's; none by default, nor when its own was refused. */
   readonly design: FigmaLink | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
@@ -355,6 +357,10 @@ const treeStory = (
   isTouch: story.isTouch ?? entry.isTouch ?? false,
   isLogic: story.isLogic ?? entry.isLogic ?? false,
   height: story.height ?? entry.height,
+  device:
+    entry.device === undefined && story.device === undefined
+      ? undefined
+      : { ...entry.device, ...story.device },
   design,
   tags: story.tags ?? []
 });

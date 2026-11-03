@@ -12,7 +12,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "./csf.ts";
+import type { StoryDeviceSetting, StoryGroup } from "./csf.ts";
 import type { StoryTextTable } from "./texts.ts";
 
 /** What a Figma file is, as the embed's address names it. */
@@ -72,6 +72,8 @@ export type StoryIndexEntry = {
    * `false` to leave the meta's out.
    */
   readonly isLogic?: boolean;
+  /** The story's own `parameters.device`, when it sets one: the device it is shown in by default. */
+  readonly device?: StoryDeviceSetting;
   /**
    * The first sentence of the story's TSDoc, or its `parameters.docs.description.story`: what it shows and what to
    * notice.
@@ -103,6 +105,8 @@ export type StoryFileIndex = {
   readonly isTouch?: boolean;
   /** The meta's `parameters.logic`, when it sets one: every story is about logic unless it says otherwise. */
   readonly isLogic?: boolean;
+  /** The meta's `parameters.device`, when it sets one: every story's device unless it sets its own fields. */
+  readonly device?: StoryDeviceSetting;
   /** The meta's `alsoIn`, when it sets one: the other places the component is listed in. */
   readonly alsoIn?: readonly string[];
   /** The meta's `related`, when it sets one: the titles of the components its page names at its top. */

@@ -7,14 +7,23 @@
 import type { StoryFileCode } from "@forgebook/story-format/source";
 import { type ChangeEvent, type MouseEvent, type ReactNode, useId, useState } from "react";
 
+import { deviceDefaultOf, shownDevice } from "../deviceView.ts";
 import type { PanelArgs } from "../messages.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
-import { frameAddress, type ViewState } from "../viewState.ts";
+import { frameAddress, schemeOf, type ViewState } from "../viewState.ts";
 import { type BoxWidth, BoxWidthControl, useBoxWidth } from "./BoxWidth.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { useCodeWriter } from "./codeWriter.ts";
+import {
+  DeviceSlot,
+  deviceAddress,
+  inkScheme,
+  isWaitingForDevice,
+  roomSizing,
+  useFramedDevice
+} from "./DeviceSlot.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { StageViewport } from "./StageViewport.tsx";
@@ -25,6 +34,7 @@ import { useCopy } from "./useCopy.ts";
 import { type FullPage, useFullPage } from "./useFullPage.ts";
 import { useLoadedView } from "./useLiveView.ts";
 import type { Loaded } from "./useLoaded.ts";
+import { useSystemDark } from "./useSystemDark.ts";
 
 /** The height of a frame before its story reports its own, in CSS px. */
 const FALLBACK_HEIGHT = 160;
@@ -231,7 +241,8 @@ const ExampleBar = ({
   onCodeShownChange,
   codeId,
   full,
-  boxWidth
+  boxWidth,
+  isFramed
 }: {
   readonly story: TreeStory;
   readonly context: Pick<ExampleContext, "hrefOf" | "onOpen" | "touches" | "onTouchChange">;
@@ -241,6 +252,8 @@ const ExampleBar = ({
   readonly codeId: string;
   readonly full: FullPage;
   readonly boxWidth: BoxWidth;
+  /** Whether the story is in a device, which sets its width in place of the box's. */
+  readonly isFramed: boolean;
 }): ReactNode => {
   const isTouch = context.touches.get(story.id);
   return (
@@ -260,7 +273,7 @@ const ExampleBar = ({
       {isTouch === undefined ? null : (
         <TouchToggle story={story} isTouch={isTouch} onTouchChange={context.onTouchChange} />
       )}
-      <BoxWidthControl boxWidth={boxWidth} />
+      {isFramed ? null : <BoxWidthControl boxWidth={boxWidth} />}
       <button
         type="button"
         className="forgebook-example__full"
@@ -306,7 +319,12 @@ export const Example = ({
   const [isCodeShown, setIsCodeShown] = useState(false);
   const codeId = useId();
   const full = useFullPage();
-  const { touch } = useCatalogue();
+  const catalogue = useCatalogue();
+  const { touch } = catalogue;
+  // a device sets the story's width and height, over the page as in the list
+  const shown = shownDevice(context.view, deviceDefaultOf(catalogue.device, story.device));
+  const framed = useFramedDevice(shown);
+  const scheme = inkScheme(schemeOf(context.view, context.switches), useSystemDark());
   // the frame loads with the story's finger as it is then; a change after reaches it live, keeping the story's state
   const loadedView = useLoadedView(
     context.frameView.sheets,
@@ -346,25 +364,36 @@ export const Example = ({
       >
         <div ref={full.stageRef} className="forgebook-example__stage">
           <StageViewport
-            width={boxWidth.width}
-            onWidthChange={boxWidth.onWidthChange}
-            onShownWidthChange={boxWidth.onShownWidthChange}
-            background={context.background}
+            {...roomSizing(framed, {
+              width: boxWidth.width,
+              onWidthChange: boxWidth.onWidthChange,
+              onShownWidthChange: boxWidth.onShownWidthChange,
+              background: context.background
+            })}
           >
-            {isMounted ? (
-              <FrameView
-                title={STRINGS.frameTitle(context.component.name, story.name)}
-                address={frameAddress(context.frameUrl, story.id, loadedView, context.switches)}
-                heights={context.heights}
-                settled={context.settled}
-                fallbackHeight={fallbackHeight}
-                // over the page, the story fills the room it has
-                sceneHeight={sceneHeightOf(story, full.stageHeight)}
-              />
-            ) : (
-              // the frame's room until its turn comes, so the page does not jump when it loads
-              <div className="forgebook-frame-placeholder" style={{ height: fallbackHeight }} />
-            )}
+            <DeviceSlot framed={framed} scheme={scheme} background={context.background}>
+              {isMounted && !isWaitingForDevice(shown, framed) ? (
+                <FrameView
+                  title={STRINGS.frameTitle(context.component.name, story.name)}
+                  address={deviceAddress(
+                    frameAddress(context.frameUrl, story.id, loadedView, context.switches),
+                    framed
+                  )}
+                  heights={context.heights}
+                  settled={context.settled}
+                  fallbackHeight={fallbackHeight}
+                  // over the page, the story fills the room it has
+                  sceneHeight={sceneHeightOf(story, full.stageHeight)}
+                  fixedHeight={framed?.area.height}
+                />
+              ) : (
+                // the frame's room until its turn comes, so the page does not jump when it loads
+                <div
+                  className="forgebook-frame-placeholder"
+                  style={{ height: framed?.area.height ?? fallbackHeight }}
+                />
+              )}
+            </DeviceSlot>
           </StageViewport>
         </div>
         <ExampleBar
@@ -376,6 +405,7 @@ export const Example = ({
           codeId={codeId}
           full={full}
           boxWidth={boxWidth}
+          isFramed={framed !== undefined}
         />
         {source === undefined ? null : <ExampleCode id={codeId} source={source} isShown={isCodeShown} />}
       </div>
