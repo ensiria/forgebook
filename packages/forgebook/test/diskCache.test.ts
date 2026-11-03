@@ -6,7 +6,7 @@
  */
 import { mkdirSync, mkdtempSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -112,5 +112,25 @@ describe("codeStamp", () => {
     expect(codeStamp([join(ROOT, "code")])).toBe(stamp);
     writeFileSync(file, "export const a = 4;\n");
     expect(codeStamp([join(ROOT, "code")])).not.toBe(stamp);
+  });
+
+  it("changes with a save of the same size made at once, which a coarse clock may give the same times", () => {
+    const file = fileIn("quick");
+    // on a file system whose times move by a clock tick (Windows), most of these saves share their tick with the last
+    for (let round = 0; round < 200; round++) {
+      writeFileSync(file, `export const a = ${round % 10};\n`);
+      const stamp = codeStamp([join(ROOT, "quick")]);
+      writeFileSync(file, `export const a = ${(round + 1) % 10};\n`);
+      expect(codeStamp([join(ROOT, "quick")])).not.toBe(stamp);
+    }
+  });
+
+  it("reads a file changed within the margin by its text, and one settled by its times alone", () => {
+    // two copies differ only by their files' times and inodes: alike by text, apart by stamp
+    const first = fileIn("copy-1");
+    const second = fileIn("copy-2");
+    const settled = nowNs() + SETTLE_MARGIN_NS + 60_000_000_000n;
+    expect(codeStamp([dirname(first)])).toBe(codeStamp([dirname(second)]));
+    expect(codeStamp([dirname(first)], [], settled)).not.toBe(codeStamp([dirname(second)], [], settled));
   });
 });
