@@ -20,7 +20,7 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 
 import {
   type ConfigEnv,
@@ -37,6 +37,7 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
+import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
@@ -56,18 +57,16 @@ import {
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
-import { docsModule } from "./pluginModules.ts";
+import { docsModule, FILES_PREFIX, patternModule, USAGE_ID_PREFIX, usageModule } from "./pluginModules.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
-  indexedStoryFiles,
+  isKeptIndex,
+  type KeptIndex,
   storyFilesGroupOf,
   storyFilesGroupText,
-  storyFilesModule,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
-import { storyReach } from "./storyReach.ts";
 import { CODE_QUERY, DOCS_PAGE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
-import { joinedUsage } from "./usageModule.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /**
@@ -98,9 +97,6 @@ const sassOptions = async (): Promise<NonNullable<UserConfig["css"]>> => {
 
 /** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
 const FILES_QUERY = "?forgebook-files";
-
-/** The id of a pattern's module: virtual, with the declaring module's folder and the pattern after it. */
-const FILES_PREFIX = "\0forgebook-files:";
 
 /** The query that asks for the docs pages a pattern matches (`./docs/*.md?forgebook-docs-pages`). */
 const DOCS_PAGES_QUERY = "?forgebook-docs-pages";
@@ -174,40 +170,6 @@ const patternId = (source: string, folder: string): string | null => {
 };
 
 /**
- * The module of a `?forgebook-files` pattern: every matched story file's index and loaders.
- *
- * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
- * @param watch - adds a file whose edit renews the module (each story file).
- * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks; none
- *   where no page will ask.
- * @param hasUsage - whether the group offers its "Used in" loader.
- * @throws when a story file cannot be indexed.
- */
-const patternModule = (
-  id: string,
-  watch: (file: string) => void,
-  warm: ((storyFile: string) => void) | undefined,
-  hasUsage: boolean
-): { code: string; moduleType: "js" } => {
-  const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  let first: string | undefined;
-  const code = storyFilesModule(
-    root,
-    pattern,
-    (file: string): void => {
-      first ??= file;
-      watch(file);
-    },
-    hasUsage
-  );
-  if (first !== undefined) warm?.(first);
-  return { code, moduleType: "js" };
-};
-
-/** The resolved id of a group's "Used in" module: Rollup's mark of a virtual module, then its import's specifier. */
-const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
-
-/**
  * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in"), when the import names
  * one.
  *
@@ -216,50 +178,6 @@ const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
 const virtualId = (source: string): string | undefined => {
   if (source === CONFIG_MODULE) return CONFIG_ID;
   return source.startsWith(USAGE_PREFIX) ? `\0${source}` : undefined;
-};
-
-/**
- * A group's "Used in" module: its story files indexed, what their stories render read in the docs worker, joined.
- *
- * @param id - the module's id (`USAGE_ID_PREFIX`, then the group: `storyFilesGroupText`).
- * @param watch - adds a file whose edit renews the module (each story file).
- * @param usage - reads the facts in the docs worker.
- */
-const usageModule = async (
-  id: string,
-  watch: (file: string) => void,
-  usage: DocsExtractor["usage"],
-  isServing: boolean
-): Promise<{ code: string; moduleType: "js" }> => {
-  const { root, pattern } = storyFilesGroupOf(id.slice(USAGE_ID_PREFIX.length));
-  const files = indexedStoryFiles(root, pattern, watch);
-  const graph = await usage(
-    files.map((file) => ({
-      storyFile: file.file,
-      exports: file.index.stories.map((story) => story.exportName)
-    }))
-  );
-  const answer =
-    typeof graph === "string"
-      ? { error: graph }
-      : joinedUsage(
-          graph,
-          files.map((file) => ({
-            storyFile: file.file,
-            title: file.index.title,
-            related: file.index.related ?? []
-          }))
-        );
-  // on the dev server only: a static build has no tools to ask, and this would ship every story's files to the reader
-  const reach =
-    isServing && typeof graph !== "string"
-      ? storyReach(
-          graph,
-          files.map((file) => ({ storyFile: file.file, title: file.index.title }))
-        )
-      : [];
-  const code = `export default ${JSON.stringify(answer)};\nexport const reach = ${JSON.stringify(reach)};`;
-  return { code, moduleType: "js" };
 };
 
 /** The resolved id of the configuration's data module. */
@@ -377,11 +295,27 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
-  /**
-   * Whether the server runs tests (Vitest's mode): no person waits for a page, so no docs program is warmed. A worker
-   * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
-   */
-  let isTestRun = false;
+  /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
+  let cacheFolder: string | undefined;
+  /** The stamp of the plugin's own code, which makes the kept indexes and code: another version is a miss. */
+  let pluginCode: string | undefined;
+  const keptCache = <TValue>(
+    kind: string,
+    isValue: (value: unknown) => value is TValue & {}
+  ): DiskCache<TValue> | undefined => {
+    if (cacheFolder === undefined) return undefined;
+    // the plugin's own folder holds the code that makes them, with the parser and the highlighter it reads with: an
+    // edit or another version of any is a miss; a stamp that cannot be read keeps nothing
+    try {
+      const resolvePackage = packageResolver(PACKAGE_DIR);
+      const tools = ["vite", "typescript-6", "highlight.js"].flatMap((name) => resolvePackage(name) ?? []);
+      pluginCode ??= codeStamp([PACKAGE_DIR], tools);
+    } catch {
+      return undefined;
+    }
+    return diskCache(join(cacheFolder, kind), pluginCode, isValue);
+  };
+  const indexCache = (): DiskCache<KeptIndex> | undefined => keptCache("index", isKeptIndex);
   // the docs are read in a worker, made once the framework is known: a package's TypeScript program takes seconds to
   // build and would hold every other answer of the dev server meanwhile
   let docs: DocsExtractor | undefined;
@@ -390,7 +324,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (framework === undefined)
       throw new Error("Forgebook has no framework: add forgebook.config.ts, or give the plugin `framework`");
     // a build reads every story's docs, a dev server one component at a time
-    docs ??= createDocsExtractor(framework.docsModule, { readsEverything: !isServing() });
+    docs ??= createDocsExtractor(framework.docsModule, {
+      readsEverything: !isServing(),
+      ...(cacheFolder === undefined ? {} : { cacheFolder })
+    });
     return docs;
   };
   /**
@@ -422,11 +359,29 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
-      return usageModule(id, watch, extractor().usage, isServing());
+      return usageModule(id, watch, extractor().usage, isServing(), indexCache());
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    return patternModule(id, watch, isTestRun ? undefined : extractor().warm, config?.lists.usedIn !== false);
+    // a build reads every story's docs: its worker starts while Vite loads the pages; a dev server's waits for a page
+    return patternModule(
+      id,
+      watch,
+      config?.lists.usedIn !== false,
+      indexCache(),
+      isServing() ? undefined : extractor().warm
+    );
+  };
+  /**
+   * Tells the docs a source file was added or removed: it may be what an import now finds, so no kept docs are read
+   * again this session.
+   *
+   * @param file - the file.
+   */
+  const noteListing = (file: string): void => {
+    const framework = config?.framework ?? options.framework;
+    if (framework === undefined) return;
+    if (SOURCE_FILE.test(file) || framework.componentFiles?.extension === extname(file)) extractor().listed();
   };
   /**
    * The modules a file added or removed changes; none when it changes no list.
@@ -459,16 +414,15 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (!TEXT_QUERIES.some((query) => id.endsWith(query))) return undefined;
     // loaded on the first of these queries: the highlighter, the Markdown reader and what they need stay out of a
     // server whose pages never ask
-    const { textModule } = await import("./textModules.ts");
+    const { isKeptCode, textModule } = await import("./textModules.ts");
     const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
-    return textModule(id, { watch, resolveImport, componentFiles });
+    return textModule(id, { watch, resolveImport, componentFiles, cache: keptCache("code", isKeptCode) });
   };
   return {
     name: "forgebook",
     enforce: "pre",
     config: async (userConfig: UserConfig, environment: ConfigEnv): Promise<UserConfig> => {
       command = environment.command;
-      isTestRun = environment.mode === "test";
       if (config === undefined && options.framework === undefined) {
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
@@ -515,7 +469,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       return importer === undefined ? null : patternId(source, VITE_PATHS.dirname(importer));
     },
     // a warning and not a failure: a theme a reader can still use must not stop a catalogue from building
-    configResolved: (resolved: { readonly logger: Logger }): void => {
+    configResolved: (resolved: { readonly logger: Logger; readonly cacheDir: string }): void => {
+      // a dev server's answers only: a build reads everything once, and stamping each answer's files costs it more than
+      // a later build would save
+      if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
       for (const problem of config?.shell.problems ?? [])
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
     },
@@ -564,6 +521,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const watched = [...(config?.watch ?? []), ...(options.watch ?? [])];
       if (watched.length > 0) server.watcher.add(watched);
       const refresh = (file: string): void => {
+        noteListing(file);
         const renewed = modulesListing(file);
         if (renewed === undefined) return;
         const graph = server.environments.client.moduleGraph;
