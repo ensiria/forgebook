@@ -23,7 +23,8 @@ export const react = (reactPlugin: ReactPluginOptions = {}): FrameworkAdapter =>
   // beside this module, with its extension: `.ts` in the sources, `.js` once built for npm
   docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
   pages: { frame: "@forgebook/react/frame", code: "@forgebook/react/code" },
-  // what the renderer and the JSX of the stories import in the frame (the server render for the generated tests)
+  // what the renderer and the JSX of the stories import in the frame; the server render is named too: the page never
+  // runs it, but Vite meets its import in the renderer and would reload
   browserDependencies: [
     "react",
     "react/jsx-runtime",
