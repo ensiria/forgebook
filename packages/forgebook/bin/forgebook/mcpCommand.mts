@@ -68,7 +68,7 @@ export const mcpCommands = (
       );
       const server = {
         info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
-        instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
+        instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides.`,
         tools: [
           visualDiffTool((input, outDir) =>
             runStoryDiff(config, options.url, input, {

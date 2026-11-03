@@ -20,6 +20,7 @@ import type {
   StorySource
 } from "@forgebook/story-format/source";
 
+import { pageProblems, type TreePage, treePages } from "./pageTree.ts";
 import { sourceFiles } from "./sourceFiles.ts";
 
 /** One story in the tree. */
@@ -119,11 +120,13 @@ export type TreeSource = {
   readonly background: StoryBackground | undefined;
   /** Its families, in the source's order, then alphabetically. */
   readonly families: readonly TreeFamily[];
+  /** Its docs pages: by `order`, the pages without one after, then by title. Empty when it has none. */
+  readonly pages: readonly TreePage[];
 };
 
 /** The tree, with what is wrong in the indexes (a title without a family, two files with the same title). */
 export type StoryTree = {
-  /** Every source with stories. */
+  /** Every source with stories or docs pages. */
   readonly sources: readonly TreeSource[];
   /** One message per problem; the files concerned are left out of the tree. */
   readonly problems: readonly string[];
@@ -399,6 +402,16 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
     });
 };
 
+/** The ids of the sources' components. */
+const componentIds = (sources: readonly TreeSource[]): string[] =>
+  sources.flatMap((source) =>
+    source.families.flatMap((family) =>
+      family.groups.flatMap((group) =>
+        group.components.map((component) => componentId(source.id, component.title))
+      )
+    )
+  );
+
 /**
  * The catalogue's tree from the sources.
  *
@@ -411,9 +424,21 @@ export const storyTree = (sources: readonly StorySource[]): StoryTree => {
     name: source.name,
     logo: source.logo,
     background: source.background,
-    families: sourceFamilies(source, problems)
+    families: sourceFamilies(source, problems),
+    pages: treePages(source, problems)
   }));
-  return { sources: tree.filter((source) => source.families.length > 0), problems };
+  const shown = tree.filter((source) => source.families.length > 0 || source.pages.length > 0);
+  return {
+    sources: shown,
+    problems: [
+      ...problems,
+      ...pageProblems(
+        shown,
+        new Set(storyLocations({ sources: shown, problems: [] }).map(({ story }) => story.id)),
+        new Set(componentIds(shown))
+      )
+    ]
+  };
 };
 
 /**
