@@ -13,3 +13,6 @@ export const VUE_PORT = SHELL_PORT + 1;
 
 /** The port the Next.js fixture catalogue listens on: a gap after the fixture app's, for the other frameworks'. */
 export const NEXTJS_PORT = SHELL_PORT + 7;
+
+/** The port the white-label catalogue listens on: after the frameworks' catalogues. */
+export const WHITE_LABEL_PORT = NEXTJS_PORT + 1;

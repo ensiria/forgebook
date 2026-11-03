@@ -17,7 +17,13 @@ import { pathToFileURL } from "node:url";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import type { CatalogueLists, PanelTabId, TurnedOffControl } from "../catalogue.ts";
-import { mergedThemes, shellThemeCss, shellThemeProblems, themeValueProblem } from "../shellTheme.ts";
+import {
+  frameThemeCss,
+  mergedThemes,
+  shellThemeCss,
+  shellThemeProblems,
+  themeValueProblem
+} from "../shellTheme.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
@@ -34,6 +40,10 @@ const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebo
 export type ResolvedShell = {
   /** The theme, as CSS; empty for none. */
   readonly themeCss: string;
+  /** What the frames need of the theme, as CSS; empty for none. */
+  readonly frameCss: string;
+  /** Whether Forgebook's mark stands in for a catalogue without a logo. */
+  readonly hasBranding: boolean;
   /** The style sheets it loads after its own, absolute, the presets' first. */
   readonly styleSheets: readonly string[];
   /** What in the theme will not work, for a warning. */
@@ -59,7 +69,7 @@ export type ResolvedConfig = {
   readonly framework: FrameworkAdapter;
   /** The catalogue's name. */
   readonly title: string;
-  /** The logo's absolute path; none for Forgebook's own mark. */
+  /** The logo's absolute path; none for Forgebook's own mark, or the title alone without branding. */
   readonly logo: string | undefined;
   /** The heights file's address, relative to the pages. */
   readonly heights: string | undefined;
@@ -248,6 +258,14 @@ const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "
 });
 
 /**
+ * Whether Forgebook's mark may stand in for a logo: on, unless the last that says so turns it off.
+ *
+ * @param all - the presets, then the catalogue.
+ */
+const hasBrandingIn = (all: readonly Pick<ForgebookConfig, "shell">[]): boolean =>
+  all.findLast((each) => each.shell?.branding !== undefined)?.shell?.branding !== false;
+
+/**
  * A configuration with its presets merged and its paths made absolute, in Vite's form.
  *
  * @param config - the configuration.
@@ -302,6 +320,8 @@ export const resolveConfig = (
       .join("\n"),
     shell: {
       themeCss: shellThemeCss(theme),
+      frameCss: frameThemeCss(theme),
+      hasBranding: hasBrandingIn([...presets, config]),
       styleSheets: [
         ...presets.flatMap((preset) => (preset.shell?.css === undefined ? [] : [ownPath(preset.shell.css)])),
         ...(config.shell?.css === undefined ? [] : [absolute(config.shell.css)])

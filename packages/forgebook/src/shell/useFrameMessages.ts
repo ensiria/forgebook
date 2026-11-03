@@ -43,8 +43,8 @@ export type FrameHandlers = {
   readonly onReady: (frame: Window, message: ReadyMessage) => void;
   /** An event was called. */
   readonly onCall: (call: EventCall) => void;
-  /** A frame could not show its story; none where nothing waits for it. */
-  readonly onFailed?: (storyId: string) => void;
+  /** A frame could not show its story, and why; none where nothing waits for it. */
+  readonly onFailed?: (storyId: string, message: string) => void;
   /** A story's play function reported its trace; none where nothing shows it. */
   readonly onPlay?: (storyId: string, trace: PlayTrace) => void;
   /** An accessibility check is over: the rules broken, or why it could not run; none where nothing asks for one. */
@@ -104,7 +104,7 @@ const onFrameMessage = (
       if (address !== undefined) targets.setHeight(address, message.height);
       return;
     case "forgebook:error":
-      handlers.onFailed?.(message.storyId);
+      handlers.onFailed?.(message.storyId, message.message);
       return;
     case "forgebook:play":
       handlers.onPlay?.(message.storyId, message.trace);

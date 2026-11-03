@@ -88,6 +88,7 @@ links to other pages by their file (`./colours.md#brand`). A page never holds a 
 | `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`) |
+| `npx forgebook story <id> --json` | Its `links`: `address` in the catalogue, `frame` alone, `embed` with no chrome, for a wiki or an iframe |
 | `npx forgebook shot <id> --update` then `npx forgebook diff <id> --json` | Baselines, then what changed against them: the region, the percentage, a marked picture |
 
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says

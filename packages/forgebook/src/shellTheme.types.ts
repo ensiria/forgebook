@@ -89,4 +89,10 @@ export type ShellOptions = {
    * hatch: it reaches the shell's class names, which are not public API and may change in any release.
    */
   readonly css?: string;
+  /**
+   * Whether Forgebook's mark stands in for a catalogue without a logo, in the sidebar and as the page's icon. `false`
+   * leaves the catalogue's own logo and title, or its title alone. On by default; the catalogue's value wins over a
+   * preset's.
+   */
+  readonly branding?: boolean;
 };

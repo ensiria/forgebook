@@ -28,6 +28,8 @@ export type StoryLinks = {
   readonly address: string;
   /** Its frame alone: the story's own document, as the tests open it. */
   readonly frame: string;
+  /** The story with no chrome, in the catalogue's theme: what a person pastes in a wiki or an iframe. */
+  readonly embed: string;
 };
 
 /** A design's place in Figma: what to give a person, or a tool that reads Figma. */

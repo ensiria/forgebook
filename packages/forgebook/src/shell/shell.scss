@@ -467,6 +467,16 @@
     gap: $space-2;
   }
 
+  // on the window, placed by its button (`EmbedButton.tsx`): the story's pane would clip it, and its first draw comes
+  // before the lazy sheet, so the rule that takes it out of the pane is here
+  .forgebook-popover.forgebook-popover--embed {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: auto;
+    z-index: 4;
+  }
+
   // the matrix's two axes as one control: their selects quiet inside a tinted group, as the width's presets are
   .forgebook-matrix-picker {
     display: flex;

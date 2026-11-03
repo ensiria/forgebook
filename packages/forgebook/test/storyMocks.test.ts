@@ -169,4 +169,20 @@ describe("startStoryMocks", () => {
     await expect(second).resolves.toBeTypeOf("function");
     expect(reloads).toBe(1);
   });
+
+  it("draws its story where the browser denies the storage, never reloading blind", async () => {
+    vi.useFakeTimers();
+    stubPage(null);
+    Object.defineProperty(globalThis, "sessionStorage", {
+      configurable: true,
+      get: (): never => {
+        throw new Error("denied");
+      }
+    });
+    const started = startStoryMocks({ msw: { handlers: ["a"] } }, async () => TOOLS);
+    await vi.advanceTimersByTimeAsync(1000);
+    vi.useRealTimers();
+    await expect(started).resolves.toBeTypeOf("function");
+    expect(reloads).toBe(0);
+  });
 });

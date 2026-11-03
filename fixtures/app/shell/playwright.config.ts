@@ -4,8 +4,9 @@
  *
  * @remarks
  * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT`, so two worktrees can
- * run the tests at once. The Vue and Next.js fixture catalogues run beside the fixture app, for what a catalogue of
- * another framework must do (`vue.e2e.ts`) and what a Next.js project's components need (`nextjs.e2e.ts`).
+ * run the tests at once. The Vue, Next.js and white-label catalogues run beside the fixture app, for what a catalogue
+ * of another framework must do (`vue.e2e.ts`), what a Next.js project's components need (`nextjs.e2e.ts`) and a
+ * catalogue with no trace of Forgebook's look (`embed.e2e.ts`).
  *
  * @module
  */
@@ -13,7 +14,7 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { NEXTJS_PORT, SHELL_PORT, VUE_PORT } from "./ports";
+import { NEXTJS_PORT, SHELL_PORT, VUE_PORT, WHITE_LABEL_PORT } from "./ports";
 
 /**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
@@ -21,12 +22,14 @@ import { NEXTJS_PORT, SHELL_PORT, VUE_PORT } from "./ports";
  *
  * @param folder - the catalogue's folder.
  * @param port - the port it listens on.
+ * @param configFile - its configuration, relative to the folder; the folder's `forgebook.config.ts` when absent.
  */
 const catalogueServer = (
   folder: string,
-  port: number
+  port: number,
+  configFile?: string
 ): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
-  command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${port} --force`,
+  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${port} --force`,
   cwd: folder,
   url: `http://127.0.0.1:${port}/`,
   reuseExistingServer: false
@@ -40,6 +43,8 @@ export default defineConfig({
   webServer: [
     catalogueServer(join(import.meta.dirname, ".."), SHELL_PORT),
     catalogueServer(join(import.meta.dirname, "..", "..", "vue"), VUE_PORT),
+    // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
+    catalogueServer(join(import.meta.dirname, ".."), WHITE_LABEL_PORT, "white-label/forgebook.config.ts"),
     catalogueServer(join(import.meta.dirname, "..", "..", "nextjs"), NEXTJS_PORT)
   ],
   use: {

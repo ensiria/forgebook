@@ -272,7 +272,7 @@ export const catalogueTools = ({
   {
     name: "story_address",
     description:
-      "The links that open a story in the catalogue and in its frame alone, in the view asked for: give them to a person to look at what you describe.",
+      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe.",
     inputSchema: {
       type: "object",
       properties: {

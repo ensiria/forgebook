@@ -9,7 +9,7 @@
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
-import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
+import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
 import { anchorOf } from "../pageAddress.ts";
 import { findPage, type PageLocation } from "../pageTree.ts";
@@ -31,11 +31,11 @@ import {
   type TreeSource,
   type TreeStory
 } from "../storyTree.ts";
-import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
+import type { ViewSwitch } from "../switches.ts";
 import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
 import { ComponentPage } from "./ComponentPage.tsx";
-import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
+import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
 import { HomePage } from "./HomePage.tsx";
 import { Icon } from "./icons.tsx";
 import { LogicMark } from "./LogicMark.tsx";
@@ -63,9 +63,11 @@ export type ShellConfig = {
   readonly title: string;
   /**
    * The catalogue's logo, the URL of a square image: beside its name in the sidebar and as the page's icon. None by
-   * default: the catalogue's own mark. The catalogue belongs to whoever mounts it, so the logo is theirs to give.
+   * default: Forgebook's mark. The catalogue belongs to whoever mounts it, so the logo is theirs to give.
    */
   readonly logo?: string;
+  /** Whether a catalogue without a logo shows Forgebook's mark; off, it shows its name alone. On by default. */
+  readonly hasBranding?: boolean;
   /**
    * The stories' measured heights, the address of the file `forgebook-heights` writes (relative to the page): a story's
    * box waits at its height while it loads. None by default, and a missing file is none: boxes then wait at a guess.
@@ -101,9 +103,6 @@ type Page =
   | { readonly kind: "component"; readonly id: string }
   | { readonly kind: "page"; readonly id: string; readonly anchor?: string | undefined }
   | { readonly kind: "home" };
-
-/** No languages: a catalogue that offers none. */
-const NO_LANGUAGES: readonly StoryLanguage[] = [];
 
 /** The home. */
 const HOME: Page = { kind: "home" };
@@ -584,7 +583,7 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
  *
  * @param props - the configuration.
  */
-const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): ReactNode => {
+const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const {
     width: sidebarWidth,
@@ -693,6 +692,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
         appearance={appearance}
         title={title}
         logo={logo}
+        hasBranding={hasBranding !== false}
         tree={tree}
         isHome={shown.kind === "home"}
         homeHref={addressQuery(pageAddress(HOME), switches)}
@@ -831,15 +831,8 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl }: ShellConfig): Re
  *
  * @param props - the configuration.
  */
-export const Shell = (props: ShellConfig): ReactNode => {
-  const { title, switches, languages = NO_LANGUAGES, lists } = props;
-  const catalogue = useMemo(
-    () => catalogueSettings(title, catalogueSwitches(switches, languages, lists?.controls), lists),
-    [title, switches, languages, lists]
-  );
-  return (
-    <CatalogueContext.Provider value={catalogue}>
-      <ShellPage {...props} />
-    </CatalogueContext.Provider>
-  );
-};
+export const Shell = (props: ShellConfig): ReactNode => (
+  <CatalogueContext.Provider value={useConfiguredCatalogue(props)}>
+    <ShellPage {...props} />
+  </CatalogueContext.Provider>
+);

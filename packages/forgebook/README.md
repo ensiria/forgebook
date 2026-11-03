@@ -463,6 +463,50 @@ Fonts are yours to load: a web font goes in a style sheet of your own, `shell.cs
 after the shell's. It is also an escape hatch, since the shell's class names are not public API and can change in any
 release. Layout is not themable, though a font does change how wide text runs.
 
+## Embedding and white-label
+
+Add `embed` to a story's address and the catalogue's page shows that story alone, with no sidebar, toolbar or panel, in
+your theme: paste it in a wiki, in Notion, or in an iframe of your own.
+
+```html
+<iframe src="https://ui.example.com/?embed&story=acme:button--primary&theme=dark" title="Button" width="100%" height="320" style="border: 0"></iframe>
+```
+
+The story bar's **Embed** button gives the link and this code for the story and view on screen, with the values set in the
+panel; `forgebook story <id>` and the `story_address` tool give the same link as `links.embed`. The switches, the
+background, the language, `args`, `width` and `height` are read from the address; the stage's own settings (compare, zoom,
+the panel) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
+be embedded the same way once they exist, and oEmbed, so that a wiki can turn a pasted link into a frame on its own, comes
+later.
+
+A page of your own can follow the story's height. An embed posts `{ type: "forgebook:embed-size", height }` to the page around
+it, and the Embed button's **Follow the story's height** adds the few lines that listen. Check `event.source` and
+`event.origin` in your own listener, as those lines do. The story needs `allow-scripts allow-same-origin` if you sandbox the
+iframe, since its modules are loaded as those of its own origin.
+
+An embed sends nothing but the height and listens to nothing from the page around it, and it keeps working where a browser
+denies a third-party frame its storage. What it does take from outside is its address: like the catalogue's own `args`, the
+address reaches the story's props, so a story that renders a prop as raw HTML should not be published for anyone to frame.
+And a height says something: a page that can reach your catalogue can tell whether a story exists.
+
+Forgebook sets no framing headers, on the dev server or in a build, so what you host keeps the rules it has. To choose who may
+frame your catalogue, answer with `Content-Security-Policy: frame-ancestors` on your own server, which is the way to protect a
+private one; `X-Frame-Options: DENY` turns embedding off. `controls: { embed: false }` takes the button away, not the address,
+since any page can frame what it can open.
+
+To leave no trace of Forgebook's mark, turn the branding off:
+
+```ts
+// forgebook.config.ts
+title: "Acme UI",
+logo: "acme.svg",
+shell: { branding: false }
+```
+
+The sidebar then shows your logo and title, or your title alone without a logo, and the page's icon is your logo or none.
+It is on by default. The theme reaches everything Forgebook draws: the catalogue, an embed around its story, its loading and
+missing-story messages, and the box a frame shows when a story fails.
+
 ## For agents
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
