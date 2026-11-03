@@ -97,7 +97,7 @@ describe("the build's options", () => {
 
   it("refuses a device that names a model no one has, and lays the catalogue's fields over a preset's", () => {
     expect(() => resolveConfig({ ...BASE, device: { model: "nokia-3310" } }, "/catalogue")).toThrow(
-      /\/catalogue\/forgebook.config: Forgebook's device: "nokia-3310" is no device model/
+      `${resolve("/catalogue", "forgebook.config")}: Forgebook's device: "nokia-3310" is no device model`
     );
     // a configuration is code: its types are not a promise
     const loose: ForgebookConfig = { ...BASE };
