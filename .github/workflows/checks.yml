@@ -74,7 +74,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm checks
       - run: pnpm --filter @fixture/app exec playwright install chromium
-      - run: pnpm --filter @fixture/app test:shell
+      # a trace of each failed test (its requests, the frames' consoles), for a failure only this runner shows
+      - run: pnpm --filter @fixture/app test:shell --trace retain-on-failure
       # what a failed browser test saw (its page, the frames in it, the error): a failure that shows on one runner only
       # can then be read instead of guessed; one per attempt, so a rerun keeps the failure before it
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
