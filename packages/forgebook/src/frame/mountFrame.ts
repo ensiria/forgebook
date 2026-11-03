@@ -240,15 +240,20 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     shell.listen((message: ShellMessage): void => {
       if (controls !== undefined) answerShell(message, controls, storyId, catalogue.a11y, tellShell);
     });
-    // the language's texts, and the switches the story reads (the language's provider reads its id among them)
-    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => {
+    // the language's texts, and the switches the story reads (the language's provider reads its id among them); a
+    // language the source gives as a loader is loaded as it is shown
+    const shownFor = async (
+      live: Pick<LiveView, "switches">
+    ): Promise<Pick<StoryDrawing, "texts" | "globals">> => {
       const switchesShown = { switches: { ...live.switches, ...fixed.switches } };
       return {
-        texts: shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
+        texts: await shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
         globals: { ...startingGlobals(preview, story), ...codeGlobalsOf(switchesShown, switches) }
       };
     };
-    const shown = shownFor(view);
+    const shown = await shownFor(view);
+    // the view the reader chose last: a language that loads slower than the next one chosen is never drawn
+    let shownCount = 0;
     const { texts } = shown;
     const running = runStory({
       container,
@@ -283,7 +288,18 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           actions: actionNames(story.args, story.argTypes),
           fixed
         });
-        changeShown = (live: LiveView): void => running.setShown(shownFor(live));
+        changeShown = (live: LiveView): void => {
+          shownCount += 1;
+          const count = shownCount;
+          shownFor(live)
+            .then((next) => {
+              if (count === shownCount) running.setShown(next);
+            })
+            .catch((error: unknown) => {
+              // a language another choice replaced meanwhile is no longer the frame's concern
+              if (count === shownCount) reportError(error instanceof Error ? error.message : String(error));
+            });
+        };
       },
       onError: reportError,
       onTrace: (trace: PlayTrace): void => {
