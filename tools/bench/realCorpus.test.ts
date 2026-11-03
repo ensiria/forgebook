@@ -5,7 +5,7 @@
  * @module
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -79,13 +79,14 @@ describe("a corpus's definition", () => {
 
   it("keeps the clone in the work folder, and Forgebook in a dotted folder no story glob matches", () => {
     const paths = corpusPaths(VALID, "/definition", "/work");
-    expect(paths.clone).toBe("/work/corpus/lib");
-    expect(paths.bench).toBe(`/work/corpus/lib/packages/ui/${BENCH_FOLDER}`);
+    expect(paths.clone).toBe(join("/work", "corpus", "lib"));
+    expect(paths.bench).toBe(join("/work", "corpus", "lib", "packages", "ui", BENCH_FOLDER));
   });
 
   it("takes a name under the corpora, or a folder", () => {
-    expect(definitionFolder("primer", "/repo/corpora", "/here")).toBe("/repo/corpora/primer");
-    expect(definitionFolder("./mine", "/repo/corpora", "/here")).toBe("/here/mine");
+    // in the system's form: Windows writes its separators
+    expect(definitionFolder("primer", "/repo/corpora", "/here")).toBe(join("/repo/corpora", "primer"));
+    expect(definitionFolder("./mine", "/repo/corpora", "/here")).toBe(resolve("/here", "mine"));
     expect(definitionFolder("/abs/mine", "/repo/corpora", "/here")).toBe("/abs/mine");
   });
 
