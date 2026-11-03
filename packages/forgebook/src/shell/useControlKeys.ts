@@ -25,6 +25,8 @@ export type ControlKeysInput = {
   readonly fixed: FixedView;
   /** Whether a story's page is shown. */
   readonly isStoryPage: boolean;
+  /** Whether a component's page is shown: the audience's key does nothing elsewhere, as its control. */
+  readonly isComponentPage: boolean;
 };
 
 /**
@@ -40,13 +42,13 @@ export const useControlKeys = (input: ControlKeysInput): void => {
   useEffect(() => {
     const cycle = (event: KeyboardEvent): void => {
       if (isTyping(event.target)) return;
-      const { keys, view, onViewChange, fixed, isStoryPage } = latest.current;
+      const { keys, view, onViewChange, fixed, isStoryPage, isComponentPage } = latest.current;
       const pressed = pressedControl(keys, {
         key: event.key,
         shiftKey: event.shiftKey,
         hasModifier: event.metaKey || event.ctrlKey || event.altKey
       });
-      if (pressed === undefined) return;
+      if (pressed === undefined || (pressed.id === "audience" && !isComponentPage)) return;
       const changed = cycledView(view, pressed.id, pressed.step, catalogue, fixed, isStoryPage);
       if (changed === undefined) return;
       event.preventDefault();

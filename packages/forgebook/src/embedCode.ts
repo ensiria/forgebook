@@ -17,6 +17,7 @@ const STAGE_PARAMETERS: readonly string[] = [
   "component",
   "story",
   "compare",
+  "audience",
   "matrix",
   "panel",
   "tab",

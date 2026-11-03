@@ -112,7 +112,9 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 - **One frame per story**, so a story's styles and globals never leak into another, and its address opens it alone.
 - **Edits drawn in place**: an edited story file, preview or component is drawn anew in its open frame, which keeps
   what you did in the story (a typed field, an open menu); a story with a play, loaders or set-ups runs them again. An
-  edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does.
+  edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does. Where the
+  system's change events come late or never (a container's mounted volume, a Windows drive under WSL, a network
+  drive), `forgebook dev --poll` checks the files itself.
 - **Switches** for theme, contrast and motion, and the languages you declare; a library adds its own (density, brand)
   through a preset. A direction switch draws every story right to left, and a language declared `dir: "rtl"` does
   it by itself.
@@ -132,6 +134,9 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
   their TSDoc, nothing written twice.
+- **Props in groups**: a component with many props lists them under the groups their TSDoc names (`@group Paging`),
+  and a prop typed with a documented object (`texts?: FinderTexts`) unfolds to list its members
+  ([below](#props-in-groups)).
 - **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
   Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
   `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
@@ -164,7 +169,7 @@ It adds about a dozen packages to a React and Vite project.
 ## The toolbar
 
 The View menu holds every control: the catalogue's switches, and Forgebook's own (the background, the style sheets, the
-text size, the story's width). The catalogue says which start on the toolbar and which it does without; each reader
+text size, the story's width, [who a page is read by](#who-reads-a-page)). The catalogue says which start on the toolbar and which it does without; each audience
 then pins, orders and hides them, and that arrangement stays in their browser, per catalogue, never in the address
 (a link shares the values, not someone's toolbar).
 
@@ -174,14 +179,14 @@ export default defineConfig({
   framework: react(),
   title: "My components",
   stories: ["src/**/*.stories.tsx"],
-  // what starts on the toolbar, in this order: a switch's id, or "backdrop", "sheets", "text", "width"
+  // what starts on the toolbar, in this order: a switch's id, or "backdrop", "sheets", "text", "width", "audience"
   toolbar: ["theme", "contrast", "width", "text"],
   // Forgebook's own controls this catalogue does without (direction: false drops the direction switch)
   controls: { sheets: false }
 });
 ```
 
-Without `toolbar`, the colour scheme, the contrast and the width start there. A control turned off in `controls`
+Without `toolbar`, the colour scheme, the contrast, the width and the device start there. A control turned off in `controls`
 shows nowhere, not even on the toolbar, and keeps its default (the width can still be dragged on the stage). A preset
 may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
 that is no control at all stops the catalogue with an error saying which.
@@ -214,6 +219,77 @@ Safari need a device. For real touch events and native scrolling, `forgebook dev
 Chromium window with Chromium's own touch emulation (it needs `@forgebook/testing` and Playwright, as `check` does).
 `controls: { touch: false }` takes the switch away.
 
+## Devices
+
+At phone and tablet sizes a story can be shown inside a drawn device, as a browser's device mode shows a page. The
+Device control (on the toolbar after the width, and in View beside Touch) says what is shown, "No frame" or the model,
+turns the frame off or picks a model; while a device is shown, a button beside it turns it on its side, and the
+width's presets wait, since the device sets the width. The story gets
+the model's real viewport (its width and its height), the screen's rounded corners clip it, and the status bar, the
+camera's cut and the home indicator sit over it where the device has them. The choice is in the address
+(`forgebook.device=pixel-9&forgebook.orientation=landscape`, under Forgebook's name so a catalogue's own `device` or
+`orientation` switch keeps its parameter), so a link shares it; the compare view puts a device in each cell. The
+control's id, for a configuration's `toolbar` and `controls`, is the same: `controls: { "forgebook.device": false }`
+takes it away (a story's own default still frames it).
+
+A story in a device is touched with the catalogue's simulated finger, as a phone is (see Touch below): the reader can
+turn that off for it, as for a story marked for a phone, and a device that should keep the mouse says
+`touch: false`.
+
+| Model | Id | Viewport |
+|---|---|---|
+| iPhone 16 | `iphone-16` | 393 × 852 |
+| iPhone 16 Pro Max | `iphone-16-pro-max` | 440 × 956 |
+| iPhone 16e | `iphone-16e` | 390 × 844 |
+| Pixel 9 | `pixel-9` | 412 × 923 |
+| Galaxy S24 | `galaxy-s24` | 360 × 780 |
+| Generic phone | `phone` | 360 × 800 |
+| iPad mini | `ipad-mini` | 744 × 1133 |
+| iPad Pro 13″ | `ipad-pro-13` | 1032 × 1376 |
+
+The story is drawn inside the device's safe areas, as a page in a phone's browser is: the status bar, the camera's cut
+and the home indicator take their room around it (59 and 34 px on an iPhone 16 upright, the sides on its side), and
+the story's viewport is what is left (393 × 759). A story that draws edge to edge, as a full-screen app does, says
+`edgeToEdge: true`: it gets the whole screen, and the frame tells it the safe areas as custom properties on its root,
+`--forgebook-safe-area-top`, `-right`, `-bottom` and `-left`, since browsers keep `env(safe-area-inset-*)` at zero in
+a frame. Read them with the real insets as the fallback, so the same CSS works on a phone:
+
+```css
+.screen {
+  padding-top: var(--forgebook-safe-area-top, env(safe-area-inset-top));
+}
+```
+
+An id names a model for good: it is never renamed or removed, and a new model gets a new id.
+
+A story meant for a device says so, on its page and on its component's page:
+
+```tsx
+export default {
+  title: "Screens/Settings",
+  component: Settings,
+  // every story of the file in an iPhone 16; a story's own fields win
+  parameters: { device: { frame: true, model: "iphone-16" } }
+} satisfies Meta<typeof Settings>;
+
+export const Landscape: Story<typeof Settings> = { parameters: { device: { orientation: "landscape" } } };
+
+// under the status bar, padded with the safe areas the frame tells it
+export const FullScreen: Story<typeof Settings> = { parameters: { device: { edgeToEdge: true } } };
+
+// in the iPhone, with the mouse
+export const Pointer: Story<typeof Settings> = { parameters: { device: { touch: false } } };
+```
+
+A catalogue sets the default under every story with `device` in its configuration (`device: { model: "pixel-9" }`
+only picks the model the button turns on). Nothing is framed for a catalogue and a story that set nothing. The reader's
+choice wins over both: turned off, a framed story shows without its device.
+
+The device is the shell's: the story's own document is the same, so the generated tests and `forgebook shot` stay
+unframed, unless a view names a model (`forgebook shot <id> --view "iphone-16"`, or `"dark pixel-9 landscape"`), which
+gives the picture framed (`portrait` and `landscape` need a model beside them; a catalogue's switch with a value
+named like a model keeps the word, so write `forgebook.device=phone` then). The drawing and its styles load the first time a device is shown.
+
 ## Hooks and functions
 
 A story can be about logic, not looks: a small scene that uses a hook or a function, there to document and try what it
@@ -242,6 +318,83 @@ panel opens on Signature, with no tab of args (its scene takes none), and the ba
 Compare: the story is drawn once, never compared. A section of its own is a title's
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
+
+## Who reads a page
+
+A component's page holds what a designer, a coder and a tester each want, in an order that suits none of them. **Reading
+for**, in the View menu, draws the same page for one of them. It is not another page: the frames stay where they are and
+keep their state, and what goes around them is reordered and filtered.
+
+| Reading for | First | Left out | Added |
+|---|---|---|---|
+| Everyone | The page as it always was | Nothing | Nothing |
+| Designers | When to use it, then a larger demo | Code, the API reference, the sections on parts and test ids | Docs pages that show it, its design tokens |
+| Coders | The API reference, parts and styling | Nothing | Every example's code, open |
+| Testers | What the stories cover: each story, its group, its play function, whether the generated tests run it | The API reference, sections that are not about testing, "Used in" | A check of every story's accessibility, on request |
+
+The address keeps it (`?component=…&audience=designer`), so a link opens the page as it was read, and the page says so with
+a way back to all of it; it is not part of a named view, which holds how stories are drawn. A catalogue can start with another audience, pin the control, give it a key or do without it:
+
+```ts
+// forgebook.config.ts
+export default defineConfig({
+  framework: react(),
+  title: "My components",
+  stories: ["src/**/*.stories.tsx"],
+  audience: "designer",
+  toolbar: ["theme", "audience"],
+  keys: { audience: "r" }
+});
+```
+
+With `controls: { audience: false }` the catalogue's `audience` is the only one, whatever an address says, and the page
+offers no way back. Names change
+through `strings` (`"audiences.coder": "Developers"`, and `"audienceTexts.coverage"` for what the pages add).
+
+A designer's guidance comes from the component's TSDoc (`@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
+`@replacedBy`). Tokens are those named after the component (`select.border`, `component.select.height`), the rest closed
+under them, and load only when such a page is drawn. A play function is noted when the file writes it for the story: its
+own, the meta's, or from a story of the file it spreads. In a documentation file, sections are told apart by the English
+words of their `##` headings: parts, styling, test ids, hooks, API and props are left out for a designer, with every code
+block; a tester gets accessibility, keyboard, states and test ids, or the whole file when no heading says any of them.
+
+## Props in groups
+
+A component with forty props reads better in groups. Name a prop's group in its TSDoc, with the `@group` tag TypeDoc
+reads too:
+
+```tsx
+export type FinderProps = {
+  /** The query. */
+  readonly query?: string;
+  /**
+   * The page shown.
+   *
+   * @group Paging
+   */
+  readonly page?: number;
+  /**
+   * The texts it shows, for a translation.
+   *
+   * @group Texts
+   */
+  readonly texts?: FinderTexts;
+};
+```
+
+- The API reference lists the props that name no group first, then each group under its name, in the order the
+  groups first appear among the props; the events keep their own heading after them. The Props tab does the same: the
+  props that name no group by control, as before, then each group with its controls, its toggles and the props it
+  cannot set.
+- Every group starts open; a reader folds one away from its name.
+- To show some groups first, name them in order: `propGroups: ["Selection", "Paging"]` in the configuration for every
+  component, or `parameters: { propGroups: ["Texts"] }` in a component's meta, written as a list of plain strings.
+  The meta's come first, then the configuration's, then the rest as they appear. Nothing named, nothing changes.
+- A prop whose type is an object the package declares, with TSDoc on at least one member (`FinderTexts`), has a
+  "members" button beside its type: it lists the members under the row, with their types, defaults and TSDoc. Only one
+  level, and only once unfolded, so large text types cost the page nothing until read.
+- With `eslint-plugin-tsdoc`, declare the tag in your `tsdoc.json`:
+  `{ "tagName": "@group", "syntaxKind": "block", "allowMultiple": false }`.
 
 ## Docs pages
 
@@ -436,7 +589,7 @@ browser tests run in CI.
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
-| `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
+| `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height (framed in a device a view names); with `@forgebook/testing` |
 | `forgebook pages` | Lists the docs pages with their ids and addresses; fails when the index has problems |
 | `forgebook page <id>` | One docs page's Markdown; its headings too with `--json` |
 | `forgebook diff <id>` | Compares a story's pictures with the baselines `forgebook shot --update` stored: the region, the percentage and a marked picture; fails when anything differs |
@@ -618,7 +771,7 @@ your theme: paste it in a wiki, in Notion, or in an iframe of your own.
 The story bar's **Embed** button gives the link and this code for the story and view on screen, with the values set in the
 panel; `forgebook story <id>` and the `story_address` tool give the same link as `links.embed`. The switches, the
 background, the language, `args`, `width` and `height` are read from the address; the stage's own settings (compare, zoom,
-the panel) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
+the panel, the device frame) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
 be embedded the same way once they exist, and oEmbed, so that a wiki can turn a pasted link into a frame on its own, comes
 later.
 
@@ -672,6 +825,8 @@ shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.b
 ```json
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
+
+It offers sixteen tools: `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 
 It offers seventeen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,

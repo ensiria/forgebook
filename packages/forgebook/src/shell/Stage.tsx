@@ -35,19 +35,28 @@ import {
   type PanelTab,
   type StageHeight,
   type StageWidth,
+  schemeOf,
   type ViewState,
   viewParams,
   type Zoom
 } from "../viewState.ts";
 import { useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
-import { compareVariants } from "./compareVariants.ts";
+import {
+  DeviceSlot,
+  deviceAddress,
+  isWaitingForDevice,
+  roomSizing,
+  useInkScheme,
+  useStageDevice
+} from "./DeviceSlot.tsx";
 import { Dock } from "./Dock.tsx";
 import { DroppedArgsNote } from "./DroppedArgsNote.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
 import { framesOrigin } from "./framesOrigin.ts";
 import type { PluginReports, ShellPlugin } from "./pluginTabs.tsx";
+import { StageCompare } from "./StageCompare.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryBar } from "./StoryBar.tsx";
@@ -168,14 +177,15 @@ const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
 
 /**
- * What an embed of the story keeps of the page: its view and the values set in the panel.
+ * What an embed of the story keeps of the page: its view and the values set in the panel. An embed draws no device
+ * frame, so the device chosen is left out: the embed is the story at the width its iframe gives it.
  *
  * @param view - the reader's view, without what the story fixes, which the story fixes again.
  * @param panelArgs - the values set in the panel.
  * @param switches - the catalogue's switches.
  */
 const embedQuery = (view: ViewState, panelArgs: PanelArgs, switches: readonly ViewSwitch[]): string => {
-  const params = viewParams(view, switches);
+  const params = viewParams({ ...view, device: "auto", orientation: "auto" }, switches);
   const args = panelArgsParam(panelArgs);
   if (args !== "") params.set("args", args);
   return params.toString();
@@ -354,14 +364,15 @@ export const Stage = ({
   const hasClock = clocked === story.id && !isComparing(view);
   // the frame loads again only for another story or style sheets; the rest of the view (the switches, the language
   // among them) is sent live
-  const address = frameAddress(
-    frameUrl,
-    story.id,
-    useLoadedView(`${story.id}|${view.sheets}`, view),
-    switches
+  // a device sets the story's width and height in place of the stage's own, and its story area is the toolbar's width
+  const { shown, framed } = useStageDevice(view, story.device, onShownWidthChange);
+  const address = deviceAddress(
+    frameAddress(frameUrl, story.id, useLoadedView(`${story.id}|${view.sheets}`, view), switches),
+    framed
   );
   useLiveView(storyRef, view, !isComparing(view));
   useScrollMemory(storyRef, scroll);
+  const ink = useInkScheme(schemeOf(view, switches));
   // a story not shown yet waits at its measured height, or keeps the last story's, until it reports its own, so the
   // page does not jump twice
   const reportedHeight = heights.get(address);
@@ -378,8 +389,9 @@ export const Stage = ({
     reports: pluginReports,
     isComparing: isComparing(view),
     aside: {
-      address: frameAddress(frameUrl, story.id, view, switches),
-      width: view.width,
+      // as the stage draws it: at its device's screen width and told its safe areas
+      address: deviceAddress(frameAddress(frameUrl, story.id, view, switches), framed),
+      width: framed?.area.width ?? view.width,
       background: backgroundOf(view),
       args: panelArgs,
       view: liveView(view)
@@ -407,6 +419,7 @@ export const Stage = ({
         { key, isChanged: acceptedArgs[name] !== undefined }
       ])
     ),
+    propGroups: component.propGroups,
     calls: calls.filter((call) => call.storyId === story.id),
     onClearCalls: (): void => setCalls([]),
     trace: isComparing(view) ? undefined : traces.get(story.id),
@@ -444,48 +457,45 @@ export const Stage = ({
               onRemove={(): void => onPanelArgsChange(acceptedArgs)}
             />
             {isComparing(view) ? (
-              <div className="forgebook-compare">
-                {compareVariants(view.compare, catalogue).map((variant) => (
-                  <figure
-                    key={variant.label}
-                    className="forgebook-compare__cell"
-                    // the label (the shell's text) reads on the page's colour; the frame draws the backdrop
-                    style={{ backgroundColor: backgroundOf({ ...variant.viewOf(view), backdrop: "plain" }) }}
-                  >
-                    <figcaption className="forgebook-compare__label">{variant.label}</figcaption>
-                    <FrameView
-                      title={`${title} · ${variant.label}`}
-                      address={frameAddress(frameUrl, story.id, variant.viewOf(view), switches)}
-                      heights={heights}
-                      settled={settled}
-                      fallbackHeight={lastHeight}
-                      sceneHeight={story.height}
-                    />
-                  </figure>
-                ))}
-              </div>
+              <StageCompare
+                story={story}
+                title={title}
+                view={view}
+                frameUrl={frameUrl}
+                framed={framed}
+                heights={heights}
+                settled={settled}
+                fallbackHeight={lastHeight}
+                backgroundOf={backgroundOf}
+              />
             ) : (
               <StageViewport
                 zoom={view.zoom}
-                width={view.width}
-                onWidthChange={widthSetter(panel.fixed, view, onViewChange)}
-                onShownWidthChange={onShownWidthChange}
-                background={backgroundOf(view)}
-                height={view.height}
-                onHeightChange={(height: StageHeight): void => onViewChange({ ...view, height })}
+                {...roomSizing(framed, {
+                  width: view.width,
+                  onWidthChange: widthSetter(panel.fixed, view, onViewChange),
+                  onShownWidthChange,
+                  background: backgroundOf(view),
+                  height: view.height,
+                  onHeightChange: (height: StageHeight): void => onViewChange({ ...view, height })
+                })}
               >
                 {(fixedHeight: number | undefined): ReactNode => (
-                  <FrameView
-                    ref={frameRef}
-                    key={story.id}
-                    title={title}
-                    address={address}
-                    heights={heights}
-                    settled={settled}
-                    fallbackHeight={measuredHeight ?? lastHeight}
-                    sceneHeight={story.height}
-                    fixedHeight={fixedHeight}
-                  />
+                  <DeviceSlot framed={framed} scheme={ink} background={backgroundOf(view)}>
+                    {isWaitingForDevice(shown, framed) ? null : (
+                      <FrameView
+                        ref={frameRef}
+                        key={story.id}
+                        title={title}
+                        address={address}
+                        heights={heights}
+                        settled={settled}
+                        fallbackHeight={measuredHeight ?? lastHeight}
+                        sceneHeight={story.height}
+                        fixedHeight={framed?.area.height ?? fixedHeight}
+                      />
+                    )}
+                  </DeviceSlot>
                 )}
               </StageViewport>
             )}

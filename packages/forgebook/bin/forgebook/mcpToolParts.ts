@@ -14,7 +14,7 @@ export type Ask = (route: string, params: URLSearchParams) => Promise<AgentAnswe
 export const VIEW = {
   type: "string",
   description:
-    "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it); none for the default."
+    "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it, audience=designer); none for the default."
 } as const;
 
 /**
