@@ -67,6 +67,7 @@ import {
   patternModule,
   REACH_ID_PREFIX,
   reachModule,
+  searchIndexes,
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
@@ -302,6 +303,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const usageModules = new Set<string>();
   /** The docs pages' modules, renewed when a Markdown file is added or removed. */
   const docsModules = new Set<string>();
+  /** The groups' search indexes: any edit may change what a component's docs say. */
+  const searchModules = new Set<string>();
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
   /** Where the frames run: the dev server's second port once it listens, the configuration's choice in a build. */
@@ -326,6 +329,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
+  // the search's indexes, a build reading each component's docs once for its page and its index
+  const search = searchIndexes({
+    extract: (storyFile: string) => extractor().extract(storyFile),
+    isServing,
+    track: (id: string, isPages: boolean) => (isPages ? docsModules : searchModules).add(id)
+  });
   // whether an edited story file is drawn anew in its open frames: a dev server's, unless the framework cannot
   const isRedrawing = (): boolean =>
     isServing() && (config?.framework ?? options.framework)?.redrawsEditedStories !== false;
@@ -370,7 +379,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     return docs;
   };
   /**
-   * Renews what an edited source file may change: the docs' programs, and every group's "Used in".
+   * Renews what an edited source file may change: the docs' programs, and every group's "Used in" and search index.
    *
    * @param server - the dev server.
    * @param file - the edited file.
@@ -379,7 +388,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
     if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
-    invalidateEverywhere(server, usageModules);
+    invalidateEverywhere(server, [...usageModules, ...searchModules]);
   };
   /**
    * A pattern's module, or a group's "Used in" or reach module, when the id is one.
@@ -438,7 +447,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    */
   const modulesListing = (file: string): readonly string[] | undefined => {
     // the patterns' modules list the story files; the groups' "Used in" read them
-    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules];
+    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules, ...searchModules];
     return DOCS_PAGE_FILE.test(file) && docsModules.size > 0 ? [...docsModules] : undefined;
   };
   /**
@@ -459,7 +468,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       return tokensModule(config, watch, (specifier: string) => resolveImport(specifier, importer));
     }
     if (id.endsWith(DOCS_QUERY)) {
-      return docsModule(await extractor().extract(id.slice(0, -DOCS_QUERY.length)), watch);
+      return docsModule(await search.docsOf(id.slice(0, -DOCS_QUERY.length)), watch);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
     const docsPages = await docsModuleOf(id, watch, isServing(), config?.plugins ?? []);
@@ -588,7 +597,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
           isServing() || this.environment.name !== "client"
             ? inlineJson
             : packedJsonOf((asset): unknown => this.emitFile(asset));
-        return (await storiesModule(id, watch, pack)) ?? null;
+        return (await search.moduleOf(id, watch, pack)) ?? (await storiesModule(id, watch, pack)) ?? null;
       } catch (error) {
         this.error(error instanceof Error ? error.message : String(error));
       }

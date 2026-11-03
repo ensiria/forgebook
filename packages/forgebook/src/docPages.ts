@@ -80,16 +80,6 @@ export const PAGE_LINK_SCHEME = "forgebook-page:";
 /** What an image's address starts with in the compiled HTML: its place in the page's `assets` follows. */
 export const ASSET_SCHEME = "forgebook-asset:";
 
-/** What every heading's element id starts with. */
-const HEADING_ID_PREFIX = "doc-";
-
-/**
- * A heading's element id.
- *
- * @param anchor - its anchor, as the address's fragment writes it.
- */
-export const headingElementId = (anchor: string): string => `${HEADING_ID_PREFIX}${anchor}`;
-
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

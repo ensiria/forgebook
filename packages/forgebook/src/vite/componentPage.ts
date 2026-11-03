@@ -17,6 +17,7 @@ import { basename } from "node:path";
 
 import { Marked, type Token, type Tokens } from "marked";
 
+import { headingElementId } from "../docAnchors.ts";
 import { escapeHtml, highlightCode } from "./highlightCode.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -33,6 +34,45 @@ export const codeHtml = ({ text, lang }: Tokens.Code): string => {
 
 /** Markdown with GitHub's tables, its code blocks coloured. */
 const markdown = new Marked({ async: false, gfm: true, renderer: { code: codeHtml } });
+
+/**
+ * A page's anchors, made from its headings as GitHub makes them (`tokens`, `tokens-1`), so a link written for a
+ * repository's reader keeps working here. One per page: it counts the headings it saw.
+ *
+ * @returns what gives a heading's text its anchor.
+ */
+export const headingAnchors = (): ((text: string) => string) => {
+  const seen = new Set<string>();
+  return (text: string): string => {
+    const slug =
+      text
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, "-")
+        .replace(/^-|-$/g, "") || "section";
+    let anchor = slug;
+    // "Tokens", "Tokens", "Tokens 1": counting alone would give the last two the same anchor
+    for (let count = 1; seen.has(anchor); count += 1) anchor = `${slug}-${count}`;
+    seen.add(anchor);
+    return anchor;
+  };
+};
+
+/** The Markdown of one component's page: its headings carry their anchors, and take the focus when a search opens one. */
+const componentPageRenderer = (): Marked => {
+  const anchorOf = headingAnchors();
+  return new Marked({
+    async: false,
+    gfm: true,
+    renderer: {
+      code: codeHtml,
+      heading({ tokens, depth }: Tokens.Heading): string {
+        const anchor = anchorOf(this.parser.parseInline(tokens, this.parser.textRenderer));
+        const id = escapeHtml(headingElementId(anchor));
+        return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
+      }
+    }
+  });
+};
 
 /** A component's page text, as HTML. */
 export type ComponentPageText = {
@@ -105,5 +145,6 @@ export const markdownHtml = (text: string): string =>
 export const componentPage = (storyFile: string): ComponentPageText | undefined => {
   const file = pageFileOf(storyFile);
   if (!existsSync(file)) return undefined;
-  return { html: markdown.parse(pageMarkdown(readFileSync(file, "utf8")), { async: false }), file };
+  const html = componentPageRenderer().parse(pageMarkdown(readFileSync(file, "utf8")), { async: false });
+  return { html, file };
 };

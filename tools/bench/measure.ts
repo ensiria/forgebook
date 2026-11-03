@@ -51,6 +51,9 @@ const QUIET_TIMEOUT = 30_000;
 /** How often the server's memory is read, in milliseconds. */
 const MEMORY_INTERVAL = 250;
 
+/** A word every generated component holds, so the first search reads the whole index. */
+const SEARCH_WORDS = "widget";
+
 /** A viewport tall enough that a component's stories are all in view, so a lazy frame is not left waiting. */
 const TALL_VIEWPORT = { width: 1280, height: 2600 };
 
@@ -459,10 +462,26 @@ export type LoadSample = {
   readonly frame: number | undefined;
   /** JavaScript fetched in all, each file once, in bytes: a file both sides fetch counts in both columns. */
   readonly total: number;
+  /** JavaScript the first search then fetches, in bytes; none where a tool's search loads with its page. */
+  readonly search: number | undefined;
 };
 
+/** The data a catalogue's build keeps out of its scripts, gzipped, and fetches when a module asks (its indexes, axe). */
+const PACKED_FILE = /\.bin$/;
+
 /**
- * Serves the last build and counts the JavaScript a first load fetches once the network went quiet.
+ * Whether a response is part of a page's weight: a script, or the data a module of the build fetches in place of
+ * holding it, which is its weight all the same.
+ *
+ * @param type - the request's resource type.
+ * @param url - its address.
+ */
+const isWeighed = (type: string, url: string): boolean =>
+  type === "script" || (type === "fetch" && PACKED_FILE.test(new URL(url).pathname));
+
+/**
+ * Serves the last build and counts the JavaScript a first load fetches once the network went quiet, then what the first
+ * search adds: the list's code and the index, which nobody who never searches pays for.
  *
  * @param context - the measurement's context.
  */
@@ -475,7 +494,7 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
   // one from another site (Carbon's footer, from IBM's), which is not the build's weight and has no file here to measure
   page.on("response", (response) => {
     const request = response.request();
-    if (request.resourceType() !== "script" || !response.ok()) return;
+    if (!isWeighed(request.resourceType(), request.url()) || !response.ok()) return;
     const url = new URL(request.url());
     if (url.origin !== new URL(server.base).origin) return;
     const path = url.pathname;
@@ -487,11 +506,17 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
     await quiet(page);
     const total = (paths: ReadonlySet<string>): number =>
       [...paths].reduce((sum, path) => sum + server.gzippedSize(path), 0);
-    return {
+    const first = {
       shell: total(main),
       frame: page.frames().length > 1 ? total(frames) : undefined,
       total: total(new Set([...main, ...frames]))
     };
+    const { search } = context.target;
+    if (search === undefined) return { ...first, search: undefined };
+    const loaded = new Set(main);
+    await page.locator(search.field).fill(SEARCH_WORDS);
+    await page.locator(search.ready).waitFor({ timeout: SAMPLE_TIMEOUT });
+    return { ...first, search: total(new Set([...main].filter((path) => !loaded.has(path)))) };
   } finally {
     await browserContext.close();
     await server.close();

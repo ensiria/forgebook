@@ -1,8 +1,8 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page` and `list_plugins`; and `story_preview` (`mcpPreview.ts`), for a client that
- * renders apps.
+ * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
+ * for a client that renders apps.
  *
  * @module
  */

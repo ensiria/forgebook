@@ -67,7 +67,7 @@ export const SignatureReference = ({
           </thead>
           <tbody>
             {signature.parameters.map((parameter) => (
-              <tr key={parameter.name}>
+              <tr key={parameter.name} data-prop={parameter.name}>
                 <th scope="row">
                   <code className="forgebook-api__name">
                     {parameter.isRest ? "..." : ""}
