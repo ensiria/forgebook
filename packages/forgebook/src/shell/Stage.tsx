@@ -332,7 +332,10 @@ export const Stage = ({
     },
     onSpills: worstCase.receive,
     onPluginReport: (message: PluginReportMessage): void =>
-      setPluginReports((current) => new Map(current).set(`${message.storyId}|${message.plugin}`, message))
+      setPluginReports((current) => new Map(current).set(`${message.storyId}|${message.plugin}`, message)),
+    // a story that changes its own args changes the panel's values, as the reader would
+    onStoryArgs: (storyId: string, args: PanelArgs): void =>
+      storyId === story.id ? onPanelArgsChange(args) : undefined
   });
 
   // the docs may arrive after the frames: they learn the events then

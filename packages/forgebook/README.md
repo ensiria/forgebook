@@ -515,7 +515,11 @@ titles from the file's path, `args` and `argTypes` (with their controls), action
 `tags` (`!dev`, `!test`), a story's `globals`, JSX in `.js` story files (listed and shown as code; Vite compiles JSX only in
 `.jsx` and `.tsx`, so such a library adds the plugin its own Storybook uses for them, through the framework's plugins),
 hooks in a `render` or a decorator (React and
-Preact, with the story's state kept when a decorator draws `<Story />`), a preview's named exports beside its default
+Preact, with the story's state kept when a decorator draws `<Story />`), Storybook's preview hooks from
+`storybook/preview-api` in a React story file (`useArgs`, whose update and reset change the story's args as the panel
+would and show in it, a value the panel cannot show staying the story's; `useGlobals`, `useParameter` and
+`useStoryContext` to read; its `useState`, `useEffect` and the rest, which are React's there; `useChannel` throws, since
+Storybook's addons are not there), a preview's named exports beside its default
 export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. The answers
 to tools and agents read a preview's args and parameters on the server: a package it imports that only a browser can
 load (Storybook's docs blocks, which read `document` as they load) is left as a placeholder there, which the preview can

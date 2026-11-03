@@ -22,6 +22,17 @@ import type { LoadedArgs, LoadedDecorator, LoadedStory } from "./storyModule.ts"
 /** Which story is drawn: its id, its name and its file's title, as its context gives them. */
 export type StoryIdentity = Pick<StoryContext<LoadedArgs>, "id" | "name" | "title">;
 
+/**
+ * A change a story makes to its own args while it is drawn (Storybook's `useArgs`): the names reset to the story's
+ * own values first, then the values set.
+ */
+export type ArgsChange = {
+  /** The names whose values go back to the story's own, or every name. */
+  readonly reset: readonly string[] | "all";
+  /** The values set, by name. */
+  readonly set: Readonly<Record<string, unknown>>;
+};
+
 /** One story to draw, as the frame hands it to the framework. */
 export type StoryDrawing = {
   /** Which story it is. */
@@ -48,6 +59,11 @@ export type StoryDrawing = {
    * `push`), by name, with what it was called with. None outside a catalogue (a test's server render).
    */
   readonly onEvent?: (name: string, values: readonly unknown[]) => void;
+  /**
+   * Changes the story's args from its own code, as the panel would: the story is drawn again with them and the panel
+   * shows them. None where nothing takes them (a test's server render): a change there changes nothing.
+   */
+  readonly changeArgs?: (change: ArgsChange) => void;
 };
 
 /** What the frame keeps of a story drawn in a canvas. */
