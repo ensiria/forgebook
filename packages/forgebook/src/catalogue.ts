@@ -12,9 +12,12 @@
  * @module
  */
 
+import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
+
 import { type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
+import { DEVICE_PARAMETER, type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "./deviceView.ts";
 import type { CatalogueView } from "./namedViews.ts";
 import { switchWithRole, type TouchChoice, touchChoiceOf, type ViewSwitch } from "./switches.ts";
 import { viewQuery } from "./viewWords.ts";
@@ -42,11 +45,13 @@ export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y"
 export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
 
 /**
- * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the background, the
- * style sheets, the text size, the stage's width and who a component's page is read by. Their ids are the address's
- * own parameters, so no switch takes one.
+ * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the device frame (first,
+ * so it sits beside the Touch switch, the last of the ready-made ones), the background, the style sheets, the text
+ * size, the stage's width and who a component's page is read by. Their ids are their parameters in the address, so no
+ * switch takes one; the device's is under Forgebook's name (`forgebook.device`), so a catalogue's own `device` switch
+ * keeps its id.
  */
-export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width", "audience"] as const;
+export const OWN_CONTROL_IDS = [DEVICE_PARAMETER, "backdrop", "sheets", "text", "width", "audience"] as const;
 
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
@@ -103,7 +108,7 @@ export type CatalogueLists = {
   readonly controls?: Readonly<Partial<Record<TurnedOffControl, false>>>;
   /**
    * The controls that start on the toolbar, in their order, by id (a switch's id or one of `OWN_CONTROL_IDS`); the
-   * colour scheme, the contrast and the width by default. A control turned off in `controls` (here or by a preset) is
+   * colour scheme, the contrast, the width and the device by default. A control turned off in `controls` (here or by a preset) is
    * left out. A person's own arrangement replaces it.
    */
   readonly toolbar?: readonly string[];
@@ -135,6 +140,12 @@ export type CatalogueLists = {
    * (`theme=dark&width=360`) or as words (`"dark it 360"`); a reader saves their own beside them.
    */
   readonly views?: readonly CatalogueView[];
+  /**
+   * The device every story is shown in by default, under each story's own `parameters.device`: `{ frame: true }`
+   * frames them all in a generic phone, `{ model: "pixel-9" }` only sets the model the toolbar's toggle turns on. No
+   * frame by default.
+   */
+  readonly device?: StoryDeviceSetting;
   /**
    * The prop groups listed first in every component's API reference and Props tab, in this order, by the name their
    * props' TSDoc gives (`@group Selection`). A component's meta may name its own first (`parameters.propGroups`); the
@@ -193,6 +204,8 @@ export type CatalogueSettings = {
   readonly keys: ControlKeys;
   /** The catalogue's named views, their values in the address's form. */
   readonly views: readonly { readonly name: string; readonly query: string }[];
+  /** The device every story is shown in by default, under its own. */
+  readonly device: DeviceDefault;
   /** The prop groups listed first, in their order; none by default. */
   readonly propGroups: readonly string[];
 };
@@ -230,8 +243,8 @@ const withHundred = (list: readonly number[] | undefined, fallback: readonly num
   list?.includes(100) ? [...list].sort((first, second) => first - second) : fallback;
 
 /**
- * The controls that start on the toolbar when the configuration names none: the colour scheme, the contrast and the
- * width, those the catalogue has.
+ * The controls that start on the toolbar when the configuration names none: the colour scheme, the contrast, the
+ * width and the device, those the catalogue has.
  *
  * @param switches - the catalogue's switches.
  * @param ownControls - Forgebook's own controls shown.
@@ -240,7 +253,8 @@ const defaultToolbar = (switches: readonly ViewSwitch[], ownControls: readonly O
   ...[switchWithRole(switches, "colorScheme"), switchWithRole(switches, "contrast")].flatMap((each) =>
     each === undefined ? [] : [each.id]
   ),
-  ...(ownControls.includes("width") ? ["width"] : [])
+  ...(ownControls.includes("width") ? ["width"] : []),
+  ...(ownControls.includes(DEVICE_PARAMETER) ? [DEVICE_PARAMETER] : [])
 ];
 
 /**
@@ -355,7 +369,9 @@ export const catalogueSettings = (
     hasEmbed: controlsOff.embed !== false,
     appearance: lists.appearance ?? "system",
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
-    views: catalogueViews(switches, lists.views)
+    views: catalogueViews(switches, lists.views),
+    // checked when the configuration loads (`configFile.ts`): a model that is none is left out here
+    device: deviceDefaultOf(NO_DEVICE, lists.device)
   };
 };
 

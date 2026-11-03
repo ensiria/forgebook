@@ -16,6 +16,7 @@ import {
   SKILL_FOLDERS,
   withAgentsSection
 } from "../bin/forgebook/agentsText.ts";
+import { DEVICE_IDS } from "../src/deviceView.ts";
 
 describe("withAgentsSection", () => {
   it("writes the section alone into a file that does not exist yet", () => {
@@ -67,5 +68,12 @@ describe("agentsSkill", () => {
 describe("SKILL_FOLDERS", () => {
   it("writes where every agent of the standard looks, and where Claude Code does", () => {
     expect(SKILL_FOLDERS).toEqual([".agents/skills/forgebook", ".claude/skills/forgebook"]);
+  });
+});
+
+describe("the agents' section on devices", () => {
+  it("names every device model, so an agent can write any of them", () => {
+    const section = readFileSync(new URL("../bin/forgebook/agents.md", import.meta.url), "utf8");
+    for (const id of DEVICE_IDS) expect(section).toContain(`\`${id}\``);
   });
 });

@@ -112,7 +112,9 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 - **One frame per story**, so a story's styles and globals never leak into another, and its address opens it alone.
 - **Edits drawn in place**: an edited story file, preview or component is drawn anew in its open frame, which keeps
   what you did in the story (a typed field, an open menu); a story with a play, loaders or set-ups runs them again. An
-  edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does.
+  edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does. Where the
+  system's change events come late or never (a container's mounted volume, a Windows drive under WSL, a network
+  drive), `forgebook dev --poll` checks the files itself.
 - **Switches** for theme, contrast and motion, and the languages you declare; a library adds its own (density, brand)
   through a preset. A direction switch draws every story right to left, and a language declared `dir: "rtl"` does
   it by itself.
@@ -184,7 +186,7 @@ export default defineConfig({
 });
 ```
 
-Without `toolbar`, the colour scheme, the contrast and the width start there. A control turned off in `controls`
+Without `toolbar`, the colour scheme, the contrast, the width and the device start there. A control turned off in `controls`
 shows nowhere, not even on the toolbar, and keeps its default (the width can still be dragged on the stage). A preset
 may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
 that is no control at all stops the catalogue with an error saying which.
@@ -216,6 +218,77 @@ Chromium lets a page build touch events). A virtual keyboard, the viewport shrin
 Safari need a device. For real touch events and native scrolling, `forgebook dev --touch` opens the catalogue in a
 Chromium window with Chromium's own touch emulation (it needs `@forgebook/testing` and Playwright, as `check` does).
 `controls: { touch: false }` takes the switch away.
+
+## Devices
+
+At phone and tablet sizes a story can be shown inside a drawn device, as a browser's device mode shows a page. The
+Device control (on the toolbar after the width, and in View beside Touch) says what is shown, "No frame" or the model,
+turns the frame off or picks a model; while a device is shown, a button beside it turns it on its side, and the
+width's presets wait, since the device sets the width. The story gets
+the model's real viewport (its width and its height), the screen's rounded corners clip it, and the status bar, the
+camera's cut and the home indicator sit over it where the device has them. The choice is in the address
+(`forgebook.device=pixel-9&forgebook.orientation=landscape`, under Forgebook's name so a catalogue's own `device` or
+`orientation` switch keeps its parameter), so a link shares it; the compare view puts a device in each cell. The
+control's id, for a configuration's `toolbar` and `controls`, is the same: `controls: { "forgebook.device": false }`
+takes it away (a story's own default still frames it).
+
+A story in a device is touched with the catalogue's simulated finger, as a phone is (see Touch below): the reader can
+turn that off for it, as for a story marked for a phone, and a device that should keep the mouse says
+`touch: false`.
+
+| Model | Id | Viewport |
+|---|---|---|
+| iPhone 16 | `iphone-16` | 393 × 852 |
+| iPhone 16 Pro Max | `iphone-16-pro-max` | 440 × 956 |
+| iPhone 16e | `iphone-16e` | 390 × 844 |
+| Pixel 9 | `pixel-9` | 412 × 923 |
+| Galaxy S24 | `galaxy-s24` | 360 × 780 |
+| Generic phone | `phone` | 360 × 800 |
+| iPad mini | `ipad-mini` | 744 × 1133 |
+| iPad Pro 13″ | `ipad-pro-13` | 1032 × 1376 |
+
+The story is drawn inside the device's safe areas, as a page in a phone's browser is: the status bar, the camera's cut
+and the home indicator take their room around it (59 and 34 px on an iPhone 16 upright, the sides on its side), and
+the story's viewport is what is left (393 × 759). A story that draws edge to edge, as a full-screen app does, says
+`edgeToEdge: true`: it gets the whole screen, and the frame tells it the safe areas as custom properties on its root,
+`--forgebook-safe-area-top`, `-right`, `-bottom` and `-left`, since browsers keep `env(safe-area-inset-*)` at zero in
+a frame. Read them with the real insets as the fallback, so the same CSS works on a phone:
+
+```css
+.screen {
+  padding-top: var(--forgebook-safe-area-top, env(safe-area-inset-top));
+}
+```
+
+An id names a model for good: it is never renamed or removed, and a new model gets a new id.
+
+A story meant for a device says so, on its page and on its component's page:
+
+```tsx
+export default {
+  title: "Screens/Settings",
+  component: Settings,
+  // every story of the file in an iPhone 16; a story's own fields win
+  parameters: { device: { frame: true, model: "iphone-16" } }
+} satisfies Meta<typeof Settings>;
+
+export const Landscape: Story<typeof Settings> = { parameters: { device: { orientation: "landscape" } } };
+
+// under the status bar, padded with the safe areas the frame tells it
+export const FullScreen: Story<typeof Settings> = { parameters: { device: { edgeToEdge: true } } };
+
+// in the iPhone, with the mouse
+export const Pointer: Story<typeof Settings> = { parameters: { device: { touch: false } } };
+```
+
+A catalogue sets the default under every story with `device` in its configuration (`device: { model: "pixel-9" }`
+only picks the model the button turns on). Nothing is framed for a catalogue and a story that set nothing. The reader's
+choice wins over both: turned off, a framed story shows without its device.
+
+The device is the shell's: the story's own document is the same, so the generated tests and `forgebook shot` stay
+unframed, unless a view names a model (`forgebook shot <id> --view "iphone-16"`, or `"dark pixel-9 landscape"`), which
+gives the picture framed (`portrait` and `landscape` need a model beside them; a catalogue's switch with a value
+named like a model keeps the word, so write `forgebook.device=phone` then). The drawing and its styles load the first time a device is shown.
 
 ## Hooks and functions
 
@@ -516,7 +589,7 @@ browser tests run in CI.
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
-| `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
+| `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height (framed in a device a view names); with `@forgebook/testing` |
 | `forgebook pages` | Lists the docs pages with their ids and addresses; fails when the index has problems |
 | `forgebook page <id>` | One docs page's Markdown; its headings too with `--json` |
 | `forgebook diff <id>` | Compares a story's pictures with the baselines `forgebook shot --update` stored: the region, the percentage and a marked picture; fails when anything differs |
@@ -698,7 +771,7 @@ your theme: paste it in a wiki, in Notion, or in an iframe of your own.
 The story bar's **Embed** button gives the link and this code for the story and view on screen, with the values set in the
 panel; `forgebook story <id>` and the `story_address` tool give the same link as `links.embed`. The switches, the
 background, the language, `args`, `width` and `height` are read from the address; the stage's own settings (compare, zoom,
-the panel) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
+the panel, the device frame) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
 be embedded the same way once they exist, and oEmbed, so that a wiki can turn a pasted link into a frame on its own, comes
 later.
 

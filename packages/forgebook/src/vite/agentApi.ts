@@ -75,6 +75,7 @@ const agentStory = (
   ...(story.height === undefined ? {} : { height: story.height }),
   isLogic: story.isLogic,
   hasPlay: story.hasPlay,
+  ...(story.device === undefined ? {} : { device: story.device }),
   links: storyLinks(pages, story.id, view)
 });
 

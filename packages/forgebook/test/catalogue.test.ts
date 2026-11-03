@@ -153,6 +153,7 @@ describe("story groups", () => {
         controls: "all" as const,
         description: undefined,
         height: undefined,
+        device: undefined,
         design: undefined,
         tags: [],
         hasPlay: false,
@@ -194,5 +195,27 @@ describe("configureStrings", () => {
     expect(STRINGS.tabs.parts).toBe("Parts and hooks");
     expect(STRINGS.allStories).toBe(allStories);
     expect(Object.keys(STRINGS)).not.toContain("nothing");
+  });
+
+  it("frames no story by default, takes the catalogue's device, and leaves out a model that is none", () => {
+    expect(catalogueSettings("Acme UI", DEFAULT_SWITCHES).device).toEqual({
+      isFramed: false,
+      model: "phone",
+      orientation: "portrait",
+      isTouch: true,
+      isEdgeToEdge: false
+    });
+    expect(
+      catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { frame: true, model: "pixel-9" } }).device
+    ).toEqual({
+      isFramed: true,
+      model: "pixel-9",
+      orientation: "portrait",
+      isTouch: true,
+      isEdgeToEdge: false
+    });
+    expect(
+      catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { model: "nokia-3310" } }).device.model
+    ).toBe("phone");
   });
 });

@@ -101,6 +101,21 @@ describe("the build's options", () => {
       readableNames: true
     });
   });
+
+  it("refuses a device that names a model no one has, and lays the catalogue's fields over a preset's", () => {
+    expect(() => resolveConfig({ ...BASE, device: { model: "nokia-3310" } }, "/catalogue")).toThrow(
+      `${resolve("/catalogue", "forgebook.config")}: Forgebook's device: "nokia-3310" is no device model`
+    );
+    // a configuration is code: its types are not a promise
+    const loose: ForgebookConfig = { ...BASE };
+    Reflect.set(loose, "device", "pixel-9");
+    expect(() => resolveConfig(loose, "/catalogue")).toThrow(/Forgebook's device: write it as an object/);
+    const resolved = resolveConfig(
+      { ...BASE, device: { frame: true }, presets: [{ name: "a", device: { model: "pixel-9" } }] },
+      "/catalogue"
+    );
+    expect(resolved.lists.device).toEqual({ model: "pixel-9", frame: true });
+  });
 });
 
 describe("findConfigFile", () => {

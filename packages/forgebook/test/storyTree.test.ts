@@ -582,3 +582,26 @@ describe("tags", () => {
     ]);
   });
 });
+
+describe("a story's device", () => {
+  it("lays the story's own fields over the meta's, and has none when neither sets one", () => {
+    const tree = storyTree([
+      source({
+        "./a.stories.tsx": {
+          title: "Layouts/Screen",
+          device: { frame: true, model: "iphone-16" },
+          stories: [{ exportName: "Phone" }, { exportName: "Pixel", device: { model: "pixel-9" } }]
+        },
+        "./b.stories.tsx": { title: "Layouts/Card", stories: [{ exportName: "Plain" }] }
+      })
+    ]);
+    const stories = tree.sources[0]?.families[0]?.groups[0]?.components.flatMap(
+      (component) => component.stories
+    );
+    expect(stories?.map((story) => [story.exportName, story.device])).toEqual([
+      ["Plain", undefined],
+      ["Phone", { frame: true, model: "iphone-16" }],
+      ["Pixel", { frame: true, model: "pixel-9" }]
+    ]);
+  });
+});

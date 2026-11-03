@@ -25,6 +25,7 @@ import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
 import { detailOf, type PanelArgs, previewValue, type ShellMessage } from "../messages.ts";
 import { panelArgsOf, storyArgsOf } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
+import { applySafeArea } from "../safeAreaParameter.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { isClockHeldIn } from "../storyClock.ts";
 import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGlobals.ts";
@@ -159,6 +160,8 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const shell = shellChannel(config.frames ?? SAME_ORIGIN, window);
   const tellShell = shell.tell;
   applyView(document.documentElement, view, catalogue);
+  // a story drawn edge to edge in a device is told its safe areas, which `env()` cannot give a frame
+  applySafeArea(document.documentElement, window.location.search);
   // what the story fixes of the view, once it is read: every view the frame applies has it over the shell's
   let fixed: FixedView = NOT_FIXED;
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount

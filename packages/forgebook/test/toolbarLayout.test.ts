@@ -28,12 +28,13 @@ const layout = (placed: readonly PlacedControl[]): string[] =>
 const CATALOGUE = catalogueSettings("Acme", FIXTURE_SWITCHES);
 
 describe("placedControls", () => {
-  it("starts today's bar: the colour scheme, the contrast and the width pinned, every other control in View", () => {
-    expect(CATALOGUE.toolbar).toEqual(["theme", "contrast", "width"]);
+  it("starts today's bar: the colour scheme, the contrast, the width and the device pinned, every other control in View", () => {
+    expect(CATALOGUE.toolbar).toEqual(["theme", "contrast", "width", "forgebook.device"]);
     expect(layout(placedControls(CATALOGUE, undefined))).toEqual([
       "theme:p",
       "contrast:p",
       "width:p",
+      "forgebook.device:p",
       "motion:-",
       "speed:-",
       "press:-",
@@ -61,6 +62,7 @@ describe("placedControls", () => {
       "press:-",
       "dir:-",
       "touch:-",
+      "forgebook.device:-",
       "backdrop:-",
       "text:-",
       "audience:-"
@@ -107,6 +109,7 @@ describe("placedControls", () => {
       "lang:-",
       "dir:-",
       "touch:-",
+      "forgebook.device:-",
       "audience:-"
     ]);
   });
@@ -117,15 +120,28 @@ describe("arranging", () => {
 
   it("pins and hides as two choices, each keeping the control's position", () => {
     const placed = withHidden(withPinned(withHidden(start, "width", true), "motion", true), "motion", true);
-    expect(layout(placed).slice(0, 4)).toEqual(["theme:p", "contrast:p", "width:ph", "motion:ph"]);
+    expect(layout(placed).slice(0, 5)).toEqual([
+      "theme:p",
+      "contrast:p",
+      "width:ph",
+      "forgebook.device:p",
+      "motion:ph"
+    ]);
     expect(layout(withPinned(placed, "width", false))[2]).toBe("width:h");
   });
 
   it("moves a control among the shown ones, the hidden ones keeping their position", () => {
     const hidden = withHidden(start, "contrast", true);
-    // shown: theme, width, motion, speed…; motion to the first position
+    // shown: theme, width, the device, motion, speed…; motion to the first position
     const placed = withPosition(hidden, "motion", 0);
-    expect(layout(placed).slice(0, 5)).toEqual(["motion:-", "contrast:ph", "theme:p", "width:p", "speed:-"]);
+    expect(layout(placed).slice(0, 6)).toEqual([
+      "motion:-",
+      "contrast:ph",
+      "theme:p",
+      "width:p",
+      "forgebook.device:p",
+      "speed:-"
+    ]);
     // to the end, past the last; a hidden control does not move
     expect(layout(withPosition(placed, "motion", 99)).at(-1)).toBe("motion:-");
     expect(withPosition(placed, "contrast", 3)).toEqual(placed);

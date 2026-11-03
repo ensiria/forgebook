@@ -41,6 +41,7 @@ describe("the direction switch", () => {
     ]);
     // turning it off is not one of Forgebook's own controls: those stay
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES, lists).ownControls).toEqual([
+      "forgebook.device",
       "backdrop",
       "sheets",
       "text",

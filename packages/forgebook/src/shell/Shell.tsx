@@ -11,6 +11,7 @@ import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState }
 
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
+import { type DeviceDefault, deviceDefaultOf, pageDeviceDefault } from "../deviceView.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
 import { anchorOf } from "../pageAddress.ts";
 import { findPage, type PageLocation } from "../pageTree.ts";
@@ -319,6 +320,23 @@ const sidebarCurrent = (
   location === undefined
     ? undefined
     : { sourceId: location.source.id, title: location.component.title, storyId };
+
+/**
+ * The page's default device for the toolbar: the shown story's, a component's stories' on its page (`pageDeviceDefault`),
+ * the catalogue's elsewhere.
+ *
+ * @param catalogueDevice - the catalogue's default.
+ * @param shown - the page shown.
+ */
+const deviceOfShown = (catalogueDevice: DeviceDefault, shown: Shown): DeviceDefault => {
+  if (shown.kind === "story") return deviceDefaultOf(catalogueDevice, shown.location.story.device);
+  if (shown.kind === "component")
+    return pageDeviceDefault(
+      catalogueDevice,
+      shown.location.component.stories.map((story) => story.device)
+    );
+  return catalogueDevice;
+};
 
 /**
  * What the shown story fixes of the view, for the toolbar; nothing on any other page.
@@ -760,6 +778,7 @@ const ShellPage = ({
     touchOverrides,
     onTouchChange: setTouchOverride,
     touch: catalogue.touch,
+    catalogueDevice: catalogue.device,
     onAddressViewChange: changeView
   });
 
@@ -839,6 +858,7 @@ const ShellPage = ({
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}
+          deviceDefault={deviceOfShown(catalogue.device, shown)}
         />
         {shown.kind === "home" ? (
           <LazyPage
