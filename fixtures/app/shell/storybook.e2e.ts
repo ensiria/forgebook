@@ -32,7 +32,10 @@ const shownArgs = async (page: Page): Promise<Record<string, unknown>> => {
   return JSON.parse(text ?? "{}") as Record<string, unknown>;
 };
 
-/** Every story of the Storybook fixture, by its id without the source. */
+/**
+ * Every story of the Storybook fixture, by its id without the source, but the hot-edit file's: `hotEdit.e2e.ts` edits
+ * that file while this spec may run, and checks its stories itself.
+ */
 const STORY_IDS = [
   "components-button--primary",
   "components-button--secondary",
@@ -58,9 +61,7 @@ const STORY_IDS = [
   "storybook-merged--aliased",
   "storybook-merged--wrapping",
   "storybook-merged--reexported",
-  "storybook-plain-javascript--untyped",
-  "storybook-hot-edit--own",
-  "storybook-hot-edit--behind"
+  "storybook-plain-javascript--untyped"
 ];
 
 test("every story written the Storybook way is ready in its frame, without a page error", async ({

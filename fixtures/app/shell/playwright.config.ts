@@ -14,6 +14,9 @@
  * `FORGEBOOK_SHELL_GROUP=<index>/<count>` runs one group of catalogues and their specs instead of all of them at once
  * (`catalogueGroups.ts`), for a machine whose memory does not hold every dev server together.
  *
+ * The specs that edit fixture files run in a project of their own, `story file edits`, on one worker; every other spec
+ * runs in `catalogues`, in parallel.
+ *
  * @module
  */
 import { join } from "node:path";
@@ -63,9 +66,24 @@ const SERVERS: Readonly<Record<Catalogue, { folder: string; configFile?: string 
 /** The catalogues and specs this run takes: all of them, or one group (`catalogueGroups.ts`). */
 const group = runGroup(import.meta.dirname);
 
+/**
+ * The specs that edit committed fixture files while the catalogue serves them (`fileEdits.ts`): run on one worker, so
+ * no two of their tests, nor two repetitions of one (`--repeat-each`), edit the same file at once.
+ */
+const EDITING_SPECS: readonly string[] = ["hotEdit.e2e.ts"];
+
+/** This run's specs that edit fixture files. */
+const editingSpecs = group.specs.filter((spec) => EDITING_SPECS.includes(spec));
+
+/** This run's other specs. */
+const otherSpecs = group.specs.filter((spec) => !EDITING_SPECS.includes(spec));
+
 export default defineConfig({
   testDir: import.meta.dirname,
-  testMatch: [...group.specs],
+  projects: [
+    ...(otherSpecs.length === 0 ? [] : [{ name: "catalogues", testMatch: otherSpecs }]),
+    ...(editingSpecs.length === 0 ? [] : [{ name: "story file edits", testMatch: editingSpecs, workers: 1 }])
+  ],
   // a group keeps its results apart, so the next group's run does not clear a failure before it
   ...(group.place === undefined
     ? {}
