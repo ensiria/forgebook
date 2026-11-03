@@ -9,6 +9,7 @@ import { join } from "node:path";
 
 import { type ComponentDocs, isComponentDocs, type PropDocs } from "forgebook/component-docs";
 import { markSourcesChanged } from "forgebook/vite/docs-program";
+import { normalizePath } from "vite";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -105,9 +106,9 @@ describe("a component with TypeScript", () => {
   it("names the files its docs come from, a component as its .svelte file", () => {
     const component = extractStoryComponent(docsFile("Badge.stories.ts"));
     if (typeof component === "string" || !("file" in component)) throw new Error("No component");
-    expect(component.file).toBe(docsFile("Badge.svelte"));
-    expect(component.sources).toContain(docsFile("Badge.svelte"));
-    expect(component.sources).toContain(docsFile("Plain.svelte"));
+    expect(component.file).toBe(normalizePath(docsFile("Badge.svelte")));
+    expect(component.sources).toContain(normalizePath(docsFile("Badge.svelte")));
+    expect(component.sources).toContain(normalizePath(docsFile("Plain.svelte")));
     expect(component.sources.some((file) => file.endsWith(".svelte.ts"))).toBe(false);
   });
 });
@@ -175,7 +176,7 @@ describe("a component's file, for forgebook new", () => {
     const component = extractFileComponent(docsFile("Badge.svelte"));
     if (typeof component === "string" || !("file" in component)) throw new Error(String(component));
     expect(component.docs.name).toBe("Badge");
-    expect(component.file).toBe(docsFile("Badge.svelte"));
+    expect(component.file).toBe(normalizePath(docsFile("Badge.svelte")));
     expect(component.docs.props.map((prop) => prop.name)).toContain("label");
   });
 
