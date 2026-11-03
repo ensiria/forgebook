@@ -19,8 +19,8 @@ import {
   indexedStoryFiles,
   type KeptIndex,
   REACH_PREFIX,
+  storyFilesCode,
   storyFilesGroupOf,
-  storyFilesModule,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { storyReach } from "./storyReach.ts";
@@ -55,7 +55,8 @@ export const docsModule = (
 };
 
 /**
- * The module of a `?forgebook-files` pattern: every matched story file's index and loaders.
+ * The module of a `?forgebook-files` pattern: every matched story file's index and loaders; with the files, indexed,
+ * which the dev server keeps to tell an edit that changes the list.
  *
  * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
@@ -70,21 +71,12 @@ export const patternModule = (
   loaders: GroupLoaders,
   cache: DiskCache<KeptIndex> | undefined,
   warm: ((storyFile: string) => void) | undefined
-): { code: string; moduleType: "js" } => {
+): { code: string; moduleType: "js"; files: readonly IndexedStoryFile[] } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  let first: string | undefined;
-  const code = storyFilesModule(
-    root,
-    pattern,
-    (file: string): void => {
-      first ??= file;
-      watch(file);
-    },
-    loaders,
-    cache
-  );
-  if (first !== undefined) warm?.(first);
-  return { code, moduleType: "js" };
+  const files = indexedStoryFiles(root, pattern, watch, cache);
+  const [first] = files;
+  if (first !== undefined) warm?.(first.file);
+  return { code: storyFilesCode(root, pattern, files, loaders), moduleType: "js", files };
 };
 
 /** A group's story files indexed, and what their stories render, read in the docs worker. */

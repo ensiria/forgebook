@@ -116,6 +116,13 @@ describe("the generated pages", () => {
     expect(entry).toContain("previews: [preview0]");
   });
 
+  it("takes its previews' edits on a dev server, and none without previews", () => {
+    const entry = frameEntry(CONFIG);
+    expect(entry).toContain('import.meta.hot.accept(["/catalogue/forgebook.preview.tsx"], (next) =>');
+    expect(entry).toContain('"forgebook:previews"');
+    expect(frameEntry({ ...CONFIG, previews: [] })).not.toContain("import.meta.hot");
+  });
+
   it("hands the frame axe's address when there is one, with what it imports", () => {
     expect(frameEntry(CONFIG)).not.toContain("axeUrl");
     const entry = frameEntry(CONFIG, { imports: ['import axeUrl from "/axe.min.js?url";'], value: "axeUrl" });

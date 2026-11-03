@@ -14,6 +14,7 @@
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
 import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
 import type { FramesPlacement } from "../frameOrigins.ts";
+import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { MOCKS_MODULES, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
@@ -324,6 +325,23 @@ export type AxeAddress = {
 };
 
 /**
+ * What the frame's entry runs on a dev server to take the edits of its previews and of what they import, which the frame
+ * draws in place (`hotModules.ts`); without it, an edit of a component a preview imports through a library's index
+ * reloads every open page.
+ *
+ * @param previews - the previews' files, as the entry imports them.
+ */
+const previewsHot = (previews: readonly string[]): readonly string[] =>
+  previews.length === 0
+    ? []
+    : [
+        "if (import.meta.hot)",
+        `  import.meta.hot.accept(${JSON.stringify(previews)}, (next) =>`,
+        `    window.dispatchEvent(new CustomEvent(${JSON.stringify(PREVIEWS_EVENT)}, { detail: { next } }))`,
+        "  );"
+      ];
+
+/**
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
@@ -351,6 +369,7 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     ...(config.hasMocks ? [mockToolsLoader()] : []),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
+    ...previewsHot(config.previews),
     ""
   ].join("\n");
 };

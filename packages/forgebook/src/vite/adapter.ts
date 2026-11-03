@@ -73,6 +73,12 @@ export type FrameworkAdapter = {
    * plain words. `any` by default, where a text stays text.
    */
   readonly addressTexts?: AddressTexts;
+  /**
+   * Whether an edited story file is drawn anew in its open frames, which keep what the reader did in the story
+   * (`hotModules.ts`); `true` by default. `false` for a framework whose compiler makes a story file anew from its own
+   * program and leaves out the code Vite's plugins add to it (Angular's): an edit of its story files reloads the pages.
+   */
+  readonly redrawsEditedStories?: boolean;
 };
 
 /**
