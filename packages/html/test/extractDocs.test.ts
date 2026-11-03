@@ -7,6 +7,7 @@
 import { join } from "node:path";
 
 import { type ComponentDocs, isComponentDocs, type PropDocs } from "forgebook/component-docs";
+import { normalizePath } from "vite";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -67,8 +68,8 @@ describe("a function the meta names", { timeout: 30_000 }, () => {
   it("says which files the docs come from", () => {
     const component = extractStoryComponent(docsFile("Button.stories.ts"));
     if (typeof component === "string" || !("file" in component)) throw new Error("No component");
-    expect(component.file).toBe(docsFile("button.ts"));
-    expect(component.sources).toContain(docsFile("button.ts"));
+    expect(component.file).toBe(normalizePath(docsFile("button.ts")));
+    expect(component.sources).toContain(normalizePath(docsFile("button.ts")));
   });
 });
 
