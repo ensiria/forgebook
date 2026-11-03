@@ -6,7 +6,8 @@
  * The props that name no group come first: they are the ones an author left out of every group, most often the few
  * every use of the component sets (`value`, `onChange`). Then each group, in the order a configuration names them
  * (the component's meta, then the catalogue), the others in the order they first appear among the props. A component
- * whose props name no group is one list, as it always was. Pure.
+ * whose props name no group is one list, as it always was. Every group starts open: a reader folds one away, never the
+ * catalogue. Pure.
  *
  * @module
  */
@@ -18,13 +19,6 @@ export type PropGroup<TProp> = {
   /** Its props, in their order among the component's. */
   readonly props: readonly TProp[];
 };
-
-/**
- * The most props a group shows open when the page draws it; a longer one starts folded. Twelve rows of the API
- * reference fill about one laptop screen, so a group past it would push every group after it out of sight, while a
- * folded one still shows its name and count.
- */
-export const LONG_GROUP = 12;
 
 /**
  * The order of the groups named first: the component's own (its meta's `parameters.propGroups`), then the
@@ -71,16 +65,6 @@ export const groupedProps = <TProp extends { readonly group?: string | undefined
     .sort((left, right) => rank(left.name ?? "") - rank(right.name ?? ""));
   return ungrouped.length === 0 ? groups : [{ name: undefined, props: ungrouped }, ...groups];
 };
-
-/**
- * Whether a group starts folded: a named one longer than `LONG_GROUP`, unless it is the first listed, so a page never
- * opens on nothing but folded groups.
- *
- * @param group - the group.
- * @param index - its place among the groups listed, from 0.
- */
-export const startsFolded = (group: PropGroup<unknown>, index: number): boolean =>
-  group.name !== undefined && index > 0 && group.props.length > LONG_GROUP;
 
 /**
  * Whether any of the props names a group: when none does, the props are listed as one list, as before groups.

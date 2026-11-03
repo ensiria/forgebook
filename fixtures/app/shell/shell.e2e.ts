@@ -742,12 +742,13 @@ test.describe("the component's page", () => {
       "hint",
       "classNames"
     ]);
-    // the meta names Texts first, though Behaviour comes first in the props; both short, so both open
+    // the meta names Texts first, though Behaviour comes first in the props; every group starts open
     const groups = reference.locator(":scope > .forgebook-api__group");
     await expect(groups.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
     await expect(groups.locator(".forgebook-fold__count")).toHaveText(["1 prop", "2 props"]);
     await expect(groups.nth(1).locator("tbody th")).toHaveText(["rows", "isDisabled"]);
     await expect(groups.nth(0)).toHaveAttribute("open");
+    await expect(groups.nth(1)).toHaveAttribute("open");
     // a group folds from its summary
     await groups.nth(1).locator("summary").click();
     await expect(groups.nth(1)).not.toHaveAttribute("open");
@@ -1494,6 +1495,7 @@ test.describe("the panel", () => {
     await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
     // a group's number field and toggle sit in it, and set the story as anywhere else
     const behaviour = tab.locator(".forgebook-fold").filter({ hasText: "Behaviour" });
+    await expect(tab.locator(".forgebook-fold[open]")).toHaveCount(2);
     await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
     await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
     await expect(frameOf(page).locator("select")).toBeDisabled();

@@ -274,8 +274,7 @@ export type FinderProps = {
   groups first appear among the props; the events keep their own heading after them. The Props tab does the same: the
   props that name no group by control, as before, then each group with its controls, its toggles and the props it
   cannot set.
-- A group of more than 12 props starts folded, its name and count in sight, unless it is the first thing listed: twelve
-  rows fill about a laptop's screen, and a longer group would push the groups after it out of sight.
+- Every group starts open; a reader folds one away from its name.
 - To show some groups first, name them in order: `propGroups: ["Selection", "Paging"]` in the configuration for every
   component, or `parameters: { propGroups: ["Texts"] }` in a component's meta, written as a list of plain strings.
   The meta's come first, then the configuration's, then the rest as they appear. Nothing named, nothing changes.

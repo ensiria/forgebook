@@ -7,8 +7,8 @@
  *
  * @remarks
  * Props whose TSDoc names a group (`@group Selection`) are listed under its name after the others, as the API reference
- * lists them (`propGroups.ts`): each group's controls, its toggles, then its props the panel cannot set. A long group
- * starts folded. A component whose props name no group shows the tab as it always was.
+ * lists them (`propGroups.ts`): each group's controls, its toggles, then its props the panel cannot set. Each starts
+ * open, and a reader may fold it away. A component whose props name no group shows the tab as it always was.
  *
  * @module
  */
@@ -19,7 +19,7 @@ import { type ChangeEvent, type ReactNode, useId } from "react";
 import { isColorProp, isNamedProp, type PanelProp, settableProps } from "../argTypes.ts";
 import { type ArgValue, isNamedArg, type PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
-import { groupedProps, propGroupOrder, startsFolded } from "../propGroups.ts";
+import { groupedProps, propGroupOrder } from "../propGroups.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
 import { ChoiceControl, NumberField, textOf } from "./PropFields.tsx";
@@ -278,19 +278,17 @@ const ReadOnlyProp = ({ prop }: { readonly prop: PanelProp }): ReactNode => (
  * A group the props' TSDoc names, under its name: its controls in the order of the props, its toggles, then the props
  * the panel cannot set.
  *
- * @param props - the group's name and props, whether it starts folded, and how each prop is drawn.
+ * @param props - the group's name and props, and how each prop is drawn.
  */
 const NamedGroup = ({
   name,
   props,
-  isFolded,
   isSettable,
   control,
   toggle
 }: {
   readonly name: string;
   readonly props: readonly PanelProp[];
-  readonly isFolded: boolean;
   readonly isSettable: (prop: PanelProp) => boolean;
   readonly control: (prop: PanelProp) => ReactNode;
   readonly toggle: (prop: PanelProp) => ReactNode;
@@ -300,7 +298,7 @@ const NamedGroup = ({
   const others = props.filter((prop) => !isSettable(prop));
   return (
     <div className="forgebook-prop-group">
-      <details className="forgebook-fold" open={!isFolded}>
+      <details className="forgebook-fold" open>
         <summary className="forgebook-fold__summary forgebook-prop-group__title">
           <Icon name="chevronRight" size={12} />
           <h3 className="forgebook-fold__name">{name}</h3>
@@ -427,13 +425,12 @@ export const PropsTab = ({
           </div>
         </div>
       )}
-      {propGroups.map((group, index) =>
+      {propGroups.map((group) =>
         group.name === undefined ? null : (
           <NamedGroup
             key={group.name}
             name={group.name}
             props={group.props}
-            isFolded={startsFolded(group, index)}
             isSettable={isSettable}
             control={control}
             toggle={toggle}

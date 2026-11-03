@@ -5,7 +5,7 @@
  *
  * @remarks
  * Props whose TSDoc names a group (`@group Selection`) are listed under its heading, after the props that name none
- * (`propGroups.ts`); a long group starts folded, its name and count still in sight. A prop whose type is an object the
+ * (`propGroups.ts`), each open, so a reader may fold one away. A prop whose type is an object the
  * package documents (`texts?: FileFinderTexts`) unfolds in place to list that type's members; they are drawn only
  * once unfolded, so a library with large text types keeps a light page.
  *
@@ -14,7 +14,7 @@
 import { type ReactNode, useState } from "react";
 
 import type { ComponentDocs, MemberDocs, PropDocs, SubcomponentDocs } from "../componentDocs.ts";
-import { groupedProps, type PropGroup, propGroupOrder, startsFolded } from "../propGroups.ts";
+import { groupedProps, type PropGroup, propGroupOrder } from "../propGroups.ts";
 import { Code } from "./Code.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
@@ -145,24 +145,22 @@ const PropTable = ({
 };
 
 /**
- * A group of props: the props that name none as a table alone, a named group under its heading, folded when it is
- * long.
+ * A group of props: the props that name none as a table alone, a named group under its heading, open until a reader
+ * folds it.
  *
- * @param props - the group, its place among the groups, and the level of its heading.
+ * @param props - the group, and the level of its heading.
  */
 const GroupTable = ({
   group,
-  index,
   level
 }: {
   readonly group: PropGroup<PropDocs>;
-  readonly index: number;
   readonly level: 3 | 4;
 }): ReactNode => {
   if (group.name === undefined) return <PropTable rows={group.props} kind="props" />;
   const Heading = level === 3 ? "h3" : "h4";
   return (
-    <details className="forgebook-fold forgebook-api__group" open={!startsFolded(group, index)}>
+    <details className="forgebook-fold forgebook-api__group" open>
       <summary className="forgebook-fold__summary">
         <Icon name="chevronRight" size={14} />
         <Heading className="forgebook-fold__name">{group.name}</Heading>
@@ -196,8 +194,8 @@ const PropsAndEvents = ({
   const events = props.filter((prop) => prop.kind === "event");
   return (
     <>
-      {groups.map((group, index) => (
-        <GroupTable key={group.name ?? ""} group={group} index={index} level={level} />
+      {groups.map((group) => (
+        <GroupTable key={group.name ?? ""} group={group} level={level} />
       ))}
       {events.length === 0 ? null : (
         <>

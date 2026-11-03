@@ -1,11 +1,11 @@
 /**
- * Tests for the props in their groups: the order of the groups, the props naming none first, and which start folded.
+ * Tests for the props in their groups: the order of the groups, the props naming none first.
  *
  * @module
  */
 import { describe, expect, it } from "vitest";
 
-import { groupedProps, hasPropGroups, LONG_GROUP, propGroupOrder, startsFolded } from "../src/propGroups.ts";
+import { groupedProps, hasPropGroups, propGroupOrder } from "../src/propGroups.ts";
 
 /** A prop with a name and, maybe, a group. */
 type Prop = { readonly name: string; readonly group?: string };
@@ -70,26 +70,5 @@ describe("propGroupOrder", () => {
     ]);
     expect(propGroupOrder(undefined, ["Texts"])).toEqual(["Texts"]);
     expect(propGroupOrder()).toEqual([]);
-  });
-});
-
-describe("startsFolded", () => {
-  /** A group of a given length. */
-  const groupOf = (
-    name: string | undefined,
-    length: number
-  ): { name: string | undefined; props: Prop[] } => ({
-    name,
-    props: Array.from({ length }, (_, index) => ({ name: `prop${index}` }))
-  });
-
-  it("folds a named group longer than LONG_GROUP, unless it is the first listed", () => {
-    expect(startsFolded(groupOf("Texts", LONG_GROUP + 1), 1)).toBe(true);
-    expect(startsFolded(groupOf("Texts", LONG_GROUP), 1)).toBe(false);
-    expect(startsFolded(groupOf("Texts", LONG_GROUP + 1), 0)).toBe(false);
-  });
-
-  it("never folds the props that name no group", () => {
-    expect(startsFolded(groupOf(undefined, LONG_GROUP * 4), 0)).toBe(false);
   });
 });
