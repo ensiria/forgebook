@@ -3,7 +3,7 @@
  * files, so a project on Storybook tries Forgebook in one command, its stories read as they are.
  *
  * @remarks
- * Defined here, on the scope `forgebook.mts` hands it, so the entry stays a list of commands; the reading is the
+ * Defined here, on the scope `forgebookCommands.mts` hands it, so the commands module stays a list of commands; the reading is the
  * importer's (`importers/storybook.ts`), the writing `initConfig.ts`'s. A configuration already there is never
  * replaced unless asked (`--force`): it may hold a person's work.
  *
@@ -18,7 +18,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { CONFIG_FILES } from "../../src/vite/configFile.ts";
 import { COMMAND, type ForgebookOptions } from "./catalogueCommands.ts";
-import { type ImportedConfig, importStorybook } from "./importers/storybook.ts";
+import type { ImportedConfig } from "./importers/storybook.ts";
 import { frameworkPeers } from "./importers/storybookFrameworks.ts";
 import { CONFIG_FILE, initConfigText } from "./initConfig.ts";
 
@@ -98,6 +98,8 @@ export const initCommands = (
         throw new ScriptError(`${existing} is already there`, {
           hint: "Give --force to replace it with the one read from Storybook"
         });
+      // the importer reads Storybook's files with the compiler: only this command loads it
+      const { importStorybook } = await import("./importers/storybook.ts");
       const imported = await importStorybook(process.cwd());
       if (typeof imported === "string") throw new ScriptError(imported);
       writeFileSync(file, initConfigText(imported, "Storybook"));

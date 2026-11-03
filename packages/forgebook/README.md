@@ -40,6 +40,10 @@ TypeScript with no framework: each README has the configuration and the stories.
 npm install --save-dev forgebook @forgebook/react
 ```
 
+What Forgebook keeps between runs lives in `node_modules/.vite`, beside Vite's pre-bundled dependencies: Node's compile
+cache of the `forgebook` command in `node_modules/.vite/forgebook/compile`, which makes a later start quicker. Removing
+`node_modules/.vite` starts from nothing.
+
 ## A first catalogue
 
 A component, with its props typed and documented:
