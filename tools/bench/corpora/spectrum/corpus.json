@@ -1,0 +1,40 @@
+{
+  "name": "spectrum",
+  "repository": "https://github.com/adobe/react-spectrum.git",
+  "commit": "a562b335e645c172ec5a940b3e47ccdadbeeaa15",
+  "licence": "Apache-2.0",
+  "install": ["node", ".yarn/releases/yarn-4.18.0.cjs", "install", "--immutable", "--mode=skip-build"],
+  "prepare": [["node_modules/.bin/patch-package"], ["node", ".yarn/releases/yarn-4.18.0.cjs", "build:icons"]],
+  "folder": ".",
+  "expected": {
+    "files": 179,
+    "stories": 1511
+  },
+  "measured": {
+    "forgebookStory": "stories:button--default",
+    "forgebookComponent": "stories:button",
+    "text": "Default",
+    "pageText": "Default",
+    "sidebar": "Button",
+    "storybookStory": "button--default"
+  },
+  "edits": {
+    "story": {
+      "file": "packages/@adobe/react-spectrum/stories/button/Button.stories.tsx",
+      "find": "<Button {...props}>Default</Button>",
+      "replace": "<Button {...props}>Default {edit}</Button>"
+    },
+    "component": {
+      "file": "packages/@adobe/react-spectrum/src/button/Button.tsx",
+      "find": "{typeof children === 'string' ? <Text>{children}</Text> : children}",
+      "replace": "{typeof children === 'string' ? <Text>{children}</Text> : children} {edit}"
+    }
+  },
+  "storybook": {
+    "folder": ".",
+    "configDir": ".storybook",
+    "env": {
+      "NODE_ENV": "storybook"
+    }
+  }
+}

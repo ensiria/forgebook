@@ -79,6 +79,7 @@ export const reportMismatches = (first: BenchReport, second: BenchReport): strin
   return [
     ...differs("corpus", first.corpus, second.corpus),
     ...differs("throttle", first.throttle, second.throttle),
+    ...differs("frames", first.frames, second.frames),
     ...differs("machine", first.machine, second.machine),
     ...differs("forgebook", first.forgebook, second.forgebook),
     ...differs("startedAt", first.startedAt === second.startedAt ? "same run" : "", "")

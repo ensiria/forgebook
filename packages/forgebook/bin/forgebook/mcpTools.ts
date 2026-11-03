@@ -1,7 +1,8 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page` and `search_catalogue`.
+ * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
+ * for a client that renders apps.
  *
  * @module
  */
@@ -11,10 +12,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { PluginsDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
+import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { previewTool } from "./mcpPreview.ts";
 import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
@@ -58,6 +62,8 @@ const problemsResult = (answer: AgentAnswer): McpToolResult => {
 
 /** What the tools reach the catalogue through. */
 export type CatalogueReach = {
+  /** The plugins the configuration lists. */
+  readonly plugins: PluginsDocument;
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
   readonly ask: Ask;
   /** Writes a component's first stories, the file relative to the catalogue's folder. */
@@ -68,6 +74,8 @@ export type CatalogueReach = {
   readonly shot: Shot;
   /** Runs the checks on a page of the application. */
   readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
+  /** Serves the catalogue where a browser can open a preview, and answers where. */
+  readonly servePreview: () => Promise<string>;
 };
 
 /**
@@ -80,9 +88,18 @@ export const catalogueTools = ({
   writeNew,
   check,
   shot,
-  checkPage
+  checkPage,
+  servePreview,
+  plugins
 }: CatalogueReach): readonly McpTool[] => [
   ...pageTools(ask),
+  {
+    name: "list_plugins",
+    description:
+      "The plugins this catalogue lists and what each adds: panel tabs (open one with tab=<id> in a view), switches, docs blocks. A tab needs its plugin: a story's parameter does nothing without it.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    call: async (): Promise<McpToolResult> => ({ structured: plugins, isError: false })
+  },
   {
     name: "check_page",
     description:
@@ -152,7 +169,7 @@ export const catalogueTools = ({
   {
     name: "list_tokens",
     description:
-      "The design tokens of this catalogue, to use instead of a colour, size or duration written by hand: how many of each type, and the first of them. To replace a raw value, call nearest_token; for one token's description, get_token.",
+      "The design tokens of this catalogue and of the libraries it shows, to use instead of a colour, size or duration written by hand: how many of each type, the first of them, and `clashes` where two authors disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
     inputSchema: {
       type: "object",
       properties: {
@@ -247,7 +264,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -268,7 +285,7 @@ export const catalogueTools = ({
   {
     name: "story_address",
     description:
-      "The links that open a story in the catalogue and in its frame alone, in the view asked for: give them to a person to look at what you describe.",
+      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe.",
     inputSchema: {
       type: "object",
       properties: {
@@ -282,12 +299,10 @@ export const catalogueTools = ({
       const id = textOf(args, "id") ?? "";
       const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const story = answer.body.components
-        .flatMap((component) => component.stories)
-        .find((each) => each.id === id);
-      return story === undefined
+      const named = namedStory(answer.body, id);
+      return named === undefined
         ? { structured: { error: `No story "${id}"` }, isError: true }
-        : { structured: { id, links: story.links }, isError: false };
+        : { structured: { id: named.story.id, links: named.story.links }, isError: false };
     }
   },
   {
@@ -335,6 +350,11 @@ export const catalogueTools = ({
         allVariants: {
           type: "boolean",
           description: "Check every variant the catalogue's browser tests check."
+        },
+        semantic: {
+          type: "boolean",
+          description:
+            "Also ask the model the user configured whether headings, labels and alternatives say the right thing. Its judgements are opinions, in `judgements`."
         }
       },
       required: ["id"],
@@ -347,7 +367,8 @@ export const catalogueTools = ({
       const report = await check({
         id: textOf(args, "id") ?? "",
         views,
-        isAllVariants: args["allVariants"] === true
+        isAllVariants: args["allVariants"] === true,
+        isSemantic: args["semantic"] === true
       });
       if (typeof report === "string") return { structured: { error: report }, isError: true };
       return { structured: report, isError: report.results.some((result) => result.problems.length > 0) };
@@ -374,7 +395,7 @@ export const catalogueTools = ({
   {
     name: "story_shot",
     description:
-      "Take a story's pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files' paths. Views are written as the catalogue's address writes them (theme=dark&width=360) or as words (\"dark it 360\"). Needs @forgebook/testing and Playwright in the project.",
+      'Take a story\'s pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files\' paths. Views are written as the catalogue\'s address writes them (theme=dark&width=360) or as words ("dark it 360"); a device model\'s id in a view ("iphone-16", "pixel-9 landscape") frames the picture in that device. Needs @forgebook/testing and Playwright in the project.',
     inputSchema: {
       type: "object",
       properties: {
@@ -408,5 +429,6 @@ export const catalogueTools = ({
       }));
       return { structured: report, isError: false, images };
     }
-  }
+  },
+  previewTool({ ask, serve: servePreview })
 ];

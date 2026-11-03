@@ -1,0 +1,74 @@
+{
+  "name": "@forgebook/plugin-msw",
+  "version": "0.1.0",
+  "description": "MSW for Forgebook: a story's API answered by its handlers, and a Network tab with its handlers and its requests.",
+  "keywords": [
+    "forgebook",
+    "forgebook-plugin"
+  ],
+  "license": "MIT",
+  "author": "Jason Scoppetta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/plugin-msw"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": "./src/plugin.ts",
+    "./frame": "./src/frame.ts",
+    "./tab": "./src/NetworkTab.tsx"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p test"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "msw": "^2.0.0 || ^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "forgebook": "workspace:*",
+    "msw": "3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/plugin.d.ts",
+        "default": "./dist/src/plugin.js"
+      },
+      "./frame": {
+        "types": "./dist/src/frame.d.ts",
+        "default": "./dist/src/frame.js"
+      },
+      "./tab": {
+        "types": "./dist/src/NetworkTab.d.ts",
+        "default": "./dist/src/NetworkTab.js"
+      }
+    }
+  }
+}

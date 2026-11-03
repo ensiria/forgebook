@@ -7,12 +7,12 @@
  */
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
-import type { PlacedControl } from "../toolbarLayout.ts";
+import type { ToolbarControl as Control, PlacedControl } from "../toolbarLayout.ts";
 import { ControlKeyField } from "./ControlKeyField.tsx";
+import { controlLabel } from "./controlLabel.ts";
 import { InfoTip } from "./InfoTip.tsx";
 import { Icon } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
-import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
 
 /** The arrow keys that move a row, and by how much. */
@@ -34,8 +34,8 @@ export const ControlRow = ({
   hintId,
   onGrab,
   onAnnounce,
-  ...context
-}: ControlContext & {
+  drawControl
+}: {
   readonly each: PlacedControl;
   readonly index: number;
   readonly count: number;
@@ -48,6 +48,8 @@ export const ControlRow = ({
   readonly hintId: string;
   readonly onGrab: (event: PointerEvent<HTMLButtonElement>, id: string) => void;
   readonly onAnnounce: (text: string) => void;
+  /** Draws a control in a row's form, as the toolbar draws it, with the view it reads and sets. */
+  readonly drawControl: (control: Control) => ReactNode;
 }): ReactNode => {
   const { control, isPinned } = each;
   const label = controlLabel(control);
@@ -86,7 +88,7 @@ export const ControlRow = ({
         ) : null}
       </span>
       <div className="forgebook-arrange__control">
-        <ToolbarControl control={control} form="row" {...context} />
+        {drawControl(control)}
         {description === undefined ? null : <InfoTip note={description} about={label} />}
       </div>
       <ControlKeyField

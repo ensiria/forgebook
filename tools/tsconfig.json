@@ -5,5 +5,7 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true
   },
-  "include": ["."]
+  "include": ["."],
+  // each corpus's files are copied into a cloned library, the only place their imports resolve
+  "exclude": ["bench/corpora"]
 }

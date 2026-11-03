@@ -1,0 +1,12 @@
+// The SvelteKit package's sources that run in a page: the renderer, the stand-ins of `$app/*` and the frame page.
+// `vite/` runs on Node and has its own tsconfig.json.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."],
+  "exclude": ["vite"]
+}

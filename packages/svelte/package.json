@@ -1,0 +1,98 @@
+{
+  "name": "@forgebook/svelte",
+  "version": "0.1.8",
+  "description": "Forgebook for Svelte 5: the story types and the context helpers, the renderer the frame mounts a story with, and the adapter that reads a Svelte component's props, snippets and callback props.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/svelte"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": [
+    "**/vite/svelteSources.*"
+  ],
+  "exports": {
+    ".": "./src/stories.ts",
+    "./clock": "./src/clock.ts",
+    "./texts": "./src/texts.ts",
+    "./renderer": "./src/svelteRenderer.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./code": "./src/storyMarkup.ts",
+    "./vite": "./src/vite/svelte.ts",
+    "./docs": "./src/vite/extractDocs.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "svelte-check --tsconfig src/tsconfig.json --fail-on-warnings && tsc -p src/vite && svelte-check --tsconfig test/tsconfig.json --fail-on-warnings"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "svelte2tsx": "0.7.63",
+    "typescript-6": "npm:typescript@6.0.3"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "svelte": "^5.46.4"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./clock": {
+        "types": "./dist/src/clock.d.ts",
+        "default": "./dist/src/clock.js"
+      },
+      "./texts": {
+        "types": "./dist/src/texts.d.ts",
+        "default": "./dist/src/texts.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/svelteRenderer.d.ts",
+        "default": "./dist/src/svelteRenderer.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyMarkup.d.ts",
+        "default": "./dist/src/storyMarkup.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/svelte.d.ts",
+        "default": "./dist/src/vite/svelte.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
+  }
+}

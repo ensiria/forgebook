@@ -3,7 +3,7 @@
  * its words together keeps them consistent and ready for a translation.
  *
  * @remarks
- * A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
+ * Only the audiences' texts (`audiencePage.ts`) live elsewhere, to stay out of the first load. A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
  * its configuration): the shell applies the replacements once, before it draws (`configureStrings`), as a translation
  * is set up, so every module keeps reading `STRINGS`. A text that takes values (`allStories(count)`) stays the shell's.
  *
@@ -34,6 +34,9 @@ const shellStrings = {
   related: "Related",
   view: "View",
   viewChanged: "A view setting is changed",
+  viewMenuError: "The View menu could not be loaded",
+  audienceError: "This part of the page could not be loaded",
+  compareError: "The comparison could not be loaded",
   controlChanged: (control: string): string => `${control}: changed`,
   controlKey: (control: string, key: string | undefined): string =>
     key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
@@ -84,6 +87,18 @@ const shellStrings = {
   widthFill: "Fill",
   widthPx: (width: number): string => `${width}`,
   copyStoryId: "Copy the story's id",
+  embedStory: "Embed this story",
+  embedHint: "Paste the link in a wiki or Notion, the HTML in a page of your own.",
+  embedLink: "Link",
+  embedCode: "HTML",
+  embedFollow: "Follow the story's height",
+  embedFollowHint: "Adds a script, which some pages remove: the frame then keeps the height written in it.",
+  embedLocal: "This address opens only on this computer: copy it from the published catalogue.",
+  embedFailed: "This story could not be shown.",
+  embedPanelFailed: "This could not load: reload the page to try again.",
+  embedCopyFailed: "Selected: copy it with your keys",
+  embedNoStory: "This address names no story.",
+  embedUnknownStory: (id: string): string => `No story "${id}": it may have been renamed.`,
   clearSearch: "Clear the search",
   fromTexts: "From the story's texts:",
   backToText: "Back to the text",
@@ -104,6 +119,13 @@ const shellStrings = {
   heightHandle: "Story height",
   heightHandleHint: "Drag to change the story's height; double-click for its own",
   widthFillNote: "Fill: the story takes the whole stage",
+  device: "Device",
+  deviceNone: "No frame",
+  devicePhones: "Phones",
+  deviceGeneric: "Generic phone",
+  deviceTablets: "Tablets",
+  deviceTurn: "Turn the device",
+  setByDevice: "Set by the device frame",
   panel: "Panel",
   panelHeight: "Panel height",
   closePanel: "Close the panel",
@@ -116,6 +138,9 @@ const shellStrings = {
     a11y: "Accessibility",
     signature: "Signature"
   },
+  openInFigma: "Open in Figma",
+  pluginLoading: "Loading the tab…",
+  pluginError: "This tab could not be loaded",
   logic: "Logic",
   logicHint: "About logic, not looks: a scene that uses the hook or the function",
   signatureParameter: "Parameter",
@@ -132,6 +157,7 @@ const shellStrings = {
   code: "Code",
   codeFromArgs: "from the args",
   codeRender: "the story's render",
+  codeLoading: "Reading the story's code…",
   codeError: "The story's code could not be read",
   copy: "Copy",
   copied: "Copied",
@@ -161,6 +187,10 @@ const shellStrings = {
   apiSignature: "Signature",
   apiDefault: "Default",
   apiWhat: "What it does",
+  apiMember: "Member",
+  propCount: (count: number): string => `${count} ${count === 1 ? "prop" : "props"}`,
+  memberCount: (count: number): string => `${count} ${count === 1 ? "member" : "members"}`,
+  membersOf: (type: string): string => `Members of ${type}`,
   showCode: "Show code",
   hideCode: "Hide code",
   openStory: "Open the story",
@@ -176,6 +206,9 @@ const shellStrings = {
   backToPlace: "Back to its place",
   backToPlaceNamed: (name: string): string => `Put ${name} back in its place`,
   examples: "Examples",
+  audience: "Reading for",
+  audiences: { everyone: "Everyone", designer: "Designers", coder: "Coders", tester: "Testers" },
+  audienceElsewhere: "Changes a component's page",
   pageError: "The component's page could not be read",
   storyLabel: "Story",
   frameTitle: (component: string, story: string): string => `${component}: ${story}`,
@@ -204,6 +237,9 @@ const shellStrings = {
   setByStory: "Set by the story",
   required: "Required",
   resetArgs: "Reset",
+  droppedArgs: "The link sets values this story does not take; they were left out:",
+  droppedArgReasons: { undeclared: "not one of its props", type: "not of the prop's type" },
+  removeDroppedArgs: "Remove them from the address",
   appearance: "Appearance",
   appearanceOf: (name: string): string => `Appearance: ${name}`,
   appearances: { light: "Light", dark: "Dark", system: "System", story: "Follow the story" },
@@ -225,6 +261,9 @@ const shellStrings = {
   testIds: "Test ids",
   noProps: "This page has no props",
   docsLoading: "Reading the component…",
+  tabLoading: "Loading the tab…",
+  tabError: "The tab could not be loaded",
+  pageLoadError: "The page could not be loaded",
   docsError: "The component could not be read",
   indexProblems: "Some story files could not be placed"
 };
@@ -235,8 +274,8 @@ export type ShellStrings = typeof shellStrings;
 /** The shell's texts, as shown. */
 export const STRINGS: ShellStrings = shellStrings;
 
-/** What the catalogue replaces, kept for the texts that load later (`configureGroup`). */
-let given: Readonly<Record<string, string>> = {};
+/** The catalogue's replacements, for the texts that load after it set them. */
+let catalogueReplacements: Readonly<Record<string, string>> = {};
 
 /**
  * Whether a value is a group of texts (`tabs`), whose members a path can name.
@@ -271,17 +310,23 @@ const replaceText = (texts: Record<string, unknown>, path: readonly string[], te
  * @param replacements - the new texts, by their path (`tabs.props`).
  */
 export const configureStrings = (replacements: Readonly<Record<string, string>>): void => {
-  given = replacements;
+  catalogueReplacements = replacements;
   for (const [path, text] of Object.entries(replacements)) replaceText(STRINGS, path.split("."), text);
 };
 
 /**
- * Applies the catalogue's replacements to a group of texts loaded on first use, which `configureStrings` could not reach:
- * the first screen does not carry the words of a feature below it.
+ * Texts kept out of the first load, with the catalogue's replacements applied as those of `STRINGS` are.
  *
- * @param name - the group's name, what its paths start with (`search`, for `search.kindPage`).
- * @param group - its texts.
+ * @param group - their name among the texts (`audienceTexts`): a replacement's path starts with it.
+ * @param texts - the texts.
+ * @returns the same texts, changed in place.
  */
-export const configureGroup = (name: string, group: Record<string, unknown>): void => {
-  for (const [path, text] of Object.entries(given)) replaceText({ [name]: group }, path.split("."), text);
+export const textsOfGroup = <TTexts extends Record<string, unknown>>(
+  group: string,
+  texts: TTexts
+): TTexts => {
+  for (const [path, text] of Object.entries(catalogueReplacements)) {
+    replaceText({ [group]: texts }, path.split("."), text);
+  }
+  return texts;
 };

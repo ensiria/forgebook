@@ -1,0 +1,57 @@
+# pnpm at the version package.json pins in `packageManager`, installed straight from npm and kept in the Actions cache,
+# for every job of every workflow. It goes before actions/setup-node, whose `cache: pnpm` asks pnpm where its store is.
+#
+# pnpm/action-setup always installs its own pnpm first and then has that pnpm download the pinned one: two downloads
+# per job, the second through pnpm's own fetch, whose 60-second timeout fails the job when the registry stalls. Here a
+# job whose pnpm is in the cache downloads nothing; a job that misses downloads it once with npm, which retries a slow
+# or broken request on its own.
+name: Set up pnpm
+description: Install the pnpm version pinned by packageManager in package.json, cached across runs
+
+runs:
+  using: composite
+  steps:
+    - id: pin
+      shell: bash
+      # `pnpm@<version>` with an optional `+<hash>`: the version only. The folder is written with forward slashes,
+      # which bash, npm and the PATH all read on Windows too, where the tool cache is `C:\hostedtoolcache\windows`
+      run: |
+        version=$(node -p "require('./package.json').packageManager.replace(/^pnpm@/, '').split('+')[0]")
+        dir=$(node -p "process.env.RUNNER_TOOL_CACHE.replaceAll('\\\\', '/')")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "dir=$dir/pnpm/$version" >> "$GITHUB_OUTPUT"
+    - id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.pin.outputs.dir }}
+        key: pnpm-${{ steps.pin.outputs.version }}-${{ runner.os }}
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      # a request that stalls is given up after a minute and tried again, five times, with a growing pause
+      run: >-
+        npm install --prefix "$DIR" --no-save --no-package-lock --no-audit --no-fund
+        --fetch-timeout=60000 --fetch-retries=5 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=60000
+        "pnpm@$VERSION"
+      env:
+        DIR: ${{ steps.pin.outputs.dir }}
+        VERSION: ${{ steps.pin.outputs.version }}
+    # the pnpm found on the PATH must be the pinned one, whether it came from the cache or from npm
+    - shell: bash
+      run: |
+        bin="$DIR/node_modules/.bin"
+        installed=$("$bin/pnpm" --version)
+        if [ "$installed" != "$VERSION" ]; then
+          echo "::error::pnpm $installed is installed, package.json pins $VERSION"
+          exit 1
+        fi
+        echo "$bin" >> "$GITHUB_PATH"
+      env:
+        DIR: ${{ steps.pin.outputs.dir }}
+        VERSION: ${{ steps.pin.outputs.version }}
+    # saved as soon as it is installed and checked, not at the end of the job: a job that fails later still leaves
+    # the next one a pnpm that needs no download
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.pin.outputs.dir }}
+        key: ${{ steps.cache.outputs.cache-primary-key }}

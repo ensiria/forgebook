@@ -17,13 +17,6 @@ export type InteractionsTabProps = {
   readonly onPlayAgain: () => void;
 };
 
-/**
- * The tab's hint: the play's status.
- *
- * @param trace - the trace.
- */
-export const interactionsHint = (trace: PlayTrace): string => STRINGS.playStatus[trace.status];
-
 /** A status with its time, as a line ends. */
 const StatusNote = ({
   status,

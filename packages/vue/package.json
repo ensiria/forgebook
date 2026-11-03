@@ -1,0 +1,95 @@
+{
+  "name": "@forgebook/vue",
+  "version": "0.1.8",
+  "description": "Forgebook for Vue: the story types and composables, the renderer the frame mounts a story with, and the adapter that reads a Vue component's props, events and slots.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/vue"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./clock": "./src/clock.ts",
+    "./texts": "./src/texts.ts",
+    "./renderer": "./src/vueRenderer.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./code": "./src/storyTemplate.ts",
+    "./vite": "./src/vite/vue.ts",
+    "./docs": "./src/vite/extractDocs.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "@vitejs/plugin-vue": "6.0.10",
+    "@vue/language-core": "3.3.14",
+    "typescript-6": "npm:typescript@6.0.3",
+    "vue-component-meta": "3.3.14"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "vue": "3.5.44"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./clock": {
+        "types": "./dist/src/clock.d.ts",
+        "default": "./dist/src/clock.js"
+      },
+      "./texts": {
+        "types": "./dist/src/texts.d.ts",
+        "default": "./dist/src/texts.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/vueRenderer.d.ts",
+        "default": "./dist/src/vueRenderer.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyTemplate.d.ts",
+        "default": "./dist/src/storyTemplate.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/vue.d.ts",
+        "default": "./dist/src/vite/vue.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
+  }
+}

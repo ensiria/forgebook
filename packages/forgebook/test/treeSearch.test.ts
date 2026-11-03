@@ -11,12 +11,15 @@ import type { TreeComponent, TreeFamily } from "../src/storyTree.ts";
 
 /** A component with a few stories. */
 const BUTTON: TreeComponent = {
+  id: "kit:actions-buttons-button",
   name: "Button",
   title: "Actions/Buttons/Button",
   file: "Button.stories.tsx",
+  files: ["Button.stories.tsx"],
   stories: [
     {
       id: "kit:b--overview",
+      file: "Button.stories.tsx",
       name: "Overview",
       exportName: "Overview",
       controls: "all",
@@ -26,10 +29,14 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      device: undefined,
+      design: undefined,
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--danger",
+      file: "Button.stories.tsx",
       name: "Danger",
       exportName: "Danger",
       controls: "all",
@@ -39,10 +46,14 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      device: undefined,
+      design: undefined,
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--long",
+      file: "Button.stories.tsx",
       name: "Long label",
       exportName: "Long",
       controls: "all",
@@ -52,13 +63,18 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      device: undefined,
+      design: undefined,
+      tags: [],
+      hasPlay: false
     }
   ],
   unlisted: [],
   alsoIn: [],
   related: [],
-  keywords: ["Pressable", "CTA"]
+  keywords: ["Pressable", "CTA"],
+  design: undefined,
+  propGroups: []
 };
 
 /** A family holding it, and an alias of a component that lives elsewhere. */

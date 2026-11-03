@@ -18,6 +18,7 @@ import { findComponents } from "../src/vite/findComponent.ts";
 /** A story. */
 const story = (name: string, description?: string): TreeStory => ({
   id: `kit:${name.toLowerCase()}`,
+  file: "./x.stories.tsx",
   name,
   exportName: name,
   controls: "all",
@@ -27,7 +28,10 @@ const story = (name: string, description?: string): TreeStory => ({
   isTouch: false,
   isLogic: false,
   height: undefined,
-  tags: []
+  device: undefined,
+  design: undefined,
+  tags: [],
+  hasPlay: false
 });
 
 /** A component. */
@@ -36,9 +40,13 @@ const component = (
   keywords: readonly string[] = [],
   stories: readonly TreeStory[] = []
 ): TreeComponent => ({
+  id: `kit:${title.toLowerCase()}`,
   name: title.split("/").at(-1) ?? title,
   title,
   file: `./${title}.stories.tsx`,
+  files: [`./${title}.stories.tsx`],
+  design: undefined,
+  propGroups: [],
   stories,
   unlisted: [],
   alsoIn: [],

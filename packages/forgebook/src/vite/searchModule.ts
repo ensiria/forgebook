@@ -19,6 +19,7 @@ import { componentPage } from "./componentPage.ts";
 import { compiledDocPage } from "./docPageMarkdown.ts";
 import { indexedDocPages } from "./docPagesModule.ts";
 import type { DocsResult } from "./docsExtractor.ts";
+import type { PackJson } from "./packedModule.ts";
 import { type IndexedStoryFile, indexedStoryFiles } from "./storyFilesModule.ts";
 
 /** A heading of the pages' HTML: its anchor, and what is inside it. */
@@ -205,13 +206,16 @@ const entryOf = (
  * @param extract - reads a story file's component.
  * @param isServing - whether a dev server runs: only its tools read the problems, which name files on this computer, so
  * a static build leaves them out.
+ * @param pack - writes the index's JSON as the module's value: as it is, or in a gzipped file of a build's own, which
+ * few visits read.
  */
 export const storySearchModule = async (
   root: string,
   pattern: string,
   watch: (file: string) => void,
   extract: (storyFile: string) => Promise<DocsResult>,
-  isServing: boolean
+  isServing: boolean,
+  pack: PackJson
 ): Promise<string> => {
   const files = indexedStoryFiles(root, pattern, watch);
   const entries = await Promise.all(
@@ -224,7 +228,7 @@ export const storySearchModule = async (
     ),
     ...(problems.length === 0 || !isServing ? {} : { problems })
   };
-  return `export default ${JSON.stringify(index)};`;
+  return `export default ${pack(JSON.stringify(index))};`;
 };
 
 /**
@@ -233,11 +237,17 @@ export const storySearchModule = async (
  * @param root - the declaring module's folder.
  * @param pattern - the pattern.
  * @param watch - adds a file whose edit renews the module.
+ * @param pack - writes the index's JSON as the module's value.
  */
-export const pagesSearchModule = (root: string, pattern: string, watch: (file: string) => void): string => {
+export const pagesSearchModule = (
+  root: string,
+  pattern: string,
+  watch: (file: string) => void,
+  pack: PackJson
+): string => {
   const pages = indexedDocPages(root, pattern, watch).map(({ key, file }) => [
     key,
     blockSections(compiledDocPage(file, readFileSync(file, "utf8")).blocks)
   ]);
-  return `export default ${JSON.stringify({ pages: Object.fromEntries(pages) })};`;
+  return `export default ${pack(JSON.stringify({ pages: Object.fromEntries(pages) }))};`;
 };

@@ -51,13 +51,22 @@ export const FORGEBOOK_OPTIONS: ForgebookOptions = {
 export const COMMAND = "forgebook";
 
 /**
+ * The configuration file a command reads: the one given, or the one in the folder it runs in.
+ *
+ * @param file - the configuration file given; none to look in the current folder.
+ * @returns its absolute path, or none when there is none here.
+ */
+export const configPathOf = (file: string | undefined): string | undefined =>
+  file === undefined ? findConfigFile(process.cwd()) : resolve(file);
+
+/**
  * The catalogue's configuration: the file given, or the one in the folder the command runs in.
  *
  * @param file - the configuration file given; none to look in the current folder.
  * @throws a `ScriptError` when there is none, or it cannot be used.
  */
 export const configOf = async (file: string | undefined): Promise<ResolvedConfig> => {
-  const found = file === undefined ? findConfigFile(process.cwd()) : resolve(file);
+  const found = configPathOf(file);
   if (found === undefined)
     throw new ScriptError(`No ${CONFIG_FILES[0]} here`, {
       hint: `Run ${COMMAND} in the catalogue's folder, or give --config`

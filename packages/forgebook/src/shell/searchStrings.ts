@@ -4,10 +4,10 @@
  *
  * @module
  */
-import { configureGroup } from "./strings.ts";
+import { textsOfGroup } from "./strings.ts";
 
-/** The texts, as Forgebook writes them. */
-const searchStrings = {
+/** The search's texts, as shown: Forgebook's, with the catalogue's replacements. */
+export const SEARCH_STRINGS = textsOfGroup("search", {
   results: "Search results",
   count: (count: number): string => (count === 1 ? "1 result" : `${count} results`),
   reading: "Reading the docs…",
@@ -29,9 +29,4 @@ const searchStrings = {
   keyMove: "to move",
   keyOpen: "to open",
   keyClear: "to clear"
-};
-
-configureGroup("search", searchStrings);
-
-/** The search's texts, as shown. */
-export const SEARCH_STRINGS: typeof searchStrings = searchStrings;
+});

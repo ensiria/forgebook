@@ -11,12 +11,14 @@
  * @module
  */
 
-import type { StoryLanguage } from "@forgebook/story-format/source";
+import type { StoryLanguage, StoryTokensFile } from "@forgebook/story-format/source";
 
 import type { CatalogueLists } from "../catalogue.ts";
+import type { ForgebookPlugin } from "../plugin.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
+import type { FramesOption } from "./framesConfig.ts";
 
 /** What a library's preset gives a catalogue. */
 export type ForgebookPreset = CatalogueLists & {
@@ -35,7 +37,7 @@ export type ForgebookPreset = CatalogueLists & {
 };
 
 /** A tokens file: its path from the configuration's folder, with its theme when it is a theme's. */
-export type TokensFile = string | { readonly file: string; readonly mode: string };
+export type TokensFile = StoryTokensFile;
 
 /** A catalogue's configuration: the lists of `CatalogueLists` (widths, backgrounds, story groups…) besides these. */
 export type ForgebookConfig = CatalogueLists & {
@@ -43,7 +45,10 @@ export type ForgebookConfig = CatalogueLists & {
   readonly framework: FrameworkAdapter;
   /** Its name, in the page's title and the sidebar. */
   readonly title: string;
-  /** Its logo: a square image, by path from the configuration's folder; Forgebook's own mark by default. */
+  /**
+   * Its logo: a square image, by path from the configuration's folder; Forgebook's own mark by default, or its title
+   * alone with `shell: { branding: false }`.
+   */
   readonly logo?: string;
   /** The stories' measured heights, the file `forgebook-heights` writes, served from the public folder; none by default. */
   readonly heights?: string;
@@ -63,11 +68,12 @@ export type ForgebookConfig = CatalogueLists & {
   readonly switches?: readonly ViewSwitch[];
   /** The languages its stories can be drawn in; none turns the Language row off. */
   readonly languages?: readonly StoryLanguage[];
-  /** The shell's look: a theme of colours, fonts and corners, and an escape hatch. */
+  /** The shell's look: a theme of colours, fonts and corners, an escape hatch, and whether Forgebook's mark shows. */
   readonly shell?: ShellOptions;
   /**
    * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of
-   * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from.
+   * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from,
+   * after each source's: a name given twice takes the catalogue's value, and tools report the clash.
    */
   readonly tokens?: readonly TokensFile[];
   /** Its preview's path from the configuration's folder; `forgebook.preview.ts` (or `.tsx`) beside it when there. */
@@ -78,6 +84,27 @@ export type ForgebookConfig = CatalogueLists & {
   readonly watch?: readonly string[];
   /** The libraries' presets, in order; the configuration's own values win over theirs. */
   readonly presets?: readonly ForgebookPreset[];
+  /** The plugins, in order (`[figma()]`): a package adds nothing to the catalogue until it is listed here. */
+  readonly plugins?: readonly ForgebookPlugin[];
+  /**
+   * Where the stories' frames run. On the dev server, an origin of their own by default (the catalogue's port + 1), so
+   * a story's code cannot reach the catalogue's page, its agent API or the project's files; a build keeps the
+   * catalogue's origin unless `origins` names a second host. `"same-origin"` runs them on the catalogue's origin.
+   */
+  readonly frames?: FramesOption;
+  /** How `forgebook build` writes the catalogue. */
+  readonly build?: BuildOptions;
+};
+
+/** How `forgebook build` writes the catalogue. */
+export type BuildOptions = {
+  /**
+   * Whether each script a build writes is named after its module as well as its hash (`assets/Button-3f9a1c2b.js`), for
+   * whoever reads a build's files; `false` by default: its hash alone (`assets/3f9a1c2b.js`), since a catalogue names
+   * each story file's scripts once per loader, and the names are a tenth of what its index weighs.
+   * `forgebook build --readable-names` turns it on for one build.
+   */
+  readonly readableNames?: boolean;
 };
 
 /**

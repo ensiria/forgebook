@@ -30,8 +30,10 @@ import type { AppearanceState } from "./useAppearance.ts";
 export type SidebarProps = SidebarPageLinks & {
   /** The catalogue's name. */
   readonly title: string;
-  /** The catalogue's logo, the URL of a square image; none shows the catalogue's own mark. */
+  /** The catalogue's logo, the URL of a square image; none shows Forgebook's mark, or the name alone without branding. */
   readonly logo: string | undefined;
+  /** Whether a catalogue without a logo shows Forgebook's mark. */
+  readonly hasBranding: boolean;
   /** The tree. */
   readonly tree: StoryTree;
   /** The sources, for the search's index. */
@@ -125,6 +127,7 @@ const componentCount = (family: TreeFamily): number =>
 export const Sidebar = ({
   title,
   logo,
+  hasBranding,
   tree,
   sources: storySources,
   searchHref,
@@ -146,6 +149,7 @@ export const Sidebar = ({
   const [query, setQuery] = useState("");
   const [filterTree, setFilterTree] = useState<typeof shownTree>();
   const showFiltered = useCallback((filter: typeof shownTree): void => setFilterTree(() => filter), []);
+  const mark = logo ?? (hasBranding ? FORGEBOOK_MARK_URL : undefined);
   const navRef = useRef<HTMLElement>(null);
   // the shown component stays in sight: a page opened by a key, the picker or the address scrolls the list to it
   const currentEntry = currentPageId ?? current?.title;
@@ -206,13 +210,9 @@ export const Sidebar = ({
           }}
         >
           {/* decorative: the name beside it says what it is */}
-          <img
-            className="forgebook-brand__logo"
-            src={logo ?? FORGEBOOK_MARK_URL}
-            alt=""
-            width={28}
-            height={28}
-          />
+          {mark === undefined ? null : (
+            <img className="forgebook-brand__logo" src={mark} alt="" width={28} height={28} />
+          )}
           <span className="forgebook-brand__name">{title}</span>
         </a>
         <button
