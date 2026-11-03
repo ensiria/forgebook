@@ -37,7 +37,8 @@ const SOURCE: StorySource = {
           ]
         },
         "./colour.stories.tsx": { title: "Foundations/Colour", stories: [{ exportName: "Scales" }] },
-        "./again.stories.tsx": { title: "Actions/Button", stories: [{ exportName: "Twice" }] }
+        // a second file of the title: its story with the id of one already listed is refused
+        "./other.stories.tsx": { title: "Actions/Button", stories: [{ exportName: "Primary" }] }
       },
       stories: {},
       docs: {},
@@ -76,7 +77,7 @@ describe("storiesDocument", () => {
   it("carries the schema, the sources and the index's problems", () => {
     expect(document.schema).toBe(1);
     expect(document.sources).toEqual([{ id: "kit", name: "Kit" }]);
-    expect(document.problems.join("\n")).toContain("again.stories.tsx");
+    expect(document.problems.join("\n")).toContain("other.stories.tsx");
   });
 });
 

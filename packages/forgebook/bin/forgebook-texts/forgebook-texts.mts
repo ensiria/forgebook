@@ -22,7 +22,7 @@ import type { StoryTextsReport } from "./storyTextsReport.types.ts";
 const COMMAND = "forgebook-texts";
 
 /** Where a package's story files and fixtures are, relative to it. */
-const SOURCE_PATTERNS = ["src/**/*.stories.tsx", "stories/**/*.{ts,tsx}"];
+const SOURCE_PATTERNS = ["src/**/*.stories.{ts,tsx}", "stories/**/*.{ts,tsx}"];
 
 /** A locale file's table, read as JSON. */
 const readTable = (file: string): Readonly<Record<string, string>> => {

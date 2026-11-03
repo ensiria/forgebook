@@ -154,15 +154,28 @@ describe("importStorybook", () => {
     );
   });
 
-  it("refuses a framework Forgebook does not read, saying what it reads", async () => {
+  it("reads a Vue project's Storybook as Vue", async () => {
     const project = join(scratch, "vue");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
     writeFileSync(
       join(project, ".storybook", "main.ts"),
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/vue3-vite" };\n'
     );
+    const imported = await importStorybook(project);
+    if (typeof imported === "string") throw new Error(imported);
+    expect(imported.framework).toBe("vue");
+    expect(imported.frameworkOptions).toBeUndefined();
+  });
+
+  it("refuses a framework Forgebook does not read, saying what it reads", async () => {
+    const project = join(scratch, "angular");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(project, ".storybook", "main.ts"),
+      'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
+    );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads Storybook's React stories on Vite and Next.js's (@storybook/react-vite, @storybook/nextjs-vite, @storybook/nextjs); this project uses @storybook/vue3-vite"
+      "Forgebook reads Storybook's React and Vue stories on Vite and Next.js's (@storybook/react-vite, @storybook/vue3-vite, @storybook/nextjs-vite, @storybook/nextjs); this project uses @storybook/angular"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package
@@ -273,5 +286,22 @@ describe("initConfigText", () => {
     );
     expect(text).toContain('import { nextjs } from "@forgebook/nextjs/vite";');
     expect(text).toContain('  framework: nextjs({ dir: "web", nextConfig: "next.config.mjs" }),');
+  });
+
+  it("names the framework the stories are written for", () => {
+    const text = initConfigText(
+      {
+        framework: "vue",
+        frameworkOptions: undefined,
+        title: "x",
+        stories: ["src/*.stories.ts"],
+        preview: undefined,
+        switches: undefined,
+        notes: []
+      },
+      "Storybook"
+    );
+    expect(text).toContain('import { vue } from "@forgebook/vue/vite";');
+    expect(text).toContain("  framework: vue(),");
   });
 });

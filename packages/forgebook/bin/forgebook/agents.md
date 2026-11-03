@@ -7,7 +7,11 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 ### Writing a story file
 
 - One file per component, beside it: `Badge.tsx` and `Badge.stories.tsx`, in CSF 3 (Storybook's format; Forgebook
-  reads it, never MDX or addons).
+  reads it, never MDX or addons). Files with the same title are one component, as in Storybook: each story keeps its
+  own file (`file` in `forgebook stories --json`), and the component lists them all (`files`).
+- Every named export of a story file is a story; leave helpers and data out with the meta's `excludeStories`.
+- Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
+  the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the
   catalogue shows that sentence):
 
@@ -22,6 +26,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   export const Default: Story<typeof Badge> = { args: { label: "New" }, parameters: { main: true } };
   ```
 
+- In a Vue project, the same with `Badge.vue` and `Badge.stories.ts`: the types from `@forgebook/vue`, the component by its
+  default import, a slot as the arg `#name` (`"#default": "Text"`) and an event as its listener (`onRemove`). Open a `.vue`
+  file's script with its TSDoc block: that comment is the component's.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
@@ -70,7 +77,7 @@ links to other pages by their file (`./colours.md#brand`). A page never holds a 
 | Command | What it is for |
 |---|---|
 | `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
-| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props |
+| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |

@@ -6,6 +6,11 @@
  * The repo type-checks with TypeScript 7, whose native compiler has no JavaScript API; TypeScript 6 (the version
  * typescript-eslint uses too) reads the same configurations.
  *
+ * A file is read with the configuration an editor reads it with: the nearest `tsconfig.json` up its folders that holds
+ * it, or a project it references. A monorepo's package often holds only its sources while the root's configuration
+ * holds the stories too, with the paths that lead a package's name to its sources: reading a story with the package's
+ * configuration would leave its component's type unknown.
+ *
  * @module
  */
 import { dirname } from "node:path";
@@ -29,9 +34,29 @@ const programs = new Map<string, ts.Program>();
  */
 const outdated = new Set<string>();
 
+/** Each configuration read, with the files it holds, kept until a source changes; `undefined` when it cannot be read. */
+const configurations = new Map<string, ReadConfiguration | undefined>();
+
+/** A configuration read: its options and files, and the files as a set to look one up. */
+type ReadConfiguration = {
+  /** What TypeScript read. */
+  readonly parsed: ts.ParsedCommandLine;
+  /** Its files, in TypeScript's form (forward slashes). */
+  readonly fileSet: ReadonlySet<string>;
+};
+
+/**
+ * The files read since the configurations were last read that none of them lists: they are not read again for each,
+ * which a project whose stories no configuration holds would otherwise pay on every read.
+ */
+const unlisted = new Set<string>();
+
 /** Marks every program as maybe holding an edited file: each is renewed on its next read. */
 export const markSourcesChanged = (): void => {
   for (const configPath of programs.keys()) outdated.add(configPath);
+  // an edited configuration may hold other files, or have other options
+  configurations.clear();
+  unlisted.clear();
 };
 
 /**
@@ -105,15 +130,13 @@ const looseProgram = (file: string, options: ts.CompilerOptions): DocsProgram =>
 };
 
 /**
- * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, the one
- * the files no configuration holds share (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
+ * A configuration, read once until a source changes.
  *
- * @param file - an absolute path to a source file.
- * @returns the program, or a message when the configuration above it cannot be read.
+ * @param configPath - the `tsconfig.json`.
+ * @returns it with its files, or `undefined` when it cannot be read.
  */
-export const programFor = (file: string): DocsProgram | string => {
-  const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
-  if (configPath === undefined) return looseProgram(file, FALLBACK_OPTIONS);
+const readConfiguration = (configPath: string): ReadConfiguration | undefined => {
+  if (configurations.has(configPath)) return configurations.get(configPath);
   const parsed = ts.getParsedCommandLineOfConfigFile(
     configPath,
     {},
@@ -122,9 +145,88 @@ export const programFor = (file: string): DocsProgram | string => {
       onUnRecoverableConfigFileDiagnostic: () => undefined
     }
   );
-  if (parsed === undefined) return `${configPath} could not be read`;
-  const program = keptProgram(configPath, parsed.fileNames, parsed.options);
-  if (program.getSourceFile(file) === undefined) return looseProgram(file, parsed.options);
+  const read = parsed === undefined ? undefined : { parsed, fileSet: new Set(parsed.fileNames) };
+  configurations.set(configPath, read);
+  return read;
+};
+
+/**
+ * The configuration a config file stands for, then the projects it references (a root's `tsconfig.json` that only
+ * lists its packages' projects), in an editor's order.
+ *
+ * @param configPath - the `tsconfig.json`.
+ */
+const withReferences = (configPath: string): string[] => [
+  configPath,
+  ...(readConfiguration(configPath)?.parsed.projectReferences ?? []).map((reference) =>
+    ts.resolveProjectReferencePath(reference)
+  )
+];
+
+/**
+ * The first configuration up a file's folders (or a project one references) that lists it, as an editor finds it.
+ * Each is read only when the ones below it do not list the file, so a configuration far above (a home folder's) is
+ * read only for a file nothing closer holds.
+ *
+ * @param file - an absolute path to a source file.
+ */
+const holdingConfiguration = (file: string): string | undefined => {
+  const name = file.replaceAll("\\", "/");
+  let folder = dirname(file);
+  for (;;) {
+    const configPath = ts.findConfigFile(folder, ts.sys.fileExists, "tsconfig.json");
+    if (configPath === undefined) return undefined;
+    const holding = withReferences(configPath).find(
+      (candidate) => readConfiguration(candidate)?.fileSet.has(name) === true
+    );
+    if (holding !== undefined) return holding;
+    const parent = dirname(dirname(configPath));
+    if (parent === dirname(configPath)) return undefined;
+    folder = parent;
+  }
+};
+
+/**
+ * A configuration's program, renewed when it lacks a file the configuration lists: a story file added since the
+ * program was made.
+ *
+ * @param configPath - the `tsconfig.json`.
+ * @param read - the configuration, read.
+ * @param file - the file the program is for.
+ */
+const configurationProgram = (configPath: string, read: ReadConfiguration, file: string): DocsProgram => {
+  const kept = programs.get(configPath);
+  if (kept !== undefined && kept.getSourceFile(file) === undefined) outdated.add(configPath);
+  const program = keptProgram(configPath, read.parsed.fileNames, read.parsed.options);
+  return { program, checker: program.getTypeChecker() };
+};
+
+/**
+ * The program that holds a file: the one of the first configuration up its folders (or a project it references) that
+ * lists it; else the nearest one's, when the file reaches it through an import; else the one the files no
+ * configuration holds share (`FALLBACK_OPTIONS`, or the nearest configuration's with JavaScript allowed).
+ *
+ * @param file - an absolute path to a source file.
+ * @returns the program, or a message when the configuration above it cannot be read.
+ */
+export const programFor = (file: string): DocsProgram | string => {
+  const nearest = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
+  if (nearest === undefined) return looseProgram(file, FALLBACK_OPTIONS);
+  // a file added since the configurations were read is in none of their lists: they are read again, once per file
+  let holding = holdingConfiguration(file);
+  if (holding === undefined && !unlisted.has(file)) {
+    configurations.clear();
+    unlisted.clear();
+    holding = holdingConfiguration(file);
+  }
+  if (holding === undefined) unlisted.add(file);
+  const holdingRead = holding === undefined ? undefined : readConfiguration(holding);
+  if (holding !== undefined && holdingRead !== undefined)
+    return configurationProgram(holding, holdingRead, file);
+  const read = readConfiguration(nearest);
+  if (read === undefined) return `${nearest} could not be read`;
+  const program = keptProgram(nearest, read.parsed.fileNames, read.parsed.options);
+  if (program.getSourceFile(file) === undefined) return looseProgram(file, read.parsed.options);
   return { program, checker: program.getTypeChecker() };
 };
 
@@ -194,4 +296,29 @@ export const tagOf = (symbol: ts.Symbol, checker: ts.TypeChecker, name: string):
     .displayPartsToString(tag.text)
     .trim()
     .replace(/^`(.*)`$/, "$1");
+};
+
+/**
+ * The component asked for among a file's: the one named, or the only one.
+ *
+ * @param components - the names of the components the file exports.
+ * @param exportName - the export asked for; the file's only component when none.
+ * @param file - the file, for the message.
+ * @returns the name, or a message naming the components when there is none or several.
+ */
+export const chosenExport = (
+  components: readonly string[],
+  exportName: string | undefined,
+  file: string
+): string | { readonly problem: string } => {
+  const chosen = exportName === undefined ? components : components.filter((each) => each === exportName);
+  const [only] = chosen;
+  if (only !== undefined && chosen.length === 1) return only;
+  const names = components.join(", ") || "none";
+  return {
+    problem:
+      exportName === undefined
+        ? `${file} exports ${components.length === 0 ? "no component" : `several components (${names})`}: name one`
+        : `${file} exports no component ${exportName} (its components: ${names})`
+  };
 };
