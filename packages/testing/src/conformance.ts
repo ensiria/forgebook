@@ -148,8 +148,13 @@ export const describeAdapter = (subject: AdapterSubject): void => {
       expect(code).toContain("Ada");
     });
 
-    it.runIf(docsOf !== undefined)("reads a component's docs in the catalogue's shape", () => {
-      expect(isComponentDocs(docsOf?.())).toBe(true);
-    });
+    // the docs come from a TypeScript program of the subject's package, which a shared runner takes seconds to build
+    it.runIf(docsOf !== undefined)(
+      "reads a component's docs in the catalogue's shape",
+      () => {
+        expect(isComponentDocs(docsOf?.())).toBe(true);
+      },
+      60_000
+    );
   });
 };
