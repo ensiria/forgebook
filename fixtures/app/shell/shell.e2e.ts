@@ -1151,17 +1151,23 @@ test.describe("touch", () => {
   test("a tap sends a finger's events and a touch click, a long press the menu, and the CSS answers as a phone's", async ({
     page
   }) => {
+    await page.clock.install();
     await page.goto(touchPad());
     await frameStatus(page);
     const button = await centreOf(frameOf(page).getByRole("button", { name: "Press me" }));
     await page.mouse.move(button.x, button.y);
+    // the frame's clock, not the machine's, says how long a press lasts: paused, a tap stays a tap however long the
+    // runner takes between the press and the lift, and a long press is exactly as long as the frame waits for one
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page.mouse.down();
     await page.mouse.up();
+    // the touch click follows the real one on a timer of its own
+    await page.clock.runFor(1);
     await expect
       .poll(() => eventLog(page))
       .toEqual(["pointerdown touch", "touchstart 1", "pointerup touch", "touchend 0", "click touch"]);
     await page.mouse.down();
-    await page.waitForTimeout(650);
+    await page.clock.runFor(650);
     await page.mouse.up();
     await expect.poll(async () => (await eventLog(page)).includes("contextmenu")).toBe(true);
     await expect(frameOf(page).getByText("A phone's media")).toBeVisible();
