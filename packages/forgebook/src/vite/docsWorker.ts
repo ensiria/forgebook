@@ -16,7 +16,7 @@ import { parentPort, workerData } from "node:worker_threads";
 
 import { type DocsModule, isDocsModule } from "./adapter.ts";
 import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
-import { markSourcesChanged } from "./docsProgram.ts";
+import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
 import { usageGraph } from "./usageGraph.ts";
 
 /** Whether the worker's data names a docs module. */
@@ -24,7 +24,9 @@ const isWorkerData = (value: unknown): value is DocsWorkerData =>
   typeof value === "object" &&
   value !== null &&
   "docsModule" in value &&
-  typeof value.docsModule === "string";
+  typeof value.docsModule === "string" &&
+  "readsEverything" in value &&
+  typeof value.readsEverything === "boolean";
 
 /** The framework's docs module, or why it could not be loaded: every request is then answered with that. */
 const loadDocsModule = async (): Promise<DocsModule | string> => {
@@ -37,6 +39,9 @@ const loadDocsModule = async (): Promise<DocsModule | string> => {
     return `${workerData.docsModule} could not be loaded: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
+
+// a dev server shows one component at a time: its programs hold what was asked for, not every file of a package
+if (isWorkerData(workerData) && !workerData.readsEverything) readAskedFilesOnly();
 
 /** The framework's docs module, loaded once, before the first answer. */
 const docsModule = loadDocsModule();

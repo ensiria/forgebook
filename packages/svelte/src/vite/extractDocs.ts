@@ -32,7 +32,7 @@ import { COMPONENT_EXTENSION, componentScriptFile, SVELTE_SOURCES } from "./svel
 export const storyTypesModule = "@forgebook/svelte";
 
 /** A story file's or a component's program, with its components read as TypeScript. */
-const svelteProgram = (file: string): DocsProgram | string => programFor(file, SVELTE_SOURCES);
+const svelteProgram = (file: string): DocsProgram | string => programFor(file, { sources: SVELTE_SOURCES });
 
 /**
  * The file that declares a symbol, a component as its `.svelte` file.

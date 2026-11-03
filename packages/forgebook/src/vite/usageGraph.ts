@@ -344,7 +344,8 @@ export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | 
   for (const asked of requests) {
     // in Vite's form, as TypeScript names the files the graph is made of, so a story file meets its components
     const request = { ...asked, storyFile: VITE_PATHS.normalize(asked.storyFile) };
-    const docsProgram = programFor(request.storyFile);
+    // a group's usage reads what every story of the configuration reaches: its whole program, built once
+    const docsProgram = programFor(request.storyFile, { reach: "whole" });
     if (typeof docsProgram === "string") return docsProgram;
     programs.add(docsProgram.program);
     const usage = fileUsage(request, docsProgram.program);
