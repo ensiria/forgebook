@@ -4,10 +4,16 @@
  *
  * @remarks
  * The sidebar lists every story before any is loaded, so the index comes from the code itself, parsed with Vite's
- * parser (the same files Vite compiles). It reads a meta written inline or as a constant (`export default meta`), a
- * story as an object (CSF 3) or as a function with its properties assigned after it (CSF 2: `A.storyName`,
- * `A.parameters`), named exports and re-exports (`export { A as B }`), `includeStories`, `excludeStories`,
- * `__namedExportsOrder`, the meta's and the stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
+ * parser (the same files Vite compiles). It reads a meta written inline or as a constant (`export default meta`,
+ * `export { meta as default }`), `includeStories`, `excludeStories`, `__namedExportsOrder`, the meta's and the
+ * stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
+ *
+ * Every named export the meta lets in is a story, as Storybook's indexer has it, whatever writes its value: an object
+ * (CSF 3), a function with its properties assigned after it (CSF 2: `A.storyName`, `A.parameters`), a template bound
+ * into a story, a helper's result (`makeStory(…)`), another constant (`export const B = A`), a re-export
+ * (`export { A as B }`, from this file or another). The fields come from the object a value is or names, and from what
+ * is assigned to the export; anything else is the frame's to read when the story loads. Only what does not exist when
+ * the file runs is left out: `export type`, and `export *`, whose names Storybook does not list either.
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
@@ -21,6 +27,8 @@
 import type { StoryGroup } from "@forgebook/story-format/csf";
 import type { StoryControlsSetting, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import { type ESTree, parseSync } from "vite";
+
+import { moduleName, type NamedExport, namedExports } from "./storyExports.ts";
 
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
@@ -242,18 +250,21 @@ const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readon
 /** What the index reads of one story besides its export. */
 type StoryFields = Pick<
   StoryIndexEntry,
-  "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "isLogic" | "tags"
+  "id" | "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "isLogic" | "tags"
 >;
 
 /**
- * What the index reads of one story: its name (`name`, or CSF 2's `storyName`), controls, group, height, whether it is
- * the demo, and its tags under the meta's.
+ * What the index reads of one story: its own id (`parameters.__id`), its name (`name`, or CSF 2's `storyName`),
+ * controls, group, height, whether it is the demo, and its tags under the meta's.
  *
- * @param fields - the story's fields.
+ * @param fields - the story's fields: its own, for its name and id, and all it has, for the rest.
  * @param metaTags - the meta's tags.
  */
-const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): StoryFields | Error => {
-  const name = stringField(fields, "name") ?? stringField(fields, "storyName");
+const storyFields = (
+  { own, fields }: StoryFieldSources,
+  metaTags: readonly string[] | undefined
+): StoryFields | Error => {
+  const name = stringField(own, "name") ?? stringField(own, "storyName");
   const controls = controlsOf(fields);
   if (controls instanceof Error) return controls;
   const group = groupOf(fields);
@@ -266,7 +277,10 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   const main = parameter(fields, "main");
   const flags = flagsOf(fields);
   if (flags instanceof Error) return flags;
+  // Storybook reads a story's own id only when written plainly, and ignores it otherwise
+  const id = parameter(own, "__id");
   return {
+    ...(id?.type === "Literal" && typeof id.value === "string" ? { id: id.value } : {}),
     ...(name === undefined ? {} : { name }),
     ...(controls === undefined ? {} : { controls }),
     ...(group === undefined ? {} : { group }),
@@ -277,30 +291,10 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   };
 };
 
-/**
- * A story's source: an object (CSF 3), a function (CSF 2), or a template bound to a new story (CSF 2's
- * `Template.bind({})`), as written.
- */
-type StorySourceNode =
-  | ESTree.ObjectExpression
-  | ESTree.Function
-  | ESTree.ArrowFunctionExpression
-  | ESTree.CallExpression
-  | undefined;
-
-/** Whether an expression binds a template into a story function (`Template.bind({})`). */
-const isBoundTemplate = (value: ESTree.Expression): value is ESTree.CallExpression =>
-  value.type === "CallExpression" &&
-  value.callee.type === "MemberExpression" &&
-  value.callee.property.type === "Identifier" &&
-  value.callee.property.name === "bind";
-
-/** The file's top level, read once: its constants, its functions, and the properties assigned to them. */
+/** The file's top level, read once: its constants and the properties assigned to names. */
 type TopLevel = {
-  /** Each `const`'s value, by name. */
+  /** Each constant's value, by name. */
   readonly values: ReadonlyMap<string, ESTree.Expression>;
-  /** Each function declared at the top, by name. */
-  readonly functions: ReadonlyMap<string, ESTree.Function>;
   /** The properties assigned to a name after it (`A.storyName = "…"`), by name then property. */
   readonly assigned: ReadonlyMap<string, ReadonlyMap<string, ESTree.Expression>>;
 };
@@ -327,105 +321,91 @@ const assignedProperty = (statement: ESTree.Program["body"][number]): AssignedPr
   return { name: object.name, property: property.name, value: unwrapped(expression.right) };
 };
 
-/** A name declared at the top of the file: a constant's value or a function. */
-type Declared =
-  | { readonly kind: "value"; readonly name: string; readonly value: ESTree.Expression }
-  | { readonly kind: "function"; readonly name: string; readonly value: ESTree.Function };
+/** A constant declared at the top of the file, with its value. */
+type Declared = { readonly name: string; readonly value: ESTree.Expression };
 
 /**
- * The names a top-level statement declares, exported or not: its constants with a value, its function.
+ * The constants a top-level statement declares with a value, exported or not.
  *
  * @param statement - the statement.
  */
 const declaredBy = (statement: ESTree.Program["body"][number]): Declared[] => {
   const declaration = statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-  if (declaration?.type === "FunctionDeclaration" && declaration.id !== null)
-    return [{ kind: "function", name: declaration.id.name, value: declaration }];
   if (declaration?.type !== "VariableDeclaration") return [];
   return declaration.declarations.flatMap(({ id, init }): Declared[] =>
-    id.type === "Identifier" && init !== null
-      ? [{ kind: "value", name: id.name, value: unwrapped(init) }]
-      : []
+    id.type === "Identifier" && init !== null ? [{ name: id.name, value: unwrapped(init) }] : []
   );
 };
 
 /**
- * The file's top level: its constants and functions, exported or not, and the properties assigned to them.
+ * The file's top level: its constants, exported or not, and the properties assigned to names.
  *
  * @param program - the parsed file.
  */
 const topLevelOf = (program: ESTree.Program): TopLevel => {
   const values = new Map<string, ESTree.Expression>();
-  const functions = new Map<string, ESTree.Function>();
   const assigned = new Map<string, Map<string, ESTree.Expression>>();
   for (const statement of program.body) {
-    for (const declared of declaredBy(statement)) {
-      if (declared.kind === "value") values.set(declared.name, declared.value);
-      else functions.set(declared.name, declared.value);
-    }
+    for (const declared of declaredBy(statement)) values.set(declared.name, declared.value);
     const property = assignedProperty(statement);
     if (property === undefined) continue;
     const properties = assigned.get(property.name) ?? new Map<string, ESTree.Expression>();
     properties.set(property.property, property.value);
     assigned.set(property.name, properties);
   }
-  return { values, functions, assigned };
+  return { values, assigned };
 };
 
 /**
- * A story's source and fields, by the local name its export points at.
+ * The object a value is, or the one the constants it names lead to (`export const B = A`); `undefined` for any other
+ * value, or for names that lead back to themselves.
  *
  * @param top - the file's top level.
- * @param local - the local name.
+ * @param value - the value.
+ * @param seen - the names followed so far.
  */
-const storyOf = (
+const objectOf = (
   top: TopLevel,
-  local: string
-): { readonly node: StorySourceNode; readonly fields: Fields } => {
-  const value = top.values.get(local);
-  const isStory =
-    value !== undefined &&
-    (value.type === "ObjectExpression" ||
-      value.type === "ArrowFunctionExpression" ||
-      value.type === "FunctionExpression" ||
-      isBoundTemplate(value));
-  const node: StorySourceNode = isStory ? value : top.functions.get(local);
-  const properties = top.assigned.get(local);
-  const fields: Fields =
-    node?.type === "ObjectExpression"
-      ? objectFields(node)
-      : (name: string): ESTree.Expression | undefined => properties?.get(name);
-  return { node, fields };
+  value: ESTree.Expression | undefined,
+  seen: ReadonlySet<string> = new Set()
+): ESTree.ObjectExpression | undefined => {
+  if (value?.type === "ObjectExpression") return value;
+  if (value?.type !== "Identifier" || seen.has(value.name)) return undefined;
+  return objectOf(top, top.values.get(value.name), new Set([...seen, value.name]));
 };
 
-/** One named export of the file: its exported name, the local name it points at, and where its statement starts. */
-type NamedExport = { readonly exportName: string; readonly local: string; readonly start: number };
+/**
+ * Where a story's fields are read: its own (what is assigned to it, and the object its export declares in place), which
+ * give its name and id, as Storybook's indexer reads them; and all it has, the object another constant holds too,
+ * which give the rest, since the story is that object when the file runs.
+ */
+type StoryFieldSources = {
+  /** Its own fields. */
+  readonly own: Fields;
+  /** All its fields. */
+  readonly fields: Fields;
+};
 
 /**
- * The file's named exports, in their order: declared ones and re-exports of local names (`export { A as B }`), never
- * an export from another file.
+ * A story's fields, by the export that names it: what is assigned to it after its declaration (`A.storyName = "…"`),
+ * else the object its value is or names. A story from another file has none.
  *
- * @param program - the parsed file.
+ * @param top - the file's top level.
+ * @param named - the export.
  */
-const namedExports = (program: ESTree.Program): NamedExport[] =>
-  program.body.flatMap((statement): NamedExport[] => {
-    if (statement.type !== "ExportNamedDeclaration" || statement.source !== null) return [];
-    const { declaration } = statement;
-    if (declaration?.type === "VariableDeclaration") {
-      return declaration.declarations.flatMap((declarator) =>
-        declarator.id.type === "Identifier"
-          ? [{ exportName: declarator.id.name, local: declarator.id.name, start: statement.start }]
-          : []
-      );
-    }
-    if (declaration?.type === "FunctionDeclaration" && declaration.id !== null)
-      return [{ exportName: declaration.id.name, local: declaration.id.name, start: statement.start }];
-    return statement.specifiers.flatMap((specifier) =>
-      specifier.local.type === "Identifier" && specifier.exported.type === "Identifier"
-        ? [{ exportName: specifier.exported.name, local: specifier.local.name, start: statement.start }]
-        : []
-    );
-  });
+const storyFieldsOf = (top: TopLevel, named: NamedExport): StoryFieldSources => {
+  const { local } = named;
+  if (local === undefined) return { own: () => undefined, fields: () => undefined };
+  const assigned = top.assigned.get(local);
+  const value = top.values.get(local);
+  const declared = named.isDeclared && value?.type === "ObjectExpression" ? value : undefined;
+  const object = objectOf(top, value);
+  const read =
+    (from: ESTree.ObjectExpression | undefined) =>
+    (name: string): ESTree.Expression | undefined =>
+      assigned?.get(name) ?? (from === undefined ? undefined : propertyValue(from, name));
+  return { own: read(declared), fields: read(object) };
+};
 
 /**
  * Whether an export is a story, as the meta's `includeStories` and `excludeStories` say (a list of names or a regular
@@ -460,14 +440,32 @@ const exportsOrder = (top: TopLevel): readonly string[] | undefined => {
 };
 
 /**
- * The meta's object: the default export, inline or a constant of the file (`export default meta`).
+ * The meta exported by name (`export { meta as default }`), when it is a constant of the file written as an object.
+ *
+ * @param program - the parsed file.
+ * @param top - the file's top level.
+ */
+const namedMeta = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
+  for (const statement of program.body) {
+    if (statement.type !== "ExportNamedDeclaration" || statement.source !== null) continue;
+    const specifier = statement.specifiers.find((each) => moduleName(each.exported) === "default");
+    if (specifier === undefined) continue;
+    const value = top.values.get(moduleName(specifier.local));
+    return value?.type === "ObjectExpression" ? value : undefined;
+  }
+  return undefined;
+};
+
+/**
+ * The meta's object: the default export, inline or a constant of the file (`export default meta`,
+ * `export { meta as default }`).
  *
  * @param program - the parsed file.
  * @param top - the file's top level.
  */
 const metaObject = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
   const meta = program.body.find((statement) => statement.type === "ExportDefaultDeclaration");
-  if (meta === undefined) return undefined;
+  if (meta === undefined) return namedMeta(program, top);
   const { declaration } = meta;
   if (
     declaration.type === "FunctionDeclaration" ||
@@ -520,15 +518,19 @@ const titleOf = (
 /** The meta's fields besides its title and stories, each only when set. */
 type MetaFields = Pick<
   StoryFileIndex,
-  "controls" | "height" | "alsoIn" | "related" | "keywords" | "description"
+  "id" | "controls" | "height" | "alsoIn" | "related" | "keywords" | "description"
 >;
 
 /**
- * The meta's fields besides its title and stories, or the first problem.
+ * The meta's fields besides its title and stories (its `id` among them), or the first problem.
  *
  * @param meta - the meta's fields.
  */
 const metaFieldsOf = (meta: Fields): MetaFields | Error => {
+  const id = meta("id");
+  // Storybook refuses a component id written by code: it would give ids no link can know
+  if (id !== undefined && (id.type !== "Literal" || typeof id.value !== "string"))
+    return new Error("`id` must be a plain string");
   const controls = controlsOf(meta);
   if (controls instanceof Error) return controls;
   const height = heightOf(meta);
@@ -539,6 +541,8 @@ const metaFieldsOf = (meta: Fields): MetaFields | Error => {
   const flags = flagsOf(meta);
   if (flags instanceof Error) return flags;
   return {
+    // an empty id is none, as Storybook's `meta.id || meta.title` has it
+    ...(id === undefined || id.value === "" ? {} : { id: String(id.value) }),
     ...(controls === undefined ? {} : { controls }),
     ...(height === undefined ? {} : { height }),
     ...flags,
@@ -589,12 +593,12 @@ export const indexStoryFile = (
   const metaTags = stringListOf(meta, "tags");
   if (metaTags instanceof Error) return `${file}: the meta's ${metaTags.message}`;
   const stories: StoryIndexEntry[] = [];
-  for (const { exportName, local, start } of storyExports(program, top, meta)) {
-    const story = storyOf(top, local);
-    if (story.node === undefined) continue;
-    const fields = storyFields(story.fields, metaTags);
+  for (const named of storyExports(program, top, meta)) {
+    const { exportName, start } = named;
+    const sources = storyFieldsOf(top, named);
+    const fields = storyFields(sources, metaTags);
     if (fields instanceof Error) return `${file}: story ${exportName}: ${fields.message}`;
-    const description = leadingSentence(text, comments, start) ?? docsDescription(story.fields, "story");
+    const description = leadingSentence(text, comments, start) ?? docsDescription(sources.fields, "story");
     stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }) });
   }
   const metaFields = metaFieldsOf(meta);

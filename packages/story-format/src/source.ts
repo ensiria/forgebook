@@ -21,6 +21,11 @@ export type StoryControlsSetting = "all" | readonly string[];
 export type StoryIndexEntry = {
   /** The named export (`KeyboardOpen`). */
   readonly exportName: string;
+  /**
+   * The story's id as it writes it (Storybook's `parameters.__id`, a plain string), when it writes one: it replaces the
+   * id made from the meta and the export, without the source's id.
+   */
+  readonly id?: string;
   /** The name written in the story, when it has one (`name: "Keyboard · open"`). */
   readonly name?: string;
   /** The story's own `parameters.controls`, when it sets one: `[]` for `false`. */
@@ -54,6 +59,11 @@ export type StoryIndexEntry = {
 export type StoryFileIndex = {
   /** The meta's title (`Inputs/Selection/Select`). */
   readonly title: string;
+  /**
+   * The meta's `id`, when it writes one: its stories' ids start with it instead of the title, as Storybook's do
+   * (`id: "menus"` gives `menus--overview`).
+   */
+  readonly id?: string;
   /** The meta's `parameters.controls`, when it sets one: `[]` for `false`. */
   readonly controls?: StoryControlsSetting;
   /** The meta's `parameters.height`, when it sets one: every story's frame height, in CSS px. */
