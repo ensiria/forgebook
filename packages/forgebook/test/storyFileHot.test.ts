@@ -118,6 +118,21 @@ describe("a story file's edit on a dev server", () => {
     expect(code.startsWith(`${head} import * as __forgebookShown`)).toBe(true);
   });
 
+  it("ends a leading line comment where JavaScript does, at any line terminator", () => {
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
+    for (const end of ["\r\n", "\r", "\u2028", "\u2029"]) {
+      const head = `// @jsxImportSource @kit/jsx${end}`;
+      const code = codeOf(hooks.transform(`${head}${ONE_STORY}`, "/kit/src/Badge.stories.tsx"));
+      expect(code.startsWith(`${head}import * as __forgebookShown`)).toBe(true);
+    }
+  });
+
+  it("puts the code on a line of its own in a file that is only a line comment", () => {
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
+    const code = codeOf(hooks.transform("// nothing yet", "/kit/src/Badge.stories.tsx"));
+    expect(code.startsWith("// nothing yet\nimport * as __forgebookShown")).toBe(true);
+  });
+
   it("does not take a comment inside the code for a leading one", () => {
     const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
     const story = `const text = "/* not a comment */";\n${ONE_STORY}`;

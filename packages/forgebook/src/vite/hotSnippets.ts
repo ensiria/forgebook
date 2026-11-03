@@ -52,7 +52,11 @@ export const storyFileHot = (file: string): string =>
  * stay its first statements, and the comments hold the pragmas a compiler reads only before the first statement
  * (`@jsxImportSource`, `@jsxRuntime`): after added code, a file written for another JSX runtime compiles for React's.
  */
-const HEAD = /^(?:\s*(?:\/\/[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|(["'])use [^"']*\1;?))*/;
+const HEAD =
+  /^(?:\s*(?:\/\/[^\n\r\u2028\u2029]*(?:\r\n|[\n\r\u2028\u2029]|$)|\/\*[\s\S]*?\*\/|(["'])use [^"']*\1;?))*/;
+
+/** What ends a line, and so a line comment, in JavaScript. */
+const LINE_END = /[\n\r\u2028\u2029]$/;
 
 /**
  * A story file's code with its accepting code first: it runs before the file's own, so an edit that throws while the
@@ -64,7 +68,10 @@ const HEAD = /^(?:\s*(?:\/\/[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|(["'])use [^"']*\1;?
  */
 export const withStoryFileHot = (code: string, id: string): string => {
   const head = HEAD.exec(code)?.[0] ?? "";
-  const separator = head === "" || head.endsWith("\n") ? "" : " ";
+  // a file that is all head may end in a line comment, which would take the code in: it goes on a line of its own
+  let separator = " ";
+  if (head === "" || LINE_END.test(head)) separator = "";
+  else if (head.length === code.length) separator = "\n";
   return `${head}${separator}${storyFileHot(id)} ${code.slice(head.length)}`;
 };
 
