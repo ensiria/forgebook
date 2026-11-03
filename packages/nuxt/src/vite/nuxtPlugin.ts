@@ -16,7 +16,7 @@
  * @module
  */
 import { readdirSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, posix, relative, sep } from "node:path";
 
 import MagicString, { type SourceMap } from "magic-string";
 import { createUnimport, type Import, scanDirExports, toExports, type Unimport } from "unimport";
@@ -140,7 +140,7 @@ export const componentsOf = (
   const dirs = [...config.componentsDirs].sort((a, b) => b.path.length - a.path.length);
   for (const dir of dirs)
     for (const file of filesOf(dir.path)) {
-      const path = join(dir.path, file);
+      const path = `${dir.path}/${file}`;
       if (seen.has(path)) continue;
       seen.add(path);
       const name = componentName(file, dir.prefix, dir.pathPrefix);
@@ -419,9 +419,9 @@ const aliasesOf = (config: NuxtProjectConfig): { readonly find: RegExp; readonly
     { find: prefix("@@"), replacement: config.rootDir },
     { find: prefix("~"), replacement: config.srcDir },
     { find: prefix("@"), replacement: config.srcDir },
-    { find: prefix("#shared"), replacement: join(config.rootDir, "shared") },
-    { find: /^assets(?=\/)/, replacement: join(config.srcDir, "assets") },
-    { find: /^public(?=\/)/, replacement: join(config.rootDir, "public") }
+    { find: prefix("#shared"), replacement: `${config.rootDir}/shared` },
+    { find: /^assets(?=\/)/, replacement: `${config.srcDir}/assets` },
+    { find: /^public(?=\/)/, replacement: `${config.rootDir}/public` }
   ];
 };
 
@@ -488,7 +488,8 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
     configureServer: (server: ViteDevServer): void => {
       const isWatched = (file: string, isAddedOrRemoved: boolean): boolean => {
         const { config } = project();
-        const isIn = (dir: string): boolean => file.startsWith(`${dir}${sep}`);
+        // the watcher names a file as the system writes it, the config's folders are in Vite's form
+        const isIn = (dir: string): boolean => normalizePath(file).startsWith(`${dir}/`);
         // an added or removed page or component changes the project; an edited one only its own module
         if (config.importsDirs.some(isIn)) return true;
         return (
@@ -528,7 +529,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
         const current = project();
         if (!isProjectFile(file, current.config.rootDir)) return undefined;
         const source = new MagicString(code);
-        if (!(await withNuxtCode(source, current, relative(current.config.rootDir, file), id, isDev)))
+        if (!(await withNuxtCode(source, current, posix.relative(current.config.rootDir, file), id, isDev)))
           return undefined;
         return { code: source.toString(), map: source.generateMap({ hires: "boundary", source: id }) };
       }

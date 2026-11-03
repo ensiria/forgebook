@@ -6,9 +6,11 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import MagicString from "magic-string";
+import { normalizePath } from "vite";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { BUILT_IN_COMPONENTS } from "../src/app/components.ts";
@@ -28,6 +30,9 @@ const scratch = mkdtempSync(join(tmpdir(), "forgebook-nuxt-"));
 afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
+
+/** `path.join`, in the form the config gives its paths: Vite's, with forward slashes on every system. */
+const viteJoin = (...segments: readonly string[]): string => normalizePath(join(...segments));
 
 describe("the pages' routes", () => {
   it("names and writes each route as Nuxt does", () => {
@@ -95,7 +100,7 @@ describe("the components' names", () => {
     writeFileSync(join(root, "app", "components", "global", "Logo.vue"), "");
     writeFileSync(join(root, "app", "components", "a;alert(1)x.vue"), "");
     const config = readNuxtConfig({}, undefined, root);
-    expect(config.componentsDirs.map((dir) => dir.path.slice(root.length))).toEqual([
+    expect(config.componentsDirs.map((dir) => dir.path.slice(normalizePath(root).length))).toEqual([
       "/app/components/islands",
       "/app/components/global",
       "/app/components"
@@ -103,7 +108,7 @@ describe("the components' names", () => {
     const { components, skipped } = componentsOf(config);
     // read from the global folder, not again as `GlobalLogo` from the components' one
     expect([...components.keys()]).toEqual(["Logo"]);
-    expect(skipped).toEqual([join(root, "app", "components", "a;alert(1)x.vue")]);
+    expect(skipped).toEqual([viteJoin(root, "app", "components", "a;alert(1)x.vue")]);
   });
 
   it("takes the folder's prefix, and its folders only when it says so", () => {
@@ -163,7 +168,8 @@ describe("nuxt.config", () => {
   it("resolves Nuxt's path aliases, a relative path and a package", () => {
     expect(resolvedPath("~/assets/a.css", "/p", "/p/app")).toBe("/p/app/assets/a.css");
     expect(resolvedPath("@@/shared", "/p", "/p/app")).toBe("/p/shared");
-    expect(resolvedPath("./x", "/p", "/p/app")).toBe("/p/x");
+    // a relative path is resolved on the running system, which puts a drive before `/p` on Windows
+    expect(resolvedPath("./x", "/p", "/p/app")).toBe(normalizePath(resolve("/p", "x")));
     expect(resolvedPath("some-package/style.css", "/p", "/p/app")).toBe("some-package/style.css");
   });
 
@@ -181,25 +187,25 @@ describe("nuxt.config", () => {
       undefined,
       root
     );
-    expect(config.srcDir).toBe(join(root, "app"));
-    expect(config.pagesDir).toBe(join(root, "app", "pages"));
-    expect(config.css).toEqual([join(root, "app", "main.css")]);
+    expect(config.srcDir).toBe(viteJoin(root, "app"));
+    expect(config.pagesDir).toBe(viteJoin(root, "app", "pages"));
+    expect(config.css).toEqual([viteJoin(root, "app", "main.css")]);
     expect(config.componentsDirs).toEqual([
-      { path: join(root, "app", "ui"), prefix: "Ui", pathPrefix: true },
-      { path: join(root, "app", "other"), prefix: "", pathPrefix: true }
+      { path: viteJoin(root, "app", "ui"), prefix: "Ui", pathPrefix: true },
+      { path: viteJoin(root, "app", "other"), prefix: "", pathPrefix: true }
     ]);
     expect(config.publicRuntimeConfig).toEqual({ siteName: "Shop" });
     // as Nuxt reads them, from the sources' folder
     expect(config.importsDirs).toEqual(
       expect.arrayContaining([
-        join(root, "app", "stores"),
-        join(root, "app", "helpers"),
-        join(root, "app", "more")
+        viteJoin(root, "app", "stores"),
+        viteJoin(root, "app", "helpers"),
+        viteJoin(root, "app", "more")
       ])
     );
     expect(config.baseURL).toBe("/shop/");
     expect(readNuxtConfig({ components: false }, undefined, root).componentsDirs).toEqual([]);
-    expect(readNuxtConfig({}, undefined, scratch).srcDir).toBe(scratch);
+    expect(readNuxtConfig({}, undefined, scratch).srcDir).toBe(normalizePath(scratch));
   });
 
   it("puts the environment's NUXT_PUBLIC_ variables over the keys the config has", () => {
@@ -228,7 +234,7 @@ describe("nuxt.config", () => {
     writeFileSync(join(bad, "nuxt.config.mjs"), "throw new Error('broken');\n");
     // as the dev server loads it, on Node: Vitest's own module loader would stand in for Node's import
     const script = [
-      `import { loadNuxtConfig } from ${JSON.stringify(join(import.meta.dirname, "..", "src", "vite", "nuxtConfig.ts"))};`,
+      `import { loadNuxtConfig } from ${JSON.stringify(pathToFileURL(join(import.meta.dirname, "..", "src", "vite", "nuxtConfig.ts")).href)};`,
       `const good = await loadNuxtConfig(${JSON.stringify(good)});`,
       `const bad = await loadNuxtConfig(${JSON.stringify(bad)});`,
       "process.stdout.write(JSON.stringify({ baseURL: good.config.baseURL, problem: good.problem ?? null,",

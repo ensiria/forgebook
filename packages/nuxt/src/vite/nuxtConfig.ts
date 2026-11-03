@@ -12,11 +12,16 @@
  * The runtime config keeps its `public` part only, since that is all Nuxt sends to the browser; a `NUXT_PUBLIC_`
  * variable of the environment or the `.env` files replaces the value it names, as Nuxt's does.
  *
+ * Every path it gives is in Vite's form, with forward slashes on every system: the plugin compares them with the ids
+ * Vite hands it and writes them into the modules it makes, which on Windows would not meet a path with backslashes.
+ *
  * @module
  */
 import { existsSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import nodePath from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { normalizePath } from "vite";
 
 /** A folder of components, as the catalogue reads it. */
 export type ComponentsDir = {
@@ -104,6 +109,12 @@ const textField = (config: Readonly<Record<string, unknown>>, name: string): str
   return typeof value === "string" ? value : undefined;
 };
 
+/** `path.join`, in Vite's form. */
+const join = (...segments: readonly string[]): string => normalizePath(nodePath.join(...segments));
+
+/** `path.resolve`, in Vite's form. */
+const resolve = (...segments: readonly string[]): string => normalizePath(nodePath.resolve(...segments));
+
 /** Whether a path is a folder. */
 const isFolder = (path: string): boolean => existsSync(path) && statSync(path).isDirectory();
 
@@ -120,7 +131,7 @@ export const resolvedPath = (path: string, rootDir: string, srcDir: string): str
   if (root !== null) return join(rootDir, path.slice(root[0].length));
   const src = /^(~|@)(?=\/|$)/.exec(path);
   if (src !== null) return join(srcDir, path.slice(src[0].length));
-  if (isAbsolute(path)) return path;
+  if (nodePath.isAbsolute(path)) return normalizePath(path);
   if (path.startsWith(".")) return resolve(rootDir, path);
   return path;
 };
@@ -134,7 +145,9 @@ export const resolvedPath = (path: string, rootDir: string, srcDir: string): str
  */
 const importsDir = (path: string, rootDir: string, srcDir: string): string => {
   const resolved = resolvedPath(path, rootDir, srcDir);
-  return isAbsolute(resolved) && resolved !== resolve(rootDir, path) ? resolved : resolve(srcDir, path);
+  return nodePath.isAbsolute(resolved) && resolved !== resolve(rootDir, path)
+    ? resolved
+    : resolve(srcDir, path);
 };
 
 /**
@@ -173,13 +186,14 @@ const componentsDirsOf = (value: unknown, rootDir: string, srcDir: string): Comp
  *
  * @param raw - what the file exported.
  * @param file - the file.
- * @param rootDir - the project's folder.
+ * @param projectDir - the project's folder.
  */
 export const readNuxtConfig = (
   raw: unknown,
   file: string | undefined,
-  rootDir: string
+  projectDir: string
 ): NuxtProjectConfig => {
+  const rootDir = normalizePath(projectDir);
   const config = isRecord(raw) ? raw : {};
   const srcGiven = textField(config, "srcDir");
   // Nuxt 4 keeps the sources in `app/`; a project laid out as Nuxt 3's has them at its root
