@@ -224,10 +224,18 @@ export const angularRenderer: StoryRenderer = {
     const whenDrawn = new Promise<void>((resolve) => {
       markDrawn = resolve;
     });
-    const fail = (error: unknown): void => {
+    /**
+     * Fails the story: the frame hears of it once, unless the drawing that failed is no longer the latest.
+     *
+     * @param error - what the story threw.
+     * @param drawing - the drawing that threw.
+     */
+    const fail = (error: unknown, drawing: StoryDrawing): void => {
       // a story taken away says nothing more: the frame may be showing another one in its place
       if (isUnmounted) return;
-      if (!hasFailed) onError(toError(error));
+      // args that changed while a drawing was under way are drawn next, anew: its error is of args no longer shown, and
+      // would stand over the story the frame shows once they are drawn
+      if (!hasFailed && drawing === latest) onError(toError(error));
       hasFailed = true;
     };
     const takeAway = (): void => {
@@ -259,7 +267,7 @@ export const angularRenderer: StoryRenderer = {
         drawn.setProps(composed.result.props ?? {});
       } catch (error) {
         // the story stays as it was, and is drawn anew with the next args
-        fail(error);
+        fail(error, drawing);
       }
       return true;
     };
@@ -312,7 +320,7 @@ export const angularRenderer: StoryRenderer = {
       // drawn, the story stands, as an application does, and the error goes to the browser
       class StoryErrorHandler extends ErrorHandler {
         override handleError(error: unknown): void {
-          if (own === generation && !isDrawn) fail(error);
+          if (own === generation && !isDrawn) fail(error, drawing);
           else super.handleError(error);
         }
       }
@@ -329,7 +337,7 @@ export const angularRenderer: StoryRenderer = {
         }
       } catch (error) {
         takeAway();
-        fail(error);
+        fail(error, drawing);
       }
     };
     const schedule = (drawing: StoryDrawing): void => {
