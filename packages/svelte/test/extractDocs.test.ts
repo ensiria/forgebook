@@ -9,6 +9,7 @@ import { join } from "node:path";
 
 import { type ComponentDocs, isComponentDocs, type PropDocs } from "forgebook/component-docs";
 import { markSourcesChanged } from "forgebook/vite/docs-program";
+import { normalizePath } from "vite";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -37,6 +38,12 @@ const propOf = (docs: ComponentDocs, name: string): PropDocs => {
   if (prop === undefined) throw new Error(`No prop ${name}`);
   return prop;
 };
+
+/**
+ * How long a case that builds a TypeScript program of its own may take, in milliseconds: a second on its own, many on
+ * a runner where the other packages' tests build theirs at the same time.
+ */
+const PROGRAM_TIMEOUT = 60_000;
 
 /** A component with one prop. */
 const componentWithProp = (name: string): string =>
@@ -105,9 +112,9 @@ describe("a component with TypeScript", () => {
   it("names the files its docs come from, a component as its .svelte file", () => {
     const component = extractStoryComponent(docsFile("Badge.stories.ts"));
     if (typeof component === "string" || !("file" in component)) throw new Error("No component");
-    expect(component.file).toBe(docsFile("Badge.svelte"));
-    expect(component.sources).toContain(docsFile("Badge.svelte"));
-    expect(component.sources).toContain(docsFile("Plain.svelte"));
+    expect(component.file).toBe(normalizePath(docsFile("Badge.svelte")));
+    expect(component.sources).toContain(normalizePath(docsFile("Badge.svelte")));
+    expect(component.sources).toContain(normalizePath(docsFile("Plain.svelte")));
     expect(component.sources.some((file) => file.endsWith(".svelte.ts"))).toBe(false);
   });
 });
@@ -135,7 +142,7 @@ describe("other components and stories", () => {
     expect(extractComponentDocs(docsFile("Foundations.stories.ts"))).toEqual({ name: null });
   });
 
-  it("sees an edit once the worker hears of it", () => {
+  it("sees an edit once the worker hears of it", { timeout: PROGRAM_TIMEOUT }, () => {
     const folder = mkdtempSync(join(FIXTURES, "edited-"));
     try {
       const config = readFileSync(join(FIXTURES, "docs", "tsconfig.json"), "utf8");
@@ -155,7 +162,9 @@ describe("other components and stories", () => {
     }
   });
 
-  it("reads a component whose script does not parse as one with no props, instead of throwing", () => {
+  it("reads a component whose script does not parse as one with no props, instead of throwing", {
+    timeout: PROGRAM_TIMEOUT
+  }, () => {
     const folder = mkdtempSync(join(FIXTURES, "broken-"));
     try {
       writeFileSync(join(folder, "Broken.svelte"), '<script lang="ts">\n  const = ;\n</script>\n');
@@ -175,7 +184,7 @@ describe("a component's file, for forgebook new", () => {
     const component = extractFileComponent(docsFile("Badge.svelte"));
     if (typeof component === "string" || !("file" in component)) throw new Error(String(component));
     expect(component.docs.name).toBe("Badge");
-    expect(component.file).toBe(docsFile("Badge.svelte"));
+    expect(component.file).toBe(normalizePath(docsFile("Badge.svelte")));
     expect(component.docs.props.map((prop) => prop.name)).toContain("label");
   });
 

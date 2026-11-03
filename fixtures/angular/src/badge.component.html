@@ -1,0 +1,9 @@
+<span class="badge badge--{{ tone() }}">
+  <ng-content select="[icon]" />
+  <span class="badge__label">{{ label() }}</span>
+  <ng-content />
+  @if (count() > 0) {
+    <button type="button" class="badge__count" (click)="countDown()">{{ count() }}</button>
+  }
+  <button type="button" aria-label="Remove" (click)="removed.emit(label())">×</button>
+</span>

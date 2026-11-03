@@ -1,5 +1,5 @@
 /**
- * The types of the `?forgebook-files` and `?forgebook-markdown` imports, for the module that declares a source: add
+ * The types of the `?forgebook-files`, `?forgebook-markdown` and `?forgebook-docs-pages` imports, for the module that declares a source: add
  * `@forgebook/story-format/client` to that folder's `compilerOptions.types`, beside `vite/client`.
  *
  * @remarks
@@ -23,4 +23,12 @@ declare module "*?forgebook-markdown" {
   // the source imports it as a default (`() => import("./home.md?forgebook-markdown")`), so the module has one
   // biome-ignore lint/style/noDefaultExport: see above
   export default markdown;
+}
+
+declare module "*?forgebook-docs-pages" {
+  /** The docs pages the pattern before `?forgebook-docs-pages` matches. */
+  const pages: import("./source").DocPages;
+  // the source imports them as a default (`import pages from "…?forgebook-docs-pages"`), so the module has one
+  // biome-ignore lint/style/noDefaultExport: see above
+  export default pages;
 }

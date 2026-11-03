@@ -121,7 +121,7 @@ const sveltePropDocs = (
   node: ts.Node,
   defaults: ReadonlyMap<string, string>
 ): PropDocs => {
-  const read = propDocs(symbol, checker, node, EVENT_NAME);
+  const read = propDocs(symbol, checker, node, { eventName: EVENT_NAME });
   // a component without TypeScript writes its props in JSDoc, whose `@property {T} name - text` keeps the dash
   const docs = { ...read, description: read.description.replace(/^-\s+/, "") };
   const type = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(symbol, node));

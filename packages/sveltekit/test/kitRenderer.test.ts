@@ -46,7 +46,7 @@ const drawing = (parameters: Readonly<Record<string, unknown>>, calls: string[] 
     decorators: [],
     globals: {},
     loaded: {},
-    report: (name: string, values: readonly unknown[]): void => {
+    onEvent: (name: string, values: readonly unknown[]): void => {
       calls.push(`${name} ${values.map((value) => JSON.stringify(value)).join(" ")}`);
     }
   };

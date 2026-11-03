@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentDocs } from "../src/componentDocs.ts";
+import type { DesignTabProps } from "../src/shell/DesignTab.tsx";
 import { type DockTabsInput, dockTabs } from "../src/shell/dockTabs.tsx";
 
 /** A hook whose options carry a value and a callback, so a component would get Props and Events. */
@@ -58,7 +59,8 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   trace: undefined,
   onPlayAgain: (): undefined => undefined,
   check: { status: "idle" },
-  onCheck: undefined
+  onCheck: undefined,
+  design: undefined
 });
 
 describe("the tabs of a story's panel", () => {
@@ -80,18 +82,41 @@ describe("the tabs of a story's panel", () => {
     expect(dockTabs(inputOf(false)).map((tab) => tab.id)).toEqual(["props", "events", "a11y"]);
   });
 
-  it("gives a component with no events an Events tab once a framework reported a call (a router's)", () => {
-    const { signature: _signature, ...component } = HOOK_DOCS;
-    const quiet: ComponentDocs = { ...component, props: [] };
-    const input: DockTabsInput = { ...inputOf(false), docs: { status: "ready", value: quiet } };
-    expect(dockTabs(input).map((tab) => tab.id)).toEqual(["a11y"]);
-    const call = {
-      storyId: "kit:nav--default",
-      name: "goto",
-      values: ['"/about"'],
-      details: [null],
-      time: 0
+  it("shows Events for a story with no events of its own once a framework reported a call", () => {
+    const input: DockTabsInput = {
+      ...inputOf(false),
+      docs: { status: "ready", value: { ...HOOK_DOCS, props: [] } }
     };
-    expect(dockTabs({ ...input, calls: [call] }).map((tab) => tab.id)).toEqual(["events", "a11y"]);
+    expect(dockTabs(input).map((tab) => tab.id)).not.toContain("events");
+    const withCall = dockTabs({
+      ...input,
+      calls: [{ storyId: "s", name: "router.push", values: ["/about"], details: [null], time: 0 }]
+    });
+    expect(withCall.map((tab) => tab.id)).toContain("events");
+  });
+
+  it("offers the Design tab only to a story with a design, a story about logic too", () => {
+    const design: DesignTabProps = {
+      link: { url: "https://www.figma.com/design/File1/Kit", kind: "design", fileKey: "File1" },
+      title: "Select › Small",
+      frame: {
+        address: "/frame.html?story=a",
+        width: "fill",
+        background: undefined,
+        args: {},
+        view: undefined
+      }
+    };
+    expect(dockTabs({ ...inputOf(false), design }).map((tab) => tab.id)).toEqual([
+      "props",
+      "events",
+      "design",
+      "a11y"
+    ]);
+    expect(dockTabs({ ...inputOf(true), design }).map((tab) => tab.id)).toEqual([
+      "signature",
+      "design",
+      "a11y"
+    ]);
   });
 });

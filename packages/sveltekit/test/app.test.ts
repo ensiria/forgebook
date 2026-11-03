@@ -47,13 +47,13 @@ const SETTINGS: KitAppSettings = {
  * A story's page, made the frame's current one.
  *
  * @param parameters - the story's parameters.
- * @param report - where its calls are told.
+ * @param onEvent - where its calls are told.
  */
 const story = (
   parameters: Readonly<Record<string, unknown>> = {},
-  report?: (name: string, values: readonly unknown[]) => void
+  onEvent?: (name: string, values: readonly unknown[]) => void
 ): KitStore => {
-  const store = createKitStore(parameters, report);
+  const store = createKitStore(parameters, onEvent);
   setCurrentStore(store);
   return store;
 };

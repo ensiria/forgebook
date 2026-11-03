@@ -10,7 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
-import type { MountedStory, StoryDrawing, StoryRenderer } from "../src/frame/renderer.ts";
+import type { MountedStory, StoryDrawing } from "../src/frame/renderer.ts";
+import type { MockTools } from "../src/frame/storyMocks.ts";
 import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun.ts";
 import type { PanelArgs } from "../src/messages.ts";
@@ -58,7 +59,7 @@ const run = async (
   story: LoadedStory,
   playTools?: PlayToolsLoader,
   onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
-  renderer: StoryRenderer = domRenderer
+  mockTools?: StoryRunOptions["mockTools"]
 ): Promise<{ readonly container: HTMLElement; readonly reports: Reports }> => {
   const container = document.createElement("div");
   document.body.append(container);
@@ -68,7 +69,8 @@ const run = async (
     story,
     identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
     ...(playTools === undefined ? {} : { playTools }),
-    renderer,
+    ...(mockTools === undefined ? {} : { mockTools }),
+    renderer: domRenderer,
     clock: heldFrameClock(0),
     texts: {},
     decorators: [],
@@ -208,6 +210,36 @@ describe("runStory with a second framework", () => {
     expect(events).toEqual(["set up 1", "undone 1", "set up 2"]);
   });
 
+  it("keeps a story's mocks running when it is played again", async () => {
+    vi.stubGlobal("navigator", {
+      serviceWorker: { controller: {}, addEventListener: (): void => undefined }
+    });
+    const events: string[] = [];
+    const tools: MockTools = {
+      http: { all: (path: string): string => `all ${path}` },
+      passthrough: (): string => "passthrough",
+      setupWorker: () => ({
+        start: async (): Promise<undefined> => {
+          events.push("start");
+          return undefined;
+        },
+        stop: (): void => {
+          events.push("stop");
+        }
+      })
+    };
+    const { reports } = await run(
+      badge({ parameters: { msw: { handlers: ["a"] } } }),
+      undefined,
+      undefined,
+      async () => tools
+    );
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(events).toEqual(["start"]);
+    vi.unstubAllGlobals();
+  });
+
   it("shows the error of a loader that throws, and never gets ready", async () => {
     const { container, reports } = await run(
       badge({
@@ -284,20 +316,39 @@ describe("runStory with a second framework", () => {
     expect(wasCalled).toBe(true);
   });
 
-  it("lists the calls a framework reports (a router's) among the story's events", async () => {
+  it("lists a call the framework reports, as a router's push, among the story's events", async () => {
     const calls: string[] = [];
-    const reporting: StoryRenderer = {
-      ...domRenderer,
-      mount: (canvas: HTMLElement, first: StoryDrawing, onError: (error: Error) => void): MountedStory => {
-        first.report?.("goto", ["/about"]);
-        return domRenderer.mount(canvas, first, onError);
-      }
-    };
-    const record = (name: string, values: readonly unknown[]): void => {
-      calls.push(`${name}(${values.join(", ")})`);
-    };
-    await run(badge(), undefined, record, reporting);
-    expect(calls).toEqual(["goto(/about)"]);
+    const container = document.createElement("div");
+    document.body.append(container);
+    runStory({
+      container,
+      story: badge(),
+      identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
+      renderer: {
+        ...domRenderer,
+        mount: (
+          canvas: HTMLElement,
+          drawing: StoryDrawing,
+          onError: (error: Error) => void
+        ): MountedStory => {
+          drawing.onEvent?.("router.push", ["/about"]);
+          return domRenderer.mount(canvas, drawing, onError);
+        }
+      },
+      clock: heldFrameClock(0),
+      texts: {},
+      decorators: [],
+      globals: {},
+      resolveArgs: (args: PanelArgs): PanelArgs => args,
+      onControlsReady: (): undefined => undefined,
+      onEvent: (name: string, values: readonly unknown[]): void => {
+        calls.push(`${name}(${values.join(", ")})`);
+      },
+      onError: (): undefined => undefined,
+      onTrace: () => undefined
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toEqual(["router.push(/about)"]);
   });
 
   it("mounts the story anew for another matrix only, and clears its spies before each mount", async () => {

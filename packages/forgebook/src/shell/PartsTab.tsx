@@ -9,19 +9,7 @@ import type { ReactNode } from "react";
 import type { ComponentDocs } from "../componentDocs.ts";
 import { Code } from "./Code.tsx";
 import { STRINGS } from "./strings.ts";
-
-/** The props that carry a component's modifiers, each mirrored by a `data-*` styling hook. */
-const MODIFIERS = ["variant", "size", "tone", "shape", "width", "orientation"];
-
-/**
- * The `data-*` hooks of a component's modifiers.
- *
- * @param docs - the component's docs.
- */
-export const styleHooks = (docs: ComponentDocs): string[] =>
-  docs.props
-    .filter((prop) => prop.kind === "choice" && MODIFIERS.includes(prop.name))
-    .map((prop) => `data-${prop.name}="${(prop.choices ?? []).join(" | ")}"`);
+import { styleHooks } from "./tabSummaries.ts";
 
 /**
  * The Parts and styling tab.

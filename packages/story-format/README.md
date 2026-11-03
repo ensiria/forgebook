@@ -30,8 +30,8 @@ An app's `forgebook.config.ts` then lists it: `sources: ["@acme/ui/stories"]`.
 | Import | What it is |
 |---|---|
 | `@forgebook/story-format/csf` | The CSF 3 types, generic over a framework |
-| `@forgebook/story-format/source` | `StorySource`: a package's story files, style sheets, texts and home page |
-| `@forgebook/story-format/client` | The types of the `?forgebook-files` and `?forgebook-markdown` imports |
+| `@forgebook/story-format/source` | `StorySource`: a package's story files, style sheets, texts, home page and docs pages |
+| `@forgebook/story-format/client` | The types of the `?forgebook-files`, `?forgebook-markdown` and `?forgebook-docs-pages` imports |
 | `@forgebook/story-format/texts` | Texts inside the stories, by key, in the catalogue's language |
 | `@forgebook/story-format/clock` | The story clock a live story reads |
 | `@forgebook/story-format/testing-library` | `canvas` and `userEvent` in every `play`, once Testing Library is installed |

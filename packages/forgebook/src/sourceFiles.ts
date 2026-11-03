@@ -1,6 +1,6 @@
 /**
  * A source's story files as one group: its `?forgebook-files` groups merged, so the tree, the frame and the panel look
- * a file up by its key wherever its pattern was declared.
+ * a file up by its key wherever its pattern was declared; its docs pages the same way.
  *
  * @remarks
  * The keys are paths relative to the module that declared the source, unique across its groups. The merge is kept per
@@ -8,7 +8,7 @@
  *
  * @module
  */
-import type { StoryFiles, StorySource } from "@forgebook/story-format/source";
+import type { DocPages, StoryFiles, StorySource } from "@forgebook/story-format/source";
 
 /** The merged files of each source seen, by the source object itself. */
 const MERGED = new WeakMap<StorySource, StoryFiles>();
@@ -29,5 +29,26 @@ export const sourceFiles = (source: StorySource): StoryFiles => {
     pages: Object.assign({}, ...source.files.map((group) => group.pages))
   };
   MERGED.set(source, merged);
+  return merged;
+};
+
+/** The merged docs pages of each source seen, by the source object itself. */
+const MERGED_PAGES = new WeakMap<StorySource, Required<DocPages>>();
+
+/**
+ * A source's docs pages, every group merged; empty for a source without any.
+ *
+ * @param source - the source.
+ */
+export const sourcePages = (source: StorySource): Required<DocPages> => {
+  const known = MERGED_PAGES.get(source);
+  if (known !== undefined) return known;
+  const groups = source.docs ?? [];
+  const merged: Required<DocPages> = {
+    index: Object.assign({}, ...groups.map((group) => group.index)),
+    pages: Object.assign({}, ...groups.map((group) => group.pages)),
+    text: Object.assign({}, ...groups.map((group) => group.text ?? {}))
+  };
+  MERGED_PAGES.set(source, merged);
   return merged;
 };

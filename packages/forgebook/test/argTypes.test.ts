@@ -133,6 +133,13 @@ describe("mappedArgs", () => {
     expect(mappedArgs({ icon: "bold", label: "Go" }, argTypes)).toEqual({ icon: bold, label: "Go" });
     expect(mappedArgs({ icon: "italic" }, argTypes)).toEqual({ icon: "italic" });
   });
+
+  it("looks a key up among the mapping's own only, never its prototype's", () => {
+    const argTypes = { icon: { mapping: { bold: 1 } } };
+    for (const key of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      expect(mappedArgs({ icon: key }, argTypes)).toEqual({ icon: key });
+    }
+  });
 });
 
 describe("the controls parameter", () => {

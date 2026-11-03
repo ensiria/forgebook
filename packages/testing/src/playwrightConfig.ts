@@ -55,9 +55,15 @@ export const frameServerCommand = (userAgent: string | undefined): string => {
 const workersOf = ({ workers }: StoryTestServer): number =>
   workers !== undefined && workers > 0 ? workers : availableParallelism();
 
-/** The test instance of the frame page, started by Playwright and stopped after the run. */
+/**
+ * The test instance of the frame page, started by Playwright and stopped after the run.
+ *
+ * @remarks
+ * The command runs in a shell (`sh`, or `cmd.exe` on Windows), so the config's path is in double quotes, which both
+ * read: a folder with a space (`C:\Users\Ada Lovelace`) would split it into two arguments.
+ */
 const webServer = ({ dir, port, vite }: StoryTestServer): NonNullable<PlaywrightTestConfig["webServer"]> => ({
-  command: `${vite ?? frameServerCommand(process.env["npm_config_user_agent"])} --config ${dir}/vite.config.ts --host 127.0.0.1 --port ${port} --strictPort`,
+  command: `${vite ?? frameServerCommand(process.env["npm_config_user_agent"])} --config "${dir}/vite.config.ts" --host 127.0.0.1 --port ${port} --strictPort`,
   url: `http://127.0.0.1:${port}/frame.html`,
   reuseExistingServer: false
 });

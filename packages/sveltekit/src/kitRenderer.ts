@@ -192,7 +192,7 @@ const storeOf = (drawing: StoryDrawing): { readonly store: KitStore; readonly re
   const entry =
     shared !== undefined && shared.mounts > 0
       ? shared
-      : { store: createKitStore(key, drawing.report), mounts: 0 };
+      : { store: createKitStore(key, drawing.onEvent), mounts: 0 };
   if (entry !== shared) {
     entry.store.setLoader(loaderOf(entry.store.kit, entry.store));
     SHARED.set(key, entry);

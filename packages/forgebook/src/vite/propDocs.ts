@@ -156,17 +156,17 @@ const writtenLiterals = (
  * the types in, which a program kept between reads changes from one read to the next.
  *
  * @param values - the values, in the checker's order.
- * @param symbol - the prop.
+ * @param declared - the prop's declared type nodes.
  * @param checker - the type checker.
  * @returns the values, those the source writes in its order first, any other after them in the checker's order.
  */
 const writtenOrder = (
   values: readonly (string | number)[],
-  symbol: ts.Symbol,
+  declared: readonly DeclaredType[],
   checker: ts.TypeChecker
 ): (string | number)[] => {
   const seen = new Set<ts.Node>();
-  const written = declaredTypesOf(symbol).flatMap((node) =>
+  const written = declared.flatMap((node) =>
     ts.isMethodSignature(node) ? [] : writtenLiterals(node, checker, seen)
   );
   const rank = (value: string | number): number => {
@@ -229,16 +229,23 @@ const declaredMembers = (node: ts.TypeNode): ts.TypeNode[] => {
   return (ts.isUnionTypeNode(bare) ? bare.types : [bare]).filter((member) => !isNothing(member));
 };
 
+/** A prop's type as declared: a type node, or a method's whole signature. */
+type DeclaredType = ts.TypeNode | ts.MethodSignature;
+
 /**
- * A prop's declared type nodes: a property's type or a method's whole signature, once per declaration. A prop of
- * props written as alternatives (`{ indicator?: never } | { indicator?: "dot" | "spinner" }`) has one per branch.
+ * A prop's declared type nodes: a property's type (in a type or a class) or a method's whole signature, once per
+ * declaration. A prop of props written as alternatives (`{ indicator?: never } | { indicator?: "dot" | "spinner" }`)
+ * has one per branch.
  *
  * @param symbol - the prop.
  */
-const declaredTypesOf = (symbol: ts.Symbol): (ts.TypeNode | ts.MethodSignature)[] =>
-  (symbol.declarations ?? []).flatMap((declaration): (ts.TypeNode | ts.MethodSignature)[] => {
+const declaredTypesOf = (symbol: ts.Symbol): DeclaredType[] =>
+  (symbol.declarations ?? []).flatMap((declaration): DeclaredType[] => {
     if (ts.isMethodSignature(declaration)) return [declaration];
-    return ts.isPropertySignature(declaration) && declaration.type !== undefined ? [declaration.type] : [];
+    return (ts.isPropertySignature(declaration) || ts.isPropertyDeclaration(declaration)) &&
+      declaration.type !== undefined
+      ? [declaration.type]
+      : [];
   });
 
 /**
@@ -246,11 +253,11 @@ const declaredTypesOf = (symbol: ts.Symbol): (ts.TypeNode | ts.MethodSignature)[
  * checker's own text expands it and orders a union's members by the order it met the types in, which a program kept
  * between reads changes from one read to the next.
  *
- * @param symbol - the prop.
+ * @param declaredTypes - the prop's declared type nodes.
  * @returns the text, or none when the prop writes no type (the caller falls back to the checker's).
  */
-const writtenTypeText = (symbol: ts.Symbol): string | undefined => {
-  const texts = declaredTypesOf(symbol).flatMap((declared): string[] => {
+const writtenTypeText = (declaredTypes: readonly DeclaredType[]): string | undefined => {
+  const texts = declaredTypes.flatMap((declared): string[] => {
     if (!ts.isMethodSignature(declared)) return declaredMembers(declared).map(nodeText);
     const parameters = declared.parameters.map(nodeText).join(", ");
     return [`(${parameters}) => ${declared.type === undefined ? "void" : nodeText(declared.type)}`];
@@ -263,11 +270,11 @@ const writtenTypeText = (symbol: ts.Symbol): string | undefined => {
 /**
  * An event's signature as the source writes it: a function type among the prop's declared members, or a method.
  *
- * @param symbol - the event prop.
+ * @param declaredTypes - the event prop's declared type nodes.
  * @returns the signature, or none when the source writes none in place (a named handler type).
  */
-const writtenSignature = (symbol: ts.Symbol): EventSignature | undefined => {
-  const nodes = declaredTypesOf(symbol).flatMap((declared): (ts.TypeNode | ts.MethodSignature)[] =>
+const writtenSignature = (declaredTypes: readonly DeclaredType[]): EventSignature | undefined => {
+  const nodes = declaredTypes.flatMap((declared): DeclaredType[] =>
     ts.isMethodSignature(declared) ? [declared] : declaredMembers(declared)
   );
   const fn = nodes.find(
@@ -314,28 +321,55 @@ export const isForeign = (symbol: ts.Symbol): boolean =>
   );
 
 /**
+ * What a prop takes, when it is not its symbol's own type: a framework whose props are wrapped (an Angular signal input,
+ * `input<string>()`, takes the `string` its `InputSignal<string>` holds) says what a binding sets.
+ */
+export type BoundType = {
+  /** The type a binding sets. */
+  readonly type: ts.Type;
+  /**
+   * The type node that writes it (`input<"md" | "sm">()`'s argument), for its text and a choice's order; none when the
+   * source writes none.
+   */
+  readonly typeNode: ts.TypeNode | undefined;
+};
+
+/** How a framework's props differ from a plain function's, for `propDocs`. */
+export type PropReading = {
+  /** What the prop takes, when it is not the symbol's own type; none reads the symbol's. */
+  readonly taken?: BoundType | undefined;
+  /**
+   * What an event's name is, for a framework that names its callback props otherwise (Svelte's `onclick`); `on` and a
+   * capital by default.
+   */
+  readonly eventName?: RegExp | undefined;
+};
+
+/**
  * One prop's docs.
  *
- * @param symbol - the prop.
+ * @param symbol - the prop: its name, its TSDoc, whether it is optional.
  * @param checker - the program's checker.
  * @param node - where the code names the component.
- * @param eventName - what an event's name is, for a framework that names its callback props otherwise (Svelte's
- *   `onclick`); `on` and a capital by default.
+ * @param reading - how the framework's props differ from a plain function's; none for a plain prop.
  */
 export const propDocs = (
   symbol: ts.Symbol,
   checker: ts.TypeChecker,
   node: ts.Node,
-  eventName: RegExp = EVENT_NAME
+  reading: PropReading = {}
 ): PropDocs => {
-  const type = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(symbol, node));
+  const { taken, eventName = EVENT_NAME } = reading;
+  const type = checker.getNonNullableType(taken?.type ?? checker.getTypeOfSymbolAtLocation(symbol, node));
+  const takenNodes = taken?.typeNode === undefined ? [] : [taken.typeNode];
+  const declared = taken === undefined ? declaredTypesOf(symbol) : takenNodes;
   const name = symbol.getName();
   const kind = kindOf(name, type, eventName);
   const defaultValue = tagOf(symbol, checker, "defaultValue");
   const checkerChoices = kind === "choice" ? literalValues(type) : undefined;
-  const choices = checkerChoices === undefined ? undefined : writtenOrder(checkerChoices, symbol, checker);
+  const choices = checkerChoices === undefined ? undefined : writtenOrder(checkerChoices, declared, checker);
   const signature =
-    kind === "event" ? (writtenSignature(symbol) ?? signatureOf(type, checker, node)) : undefined;
+    kind === "event" ? (writtenSignature(declared) ?? signatureOf(type, checker, node)) : undefined;
   // a node takes a text: the panel can set it as one, which covers labels, titles and children
   const canTakeText = kind === "other" && checker.isTypeAssignableTo(checker.getStringType(), type);
   return {
@@ -343,7 +377,7 @@ export const propDocs = (
     kind,
     type:
       choices === undefined
-        ? (writtenTypeText(symbol) ?? checker.typeToString(type))
+        ? (writtenTypeText(declared) ?? checker.typeToString(type))
         : choiceTypeText(choices),
     description: summaryOf(symbol, checker),
     isRequired: (symbol.flags & ts.SymbolFlags.Optional) === 0,

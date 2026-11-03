@@ -17,15 +17,22 @@ import { pathToFileURL } from "node:url";
 
 import {
   isStoryCheckReport,
+  isStoryDiffReport,
   isStoryShotReport,
+  type SemanticModel,
   type StoryCheckReport,
   type StoryCheckRequest,
+  type StoryCheckStory,
+  type StoryDiffReport,
+  type StoryDiffRequest,
   type StoryShotReport
 } from "../../src/storyCheck.ts";
+import { formerComponentId } from "../../src/storyTree.ts";
 import { catalogueSwitches, type ViewSwitch } from "../../src/switches.ts";
 import { viewQuery } from "../../src/viewWords.ts";
-import type { AgentStory, StoriesDocument } from "../../src/vite/agent.types.ts";
+import type { AgentComponent, AgentStory, StoriesDocument } from "../../src/vite/agent.types.ts";
 import { isStoriesDocument } from "../../src/vite/agentApi.ts";
+import { formerIdOf, namedComponent, namedStory } from "../../src/vite/agentIds.ts";
 import { AGENT_API } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { servedCatalogue } from "./agentClient.ts";
@@ -42,18 +49,41 @@ export type StoryCheckInput = {
   readonly views: readonly string[];
   /** Run every variant the catalogue's browser tests check. */
   readonly isAllVariants: boolean;
+  /** Ask the configured model too: it sends each story's tree and picture to that address. */
+  readonly isSemantic?: boolean;
 };
 
 /**
- * The stories an id names: the story itself, or a component's listed stories.
+ * A story of the document as a check reads it.
+ *
+ * @param component - its component.
+ * @param story - the story.
+ */
+const checkedStory = (component: AgentComponent, story: AgentStory): StoryCheckStory => {
+  const formerId = formerIdOf(component, story);
+  return {
+    id: story.id,
+    ...(formerId === undefined ? {} : { formerId }),
+    ...(story.height === undefined ? {} : { height: story.height }),
+    ...(story.isLogic ? { isLogic: true } : {})
+  };
+};
+
+/**
+ * The stories an id names, as a check reads them: the story itself, or a component's listed stories; by their ids, or
+ * by the ids an earlier rule gave them.
  *
  * @param document - the catalogue's stories.
  * @param id - the id.
  */
-export const storiesNamed = (document: StoriesDocument, id: string): AgentStory[] => {
-  const component = document.components.find((each) => each.id === id);
-  if (component !== undefined) return component.stories.filter((story) => !story.isUnlisted);
-  return document.components.flatMap((each) => each.stories.filter((story) => story.id === id));
+export const storiesNamed = (document: StoriesDocument, id: string): StoryCheckStory[] => {
+  const component = namedComponent(document, id);
+  if (component !== undefined)
+    return component.stories
+      .filter((story) => !story.isUnlisted)
+      .map((story) => checkedStory(component, story));
+  const named = namedStory(document, id);
+  return named === undefined ? [] : [checkedStory(named.component, named.story)];
 };
 
 /**
@@ -130,7 +160,7 @@ const runOnStories = async (
   run: {
     readonly specifier: string;
     readonly name: string;
-    readonly extra: Readonly<Record<string, unknown>>;
+    readonly extra: (document: StoriesDocument) => Readonly<Record<string, unknown>>;
   }
 ): Promise<unknown> => {
   const call = await testingFunction(config.dir, run.specifier, run.name);
@@ -146,17 +176,13 @@ const runOnStories = async (
     if (stories.length === 0) return `No story or component "${input.id}"`;
     const request: StoryCheckRequest = {
       frameUrl: `${served.origin}/frame.html`,
-      stories: stories.map((story) => ({
-        id: story.id,
-        ...(story.height === undefined ? {} : { height: story.height }),
-        ...(story.isLogic ? { isLogic: true } : {})
-      })),
+      stories,
       switches,
       lists: config.lists,
       views,
       isAllVariants: input.isAllVariants
     };
-    return await call({ ...request, ...run.extra });
+    return await call({ ...request, ...run.extra(document) });
   } finally {
     await served.close();
   }
@@ -168,17 +194,21 @@ const runOnStories = async (
  * @param config - the catalogue's configuration.
  * @param url - where `forgebook dev` runs, when not at Vite's default address.
  * @param input - the id, the views and whether to check every variant.
+ * @param model - the model `isSemantic` asks, or what to set to have one.
  * @returns the report, or why the check could not run.
  */
 export const runStoryCheck = async (
   config: ResolvedConfig,
   url: string | undefined,
-  input: StoryCheckInput
+  input: StoryCheckInput,
+  model?: SemanticModel | string
 ): Promise<StoryCheckReport | string> => {
+  const semantic = input.isSemantic === true ? model : undefined;
+  if (typeof semantic === "string") return semantic;
   const answer = await runOnStories(config, url, input, {
     specifier: "@forgebook/testing/check",
     name: "checkStories",
-    extra: {}
+    extra: () => (semantic === undefined ? {} : { semantic })
   });
   if (typeof answer === "string" || isStoryCheckReport(answer)) return answer;
   return "@forgebook/testing/check answered something that is not a check's report";
@@ -202,10 +232,51 @@ export const runStoryShot = async (
   const answer = await runOnStories(config, url, input, {
     specifier: "@forgebook/testing/shot",
     name: "shotStories",
-    extra: { outDir }
+    extra: () => ({ outDir })
   });
   if (typeof answer === "string" || isStoryShotReport(answer)) return answer;
   return "@forgebook/testing/shot answered something that is not a picture run's report";
+};
+
+/**
+ * The component a comparison names, by its current id and the one the former rule gave it, so its baselines under
+ * either are its own; none when the id names a story.
+ *
+ * @param document - the catalogue's stories.
+ * @param id - the id asked for, current or former.
+ */
+export const diffedComponent = (
+  document: StoriesDocument,
+  id: string
+): Pick<StoryDiffRequest, "component" | "formerComponent"> => {
+  const component = namedComponent(document, id);
+  if (component === undefined) return {};
+  const former = formerComponentId(component.source, component.title);
+  return { component: component.id, ...(former === component.id ? {} : { formerComponent: former }) };
+};
+
+/**
+ * Compares the stories' pictures with their baselines.
+ *
+ * @param config - the catalogue's configuration.
+ * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param input - the id, the views and whether to compare every variant.
+ * @param folders - the baselines' folder and the one the new pictures go in, absolute.
+ * @returns the results, or why they could not be had.
+ */
+export const runStoryDiff = async (
+  config: ResolvedConfig,
+  url: string | undefined,
+  input: StoryCheckInput,
+  folders: { readonly baselines: string; readonly outDir: string }
+): Promise<StoryDiffReport | string> => {
+  const answer = await runOnStories(config, url, input, {
+    specifier: "@forgebook/testing/diff",
+    name: "diffStories",
+    extra: (document: StoriesDocument) => ({ ...folders, ...diffedComponent(document, input.id) })
+  });
+  if (typeof answer === "string" || isStoryDiffReport(answer)) return answer;
+  return "@forgebook/testing/diff answered something that is not a comparison's report";
 };
 
 /**

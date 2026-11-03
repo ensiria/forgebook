@@ -1,0 +1,12 @@
+// The program Analog's Angular plugin compiles the components with, as Angular's CLI names it: the fixture's own
+// configuration, emitting, since Angular's compiler writes the code the catalogue runs.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src"]
+}

@@ -61,7 +61,7 @@ export type AdapterSubject = {
  * How long the docs case may take, in milliseconds: it builds a TypeScript program from nothing, which takes seconds on a
  * runner where the other packages' tests build theirs at the same time.
  */
-const DOCS_TIMEOUT = 30_000;
+const DOCS_TIMEOUT = 60_000;
 
 /** The canvases of the running test, emptied after it. */
 const canvases: HTMLElement[] = [];

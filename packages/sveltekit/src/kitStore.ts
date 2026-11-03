@@ -36,7 +36,7 @@ export type KitCall = {
   readonly values: readonly unknown[];
 };
 
-/** Tells the catalogue about a call: the frame's event report, when the catalogue gives one. */
+/** Tells the catalogue about a call: the drawing's `onEvent`, when the catalogue gives one. */
 export type CallReport = (name: string, values: readonly unknown[]) => void;
 
 /** Loads the page's data for an address: the story's loads, run by the renderer. */
@@ -229,11 +229,11 @@ const registered = <TCallback>(set: Set<TCallback>, callback: TCallback): (() =>
  * A story's SvelteKit page.
  *
  * @param parameters - the story's parameters, which give its page.
- * @param report - tells the catalogue about each call; none outside a catalogue.
+ * @param onEvent - tells the catalogue about each call (the drawing's `onEvent`); none outside a catalogue.
  */
 export const createKitStore = (
   parameters: Readonly<Record<string, unknown>>,
-  report: CallReport | undefined
+  onEvent: CallReport | undefined
 ): KitStore => {
   const { base } = appSettings();
   const kit = storyKitOf(parameters, pageRouteIds(), base);
@@ -275,7 +275,7 @@ export const createKitStore = (
   };
   const record = (name: string, values: readonly unknown[]): void => {
     made.push({ name, values });
-    report?.(name, values);
+    onEvent?.(name, values);
   };
   let onError: ((error: unknown) => void) | undefined;
   /** A new navigation or reload: the later one wins. */
