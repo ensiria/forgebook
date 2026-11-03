@@ -322,7 +322,9 @@ const looseProgram = (
     kept === undefined || outdated.has(key)
       ? ts.sys.readDirectory(folder, SOURCE_EXTENSIONS, NOT_SOURCES)
       : kept.getRootFileNames().filter((name) => !(sources?.roots ?? []).includes(name));
-  const program = keptProgram(key, files.includes(file) ? files : [...files, file], merged, sources);
+  // in TypeScript's form, as the folder's files are listed, so a listed file is not added twice
+  const name = file.replaceAll("\\", "/");
+  const program = keptProgram(key, files.includes(name) ? files : [...files, name], merged, sources);
   return { program, checker: program.getTypeChecker() };
 };
 
