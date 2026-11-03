@@ -56,6 +56,22 @@ const Greeting = (props: { readonly name?: unknown }): JSX.Element => {
   );
 };
 
+/**
+ * Solid's HTML without its hydration marks (`data-hk` and the comments), which a server build that can hydrate writes:
+ * removed until none is left, since taking one out can join the text around it into another.
+ *
+ * @param html - the HTML Solid wrote.
+ */
+const withoutHydrationMarks = (html: string): string => {
+  let previous = "";
+  let current = html;
+  while (current !== previous) {
+    previous = current;
+    current = current.replace(/<!--[^>]*-->| data-hk="\d+"/g, "");
+  }
+  return current;
+};
+
 describe("solidRenderer on a server", () => {
   it("draws a story with its texts and clock, inside the catalogue's decorators, which read its globals", async () => {
     const inLanguage = (story: () => JSX.Element, context: StoryContext<LoadedArgs>): JSX.Element => (
@@ -67,10 +83,7 @@ describe("solidRenderer on a server", () => {
         { decorators: readPreview({ decorators: [inLanguage] }).decorators }
       )
     );
-    // `data-hk` and the comments are Solid's hydration marks, written by a server build that can hydrate
-    expect(html.replace(/<!--[^>]*-->| data-hk="\d+"/g, "")).toBe(
-      '<div lang="it"><p>Ciao Ada 1000</p></div>'
-    );
+    expect(withoutHydrationMarks(html)).toBe('<div lang="it"><p>Ciao Ada 1000</p></div>');
   });
 
   it("waits for the resources a story reads", async () => {
