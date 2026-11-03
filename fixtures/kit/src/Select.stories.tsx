@@ -19,7 +19,9 @@ export default {
   // listed among the forms too, and linked to the page: the sidebar's alias entry and the header's related links
   alsoIn: ["Forms/Fields"],
   related: ["Foundations/Page"],
-  args: { options: ["weekly", "monthly"], value: "weekly" }
+  args: { options: ["weekly", "monthly"], value: "weekly" },
+  // its texts listed before its behaviour, though its props name Behaviour first
+  parameters: { propGroups: ["Texts"] }
 } satisfies Meta<typeof Select>;
 
 /** The default select. */

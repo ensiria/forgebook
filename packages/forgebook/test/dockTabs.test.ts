@@ -53,6 +53,7 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   },
   namedValues: undefined,
   textArgs: {},
+  propGroups: [],
   calls: [],
   onClearCalls: (): undefined => undefined,
   trace: undefined,

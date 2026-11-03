@@ -11,11 +11,18 @@
  */
 import { useMemo } from "react";
 
+import type { DeviceDefault } from "../deviceView.ts";
 import type { TreeStory } from "../storyTree.ts";
 import type { TouchChoice } from "../switches.ts";
 import type { ViewState } from "../viewState.ts";
 import { logicView, logicViewChange } from "./logicView.ts";
-import { storyTouchesOf, storyViewChange, type TouchOverrides, touchedView } from "./storyTouch.ts";
+import {
+  phoneStories,
+  storyTouchesOf,
+  storyViewChange,
+  type TouchOverrides,
+  touchedView
+} from "./storyTouch.ts";
 
 /** The shown story's view and how to change it. */
 export type ShownView = {
@@ -37,6 +44,8 @@ export type ShownViewInput = {
   readonly onTouchChange: (storyId: string, isTouch: boolean) => void;
   /** The catalogue's touch switch. */
   readonly touch: TouchChoice | undefined;
+  /** The catalogue's default device: a story shown in a device is touched as a phone is. */
+  readonly catalogueDevice: DeviceDefault;
   /** Changes the address's view. */
   readonly onAddressViewChange: (view: ViewState) => void;
 };
@@ -47,27 +56,28 @@ export type ShownViewInput = {
  * @param input - the address's view, the story, the touch choices and the address's setter.
  */
 export const useShownView = (input: ShownViewInput): ShownView => {
-  const { addressView, story, touchOverrides, touch } = input;
+  const { addressView, story, touchOverrides, touch, catalogueDevice } = input;
   const isLogic = story?.isLogic === true;
+  const isPhone = story !== undefined && phoneStories(addressView, catalogueDevice)(story);
   const view = useMemo(
     () =>
       logicView(
         touchedView(
           addressView,
           story?.id,
-          storyTouchesOf(story === undefined ? [] : [story], touchOverrides),
+          storyTouchesOf(story === undefined ? [] : [story], touchOverrides, () => isPhone),
           touch
         ),
         isLogic
       ),
-    [addressView, story, touchOverrides, touch, isLogic]
+    [addressView, story, touchOverrides, touch, isLogic, isPhone]
   );
   const onViewChange = (next: ViewState): void => {
     if (story === undefined) {
       input.onAddressViewChange(next);
       return;
     }
-    const change = storyViewChange(next, addressView, story, touch);
+    const change = storyViewChange(next, addressView, story, touch, isPhone);
     if (change.isTouch !== undefined) input.onTouchChange(story.id, change.isTouch);
     input.onAddressViewChange(logicViewChange(change.view, addressView, isLogic));
   };

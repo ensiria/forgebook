@@ -42,7 +42,7 @@ const typeCounts = (tokens: readonly DesignToken[]): Record<string, number> => {
 };
 
 /** A token as a list gives it: no description, and no empty fields, since each one costs an agent's context. */
-const tokenSummary = (token: DesignToken): AgentTokenSummary => {
+export const tokenSummary = (token: DesignToken): AgentTokenSummary => {
   const { name, type, value, modes, deprecated, isThemeOnly } = token;
   return {
     name,

@@ -14,7 +14,7 @@ import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.
 import { isLiveErrorReport } from "../liveErrors.ts";
 import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
 import type { UsageIndex } from "../usedIn.ts";
-import { frameAddressOf, storyAddressOf } from "../viewState.ts";
+import { componentAddressOf, frameAddressOf, storyAddressOf } from "../viewState.ts";
 import type {
   AgentComponent,
   AgentDesign,
@@ -52,6 +52,8 @@ export type CataloguePages = {
  */
 export const storyLinks = (pages: CataloguePages, id: string, view: string): StoryLinks => ({
   address: storyAddressOf(pages.page, id, view),
+  // the last `--` ends the component's id: a source's own id may hold one
+  component: componentAddressOf(pages.page, id.slice(0, id.lastIndexOf("--")), view),
   frame: frameAddressOf(pages.frame, id, view),
   embed: embedAddressOf(pages.page, id, view)
 });
@@ -72,6 +74,8 @@ const agentStory = (
   isUnlisted,
   ...(story.height === undefined ? {} : { height: story.height }),
   isLogic: story.isLogic,
+  hasPlay: story.hasPlay,
+  ...(story.device === undefined ? {} : { device: story.device }),
   links: storyLinks(pages, story.id, view)
 });
 

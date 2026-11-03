@@ -47,8 +47,8 @@ import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { FILES_MODULE_HOT, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
 import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
+  AGENT_SOURCES_FILE,
   agentSourcesModule,
-  CONFIG_MODULE,
   configModule,
   frameEntry,
   PAGE_ENTRIES,
@@ -60,6 +60,7 @@ import {
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
+import { CONFIG_ID, DOCS_PAGES_PREFIX, patternId, TOKENS_ID, virtualId } from "./pluginIds.ts";
 import {
   docsModule,
   FILES_PREFIX,
@@ -70,14 +71,8 @@ import {
   usageModule
 } from "./pluginModules.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
-import {
-  isKeptIndex,
-  type KeptIndex,
-  REACH_PREFIX,
-  storyFilesGroupOf,
-  storyFilesGroupText,
-  USAGE_PREFIX
-} from "./storyFilesModule.ts";
+import { isKeptIndex, type KeptIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
+import { tokensModule } from "./storylessRoutes.ts";
 import { CODE_QUERY, DOCS_PAGE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -106,15 +101,6 @@ const sassOptions = async (): Promise<NonNullable<UserConfig["css"]>> => {
   const { NodePackageImporter } = await import("sass-embedded");
   return { preprocessorOptions: { scss: { importers: [new NodePackageImporter()] } } };
 };
-
-/** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
-const FILES_QUERY = "?forgebook-files";
-
-/** The query that asks for the docs pages a pattern matches (`./docs/*.md?forgebook-docs-pages`). */
-const DOCS_PAGES_QUERY = "?forgebook-docs-pages";
-
-/** The id of a pattern's docs pages: virtual, with the declaring module's folder and the pattern after it. */
-const DOCS_PAGES_PREFIX = "\0forgebook-docs-pages:";
 
 /** A docs page, whose file added or removed changes what the sidebar lists. */
 const DOCS_PAGE_FILE = /\.md$/;
@@ -176,42 +162,6 @@ const invalidateEverywhere = (server: ViteDevServer, ids: Iterable<string>): voi
     }
   }
 };
-
-/**
- * The id of a `?forgebook-files` module: its prefix, then its group (`storyFilesGroupText`), which holds no `..`.
- *
- * @param folder - the importing module's folder.
- * @param pattern - the pattern as the import writes it.
- */
-const filesId = (folder: string, pattern: string): string =>
-  `${FILES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
-
-/**
- * The id of a pattern's module, when an import asks for one: its story files, or its docs pages.
- *
- * @param source - the import's specifier.
- * @param folder - the importing module's folder.
- */
-const patternId = (source: string, folder: string): string | null => {
-  if (source.endsWith(FILES_QUERY)) return filesId(folder, source.slice(0, -FILES_QUERY.length));
-  if (!source.endsWith(DOCS_PAGES_QUERY)) return null;
-  const pattern = source.slice(0, -DOCS_PAGES_QUERY.length);
-  return `${DOCS_PAGES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
-};
-
-/**
- * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in"), when the import names
- * one.
- *
- * @param source - the import's specifier.
- */
-const virtualId = (source: string): string | undefined => {
-  if (source === CONFIG_MODULE) return CONFIG_ID;
-  return source.startsWith(USAGE_PREFIX) || source.startsWith(REACH_PREFIX) ? `\0${source}` : undefined;
-};
-
-/** The resolved id of the configuration's data module. */
-const CONFIG_ID = `\0${CONFIG_MODULE}`;
 
 /**
  * The page a request names, when it names one: `/` is the shell's.
@@ -503,6 +453,11 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     watch: (file: string) => void,
     resolveImport: (specifier: string, importer: string) => Promise<string | undefined>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
+    if (id === TOKENS_ID && config !== undefined) {
+      // a source's tokens are found from its module, imported as the generated pages import it
+      const importer = pageModulePath(config.dir, AGENT_SOURCES_FILE);
+      return tokensModule(config, watch, (specifier: string) => resolveImport(specifier, importer));
+    }
     if (id.endsWith(DOCS_QUERY)) {
       return docsModule(await extractor().extract(id.slice(0, -DOCS_QUERY.length)), watch);
     }
