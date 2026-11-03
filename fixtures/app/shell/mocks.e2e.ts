@@ -5,6 +5,9 @@
  * @module
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 
 import { framesPortOf } from "./ports";
@@ -144,4 +147,52 @@ test("answers every frame from its own handlers when the worker's registration t
   for (const { id, text } of [answered, byName]) {
     await expect(frameOfStory(page, id).getByTestId("greeting")).toHaveText(text, { timeout: WORKER_START });
   }
+});
+
+/** How long the worker below holds a page's closing for the same page's next start, at most, in milliseconds. */
+const CLOSE_HELD = 1000;
+
+/**
+ * MSW's worker as a busy machine runs it: a page's closing, which looks at the open pages before it forgets the page,
+ * ends only after the same page starts again, if it does within a moment.
+ */
+const SLOW_CLOSING_WORKER = readFileSync(
+  join(import.meta.dirname, "..", "public", "mockServiceWorker.js"),
+  "utf8"
+)
+  .replace(
+    "activeClientIds.delete(clientId);",
+    `await new Promise((resolve) => {
+          startedAgain.set(clientId, resolve);
+          setTimeout(resolve, ${CLOSE_HELD});
+        });
+        activeClientIds.delete(clientId);`
+  )
+  .replace(
+    "activeClientIds.add(clientId);",
+    `activeClientIds.add(clientId);
+          startedAgain.get(clientId)?.();`
+  )
+  .replace(
+    "const activeClientIds = new Set();",
+    "const activeClientIds = new Set();\nconst startedAgain = new Map();"
+  );
+
+test("keeps a story's mocks when it is played again", async ({ page }) => {
+  const [answered] = GREETINGS;
+  await page
+    .context()
+    .route("**/mockServiceWorker.js", (route) =>
+      route.fulfill({ contentType: "text/javascript", body: SLOW_CLOSING_WORKER })
+    );
+  await page.goto(`/?story=${answered.id}`);
+  const frame = frameOfStory(page, answered.id);
+  const firstDrawn = frame.getByTestId("greeting");
+  await expect(firstDrawn).toHaveText(answered.text, { timeout: WORKER_START });
+  // marked, so the story drawn again is told from the first one
+  await firstDrawn.evaluate((element) => element.setAttribute("data-first", ""));
+  await page.evaluate(() =>
+    document.querySelector("iframe")?.contentWindow?.postMessage({ type: "forgebook:play-again" }, "*")
+  );
+  await expect(frame.locator('[data-testid="greeting"]:not([data-first])')).toHaveText(answered.text);
 });

@@ -12,6 +12,15 @@ which is not the program users run. A browser decides every time: a server that 
 its dependencies and reload the page. The time comes from the page itself, one animation frame after the element is
 fully shown, by then painted, a fade included: waiting from outside would measure Playwright's retries, which land on a coarse grid.
 
+Forgebook's stories draw in frames on an origin of their own, which the catalogue's page cannot read. So the page's
+script also runs inside each such frame and stamps what it draws there, and the catalogue's page stamps when the frame's
+element was shown: a story counts as drawn at the later of the two, as it does when the frames share the catalogue's
+origin and the page reads them directly. `--frames same-origin` measures Forgebook with `frames: "same-origin"`, the
+option that keeps them there; the report says which was measured, and two reports of different modes are not compared.
+Forgebook's dev server takes two ports then, its own and the frames', named on its command line so that a taken port
+fails the sample instead of moving the frames onto the next tool's. A static build keeps the frames on the catalogue's
+origin unless its configuration names two hosts, so `shellJs` and `frameJs` are read on one origin.
+
 | Metric | Definition |
 |---|---|
 | `coldStart` | process spawned → the first story visible, every cache removed |
