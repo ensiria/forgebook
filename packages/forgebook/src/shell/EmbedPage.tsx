@@ -32,6 +32,7 @@ import { findStory, type StoryLocation, storyTree } from "../storyTree.ts";
 import { frameAddress, parseView, STAGE_HEIGHT_RANGE, type ViewState } from "../viewState.ts";
 import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
 import { FrameView } from "./FrameView.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
 import type { ShellConfig } from "./Shell.tsx";
 import { shellIsDark } from "./shellScheme.ts";
 import { STRINGS } from "./strings.ts";
@@ -150,7 +151,7 @@ const EmbedStory = ({ location, view, panelArgs, frameUrl }: EmbedStoryProps): R
       setFixed(message.fixed);
       setFailure(undefined);
       const args: ShellMessage = { type: "forgebook:args", args: panelArgs };
-      frame.postMessage(args, window.location.origin);
+      frame.postMessage(args, framesOrigin());
     },
     onCall: (): void => undefined,
     onFailed: (_storyId: string, message: string): void => setFailure(message)

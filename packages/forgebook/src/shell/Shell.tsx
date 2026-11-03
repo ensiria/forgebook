@@ -77,7 +77,10 @@ export type ShellConfig = {
   readonly heights?: string;
   /** The sources, in the order the sidebar lists them. */
   readonly sources: readonly StorySource[];
-  /** The frame page's address, relative to the shell's (`frame.html`). */
+  /**
+   * The frame page's address: relative to the shell's (`frame.html`) when the frames share its origin, on the frames'
+   * origin otherwise (`mountShell` makes it).
+   */
   readonly frameUrl: string;
   /**
    * The languages every story can be drawn in (the View menu's Language row); none turns them off. Give the frame

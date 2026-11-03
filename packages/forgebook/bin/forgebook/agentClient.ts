@@ -83,7 +83,7 @@ const ownClient = async (config: ResolvedConfig, origin: string): Promise<Catalo
   );
   return {
     ask: (route: string, params: URLSearchParams): Promise<AgentAnswer> =>
-      agentAnswer(agentServer(server, config), config, route, params, origin),
+      agentAnswer(agentServer(server, config), config, route, params, { catalogue: origin, frames: origin }),
     runningAt: undefined,
     close: () => server.close()
   };

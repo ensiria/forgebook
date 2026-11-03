@@ -48,6 +48,7 @@ import { Dock } from "./Dock.tsx";
 import { DroppedArgsNote } from "./DroppedArgsNote.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryBar } from "./StoryBar.tsx";
@@ -164,7 +165,7 @@ const useStoryCheck = (
     run: (): void => {
       setCheck({ status: "running" });
       const message: ShellMessage = { type: "forgebook:check" };
-      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+      frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
     },
     receive: (result: CheckResult): void =>
       setCheck(
@@ -333,8 +334,7 @@ export const Stage = ({
         })
       );
       onFixedChange(message.storyId, message.fixed);
-      const send = (shellMessage: ShellMessage): void =>
-        frame.postMessage(shellMessage, window.location.origin);
+      const send = (shellMessage: ShellMessage): void => frame.postMessage(shellMessage, framesOrigin());
       send({ type: "forgebook:events", names: eventNames });
       // checked against the shown story's declaration only: a late message of the story shown before sends nothing
       const accepted = message.storyId === story.id ? addressArgs.acceptedFor(message) : undefined;
@@ -376,7 +376,7 @@ export const Stage = ({
 
   const replay = (): void => {
     const message: ShellMessage = { type: "forgebook:replay" };
-    frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+    frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
   };
   const title = STRINGS.frameTitle(component.name, story.name);
   const canReplay = replayable === story.id && !isComparing(view);
@@ -426,7 +426,7 @@ export const Stage = ({
     trace: isComparing(view) ? undefined : traces.get(story.id),
     onPlayAgain: (): void => {
       const message: ShellMessage = { type: "forgebook:play-again" };
-      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+      frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
     },
     check: storyCheck.check,
     onCheck: isComparing(view) ? undefined : storyCheck.run,

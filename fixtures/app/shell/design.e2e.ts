@@ -42,7 +42,8 @@ const comparedStory = (page: Page): FrameLocator =>
  */
 const reportFrom = async (iframe: Locator, report: unknown): Promise<void> => {
   const frame = await (await iframe.elementHandle())?.contentFrame();
-  await frame?.evaluate((message) => window.parent.postMessage(message, window.location.origin), report);
+  // to whatever page holds it: the frame runs on the frames' origin, the shell on the catalogue's
+  await frame?.evaluate((message) => window.parent.postMessage(message, "*"), report);
 };
 
 test.describe("the Design tab", () => {
