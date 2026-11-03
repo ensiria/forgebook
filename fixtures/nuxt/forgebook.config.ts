@@ -5,11 +5,14 @@
  * @module
  */
 import { nuxt } from "@forgebook/nuxt/vite";
+import { msw } from "@forgebook/plugin-msw";
 import { defineConfig } from "forgebook";
 
 export default defineConfig({
   framework: nuxt(),
   title: "Nuxt fixture",
   sources: ["./stories.ts"],
+  // its stories answer their fetches from mocks
+  plugins: [msw()],
   languages: [{ id: "it", label: "Italiano" }]
 });

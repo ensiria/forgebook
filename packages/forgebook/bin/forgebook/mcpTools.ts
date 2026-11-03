@@ -1,7 +1,8 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages` and `get_page`; and `story_preview` (`mcpPreview.ts`), for a client that renders apps.
+ * `nearest_token`, `list_pages`, `get_page` and `list_plugins`; and `story_preview` (`mcpPreview.ts`), for a client that
+ * renders apps.
  *
  * @module
  */
@@ -11,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { PluginsDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
@@ -60,6 +62,8 @@ const problemsResult = (answer: AgentAnswer): McpToolResult => {
 
 /** What the tools reach the catalogue through. */
 export type CatalogueReach = {
+  /** The plugins the configuration lists. */
+  readonly plugins: PluginsDocument;
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
   readonly ask: Ask;
   /** Writes a component's first stories, the file relative to the catalogue's folder. */
@@ -85,9 +89,17 @@ export const catalogueTools = ({
   check,
   shot,
   checkPage,
-  servePreview
+  servePreview,
+  plugins
 }: CatalogueReach): readonly McpTool[] => [
   ...pageTools(ask),
+  {
+    name: "list_plugins",
+    description:
+      "The plugins this catalogue lists and what each adds: panel tabs (open one with tab=<id> in a view), switches, docs blocks. A tab needs its plugin: a story's parameter does nothing without it.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    call: async (): Promise<McpToolResult> => ({ structured: plugins, isError: false })
+  },
   {
     name: "check_page",
     description:

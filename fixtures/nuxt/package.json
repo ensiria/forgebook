@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@forgebook/nuxt": "workspace:*",
+    "@forgebook/plugin-msw": "workspace:*",
     "@forgebook/story-format": "workspace:*",
     "@forgebook/testing": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",

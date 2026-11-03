@@ -14,7 +14,9 @@ import { resolve } from "node:path";
 
 import type { DocPageIndex } from "@forgebook/story-format/source";
 
+import type { ForgebookPlugin } from "../plugin.ts";
 import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
+import { pluginFences } from "./pluginConfig.ts";
 import { storyFileKeys } from "./storyFilesModule.ts";
 import { DOCS_PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
@@ -97,13 +99,20 @@ export const docPagesModule = (
  * @param file - the page's file, absolute.
  * @param watch - adds a file whose edit renews the module.
  * @param isServing - whether a dev server runs.
+ * @param plugins - the catalogue's plugins, whose fences a page may draw.
  */
-export const docPageModule = (file: string, watch: (file: string) => void, isServing: boolean): string => {
+export const docPageModule = (
+  file: string,
+  watch: (file: string) => void,
+  isServing: boolean,
+  plugins: readonly ForgebookPlugin[] = []
+): string => {
   watch(file);
   const { blocks, headings, images, text } = compiledDocPage(
     file,
     readFileSync(file, "utf8"),
-    watchedRead(watch)
+    watchedRead(watch),
+    pluginFences(plugins)
   );
   return [
     ...images.map(

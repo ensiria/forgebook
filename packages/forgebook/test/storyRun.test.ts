@@ -11,7 +11,6 @@ import { describe, expect, it, vi } from "vitest";
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
 import type { MountedStory, StoryDrawing } from "../src/frame/renderer.ts";
-import type { MockTools } from "../src/frame/storyMocks.ts";
 import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
 import {
   type RunningStory,
@@ -64,7 +63,7 @@ const run = async (
   story: LoadedStory,
   playTools?: PlayToolsLoader,
   onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
-  mockTools?: StoryRunOptions["mockTools"]
+  pluginSetups: StoryRunOptions["pluginSetups"] = []
 ): Promise<{
   readonly container: HTMLElement;
   readonly reports: Reports;
@@ -78,7 +77,7 @@ const run = async (
     story,
     identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
     ...(playTools === undefined ? {} : { playTools }),
-    ...(mockTools === undefined ? {} : { mockTools }),
+    pluginSetups,
     renderer: domRenderer,
     clock: heldFrameClock(0),
     texts: {},
@@ -265,36 +264,6 @@ describe("runStory with a second framework", () => {
     expect(events).toEqual(["set up 1", "undone 1", "set up 2"]);
   });
 
-  it("keeps a story's mocks running when it is played again", async () => {
-    vi.stubGlobal("navigator", {
-      serviceWorker: { controller: {}, addEventListener: (): void => undefined }
-    });
-    const events: string[] = [];
-    const tools: MockTools = {
-      http: { all: (path: string): string => `all ${path}` },
-      passthrough: (): string => "passthrough",
-      setupWorker: () => ({
-        start: async (): Promise<undefined> => {
-          events.push("start");
-          return undefined;
-        },
-        stop: (): void => {
-          events.push("stop");
-        }
-      })
-    };
-    const { reports } = await run(
-      badge({ parameters: { msw: { handlers: ["a"] } } }),
-      undefined,
-      undefined,
-      async () => tools
-    );
-    controlsOf(reports).playAgain();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(events).toEqual(["start"]);
-    vi.unstubAllGlobals();
-  });
-
   it("shows the error of a loader that throws, and never gets ready", async () => {
     const { container, reports } = await run(
       badge({
@@ -371,6 +340,134 @@ describe("runStory with a second framework", () => {
     expect(wasCalled).toBe(true);
   });
 
+  it("runs a plugin's preparation ahead of the story's loaders, and undoes it after the story's set-ups", async () => {
+    const order: string[] = [];
+    const { reports } = await run(
+      badge({
+        loaders: [
+          (): undefined => {
+            order.push("loader");
+            return undefined;
+          }
+        ],
+        beforeEach: [
+          (): (() => void) => {
+            order.push("set-up");
+            return (): void => void order.push("story undone");
+          }
+        ]
+      }),
+      undefined,
+      undefined,
+      [
+        (): (() => void) => {
+          order.push("plugin");
+          return (): void => void order.push("plugin undone");
+        }
+      ]
+    );
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order.slice(0, 5)).toEqual(["plugin", "loader", "set-up", "story undone", "plugin undone"]);
+  });
+
+  it("never holds two mounts' preparations at once, and skips one overtaken", async () => {
+    let running = 0;
+    let most = 0;
+    let started = 0;
+    const { reports } = await run(badge(), undefined, undefined, [
+      async (): Promise<() => Promise<void>> => {
+        started += 1;
+        running += 1;
+        most = Math.max(most, running);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return async (): Promise<void> => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          running -= 1;
+        };
+      }
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const controls = controlsOf(reports);
+    controls.playAgain();
+    controls.playAgain();
+    controls.playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(most).toBe(1);
+    expect(started).toBe(2);
+  });
+
+  it("goes on after a cleanup that never ends, so a request held open cannot leave a story blank", async () => {
+    vi.useFakeTimers();
+    let prepared = 0;
+    const started = run(badge(), undefined, undefined, [
+      (): (() => Promise<void>) => {
+        prepared += 1;
+        return (): Promise<void> => new Promise(() => undefined);
+      }
+    ]);
+    await vi.advanceTimersByTimeAsync(1);
+    const { reports } = await started;
+    controlsOf(reports).playAgain();
+    await vi.advanceTimersByTimeAsync(2100);
+    vi.useRealTimers();
+    expect(prepared).toBe(2);
+  });
+
+  it("undoes a plugin's preparation when the story's own cleanup throws", async () => {
+    let isUndone = false;
+    const { reports } = await run(
+      badge({
+        beforeEach: [
+          (): (() => void) => (): void => {
+            throw new Error("No cleanup");
+          }
+        ]
+      }),
+      undefined,
+      undefined,
+      [
+        (): (() => void) => (): void => {
+          isUndone = true;
+        }
+      ]
+    );
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(isUndone).toBe(true);
+  });
+
+  it("shows what a plugin's preparation throws as the story's error", async () => {
+    const { reports } = await run(badge(), undefined, undefined, [
+      (): undefined => {
+        throw new Error("No worker");
+      }
+    ]);
+    expect(reports.errors).toEqual(["No worker"]);
+  });
+
+  it("undoes a plugin's preparation when the story's own set-up fails", async () => {
+    let isUndone = false;
+    const { reports } = await run(
+      badge({
+        beforeEach: [
+          (): undefined => {
+            throw new Error("No data");
+          }
+        ]
+      }),
+      undefined,
+      undefined,
+      [
+        (): (() => void) => (): void => {
+          isUndone = true;
+        }
+      ]
+    );
+    expect(reports.errors).toEqual(["No data"]);
+    expect(isUndone).toBe(true);
+  });
+
   it("lists a call the framework reports, as a router's push, among the story's events", async () => {
     const calls: string[] = [];
     const container = document.createElement("div");
@@ -392,6 +489,7 @@ describe("runStory with a second framework", () => {
       },
       clock: heldFrameClock(0),
       texts: {},
+      pluginSetups: [],
       decorators: [],
       globals: {},
       resolveArgs: (args: PanelArgs): PanelArgs => args,
