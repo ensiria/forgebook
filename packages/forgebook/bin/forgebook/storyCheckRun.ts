@@ -15,6 +15,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "../../src/deviceView.ts";
 import {
   isStoryCheckReport,
   isStoryDiffReport,
@@ -58,14 +59,20 @@ export type StoryCheckInput = {
  *
  * @param component - its component.
  * @param story - the story.
+ * @param catalogueDevice - the catalogue's default device, under the story's.
  */
-const checkedStory = (component: AgentComponent, story: AgentStory): StoryCheckStory => {
+const checkedStory = (
+  component: AgentComponent,
+  story: AgentStory,
+  catalogueDevice: DeviceDefault
+): StoryCheckStory => {
   const formerId = formerIdOf(component, story);
   return {
     id: story.id,
     ...(formerId === undefined ? {} : { formerId }),
     ...(story.height === undefined ? {} : { height: story.height }),
-    ...(story.isLogic ? { isLogic: true } : {})
+    ...(story.isLogic ? { isLogic: true } : {}),
+    ...(deviceDefaultOf(catalogueDevice, story.device).isEdgeToEdge ? { isEdgeToEdge: true } : {})
   };
 };
 
@@ -75,15 +82,20 @@ const checkedStory = (component: AgentComponent, story: AgentStory): StoryCheckS
  *
  * @param document - the catalogue's stories.
  * @param id - the id.
+ * @param catalogueDevice - the catalogue's default device; none by default.
  */
-export const storiesNamed = (document: StoriesDocument, id: string): StoryCheckStory[] => {
+export const storiesNamed = (
+  document: StoriesDocument,
+  id: string,
+  catalogueDevice: DeviceDefault = NO_DEVICE
+): StoryCheckStory[] => {
   const component = namedComponent(document, id);
   if (component !== undefined)
     return component.stories
       .filter((story) => !story.isUnlisted)
-      .map((story) => checkedStory(component, story));
+      .map((story) => checkedStory(component, story, catalogueDevice));
   const named = namedStory(document, id);
-  return named === undefined ? [] : [checkedStory(named.component, named.story)];
+  return named === undefined ? [] : [checkedStory(named.component, named.story, catalogueDevice)];
 };
 
 /**
@@ -172,7 +184,7 @@ const runOnStories = async (
   try {
     const document = await storiesAt(served.origin);
     if (typeof document === "string") return document;
-    const stories = storiesNamed(document, input.id);
+    const stories = storiesNamed(document, input.id, deviceDefaultOf(NO_DEVICE, config.lists.device));
     if (stories.length === 0) return `No story or component "${input.id}"`;
     const request: StoryCheckRequest = {
       frameUrl: `${served.origin}/frame.html`,

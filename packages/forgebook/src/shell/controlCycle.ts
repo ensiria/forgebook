@@ -8,6 +8,8 @@
  *
  * @module
  */
+
+import { AUDIENCE_IDS } from "../audiences.ts";
 import type { CatalogueSettings } from "../catalogue.ts";
 import { cycledValue, switchValues } from "../controlKeys.ts";
 import type { FixedView } from "../storyGlobals.ts";
@@ -43,6 +45,7 @@ const cycledOwn = (
   }
   if (id === "sheets") return { ...view, sheets: cycledValue(SHEETS_CHOICES, view.sheets, step) };
   if (id === "text") return { ...view, text: cycledValue(catalogue.textSizes, view.text, step) };
+  if (id === "audience") return { ...view, audience: cycledValue(AUDIENCE_IDS, view.audience, step) };
   if (id !== "width") return undefined;
   const widths: StageWidth[] = ["fill", ...catalogue.widths.map((preset) => preset.width)];
   return { ...view, width: cycledValue(widths, view.width, step) };

@@ -27,6 +27,13 @@ const BASE: ForgebookConfig = {
 const folder = (): string => mkdtempSync(join(tmpdir(), "forgebook-config-"));
 
 describe("resolveConfig", () => {
+  it("refuses an audience that is none, from the catalogue or a preset", () => {
+    expect(() => resolveConfig({ ...BASE, ...JSON.parse('{"audience":"manager"}') }, "/catalogue")).toThrow(
+      'the audience "manager" is none of everyone, designer, coder, tester'
+    );
+    expect(resolveConfig({ ...BASE, audience: "tester" }, "/catalogue").lists.audience).toBe("tester");
+  });
+
   it("merges the presets under the configuration: a switch or language of the same id is replaced in its place", () => {
     const dark = { ...themeSwitch(), default: "dark" };
     const resolved = resolveConfig(
@@ -93,6 +100,21 @@ describe("the build's options", () => {
     expect(resolveConfig({ ...base, build: { readableNames: true } }, "/app").build).toEqual({
       readableNames: true
     });
+  });
+
+  it("refuses a device that names a model no one has, and lays the catalogue's fields over a preset's", () => {
+    expect(() => resolveConfig({ ...BASE, device: { model: "nokia-3310" } }, "/catalogue")).toThrow(
+      `${resolve("/catalogue", "forgebook.config")}: Forgebook's device: "nokia-3310" is no device model`
+    );
+    // a configuration is code: its types are not a promise
+    const loose: ForgebookConfig = { ...BASE };
+    Reflect.set(loose, "device", "pixel-9");
+    expect(() => resolveConfig(loose, "/catalogue")).toThrow(/Forgebook's device: write it as an object/);
+    const resolved = resolveConfig(
+      { ...BASE, device: { frame: true }, presets: [{ name: "a", device: { model: "pixel-9" } }] },
+      "/catalogue"
+    );
+    expect(resolved.lists.device).toEqual({ model: "pixel-9", frame: true });
   });
 });
 

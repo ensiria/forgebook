@@ -3,16 +3,20 @@
  * their browser, and the catalogue's own (`views` in its configuration), offered to the whole team.
  *
  * @remarks
- * A named view holds values, never an arrangement: the switches, the background, the style sheets, the text size and
- * the width. Picking one sets them as choosing each would, so the address carries the values; a name never goes in the
+ * A named view holds values, never an arrangement: the switches, the background, the style sheets, the text size, the
+ * width and the device. Picking one sets them as choosing each would, so the address carries the values; a name never goes in the
  * address, since another reader may not have it. Pure: views in, views out.
  *
  * @module
  */
+import { isDeviceId, isDeviceOrientation } from "./deviceView.ts";
 import { parseView, type ViewCatalogue, type ViewState, viewParams } from "./viewState.ts";
 
 /** The values a named view holds: the View menu's. */
-export type ViewValues = Pick<ViewState, "switches" | "backdrop" | "sheets" | "text" | "width">;
+export type ViewValues = Pick<
+  ViewState,
+  "switches" | "backdrop" | "sheets" | "text" | "width" | "device" | "orientation"
+>;
 
 /** A view saved under a name. */
 export type NamedView = {
@@ -40,7 +44,9 @@ export const viewValues = (view: ViewState): ViewValues => ({
   backdrop: view.backdrop,
   sheets: view.sheets,
   text: view.text,
-  width: view.width
+  width: view.width,
+  device: view.device,
+  orientation: view.orientation
 });
 
 /**
@@ -80,8 +86,8 @@ export const withoutView = (views: readonly NamedView[], name: string): NamedVie
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** Whether a value is a named view's values, as this module stores them. */
-const isViewValues = (value: unknown): value is ViewValues =>
+/** Whether a value is a named view's values, as this module stores them; the device may be missing. */
+const isViewValues = (value: unknown): value is Omit<ViewValues, "device" | "orientation"> =>
   isRecord(value) &&
   isRecord(value["switches"]) &&
   Object.values(value["switches"]).every((each) => typeof each === "string") &&
@@ -103,10 +109,24 @@ export const readNamedViews = (stored: string | null): NamedView[] => {
   } catch {
     return [];
   }
-  return (Array.isArray(parsed) ? parsed : []).filter(
-    (each): each is NamedView =>
-      isRecord(each) && typeof each["name"] === "string" && isViewValues(each["values"])
-  );
+  // a view saved before views held the device has none: it follows the story's
+  return (Array.isArray(parsed) ? parsed : []).flatMap((each): NamedView[] => {
+    if (!isRecord(each) || typeof each["name"] !== "string") return [];
+    const values: unknown = each["values"];
+    const device = isRecord(values) ? values["device"] : undefined;
+    const orientation = isRecord(values) ? values["orientation"] : undefined;
+    if (!isViewValues(values)) return [];
+    return [
+      {
+        name: each["name"],
+        values: {
+          ...values,
+          device: device === "off" || isDeviceId(device) ? device : "auto",
+          orientation: isDeviceOrientation(orientation) ? orientation : "auto"
+        }
+      }
+    ];
+  });
 };
 
 /**
@@ -135,7 +155,9 @@ export const isSameView = (
   first.backdrop === second.backdrop &&
   first.sheets === second.sheets &&
   first.text === second.text &&
-  first.width === second.width;
+  first.width === second.width &&
+  first.device === second.device &&
+  first.orientation === second.orientation;
 
 /**
  * A view with a named view's values read back as an address is: what the catalogue no longer offers (a background, a

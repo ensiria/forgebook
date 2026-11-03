@@ -7,7 +7,8 @@
  * Loaded from the project by the command only when it runs, as the check is. A story is pictured at its start (its
  * clock held, animations off), so the same story in the same view gives the same picture. A frame that never says it
  * is ready is pictured as it is, so the picture shows what is wrong. The file's name is the story's id and the view's,
- * so the pictures of several views sit side by side.
+ * so the pictures of several views sit side by side. A view that names a device (`iphone-16`) is pictured in it, framed
+ * (`deviceShot.ts`); no other view is.
  *
  * @module
  */
@@ -15,7 +16,9 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import type { StoryShot, StoryShotReport, StoryShotRequest } from "forgebook/story-check";
+import { schemeOf } from "forgebook/view-state";
 
+import { framedShot } from "./deviceShot.ts";
 import { eachStoryPage, openedStory, type StoryPage } from "./storyPages.ts";
 
 /** A text with no hyphens at its ends; a loop, since a regular expression slows on a long run of them. */
@@ -49,6 +52,12 @@ export const shotStories = async (request: StoryShotRequest): Promise<StoryShotR
   const shots = await eachStoryPage(request, async (page, storyPage): Promise<StoryShot> => {
     const status = await openedStory(page, storyPage);
     const file = join(request.outDir, shotName(storyPage));
+    if (storyPage.device !== undefined) {
+      // a story's scheme of `system` is pictured light, as the held window has no system to follow
+      const scheme = schemeOf(storyPage.view, request.switches) === "dark" ? "dark" : "light";
+      await framedShot(page, storyPage.device, storyPage.isEdgeToEdge, scheme, file);
+      return { storyId: storyPage.story.id, view: storyPage.name, frame: storyPage.frame, file };
+    }
     // the story at its own height, not the window's: the body's, as the shell sizes a frame
     const size = await page.evaluate(() => ({
       width: document.documentElement.clientWidth,

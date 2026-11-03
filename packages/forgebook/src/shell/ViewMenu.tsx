@@ -80,7 +80,8 @@ export const ViewMenu = ({
   readonly ownView: ViewState;
 }): ReactNode => {
   const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
-  const { switches } = useCatalogue();
+  const catalogue = useCatalogue();
+  const { switches } = catalogue;
   const [panel, setPanel] = useState(initialPanel);
   const ids = menuControlIds(layout.placed, movedIds);
   // the menu never runs past the window's edges: a narrow window keeps it inside, its widest values then scroll; a
@@ -143,7 +144,7 @@ export const ViewMenu = ({
       >
         <Icon name="sliders" size={14} />
         {STRINGS.view}
-        {hasViewChanges(ownView, switches, ids) ? (
+        {hasViewChanges(ownView, switches, ids, catalogue.audience) ? (
           <span className="forgebook-dot" role="img" aria-label={STRINGS.viewChanged} />
         ) : null}
         <Icon name="chevronDown" size={12} />
