@@ -13,7 +13,7 @@ import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
  * Vite's configuration for a catalogue.
  *
  * @param config - the catalogue's configuration, read.
- * @param overrides - what the command sets (the port, the output folder).
+ * @param overrides - what the command sets (the port, the output folder); its plugins run after the catalogue's.
  */
 export const catalogueVite = async (
   config: ResolvedConfig,
@@ -23,5 +23,9 @@ export const catalogueVite = async (
   root: config.dir,
   // the configuration file is Forgebook's: a vite.config beside it is not read
   configFile: false,
-  plugins: [forgebookPlugin({ config }), ...((await config.framework.vitePlugins?.()) ?? [])]
+  plugins: [
+    forgebookPlugin({ config }),
+    ...((await config.framework.vitePlugins?.()) ?? []),
+    ...(overrides.plugins ?? [])
+  ]
 });
