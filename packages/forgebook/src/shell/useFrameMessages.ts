@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Violation } from "../a11y.ts";
-import { type FrameMessage, isFrameMessage } from "../messages.ts";
+import { type FrameMessage, isFrameMessage, type PanelArgs } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { isFromFrames } from "./framesOrigin.ts";
 
@@ -20,9 +20,6 @@ export const FRAME_ASIDE_ATTRIBUTE = "data-forgebook-aside";
 
 /** A message of a frame that the stage answers. */
 export type ReadyMessage = Extract<FrameMessage, { type: "forgebook:ready" }>;
-
-/** The args a story changed itself. */
-export type StoryArgsMessage = Extract<FrameMessage, { type: "forgebook:story-args" }>;
 
 /** What a plugin's frame module reported. */
 export type PluginReportMessage = Extract<FrameMessage, { type: "forgebook:plugin" }>;
@@ -64,8 +61,11 @@ export type FrameHandlers = {
   readonly onSpills?: (storyId: string, count: number, frame: string) => void;
   /** A plugin's frame module told its tab about a story; none where no tab shows it. */
   readonly onPluginReport?: (message: PluginReportMessage) => void;
-  /** A story changed its own args (Storybook's `useArgs`); none where no panel shows them. */
-  readonly onStoryArgs?: (message: StoryArgsMessage) => void;
+  /**
+   * A story changed its own args (Storybook's `useArgs`): its id, and the panel's values the change makes; none where no
+   * panel shows them.
+   */
+  readonly onStoryArgs?: (storyId: string, args: PanelArgs) => void;
 };
 
 /** An accessibility check's result, as a frame reported it. */
@@ -130,7 +130,7 @@ const onFrameMessage = (message: FrameMessage, frame: HTMLIFrameElement, targets
       handlers.onPluginReport?.(message);
       return;
     case "forgebook:story-args":
-      handlers.onStoryArgs?.(message);
+      handlers.onStoryArgs?.(message.storyId, message.args);
       return;
     case "forgebook:call":
       handlers.onCall({
