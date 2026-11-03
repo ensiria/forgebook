@@ -10,6 +10,12 @@ import type { Violation } from "../a11y.ts";
 import { type FrameMessage, isFrameMessage } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 
+/**
+ * Marks a frame shown beside the page's own, which answers it itself: a story's second frame reporting here would
+ * replace the stage's play trace and add to its spills and its calls, though it runs at another size.
+ */
+export const FRAME_ASIDE_ATTRIBUTE = "data-forgebook-aside";
+
 /** A message of a frame that the stage answers. */
 export type ReadyMessage = Extract<FrameMessage, { type: "forgebook:ready" }>;
 
@@ -144,7 +150,9 @@ export const useFrameMessages = (handlers: FrameHandlers): FrameReports => {
   useEffect(() => {
     const listen = (event: MessageEvent): void => {
       if (event.origin !== window.location.origin || !isFrameMessage(event.data)) return;
-      onFrameMessage(event.data, frameOf(event.source), {
+      const frame = frameOf(event.source);
+      if (frame?.hasAttribute(FRAME_ASIDE_ATTRIBUTE)) return;
+      onFrameMessage(event.data, frame, {
         handlers: handlersRef.current,
         setReplayable,
         setClocked,

@@ -9,9 +9,11 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
 - `packages/forgebook`: the core (`forgebook` on npm): `src/shell` (the catalogue's page), `src/frame` (a story's
   frame), `src/vite` (the plugin, the props extractor, the answers to tools and agents), `bin/` (`forgebook`,
   `forgebook-docs`, `forgebook-texts`).
-- `packages/react` (`@forgebook/react`), `packages/vue` (`@forgebook/vue`), `packages/story-format` (`@forgebook/story-format`, no dependencies),
+- `packages/react` (`@forgebook/react`), `packages/vue` (`@forgebook/vue`), `packages/nextjs` (`@forgebook/nextjs`, on
+  React's), `packages/story-format` (`@forgebook/story-format`, no dependencies),
   `packages/testing` (`@forgebook/testing`).
-- `fixtures/`: the kit, the stories written the Storybook way, and the catalogue the shell's browser tests run on.
+- `fixtures/`: the kit, the stories written the Storybook way, the catalogue the shell's browser tests run on, and the
+  Vue catalogue (`fixtures/vue`) and small Next.js app (`fixtures/nextjs`) whose catalogues they open beside it.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
 
 ## Before you say a change is done
@@ -37,6 +39,10 @@ case, with the reason (`// biome-ignore lint/…: the protocol names this field`
 - **Two runtimes.** `src/shell` and `src/frame` run in the page. `src/vite` and `bin/` run on Node directly, their
   types stripped, so their relative imports carry `.ts` (each folder has its own `tsconfig.json`).
   `src/componentDocs.ts` is the shape both sides share. `packages/testing` runs inside Playwright or Vitest.
+- **Windows too.** CI runs the checks and the shell's suite on Windows. A path the Node side compares with a Vite id,
+  writes into generated code or uses as a key goes through `src/vite/vitePaths.ts` (forward slashes on every system,
+  as Vite's ids), and its logic is tested with `path.win32`; a package's command (`pnpm`, `npm`) is a `.cmd` there,
+  which only a shell starts.
 - **The props extractor reads types, never runs code**: TypeScript 6's compiler API (`typescript-6`, an alias: the
   repository type-checks with TypeScript 7, which has no compiler API), the props declared in the package only.
 - **Tools and agents get what the shell shows**: the dev server's answers (`src/vite/agentRoutes.ts`) load the same

@@ -17,6 +17,7 @@ const CONFIG: ResolvedConfig = {
   logo: undefined,
   heights: undefined,
   stories: [],
+  docs: [],
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [],
@@ -78,10 +79,10 @@ describe("prebundled", () => {
 });
 
 describe("a project with MSW", () => {
-  it("pre-bundles its browser module, which Node cannot resolve, so a page does not reload to find it", () => {
-    expect(prebundled({ ...CONFIG, hasMocks: true }, resolverOf({}), resolverOf({}))).toContain(
-      "msw/browser"
-    );
+  it("pre-bundles its modules, the browser one which Node cannot resolve, so a page does not reload to find them", () => {
+    const names = prebundled({ ...CONFIG, hasMocks: true }, resolverOf({}), resolverOf({}));
+    expect(names).toContain("msw/browser");
+    expect(names).toContain("msw");
     expect(prebundled(CONFIG, resolverOf({}), resolverOf({}))).not.toContain("msw/browser");
   });
 });

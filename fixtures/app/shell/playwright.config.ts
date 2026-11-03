@@ -3,9 +3,9 @@
  * the unit tests cannot reach (the address, the panel, the stage, the keys, the errors).
  *
  * @remarks
- * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT`, so two worktrees can run
- * the tests at once. The Vue fixture catalogue runs beside the fixture app, for what a catalogue of another framework
- * must do (`vue.e2e.ts`).
+ * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT`, so two worktrees can
+ * run the tests at once. The Vue and Next.js fixture catalogues run beside the fixture app, for what a catalogue of
+ * another framework must do (`vue.e2e.ts`) and what a Next.js project's components need (`nextjs.e2e.ts`).
  *
  * @module
  */
@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { SHELL_PORT, VUE_PORT } from "./ports";
+import { NEXTJS_PORT, SHELL_PORT, VUE_PORT } from "./ports";
 
 /**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
@@ -22,7 +22,10 @@ import { SHELL_PORT, VUE_PORT } from "./ports";
  * @param folder - the catalogue's folder.
  * @param port - the port it listens on.
  */
-const catalogueServer = (folder: string, port: number) => ({
+const catalogueServer = (
+  folder: string,
+  port: number
+): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
   command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${port} --force`,
   cwd: folder,
   url: `http://127.0.0.1:${port}/`,
@@ -36,7 +39,8 @@ export default defineConfig({
   reporter: [["list"]],
   webServer: [
     catalogueServer(join(import.meta.dirname, ".."), SHELL_PORT),
-    catalogueServer(join(import.meta.dirname, "..", "..", "vue"), VUE_PORT)
+    catalogueServer(join(import.meta.dirname, "..", "..", "vue"), VUE_PORT),
+    catalogueServer(join(import.meta.dirname, "..", "..", "nextjs"), NEXTJS_PORT)
   ],
   use: {
     browserName: "chromium",

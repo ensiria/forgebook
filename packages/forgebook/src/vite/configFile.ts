@@ -11,7 +11,7 @@
  */
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { StoryLanguage } from "@forgebook/story-format/source";
@@ -21,6 +21,8 @@ import { mergedThemes, shellThemeCss, shellThemeProblems, themeValueProblem } fr
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { ForgebookConfig } from "./config.ts";
+import { tokenThemeOf } from "./themeFromTokens.ts";
+import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
@@ -46,7 +48,10 @@ export type ResolvedTokensFile = {
   readonly mode: string | undefined;
 };
 
-/** A configuration ready for the pages: its folder, its presets merged, its paths absolute. */
+/**
+ * A configuration ready for the pages: its folder, its presets merged, its paths absolute and in Vite's form (forward
+ * slashes on every system, `vitePaths.ts`), so they compare with Vite's ids and can be written into generated code.
+ */
 export type ResolvedConfig = {
   /** The folder the configuration file is in: Vite's root. */
   readonly dir: string;
@@ -60,6 +65,8 @@ export type ResolvedConfig = {
   readonly heights: string | undefined;
   /** The project's own story globs, from the configuration's folder. */
   readonly stories: readonly string[];
+  /** The project's own docs pages' globs, from the configuration's folder. */
+  readonly docs: readonly string[];
   /** The sources' module specifiers. */
   readonly sources: readonly string[];
   /** The switches, the presets' and the catalogue's merged; none when neither declares any. */
@@ -84,8 +91,11 @@ export type ResolvedConfig = {
   readonly hasMocks: boolean;
 };
 
-/** MSW's browser module, for a story's mocked API. */
-export const MOCKS_MODULE = "msw/browser";
+/**
+ * MSW's modules, for a story's mocked API: the browser module, which starts the worker, and the main one, whose handler
+ * keeps each story's handlers to its own frame.
+ */
+export const MOCKS_MODULES = ["msw/browser", "msw"] as const;
 
 /** Its package's manifest, what tells it is installed: the module itself cannot be resolved from Node. */
 const MOCKS_MANIFEST = "msw/package.json";
@@ -201,6 +211,12 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   };
 };
 
+/** Whether a configuration's list has something in it. */
+const isListed = (config: object, key: string): boolean => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list) && list.length > 0;
+};
+
 /**
  * Why a loaded configuration cannot be used, or none.
  *
@@ -212,9 +228,7 @@ const configProblem = (config: unknown): string | undefined => {
   if (!("framework" in config) || typeof config.framework !== "object" || config.framework === null)
     return "it names no framework (`framework: react()`)";
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
-  const hasStories = "stories" in config && Array.isArray(config.stories) && config.stories.length > 0;
-  const hasSources = "sources" in config && Array.isArray(config.sources) && config.sources.length > 0;
-  if (!hasStories && !hasSources)
+  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
   return undefined;
 };
@@ -226,29 +240,49 @@ const configProblem = (config: unknown): string | undefined => {
  */
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
 
+/** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
+const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "docs" | "sources"> => ({
+  stories: config.stories ?? [],
+  docs: config.docs ?? [],
+  sources: config.sources ?? []
+});
+
 /**
- * A configuration with its presets merged and its paths made absolute.
+ * A configuration with its presets merged and its paths made absolute, in Vite's form.
  *
  * @param config - the configuration.
- * @param dir - the folder of its file.
+ * @param fileDir - the folder of its file.
+ * @param paths - the path functions; the running system's unless a test names another.
  * @throws when the merged switches cannot be used.
  */
-export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedConfig => {
+export const resolveConfig = (
+  config: ForgebookConfig,
+  fileDir: string,
+  paths: VitePaths = VITE_PATHS
+): ResolvedConfig => {
   const presets = config.presets ?? [];
-  const absolute = (path: string): string => (isAbsolute(path) ? path : resolve(dir, path));
+  const dir = paths.normalize(fileDir);
+  const absolute = (path: string): string => paths.resolve(dir, path);
+  // a preset's preview and style sheet are absolute paths (its own files) or a package's specifier, kept as written
+  const ownPath = (path: string): string => (paths.isAbsolute(path) ? paths.normalize(path) : path);
   const declared = [...presets.map((preset) => preset.switches), config.switches];
   const switches = declared.some((list) => list !== undefined) ? mergedById(declared) : undefined;
   const problem = switches === undefined ? undefined : switchesProblem(switches);
   if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
-  const theme = mergedThemes([
-    ...presets.map((preset) => preset.shell?.theme ?? {}),
-    config.shell?.theme ?? {}
-  ]);
+  const declaredThemes = [...presets.map((preset) => preset.shell?.theme ?? {}), config.shell?.theme ?? {}];
+  const tokens = (config.tokens ?? []).map((each) =>
+    typeof each === "string"
+      ? { path: absolute(each), mode: undefined }
+      : { path: absolute(each.file), mode: each.mode }
+  );
+  const fromTokens = Object.assign({}, ...declaredThemes.map((each) => each.fromTokens));
+  const tokenThemed = tokenThemeOf(fromTokens, tokens, dir);
+  const theme = mergedThemes([tokenThemed.theme, ...declaredThemes]);
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
   const ownPreview =
     config.preview === undefined
-      ? PREVIEW_FILES.map((name) => resolve(dir, name)).find((file) => existsSync(file))
+      ? PREVIEW_FILES.map((name) => paths.join(dir, name)).find((file) => existsSync(file))
       : absolute(config.preview);
   return {
     dir,
@@ -256,12 +290,11 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     title: config.title,
     logo: config.logo === undefined ? undefined : absolute(config.logo),
     heights: config.heights,
-    stories: config.stories ?? [],
-    sources: config.sources ?? [],
+    ...shownFiles(config),
     switches,
     languages: mergedById([...presets.map((preset) => preset.languages), config.languages]),
     previews: [
-      ...presets.flatMap((preset) => (preset.preview === undefined ? [] : [preset.preview])),
+      ...presets.flatMap((preset) => (preset.preview === undefined ? [] : [ownPath(preset.preview)])),
       ...(ownPreview === undefined ? [] : [ownPreview])
     ],
     head: [...presets.map((preset) => preset.head ?? ""), config.head ?? ""]
@@ -270,16 +303,12 @@ export const resolveConfig = (config: ForgebookConfig, dir: string): ResolvedCon
     shell: {
       themeCss: shellThemeCss(theme),
       styleSheets: [
-        ...presets.flatMap((preset) => (preset.shell?.css === undefined ? [] : [preset.shell.css])),
+        ...presets.flatMap((preset) => (preset.shell?.css === undefined ? [] : [ownPath(preset.shell.css)])),
         ...(config.shell?.css === undefined ? [] : [absolute(config.shell.css)])
       ],
-      problems: shellThemeProblems(theme)
+      problems: [...tokenThemed.problems, ...shellThemeProblems(theme)]
     },
-    tokens: (config.tokens ?? []).map((each) =>
-      typeof each === "string"
-        ? { path: absolute(each), mode: undefined }
-        : { path: absolute(each.file), mode: each.mode }
-    ),
+    tokens,
     watch: (config.watch ?? []).map(absolute),
     lists: mergedLists([...presets, config]),
     hasPlayTools: hasPlayToolsIn(dir),

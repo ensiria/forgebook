@@ -277,6 +277,50 @@ describe("storyTree", () => {
   });
 });
 
+describe("designs", () => {
+  const fileLink = "https://www.figma.com/design/File1";
+
+  it("gives a story the meta's design unless it has its own, and the component the meta's", () => {
+    const tree = storyTree([
+      source({
+        "A.stories.tsx": {
+          title: "Inputs/A",
+          design: { figma: fileLink },
+          stories: [
+            { exportName: "Inherits" },
+            { exportName: "Own", design: { figma: `${fileLink}?node-id=1-2` } }
+          ]
+        }
+      })
+    ]);
+    const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
+    expect(component?.design?.url).toBe(fileLink);
+    expect(component?.stories.map((story) => story.design?.nodeId)).toEqual([undefined, "1:2"]);
+    expect(tree.problems).toEqual([]);
+  });
+
+  it("reports a link that is not Figma's and keeps the component, without the link", () => {
+    const tree = storyTree([
+      source({
+        "A.stories.tsx": {
+          title: "Inputs/A",
+          design: { figma: "https://figma.evil.example/design/File1/Kit" },
+          stories: [
+            { exportName: "Inherits" },
+            { exportName: "Own", design: { figma: "javascript:alert(1)" } }
+          ]
+        }
+      })
+    ]);
+    const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
+    expect(component?.design).toBeUndefined();
+    expect(component?.stories.map((story) => story.design)).toEqual([undefined, undefined]);
+    expect(tree.problems).toHaveLength(2);
+    expect(tree.problems[0]).toContain("A.stories.tsx: `parameters.design.figma`: ");
+    expect(tree.problems[1]).toContain("story Own");
+  });
+});
+
 describe("aliases and related components", () => {
   const tree = storyTree([
     source({

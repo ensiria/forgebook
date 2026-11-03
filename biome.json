@@ -235,6 +235,33 @@
       }
     },
     {
+      "includes": [
+        "packages/nextjs/src/next/**",
+        "fixtures/nextjs/app/**/page.tsx",
+        "fixtures/nextjs/app/**/layout.tsx",
+        "**/forgebook.preview.tsx",
+        "fixtures/nextjs/types.d.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off",
+            "useNamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["fixtures/nextjs/components/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/testing/src/playwrightConfig.ts", "fixtures/app/shell/ports.ts"],
       "linter": {
         "rules": {

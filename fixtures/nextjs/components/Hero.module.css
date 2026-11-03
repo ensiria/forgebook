@@ -1,0 +1,13 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.caption {
+  position: absolute;
+  inset-inline-start: 16px;
+  inset-block-end: 12px;
+  color: white;
+  font-family: var(--font-mono);
+}

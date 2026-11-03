@@ -4,10 +4,21 @@
  *
  * @module
  */
+import { win32 } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
-import { configModule, frameEntry, pageHtml, shellEntry, storiesSourceModule } from "../src/vite/pages.ts";
+import {
+  configModule,
+  frameEntry,
+  pageHtml,
+  pageModuleOf,
+  pageModulePath,
+  shellEntry,
+  storiesSourceModule
+} from "../src/vite/pages.ts";
+import { vitePathsOf } from "../src/vite/vitePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A resolved configuration with a logo, a preview, its own stories and a package's. */
@@ -18,6 +29,7 @@ const CONFIG: ResolvedConfig = {
   logo: "/catalogue/logo.svg",
   heights: "story-heights.json",
   stories: ["src/**/*.stories.tsx"],
+  docs: [],
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [{ id: "it", label: "Italiano" }],
@@ -48,6 +60,17 @@ describe("the generated pages", () => {
     expect(entry).toContain("sources: [source0, source1],");
   });
 
+  it("makes the project's own source from its docs pages alone, and lists them", () => {
+    const docsOnly = { ...CONFIG, stories: [], docs: ["./docs/**/*.md"] };
+    expect(shellEntry(docsOnly)).toContain(
+      'import { source as source0 } from "/catalogue/.forgebook-stories.ts";'
+    );
+    const source = storiesSourceModule(docsOnly);
+    expect(source).toContain('import docs0 from "./docs/**/*.md?forgebook-docs-pages";');
+    expect(source).toContain("  docs: [docs0],");
+    expect(storiesSourceModule(CONFIG)).not.toContain("docs:");
+  });
+
   it("mounts the framework's frame with the previews, the catalogue's last", () => {
     const entry = frameEntry(CONFIG);
     expect(entry).toContain(`import { mountFrame } from ${JSON.stringify(STUB_FRAMEWORK.pages.frame)};`);
@@ -76,7 +99,8 @@ describe("a story's mocked API", () => {
   it("names MSW in the frame's entry only for a project that installs it, and only as a dynamic import", () => {
     expect(frameEntry(CONFIG)).not.toContain("msw");
     const entry = frameEntry({ ...CONFIG, hasMocks: true });
-    expect(entry).toContain('mockTools: () => import("msw/browser"),');
+    expect(entry).toContain('await Promise.all([import("msw/browser"), import("msw")]);');
+    expect(entry).toContain("http: core.http, passthrough: core.passthrough");
     expect(entry).not.toContain('from "msw');
   });
 
@@ -110,5 +134,54 @@ describe("a catalogue's theme", () => {
     };
     expect(shellEntry(styled)).toContain('import "/catalogue/shell.css";');
     expect(frameEntry(styled)).not.toContain("shell.css");
+  });
+});
+
+describe("the generated modules' paths on Windows", () => {
+  /** Windows' path functions, answering in Vite's form. */
+  const Windows = vitePathsOf(win32);
+  /** A catalogue's folder as Node names it on Windows. */
+  const Dir = "C:\\Users\\ada\\app";
+
+  it("names each module with forward slashes, as Vite's ids are", () => {
+    expect(pageModulePath(Dir, ".forgebook-shell.ts", Windows)).toBe("C:/Users/ada/app/.forgebook-shell.ts");
+    expect(pageModulePath("C:/Users/ada/app", ".forgebook-stories.ts", Windows)).toBe(
+      "C:/Users/ada/app/.forgebook-stories.ts"
+    );
+  });
+
+  it("recognises its modules by Vite's id, whose slashes differ from Node's path of the folder", () => {
+    expect(pageModuleOf("C:/Users/ada/app/.forgebook-shell.ts", Dir, Windows)).toEqual({
+      kind: "entry",
+      page: "index.html"
+    });
+    expect(pageModuleOf("C:/Users/ada/app/.forgebook-frame.ts", Dir, Windows)).toEqual({
+      kind: "entry",
+      page: "frame.html"
+    });
+    expect(pageModuleOf("C:/Users/ada/app/.forgebook-stories.ts", Dir, Windows)).toEqual({
+      kind: "stories-source"
+    });
+    expect(pageModuleOf("C:/Users/ada/app/.forgebook-agent.ts", Dir, Windows)).toEqual({
+      kind: "agent-sources"
+    });
+  });
+
+  it("recognises a page by Node's path too, as the build's inputs may arrive", () => {
+    expect(pageModuleOf("C:\\Users\\ada\\app\\frame.html", "C:/Users/ada/app", Windows)).toEqual({
+      kind: "page",
+      page: "frame.html"
+    });
+  });
+
+  it("names nothing else, in the folder or out of it", () => {
+    expect(pageModuleOf("C:/Users/ada/app/src/main.ts", Dir, Windows)).toBeUndefined();
+    expect(pageModuleOf("C:/Users/ada/kit/.forgebook-shell.ts", Dir, Windows)).toBeUndefined();
+    expect(pageModuleOf("react", Dir, Windows)).toBeUndefined();
+  });
+
+  it("imports the project's own stories by their module's path in Vite's form", () => {
+    const own = { ...CONFIG, dir: "C:/Users/ada/app" };
+    expect(shellEntry(own)).toContain('from "C:/Users/ada/app/.forgebook-stories.ts";');
   });
 });

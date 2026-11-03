@@ -34,8 +34,12 @@ const sourceOf = (value: unknown, indent: string): string =>
  * @param tool - the tool's name, for the file's comment (`Storybook`).
  */
 export const initConfigText = (imported: ImportedConfig, tool: string): string => {
+  const options =
+    imported.frameworkOptions === undefined
+      ? ""
+      : sourceOf(imported.frameworkOptions, "  ").replace(/\n\s*/g, " ");
   const fields = [
-    `  framework: ${imported.framework}(),`,
+    `  framework: ${imported.framework}(${options}),`,
     `  title: ${JSON.stringify(imported.title)},`,
     `  stories: ${sourceOf(imported.stories, "  ")},`,
     ...(imported.preview === undefined ? [] : [`  preview: ${JSON.stringify(imported.preview)},`]),

@@ -11,7 +11,7 @@
  * @module
  */
 
-import type { StoryLanguage } from "@forgebook/story-format/source";
+import type { StoryLanguage, StoryTokensFile } from "@forgebook/story-format/source";
 
 import type { CatalogueLists } from "../catalogue.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
@@ -35,7 +35,7 @@ export type ForgebookPreset = CatalogueLists & {
 };
 
 /** A tokens file: its path from the configuration's folder, with its theme when it is a theme's. */
-export type TokensFile = string | { readonly file: string; readonly mode: string };
+export type TokensFile = StoryTokensFile;
 
 /** A catalogue's configuration: the lists of `CatalogueLists` (widths, backgrounds, story groups…) besides these. */
 export type ForgebookConfig = CatalogueLists & {
@@ -52,6 +52,11 @@ export type ForgebookConfig = CatalogueLists & {
    * named after the catalogue. Give `stories` or `sources`, or both.
    */
   readonly stories?: readonly string[];
+  /**
+   * The project's own docs pages, as globs from the configuration's folder (`["docs/**\/*.md"]`): Markdown with live
+   * stories, listed in the sidebar's Docs section, in the source named after the catalogue.
+   */
+  readonly docs?: readonly string[];
   /** The packages' story sources, as module specifiers exporting a `source` (`["@acme/ui/stories"]`). */
   readonly sources?: readonly string[];
   /** The switches of the toolbar and the View menu; the theme and the contrast when neither it nor a preset declares any. */
@@ -62,7 +67,8 @@ export type ForgebookConfig = CatalogueLists & {
   readonly shell?: ShellOptions;
   /**
    * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of
-   * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from.
+   * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from,
+   * after each source's: a name given twice takes the catalogue's value, and tools report the clash.
    */
   readonly tokens?: readonly TokensFile[];
   /** Its preview's path from the configuration's folder; `forgebook.preview.ts` (or `.tsx`) beside it when there. */
