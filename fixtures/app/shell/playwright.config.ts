@@ -3,8 +3,10 @@
  * the unit tests cannot reach (the address, the panel, the stage, the keys, the errors).
  *
  * @remarks
- * Run with `pnpm --filter @fixture/app test:shell`. The port comes from `FORGEBOOK_SHELL_PORT`, so two
- * worktrees can run the tests at once.
+ * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT`, so two worktrees can
+ * run the tests at once. The white-label catalogue (`white-label/forgebook.config.ts`) and the Next.js fixture
+ * catalogue run beside the fixture app, for a catalogue with no trace of Forgebook's look (`embed.e2e.ts`) and for what
+ * a Next.js project's components need (`nextjs.e2e.ts`).
  *
  * @module
  */
@@ -12,11 +14,26 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-/** The port the fixture app listens on. */
-const PORT = Number(process.env["FORGEBOOK_SHELL_PORT"] ?? "41721");
+import { NEXTJS_PORT, SHELL_PORT, WHITE_LABEL_PORT } from "./ports";
 
-/** The port the white-label catalogue listens on: the next one, so worktrees that set the first stay apart. */
-const WHITE_LABEL_PORT = PORT + 1;
+/**
+ * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
+ * dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here.
+ *
+ * @param folder - the catalogue's folder.
+ * @param port - the port it listens on.
+ * @param configFile - its configuration, relative to the folder; the folder's `forgebook.config.ts` when absent.
+ */
+const catalogueServer = (
+  folder: string,
+  port: number,
+  configFile?: string
+): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
+  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${port} --force`,
+  cwd: folder,
+  url: `http://127.0.0.1:${port}/`,
+  reuseExistingServer: false
+});
 
 export default defineConfig({
   testDir: import.meta.dirname,
@@ -24,25 +41,14 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"]],
   webServer: [
-    {
-      // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
-      // dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here
-      command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT} --force`,
-      cwd: join(import.meta.dirname, ".."),
-      url: `http://127.0.0.1:${PORT}/`,
-      reuseExistingServer: false
-    },
-    {
-      // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
-      command: `pnpm exec forgebook dev --config white-label/forgebook.config.ts --host 127.0.0.1 --port ${WHITE_LABEL_PORT} --force`,
-      cwd: join(import.meta.dirname, ".."),
-      url: `http://127.0.0.1:${WHITE_LABEL_PORT}/`,
-      reuseExistingServer: false
-    }
+    catalogueServer(join(import.meta.dirname, ".."), SHELL_PORT),
+    // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
+    catalogueServer(join(import.meta.dirname, ".."), WHITE_LABEL_PORT, "white-label/forgebook.config.ts"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "nextjs"), NEXTJS_PORT)
   ],
   use: {
     browserName: "chromium",
-    baseURL: `http://127.0.0.1:${PORT}/`,
+    baseURL: `http://127.0.0.1:${SHELL_PORT}/`,
     viewport: { width: 1280, height: 900 }
   }
 });

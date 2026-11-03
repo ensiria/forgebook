@@ -10,16 +10,10 @@ import type { AddressInfo } from "node:net";
 
 import { test as base, expect, type FrameLocator, type Page } from "@playwright/test";
 
-/**
- * The white-label catalogue's address: the port after the fixture app's.
- *
- * @param baseURL - the fixture app's address.
- */
-const whiteLabel = (baseURL: string | undefined): string => {
-  const address = new URL(baseURL ?? "");
-  address.port = String(Number(address.port) + 1);
-  return address.href;
-};
+import { WHITE_LABEL_PORT } from "./ports";
+
+/** The white-label catalogue's address. */
+const WHITE_LABEL = `http://127.0.0.1:${WHITE_LABEL_PORT}/`;
 
 /** A story of the fixture's Select. */
 const STORY = "kit:inputs-selection-select--small";
@@ -134,9 +128,9 @@ test.describe("a story alone", () => {
     await expect(page.locator(".forgebook-sidebar")).toHaveCount(0);
   });
 
-  test("a story that throws is told in the catalogue's look, not the frame's", async ({ page, baseURL }) => {
+  test("a story that throws is told in the catalogue's look, not the frame's", async ({ page }) => {
     // on the second catalogue: the fixture app's errors are counted by the `forgebook errors` tests
-    await page.goto(`${whiteLabel(baseURL)}?embed&story=kit:inputs-selection-select--throws`);
+    await page.goto(`${WHITE_LABEL}?embed&story=kit:inputs-selection-select--throws`);
     await expect(page.getByRole("alert")).toContainText("This story could not be shown.");
     await expect(page.locator(".forgebook-frame-view")).toBeHidden();
   });
@@ -374,39 +368,35 @@ test.describe("a catalogue with its own look throughout", () => {
       name
     );
 
-  test("shows its name alone, with neither Forgebook's mark nor its icon", async ({ page, baseURL }) => {
-    await page.goto(whiteLabel(baseURL));
+  test("shows its name alone, with neither Forgebook's mark nor its icon", async ({ page }) => {
+    await page.goto(WHITE_LABEL);
     await expect(page.getByRole("link", { name: "Ember UI", exact: true })).toBeVisible();
     await expect(page.locator(".forgebook-brand__logo")).toHaveCount(0);
     await expect(page.locator('link[rel~="icon"]')).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("Forgebook");
   });
 
-  test("an embed wears the theme in both appearances: colours, fonts and corners", async ({
-    page,
-    baseURL
-  }) => {
-    const WhiteLabel = whiteLabel(baseURL);
-    await page.goto(`${WhiteLabel}?embed&story=${STORY}`);
+  test("an embed wears the theme in both appearances: colours, fonts and corners", async ({ page }) => {
+    await page.goto(`${WHITE_LABEL}?embed&story=${STORY}`);
     await ready(storyFrame(page));
     await expect(page.locator("html")).toHaveAttribute("data-forgebook-appearance", /light|dark/);
-    await page.goto(`${WhiteLabel}?embed&story=${STORY}&theme=dark`);
+    await page.goto(`${WHITE_LABEL}?embed&story=${STORY}&theme=dark`);
     await ready(storyFrame(page));
     await expect.poll(() => custom(page, "--forgebook-surface")).toBe("#2c1f15");
     await expect(page.locator("body")).toHaveCSS("font-family", /Georgia/);
-    await page.goto(`${WhiteLabel}?embed&story=nowhere`);
+    await page.goto(`${WHITE_LABEL}?embed&story=nowhere`);
     await expect(page.getByRole("alert")).toHaveCSS("font-family", /Georgia/);
   });
 
-  test("the box a frame draws for a failed story wears the theme too", async ({ page, baseURL }) => {
-    await page.goto(`${whiteLabel(baseURL)}frame.html?story=kit:inputs-selection-select--throws`);
+  test("the box a frame draws for a failed story wears the theme too", async ({ page }) => {
+    await page.goto(`${WHITE_LABEL}frame.html?story=kit:inputs-selection-select--throws`);
     const box = page.locator(".forgebook-frame-error");
     await expect(box).toHaveCSS("font-family", /Georgia/);
     await expect(box).toHaveCSS("color", "rgb(161, 18, 46)");
   });
 
-  test("nothing it draws keeps a colour of Forgebook's default palette", async ({ page, baseURL }) => {
-    await page.goto(`${whiteLabel(baseURL)}?story=${STORY}`);
+  test("nothing it draws keeps a colour of Forgebook's default palette", async ({ page }) => {
+    await page.goto(`${WHITE_LABEL}?story=${STORY}`);
     await ready(storyFrame(page));
     for (const appearance of ["light", "dark"]) {
       await page.evaluate(
