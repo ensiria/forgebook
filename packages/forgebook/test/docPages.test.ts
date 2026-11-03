@@ -296,7 +296,7 @@ describe("agents", () => {
   const tree = storyTree([source]);
   const context = {
     tree,
-    loaded: { sources: [source], preview: NO_PREVIEW },
+    loaded: { sources: [source], preview: NO_PREVIEW, problems: [] },
     pages: PAGES,
     view: "theme=dark",
     params: new URLSearchParams({ id: "kit:guides-start" })
@@ -335,7 +335,7 @@ describe("agents", () => {
     };
     const { status, body } = await pageAnswer({
       ...context,
-      loaded: { sources: [broken], preview: NO_PREVIEW }
+      loaded: { sources: [broken], preview: NO_PREVIEW, problems: [] }
     });
     expect(status).toBe(200);
     expect(body).toMatchObject({ text: "", problems: ["The page failed to load: broken"] });
