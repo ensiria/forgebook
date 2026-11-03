@@ -7,8 +7,9 @@
  * are generated (`pages.ts`), so without this list Vite discovers each package as a page imports it, pre-bundles it
  * then, and reloads the page, more than once on a first start. The list is the shell's and the frame's packages (the
  * shell is React), the framework's, Testing Library's when the project installs it, and Forgebook's own modules when
- * they come from an installed package (a linked one is source, which Vite does not pre-bundle). A package the project
- * cannot resolve is left out, since Vite fails on one it cannot find. Pure: a resolver in, names out.
+ * they come from an installed package (a linked one is source, which Vite does not pre-bundle). axe is not among them:
+ * the frame loads it as a script (`axeScript.ts`). A package the project cannot resolve is left out, since Vite fails on
+ * one it cannot find. Pure: a resolver in, names out.
  *
  * @module
  */
@@ -22,12 +23,6 @@ const CORE_BROWSER_DEPENDENCIES = [
   "react/jsx-dev-runtime",
   "react-dom/client"
 ] as const;
-
-/**
- * What the frame imports in the browser from the core's own dependencies: named through the core, as
- * `forgebook > axe-core`, since a project need not be able to resolve them itself.
- */
-const CORE_OWN_DEPENDENCIES = ["axe-core"] as const;
 
 /** Forgebook's modules the generated pages import, besides the framework's. */
 const PAGE_MODULES = ["forgebook/shell"] as const;
@@ -47,9 +42,8 @@ const isInstalled = (file: string): boolean => file.split(/[\\/]/).includes("nod
  *
  * @param config - the catalogue's configuration.
  * @param resolve - resolves a package from the catalogue's folder.
- * @param resolveOwn - resolves a package from the core's own folder.
  */
-export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn: Resolve): string[] => {
+export const prebundled = (config: ResolvedConfig, resolve: Resolve): string[] => {
   const pageModules = [...PAGE_MODULES, config.framework.pages.frame, config.framework.pages.code];
   const candidates = [
     ...CORE_BROWSER_DEPENDENCIES,
@@ -62,16 +56,8 @@ export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn:
     const file = resolve(name);
     return file !== undefined && isInstalled(file);
   });
-  const own = CORE_OWN_DEPENDENCIES.filter((name) => resolveOwn(name) !== undefined).map(
-    (name) => `forgebook > ${name}`
-  );
   return [
-    ...new Set([
-      ...candidates.filter((name) => resolve(name) !== undefined),
-      ...mocks,
-      ...own,
-      ...installedPages
-    ])
+    ...new Set([...candidates.filter((name) => resolve(name) !== undefined), ...mocks, ...installedPages])
   ];
 };
 

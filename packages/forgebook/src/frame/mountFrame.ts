@@ -58,6 +58,8 @@ export type FrameConfig = {
   readonly renderer: StoryRenderer;
   /** The sources the shell shows, in the same order. */
   readonly sources: readonly StorySource[];
+  /** The address of axe's script, for the Accessibility card; the generated page gives it. */
+  readonly axeUrl?: string;
   /** The languages every story can be drawn in, as the shell's configuration gives them; none turns them off. */
   readonly languages?: readonly StoryLanguage[];
   /**
@@ -100,6 +102,7 @@ import.meta.hot?.on("vite:afterUpdate", (): void => {
  * @param controls - the rendered story's controls.
  * @param storyId - the story's id, for the answers.
  * @param rules - the catalogue's accessibility rules, for a check.
+ * @param axeUrl - the address of axe's script, for a check.
  * @param tellShell - tells the shell the check's result.
  */
 const answerShell = (
@@ -107,6 +110,7 @@ const answerShell = (
   controls: StoryControls,
   storyId: string,
   rules: A11ySettings,
+  axeUrl: string | undefined,
   tellShell: ShellChannel["tell"]
 ): void => {
   if (message.type === "forgebook:replay") void controls.replay();
@@ -117,7 +121,7 @@ const answerShell = (
   else if (message.type === "forgebook:clock") controls.setClock(message.state);
   else if (message.type === "forgebook:clock-restart") controls.restartClock();
   else if (message.type === "forgebook:check") {
-    checkStory(document, rules)
+    checkStory(document, rules, axeUrl)
       .then((violations) => tellShell({ type: "forgebook:checked", storyId, violations }))
       .catch((error: unknown) =>
         tellShell({
@@ -238,7 +242,8 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     let controls: StoryControls | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
     shell.listen((message: ShellMessage): void => {
-      if (controls !== undefined) answerShell(message, controls, storyId, catalogue.a11y, tellShell);
+      if (controls !== undefined)
+        answerShell(message, controls, storyId, catalogue.a11y, config.axeUrl, tellShell);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them); a
     // language the source gives as a loader is loaded as it is shown

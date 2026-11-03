@@ -115,6 +115,13 @@ describe("the generated pages", () => {
     expect(entry).toContain("previews: [preview0]");
   });
 
+  it("hands the frame axe's address when there is one, with what it imports", () => {
+    expect(frameEntry(CONFIG)).not.toContain("axeUrl");
+    const entry = frameEntry(CONFIG, { imports: ['import axeUrl from "/axe.min.js?url";'], value: "axeUrl" });
+    expect(entry).toContain('import axeUrl from "/axe.min.js?url";');
+    expect(entry).toContain("    axeUrl: axeUrl,");
+  });
+
   it("loads Testing Library for the plays only when the project installs it, and only on the first play", () => {
     expect(frameEntry(CONFIG)).not.toContain("@testing-library");
     const entry = frameEntry({ ...CONFIG, hasPlayTools: true });

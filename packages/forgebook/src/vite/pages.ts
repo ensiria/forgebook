@@ -315,22 +315,34 @@ const mockToolsLoader = (): string => {
   ].join("\n");
 };
 
+/** How a frame's entry gets the address of axe's script (`axeScript.ts`). */
+export type AxeAddress = {
+  /** The imports it needs. */
+  readonly imports: readonly string[];
+  /** The expression that gives the address. */
+  readonly value: string;
+};
+
 /**
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
+ * @param axe - how the entry gets the address of axe's script, for the Accessibility card; none when it cannot be
+ *   found, which leaves the card to say so.
  */
-export const frameEntry = (config: ResolvedConfig): string => {
+export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => {
   const sources = sourcesCode(config);
   return [
     `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
+    ...(axe?.imports ?? []),
     ...sources.imports,
     ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  void mountFrame(root, {",
     `    sources: ${sources.list},`,
+    ...(axe === undefined ? [] : [`    axeUrl: ${axe.value},`]),
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",

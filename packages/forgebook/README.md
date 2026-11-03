@@ -469,8 +469,9 @@ component page, where one worker serves every frame, each story's handlers answe
 goes to the network. It works on the dev server and in a static build.
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
-for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
-artefact; the last step is yours, and any host works:
+for a host that serves it under a sub-path. A host that sets a `Content-Security-Policy` needs `blob:` in `script-src` for
+the Accessibility card: a build keeps axe gzipped, and the frame runs it from a blob once unpacked. This workflow builds on
+every pull request and keeps the result as an artefact; the last step is yours, and any host works:
 ```yaml
 # .github/workflows/catalogue-preview.yml
 name: catalogue preview
