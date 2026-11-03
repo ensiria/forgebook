@@ -156,6 +156,7 @@ const shellStrings = {
   code: "Code",
   codeFromArgs: "from the args",
   codeRender: "the story's render",
+  codeLoading: "Reading the story's code…",
   codeError: "The story's code could not be read",
   copy: "Copy",
   copied: "Copied",
