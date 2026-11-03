@@ -9,6 +9,13 @@ import { expect, type Page, test } from "@playwright/test";
 /** The fixture's documented component. */
 const SELECT = "/?component=kit:inputs-selection-select";
 
+/**
+ * How long a page waits for what the docs worker answers (the API reference, the guidance, "Used in"): the run's first
+ * component page asks a worker that has not built its TypeScript program yet, and on a Windows runner that first answer
+ * takes about six seconds, past the default wait.
+ */
+const DOCS_ANSWER = { timeout: 20_000 };
+
 /** The page's column. */
 const column = (page: Page) => page.locator(".forgebook-doc");
 
@@ -26,7 +33,10 @@ test.describe("audiences of a component's page", () => {
   }) => {
     await page.goto(SELECT);
     await expect(headings(page).first()).toHaveText("Accessibility");
-    await expect(headings(page)).toHaveText(["Accessibility", "API reference", "Examples", "Used in"]);
+    await expect(headings(page)).toHaveText(
+      ["Accessibility", "API reference", "Examples", "Used in"],
+      DOCS_ANSWER
+    );
     await expect(column(page)).not.toHaveAttribute("data-audience", /.*/);
     await expect(page.locator(".forgebook-audience-note")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Show code" }).first()).toHaveAttribute(
@@ -40,14 +50,10 @@ test.describe("audiences of a component's page", () => {
     page
   }) => {
     await page.goto(`${SELECT}&audience=designer`);
-    await expect(headings(page)).toHaveText([
-      "When to use it",
-      "Accessibility",
-      "Read more",
-      "Design tokens",
-      "Examples",
-      "Used in"
-    ]);
+    await expect(headings(page)).toHaveText(
+      ["When to use it", "Accessibility", "Read more", "Design tokens", "Examples", "Used in"],
+      DOCS_ANSWER
+    );
     await expect(page.getByText("The list is short and its values are known.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Show code" })).toHaveCount(0);
     await expect(column(page).locator("pre")).toHaveCount(0);
@@ -62,18 +68,40 @@ test.describe("audiences of a component's page", () => {
     await expect(tokens.getByRole("rowheader", { name: "color.accent" })).toBeVisible();
   });
 
+  test("asks for a designer's tokens and usage without waiting for the audience's sections", async ({
+    page
+  }) => {
+    // the sections' code held back: their data must already be on its way
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/AudienceSections\.tsx/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const tokens = page.waitForRequest(/virtual:forgebook\/tokens/);
+    const usage = page.waitForRequest(/virtual:forgebook-usage:/);
+    await page.goto(`${SELECT}&audience=designer`);
+    await Promise.all([tokens, usage]);
+    release();
+    const tokensSection = page.getByRole("region", { name: "Design tokens" });
+    await expect(tokensSection.getByRole("rowheader", { name: "select.border" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Used in" })).toBeVisible(DOCS_ANSWER);
+  });
+
   test("opens a docs page from a designer's page, keeping the audience in the address", async ({ page }) => {
     await page.goto(`${SELECT}&audience=designer`);
     await page.getByRole("region", { name: "Read more" }).getByRole("link", { name: "Theming" }).click();
     await expect(page).toHaveURL(/page=kit%3Aguides-theming/);
     await expect(page).toHaveURL(/audience=designer/);
     await page.goBack();
-    await expect(headings(page).first()).toHaveText("When to use it");
+    await expect(headings(page).first()).toHaveText("When to use it", DOCS_ANSWER);
   });
 
   test("gives a coder the API first and every example's code open", async ({ page }) => {
     await page.goto(`${SELECT}&audience=coder`);
-    await expect(headings(page).first()).toHaveText("API reference");
+    await expect(headings(page).first()).toHaveText("API reference", DOCS_ANSWER);
     await expect(headings(page).nth(1)).toHaveText("Parts and styling");
     await expect(page.getByRole("button", { name: "Hide code" }).first()).toHaveAttribute(
       "aria-expanded",
@@ -124,7 +152,7 @@ test.describe("audiences of a component's page", () => {
     await openView(page);
     await page.getByLabel("Reading for", { exact: true }).selectOption("coder");
     await expect(page).toHaveURL(/audience=coder/);
-    await expect(headings(page).first()).toHaveText("API reference");
+    await expect(headings(page).first()).toHaveText("API reference", DOCS_ANSWER);
     await page.getByLabel("Reading for", { exact: true }).selectOption("designer");
     await expect(headings(page).first()).toHaveText("When to use it");
     await expect(frame.locator("html")).toHaveAttribute("data-kept", "");
