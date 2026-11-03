@@ -147,6 +147,10 @@ export const svelteRenderer: StoryRenderer = {
     const failed = storyCell(false);
     // the same as `failed`, read where nothing must follow it
     let hasFailed = false;
+    // a new try after an error, not settled yet, and how many drawings came since it started: its error, which Svelte
+    // reports after drawing, may be of args no longer shown
+    let isTrying = false;
+    let updatesSinceTry = 0;
     const context = liveContext(args, view, scene, canvas);
     const snippetOf = textSnippets();
     let markDrawn = (): void => undefined;
@@ -164,6 +168,11 @@ export const svelteRenderer: StoryRenderer = {
         return failed.current;
       },
       fail: (error: unknown): void => {
+        if (isTrying && updatesSinceTry > 0) {
+          // the args changed while the try was drawn: tried again with them, the failed try said nothing of
+          tryAgain();
+          return;
+        }
         if (!hasFailed) onError(toError(error));
         hasFailed = true;
         failed.set(true);
@@ -187,6 +196,19 @@ export const svelteRenderer: StoryRenderer = {
         if (!hasFailed) markDrawn();
       });
     };
+    /** Draws the story anew with the args of the moment, after an error. */
+    const tryAgain = (): void => {
+      hasFailed = false;
+      failed.set(false);
+      attempt.set(attempt.current + 1);
+      const tried = attempt.current;
+      isTrying = true;
+      updatesSinceTry = 0;
+      void settled().then(() => {
+        if (attempt.current === tried) isTrying = false;
+      });
+      markDrawnOnceSettled();
+    };
     // the effects run now, `onMount` among them: a story that throws there is not drawn
     flushSync();
     markDrawnOnceSettled();
@@ -196,12 +218,8 @@ export const svelteRenderer: StoryRenderer = {
         args.set(next.args);
         assignView(view, next);
         if (!isSameStory(scene.current, next)) scene.set(next);
-        if (hasFailed) {
-          hasFailed = false;
-          failed.set(false);
-          attempt.set(attempt.current + 1);
-          markDrawnOnceSettled();
-        }
+        updatesSinceTry += 1;
+        if (hasFailed) tryAgain();
       },
       unmount: (): void => {
         void unmount(instance);
