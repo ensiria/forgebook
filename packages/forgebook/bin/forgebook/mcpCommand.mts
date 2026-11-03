@@ -9,9 +9,10 @@ import { resolve } from "node:path";
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
 import { readPackageVersion } from "@ensiria/cli-kit/files";
 
-import { catalogueClient } from "./agentClient.ts";
+import { catalogueClient, previewServer } from "./agentClient.ts";
 import { builtCatalogueServer, serveMcp } from "./builtCatalogue.ts";
 import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { previewResource } from "./mcpPreview.ts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
@@ -66,9 +67,11 @@ export const mcpCommands = (
       log.debug(
         client.runningAt === undefined ? "Answering from a server of its own" : `Asking ${client.runningAt}`
       );
+      const version = readPackageVersion(import.meta.dirname);
+      const preview = previewServer(config, client.runningAt);
       const server = {
-        info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
-        instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
+        info: { name: "forgebook", version },
+        instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides.`,
         tools: [
           visualDiffTool((input, outDir) =>
             runStoryDiff(config, options.url, input, {
@@ -82,11 +85,14 @@ export const mcpCommands = (
               newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
             check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
             shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
-            checkPage: (address) => runPageCheck(config, [address])
+            checkPage: (address) => runPageCheck(config, [address]),
+            servePreview: preview.serve
           })
-        ]
+        ],
+        apps: [previewResource({ origin: preview.origin, strings: config.lists.strings ?? {}, version })]
       };
       await serveMcp(server, io);
+      await preview.close();
       await client.close();
     }
   })

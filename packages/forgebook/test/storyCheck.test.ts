@@ -11,7 +11,7 @@ import { diffedComponent, storiesNamed } from "../bin/forgebook/storyCheckRun.ts
 import { isStoryCheckReport, type StoryCheckReport } from "../src/storyCheck.ts";
 import type { StoriesDocument } from "../src/vite/agent.types.ts";
 
-const LINKS = { address: "", frame: "" };
+const LINKS = { address: "", frame: "", embed: "" };
 
 const DOCUMENT: StoriesDocument = {
   schema: 1,

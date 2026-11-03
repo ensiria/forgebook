@@ -1,6 +1,8 @@
 /**
  * The dev server's answers to tools and agents, under `/__forgebook/api/`: `stories` (every story) and `story?id=…`
- * (one in detail), each with an optional `view` (the view's query, `theme=dark&lang=it`) the links open in.
+ * (one in detail), `pages` and `page?id=…` (the docs pages), each with an optional `view` (the view's query,
+ * `theme=dark&lang=it`) the links open in; and `preview?id=…`, the page that shows a story inside a client that renders
+ * apps, the one answer that is not JSON.
  *
  * @remarks
  * The server loads the sources and the previews with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool
@@ -21,6 +23,7 @@ import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { findComponentByTitle, findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
+import { frameAddressOf } from "../viewState.ts";
 import type { AgentChangedStory, ChangedStoriesDocument, ErrorsDocument } from "./agent.types.ts";
 import {
   type CataloguePages,
@@ -31,9 +34,11 @@ import {
 } from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
+import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
 import { findAnswer } from "./findRoute.ts";
 import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
+import { PREVIEW_ROUTE } from "./previewRoute.ts";
 import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
@@ -293,6 +298,8 @@ export const agentAnswer = async (
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
+    if (route === "pages") return pagesAnswer(context);
+    if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context);
     if (route === "agent-index")
       return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
@@ -300,6 +307,22 @@ export const agentAnswer = async (
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
   }
+};
+
+/**
+ * Answers a story's preview page. Its code is read here, on the first request for one: a dev server no client asks for a
+ * preview never loads it.
+ *
+ * @param url - the request's address: `id` and `view` in its query.
+ * @param response - the answer.
+ */
+const answerPreview = async (url: URL, response: ServerResponse): Promise<void> => {
+  const { previewRelayPage } = await import("./previewPages.ts");
+  const id = url.searchParams.get("id") ?? "";
+  const frame = frameAddressOf("/frame.html", id, url.searchParams.get("view") ?? "");
+  response.setHeader("Content-Type", "text/html");
+  response.setHeader("Cache-Control", "no-store");
+  response.end(previewRelayPage(frame, id));
 };
 
 /**
@@ -319,6 +342,10 @@ export const agentMiddleware =
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
+    if (route === PREVIEW_ROUTE) {
+      void answerPreview(url, response).catch(next);
+      return;
+    }
     void agentAnswer(agentServer(server, config), config, route, url.searchParams, url.origin, live)
       .then(({ status, body }) => {
         response.statusCode = status;

@@ -342,6 +342,36 @@ describe("indexStoryFile", () => {
     ).toBe("A.stories.tsx: the meta's `parameters.touch` must be written as a plain `true` or `false`");
   });
 
+  it("reads a design from the meta and a story, written plainly", () => {
+    const text = `export default { title: "A/B", parameters: { design: { figma: "https://www.figma.com/design/F/A" } } };
+      export const X = { parameters: { design: { figma: "https://www.figma.com/design/F/A?node-id=1-2" } } };
+      export const Y = {};`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      design: { figma: "https://www.figma.com/design/F/A" },
+      stories: [
+        { exportName: "X", design: { figma: "https://www.figma.com/design/F/A?node-id=1-2" } },
+        { exportName: "Y" }
+      ]
+    });
+  });
+
+  it("refuses a Figma link written by code, which only the index reads, and leaves another tool's design alone", () => {
+    expect(
+      indexStoryFile(
+        "A.stories.tsx",
+        'export default { title: "A/B" }; export const X = { parameters: { design: { figma: LINK } } };'
+      )
+    ).toBe("A.stories.tsx: story X: `parameters.design.figma` must be written as a plain string");
+    expect(
+      indexStoryFile(
+        "A.stories.tsx",
+        `export default { title: "A/B", parameters: { design: { type: "figma", url: "https://example.com" } } };
+         export const X = { parameters: { design: [{ type: "figma", url: "https://example.com" }] } };`
+      )
+    ).toEqual({ title: "A/B", stories: [{ exportName: "X" }] });
+  });
+
   it("refuses controls written plainly but wrongly, and leaves controls written by code to the frame", () => {
     const wrong = `export default { title: "A/B" };
       export const X = { parameters: { controls: true } };`;

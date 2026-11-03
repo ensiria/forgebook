@@ -70,6 +70,18 @@ export type CatalogueComponent = {
   readonly mainStoryId: string | undefined;
   /** Whether every story of its file is about logic (`parameters.logic`): a hook or a function, listed by its call. */
   readonly isLogic: boolean;
+  /** The link to its design in Figma (the meta's `parameters.design.figma`), when it has a valid one. */
+  readonly design: string | undefined;
+};
+
+/** One docs page of the package. */
+export type CataloguePage = {
+  /** Its title (`Guides/Theming`). */
+  readonly title: string;
+  /** Its file, relative to the package's folder. */
+  readonly file: string;
+  /** What it is about, in a sentence; none when it does not say. */
+  readonly description: string | undefined;
 };
 
 /** Everything `CATALOG.md` lists. */
@@ -82,6 +94,8 @@ export type CatalogueData = {
   readonly sourceId: string | undefined;
   /** The components with stories, by title. */
   readonly components: readonly CatalogueComponent[];
+  /** The docs pages its source declares, in reading order; none by default. */
+  readonly pages?: readonly CataloguePage[];
   /** The other exported modules. */
   readonly modules: readonly ModuleDocs[];
   /** The public Sass modules. */
@@ -103,6 +117,7 @@ export type CatalogueDocsReport = {
   /** How many components, modules, Sass modules, style sheets and design tokens it lists. */
   readonly counts: {
     readonly components: number;
+    readonly pages: number;
     readonly modules: number;
     readonly sassModules: number;
     readonly styleSheets: number;

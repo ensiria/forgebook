@@ -23,6 +23,8 @@ import type {
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
+  PageDocument,
+  PagesDocument,
   StoriesDocument,
   StoryDocument,
   TokensDocument
@@ -65,10 +67,12 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["File", document.component.file],
     ["Opens at", document.story.links.address],
     ["Frame", document.story.links.frame],
+    ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
     ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
+  if (document.design !== undefined) entries.push(["Design", document.design.figma]);
   return keyValue(entries, uncut(style));
 };
 
@@ -285,3 +289,29 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
     ...document.skipped.map((each) => `Not checked: ${each}`)
   ].join("\n");
 };
+
+/**
+ * The docs pages as a table: one row per page, its id first (what `forgebook page` takes), then its title and how many
+ * stories it shows.
+ *
+ * @param document - the pages document.
+ * @param style - colours, glyphs and width.
+ */
+export const pagesText = (document: PagesDocument, style: OutputStyle): string =>
+  document.pages.length === 0
+    ? "No docs pages here."
+    : table(
+        document.pages.map((page) => [page.id, page.title, String(page.stories.length)]),
+        {
+          columns: [{ header: "Id" }, { header: "Page", tone: "muted" }, { header: "Stories", tone: "muted" }]
+        },
+        uncut(style)
+      );
+
+/**
+ * One docs page as a person reads it: where it opens, then its Markdown.
+ *
+ * @param document - the page's document.
+ */
+export const pageText = (document: PageDocument): string =>
+  [document.page.links.address, "", document.text].join("\n");

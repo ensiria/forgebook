@@ -106,7 +106,10 @@ describe("forgebook story", () => {
       schema: 1,
       args: { size: "md", label: "Save" },
       story: {
-        links: { frame: `${NO_SERVER}/frame.html?theme=dark&story=stories%3Aactions-button--primary` }
+        links: {
+          frame: `${NO_SERVER}/frame.html?theme=dark&story=stories%3Aactions-button--primary`,
+          embed: `${NO_SERVER}/?embed&theme=dark&story=stories%3Aactions-button--primary`
+        }
       },
       problems: []
     });

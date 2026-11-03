@@ -14,16 +14,20 @@ import { globSync, readFileSync } from "node:fs";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
+import { figmaLink } from "../../src/figmaLink.ts";
 import { csfStoryId } from "../../src/storyIds.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
+import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
+import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import { readTokenFiles, type SourceTokens, sourceTokensIn } from "../../src/vite/sourceTokens.ts";
 import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type {
   CatalogueComponent,
   CatalogueData,
+  CataloguePage,
   ModuleDocs,
   SassModuleDocs,
   StyleSheetDocs
@@ -60,6 +64,16 @@ const sourceExports = (manifest: unknown): Readonly<Record<string, string>> => {
  */
 const isLogicFile = (index: StoryFileIndex): boolean =>
   index.stories.length > 0 && index.stories.every((story) => (story.isLogic ?? index.isLogic) === true);
+
+/**
+ * The link to a component's design, when its meta writes a valid one: a wrong one is the catalogue's to report.
+ *
+ * @param index - the file's index.
+ */
+const designOf = (index: StoryFileIndex): string | undefined => {
+  const link = index.design === undefined ? undefined : figmaLink(index.design.figma);
+  return link === undefined || typeof link === "string" ? undefined : link.url;
+};
 
 /**
  * A story file's main story (`parameters.main`, else its first): its export and its id without the source's.
@@ -136,7 +150,8 @@ const collectComponents = (
       docs: component.docs,
       stories: index.stories.map((story) => story.name ?? story.exportName),
       ...mainStoryOf(index),
-      isLogic: isLogicFile(index)
+      isLogic: isLogicFile(index),
+      design: designOf(index)
     };
     addComponent(components, collected);
   }
@@ -197,6 +212,50 @@ const collectTokens = (
   return { tokens, problems: [...declared.problems, ...problems] };
 };
 
+/** A `?forgebook-docs-pages` import of a source module: its pattern, before the query. */
+const PAGES_IMPORT = /["']([^"']+)\?forgebook-docs-pages["']/g;
+
+/** A page's position: its `order`, or after every page with one. */
+const orderOf = (order: number | undefined): number => order ?? Number.POSITIVE_INFINITY;
+
+/**
+ * The docs pages a package's `./stories` export declares, read from its `?forgebook-docs-pages` imports, in reading
+ * order.
+ *
+ * @param packageDir - the package's folder.
+ * @param exports - its exports.
+ * @param problems - receives what the pages' index noticed.
+ */
+const collectPages = (
+  packageDir: string,
+  exports: Readonly<Record<string, string>>,
+  problems: string[]
+): CataloguePage[] => {
+  const source = exports[STORIES_SUBPATH];
+  if (source === undefined) return [];
+  const file = VITE_PATHS.resolve(packageDir, source);
+  const patterns = [...(readLinkedFile(file) ?? "").matchAll(PAGES_IMPORT)].flatMap(
+    (match) => match[1] ?? []
+  );
+  const pages = patterns.flatMap((pattern) =>
+    indexedDocPages(VITE_PATHS.dirname(file), pattern, (): void => undefined)
+  );
+  for (const page of pages)
+    for (const note of page.index.notes ?? [])
+      problems.push(`${VITE_PATHS.relative(packageDir, page.file)}: ${note}`);
+  return pages
+    .sort(
+      (left, right) =>
+        orderOf(left.index.order) - orderOf(right.index.order) ||
+        left.index.title.localeCompare(right.index.title)
+    )
+    .map((page) => ({
+      title: page.index.title,
+      file: VITE_PATHS.relative(packageDir, page.file),
+      description: page.index.description
+    }));
+};
+
 /**
  * Reads a package for its catalogue.
  *
@@ -243,6 +302,7 @@ export const collectDocs = (
       description,
       sourceId: declared?.id,
       components,
+      pages: collectPages(packageDir, exports, problems),
       modules,
       sassModules,
       styleSheets,

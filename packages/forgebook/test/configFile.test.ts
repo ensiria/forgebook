@@ -96,6 +96,18 @@ describe("findConfigFile", () => {
   });
 });
 
+describe("the shell's branding", () => {
+  it("stays on unless turned off, the catalogue winning over its presets", () => {
+    const off = { shell: { branding: false } };
+    const on = { shell: { branding: true } };
+    const preset = { name: "p", ...off };
+    expect(resolveConfig(BASE, "/c").shell.hasBranding).toBe(true);
+    expect(resolveConfig({ ...BASE, ...off }, "/c").shell.hasBranding).toBe(false);
+    expect(resolveConfig({ ...BASE, presets: [preset] }, "/c").shell.hasBranding).toBe(false);
+    expect(resolveConfig({ ...BASE, presets: [preset], ...on }, "/c").shell.hasBranding).toBe(true);
+  });
+});
+
 describe("the shell's look", () => {
   const base = { framework: STUB_FRAMEWORK, title: "T", stories: ["s"] };
 

@@ -29,12 +29,13 @@ const CONFIG: ResolvedConfig = {
   logo: "/catalogue/logo.svg",
   heights: "story-heights.json",
   stories: ["src/**/*.stories.tsx"],
+  docs: [],
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [{ id: "it", label: "Italiano" }],
   previews: ["/catalogue/forgebook.preview.tsx"],
   head: '<link rel="stylesheet" href="/fonts.css" />',
-  shell: { themeCss: "", styleSheets: [], problems: [] },
+  shell: { themeCss: "", frameCss: "", hasBranding: true, styleSheets: [], problems: [] },
   tokens: [],
   watch: [],
   lists: {},
@@ -43,6 +44,19 @@ const CONFIG: ResolvedConfig = {
 };
 
 describe("the generated pages", () => {
+  it("writes what a frame needs of the theme into the frame only, and nothing without it", () => {
+    const themed = { ...CONFIG, shell: { ...CONFIG.shell, frameCss: ".forgebook-frame-error{--x:1}" } };
+    expect(pageHtml("frame.html", themed)).toContain("<style>.forgebook-frame-error{--x:1}</style>");
+    expect(pageHtml("index.html", themed)).not.toContain("forgebook-frame-error");
+    expect(pageHtml("frame.html", CONFIG)).not.toContain("<style>");
+  });
+
+  it("tells the shell to leave Forgebook's mark out only when the branding is off", () => {
+    expect(shellEntry(CONFIG)).not.toContain("hasBranding");
+    const plain = { ...CONFIG, shell: { ...CONFIG.shell, hasBranding: false } };
+    expect(shellEntry(plain)).toContain("hasBranding: false,");
+  });
+
   it("titles the shell after the catalogue, escaped, and gives only the frame the head's tags", () => {
     expect(pageHtml("index.html", CONFIG)).toContain("<title>Acme &#60;UI&#62;</title>");
     expect(pageHtml("index.html", CONFIG)).toContain('<script type="module" src="/.forgebook-shell.ts">');
@@ -57,6 +71,17 @@ describe("the generated pages", () => {
     expect(entry).toContain('import { source as source0 } from "/catalogue/.forgebook-stories.ts";');
     expect(entry).toContain('import { source as source1 } from "@acme/ui/stories";');
     expect(entry).toContain("sources: [source0, source1],");
+  });
+
+  it("makes the project's own source from its docs pages alone, and lists them", () => {
+    const docsOnly = { ...CONFIG, stories: [], docs: ["./docs/**/*.md"] };
+    expect(shellEntry(docsOnly)).toContain(
+      'import { source as source0 } from "/catalogue/.forgebook-stories.ts";'
+    );
+    const source = storiesSourceModule(docsOnly);
+    expect(source).toContain('import docs0 from "./docs/**/*.md?forgebook-docs-pages";');
+    expect(source).toContain("  docs: [docs0],");
+    expect(storiesSourceModule(CONFIG)).not.toContain("docs:");
   });
 
   it("mounts the framework's frame with the previews, the catalogue's last", () => {

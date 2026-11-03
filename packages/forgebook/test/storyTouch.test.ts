@@ -33,6 +33,7 @@ const storyOf = (id: string, isTouch: boolean): TreeStory => ({
   isTouch,
   isLogic: false,
   height: undefined,
+  design: undefined,
   tags: []
 });
 

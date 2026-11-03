@@ -1,7 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`
- * and `nearest_token`.
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
+ * `nearest_token`, `list_pages` and `get_page`; and `story_preview` (`mcpPreview.ts`), for a client that renders apps.
  *
  * @module
  */
@@ -16,7 +16,10 @@ import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { previewTool } from "./mcpPreview.ts";
+import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
+import { pageTools } from "./pageTools.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
 /** The session's folder for pictures; made on the first call. */
@@ -32,28 +35,6 @@ const shotsFolder = (): string => {
   mkdirSync(shotsDir, { recursive: true });
   return shotsDir;
 };
-
-/** Asks the catalogue one of its answers. */
-type Ask = (route: string, params: URLSearchParams) => Promise<AgentAnswer>;
-
-/** The schema of the view argument, shared by the tools. */
-const VIEW = {
-  type: "string",
-  description:
-    "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it); none for the default."
-} as const;
-
-/** A text argument, or none. */
-const textOf = (args: Readonly<Record<string, unknown>>, name: string): string | undefined => {
-  const value = args[name];
-  return typeof value === "string" && value !== "" ? value : undefined;
-};
-
-/** An answer as a tool's result: a failure when the catalogue did not answer 200. */
-const resultOf = (answer: AgentAnswer): McpToolResult => ({
-  structured: answer.body,
-  isError: answer.status !== 200
-});
 
 /** Writes a component's first stories, as `forgebook new --print` does. */
 type NewStories = (file: string, exportName: string | undefined) => Promise<NewStoriesFile>;
@@ -89,6 +70,8 @@ export type CatalogueReach = {
   readonly shot: Shot;
   /** Runs the checks on a page of the application. */
   readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
+  /** Serves the catalogue where a browser can open a preview, and answers where. */
+  readonly servePreview: () => Promise<string>;
 };
 
 /**
@@ -101,8 +84,10 @@ export const catalogueTools = ({
   writeNew,
   check,
   shot,
-  checkPage
+  checkPage,
+  servePreview
 }: CatalogueReach): readonly McpTool[] => [
+  ...pageTools(ask),
   {
     name: "check_page",
     description:
@@ -267,7 +252,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -288,7 +273,7 @@ export const catalogueTools = ({
   {
     name: "story_address",
     description:
-      "The links that open a story in the catalogue and in its frame alone, in the view asked for: give them to a person to look at what you describe.",
+      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe.",
     inputSchema: {
       type: "object",
       properties: {
@@ -432,5 +417,6 @@ export const catalogueTools = ({
       }));
       return { structured: report, isError: false, images };
     }
-  }
+  },
+  previewTool({ ask, serve: servePreview })
 ];

@@ -43,7 +43,10 @@ export type ForgebookConfig = CatalogueLists & {
   readonly framework: FrameworkAdapter;
   /** Its name, in the page's title and the sidebar. */
   readonly title: string;
-  /** Its logo: a square image, by path from the configuration's folder; Forgebook's own mark by default. */
+  /**
+   * Its logo: a square image, by path from the configuration's folder; Forgebook's own mark by default, or its title
+   * alone with `shell: { branding: false }`.
+   */
   readonly logo?: string;
   /** The stories' measured heights, the file `forgebook-heights` writes, served from the public folder; none by default. */
   readonly heights?: string;
@@ -52,13 +55,18 @@ export type ForgebookConfig = CatalogueLists & {
    * named after the catalogue. Give `stories` or `sources`, or both.
    */
   readonly stories?: readonly string[];
+  /**
+   * The project's own docs pages, as globs from the configuration's folder (`["docs/**\/*.md"]`): Markdown with live
+   * stories, listed in the sidebar's Docs section, in the source named after the catalogue.
+   */
+  readonly docs?: readonly string[];
   /** The packages' story sources, as module specifiers exporting a `source` (`["@acme/ui/stories"]`). */
   readonly sources?: readonly string[];
   /** The switches of the toolbar and the View menu; the theme and the contrast when neither it nor a preset declares any. */
   readonly switches?: readonly ViewSwitch[];
   /** The languages its stories can be drawn in; none turns the Language row off. */
   readonly languages?: readonly StoryLanguage[];
-  /** The shell's look: a theme of colours, fonts and corners, and an escape hatch. */
+  /** The shell's look: a theme of colours, fonts and corners, an escape hatch, and whether Forgebook's mark shows. */
   readonly shell?: ShellOptions;
   /**
    * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of

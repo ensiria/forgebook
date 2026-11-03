@@ -10,7 +10,8 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
 **Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 today, through
-[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react); other frameworks plug in through the same
+[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), a Next.js project's components through
+[`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs); other frameworks plug in through the same
 adapter (the catalogue's own interface is React either way) · npm, pnpm, yarn or bun ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/LICENSE)
 
@@ -119,12 +120,16 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   component (Tree renders Row, Row renders DropLine), each with the stories to open; read from the types, never kept
   by hand. It shows only when there is such a use; a reader folds it away; `usedIn: false` in the configuration turns
   it off.
+- **The design beside the code**: a component's or a story's Figma link gives it a Design tab and a side-by-side view
+  ([below](#design-links)).
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
   own, each with its name, logo, texts and design tokens.
-- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook, helper and
-  design token of a package, from its exports, their TSDoc, its stories and its source.
+- **Docs pages**: guides and foundations in Markdown, with live stories inside, in a section of their own above the
+  components ([below](#docs-pages)).
+- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook, helper, design token
+  and docs page of a package, from its exports, their TSDoc, its stories and its source.
 - **Tests from the stories**, with [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing): every
   story in the browser with axe, spills and overlays, screenshots, and every story rendered on the server.
 
@@ -212,6 +217,92 @@ Compare: the story is drawn once, never compared. A section of its own is a titl
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
 
+## Docs pages
+
+Guides, foundations and recipes are Markdown files with a little front matter, not MDX: a page is read at build time, and
+nothing is compiled in the browser. A project lists them in its configuration (`docs: ["docs/**/*.md"]`); a
+library gives them with its source, so every catalogue that shows it gets them:
+
+```ts
+// packages/ui/stories.ts
+import docs from "./docs/**/*.md?forgebook-docs-pages";
+import files from "./src/**/*.stories.tsx?forgebook-files";
+
+export const source: StorySource = { id: "acme", name: "Acme UI", files: [files], docs: [docs], sheets };
+```
+
+A page says where it goes, then writes what it has to say; a fence named `story` draws a story in its frame, one named
+`props` a component's API table from its types:
+
+````md
+---
+title: Guides/Theming
+order: 2
+description: How the library follows the catalogue's theme.
+---
+
+The buttons read their colours from the page's theme.
+
+```story acme:actions-button--primary
+```
+
+## The props
+
+```props acme:actions-button
+```
+
+See [the colours](./colours.md#brand), or [every state](?component=acme:actions-button).
+````
+
+- `title` places the page: `Guides/Theming` is a page of the group Guides. Without one, the file's opening `#` heading
+  or its name; `order` sorts the pages, lower first, then the pages without one by title. The address is
+  `?page=acme:guides-theming`, and a heading's anchor follows it (`#the-props`), made as GitHub makes them.
+- Stories load as they come near, follow the view's switches live, and keep their bar: their code, their box over the
+  page, a link to their own page. A story of another source works too: the id is the whole one `forgebook stories` lists.
+- A link to another page is written to its file (`./colours.md#brand`), so it works in the repository too. Images are
+  relative to the file, and go through the build. A fence must sit at the page's top level, not inside a list or a quote.
+- The page gets its look from the shell's palette, so a `shell.theme` and both appearances reach it; a page with two
+  headings or more lists them beside its text, or above it on a narrow page.
+- `forgebook stories` fails when a page names a story or a component that is not there, a link leads to no page, or an
+  image is not a file of its package, so a rename never breaks a page unseen.
+- A page is trusted as a story's code is: Markdown lets it hold raw HTML, which runs in the catalogue. Review one as you
+  review code, and do not build a catalogue from pages you did not write.
+
+## Design links
+
+A component carries its own link to Figma, on its meta; a story with a design of its own writes it over the meta's:
+
+```ts
+export default {
+  title: "Actions/Button",
+  component: Button,
+  parameters: { design: { figma: "https://www.figma.com/design/AbC123/Kit?node-id=12-34" } }
+} satisfies Meta<typeof Button>;
+
+export const Danger: Story<typeof Button> = {
+  parameters: { design: { figma: "https://www.figma.com/design/AbC123/Kit?node-id=56-78" } }
+};
+```
+
+The component's header then links to Figma, and the story's panel has a **Design** tab with the node embedded and
+**Compare with the story**, the story and its design side by side over the page, at the story's width and with the
+panel's values. Comparing is for your eyes: Forgebook draws no overlay and gives no match percentage, because Figma and
+a browser render differently and such a number would mislead. The tab loads, with Figma, only when opened.
+
+Write the link plainly, as a string: the index reads it without running the file, so a link written by code is a problem.
+A link that is not `https` on `figma.com`, or does not name a `design`, `file`, `proto`, `board`, `slides` or `deck`, is
+reported with the index's problems and never embedded; the component keeps its stories. What is kept of a link is its
+file, branch and node, so a shared link's other parameters are dropped. A `design` parameter without
+`figma` (Storybook's design addon uses the same name) is left alone.
+
+Nothing here needs a Figma token: the embed shows what the reader's own Figma session or the file's sharing allows, and
+a private file asks them to sign in, inside the embed. That sign-in needs the browser's storage access, so a reader who
+blocks it uses Open in Figma. A catalogue published with a Content Security Policy allows
+`frame-src https://embed.figma.com https://www.figma.com`. Turn the tab off with `tabs: { design: false }`; the header's link stays.
+
+`forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
+`address` of the Design tab to hand a person. `list_stories` gives each component's, and `CATALOG.md` lists it.
+
 ## Coming from Storybook
 
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and
@@ -249,8 +340,10 @@ To try it on a Storybook project, run `npx forgebook init --from storybook` in t
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
 computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
-become switches. It reads React on Vite (`@storybook/react-vite`) only, never replaces a configuration without
-`--force`, and lists what it left out.
+become switches. It reads React on Vite (`@storybook/react-vite`) and Next.js (`@storybook/nextjs-vite`, and
+`@storybook/nextjs` on webpack, whose stories are the same), never replaces a configuration without `--force`, and
+lists what it left out. A Next.js project gets `framework: nextjs()` and keeps its stories' `parameters.nextjs`:
+[`@forgebook/nextjs`](https://github.com/ensiria/forgebook/blob/develop/packages/nextjs/README.md) says what it draws.
 
 ## Monorepos
 
@@ -301,6 +394,8 @@ browser tests run in CI.
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
+| `forgebook pages` | Lists the docs pages with their ids and addresses; fails when the index has problems |
+| `forgebook page <id>` | One docs page's Markdown; its headings too with `--json` |
 | `forgebook diff <id>` | Compares a story's pictures with the baselines `forgebook shot --update` stored: the region, the percentage and a marked picture; fails when anything differs |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
@@ -389,6 +484,50 @@ Fonts are yours to load: a web font goes in a style sheet of your own, `shell.cs
 after the shell's. It is also an escape hatch, since the shell's class names are not public API and can change in any
 release. Layout is not themable, though a font does change how wide text runs.
 
+## Embedding and white-label
+
+Add `embed` to a story's address and the catalogue's page shows that story alone, with no sidebar, toolbar or panel, in
+your theme: paste it in a wiki, in Notion, or in an iframe of your own.
+
+```html
+<iframe src="https://ui.example.com/?embed&story=acme:button--primary&theme=dark" title="Button" width="100%" height="320" style="border: 0"></iframe>
+```
+
+The story bar's **Embed** button gives the link and this code for the story and view on screen, with the values set in the
+panel; `forgebook story <id>` and the `story_address` tool give the same link as `links.embed`. The switches, the
+background, the language, `args`, `width` and `height` are read from the address; the stage's own settings (compare, zoom,
+the panel) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
+be embedded the same way once they exist, and oEmbed, so that a wiki can turn a pasted link into a frame on its own, comes
+later.
+
+A page of your own can follow the story's height. An embed posts `{ type: "forgebook:embed-size", height }` to the page around
+it, and the Embed button's **Follow the story's height** adds the few lines that listen. Check `event.source` and
+`event.origin` in your own listener, as those lines do. The story needs `allow-scripts allow-same-origin` if you sandbox the
+iframe, since its modules are loaded as those of its own origin.
+
+An embed sends nothing but the height and listens to nothing from the page around it, and it keeps working where a browser
+denies a third-party frame its storage. What it does take from outside is its address: like the catalogue's own `args`, the
+address reaches the story's props, so a story that renders a prop as raw HTML should not be published for anyone to frame.
+And a height says something: a page that can reach your catalogue can tell whether a story exists.
+
+Forgebook sets no framing headers, on the dev server or in a build, so what you host keeps the rules it has. To choose who may
+frame your catalogue, answer with `Content-Security-Policy: frame-ancestors` on your own server, which is the way to protect a
+private one; `X-Frame-Options: DENY` turns embedding off. `controls: { embed: false }` takes the button away, not the address,
+since any page can frame what it can open.
+
+To leave no trace of Forgebook's mark, turn the branding off:
+
+```ts
+// forgebook.config.ts
+title: "Acme UI",
+logo: "acme.svg",
+shell: { branding: false }
+```
+
+The sidebar then shows your logo and title, or your title alone without a logo, and the page's icon is your logo or none.
+It is on by default. The theme reaches everything Forgebook draws: the catalogue, an embed around its story, its loading and
+missing-story messages, and the box a frame shows when a story fails.
+
 ## For agents
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
@@ -412,10 +551,29 @@ shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.b
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers fifteen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers seventeen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
-kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
+kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
+`node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
+
+`get_story` gives a story's design too (`design`, [above](#design-links)), so an agent can read the node with a Figma tool
+and compare it with `story_shot`.
+
+#### Inline previews
+
+A client that renders [MCP Apps](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
+gets one more tool, `story_preview`, and the page `ui://forgebook/story-preview` to show its answer in: the story, live,
+inside the conversation, with a button that opens it in the catalogue. Any other client gets the answers it always got:
+the tool is not listed, and `story_shot` is how it sees a story. Nothing runs until the tool is called: a client may read
+the page ahead of time, and that starts no server and loads no story. When no `forgebook dev` runs, one is started for the
+first preview and kept for the session.
+
+The story comes from a local server, and the host decides whether it gets in. A browser refuses a public page's frame to
+a local address (Chromium's Local Network Access), so a host whose app runs on a public origin, as a web client's does,
+shows the story's picture instead: the page asks the host to run `story_shot`, and needs Playwright as that tool does. The
+page's words are replaceable as the shell's are (`strings`): `previewOpen`, `previewWaiting`, `previewLoading`,
+`previewTakingPicture`, `previewUnavailable`, `previewCancelled`, `previewPicture`, `previewFrame`.
 
 A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
 `@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
@@ -467,16 +625,17 @@ are read for values: stories, tests, token definitions and generated files are l
 code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
-component, hook, helper, style module (what it is, how to import it, its props, the id of a story that shows it) and
-design token of its source (its value, each theme's, what it aliases, what it is for), and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the
+component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),
+docs page and design token of its source (its value, each theme's, what it aliases, what it is for), and `llms.txt`,
+which points an agent to it and links the pages. The file's name, its sections and the subpaths left out are set in the
 package's `package.json`:
 
 ```json
-{ "forgebook": { "catalog": { "file": "CATALOG.md", "sections": ["components", "modules"], "exclude": ["./internal/*"] } } }
+{ "forgebook": { "catalog": { "file": "CATALOG.md", "sections": ["components", "pages", "modules"], "exclude": ["./internal/*"] } } }
 ```
 
-`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed),
-and its JSON lists every story for a script.
+`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed) or a
+docs page that names what is not there, and its JSON lists every story for a script.
 
 ## Packages
 
@@ -484,6 +643,7 @@ and its JSON lists every story for a script.
 |---|---|
 | `forgebook` | The catalogue: the shell, the frame, the Vite plugin, the commands |
 | [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react) | React's story types, renderer and props reader |
+| [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs) | A Next.js project's components outside Next.js: images, fonts, links, both routers, server components |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing) | Tests generated from the stories |
 
