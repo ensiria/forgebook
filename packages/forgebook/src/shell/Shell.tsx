@@ -7,7 +7,7 @@
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
 import type { StoryFiles, StoryLanguage, StorySource } from "@forgebook/story-format/source";
-import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
@@ -36,12 +36,15 @@ import {
 import type { ViewSwitch } from "../switches.ts";
 import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
-import { ComponentPage } from "./ComponentPage.tsx";
+import type { ComponentPageProps } from "./ComponentPage.tsx";
 import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import type { DocPageProps } from "./DocPage.tsx";
 import { filesCodeLoader } from "./filesCode.ts";
-import { HomePage } from "./HomePage.tsx";
+import type { HomePageProps } from "./HomePage.tsx";
 import { Icon } from "./icons.tsx";
+import { LazyPage } from "./LazyPage.tsx";
 import { LogicMark } from "./LogicMark.tsx";
+import { lazyModule } from "./lazyModule.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
@@ -103,7 +106,15 @@ export type ShellConfig = {
 };
 
 /** A docs page, loaded on first use: a catalogue may have none. */
-const DocPage = lazy(() => import("./DocPage.tsx").then((module) => ({ default: module.DocPage })));
+const DOC_PAGE = lazyModule<DocPageProps>(() => import("./DocPage.tsx").then((module) => module.DocPage));
+
+/** The home, loaded when it is opened. */
+const HOME_PAGE = lazyModule<HomePageProps>(() => import("./HomePage.tsx").then((module) => module.HomePage));
+
+/** A component's page, loaded when one is opened. */
+const COMPONENT_PAGE = lazyModule<ComponentPageProps>(() =>
+  import("./ComponentPage.tsx").then((module) => module.ComponentPage)
+);
 
 /**
  * The page an address names: one story, a component's page, a docs page with the heading it opens at, or the home (an
@@ -824,70 +835,78 @@ const ShellPage = ({
           fixed={fixedOfShown(fixedViews, shown)}
         />
         {shown.kind === "home" ? (
-          <HomePage
-            title={title}
-            tree={tree}
-            sources={sources}
-            recent={recent}
-            hrefOf={(page: RecentPage): string => addressQuery(pageAddress(page), switches)}
-            onOpen={(page: RecentPage): void => openPage(page)}
+          <LazyPage
+            module={HOME_PAGE}
             header={header}
+            pageProps={{
+              title,
+              tree,
+              sources,
+              recent,
+              hrefOf: (page: RecentPage): string => addressQuery(pageAddress(page), switches),
+              onOpen: (page: RecentPage): void => openPage(page),
+              header
+            }}
           />
         ) : null}
         {shown.kind === "component" ? (
-          <ComponentPage
-            component={shown.location.component}
-            view={address.view}
-            touchOverrides={touchOverrides}
-            onTouchChange={setTouchOverride}
-            frameUrl={frameUrl}
-            hrefOf={storyHrefOf}
-            onOpen={(story: TreeStory): void => openPage(storyPage(story))}
-            {...componentLoaders(files, shown.location.component)}
-            background={storyBackground(
-              shown.location.source.background,
-              address.view,
-              catalogue,
-              isSystemDark
-            )}
-            heightOf={columnHeightOf}
+          <LazyPage
+            module={COMPONENT_PAGE}
             header={header}
-            scroll={scroll}
-            usedIn={usedInLinks(source, catalogue.hasUsedIn, tree, {
-              hrefOf: (page: Page): string => addressQuery(pageAddress(page), switches),
-              onOpen: openPage
-            })}
+            pageProps={{
+              component: shown.location.component,
+              view: address.view,
+              touchOverrides,
+              onTouchChange: setTouchOverride,
+              frameUrl,
+              hrefOf: storyHrefOf,
+              onOpen: (story: TreeStory): void => openPage(storyPage(story)),
+              ...componentLoaders(files, shown.location.component),
+              background: storyBackground(
+                shown.location.source.background,
+                address.view,
+                catalogue,
+                isSystemDark
+              ),
+              heightOf: columnHeightOf,
+              header,
+              scroll,
+              usedIn: usedInLinks(source, catalogue.hasUsedIn, tree, {
+                hrefOf: (page: Page): string => addressQuery(pageAddress(page), switches),
+                onOpen: openPage
+              })
+            }}
           />
         ) : null}
         {shown.kind === "page" ? (
-          <Suspense fallback={<div className="forgebook-workspace">{header}</div>}>
-            {/* keyed by the page: its frames, its text and its scrolling element are that page's alone */}
-            <DocPage
-              key={shown.location.page.id}
-              location={shown.location}
-              anchor={shown.anchor}
-              tree={tree}
-              sources={sources}
-              view={address.view}
-              touchOverrides={touchOverrides}
-              onTouchChange={setTouchOverride}
-              frameUrl={frameUrl}
-              storyHrefOf={storyHrefOf}
-              onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
-              pageHrefOf={(id: string, anchor: string | undefined): string =>
-                addressQuery(pageAddress({ kind: "page", id, anchor }), switches)
-              }
-              onOpenPage={(id: string): void => openPage({ kind: "page", id })}
-              onOpenAnchor={openAnchor}
-              onOpenAddress={(href: string): boolean => openLinkedPage(href, openPage)}
-              heightOf={columnHeightOf}
-              backgroundOf={(pageSource: TreeSource): string | undefined =>
-                storyBackground(pageSource.background, address.view, catalogue, isSystemDark)
-              }
-              header={header}
-              scroll={scroll}
-            />
-          </Suspense>
+          // keyed by the page: its frames, its text and its scrolling element are that page's alone
+          <LazyPage
+            key={shown.location.page.id}
+            module={DOC_PAGE}
+            header={header}
+            pageProps={{
+              location: shown.location,
+              anchor: shown.anchor,
+              tree,
+              sources,
+              view: address.view,
+              touchOverrides,
+              onTouchChange: setTouchOverride,
+              frameUrl,
+              storyHrefOf,
+              onOpenStory: (story: TreeStory): void => openPage(storyPage(story)),
+              pageHrefOf: (id: string, anchor: string | undefined): string =>
+                addressQuery(pageAddress({ kind: "page", id, anchor }), switches),
+              onOpenPage: (id: string): void => openPage({ kind: "page", id }),
+              onOpenAnchor: openAnchor,
+              onOpenAddress: (href: string): boolean => openLinkedPage(href, openPage),
+              heightOf: columnHeightOf,
+              backgroundOf: (pageSource: TreeSource): string | undefined =>
+                storyBackground(pageSource.background, address.view, catalogue, isSystemDark),
+              header,
+              scroll
+            }}
+          />
         ) : null}
         {shown.kind === "story" ? (
           <Stage
