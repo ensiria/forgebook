@@ -31,6 +31,11 @@ export type Renderer = {
   readonly component: unknown;
   /** What a story draws (`ReactNode` in React). */
   readonly storyResult: unknown;
+  /**
+   * What a decorator's `story()` gives, for a framework where it is narrower than what a story may return (Vue: a story
+   * may return a component, but `story()` is a virtual node); `storyResult` without it.
+   */
+  readonly decoratedStory?: unknown;
 };
 
 /** A value a story's args may write for a prop: the prop's own, or, where it takes a text, a text named by its key. */
@@ -275,7 +280,9 @@ export type OneOrMany<TFunction> = TFunction | readonly TFunction[];
 
 /** Wraps a story: a provider, a container of a given width. */
 export type Decorator<TRenderer extends Renderer, TArgs> = (
-  story: () => TRenderer["storyResult"],
+  story: () => TRenderer extends { readonly decoratedStory: infer TStory }
+    ? TStory
+    : TRenderer["storyResult"],
   context: StoryContext<TArgs>
 ) => TRenderer["storyResult"];
 

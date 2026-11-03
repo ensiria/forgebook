@@ -9,16 +9,17 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > and every change is in the
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
-**Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 today, through
-[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), a Next.js project's components through
+**Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 through
+[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
+[`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue), a Next.js project's components through
 [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs); other frameworks plug in through the same
-adapter (the catalogue's own interface is React either way) · npm, pnpm, yarn or bun ·
+adapter (the catalogue's own interface is React either way, and a Vue story's frame loads none) · npm, pnpm, yarn or bun ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/LICENSE)
 
 ## Install
 
 In a project with React and Vite, both packages: `forgebook` is the catalogue, `@forgebook/react` the adapter it draws
-React components with.
+React components with. On Vue, `@forgebook/vue` takes its place: its README has the configuration and the stories.
 
 ```sh
 npm install --save-dev forgebook @forgebook/react
@@ -317,9 +318,10 @@ To try it on a Storybook project, run `npx forgebook init --from storybook` in t
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
 computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
-become switches. It reads React on Vite (`@storybook/react-vite`) and Next.js (`@storybook/nextjs-vite`, and
-`@storybook/nextjs` on webpack, whose stories are the same), never replaces a configuration without `--force`, and
-lists what it left out. A Next.js project gets `framework: nextjs()` and keeps its stories' `parameters.nextjs`:
+become switches. It reads React and Vue on Vite (`@storybook/react-vite`, `@storybook/vue3-vite`) and Next.js
+(`@storybook/nextjs-vite`, and `@storybook/nextjs` on webpack, whose stories are the same), never replaces a
+configuration without `--force`, and lists what it left out. A Next.js project gets `framework: nextjs()` and keeps its
+stories' `parameters.nextjs`:
 [`@forgebook/nextjs`](https://github.com/ensiria/forgebook/blob/develop/packages/nextjs/README.md) says what it draws.
 
 ## Monorepos
@@ -620,6 +622,7 @@ docs page that names what is not there, and its JSON lists every story for a scr
 |---|---|
 | `forgebook` | The catalogue: the shell, the frame, the Vite plugin, the commands |
 | [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react) | React's story types, renderer and props reader |
+| [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) | Vue's story types, renderer and props, events and slots reader |
 | [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs) | A Next.js project's components outside Next.js: images, fonts, links, both routers, server components |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing) | Tests generated from the stories |
