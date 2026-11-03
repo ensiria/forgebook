@@ -177,13 +177,34 @@ test.describe("forgebook errors", () => {
       typeof before === "object" && before !== null && "last" in before && typeof before.last === "number"
         ? before.last
         : 0;
-    await page.goto("frame.html?story=kit:inputs-selection-select--throws");
+    // the server keeps one list for every test that runs beside this one, and another may open the same story: a
+    // mark of this test's own in the frame's address (which the error keeps as its view) tells its error apart
+    const mark = `run=${test.info().testId}-${test.info().repeatEachIndex}-${test.info().retry}`;
+    await page.goto(`frame.html?story=kit:inputs-selection-select--throws&${mark}`);
     await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "error");
     await expect
       .poll(() => JSON.parse(forgebook(baseURL ?? "", ["errors", "--since", String(since), "--json"]).stdout))
       .toMatchObject({
-        errors: [{ kind: "render", storyId: "kit:inputs-selection-select--throws", n: since + 1 }]
+        errors: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "render",
+            storyId: "kit:inputs-selection-select--throws",
+            view: expect.stringContaining(mark)
+          })
+        ])
       });
+    // only the errors after the number given
+    const after: unknown = JSON.parse(
+      forgebook(baseURL ?? "", ["errors", "--since", String(since), "--json"]).stdout
+    );
+    const numbers =
+      typeof after === "object" && after !== null && "errors" in after && Array.isArray(after.errors)
+        ? after.errors.map((error: unknown) =>
+            typeof error === "object" && error !== null && "n" in error ? error.n : undefined
+          )
+        : [];
+    expect(numbers.length).toBeGreaterThan(0);
+    for (const n of numbers) expect(n).toBeGreaterThan(since);
   });
 });
 
