@@ -148,6 +148,25 @@ export const flagsOf = (fields: Fields): Pick<StoryIndexEntry, "isTouch" | "isLo
   };
 };
 
+/**
+ * `parameters.propGroups`, read by the index only since a component's API reference is drawn before any story runs:
+ * `undefined` when none, the names, or a problem when it is not a list of plain strings. Written by code it would be
+ * lost, since the frame does not read it.
+ */
+export const propGroupsOf = (fields: Fields): readonly string[] | undefined | Error => {
+  const groups = parameter(fields, "propGroups");
+  if (groups === undefined) return undefined;
+  const names =
+    groups.type === "ArrayExpression"
+      ? groups.elements.flatMap((element) =>
+          element?.type === "Literal" && typeof element.value === "string" ? [element.value] : []
+        )
+      : [];
+  return groups.type === "ArrayExpression" && names.length === groups.elements.length
+    ? names
+    : new Error("`parameters.propGroups` must be written as a list of plain strings");
+};
+
 /** `parameters.height`: `undefined` when none or written by code, the height in CSS px, or a problem when wrong. */
 export const heightOf = (fields: Fields): number | undefined | Error => {
   const height = parameter(fields, "height");

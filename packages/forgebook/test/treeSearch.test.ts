@@ -67,7 +67,8 @@ const BUTTON: TreeComponent = {
   alsoIn: [],
   related: [],
   keywords: ["Pressable", "CTA"],
-  design: undefined
+  design: undefined,
+  propGroups: []
 };
 
 /** A family holding it, and an alias of a component that lives elsewhere. */

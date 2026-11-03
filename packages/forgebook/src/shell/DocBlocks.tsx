@@ -188,7 +188,11 @@ const PropsBlock = ({
   return (
     <div ref={queue.observerOf(key)}>
       {docs.status === "ready" && isComponentDocs(docs.value) ? (
-        <ApiReference docs={docs.value} isLogic={isLogicComponent(location.component)} />
+        <ApiReference
+          docs={docs.value}
+          isLogic={isLogicComponent(location.component)}
+          componentGroups={location.component.propGroups}
+        />
       ) : null}
     </div>
   );
