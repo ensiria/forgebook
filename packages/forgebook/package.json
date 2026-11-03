@@ -68,6 +68,7 @@
     "./vite/auto-title": "./src/vite/autoTitle.ts",
     "./vite/index-story-file": "./src/vite/indexStoryFile.ts",
     "./vite/story-files-module": "./src/vite/storyFilesModule.ts",
+    "./vite/paths": "./src/vite/vitePaths.ts",
     "./switches": "./src/switches.ts",
     "./catalogue": "./src/catalogue.ts",
     "./story-check": "./src/storyCheck.ts",
@@ -270,6 +271,10 @@
       "./vite/story-files-module": {
         "types": "./dist/src/vite/storyFilesModule.d.ts",
         "default": "./dist/src/vite/storyFilesModule.js"
+      },
+      "./vite/paths": {
+        "types": "./dist/src/vite/vitePaths.d.ts",
+        "default": "./dist/src/vite/vitePaths.js"
       },
       "./switches": {
         "types": "./dist/src/switches.d.ts",
