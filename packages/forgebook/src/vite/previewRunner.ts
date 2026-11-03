@@ -8,8 +8,8 @@
  * those, but one such import would leave the whole preview out of every answer. So the previews load in a module
  * runner of their own whose evaluator takes a package (a module Vite leaves to Node) that stops on a browser global
  * (`document is not defined`) for a namespace of placeholders. A placeholder can be kept in a parameter (a docs
- * container, a decorator), but calling one, reading one of its properties or listing the namespace's names throws,
- * naming the package: a preview that uses such a package while it loads still fails to load, and is named among the
+ * container, a decorator) or called (an addon's factory in `definePreview`), but reading one of its properties, or the
+ * names of the namespace, throws, naming the package: a preview that uses such a package while it loads still fails to load, and is named among the
  * answers' problems, rather than giving values a browser would not. A file of the catalogue's own that reads a browser
  * global is not replaced: half run, it would leave values a browser does not have.
  *
@@ -85,8 +85,8 @@ const unavailable = (name: string, file: string, reason: string): Error =>
   new Error(`${name} of ${file} cannot be used on the server: it needs a browser (${reason})`);
 
 /**
- * An export of a package that did not load on Node: a function that can be kept, and throws when it is called or a
- * property of it is read.
+ * An export of a package that did not load on Node: a function that can be kept and called (what it returns is
+ * another), and throws when a property of it is read or it is constructed.
  *
  * @param name - the export.
  * @param file - the package's module.
@@ -94,11 +94,10 @@ const unavailable = (name: string, file: string, reason: string): Error =>
  */
 const placeholder = (name: string, file: string, reason: string): unknown =>
   new Proxy(() => undefined, {
-    apply: (): never => {
-      throw unavailable(name, file, reason);
-    },
-    construct: (): never => {
-      throw unavailable(name, file, reason);
+    // what a call makes is a placeholder too: Storybook's `addons: [docs()]` is kept, a value read from it throws
+    apply: (): unknown => placeholder(`${name}()`, file, reason),
+    construct: (): object => {
+      throw unavailable(`new ${name}`, file, reason);
     },
     get: (target: () => undefined, key: string | symbol, receiver: unknown): unknown => {
       if (typeof key === "symbol" || FUNCTION_KEYS.has(key)) return Reflect.get(target, key, receiver);

@@ -96,14 +96,17 @@ describe("browserOnlyNamespace", () => {
     );
   });
 
-  it("throws, naming the module, when a placeholder is called or read", () => {
+  it("throws, naming the module, when a placeholder is read", () => {
     const namespace = browserOnlyNamespace("/kit/index.js", "document is not defined");
     const themes: unknown = Reflect.get(namespace, "themes");
     expect(() => Reflect.get(Object(themes), "light")).toThrow(
       "themes.light of /kit/index.js cannot be used"
     );
     const container: unknown = Reflect.get(namespace, "DocsContainer");
-    expect(() => (typeof container === "function" ? container() : undefined)).toThrow("needs a browser");
+    // a call is kept, as an addon's factory is in a preview's list; what it made cannot be read either
+    const made: unknown = typeof container === "function" ? container() : undefined;
+    expect(typeof made).toBe("function");
+    expect(() => Reflect.get(Object(made), "title")).toThrow("DocsContainer().title of /kit/index.js");
     // its names cannot be listed: an empty list would be a value a browser does not give
     expect(() => Object.keys(namespace)).toThrow("The names of /kit/index.js cannot be used");
   });

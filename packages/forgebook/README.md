@@ -343,8 +343,9 @@ Preact, with the story's state kept when a decorator draws `<Story />`), a previ
 export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. The answers
 to tools and agents read a preview's args and parameters on the server: a package it imports that only a browser can
 load (Storybook's docs blocks, which read `document` as they load) is left as a placeholder there, which the preview can
-keep in a parameter but not use. A preview that still cannot load (it uses one, or one of its own files reads
-`document`) leaves the answers working: it is left out of them and named among their problems. A `**` pattern skips `node_modules` unless it names it.
+keep in a parameter or call (an addon's factory) but not read. A preview that still cannot load (it reads one, or one of
+its own files reads `document`) leaves the answers working: it is left out of them and named among their problems. A
+`**` pattern skips `node_modules` unless it names it.
 
 It lists what Storybook's indexer lists:
 
