@@ -89,6 +89,8 @@ test.describe("the search", () => {
     await page.goto("/");
     const field = page.getByRole("searchbox");
     await field.fill("value");
+    // the whole index first: its arrival brings new rows, and the choice starts again at the best one
+    await expect(page.locator(".forgebook-search-panel[data-ready]")).toBeVisible({ timeout: 30_000 });
     const options = results(page).getByRole("option");
     await expect(options.first()).toHaveAttribute("aria-selected", "true");
     await expect(field).toHaveAttribute(
