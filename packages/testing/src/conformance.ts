@@ -5,7 +5,7 @@
  * An adapter's package calls `describeAdapter` in its own tests with a small subject of its framework: a story that shows
  * a greeting and counts its clicks, and throws for one name. The suite then says what the frame relies on (`renderer.ts`,
  * `adapter.ts`): a story is drawn in its canvas inside its decorators, new args keep its state, it goes away, its errors
- * reach the frame, and it can be drawn on a server, at once or in time. It runs in the adapter's own Vitest, with a simulated page.
+ * reach the frame (those of the args shown only), and it can be drawn on a server, at once or in time. It runs in the adapter's own Vitest, with a simulated page.
  * A framework that compiles a component apart for a page and for a server (Svelte) runs it twice, each run checking its
  * half: in a simulated page, and in Node, where its modules are compiled for the server.
  *
@@ -168,6 +168,26 @@ export const describeAdapter = (subject: AdapterSubject): void => {
         await settled(() => element.textContent?.includes("Hello Ada") === true);
         // the frame waits for this before it runs the play function: a story drawn at last is drawn
         await settled(() => isDrawn);
+        story.unmount();
+      }
+    );
+
+    it.runIf(inPage)(
+      "says nothing of a drawing the args replaced, even one still being drawn when they changed",
+      async () => {
+        const errors: Error[] = [];
+        const element = canvas();
+        const story = renderer.mount(element, drawing(THROWING_NAME), (error) => errors.push(error));
+        await settled(() => errors.length > 0);
+        // the frame draws the story again with the same args (the events, the language), then the args change back
+        // while that drawing is under way: its error, whenever it comes, is of args no longer shown
+        story.update(drawing(THROWING_NAME));
+        await Promise.resolve();
+        const before = errors.length;
+        story.update(drawing("Grace"));
+        await settled(() => element.textContent?.includes("Hello Grace") === true);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(errors.slice(before)).toEqual([]);
         story.unmount();
       }
     );
