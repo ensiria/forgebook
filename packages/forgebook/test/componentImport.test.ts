@@ -1,12 +1,12 @@
 /**
- * Tests for the reading of a story file's meta: the module its component is imported from.
+ * Tests for where a story file's component comes from, read with Vite's parser from the file alone.
  *
  * @module
  */
 
 import { describe, expect, it } from "vitest";
 
-import { componentImport } from "../src/vite/storyMeta.ts";
+import { componentImport } from "../src/vite/componentImport.ts";
 
 describe("componentImport", () => {
   it("finds the module the meta's component is imported from, named or default, without a program", () => {
@@ -26,6 +26,13 @@ describe("componentImport", () => {
       const meta = { title: "A/B", component: Badge } satisfies Meta<typeof Badge>;
       export { meta as default };`;
     expect(componentImport("Badge.stories.tsx", satisfied)).toBe("./Badge");
+  });
+
+  it("reads a `.js` story file with JSX, and a component imported by its default name", () => {
+    const js = `import Button from "./Button";
+      export default { title: "A/B", component: Button };
+      export const Default = { render: () => <Button /> };`;
+    expect(componentImport("Button.stories.js", js)).toBe("./Button");
   });
 
   it("has none for a meta without a component, or one not imported", () => {

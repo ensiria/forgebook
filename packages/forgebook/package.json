@@ -48,6 +48,7 @@
     "./component-docs": "./src/componentDocs.ts",
     "./vite/adapter": "./src/vite/adapter.ts",
     "./vite/docs-program": "./src/vite/docsProgram.ts",
+    "./vite/module-summary": "./src/vite/moduleSummary.ts",
     "./vite/story-meta": "./src/vite/storyMeta.ts",
     "./vite/prop-docs": "./src/vite/propDocs.ts",
     "./vite/signature-docs": "./src/vite/signatureDocs.ts",
@@ -191,6 +192,10 @@
       "./vite/docs-program": {
         "types": "./dist/src/vite/docsProgram.d.ts",
         "default": "./dist/src/vite/docsProgram.js"
+      },
+      "./vite/module-summary": {
+        "types": "./dist/src/vite/moduleSummary.d.ts",
+        "default": "./dist/src/vite/moduleSummary.js"
       },
       "./vite/story-meta": {
         "types": "./dist/src/vite/storyMeta.d.ts",

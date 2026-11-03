@@ -370,6 +370,14 @@ const metaObject = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpres
   return value?.type === "ObjectExpression" ? value : undefined;
 };
 
+/**
+ * A story file's meta object, as the index reads it: inline or a constant of the file, exported by default or by name.
+ *
+ * @param program - the parsed file.
+ */
+export const storyFileMeta = (program: ESTree.Program): ESTree.ObjectExpression | undefined =>
+  metaObject(program, topLevelOf(program));
+
 /** The meta's lists of plain strings, each only when it sets it. */
 type MetaLists = Pick<StoryFileIndex, "alsoIn" | "related" | "keywords">;
 

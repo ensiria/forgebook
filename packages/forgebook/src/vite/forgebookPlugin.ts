@@ -37,7 +37,6 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
-import { DOCS_PAGE_QUERY, docPageModule, docPagesModule } from "./docPagesModule.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
@@ -57,7 +56,7 @@ import {
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
-import { codeModule, componentFileOf, docsModule, markdownModule, pageModule } from "./pluginModules.ts";
+import { docsModule } from "./pluginModules.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
   indexedStoryFiles,
@@ -67,6 +66,7 @@ import {
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { storyReach } from "./storyReach.ts";
+import { CODE_QUERY, DOCS_PAGE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 import { joinedUsage } from "./usageModule.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -102,15 +102,6 @@ const FILES_QUERY = "?forgebook-files";
 /** The id of a pattern's module: virtual, with the declaring module's folder and the pattern after it. */
 const FILES_PREFIX = "\0forgebook-files:";
 
-/** The query that asks for a story file's code: each story's `render` as written. */
-const CODE_QUERY = "?forgebook-code";
-
-/** The query that asks for a story file's component page: its documentation file as HTML. */
-const PAGE_QUERY = "?forgebook-page";
-
-/** The query a source's Markdown file is imported with (its introduction on the home), answered with its HTML. */
-const MARKDOWN_QUERY = "?forgebook-markdown";
-
 /** The query that asks for the docs pages a pattern matches (`./docs/*.md?forgebook-docs-pages`). */
 const DOCS_PAGES_QUERY = "?forgebook-docs-pages";
 
@@ -125,6 +116,9 @@ const SOURCE_FILE = /\.tsx?$/;
 
 /** The query that asks for a story file's component docs. */
 const DOCS_QUERY = "?forgebook-docs";
+
+/** The queries `textModules.ts` answers. */
+const TEXT_QUERIES: readonly string[] = [CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY];
 
 /** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
 const FILE_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY, DOCS_PAGE_QUERY];
@@ -283,38 +277,25 @@ const requestedPage = (url: string): PageFile | undefined => {
 };
 
 /**
- * A module the plugin answers from a file's text alone, when the id asks for one: a story file's code, or a Markdown
- * file as HTML.
- *
- * @param id - the module's id.
- * @param watch - adds a file whose edit renews the module.
- */
-const textModule = (
-  id: string,
-  watch: (file: string) => void
-): { code: string; moduleType: "js" } | undefined => {
-  if (id.endsWith(CODE_QUERY)) return codeModule(id.slice(0, -CODE_QUERY.length));
-  if (id.endsWith(MARKDOWN_QUERY)) return markdownModule(id.slice(0, -MARKDOWN_QUERY.length), watch);
-  return undefined;
-};
-
-/**
- * A docs pages' module, when the id is a pattern's or a page's.
+ * A docs pages' module, when the id is a pattern's or a page's. The Markdown reader loads with the first: a catalogue
+ * may have no docs pages, and a story's page reads none.
  *
  * @param id - the module's id.
  * @param watch - adds a file whose edit renews the module.
  * @param isServing - whether a dev server runs.
  */
-const docsModuleOf = (
+const docsModuleOf = async (
   id: string,
   watch: (file: string) => void,
   isServing: boolean
-): { code: string; moduleType: "js" } | undefined => {
-  if (id.endsWith(DOCS_PAGE_QUERY)) {
+): Promise<{ code: string; moduleType: "js" } | undefined> => {
+  const isPage = id.endsWith(DOCS_PAGE_QUERY);
+  if (!isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
+  const { docPageModule, docPagesModule } = await import("./docPagesModule.ts");
+  if (isPage) {
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
     return { code: docPageModule(file, watch, isServing), moduleType: "js" };
   }
-  if (!id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
   const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
   return { code: docPagesModule(root, pattern, watch, isServing), moduleType: "js" };
 };
@@ -471,16 +452,15 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (id.endsWith(DOCS_QUERY)) {
       return docsModule(await extractor().extract(id.slice(0, -DOCS_QUERY.length)), watch);
     }
-    if (id.endsWith(PAGE_QUERY)) {
-      const storyFile = id.slice(0, -PAGE_QUERY.length);
-      const componentFile = await componentFileOf(storyFile, (specifier: string) =>
-        resolveImport(specifier, storyFile)
-      );
-      const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
-      return pageModule(storyFile, componentFile, watch, componentFiles);
-    }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
-    return docsModuleOf(id, watch, isServing()) ?? textModule(id, watch);
+    const docsPages = await docsModuleOf(id, watch, isServing());
+    if (docsPages !== undefined) return docsPages;
+    if (!TEXT_QUERIES.some((query) => id.endsWith(query))) return undefined;
+    // loaded on the first of these queries: the highlighter, the Markdown reader and what they need stay out of a
+    // server whose pages never ask
+    const { textModule } = await import("./textModules.ts");
+    const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+    return textModule(id, { watch, resolveImport, componentFiles });
   };
   return {
     name: "forgebook",

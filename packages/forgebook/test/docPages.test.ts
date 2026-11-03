@@ -23,13 +23,9 @@ import { storyTree } from "../src/storyTree.ts";
 import { storyAddressOf } from "../src/viewState.ts";
 import { isPageDocument, isPagesDocument } from "../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../src/vite/agentRoutes.ts";
-import {
-  DOCS_PAGE_QUERY,
-  docPageModule,
-  docPagesModule,
-  indexedDocPages
-} from "../src/vite/docPagesModule.ts";
+import { docPageModule, docPagesModule, indexedDocPages } from "../src/vite/docPagesModule.ts";
 import { pageAnswer, pagesDocument } from "../src/vite/docPagesRoute.ts";
+import { DOCS_PAGE_QUERY } from "../src/vite/textQueries.ts";
 import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
