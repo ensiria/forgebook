@@ -58,6 +58,18 @@ export const storyFilesGroupOf = (text: string): StoryFilesGroup => {
   return { root, pattern: `${"../".repeat(Number(up))}${own}` };
 };
 
+/** The folder of a project's dependencies. */
+const DEPENDENCIES = "node_modules";
+
+/**
+ * What a pattern leaves out: the dependencies, unless it names them. A `**` from a monorepo's root would otherwise walk
+ * every package's, seconds on the server's thread for files nobody asked for, as Storybook's own globs skip them.
+ *
+ * @param pattern - the pattern.
+ */
+const excludedFrom = (pattern: string): ((name: string) => boolean) =>
+  pattern.includes(DEPENDENCIES) ? (): boolean => false : (name: string): boolean => name === DEPENDENCIES;
+
 /**
  * The story files patterns match, as paths relative to `root` starting with `./` or `../`, sorted.
  *
@@ -66,7 +78,7 @@ export const storyFilesGroupOf = (text: string): StoryFilesGroup => {
  */
 export const storyFileKeys = (root: string, patterns: readonly string[]): string[] =>
   patterns
-    .flatMap((pattern) => globSync(pattern, { cwd: root }))
+    .flatMap((pattern) => globSync(pattern, { cwd: root, exclude: excludedFrom(pattern) }))
     // with forward slashes on every system, so a story file has the same key wherever the catalogue runs
     .map((file) => VITE_PATHS.relativeKey(root, file))
     .sort();
