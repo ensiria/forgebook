@@ -122,6 +122,15 @@ const isServedByWorker = async (): Promise<boolean> => {
   return serviceWorker.controller !== null;
 };
 
+/** The page's session storage; none where the browser denies it, as a third-party frame's may be. */
+const pageStorage = (): Storage | undefined => {
+  try {
+    return sessionStorage;
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Reloads a page the worker did not take over, once.
  *
@@ -133,8 +142,10 @@ const isServedByWorker = async (): Promise<boolean> => {
  * @returns whether the page is going away, which leaves the story nothing to draw.
  */
 const reloadForWorker = (): boolean => {
-  if (sessionStorage.getItem(RELOADED_KEY) !== null) return false;
-  sessionStorage.setItem(RELOADED_KEY, "1");
+  // with no storage, as a third-party frame may have, a reload could not know it already happened: it would never end
+  const storage = pageStorage();
+  if (storage === undefined || storage.getItem(RELOADED_KEY) !== null) return false;
+  storage.setItem(RELOADED_KEY, "1");
   location.reload();
   return true;
 };
@@ -159,7 +170,7 @@ export const startStoryMocks = async (
   const tools = await load();
   const worker = tools.setupWorker(ownFrameOnly(tools), ...handlers);
   await worker.start(WORKER_OPTIONS);
-  if (await isServedByWorker()) sessionStorage.removeItem(RELOADED_KEY);
+  if (await isServedByWorker()) pageStorage()?.removeItem(RELOADED_KEY);
   else if (reloadForWorker()) await new Promise<never>(() => undefined);
   return (): void => worker.stop();
 };

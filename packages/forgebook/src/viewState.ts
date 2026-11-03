@@ -454,7 +454,8 @@ const SHELL_PARAMETERS = [
   "tools",
   "args",
   "matrix",
-  "component"
+  "component",
+  "embed"
 ];
 
 /**

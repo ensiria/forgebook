@@ -54,7 +54,8 @@ describe("storyLinks", () => {
   it("opens the story's page and its frame in the view asked for, the shell's own parameters off the frame", () => {
     expect(storyLinks(PAGES, "kit:actions-button--primary", "theme=dark&lang=it&panel=props")).toEqual({
       address: "http://localhost:5173/?theme=dark&lang=it&panel=props&story=kit%3Aactions-button--primary",
-      frame: "http://localhost:5173/frame.html?theme=dark&lang=it&story=kit%3Aactions-button--primary"
+      frame: "http://localhost:5173/frame.html?theme=dark&lang=it&story=kit%3Aactions-button--primary",
+      embed: "http://localhost:5173/?embed&theme=dark&lang=it&story=kit%3Aactions-button--primary"
     });
   });
 });
