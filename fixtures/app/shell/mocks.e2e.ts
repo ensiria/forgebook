@@ -7,6 +7,8 @@
 
 import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 
+import { framesPortOf } from "./ports";
+
 /** A service worker's first install, on a cold runner, takes longer than a story's first draw, in milliseconds. */
 const WORKER_START = 20_000;
 
@@ -87,10 +89,8 @@ test("answers every frame from its own handlers when the worker's registration t
 }) => {
   const answered = GREETINGS[0];
   const byName = GREETINGS[1];
-  await page.route(`**${HOST_PAGE}`, (route) =>
-    route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Frames</title>" })
-  );
-  await page.goto(HOST_PAGE);
+  // the host on the frames' origin, beside them: it reaches their worker's registration, and they reach it
+  await page.goto(`http://127.0.0.1:${framesPortOf("app")}${HOST_PAGE}`);
   const addFrames = (stories: readonly Greeting[]): Promise<void> =>
     page.evaluate(
       (ids) => {
