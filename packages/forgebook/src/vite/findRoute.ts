@@ -7,7 +7,7 @@ import type { StorySource } from "@forgebook/story-format/source";
 
 import { isComponentDocs, type UsageGuidance } from "../componentDocs.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { componentId, type StoryTree, type TreeComponent, type TreeSource } from "../storyTree.ts";
+import type { StoryTree, TreeComponent, TreeSource } from "../storyTree.ts";
 import type { AgentFoundComponent, FoundComponentsDocument } from "./agent.types.ts";
 import { storyLinks } from "./agentApi.ts";
 import type { IndexedComponent } from "./agentIndex.ts";
@@ -36,8 +36,8 @@ const guidanceOfComponent = async (
 };
 
 /** A component of the tree as the search reads it. */
-const findableOf = (source: TreeSource, component: TreeComponent): FindableComponent => ({
-  id: componentId(source.id, component.title),
+const findableOf = (component: TreeComponent): FindableComponent => ({
+  id: component.id,
   title: component.title,
   keywords: component.keywords,
   stories: component.stories.map((story) => `${story.name} ${story.description ?? ""}`)
@@ -54,7 +54,7 @@ export const indexedComponents = ({ tree, loaded }: RouteContext): Promise<reado
       const loadedSource = loaded.sources.find((each) => each.id === source.id);
       const guidance = await guidanceOfComponent(loadedSource, component.file);
       return {
-        ...findableOf(source, component),
+        ...findableOf(component),
         story: component.stories[0]?.id,
         ...(guidance === undefined ? {} : { guidance })
       };
@@ -76,12 +76,10 @@ export const findAnswer = async ({
   const query = params.get("query") ?? "";
   if (query.trim() === "") return { status: 400, body: { error: "No words to look for" } };
   const located = treeComponents(tree);
-  const findable = located.map(({ source, component }) => findableOf(source, component));
+  const findable = located.map(({ component }) => findableOf(component));
   const components = await Promise.all(
     findComponents(findable, query).map(async (found): Promise<AgentFoundComponent> => {
-      const place = located.find(
-        ({ source, component }) => componentId(source.id, component.title) === found.id
-      );
+      const place = located.find(({ component }) => component.id === found.id);
       const story = place?.component.stories[0]?.id;
       const source = loaded.sources.find((each) => each.id === place?.source.id);
       const guidance =

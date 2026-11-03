@@ -6,7 +6,7 @@
  */
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
-import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
+import type { StoryFiles, StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
@@ -21,6 +21,7 @@ import {
   type ComponentLocation,
   componentId,
   findComponent,
+  findComponentByTitle,
   findStory,
   isLogicComponent,
   type StoryLocation,
@@ -36,6 +37,7 @@ import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
 import { ComponentPage } from "./ComponentPage.tsx";
 import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import { filesCodeLoader } from "./filesCode.ts";
 import { HomePage } from "./HomePage.tsx";
 import { Icon } from "./icons.tsx";
 import { LogicMark } from "./LogicMark.tsx";
@@ -256,7 +258,7 @@ const shownPage = (tree: ReturnType<typeof storyTree>, page: Page): Shown => {
 const recentPageOf = (shown: Shown): RecentPage | undefined => {
   if (shown.kind === "story") return { kind: "story", id: shown.location.story.id };
   if (shown.kind === "component") {
-    return { kind: "component", id: componentId(shown.location.source.id, shown.location.component.title) };
+    return { kind: "component", id: shown.location.component.id };
   }
   return shown.kind === "page" ? { kind: "page", id: shown.location.page.id } : undefined;
 };
@@ -318,10 +320,74 @@ const ShellBar = ({ isHome, ...toolbar }: ToolbarProps & { readonly isHome: bool
     <Toolbar {...toolbar} />
   );
 
-/** A component's page, by its title. */
-const componentPage = (sourceId: string, title: string): Page => ({
+/** What a page loads of its story files: the docs, the code, and for a component its page. */
+type FileLoaders = {
+  readonly loadDocs: (() => Promise<unknown>) | undefined;
+  readonly loadCode: (() => Promise<unknown>) | undefined;
+};
+
+/**
+ * What a component's page loads: its first file's docs and page, as Storybook's docs come from the first file of a
+ * title, and the code of every file, for each example's Code card.
+ *
+ * @param files - the source's files; none without a source.
+ * @param component - the component.
+ */
+const componentLoaders = (
+  files: StoryFiles | undefined,
+  component: TreeComponent
+): FileLoaders & { readonly loadPage: (() => Promise<unknown>) | undefined } => ({
+  loadDocs: files?.docs[component.file],
+  loadCode: files === undefined ? undefined : filesCodeLoader(files.code, component.files),
+  loadPage: files?.pages[component.file]
+});
+
+/**
+ * What a story's page loads: its own file's code, and the docs of the component its file's meta names, which its
+ * controls are for.
+ *
+ * @param files - the source's files; none without a source.
+ * @param story - the story.
+ */
+const storyLoaders = (files: StoryFiles | undefined, story: TreeStory): FileLoaders => ({
+  loadDocs: files?.docs[story.file],
+  loadCode: files?.code[story.file]
+});
+
+/** A component's page. */
+const componentPage = (component: TreeComponent): Page => ({ kind: "component", id: component.id });
+
+/**
+ * Each component's id by its source and title, made once per tree: the sidebar names a component by its title, for
+ * every component on every render.
+ *
+ * @param tree - the tree.
+ */
+const componentIdsByTitle = (tree: StoryTree): ReadonlyMap<string, string> =>
+  new Map(
+    tree.sources.flatMap((source) =>
+      source.families.flatMap((family) =>
+        family.groups.flatMap((group) =>
+          group.components.map((component): [string, string] => [
+            `${source.id}\n${component.title}`,
+            component.id
+          ])
+        )
+      )
+    )
+  );
+
+/**
+ * The page of a source's component with a title, as the sidebar names a component and an alias its place; a title no
+ * component has gives the id it would have, which the page reports as missing.
+ *
+ * @param idsByTitle - the components' ids by source and title (`componentIdsByTitle`).
+ * @param sourceId - the source's id.
+ * @param title - the component's title.
+ */
+const titledPage = (idsByTitle: ReadonlyMap<string, string>, sourceId: string, title: string): Page => ({
   kind: "component",
-  id: componentId(sourceId, title)
+  id: idsByTitle.get(`${sourceId}\n${title}`) ?? componentId(sourceId, title)
 });
 
 /**
@@ -344,11 +410,9 @@ const usedInLinks = (
     : {
         load: usageLoader(source),
         componentOf: (title: string): TreeComponent | undefined =>
-          findComponent(tree, componentId(source.id, title))?.component,
-        componentHrefOf: (component: TreeComponent): string =>
-          pages.hrefOf(componentPage(source.id, component.title)),
-        onOpenComponent: (component: TreeComponent): void =>
-          pages.onOpen(componentPage(source.id, component.title)),
+          findComponentByTitle(tree, source.id, title)?.component,
+        componentHrefOf: (component: TreeComponent): string => pages.hrefOf(componentPage(component)),
+        onOpenComponent: (component: TreeComponent): void => pages.onOpen(componentPage(component)),
         storyHrefOf: (story: TreeStory): string => pages.hrefOf(storyPage(story)),
         onOpenStory: (story: TreeStory): void => pages.onOpen(storyPage(story))
       };
@@ -365,10 +429,8 @@ type LinkedComponent = { readonly page: Page; readonly name: string };
 const relatedComponents = (tree: StoryTree, location: ComponentLocation | undefined): LinkedComponent[] =>
   (location?.component.related ?? []).flatMap((title) => {
     if (location === undefined) return [];
-    const found = findComponent(tree, componentId(location.source.id, title));
-    return found === undefined
-      ? []
-      : [{ page: componentPage(location.source.id, title), name: found.component.name }];
+    const found = findComponentByTitle(tree, location.source.id, title);
+    return found === undefined ? [] : [{ page: componentPage(found.component), name: found.component.name }];
   });
 
 /**
@@ -578,6 +640,25 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
 };
 
 /**
+ * Writes the shown page's own id into the address when the address named it by a former id (`formerStoryId`), as a
+ * redirect would: a link written then keeps opening its page, and the address then shown is the page's own.
+ *
+ * @param address - the address.
+ * @param ownPage - the shown page by its own id; none on the home or a missing page.
+ * @param replaceAddress - changes the address in place.
+ */
+const useOwnPageId = (
+  address: Address,
+  ownPage: RecentPage | undefined,
+  replaceAddress: (next: Address) => void
+): void => {
+  useEffect(() => {
+    if (ownPage === undefined || address.page.kind === "home" || ownPage.id === address.page.id) return;
+    replaceAddress({ ...address, page: { ...address.page, id: ownPage.id } });
+  }, [address, ownPage, replaceAddress]);
+};
+
+/**
  * The catalogue's page inside its settings: everything below reads them, the shell's own hooks (the sidebar's width,
  * the keys, the recent pages) included.
  *
@@ -585,6 +666,7 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
  */
 const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
+  const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
   const {
     width: sidebarWidth,
     setWidth: setSidebarWidth,
@@ -621,7 +703,9 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
 
   const shown = shownPage(tree, address.page);
   const location = componentLocationOf(shown);
-  const recent = useRecentPages(recentPageOf(shown));
+  const ownPage = recentPageOf(shown);
+  const recent = useRecentPages(ownPage);
+  useOwnPageId(address, ownPage, replaceAddress);
   const shownPageLocation = pageLocationOf(shown);
   const pageName = shownPageLocation?.page.name ?? location?.component.name;
 
@@ -666,9 +750,7 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
           <StoryPicker
             component={location.component}
             currentStoryId={shownStoryId}
-            onOpenComponent={(): void =>
-              openPage(componentPage(location.source.id, location.component.title))
-            }
+            onOpenComponent={(): void => openPage(componentPage(location.component))}
             onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
           />
         )
@@ -702,10 +784,10 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
         pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), switches)}
         onOpenPage={(id: string): void => openPage({ kind: "page", id })}
         componentHref={(sourceId: string, componentTitle: string): string =>
-          addressQuery(pageAddress(componentPage(sourceId, componentTitle)), switches)
+          addressQuery(pageAddress(titledPage(idsByTitle, sourceId, componentTitle)), switches)
         }
         onOpenComponent={(sourceId: string, componentTitle: string): void =>
-          openPage(componentPage(sourceId, componentTitle))
+          openPage(titledPage(idsByTitle, sourceId, componentTitle))
         }
       />
       {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
@@ -740,9 +822,7 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
             frameUrl={frameUrl}
             hrefOf={storyHrefOf}
             onOpen={(story: TreeStory): void => openPage(storyPage(story))}
-            loadDocs={files?.docs[shown.location.component.file]}
-            loadCode={files?.code[shown.location.component.file]}
-            loadPage={files?.pages[shown.location.component.file]}
+            {...componentLoaders(files, shown.location.component)}
             background={storyBackground(
               shown.location.source.background,
               address.view,
@@ -802,8 +882,7 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
             matrixAxes={address.matrix}
             onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
             frameUrl={frameUrl}
-            loadCode={files?.code[shown.location.component.file]}
-            loadDocs={files?.docs[shown.location.component.file]}
+            {...storyLoaders(files, shown.location.story)}
             namedValues={source?.namedValues}
             header={header}
             onShownWidthChange={setShownWidth}

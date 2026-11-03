@@ -7,7 +7,11 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 ### Writing a story file
 
 - One file per component, beside it: `Badge.tsx` and `Badge.stories.tsx`, in CSF 3 (Storybook's format; Forgebook
-  reads it, never MDX or addons).
+  reads it, never MDX or addons). Files with the same title are one component, as in Storybook: each story keeps its
+  own file (`file` in `forgebook stories --json`), and the component lists them all (`files`).
+- Every named export of a story file is a story; leave helpers and data out with the meta's `excludeStories`.
+- Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
+  the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the
   catalogue shows that sentence):
 
