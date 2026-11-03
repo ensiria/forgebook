@@ -511,6 +511,15 @@ export const programFor = (
 };
 
 /**
+ * The configuration that holds a file, as `programFor` finds it; empty for a file none holds: what "Used in" groups a
+ * library's story files by, to read one configuration at a time.
+ *
+ * @internal
+ * @param file - an absolute path to a source file.
+ */
+export const configurationOf = (file: string): string => holdingConfiguration(file) ?? "";
+
+/**
  * The first paragraph of a symbol's TSDoc.
  *
  * @param symbol - a declared symbol.

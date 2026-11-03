@@ -5,6 +5,10 @@
  * @module
  */
 
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { type UsageGraph, usageGraph } from "../src/vite/usageGraph.ts";
@@ -64,5 +68,89 @@ describe("usageGraph", () => {
     expect(graph.imports[at("Row.tsx")]).toEqual([at("Badge.tsx")]);
     // react is a dependency: Badge imports nothing of the package
     expect(graph.imports[at("Badge.tsx")]).toEqual([]);
+  });
+});
+
+describe("usageGraph on a monorepo", () => {
+  it("reads each configuration's story files with a program of their own, and joins them", () => {
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), "forgebook-usage-monorepo-")));
+    const write = (file: string, text: string): void => {
+      mkdirSync(join(root, file, ".."), { recursive: true });
+      writeFileSync(join(root, file), text);
+    };
+    const options = { jsx: "react-jsx", module: "esnext", moduleResolution: "bundler", strict: true };
+    for (const name of ["a", "b"]) {
+      write(`${name}/tsconfig.json`, JSON.stringify({ compilerOptions: options, include: ["*.tsx"] }));
+      write(`${name}/Box.tsx`, "export const Box = () => null;\n");
+      write(
+        `${name}/Box.stories.tsx`,
+        'import { Box } from "./Box";\nexport default { title: "Box", component: Box };\nexport const Plain = {};\n'
+      );
+    }
+    const found = usageGraph(
+      ["a", "b"].map((name) => ({
+        storyFile: VITE_PATHS.join(root, name, "Box.stories.tsx"),
+        exports: ["Plain"]
+      }))
+    );
+    if (typeof found === "string") throw new Error(found);
+    expect(found.files.map((file) => file.component?.file)).toEqual([
+      VITE_PATHS.join(root, "a", "Box.tsx"),
+      VITE_PATHS.join(root, "b", "Box.tsx")
+    ]);
+    rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe("usageGraph on what a story renders", () => {
+  it("finds a compound component's parts and an installed library's components", () => {
+    // inside the package, so the framework's types are found: a compound component is typed through them
+    const root = realpathSync.native(mkdtempSync(join(import.meta.dirname, ".usage-renders-")));
+    const write = (file: string, text: string): void => {
+      mkdirSync(join(root, file, ".."), { recursive: true });
+      writeFileSync(join(root, file), text);
+    };
+    const options = { jsx: "react-jsx", module: "esnext", moduleResolution: "bundler", strict: true };
+    write("tsconfig.json", JSON.stringify({ compilerOptions: options, include: ["*.tsx"] }));
+    write("MenuItem.tsx", "export const MenuItem = () => null;\n");
+    write(
+      "Menu.tsx",
+      [
+        'import { forwardRef, type ReactNode } from "react";',
+        'import { MenuItem } from "./MenuItem";',
+        "const MenuRoot = forwardRef<HTMLDivElement, { children?: ReactNode }>((props, ref) => (",
+        "  <div ref={ref}>{props.children}</div>",
+        "));",
+        "export const Menu = Object.assign(MenuRoot, { Item: MenuItem });",
+        ""
+      ].join("\n")
+    );
+    write("node_modules/ext/package.json", JSON.stringify({ name: "ext", types: "index.d.ts" }));
+    write("node_modules/ext/index.d.ts", "export declare const ExtButton: () => null;\n");
+    write(
+      "Menu.stories.tsx",
+      [
+        'import { ExtButton } from "ext";',
+        'import { Menu } from "./Menu";',
+        'export default { title: "Menu", component: Menu };',
+        "export const Plain = { render: () => <Menu><Menu.Item /><ExtButton /></Menu> };",
+        ""
+      ].join("\n")
+    );
+    try {
+      const found = usageGraph([
+        { storyFile: VITE_PATHS.join(root, "Menu.stories.tsx"), exports: ["Plain"] }
+      ]);
+      if (typeof found === "string") throw new Error(found);
+      const renders = found.files.flatMap((file) => file.stories.flatMap((story) => story.renders));
+      // the part is the property the compound component is assigned
+      expect(renders).toContainEqual({ file: VITE_PATHS.join(root, "Menu.tsx"), name: "Item" });
+      expect(renders).toContainEqual({
+        file: VITE_PATHS.join(root, "node_modules", "ext", "index.d.ts"),
+        name: "ExtButton"
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
