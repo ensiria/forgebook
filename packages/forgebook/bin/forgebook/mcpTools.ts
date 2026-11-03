@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
+import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
@@ -286,12 +287,10 @@ export const catalogueTools = ({
       const id = textOf(args, "id") ?? "";
       const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const story = answer.body.components
-        .flatMap((component) => component.stories)
-        .find((each) => each.id === id);
-      return story === undefined
+      const named = namedStory(answer.body, id);
+      return named === undefined
         ? { structured: { error: `No story "${id}"` }, isError: true }
-        : { structured: { id, links: story.links }, isError: false };
+        : { structured: { id: named.story.id, links: named.story.links }, isError: false };
     }
   },
   {

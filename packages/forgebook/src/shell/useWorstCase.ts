@@ -14,6 +14,7 @@ import { type RefObject, useEffect, useMemo, useState } from "react";
 import type { PanelProp } from "../argTypes.ts";
 import type { PanelArgs, ShellMessage } from "../messages.ts";
 import { tellFrames } from "./FrameView.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
 import { isWorstCase, type WorstCaseState, worstArgs } from "./worstArgs.ts";
 
 /** What the hook reads. */
@@ -80,7 +81,7 @@ export const useWorstCase = ({
     },
     sendTo: (frame: Window): void => {
       const message: ShellMessage = { type: "forgebook:spills", isOn };
-      frame.postMessage(message, window.location.origin);
+      frame.postMessage(message, framesOrigin());
     },
     receive: (reported: string, count: number, frame: string): void =>
       setCounts((current) => new Map(current).set(reported, new Map(current.get(reported)).set(frame, count)))

@@ -125,6 +125,7 @@ describe("story groups", () => {
     const sections = groupedStories(
       [story("zeta"), story("behaviour"), story(undefined), story("alpha"), story("states")].map((each) => ({
         ...each,
+        file: "x.stories.tsx",
         controls: "all" as const,
         description: undefined,
         height: undefined,

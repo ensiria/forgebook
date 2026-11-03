@@ -18,6 +18,15 @@ describe("shotName", () => {
     );
   });
 
+  it("keeps the letters of any script an id has, so two stories never share a picture", () => {
+    expect(shotName({ story: { id: "ui:skjema-knapp--åpen" }, name: "" })).toBe(
+      "ui-skjema-knapp--åpen--default.png"
+    );
+    expect(shotName({ story: { id: "ui:按钮--默认" }, name: "" })).not.toBe(
+      shotName({ story: { id: "ui:输入--默认" }, name: "" })
+    );
+  });
+
   it("stays quick on a name that is a long run of hyphens", () => {
     const name = `${"-".repeat(200_000)}x${"-".repeat(200_000)}`;
     const started = performance.now();

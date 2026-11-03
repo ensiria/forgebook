@@ -265,6 +265,10 @@ test.describe("forgebook mcp's inline preview", () => {
       ).toBeVisible();
       const frameBox = await page.frameLocator("#view").locator("#frame").boundingBox();
       expect(frameBox?.height).toBeGreaterThan(0);
+      // the host frames the catalogue's origin only, the one it was told; the story runs on the frames' own
+      const storyOrigin = new URL(frames.at(-1) ?? "").origin;
+      expect(frameDomains).toHaveLength(1);
+      expect(frameDomains).not.toContain(storyOrigin);
       await page.screenshot({ path: testInfo.outputPath("preview.png") });
       await writeFile(testInfo.outputPath("messages.json"), JSON.stringify(host.received));
 

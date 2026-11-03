@@ -9,16 +9,20 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > and every change is in the
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
-**Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 today, through
-[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), a Next.js project's components through
+**Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 through
+[`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
+[`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue), Svelte 5 through
+[`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte), a Next.js project's components through
 [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs); other frameworks plug in through the same
-adapter (the catalogue's own interface is React either way) · npm, pnpm, yarn or bun ·
+adapter (the catalogue's own interface is React either way, and a Vue or Svelte story's frame loads none) · npm, pnpm,
+yarn or bun ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/LICENSE)
 
 ## Install
 
 In a project with React and Vite, both packages: `forgebook` is the catalogue, `@forgebook/react` the adapter it draws
-React components with.
+React components with. On Vue, `@forgebook/vue` takes its place, and on Svelte `@forgebook/svelte`: each README has the
+configuration and the stories.
 
 ```sh
 npm install --save-dev forgebook @forgebook/react
@@ -310,6 +314,29 @@ titles from the file's path, `args` and `argTypes` (with their controls), action
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
 `tags` (`!dev`, `!test`) and a story's `globals`.
 
+It lists what Storybook's indexer lists:
+
+- every named export as a story, whatever writes its value: an object, a function, a helper's result
+  (`export const Chromatic = storiesFor(…)`), another constant (`export const Default: StoryFn = Template`) or a
+  re-export (`export { A as B }`, from the file or another module); `includeStories` and `excludeStories` leave some
+  out, as there;
+- the meta written in place or held in a constant (`export default meta`, `export { meta as default }`);
+- files with one title as one component: its stories come from every file, in the order of their paths, each with its
+  own file's meta, and its page takes the first file's docs and documentation file. Two stories with one id are a
+  problem, and the second is left out;
+- Storybook's ids, so a link carries over: `inputs-readmore--open-by-default` for the title `Inputs/ReadMore` and the
+  export `OpenByDefault`, the meta's `id` in place of its title, and a story's own `parameters.__id`. An address,
+  `forgebook story`, `forgebook check` and the MCP tools still take the ids Forgebook gave before it followed
+  Storybook's (`inputs-read-more--open-by-default`), and open the story under its own; a picture stored under such an
+  id still counts as the story's baseline until `forgebook shot --update` stores one under its id.
+
+A story without a `name` is named from its export's words as Storybook splits them, in sentence case
+(`CustomSVGIcon` → "Custom SVG icon").
+
+A component's props are read with the configuration an editor reads its story file with: the nearest `tsconfig.json`
+up the file's folders that holds it, or a project it references. A monorepo whose packages hold only their sources
+and whose root holds the stories, with the paths to the packages' sources, gets its props tables as Storybook does.
+
 It does not read MDX, doc blocks or addons. Actions are explicit only: an `on*` prop is not turned into an action by
 its name.
 
@@ -317,9 +344,10 @@ To try it on a Storybook project, run `npx forgebook init --from storybook` in t
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
 computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
-become switches. It reads React on Vite (`@storybook/react-vite`) and Next.js (`@storybook/nextjs-vite`, and
-`@storybook/nextjs` on webpack, whose stories are the same), never replaces a configuration without `--force`, and
-lists what it left out. A Next.js project gets `framework: nextjs()` and keeps its stories' `parameters.nextjs`:
+become switches. It reads React, Vue and Svelte on Vite (`@storybook/react-vite`, `@storybook/vue3-vite`,
+`@storybook/svelte-vite`, `@storybook/sveltekit`) and Next.js (`@storybook/nextjs-vite`, and `@storybook/nextjs` on
+webpack, whose stories are the same), never replaces a configuration without `--force`, and lists what it left out. A
+Next.js project gets `framework: nextjs()` and keeps its stories' `parameters.nextjs`:
 [`@forgebook/nextjs`](https://github.com/ensiria/forgebook/blob/develop/packages/nextjs/README.md) says what it draws.
 
 ## Monorepos
@@ -356,7 +384,7 @@ export default defineConfig({
 ```
 
 A story's id starts with its source's (`ui:actions-button--plain`), so two packages can both have a `Button`. Props are read
-through each package's own `tsconfig.json`. This repository's fixture catalogue is built this way, on two packages, and its
+through the `tsconfig.json` that holds the story file: the package's own, or the first one up its folders that lists it. This repository's fixture catalogue is built this way, on two packages, and its
 browser tests run in CI.
 
 ## Commands
@@ -436,6 +464,40 @@ jobs:
       # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
       # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+## Stories on an origin of their own
+
+A story's code, or a value a shared link puts in one of its props (an `href`, an `html`), runs in its frame. So that it
+cannot read or act on the catalogue, the frames run on another origin than the catalogue's page:
+
+- **On the dev server**, by default: a second port, the catalogue's + 1 (`forgebook dev` prints it as `Frames`). The
+  catalogue refuses what another origin's page asks of it, and the frames' port serves only the frame page, the public
+  folder and the modules your stories import: a frame cannot call the agent API (`/__forgebook/api/`) or read a file
+  of the project that no story imports. Choose the port with `--frame-port` or `frames: { port }`.
+- **In a static build**, the frames share the catalogue's origin, unless you serve the same files from a second host
+  and name both, ideally two subdomains of one site (two different sites make the frame's cookies third-party):
+
+```ts
+export default defineConfig({
+  // …
+  frames: { origins: { catalogue: "https://ui.example.com", frames: "https://ui-frames.example.com" } }
+});
+```
+
+`origins` also serves a dev server behind a proxy that gives each port a host of its own. `frames: "same-origin"` keeps
+the frames on the catalogue's origin everywhere, for a place that opens one port only; then a story's code can reach the
+catalogue as before. What the frames could use on the catalogue's origin still works on theirs: storage, cookies, MSW's
+worker, the clipboard, full screen, the camera and the microphone. A story's link can no longer take the catalogue's
+tab to another address.
+
+What stays reachable from a frame: the code it runs (your stories, their components, what the catalogue imports), the
+errors Vite sends every page while you edit, and `forgebook errors`, where a frame reports its own errors. If the
+default port is taken, the frames move to the next free one, so their storage moves with them; give `--frame-port` to
+keep it.
+
+An embed (`?embed`) and an MCP client's inline preview are pages of the catalogue's origin that frame the story on the
+frames' origin in turn, as the catalogue does: a page or a host that frames them names the catalogue's origin only (in
+its `frame-src`, in the preview's `frameDomains`).
+
 ## Your look in the shell
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
 written into the page at build, and the frames are left alone, since they belong to your stories.
@@ -620,6 +682,8 @@ docs page that names what is not there, and its JSON lists every story for a scr
 |---|---|
 | `forgebook` | The catalogue: the shell, the frame, the Vite plugin, the commands |
 | [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react) | React's story types, renderer and props reader |
+| [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) | Vue's story types, renderer and props, events and slots reader |
+| [`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte) | Svelte's story types, renderer and props, snippets and callback props reader |
 | [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs) | A Next.js project's components outside Next.js: images, fonts, links, both routers, server components |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing) | Tests generated from the stories |

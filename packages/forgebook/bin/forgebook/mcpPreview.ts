@@ -11,6 +11,7 @@
  * @module
  */
 import { isStoriesDocument } from "../../src/vite/agentApi.ts";
+import { namedStory } from "../../src/vite/agentIds.ts";
 import { AGENT_API, type AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpAppContent, McpAppResource, McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { PREVIEW_ROUTE } from "../../src/vite/previewRoute.ts";
@@ -67,15 +68,16 @@ export const previewTool = ({ ask, serve }: PreviewReach): McpTool => ({
   },
   appResource: PREVIEW_URI,
   call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
-    const id = typeof args["id"] === "string" ? args["id"] : "";
     const view = typeof args["view"] === "string" ? args["view"] : "";
     const answer = await ask("stories", new URLSearchParams({ view }));
     if (answer.status !== 200 || !isStoriesDocument(answer.body))
       return { structured: answer.body, isError: true };
-    const story = answer.body.components
-      .flatMap((component) => component.stories)
-      .find((each) => each.id === id);
-    if (story === undefined) return { structured: { error: `No story "${id}"` }, isError: true };
+    // a former id (`formerStoryId`) names its story too, which is answered under its own id
+    const named = namedStory(answer.body, typeof args["id"] === "string" ? args["id"] : "");
+    if (named === undefined)
+      return { structured: { error: `No story "${String(args["id"])}"` }, isError: true };
+    const { story } = named;
+    const { id } = story;
     let origin: string;
     try {
       origin = await serve();

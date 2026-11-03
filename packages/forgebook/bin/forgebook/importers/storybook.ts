@@ -6,8 +6,10 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React stories on Vite, a Next.js project's among them (Storybook's `@storybook/nextjs`, on
- * webpack, too: the stories are the same), so another framework is refused with what Forgebook supports.
+ * instead. Forgebook reads React, Vue and Svelte stories on Vite, and a Next.js project's (Storybook's
+ * `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework is refused with what Forgebook
+ * supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the notes, since Forgebook reads CSF in
+ * scripts.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
@@ -23,7 +25,7 @@ import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 import { VITE_PATHS, type VitePaths } from "../../../src/vite/vitePaths.ts";
 
 /** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
-export type ImportedFramework = "react" | "nextjs";
+export type ImportedFramework = "react" | "vue" | "svelte" | "nextjs";
 
 /** What a configuration takes from another tool's files. */
 export type ImportedConfig = {
@@ -46,6 +48,9 @@ export type ImportedConfig = {
 /** The Forgebook frameworks a project's Storybook can move to, by Storybook's framework. */
 const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   "@storybook/react-vite": "react",
+  "@storybook/vue3-vite": "vue",
+  "@storybook/svelte-vite": "svelte",
+  "@storybook/sveltekit": "svelte",
   "@storybook/nextjs-vite": "nextjs",
   "@storybook/nextjs": "nextjs"
 };
@@ -422,7 +427,7 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   const storybook = storybookFramework(frameworkOf(main).name);
   if (storybook === undefined) {
     const supported = Object.keys(STORYBOOK_FRAMEWORKS).join(", ");
-    return `Forgebook reads Storybook's React stories on Vite and Next.js's (${supported}); this project uses ${frameworkOf(main).name ?? "no framework"}`;
+    return `Forgebook reads the stories of Storybook's ${supported}; this project uses ${frameworkOf(main).name ?? "no framework"}`;
   }
   const framework = STORYBOOK_FRAMEWORKS[storybook] ?? "react";
   const nextjs =
@@ -430,6 +435,10 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
   if (globs.length === 0) return `${relative(projectDir, mainFile)} names no story file Forgebook reads`;
+  if (storybook === "@storybook/sveltekit")
+    notes.push(
+      "SvelteKit's $app modules and $lib alias are not provided: a story that imports them needs an alias of its own"
+    );
   if (Array.isArray(main["addons"]) && main["addons"].length > 0)
     notes.push("The addons are left out: Forgebook has its own panel, toolbar and checks");
   notes.push(...nextjs.notes);

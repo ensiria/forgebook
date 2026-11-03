@@ -21,18 +21,37 @@ import {
   UI_EXTENSION
 } from "../src/vite/mcpProtocol.ts";
 
-/** The catalogue's answer: one story. */
+/** The catalogue's answer: two stories, one whose id the former rule wrote otherwise. */
 const STORIES: Readonly<Record<string, unknown>> = {
   schema: 1,
   problems: [],
   components: [
     {
+      id: "kit:button",
+      title: "Button",
+      source: "kit",
       stories: [
         {
           id: "kit:button--primary",
+          exportName: "Primary",
           links: {
             address: "http://localhost:5173/?story=kit%3Abutton--primary",
             frame: "http://localhost:5173/frame.html?story=kit%3Abutton--primary"
+          }
+        }
+      ]
+    },
+    {
+      id: "kit:data-readmore",
+      title: "Data/ReadMore",
+      source: "kit",
+      stories: [
+        {
+          id: "kit:data-readmore--open",
+          exportName: "Open",
+          links: {
+            address: "http://localhost:5173/?story=kit%3Adata-readmore--open",
+            frame: "http://localhost:5173/frame.html?story=kit%3Adata-readmore--open"
           }
         }
       ]
@@ -305,6 +324,20 @@ describe("what runs when", () => {
       structured: { id: "kit:button--primary", problem: "port taken" }
     });
     expect(JSON.stringify(result)).not.toContain('"preview"');
+  });
+
+  it("previews a story named by the id the former rule gave it, under its own id", async () => {
+    const { server } = reach();
+    const { answer } = await send(
+      server,
+      "tools/call",
+      { name: "story_preview", arguments: { id: "kit:data-read-more--open" } },
+      await handshake(server, APP_CAPABILITIES)
+    );
+    expect(answer).toMatchObject({
+      result: { isError: false, structuredContent: { id: "kit:data-readmore--open" } }
+    });
+    expect(JSON.stringify(answer)).toContain("id=kit%3Adata-readmore--open");
   });
 
   it("starts nothing for a story that does not exist", async () => {

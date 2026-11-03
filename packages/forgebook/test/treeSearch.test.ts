@@ -11,12 +11,15 @@ import type { TreeComponent, TreeFamily } from "../src/storyTree.ts";
 
 /** A component with a few stories. */
 const BUTTON: TreeComponent = {
+  id: "kit:actions-buttons-button",
   name: "Button",
   title: "Actions/Buttons/Button",
   file: "Button.stories.tsx",
+  files: ["Button.stories.tsx"],
   stories: [
     {
       id: "kit:b--overview",
+      file: "Button.stories.tsx",
       name: "Overview",
       exportName: "Overview",
       controls: "all",
@@ -31,6 +34,7 @@ const BUTTON: TreeComponent = {
     },
     {
       id: "kit:b--danger",
+      file: "Button.stories.tsx",
       name: "Danger",
       exportName: "Danger",
       controls: "all",
@@ -45,6 +49,7 @@ const BUTTON: TreeComponent = {
     },
     {
       id: "kit:b--long",
+      file: "Button.stories.tsx",
       name: "Long label",
       exportName: "Long",
       controls: "all",

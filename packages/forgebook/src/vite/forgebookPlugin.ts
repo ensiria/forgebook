@@ -20,7 +20,7 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 
 import {
   type ConfigEnv,
@@ -31,14 +31,17 @@ import {
   type ViteDevServer
 } from "vite";
 
+import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
-import { agentMiddleware } from "./agentRoutes.ts";
+import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { DOCS_PAGE_QUERY, docPageModule, docPagesModule } from "./docPagesModule.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
+import { builtPlacement } from "./framesConfig.ts";
+import { serveFrames } from "./framesServer.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import {
   agentSourcesModule,
@@ -181,14 +184,15 @@ const patternId = (source: string, folder: string): string | null => {
  *
  * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
- * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks.
+ * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks; none
+ *   where no page will ask.
  * @param hasUsage - whether the group offers its "Used in" loader.
  * @throws when a story file cannot be indexed.
  */
 const patternModule = (
   id: string,
   watch: (file: string) => void,
-  warm: (storyFile: string) => void,
+  warm: ((storyFile: string) => void) | undefined,
   hasUsage: boolean
 ): { code: string; moduleType: "js" } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
@@ -202,7 +206,7 @@ const patternModule = (
     },
     hasUsage
   );
-  if (first !== undefined) warm(first);
+  if (first !== undefined) warm?.(first);
   return { code, moduleType: "js" };
 };
 
@@ -316,8 +320,9 @@ const docsModuleOf = (
 };
 
 /**
- * A module the plugin generates for a catalogue's pages, when the id names one: the configuration's data, an entry,
- * the project's own stories' source, or a page's HTML (unless the folder has one of its own).
+ * A module the plugin generates for a catalogue's pages, when the id names one: an entry, the project's own stories'
+ * source, or a page's HTML (unless the folder has one of its own). The configuration's data waits for the frames'
+ * placement, so the plugin's `load` makes it.
  *
  * @param id - the module's id.
  * @param config - the catalogue's configuration.
@@ -326,7 +331,6 @@ const generatedModule = (
   id: string,
   config: ResolvedConfig
 ): { code: string; moduleType: "js" } | string | undefined => {
-  if (id === CONFIG_ID) return { code: configModule(config), moduleType: "js" };
   const named = pageModuleOf(id, config.dir);
   if (named === undefined) return undefined;
   if (named.kind === "entry") {
@@ -370,12 +374,33 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const docsModules = new Set<string>();
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
+  /** Where the frames run: the dev server's second port once it listens, the configuration's choice in a build. */
+  let framesPlacement = async (): Promise<FramesPlacement> =>
+    config === undefined ? SAME_ORIGIN : builtPlacement(config.frames);
   let config = options.config;
+  /**
+   * A module the plugin generates for the catalogue's pages: the configuration's data, once the frames are placed, or
+   * one `generatedModule` makes; none without a configuration or for another id.
+   *
+   * @param id - the module's id.
+   */
+  const pagesModule = async (
+    id: string
+  ): Promise<{ code: string; moduleType: "js" } | string | undefined> => {
+    if (config === undefined) return undefined;
+    if (id === CONFIG_ID) return { code: configModule(config, await framesPlacement()), moduleType: "js" };
+    return generatedModule(id, config);
+  };
   /** The dev server; none in a build. */
   let devServer: ViteDevServer | undefined;
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
+  /**
+   * Whether the server runs tests (Vitest's mode): no person waits for a page, so no docs program is warmed. A worker
+   * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
+   */
+  let isTestRun = false;
   // the docs are read in a worker, made once the framework is known: a package's TypeScript program takes seconds to
   // build and would hold every other answer of the dev server meanwhile
   let docs: DocsExtractor | undefined;
@@ -393,7 +418,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param file - the edited file.
    */
   const renewOnChange = (server: ViteDevServer, file: string): void => {
-    if (!SOURCE_FILE.test(file)) return;
+    const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+    if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
     const graph = server.environments.client.moduleGraph;
     for (const id of usageModules) {
@@ -418,7 +444,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    return patternModule(id, watch, extractor().warm, config?.lists.usedIn !== false);
+    return patternModule(id, watch, isTestRun ? undefined : extractor().warm, config?.lists.usedIn !== false);
   };
   /**
    * The modules a file added or removed changes; none when it changes no list.
@@ -450,7 +476,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const componentFile = await componentFileOf(storyFile, (specifier: string) =>
         resolveImport(specifier, storyFile)
       );
-      return pageModule(storyFile, componentFile, watch);
+      const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+      return pageModule(storyFile, componentFile, watch, componentFiles);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
     return docsModuleOf(id, watch, isServing()) ?? textModule(id, watch);
@@ -460,6 +487,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     enforce: "pre",
     config: async (userConfig: UserConfig, environment: ConfigEnv): Promise<UserConfig> => {
       command = environment.command;
+      isTestRun = environment.mode === "test";
       if (config === undefined && options.framework === undefined) {
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
@@ -482,7 +510,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
                     frame: pageModulePath(config.dir, "frame.html")
                   }
                 }
-              }
+              },
+              // Vite lets any localhost page read the server: neither origin needs another's reads, and the guards
+              // would be the only wall left between the frames and the catalogue (unless the app chose its own)
+              ...(config.frames.kind === "isolated" && userConfig.server?.cors === undefined
+                ? { server: { cors: false } }
+                : {})
             };
       return {
         ...pages,
@@ -508,10 +541,14 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     configureServer: (server: ViteDevServer): void => {
       devServer = server;
       server.httpServer?.on("close", (): void => void docs?.close());
+      // first: the frames' own origin, and the guard that keeps every other origin's page from reading this one
+      if (config !== undefined)
+        serveFrames(server, config, (placement) => (framesPlacement = placement), FRAMED_AGENT_PAGES);
       // an edited component or type file changes its docs: the worker renews its programs on their next read
       server.watcher.on("change", (file: string): void => renewOnChange(server, file));
       // the answers to tools and agents (`forgebook stories`, `forgebook mcp`), from the same sources as the pages
-      if (config !== undefined) server.middlewares.use(agentMiddleware(server, config, live));
+      if (config !== undefined)
+        server.middlewares.use(agentMiddleware(server, config, live, () => framesPlacement()));
       if (config?.heights !== undefined) {
         const file = {
           heights: config.heights,
@@ -559,7 +596,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       await docs?.close();
     },
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
-      const generated = config === undefined ? undefined : generatedModule(id, config);
+      const generated = await pagesModule(id);
       if (generated !== undefined) return generated;
       // an answer, not an error: an error would raise Vite's overlay on every reader's open page
       if (!isReadable(id, devServer)) return { code: "export default null;", moduleType: "js" };

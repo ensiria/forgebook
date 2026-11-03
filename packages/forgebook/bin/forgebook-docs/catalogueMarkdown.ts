@@ -12,7 +12,6 @@
  */
 import type { FunctionSignatureDocs, PropDocs } from "../../src/componentDocs.ts";
 import { pageSlug } from "../../src/pageAddress.ts";
-import { storyId } from "../../src/storyTree.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
 import type {
   CatalogueComponent,
@@ -86,9 +85,9 @@ const componentLine = (
           .join(" ");
   const parts = docs.parts.length === 0 ? "" : ` · parts: ${docs.parts.join(", ")}`;
   const story =
-    sourceId === undefined || component.mainStory === undefined
+    sourceId === undefined || component.mainStoryId === undefined
       ? ""
-      : ` · story: \`${storyId(sourceId, component.title, component.mainStory)}\``;
+      : ` · story: \`${sourceId}:${component.mainStoryId}\``;
   const design = component.design === undefined ? "" : ` · design: ${component.design}`;
   return `- **${docs.name}**${where}: ${sentence(docs.description)}. ${props}${parts}${story}${design}`;
 };

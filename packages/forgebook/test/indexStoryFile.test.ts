@@ -74,27 +74,94 @@ describe("indexStoryFile", () => {
     const text = `export default { title: "A/B" };
       const Template = (args) => <Button {...args} />;
       export const Primary = Template.bind({});
-      Primary.storyName = "Bound";
-      export const helper = format.call(null);`;
+      Primary.storyName = "Bound";`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
       title: "A/B",
       stories: [{ exportName: "Primary", name: "Bound" }]
     });
   });
 
-  it("reads re-exported stories under their exported names, never another file's", () => {
+  it("lists every export as a story, as Storybook does, whatever writes its value", () => {
     const text = `export default { title: "A/B" };
-      const Base = {};
-      export { Base as Overview };
-      export { Other } from "./other.stories";`;
+      const Template = { args: { tone: "neutral" }, parameters: { height: 120 } };
+      export const Made = makeStory({ tone: "danger" });
+      Made.storyName = "Made by a helper";
+      export const Aliased: Story = Template;
+      export const Chained = Aliased;
+      export let Later;
+      export class NotAStory {}
+      export type Props = { tone: string };`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
       title: "A/B",
-      stories: [{ exportName: "Overview" }]
+      stories: [
+        { exportName: "Made", name: "Made by a helper" },
+        { exportName: "Aliased", height: 120 },
+        { exportName: "Chained", height: 120 },
+        { exportName: "Later" }
+      ]
     });
   });
 
-  it("keeps only the stories includeStories and excludeStories let in, and skips what is no story", () => {
-    const listed = `export default { title: "A/B", excludeStories: ["mockData"] };
+  it("reads a meta exported by name (`export { meta as default }`)", () => {
+    const text = "const meta = { title: 'A/B' }; export { meta as default }; export const X = {};";
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({ title: "A/B", stories: [{ exportName: "X" }] });
+  });
+
+  it("takes a name and an id only from the story's own object, never from another constant it names", () => {
+    const text = `export default { title: "A/B", id: "" };
+      export const One = { name: "Alpha", parameters: { __id: "a-b--uno", height: 40 } };
+      export const Two = One;
+      Two.storyName = "Second";
+      export const Three = One;`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [
+        { exportName: "One", id: "a-b--uno", name: "Alpha", height: 40 },
+        { exportName: "Two", name: "Second", height: 40 },
+        { exportName: "Three", height: 40 }
+      ]
+    });
+  });
+
+  it("reads the ids a meta and a story write, as Storybook's links name them", () => {
+    const text = `export default { title: "Navigation/Menu", id: "menus" };
+      export const Overview = {};
+      export const Nested = { parameters: { __id: "menus--deep" } };
+      export const Coded = { parameters: { __id: prefix + "x" } };`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "Navigation/Menu",
+      id: "menus",
+      stories: [
+        { exportName: "Overview" },
+        { exportName: "Nested", id: "menus--deep" },
+        { exportName: "Coded" }
+      ]
+    });
+    expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", id: name };')).toBe(
+      "A.stories.tsx: the meta's `id` must be a plain string"
+    );
+  });
+
+  it("reads re-exported stories under their exported names, another file's too", () => {
+    const text = `export default { title: "A/B" };
+      const Base = { name: "The base", parameters: { height: 80 } };
+      export { Base as Overview };
+      export { Other, Third as "Third story" } from "./other.stories";
+      export type { Props } from "./props";
+      export * from "./everything";`;
+    // as Storybook's indexer, the name comes from the export, the other fields from the object it names
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [
+        { exportName: "Overview", height: 80 },
+        { exportName: "Other" },
+        { exportName: "Third story" }
+      ]
+    });
+  });
+
+  it("keeps only the stories includeStories and excludeStories let in", () => {
+    const listed = `export default { title: "A/B", excludeStories: ["mockData", "VERSION"] };
       export const mockData = { rows: [] };
       export const Overview = {};
       export const VERSION = "1";`;

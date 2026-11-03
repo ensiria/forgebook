@@ -194,11 +194,40 @@
       }
     },
     {
-      "includes": ["**/*.stories.tsx"],
+      "includes": ["**/*.stories.tsx", "**/*.stories.ts", "**/forgebook.preview.ts"],
       "linter": {
         "rules": {
           "style": {
             "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.svelte"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
+          },
+          "style": {
+            "useConst": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.vue"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off",
+            "useHookAtTopLevel": "off"
+          },
+          "style": {
+            "useVueMultiWordComponentNames": "off"
           }
         }
       }
