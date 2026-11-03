@@ -12,9 +12,10 @@
  * @module
  */
 import { existsSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { VITE_PATHS, type VitePaths } from "forgebook/vite/paths";
 import {
   type Alias,
   type HtmlTagDescriptor,
@@ -90,11 +91,17 @@ const ownExport = (subpath: string): string =>
 
 /**
  * The aliases of SvelteKit's `alias` option and of `$lib`, as SvelteKit writes them: a name for itself and what is
- * below it, a name ending in `/*` for what is below it.
+ * below it, a name ending in `/*` for what is below it. Each leads to a path in Vite's form, with forward slashes on
+ * every system: what a name leads to is written after it (`$lib/site` to `<lib>/site`), so a Windows path would come
+ * out half in backslashes.
  *
  * @param project - the project.
+ * @param paths - the system's path functions; the running system's by default.
  */
-export const projectAliases = (project: KitProject): Alias[] => {
+export const projectAliases = (
+  project: Pick<KitProject, "kit" | "dir">,
+  paths: VitePaths = VITE_PATHS
+): Alias[] => {
   const { kit, dir } = project;
   const files = isRecord(kit["files"]) ? kit["files"] : {};
   const aliases: [string, string][] = [
@@ -107,7 +114,7 @@ export const projectAliases = (project: KitProject): Alias[] => {
       : [])
   ];
   return aliases.flatMap(([name, target]): Alias[] => {
-    const path = isAbsolute(target) ? target : resolve(dir, target);
+    const path = paths.isAbsolute(target) ? paths.normalize(target) : paths.resolve(dir, target);
     if (name.endsWith("/*")) {
       const prefix = name.slice(0, -2);
       return [

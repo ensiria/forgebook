@@ -4,9 +4,10 @@
  *
  * @module
  */
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 
-import type { Plugin, ResolvedConfig } from "vite";
+import { vitePathsOf } from "forgebook/vite/paths";
+import { normalizePath, type Plugin, type ResolvedConfig } from "vite";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -103,12 +104,38 @@ describe("the aliases", () => {
       );
       return alias === undefined ? undefined : name.replace(alias.find, alias.replacement);
     };
-    expect(replaced("$lib")).toBe(join(FIXTURES, "kit2", "src/library"));
-    expect(replaced("$lib/site")).toBe(join(FIXTURES, "kit2", "src/library/site"));
-    expect(replaced("$ui/Button.svelte")).toBe(join(FIXTURES, "kit2", "src/ui/Button.svelte"));
-    expect(replaced("$icons/star.svg")).toBe(join(FIXTURES, "kit2", "src/icons/star.svg"));
+    expect(replaced("$lib")).toBe(normalizePath(join(FIXTURES, "kit2", "src/library")));
+    expect(replaced("$lib/site")).toBe(normalizePath(join(FIXTURES, "kit2", "src/library/site")));
+    expect(replaced("$ui/Button.svelte")).toBe(normalizePath(join(FIXTURES, "kit2", "src/ui/Button.svelte")));
+    expect(replaced("$icons/star.svg")).toBe(normalizePath(join(FIXTURES, "kit2", "src/icons/star.svg")));
     expect(replaced("$icons")).toBeUndefined();
     expect(replaced("$library")).toBeUndefined();
+  });
+
+  it("leads to paths in Vite's form on Windows, a name's rest after them included", () => {
+    const aliases = projectAliases(
+      {
+        dir: "C:\\app",
+        kit: {
+          files: { lib: "src\\library" },
+          alias: Object.fromEntries([
+            ["$ui", "D:\\shared\\ui"],
+            ["$icons/*", "src/icons/*"]
+          ])
+        }
+      },
+      vitePathsOf(win32)
+    );
+    const replaced = (name: string): string | undefined => {
+      const alias = aliases.find((each) =>
+        typeof each.find === "string" ? each.find === name : each.find.test(name)
+      );
+      return alias === undefined ? undefined : name.replace(alias.find, alias.replacement);
+    };
+    expect(replaced("$lib")).toBe("C:/app/src/library");
+    expect(replaced("$lib/site")).toBe("C:/app/src/library/site");
+    expect(replaced("$ui/Button.svelte")).toBe("D:/shared/ui/Button.svelte");
+    expect(replaced("$icons/star.svg")).toBe("C:/app/src/icons/star.svg");
   });
 
   it("writes the settings in the frame's page with no way to close its script", () => {
