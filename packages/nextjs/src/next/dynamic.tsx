@@ -4,7 +4,7 @@
  * @remarks
  * Next.js's own `dynamic` is shaped by its compiler (a module id written into each call); in Vite a dynamic import is
  * already split, so `React.lazy` does the work. Without a `loading` component the story's own boundary waits for the
- * module, and the story counts as drawn only once it came (`nextRenderer.tsx`), so a test or a screenshot never catches
+ * module, and the story counts as drawn only once it came (`nextFrameRenderer.tsx`), so a test or a screenshot never catches
  * the empty moment; with one, the loading state shows first, as in the app. `ssr: false` changes nothing: a story is
  * drawn in the browser.
  *

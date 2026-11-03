@@ -3,11 +3,11 @@
  * other args and takes it away, and how the shell writes a story drawn from its args as code.
  *
  * @remarks
- * The frame owns everything a framework does not need to know: the address and the view, the messages with the
- * shell, the style sheets, the play function, Replay, the matrix's layout, the story clock and the error shown in
- * place of a story. A framework package (`@forgebook/react`) implements this type and hands it to the frame; another
- * framework implements the same type. A story's decorators, providers and error capture are the framework's, since
- * they return or catch the framework's own output.
+ * The frame owns everything a framework does not need to know: the address and the view, the messages with the shell,
+ * the style sheets, the play function, Replay, the matrix's layout, the story clock and the error shown in place of a
+ * story. A framework package (`@forgebook/react`) implements `StoryRenderer` and hands the frame its drawing part
+ * (`FrameRenderer`); another framework implements the same types. A story's decorators, providers and error capture are
+ * the framework's, since they return or catch the framework's own output.
  *
  * @module
  */
@@ -66,8 +66,12 @@ export type MountedStory = {
   readonly unmount: () => void;
 };
 
-/** A framework, as the frame uses it. */
-export type StoryRenderer = {
+/**
+ * A framework, as the frame uses it: it only draws. The frame takes this rather than a whole `StoryRenderer`, so a
+ * framework's frame page can leave its server renderer out: a static catalogue would ship it (some 200 kB for React's)
+ * and a first start would pre-bundle it, for a page that never runs it.
+ */
+export type FrameRenderer = {
   /**
    * Draws a story in a canvas the frame owns.
    *
@@ -82,6 +86,10 @@ export type StoryRenderer = {
     drawing: StoryDrawing,
     onError: (error: Error) => void
   ) => MountedStory;
+};
+
+/** A framework, as the frame draws with it and the generated server tests render with it. */
+export type StoryRenderer = FrameRenderer & {
   /**
    * The story drawn as HTML on the server, for the generated server tests; throws, or rejects, when the story throws.
    * A framework whose server render is asynchronous returns a promise (Vue's waits for what `setup` awaits).

@@ -6,7 +6,7 @@
  */
 import { type FrameConfig, mountFrame as mountForgebookFrame } from "forgebook/frame";
 
-import { nextRenderer } from "./nextRenderer.tsx";
+import { nextFrameRenderer } from "./nextFrameRenderer.tsx";
 
 /**
  * Shows the story the address names in the given element, drawn with React for a Next.js project.
@@ -15,4 +15,4 @@ import { nextRenderer } from "./nextRenderer.tsx";
  * @param config - the sources and the languages, as the shell's configuration gives them.
  */
 export const mountFrame = (container: HTMLElement, config: Omit<FrameConfig, "renderer">): Promise<void> =>
-  mountForgebookFrame(container, { ...config, renderer: nextRenderer });
+  mountForgebookFrame(container, { ...config, renderer: nextFrameRenderer });
