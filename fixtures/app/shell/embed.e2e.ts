@@ -10,10 +10,10 @@ import type { AddressInfo } from "node:net";
 
 import { test as base, expect, type FrameLocator, type Page } from "@playwright/test";
 
-import { WHITE_LABEL_PORT } from "./ports";
+import { catalogueUrl } from "./ports";
 
 /** The white-label catalogue's address. */
-const WHITE_LABEL = `http://127.0.0.1:${WHITE_LABEL_PORT}/`;
+const WHITE_LABEL = catalogueUrl("white-label");
 
 /** A story of the fixture's Select. */
 const STORY = "kit:inputs-selection-select--small";

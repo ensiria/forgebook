@@ -184,14 +184,15 @@ const patternId = (source: string, folder: string): string | null => {
  *
  * @param id - the module's id (`FILES_PREFIX`, then the group: `storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
- * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks.
+ * @param warm - builds the program that holds a story file, so the package's docs are ready before a page asks; none
+ *   where no page will ask.
  * @param hasUsage - whether the group offers its "Used in" loader.
  * @throws when a story file cannot be indexed.
  */
 const patternModule = (
   id: string,
   watch: (file: string) => void,
-  warm: (storyFile: string) => void,
+  warm: ((storyFile: string) => void) | undefined,
   hasUsage: boolean
 ): { code: string; moduleType: "js" } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
@@ -205,7 +206,7 @@ const patternModule = (
     },
     hasUsage
   );
-  if (first !== undefined) warm(first);
+  if (first !== undefined) warm?.(first);
   return { code, moduleType: "js" };
 };
 
@@ -395,6 +396,11 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
+  /**
+   * Whether the server runs tests (Vitest's mode): no person waits for a page, so no docs program is warmed. A worker
+   * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
+   */
+  let isTestRun = false;
   // the docs are read in a worker, made once the framework is known: a package's TypeScript program takes seconds to
   // build and would hold every other answer of the dev server meanwhile
   let docs: DocsExtractor | undefined;
@@ -438,7 +444,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
-    return patternModule(id, watch, extractor().warm, config?.lists.usedIn !== false);
+    return patternModule(id, watch, isTestRun ? undefined : extractor().warm, config?.lists.usedIn !== false);
   };
   /**
    * The modules a file added or removed changes; none when it changes no list.
@@ -481,6 +487,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     enforce: "pre",
     config: async (userConfig: UserConfig, environment: ConfigEnv): Promise<UserConfig> => {
       command = environment.command;
+      isTestRun = environment.mode === "test";
       if (config === undefined && options.framework === undefined) {
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
