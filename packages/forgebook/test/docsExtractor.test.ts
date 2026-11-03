@@ -1,14 +1,15 @@
 /**
  * Tests for the docs read in a worker thread: the answer is the extractor's, kept on disk for a later start, and the
- * worker ends when asked.
+ * worker ends when asked, or when left with nothing to do.
  *
  * @module
  */
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Worker } from "node:worker_threads";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { createDocsExtractor } from "../src/vite/docsExtractor.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
@@ -53,5 +54,31 @@ describe("createDocsExtractor with a cache folder", () => {
     expect(await later.extract(storyFile)).toEqual(read);
     await later.close();
     rmSync(cacheFolder, { recursive: true, force: true });
+  }, 60_000);
+});
+
+describe("createDocsExtractor left idle", () => {
+  it("ends its worker once nothing is asked of it, and starts another for the next request", async () => {
+    const terminate = vi.spyOn(Worker.prototype, "terminate");
+    const extractor = createDocsExtractor(STUB_FRAMEWORK.docsModule, { idleMs: 50 });
+    const storyFile = join(KIT, "Select.stories.tsx");
+    const first = await extractor.extract(storyFile);
+    expect(typeof first === "string" ? first : first.docs).toMatchObject({ name: "Select" });
+    await vi.waitFor(() => expect(terminate).toHaveBeenCalledTimes(1), { timeout: 5_000 });
+    const again = await extractor.extract(storyFile);
+    expect(typeof again === "string" ? again : again.docs).toMatchObject({ name: "Select" });
+    await extractor.close();
+    terminate.mockRestore();
+  }, 60_000);
+
+  it("keeps a build's worker until the build ends", async () => {
+    const terminate = vi.spyOn(Worker.prototype, "terminate");
+    const extractor = createDocsExtractor(STUB_FRAMEWORK.docsModule, { idleMs: 50, readsEverything: true });
+    await extractor.extract(join(KIT, "Select.stories.tsx"));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(terminate).not.toHaveBeenCalled();
+    await extractor.close();
+    expect(terminate).toHaveBeenCalledTimes(1);
+    terminate.mockRestore();
   }, 60_000);
 });
