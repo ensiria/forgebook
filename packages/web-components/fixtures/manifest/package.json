@@ -1,0 +1,6 @@
+{
+  "name": "manifest-fixture",
+  "private": true,
+  "description": "Custom elements described by a Custom Elements Manifest, which the docs are read from.",
+  "customElements": "custom-elements.json"
+}

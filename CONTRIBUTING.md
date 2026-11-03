@@ -38,9 +38,10 @@ pnpm --filter @fixture/app exec playwright install chromium
 pnpm --filter @fixture/app test:shell                      # the shell's browser tests on the fixture catalogue
 ```
 
-The repository is a pnpm workspace: `packages/` holds the seven published packages, `fixtures/` the fixture kit, the
-Storybook-style stories, the catalogue the tests run on, a Vue catalogue, a Svelte catalogue and a small Next.js app
-with its catalogue, `tools/` the repository's own commands (`package-build`, `check-commits`).
+The repository is a pnpm workspace: `packages/` holds the ten published packages, `fixtures/` the fixture kit, the
+Storybook-style stories, the catalogue the tests run on, a catalogue for each other framework (Vue, Svelte, Solid,
+Preact, Web Components) and a small Next.js app with its catalogue, `tools/` the repository's own commands (`package-build`,
+`check-commits`).
 
 ## The rules of the code
 
@@ -95,8 +96,8 @@ whose token the workflow makes for each run from the `RELEASE_APP_KEY` secret of
 
 A staged version is not public yet: npm trusts the workflow to stage only, so a maintainer approves each version with
 2FA, in the order they were staged (`@forgebook/story-format`, `forgebook`, `@forgebook/react`,
-`@forgebook/testing`, `@forgebook/vue`, `@forgebook/nextjs`, `@forgebook/svelte`), so each one's dependencies are public
-first:
+`@forgebook/testing`, `@forgebook/vue`, `@forgebook/nextjs`, `@forgebook/svelte`, `@forgebook/solid`,
+`@forgebook/preact`, `@forgebook/web-components`), so each one's dependencies are public first:
 
 ```sh
 npm stage list forgebook          # the versions waiting, with their ids (and the same for each @forgebook/ package)

@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
+import type { MockTools } from "../src/frame/storyMocks.ts";
 import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun.ts";
 import type { PanelArgs } from "../src/messages.ts";
@@ -56,7 +57,8 @@ const badge = (extra: Record<string, unknown> = {}): LoadedStory =>
 const run = async (
   story: LoadedStory,
   playTools?: PlayToolsLoader,
-  onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined
+  onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
+  mockTools?: StoryRunOptions["mockTools"]
 ): Promise<{ readonly container: HTMLElement; readonly reports: Reports }> => {
   const container = document.createElement("div");
   document.body.append(container);
@@ -66,6 +68,7 @@ const run = async (
     story,
     identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
     ...(playTools === undefined ? {} : { playTools }),
+    ...(mockTools === undefined ? {} : { mockTools }),
     renderer: domRenderer,
     clock: heldFrameClock(0),
     texts: {},
@@ -204,6 +207,36 @@ describe("runStory with a second framework", () => {
     controlsOf(reports).playAgain();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(events).toEqual(["set up 1", "undone 1", "set up 2"]);
+  });
+
+  it("keeps a story's mocks running when it is played again", async () => {
+    vi.stubGlobal("navigator", {
+      serviceWorker: { controller: {}, addEventListener: (): void => undefined }
+    });
+    const events: string[] = [];
+    const tools: MockTools = {
+      http: { all: (path: string): string => `all ${path}` },
+      passthrough: (): string => "passthrough",
+      setupWorker: () => ({
+        start: async (): Promise<undefined> => {
+          events.push("start");
+          return undefined;
+        },
+        stop: (): void => {
+          events.push("stop");
+        }
+      })
+    };
+    const { reports } = await run(
+      badge({ parameters: { msw: { handlers: ["a"] } } }),
+      undefined,
+      undefined,
+      async () => tools
+    );
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(events).toEqual(["start"]);
+    vi.unstubAllGlobals();
   });
 
   it("shows the error of a loader that throws, and never gets ready", async () => {

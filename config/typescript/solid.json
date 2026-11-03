@@ -1,0 +1,14 @@
+// Code that runs in a page and is written for Solid: its JSX kept for Solid's compiler (`vite-plugin-solid`), which
+// turns it into the DOM operations a signal updates, and typed by `solid-js`.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": [],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "module": "preserve",
+    "moduleResolution": "bundler"
+  }
+}

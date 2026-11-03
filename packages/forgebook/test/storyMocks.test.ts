@@ -54,14 +54,24 @@ let reloads = 0;
 /** The fake frame's address. */
 const FRAME_ADDRESS = "http://localhost:5173/frame.html?story=kit%3Aprofile--loaded&theme=dark";
 
+/** How a fake page came to be: as the browser's navigation entry says. */
+type NavigationType = "navigate" | "reload";
+
+/** What a fake page holds in its session storage, which every frame of a page shares. */
+let stored = new Map<string, string>();
+
 /**
  * Stubs the page's worker state: `controller` is what serves it, a null when nothing does.
  *
  * @param controller - what serves the page.
  * @param href - the frame's address.
+ * @param navigation - how the page came to be.
  */
-const stubPage = (controller: unknown, href = FRAME_ADDRESS): void => {
-  const stored = new Map<string, string>();
+const stubPage = (
+  controller: unknown,
+  href = FRAME_ADDRESS,
+  navigation: NavigationType = "navigate"
+): void => {
   vi.stubGlobal("navigator", { serviceWorker: { controller, addEventListener: (): void => undefined } });
   vi.stubGlobal("location", { href, reload: (): void => void reloads++ });
   vi.stubGlobal("sessionStorage", {
@@ -69,10 +79,26 @@ const stubPage = (controller: unknown, href = FRAME_ADDRESS): void => {
     setItem: (key: string, value: string): void => void stored.set(key, value),
     removeItem: (key: string): void => void stored.delete(key)
   });
+  const entry = {
+    name: href,
+    entryType: "navigation",
+    startTime: 0,
+    duration: 0,
+    toJSON: (): object => ({}),
+    type: navigation
+  };
+  vi.spyOn(performance, "getEntriesByType").mockReturnValue([entry]);
+};
+
+/** Starts a story with handlers, letting the page's wait for a worker run out. */
+const startUnserved = async (): Promise<void> => {
+  void startStoryMocks({ msw: { handlers: ["a"] } }, async () => TOOLS);
+  await vi.advanceTimersByTimeAsync(1000);
 };
 
 beforeEach(() => {
   reloads = 0;
+  stored = new Map();
   stubPage({ state: "activated" });
 });
 
@@ -161,12 +187,40 @@ describe("startStoryMocks", () => {
   it("reloads once at most, so a page no worker can serve still draws its story", async () => {
     vi.useFakeTimers();
     stubPage(null);
-    void startStoryMocks({ msw: { handlers: ["a"] } }, async () => TOOLS);
-    await vi.advanceTimersByTimeAsync(1000);
+    await startUnserved();
+    stubPage(null, FRAME_ADDRESS, "reload");
     const second = startStoryMocks({ msw: { handlers: ["a"] } }, async () => TOOLS);
     await vi.advanceTimersByTimeAsync(1000);
     vi.useRealTimers();
     await expect(second).resolves.toBeTypeOf("function");
+    expect(reloads).toBe(1);
+  });
+
+  it("reloads every frame of a page the worker did not take over, not the first one alone", async () => {
+    vi.useFakeTimers();
+    stubPage(null);
+    await startUnserved();
+    stubPage(null, "http://localhost:5173/frame.html?story=kit%3Aprofile--empty");
+    await startUnserved();
+    vi.useRealTimers();
+    expect(reloads).toBe(2);
+  });
+
+  it("reloads again a frame shown anew, whatever mark an earlier visit left", async () => {
+    vi.useFakeTimers();
+    stubPage(null);
+    await startUnserved();
+    stubPage(null);
+    await startUnserved();
+    vi.useRealTimers();
+    expect(reloads).toBe(2);
+  });
+
+  it("reloads a frame that a reload of its own brought, when the worker was not the reason", async () => {
+    vi.useFakeTimers();
+    stubPage(null, FRAME_ADDRESS, "reload");
+    await startUnserved();
+    vi.useRealTimers();
     expect(reloads).toBe(1);
   });
 

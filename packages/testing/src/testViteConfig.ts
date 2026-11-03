@@ -1,6 +1,6 @@
 /**
- * The Vite config of a package's test instance of the frame page: the catalogue's plugin and the host name the
- * container's browser asks for.
+ * The Vite config of a package's test instance of the frame page: the catalogue's plugin, the framework's own (Solid's
+ * compiles the stories' JSX) and the host name the container's browser asks for.
  *
  * @remarks
  * Published (`forgebook/testing/vite`). The package's `vite.config.ts` beside its specs exports it.
@@ -23,7 +23,8 @@ import type { UserConfig } from "vite";
  */
 export const storyTestViteConfig = (dir: string, framework: FrameworkAdapter): UserConfig => ({
   root: dir,
-  plugins: [forgebookPlugin({ framework })],
+  // Vite waits for a plugin given as a promise: the framework's are loaded when the server starts
+  plugins: [forgebookPlugin({ framework }), framework.vitePlugins?.().then((plugins) => [...plugins])],
   // the visual tests' browser runs in a container and asks for the host by this name
   server: { allowedHosts: ["host.docker.internal"] }
 });

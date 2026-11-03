@@ -14,7 +14,7 @@ import { join } from "node:path";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { chromium } from "@playwright/test";
 
-import type { BenchReport, MachineReading, MetricResult, ToolName } from "./bench.types.ts";
+import type { BenchReport, FramesMode, MachineReading, MetricResult, ToolName } from "./bench.types.ts";
 import { summary } from "./benchStats.ts";
 import { buildCorpus, type CorpusSize } from "./corpus.ts";
 import { machineInfo, noiseWarnings, readMachine } from "./machine.ts";
@@ -50,8 +50,24 @@ export type MetricGroup = (typeof METRIC_GROUPS)[number];
 /** Runs of the memory metrics: a peak is steadier than a time. */
 const MEMORY_RUNS = 3;
 
-/** The first port of a run; each tool takes the next, so a server that lingers cannot answer for another. */
+/** The first port of a run; each tool takes the next ones, so a server that lingers cannot answer for another. */
 const FIRST_PORT = 62_100;
+
+/**
+ * Each tool with its first port, after the ports of the tool before.
+ *
+ * @param targets - the tools, in run order.
+ */
+export const withPorts = <TTarget extends Pick<Target, "ports">>(
+  targets: readonly TTarget[]
+): { readonly target: TTarget; readonly port: number }[] => {
+  let next = FIRST_PORT;
+  return targets.map((target) => {
+    const port = next;
+    next += target.ports;
+    return { target, port };
+  });
+};
 
 /** What a benchmark is asked to do. */
 export type BenchRequest = {
@@ -73,6 +89,8 @@ export type BenchRequest = {
   readonly groups: readonly MetricGroup[];
   /** The browser's CPU throttle, 1 for none. */
   readonly throttle: number;
+  /** Where Forgebook's frames run, as its target was configured. */
+  readonly frames: FramesMode;
   /** The script's streams. */
   readonly io: ScriptIo;
   /** Reports a step, before its sample starts. */
@@ -340,7 +358,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
   const report: Partial<Record<ToolName, Record<string, MetricResult>>> = {};
   const versions: Partial<Record<ToolName, Record<string, string>>> = {};
   const tools: ToolRun[] = [];
-  for (const [index, target] of targets.entries()) {
+  for (const { target, port } of withPorts(targets)) {
     const directory = join(folders.work, target.name);
     const metrics: Record<string, MetricResult> = {};
     report[target.name] = metrics;
@@ -362,7 +380,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
           target,
           directory,
           browser,
-          port: FIRST_PORT + index,
+          port,
           component: corpus.measured,
           throttle: request.throttle,
           io
@@ -412,6 +430,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
     measured: corpus.measured.name,
     runs,
     throttle: request.throttle,
+    frames: request.frames,
     machine: machineInfo(process.version),
     readings,
     warnings,
