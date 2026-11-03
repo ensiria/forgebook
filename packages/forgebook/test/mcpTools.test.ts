@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { catalogueTools } from "../bin/forgebook/mcpTools.ts";
 import type { AgentAnswer } from "../src/vite/agentRoutes.ts";
+import { pluginsDocument } from "../src/vite/pluginConfig.ts";
 
 /** The questions the tools asked. */
 const asked: string[] = [];
@@ -21,7 +22,8 @@ const TOOLS = catalogueTools({
   check: async () => "unused",
   checkPage: async () => "unused",
   servePreview: async () => "unused",
-  shot: async () => "unused"
+  shot: async () => "unused",
+  plugins: pluginsDocument([{ apiVersion: 1, id: "acme", tabs: [{ id: "a", label: "A", view: "@acme/a" }] }])
 });
 
 const tool = (name: string): (typeof TOOLS)[number] => {
@@ -29,6 +31,22 @@ const tool = (name: string): (typeof TOOLS)[number] => {
   if (found === undefined) throw new Error(`no tool ${name}`);
   return found;
 };
+
+describe("list_plugins", () => {
+  it("answers from the configuration, without asking the catalogue", async () => {
+    const count = asked.length;
+    const result = await tool("list_plugins").call({});
+    expect(result.isError).toBe(false);
+    expect(result.structured).toEqual({
+      schema: 1,
+      apiVersions: [1],
+      plugins: [
+        { id: "acme", tabs: [{ id: "a", label: "A" }], switches: [], docBlocks: [], runsInFrames: false }
+      ]
+    });
+    expect(asked).toHaveLength(count);
+  });
+});
 
 describe("token tools", () => {
   it("lists a category, up to a limit", async () => {

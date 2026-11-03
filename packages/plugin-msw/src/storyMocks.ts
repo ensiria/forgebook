@@ -2,12 +2,10 @@
  * A story's mocked API: `parameters.msw.handlers`, served by MSW's service worker while the story is shown.
  *
  * @remarks
- * MSW is an optional peer the project installs, and it loads only for a story that has handlers: a story without any,
- * in a catalogue with MSW or without it, costs nothing. The worker starts before the story's loaders, which may fetch.
- * Handlers are read as a list, or as a record of lists, as MSW's Storybook addon writes them, so stories move over as
- * they are. A request no handler answers goes to the network, as in the project without mocks. Every frame of a page
- * shares one origin, so one worker serves them all: each story's handlers answer its own frame only, and a frame
- * whose story has none goes to the network.
+ * MSW loads only for a story that has handlers. Handlers are read as a list, or as a record of lists, as MSW's Storybook
+ * addon writes them, so stories move over as they are. A request no handler answers goes to the network, as in the
+ * project without mocks. Every frame of a page shares one origin, so one worker serves them all: each story's handlers
+ * answer its own frame only, and a frame whose story has none goes to the network.
  *
  * @module
  */
@@ -15,50 +13,86 @@
 /** The worker's script, beside the frame's page: `npx msw init <public folder>` writes it. */
 const WORKER_FILE = "mockServiceWorker.js";
 
+/** One of the worker's events, as much of it as the log reads. */
+export type MockEvent = {
+  /** The request, with the address of the page that sent it. */
+  readonly request: { readonly method: string; readonly url: string; readonly referrer: string };
+  /** The answer. */
+  readonly response: { readonly status: number };
+};
+
 /** What of MSW's worker a story uses. */
-export type MockWorker = {
+export type MockWorker<THandler> = {
   /** Registers the service worker. */
   readonly start: (options: {
     readonly serviceWorker: { readonly url: string };
     readonly onUnhandledRequest: "bypass";
     readonly quiet: boolean;
   }) => Promise<unknown>;
-  /** Stops answering. */
-  readonly stop: () => void;
+  /** Stops answering; MSW 3 waits for its last requests. */
+  readonly stop: () => unknown;
+  /** Answers with these handlers from now on, the worker kept running. */
+  readonly resetHandlers: (...handlers: THandler[]) => void;
+  /** What the worker tells of each request. */
+  readonly events: {
+    /** Listens to an answer: a handler's, or the network's. */
+    readonly on: (
+      event: "response:mocked" | "response:bypass",
+      listener: (event: MockEvent) => void
+    ) => unknown;
+  };
 };
 
-/** What of an intercepted request a story's handlers read to tell which frame sent it. */
+/** What of an intercepted request the first handler reads to tell which frame sent it. */
 export type MockRequest = {
   /** The address of the page that sent it, an empty string when its referrer policy hides it. */
   readonly referrer: string;
 };
 
 /** What of `msw/browser` and `msw` a story uses. */
-export type MockTools = {
+export type MockTools<THandler, TAnswer> = {
   /** Makes a worker of handlers. */
-  readonly setupWorker: (...handlers: readonly unknown[]) => MockWorker;
+  readonly setupWorker: (...handlers: THandler[]) => MockWorker<THandler>;
   /** Makes request handlers. */
   readonly http: {
     /** A handler of every request; when its resolver gives no answer, the next handler answers. */
-    readonly all: (path: string, resolver: (info: { readonly request: MockRequest }) => unknown) => unknown;
+    readonly all: (
+      path: string,
+      resolver: (info: { readonly request: MockRequest }) => TAnswer | undefined
+    ) => THandler;
   };
   /** The answer that sends a request on to the network. */
-  readonly passthrough: () => unknown;
+  readonly passthrough: () => TAnswer;
 };
 
-/** Loads MSW; none when the project does not install it. */
-export type MockToolsLoader = () => Promise<MockTools>;
+/** Loads MSW. */
+export type MockToolsLoader<THandler, TAnswer> = () => Promise<MockTools<THandler, TAnswer>>;
 
 /** Whether a value is an object with named fields. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The handlers a story's parameters declare, flat. */
-const handlersOf = (parameters: Readonly<Record<string, unknown>>): readonly unknown[] => {
+/**
+ * The handlers a story's parameters declare, flat.
+ *
+ * @param parameters - the story's parameters.
+ */
+export const handlersOf = (parameters: Readonly<Record<string, unknown>>): readonly unknown[] => {
   const msw = parameters["msw"];
   const handlers = isRecord(msw) ? msw["handlers"] : undefined;
   if (Array.isArray(handlers)) return handlers;
   return isRecord(handlers) ? Object.values(handlers).flat() : [];
+};
+
+/**
+ * What a handler answers, as MSW's own log writes it (`GET /api/users`).
+ *
+ * @param handler - a handler; `info.header` is MSW's since version 2.
+ */
+export const handlerLabel = (handler: unknown): string => {
+  const info = isRecord(handler) ? handler["info"] : undefined;
+  const header = isRecord(info) ? info["header"] : undefined;
+  return typeof header === "string" ? header : "(unnamed handler)";
 };
 
 /** The parameter of a frame's address that names its story (`frame.html?story=…`). */
@@ -92,7 +126,7 @@ const isFromAnotherFrame = (request: MockRequest): boolean => {
  * page is another story's, whose handlers would answer a story that mocks nothing, or mocks otherwise. Which frame
  * started first decides nothing: each story answers its own frame, the others go to the network.
  */
-const ownFrameOnly = ({ http, passthrough }: MockTools): unknown =>
+const ownFrameOnly = <THandler, TAnswer>({ http, passthrough }: MockTools<THandler, TAnswer>): THandler =>
   http.all("*", ({ request }) => (isFromAnotherFrame(request) ? passthrough() : undefined));
 
 /** How every story's worker starts. */
@@ -101,9 +135,6 @@ const WORKER_OPTIONS = {
   onUnhandledRequest: "bypass",
   quiet: true
 } as const;
-
-/** Nothing to undo. */
-const NOTHING = (): void => undefined;
 
 /** How long a page waits for a worker to take it over, in milliseconds. */
 const TAKEOVER_WAIT = 500;
@@ -165,27 +196,43 @@ const reloadForWorker = (): boolean => {
   return true;
 };
 
+/** A story's mocks, running. */
+export type StoryMocks<THandler> = {
+  /** Answers with other handlers, the worker kept running: an edit of the story file wrote new ones. */
+  readonly renew: (handlers: readonly THandler[]) => void;
+  /** Stops them, once they stopped. */
+  readonly stop: () => Promise<void>;
+};
+
 /**
  * Starts a story's mocks, before its loaders.
  *
- * @param parameters - the story's parameters.
- * @param load - loads MSW; none when the project does not install it.
- * @returns what stops them.
- * @throws when the story has handlers and the project has no MSW, saying what to do.
+ * @param handlers - the story's handlers, at least one.
+ * @param load - loads MSW.
+ * @param onEvent - told of each answer to this frame's requests; a handler's or the network's.
+ * @returns what renews and stops them.
  */
-export const startStoryMocks = async (
-  parameters: Readonly<Record<string, unknown>>,
-  load: MockToolsLoader | undefined
-): Promise<() => void> => {
-  const handlers = handlersOf(parameters);
-  if (handlers.length === 0) return NOTHING;
-  if (load === undefined) {
-    throw new Error("This story mocks its API: `npm install --save-dev msw`, then `npx msw init public`");
-  }
+export const startStoryMocks = async <THandler, TAnswer>(
+  handlers: readonly THandler[],
+  load: MockToolsLoader<THandler, TAnswer>,
+  onEvent: (event: MockEvent, isMocked: boolean) => void
+): Promise<StoryMocks<THandler>> => {
   const tools = await load();
-  const worker = tools.setupWorker(ownFrameOnly(tools), ...handlers);
+  const first = ownFrameOnly(tools);
+  const worker = tools.setupWorker(first, ...handlers);
+  // the worker tells this page of the requests it relays for another frame too, which are that frame's to list
+  const tell = (event: MockEvent, isMocked: boolean): void => {
+    if (!isFromAnotherFrame(event.request)) onEvent(event, isMocked);
+  };
+  worker.events.on("response:mocked", (event) => tell(event, true));
+  worker.events.on("response:bypass", (event) => tell(event, false));
   await worker.start(WORKER_OPTIONS);
   if (await isServedByWorker()) pageStorage()?.removeItem(reloadedKey());
   else if (reloadForWorker()) await new Promise<never>(() => undefined);
-  return (): void => worker.stop();
+  return {
+    renew: (next: readonly THandler[]): void => worker.resetHandlers(first, ...next),
+    stop: async (): Promise<void> => {
+      await worker.stop();
+    }
+  };
 };

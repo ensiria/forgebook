@@ -47,7 +47,7 @@ test.describe("forgebook story", () => {
       figma: "https://www.figma.com/design/FixtureFile123?node-id=12-34",
       fileKey: "FixtureFile123",
       nodeId: "12:34",
-      address: expect.stringContaining("tab=design")
+      address: expect.stringContaining("tab=figma")
     });
   });
 });

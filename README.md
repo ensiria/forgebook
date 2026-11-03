@@ -26,6 +26,8 @@ This repository holds Forgebook's packages; each has its own README, which is al
 | [`@forgebook/nuxt`](packages/nuxt) | A Nuxt project's components outside Nuxt: auto-imports, aliases, router, data, state and config, on Vue's |
 | [`@forgebook/story-format`](packages/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](packages/testing) | Tests generated from the stories: browser, visual and server render |
+| [`@forgebook/plugin-figma`](packages/plugin-figma) | A story's design in the panel, and beside the story |
+| [`@forgebook/plugin-msw`](packages/plugin-msw) | A story's API answered by its handlers, and a Network tab |
 
 Requirements: Node 22.18 or later and Vite 8; React 19, Vue 3.5, Svelte 5, Solid 1.9, Preact 10.19 or 11, Lit 3,
 Angular 20 to 22 or no framework, Next.js 15 and 16 through `@forgebook/nextjs`, Nuxt 3 or 4 through `@forgebook/nuxt`,

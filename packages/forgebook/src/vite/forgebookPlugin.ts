@@ -231,18 +231,20 @@ const requestedPage = (url: string): PageFile | undefined => {
  * @param id - the module's id.
  * @param watch - adds a file whose edit renews the module.
  * @param isServing - whether a dev server runs.
+ * @param plugins - the catalogue's plugins, whose fences a page may draw.
  */
 const docsModuleOf = async (
   id: string,
   watch: (file: string) => void,
-  isServing: boolean
+  isServing: boolean,
+  plugins: ResolvedConfig["plugins"]
 ): Promise<{ code: string; moduleType: "js" } | undefined> => {
   const isPage = id.endsWith(DOCS_PAGE_QUERY);
   if (!isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
   const { docPageModule, docPagesModule } = await import("./docPagesModule.ts");
   if (isPage) {
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
-    return { code: docPageModule(file, watch, isServing), moduleType: "js" };
+    return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
   }
   const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
   return { code: docPagesModule(root, pattern, watch, isServing), moduleType: "js" };
@@ -505,7 +507,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       return docsModule(await extractor().extract(id.slice(0, -DOCS_QUERY.length)), watch);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
-    const docsPages = await docsModuleOf(id, watch, isServing());
+    const docsPages = await docsModuleOf(id, watch, isServing(), config?.plugins ?? []);
     if (docsPages !== undefined) return docsPages;
     if (!TEXT_QUERIES.some((query) => id.endsWith(query))) return undefined;
     // loaded on the first of these queries: the highlighter, the Markdown reader and what they need stay out of a

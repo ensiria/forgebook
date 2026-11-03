@@ -387,12 +387,33 @@ const addressTokens = (file: string, tokens: readonly Token[], read: ReadPage): 
 };
 
 /**
+ * A top-level fence as a block: a plugin's, one of the page's own, or code.
+ *
+ * @param token - the fence.
+ * @param text - what it holds.
+ * @param fences - the fences the catalogue's plugins draw.
+ */
+const fenceBlock = (token: Token, text: string, fences: readonly string[]): DocBlock => {
+  const [name = "", ...argument] = fenceText(token).split(/\s+/);
+  if (fences.includes(name)) return { kind: "plugin", fence: name, argument: argument.join(" "), body: text };
+  const fence = fenceOf(token);
+  if (fence !== undefined) return fence;
+  return {
+    kind: "code",
+    text,
+    html: highlightCode(text, name || undefined),
+    ...(name ? { language: name } : {})
+  };
+};
+
+/**
  * The tokens as blocks: each top-level fence on its own, the text between them as HTML.
  *
  * @param tokens - the page's tokens.
  * @param renderer - the page's renderer.
+ * @param fences - the fences the catalogue's plugins draw.
  */
-const blocksOf = (tokens: readonly Token[], renderer: Marked): DocBlock[] => {
+const blocksOf = (tokens: readonly Token[], renderer: Marked, fences: readonly string[]): DocBlock[] => {
   const blocks: DocBlock[] = [];
   let text: Token[] = [];
   const flushText = (): void => {
@@ -407,17 +428,7 @@ const blocksOf = (tokens: readonly Token[], renderer: Marked): DocBlock[] => {
       continue;
     }
     flushText();
-    const fence = fenceOf(token);
-    if (fence === undefined) {
-      const code = String(token["text"]);
-      const language = typeof token["lang"] === "string" ? token["lang"].trim().split(/\s+/)[0] : undefined;
-      blocks.push({
-        kind: "code",
-        text: code,
-        html: highlightCode(code, language || undefined),
-        ...(language ? { language } : {})
-      });
-    } else blocks.push(fence);
+    blocks.push(fenceBlock(token, String(token["text"]), fences));
   }
   flushText();
   return blocks;
@@ -437,16 +448,18 @@ export type CompiledDocPage = Omit<DocPage, "assets"> & {
  * @param file - the page's file, absolute.
  * @param text - its text.
  * @param read - reads a linked page's text; from the disk by default.
+ * @param fences - the fences the catalogue's plugins draw; none by default.
  */
 export const compiledDocPage = (
   file: string,
   text: string,
-  read: ReadPage = readLinkedFile
+  read: ReadPage = readLinkedFile,
+  fences: readonly string[] = []
 ): CompiledDocPage => {
   const { body } = frontMatterOf(text);
   const headings: DocHeading[] = [];
   const renderer = pageRenderer(headings);
   const tokens = withoutTitle(renderer.lexer(body));
   const images = addressTokens(file, tokens, read);
-  return { blocks: blocksOf(tokens, renderer), headings, images, text: body.trim() };
+  return { blocks: blocksOf(tokens, renderer, fences), headings, images, text: body.trim() };
 };

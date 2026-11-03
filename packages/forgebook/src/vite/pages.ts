@@ -16,7 +16,8 @@ import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
 import type { FramesPlacement } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
-import { MOCKS_MODULES, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { pluginFrameModule } from "./pluginConfig.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The pages, by their file name. */
@@ -253,6 +254,32 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
 };
 
 /**
+ * The shell's list of the plugins' tabs and docs blocks, each with the import that loads its view when it is first
+ * needed; nothing for a catalogue without any, whose entry is then what it would be with no plugin.
+ *
+ * @param config - the configuration.
+ */
+const pluginViewLines = (config: ResolvedConfig): string[] => {
+  const lines = config.plugins.flatMap((plugin) => {
+    const tabs = (plugin.tabs ?? []).map(
+      (tab) =>
+        `{ id: ${JSON.stringify(tab.id)}, label: ${JSON.stringify(tab.label)}, ` +
+        `when: ${JSON.stringify(tab.when)}, load: () => import(${JSON.stringify(tab.view)}) }`
+    );
+    const blocks = (plugin.docBlocks ?? []).map(
+      (block) =>
+        `{ fence: ${JSON.stringify(block.fence)}, load: () => import(${JSON.stringify(block.view)}) }`
+    );
+    return tabs.length === 0 && blocks.length === 0
+      ? []
+      : [
+          `      { id: ${JSON.stringify(plugin.id)}, tabs: [${tabs.join(", ")}], docBlocks: [${blocks.join(", ")}] },`
+        ];
+  });
+  return lines.length === 0 ? [] : ["    plugins: [", ...lines, "    ],"];
+};
+
+/**
  * The shell's entry: the shell mounted with the configuration's data, the logo, the sources and the code writer.
  *
  * @param config - the configuration.
@@ -279,6 +306,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    ...pluginViewLines(config),
     ...(config.framework.addressTexts === undefined
       ? []
       : [`    addressTexts: ${JSON.stringify(config.framework.addressTexts)},`]),
@@ -298,20 +326,6 @@ const playToolsLoader = (): string => {
     "    playTools: async () => {",
     `      const [dom, events] = await Promise.all([${imports}]);`,
     "      return { within: dom.within, userEvent: events.userEvent };",
-    "    },"
-  ].join("\n");
-};
-
-/**
- * The frame's loader of MSW: the worker and the handlers it adds to a story's, imported for the first story with
- * handlers, so a catalogue whose stories mock nothing never loads them.
- */
-const mockToolsLoader = (): string => {
-  const imports = MOCKS_MODULES.map((name) => `import(${JSON.stringify(name)})`).join(", ");
-  return [
-    "    mockTools: async () => {",
-    `      const [browser, core] = await Promise.all([${imports}]);`,
-    "      return { setupWorker: browser.setupWorker, http: core.http, passthrough: core.passthrough };",
     "    },"
   ].join("\n");
 };
@@ -350,12 +364,19 @@ const previewsHot = (previews: readonly string[]): readonly string[] =>
  */
 export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => {
   const sources = sourcesCode(config);
+  const frames = config.plugins.flatMap((plugin) => {
+    const frame = pluginFrameModule(plugin, config.framework.name);
+    return frame === undefined ? [] : [{ id: plugin.id, frame }];
+  });
   return [
     `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
     `import config from ${JSON.stringify(CONFIG_MODULE)};`,
     ...(axe?.imports ?? []),
     ...sources.imports,
     ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
+    ...frames.map(
+      (plugin, index) => `import { frame as pluginFrame${index} } from ${JSON.stringify(plugin.frame)};`
+    ),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  void mountFrame(root, {",
@@ -366,7 +387,13 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     "    lists: config.lists,",
     "    frames: config.frames,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
-    ...(config.hasMocks ? [mockToolsLoader()] : []),
+    ...(frames.length === 0
+      ? []
+      : [
+          `    plugins: [${frames
+            .map((plugin, index) => `{ id: ${JSON.stringify(plugin.id)}, create: pluginFrame${index} }`)
+            .join(", ")}],`
+        ]),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ...previewsHot(config.previews),

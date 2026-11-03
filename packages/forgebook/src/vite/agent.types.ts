@@ -13,6 +13,7 @@
 import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
 import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
+import type { PluginCondition } from "../plugin.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
@@ -46,7 +47,10 @@ export type AgentDesignLink = {
 
 /** A story's design: its place in Figma, and where a person sees it beside the story. */
 export type AgentDesign = AgentDesignLink & {
-  /** The story's page in the catalogue, on its Design tab (on its first tab where the catalogue turned that one off). */
+  /**
+   * The story's page in the catalogue, on the Design tab `@forgebook/plugin-figma` adds; on its first tab where the
+   * catalogue lists no such plugin or turned the tab off.
+   */
   readonly address: string;
 };
 
@@ -326,4 +330,35 @@ export type ErrorsDocument = {
   readonly last: number;
   /** The story index's problems now (a broken story file, a title taken twice). */
   readonly problems: readonly string[];
+};
+
+/** A plugin as the documents give it. */
+export type AgentPlugin = {
+  /** Its id. */
+  readonly id: string;
+  /** The panel tabs it adds. */
+  readonly tabs: readonly {
+    /** The tab's id: `tab=<id>` in a view opens it. */
+    readonly id: string;
+    /** Its name. */
+    readonly label: string;
+    /** The story it is offered for; none for every story. */
+    readonly when?: PluginCondition;
+  }[];
+  /** The ids of the switches it adds: `<id>=<value>` in a view sets one. */
+  readonly switches: readonly string[];
+  /** The fences of the docs blocks it adds. */
+  readonly docBlocks: readonly string[];
+  /** Whether it runs code around every story. */
+  readonly runsInFrames: boolean;
+};
+
+/** What `forgebook plugins` and `list_plugins` answer. */
+export type PluginsDocument = {
+  /** The version of this document. */
+  readonly schema: 1;
+  /** The versions of the plugin API this Forgebook speaks. */
+  readonly apiVersions: readonly number[];
+  /** The plugins the configuration lists, in order. */
+  readonly plugins: readonly AgentPlugin[];
 };

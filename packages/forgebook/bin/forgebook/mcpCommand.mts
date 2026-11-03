@@ -1,15 +1,17 @@
 /**
  * `forgebook mcp`: the catalogue's tools for agents over the Model Context Protocol, from a dev server or from a built
- * catalogue's index.
+ * catalogue's index; and `forgebook plugins`, what its `list_plugins` answers, read from the configuration alone.
  *
  * @module
  */
 import { resolve } from "node:path";
 
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
-import { readPackageVersion } from "@ensiria/cli-kit/files";
+import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 
+import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import { catalogueClient, previewServer } from "./agentClient.ts";
+import { pluginsText } from "./agentText.ts";
 import { builtCatalogueServer, serveMcp } from "./builtCatalogue.ts";
 import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { previewResource } from "./mcpPreview.ts";
@@ -20,7 +22,7 @@ import { runPageCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./story
 import { baselinesOf, visualDiffTool } from "./visualCommands.mts";
 
 /**
- * The command.
+ * The commands.
  *
  * @param forgebook - the scope of the `forgebook` command, whose options every command takes.
  */
@@ -86,7 +88,8 @@ export const mcpCommands = (
             check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
             shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
             checkPage: (address) => runPageCheck(config, [address]),
-            servePreview: preview.serve
+            servePreview: preview.serve,
+            plugins: pluginsDocument(config.plugins)
           })
         ],
         apps: [previewResource({ origin: preview.origin, strings: config.lists.strings ?? {}, version })]
@@ -94,6 +97,15 @@ export const mcpCommands = (
       await serveMcp(server, io);
       await preview.close();
       await client.close();
+    }
+  }),
+  plugins: forgebook.command({
+    summary: "List the plugins the catalogue lists, and what each adds.",
+    json: true,
+    examples: [{ command: `${COMMAND} plugins --json`, description: "As an agent reads them." }],
+    run: async ({ options, io, isJson }): Promise<void> => {
+      const document = pluginsDocument((await configOf(options.config)).plugins);
+      io.stdout.write(isJson ? formatJson(document) : `${pluginsText(document)}\n`);
     }
   })
 });
