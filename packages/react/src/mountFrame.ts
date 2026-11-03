@@ -6,7 +6,7 @@
  */
 import { type FrameConfig, mountFrame as mountForgebookFrame } from "forgebook/frame";
 
-import { reactRenderer } from "./reactRenderer.tsx";
+import { reactFrameRenderer } from "./reactFrameRenderer.tsx";
 
 /**
  * Shows the story the address names in the given element, drawn with React.
@@ -15,4 +15,4 @@ import { reactRenderer } from "./reactRenderer.tsx";
  * @param config - the sources and the languages, as the shell's configuration gives them.
  */
 export const mountFrame = (container: HTMLElement, config: Omit<FrameConfig, "renderer">): Promise<void> =>
-  mountForgebookFrame(container, { ...config, renderer: reactRenderer });
+  mountForgebookFrame(container, { ...config, renderer: reactFrameRenderer });

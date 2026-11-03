@@ -4,8 +4,8 @@
  *
  * @remarks
  * Colouring code loads highlight.js and the TypeScript compiler's scanner, and Markdown its reader: each is imported
- * only when a query needs it, and a story file's code is kept on disk between starts (`diskCache.ts`), so a story's
- * page reads it without either on a later start.
+ * only when a query needs it, code only when a story has a `render` to colour, and a story file's code is kept on disk
+ * between starts (`diskCache.ts`), so a story's page reads it without either on a later start.
  *
  * @module
  */
@@ -33,6 +33,26 @@ export const isKeptCode = (value: unknown): value is KeptCode =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
+ * Each story's `render` text with its coloured HTML.
+ *
+ * @remarks
+ * The colouring loads the TypeScript compiler, tens of megabytes the server then holds for as long as it runs: only a
+ * file with a `render` to colour loads it. A file whose stories are all args has none, and its Code tab writes them
+ * from the args (the framework's code writer), so a story's page of a library written that way leaves the compiler to
+ * the docs worker; a component's page or a Markdown page still loads it, to colour their examples.
+ *
+ * @param code - each story's `render` text, by export name.
+ */
+const colouredCode = async (code: Readonly<Record<string, string>>): Promise<KeptCode> => {
+  const entries = Object.entries(code);
+  if (entries.length === 0) return {};
+  const { highlightCode } = await import("./highlightCode.ts");
+  return Object.fromEntries(
+    entries.map(([name, text]) => [name, { text, html: highlightCode(text, "tsx") }])
+  );
+};
+
+/**
  * The module that answers a `?forgebook-code` import: each story's `render` text and its coloured HTML, or `{ error }`
  * for the card.
  *
@@ -46,14 +66,8 @@ const codeModule = async (
   const kept = cache?.read(storyFile);
   if (kept !== undefined) return { code: `export default ${JSON.stringify(kept)};`, moduleType: "js" };
   const since = nowNs();
-  const { highlightCode } = await import("./highlightCode.ts");
   const code = storyCode(storyFile, readFileSync(storyFile, "utf8"));
-  const value: KeptCode =
-    typeof code === "string"
-      ? { error: code }
-      : Object.fromEntries(
-          Object.entries(code).map(([name, text]) => [name, { text, html: highlightCode(text, "tsx") }])
-        );
+  const value: KeptCode = typeof code === "string" ? { error: code } : await colouredCode(code);
   // colouring loads the compiler's scanner: kept, a story's page reads its code without it on a later start
   const stamps = stampPaths([storyFile]);
   if (typeof code !== "string" && isSettledSince(stamps, since)) cache?.write(storyFile, value, stamps);

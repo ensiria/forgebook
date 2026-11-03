@@ -113,6 +113,8 @@ export type StoryFileIndex = {
   readonly related?: readonly string[];
   /** The meta's `keywords`, when it sets one: other words the search finds the component by. */
   readonly keywords?: readonly string[];
+  /** The meta's `parameters.propGroups`, when it sets one: the component's prop groups listed first, in order. */
+  readonly propGroups?: readonly string[];
   /** The meta's `parameters.docs.description.component`, when written plainly. */
   readonly description?: string;
   /** What the index noticed without refusing the file (a title written by code, placed by its path). */

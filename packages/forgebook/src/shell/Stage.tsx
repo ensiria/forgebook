@@ -419,6 +419,7 @@ export const Stage = ({
         { key, isChanged: acceptedArgs[name] !== undefined }
       ])
     ),
+    propGroups: component.propGroups,
     calls: calls.filter((call) => call.storyId === story.id),
     onClearCalls: (): void => setCalls([]),
     trace: isComparing(view) ? undefined : traces.get(story.id),

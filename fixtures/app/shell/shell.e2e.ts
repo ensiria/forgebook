@@ -730,6 +730,43 @@ test.describe("the component's page", () => {
     await expect(page.getByRole("article", { name: "In row", exact: true })).toHaveCount(0);
   });
 
+  test("the API reference lists the props naming no group first, then each group, and unfolds an object's members", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const reference = page.getByRole("region", { name: "API reference" });
+    await expect(reference.locator(".forgebook-api__table").first().locator("tbody th")).toHaveText([
+      "value",
+      "size",
+      "options*",
+      "hint",
+      "classNames"
+    ]);
+    // the meta names Texts first, though Behaviour comes first in the props; every group starts open
+    const groups = reference.locator(":scope > .forgebook-api__group");
+    await expect(groups.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    await expect(groups.locator(".forgebook-fold__count")).toHaveText(["1 prop", "2 props"]);
+    await expect(groups.nth(1).locator("tbody th")).toHaveText(["rows", "isDisabled"]);
+    await expect(groups.nth(0)).toHaveAttribute("open");
+    await expect(groups.nth(1)).toHaveAttribute("open");
+    // a group folds from its summary
+    await groups.nth(1).locator("summary").click();
+    await expect(groups.nth(1)).not.toHaveAttribute("open");
+    await expect(groups.nth(1).getByRole("rowheader", { name: "rows" })).toBeHidden();
+    // the texts' type unfolds under its row, its members with their TSDoc and default
+    const members = reference.getByRole("button", { name: "Members of SelectTexts: 2 members" });
+    await expect(members).toHaveAttribute("aria-expanded", "false");
+    await expect(reference.getByRole("table", { name: "Members of SelectTexts" })).toHaveCount(0);
+    await members.click();
+    await expect(members).toHaveAttribute("aria-expanded", "true");
+    const table = reference.getByRole("table", { name: "Members of SelectTexts" });
+    await expect(table.locator("tbody th")).toHaveText(["empty", "listLabel"]);
+    await expect(table).toContainText("Shown in place of the list when there is no option.");
+    await expect(table).toContainText('"Nothing to pick"');
+    // the events keep their heading, after the groups
+    await expect(reference.getByRole("heading", { level: 3, name: "Events" })).toBeVisible();
+  });
+
   test("an example's box fills the page and goes back to its place, its story never loaded again", async ({
     page
   }) => {
@@ -1458,6 +1495,23 @@ test.describe("the panel", () => {
     await page.reload();
     await frameStatus(page);
     await expect(frameOf(page).locator("select")).toHaveAttribute("data-size", "lg");
+  });
+
+  test("Props lists the props naming no group by control, then each group under its name", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const tab = page.locator(".forgebook-tab-props");
+    await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    // a group's number field and toggle sit in it, and set the story as anywhere else
+    const behaviour = tab.locator(".forgebook-fold").filter({ hasText: "Behaviour" });
+    await expect(tab.locator(".forgebook-fold[open]")).toHaveCount(2);
+    await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
+    await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
+    await expect(frameOf(page).locator("select")).toBeDisabled();
+    // the toggles that name no group stay under Toggles; Select has none left there
+    await expect(tab.locator(".forgebook-prop-group__title", { hasText: "Toggles" })).toHaveCount(0);
   });
 
   test("a shared link's values reach the frame only for the story's props, with their types; the rest are reported", async ({

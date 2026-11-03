@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 
 import ts from "typescript-6";
 
-import type { EventSignature, PropDocs, PropKind } from "../componentDocs.ts";
+import type { EventSignature, MemberDocs, PropDocs, PropKind } from "../componentDocs.ts";
 import { summaryOf, tagOf } from "./docsProgram.ts";
 import { unwrapped } from "./storyMeta.ts";
 
@@ -321,6 +321,74 @@ export const isForeign = (symbol: ts.Symbol): boolean =>
   );
 
 /**
+ * Whether a prop's type is a plain object, whose members can be listed one by one as values of their own: not a union,
+ * a function, a class's instance, an array or a tuple.
+ */
+const isMemberedObject = (type: ts.Type, checker: ts.TypeChecker): boolean =>
+  (type.flags & ts.TypeFlags.Object) !== 0 &&
+  !type.isUnion() &&
+  !type.isClass() &&
+  type.getCallSignatures().length === 0 &&
+  type.getConstructSignatures().length === 0 &&
+  !checker.isArrayType(type) &&
+  !checker.isTupleType(type);
+
+/**
+ * The members of a prop's object type, when the package declares and documents them (`texts?: FileFinderTexts`), in
+ * the order the source declares them. The members the type takes from outside the package (an element's attributes)
+ * are left out, as the props are, and a type none of whose members has TSDoc lists nothing a reader cannot read from
+ * its name. One level only: a member's own members are not read, so a recursive type ends and the docs stay small.
+ *
+ * @param type - the prop's type, without `undefined`.
+ * @param checker - the program's checker.
+ * @param node - where the code names the component.
+ * @returns the members, or none when the type is not such an object.
+ */
+const membersOf = (type: ts.Type, checker: ts.TypeChecker, node: ts.Node): MemberDocs[] | undefined => {
+  if (!isMemberedObject(type, checker)) return undefined;
+  const own = type.getProperties().filter((member) => !isForeign(member));
+  const [firstDeclaration] = type.getSymbol()?.declarations ?? own[0]?.declarations ?? [];
+  const folder = firstDeclaration === undefined ? "" : dirname(firstDeclaration.getSourceFile().fileName);
+  const members = declarationOrder(own, folder).map((member): MemberDocs => {
+    const defaultValue = tagOf(member, checker, "defaultValue");
+    const memberType = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(member, node));
+    return {
+      name: member.getName(),
+      type: writtenTypeText(declaredTypesOf(member)) ?? checker.typeToString(memberType),
+      description: summaryOf(member, checker),
+      ...(defaultValue === undefined ? {} : { defaultValue }),
+      isRequired: (member.flags & ts.SymbolFlags.Optional) === 0
+    };
+  });
+  return members.some((member) => member.description !== "") ? members : undefined;
+};
+
+/**
+ * A prop's place in the reference: the group its TSDoc names (`@group`, as TypeDoc reads it, so a library documented
+ * for both writes it once), and the members of its type when it is a documented object. Each only when it has one.
+ *
+ * @param symbol - the prop.
+ * @param kind - its kind: only a prop of kind `other` can be an object.
+ * @param type - its type, without `undefined`.
+ * @param checker - the program's checker.
+ * @param node - where the code names the component.
+ */
+const groupingOf = (
+  symbol: ts.Symbol,
+  kind: PropKind,
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  node: ts.Node
+): Pick<PropDocs, "group" | "members"> => {
+  const group = tagOf(symbol, checker, "group");
+  const members = kind === "other" ? membersOf(type, checker, node) : undefined;
+  return {
+    ...(group === undefined || group === "" ? {} : { group }),
+    ...(members === undefined ? {} : { members })
+  };
+};
+
+/**
  * What a prop takes, when it is not its symbol's own type: a framework whose props are wrapped (an Angular signal input,
  * `input<string>()`, takes the `string` its `InputSignal<string>` holds) says what a binding sets.
  */
@@ -384,7 +452,8 @@ export const propDocs = (
     ...(defaultValue === undefined ? {} : { defaultValue }),
     ...(choices === undefined ? {} : { choices }),
     ...(signature === undefined ? {} : { signature }),
-    ...(canTakeText ? { canTakeText } : {})
+    ...(canTakeText ? { canTakeText } : {}),
+    ...groupingOf(symbol, kind, type, checker, node)
   };
 };
 

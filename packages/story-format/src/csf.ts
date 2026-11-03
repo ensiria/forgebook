@@ -237,6 +237,12 @@ export type StoryParameters = {
     /** The handlers. */
     readonly handlers: readonly unknown[] | Readonly<Record<string, readonly unknown[]>>;
   };
+  /**
+   * On a meta: the component's prop groups to list first in its API reference and Props tab, in this order, by the
+   * name their props' TSDoc gives (`@group Selection`), ahead of the catalogue's own order; the others follow as they
+   * first appear. Written plainly, a list of string literals (the index reads it).
+   */
+  readonly propGroups?: readonly string[];
   /** CSF's documentation block; the catalogue reads the component's one-line description from it. */
   readonly docs?: { readonly description?: { readonly component?: string } };
 };

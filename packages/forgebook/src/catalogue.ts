@@ -138,6 +138,12 @@ export type CatalogueLists = {
    * frame by default.
    */
   readonly device?: StoryDeviceSetting;
+  /**
+   * The prop groups listed first in every component's API reference and Props tab, in this order, by the name their
+   * props' TSDoc gives (`@group Selection`). A component's meta may name its own first (`parameters.propGroups`); the
+   * groups named nowhere follow in the order they first appear. The props that name no group always come first.
+   */
+  readonly propGroups?: readonly string[];
 };
 
 /** The shell's own appearance: light, dark, the system's, or the colour scheme of the story shown. */
@@ -190,6 +196,8 @@ export type CatalogueSettings = {
   readonly views: readonly { readonly name: string; readonly query: string }[];
   /** The device every story is shown in by default, under its own. */
   readonly device: DeviceDefault;
+  /** The prop groups listed first, in their order; none by default. */
+  readonly propGroups: readonly string[];
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -287,6 +295,16 @@ const catalogueViews = (
   });
 
 /**
+ * The groups a catalogue names, of stories and of props, none by default.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+const namedGroups = (lists: CatalogueLists): Pick<CatalogueSettings, "storyGroups" | "propGroups"> => ({
+  storyGroups: lists.storyGroups ?? [],
+  propGroups: lists.propGroups ?? []
+});
+
+/**
  * A catalogue's settings, its lists' defaults filled in.
  *
  * @param title - the catalogue's title, for its storage's id.
@@ -325,7 +343,7 @@ export const catalogueSettings = (
     zooms: withHundred(lists.zooms, [50, 75, 100, 125, 150, 200]),
     textSizes: withHundred(lists.textSizes, [100, 125, 150]),
     backdrops: [...offered, ...(lists.backgrounds?.custom ?? []).map(customBackdrop)],
-    storyGroups: lists.storyGroups ?? [],
+    ...namedGroups(lists),
     tabs: [...PANEL_TAB_IDS, ...pluginTabs].filter((tab) => tabsOff[tab] !== false),
     a11y: {
       tags: lists.a11y?.tags ?? DEFAULT_A11Y_TAGS,

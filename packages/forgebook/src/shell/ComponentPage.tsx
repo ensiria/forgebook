@@ -180,7 +180,7 @@ export const ComponentPage = ({
           <Prose page={page} />
           {componentDocs === undefined ||
           (componentDocs.props.length === 0 && !(isLogic && componentDocs.signature !== undefined)) ? null : (
-            <ApiReference docs={componentDocs} isLogic={isLogic} />
+            <ApiReference docs={componentDocs} isLogic={isLogic} componentGroups={component.propGroups} />
           )}
           {examples.length === 0 ? null : (
             <section className="forgebook-doc__section" aria-labelledby="forgebook-examples">

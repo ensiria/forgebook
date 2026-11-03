@@ -144,6 +144,7 @@ describe("extractComponentDocs", () => {
       "onValueChange",
       "options",
       "hint",
+      "texts",
       "classNames"
     ]);
   });
@@ -206,6 +207,84 @@ describe("extractComponentDocs", () => {
 
   it("answers no component for a page without one", () => {
     expect(extractComponentDocs(join(KIT, "Page.stories.tsx"))).toEqual({ name: null });
+  });
+});
+
+describe("a prop's group and its object type's members", () => {
+  const dir = mkdtempSync(join(tmpdir(), "forgebook-groups-"));
+  writeFileSync(
+    join(dir, "Finder.tsx"),
+    [
+      'import type { CSSProperties, ReactNode } from "react";',
+      "/** The finder's texts. */",
+      "export type FinderTexts = {",
+      '  /** The search field\'s placeholder. @defaultValue `"Search"` */',
+      "  readonly placeholder?: string;",
+      "  /** Said when nothing matches. */",
+      "  readonly empty: string;",
+      "};",
+      "/** A point, undocumented. */",
+      "export type Point = { readonly x: number; readonly y: number };",
+      "/** The finder's props. */",
+      "export type FinderProps = {",
+      "  /** The query. */",
+      "  readonly query?: string;",
+      "  /**",
+      "   * The page shown.",
+      "   *",
+      "   * @group Paging",
+      "   */",
+      "  readonly page?: number;",
+      "  /**",
+      "   * The texts it shows.",
+      "   *",
+      "   * @group Texts",
+      "   */",
+      "  readonly texts?: FinderTexts;",
+      "  /** Where it opens. */",
+      "  readonly at?: Point;",
+      "  /** Its style. */",
+      "  readonly style?: CSSProperties;",
+      "  /** A heading above it. */",
+      "  readonly heading?: ReactNode;",
+      "};",
+      "/** Finds things. */",
+      "export const Finder = (props: FinderProps): ReactNode => null;",
+      ""
+    ].join("\n")
+  );
+  writeFileSync(
+    join(dir, "Finder.stories.tsx"),
+    'import { Finder } from "./Finder";\nexport default { title: "Data/Finder", component: Finder };\nexport const Shown = {};\n'
+  );
+  const docs = extractComponentDocs(join(dir, "Finder.stories.tsx"));
+  if (typeof docs === "string" || docs.name === null) throw new Error(String(docs));
+  const byName = Object.fromEntries(docs.props.map((prop) => [prop.name, prop]));
+
+  it("reads the group its TSDoc's @group names, and none for a prop without one", () => {
+    expect(byName["page"]?.group).toBe("Paging");
+    expect(byName["texts"]?.group).toBe("Texts");
+    expect(byName["query"]).not.toHaveProperty("group");
+    // the tag is not part of the description
+    expect(byName["page"]?.description).toBe("The page shown.");
+  });
+
+  it("lists the members of a documented object type, in the source's order, with their docs", () => {
+    expect(byName["texts"]?.members).toEqual([
+      {
+        name: "placeholder",
+        type: "string",
+        description: "The search field's placeholder.",
+        defaultValue: '"Search"',
+        isRequired: false
+      },
+      { name: "empty", type: "string", description: "Said when nothing matches.", isRequired: true }
+    ]);
+  });
+
+  it("lists none for an undocumented object, a type from outside the package, a node or a plain value", () => {
+    for (const name of ["at", "style", "heading", "query", "page"])
+      expect(byName[name], name).not.toHaveProperty("members");
   });
 });
 

@@ -11,7 +11,8 @@ import { act, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { describe, expect, it } from "vitest";
 
-import { NATIVE_ROOT_ATTRIBUTE, nativeRenderer } from "../src/nativeRenderer.ts";
+import { NATIVE_ROOT_ATTRIBUTE } from "../src/nativeFrameRenderer.ts";
+import { nativeRenderer } from "../src/nativeRenderer.ts";
 
 /** A screen as React Native writes one: a view that fills its parent with `flex: 1`. */
 const Screen = ({ title }: { readonly title?: unknown }): ReactNode => (

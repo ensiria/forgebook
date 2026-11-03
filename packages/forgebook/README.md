@@ -132,6 +132,9 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
   their TSDoc, nothing written twice.
+- **Props in groups**: a component with many props lists them under the groups their TSDoc names (`@group Paging`),
+  and a prop typed with a documented object (`texts?: FinderTexts`) unfolds to list its members
+  ([below](#props-in-groups)).
 - **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
   Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
   `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
@@ -313,6 +316,44 @@ panel opens on Signature, with no tab of args (its scene takes none), and the ba
 Compare: the story is drawn once, never compared. A section of its own is a title's
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
+
+## Props in groups
+
+A component with forty props reads better in groups. Name a prop's group in its TSDoc, with the `@group` tag TypeDoc
+reads too:
+
+```tsx
+export type FinderProps = {
+  /** The query. */
+  readonly query?: string;
+  /**
+   * The page shown.
+   *
+   * @group Paging
+   */
+  readonly page?: number;
+  /**
+   * The texts it shows, for a translation.
+   *
+   * @group Texts
+   */
+  readonly texts?: FinderTexts;
+};
+```
+
+- The API reference lists the props that name no group first, then each group under its name, in the order the
+  groups first appear among the props; the events keep their own heading after them. The Props tab does the same: the
+  props that name no group by control, as before, then each group with its controls, its toggles and the props it
+  cannot set.
+- Every group starts open; a reader folds one away from its name.
+- To show some groups first, name them in order: `propGroups: ["Selection", "Paging"]` in the configuration for every
+  component, or `parameters: { propGroups: ["Texts"] }` in a component's meta, written as a list of plain strings.
+  The meta's come first, then the configuration's, then the rest as they appear. Nothing named, nothing changes.
+- A prop whose type is an object the package declares, with TSDoc on at least one member (`FinderTexts`), has a
+  "members" button beside its type: it lists the members under the row, with their types, defaults and TSDoc. Only one
+  level, and only once unfolded, so large text types cost the page nothing until read.
+- With `eslint-plugin-tsdoc`, declare the tag in your `tsdoc.json`:
+  `{ "tagName": "@group", "syntaxKind": "block", "allowMultiple": false }`.
 
 ## Docs pages
 

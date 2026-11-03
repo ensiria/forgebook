@@ -42,6 +42,12 @@ The browser tests start a dev server for each fixture catalogue, about a gigabyt
 not hold them all, run them a group of catalogues at a time, as the Windows CI does:
 `FORGEBOOK_SHELL_GROUP=1/3 pnpm --filter @fixture/app test:shell`, then `2/3` and `3/3`.
 
+A browser test that edits a fixture file while the catalogue serves it writes through the `fileEdits` fixture
+(`fixtures/app/shell/fileEdits.ts`), which waits until the dev server has taken each write and puts the file's bytes
+back however the test ends, and its spec is listed in `EDITING_SPECS` (`shell/playwright.config.ts`), so it runs on one
+worker and no two of its tests or repetitions edit a file at once. Other specs run beside it, so they do not open
+the stories it edits.
+
 The repository is a pnpm workspace: `packages/` holds the seventeen published packages, `fixtures/` the fixture kit,
 the Storybook-style stories, the catalogue the tests run on, a catalogue for each other framework (Vue, Svelte, Solid,
 Preact, Web Components, plain HTML, Angular, React Native), and small SvelteKit, Next.js and Nuxt apps with their catalogues, `tools/`

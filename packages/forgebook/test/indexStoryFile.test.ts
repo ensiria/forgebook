@@ -289,6 +289,25 @@ describe("indexStoryFile", () => {
     );
   });
 
+  it("reads the meta's prop groups to list first, and refuses them written by code or wrongly", () => {
+    const text = `export default { title: "Data/Finder", parameters: { propGroups: ["Selection", "Paging"] } };
+      export const Overview = {};`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "Data/Finder",
+      propGroups: ["Selection", "Paging"],
+      stories: [{ exportName: "Overview" }]
+    });
+    // the index alone reads it, so a list written by code would be lost
+    for (const written of ['"Paging"', "[1]", "GROUPS", '[...GROUPS, "Paging"]']) {
+      expect(
+        indexStoryFile(
+          "A.stories.tsx",
+          `export default { title: "A/B", parameters: { propGroups: ${written} } };`
+        )
+      ).toBe("A.stories.tsx: the meta's `parameters.propGroups` must be written as a list of plain strings");
+    }
+  });
+
   it("refuses other places or related components written plainly but wrongly, and leaves code to the frame", () => {
     expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", alsoIn: [1] };')).toBe(
       "A.stories.tsx: the meta's `alsoIn` must be written as a list of plain strings"
