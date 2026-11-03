@@ -11,6 +11,8 @@
  * @module
  */
 
+import { join } from "node:path";
+
 import type { PluginOption } from "vite";
 
 import type { AddressTexts } from "../addressTexts.ts";
@@ -136,3 +138,21 @@ export const isDocsModule = (module: unknown): module is DocsModule =>
   (!("storyTypesModule" in module) || typeof module.storyTypesModule === "string") &&
   (!("storyFileShape" in module) || typeof module.storyFileShape === "function") &&
   (!("sourcesChanged" in module) || typeof module.sourcesChanged === "function");
+
+/**
+ * The files under a folder, as a pattern a Vite plugin's `include` or `exclude` takes: Vite names a module by its path
+ * with forward slashes.
+ *
+ * @param folder - the folder's absolute path.
+ */
+export const filesUnder = (folder: string): RegExp => {
+  const path = folder.split("\\").join("/").replace(/\/$/, "");
+  return new RegExp(`^${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`);
+};
+
+/**
+ * The core's own files: its shell is React, so a framework's plugin that compiles JSX its own way (Solid's compiler,
+ * Preact's refresh) leaves them to Vite. They matter when the core is linked as sources (a workspace); installed, they
+ * are JavaScript already, which such plugins do not read.
+ */
+export const FORGEBOOK_FILES: RegExp = filesUnder(join(import.meta.dirname, "..", ".."));

@@ -10,7 +10,7 @@
  *
  * @module
  */
-import type { ToolName } from "./bench.types.ts";
+import type { FramesMode, ToolName } from "./bench.types.ts";
 import type { CorpusComponent, StoryForm } from "./corpus.ts";
 
 /** A command, from a target's folder. */
@@ -35,7 +35,9 @@ export type Target = {
   readonly configFiles: Readonly<Record<string, string>>;
   /** The folders a cold start removes, from the project's root. */
   readonly caches: readonly string[];
-  /** The dev server's command. */
+  /** How many ports its dev server listens on, from the one it is given. */
+  readonly ports: number;
+  /** The dev server's command, on the first of its ports. */
   readonly dev: (port: number) => TargetCommand;
   /** The build's command. */
   readonly build: (out: string) => TargetCommand;
@@ -93,8 +95,14 @@ export default {
 };
 `;
 
-/** Forgebook's configuration, as its README writes one, with the theme switch. */
-const FORGEBOOK_CONFIG = `import { react } from "@forgebook/react/vite";
+/** Every frames mode, as `--frames` names them. */
+export const FRAMES_MODES = ["isolated", "same-origin"] as const satisfies readonly FramesMode[];
+
+/**
+ * Forgebook's configuration, as its README writes one, with the theme switch, and the option that keeps the frames on
+ * the catalogue's origin when asked.
+ */
+const forgebookConfig = (frames: FramesMode): string => `import { react } from "@forgebook/react/vite";
 import { defineConfig } from "forgebook";
 import { themeSwitch } from "forgebook/switches";
 
@@ -102,7 +110,7 @@ export default defineConfig({
   framework: react(),
   title: "Bench",
   stories: ["src/components/*.stories.tsx"],
-  switches: [themeSwitch()]
+  switches: [themeSwitch()]${frames === "same-origin" ? `,\n  frames: "same-origin"` : ""}
 });
 `;
 
@@ -120,21 +128,43 @@ const titleId = (component: CorpusComponent): string => `${component.group}-${co
 const forgebookComponent = (component: CorpusComponent): string =>
   encodeURIComponent(`stories:${titleId(component)}`);
 
-/** Forgebook, from the packages under test. */
-export const FORGEBOOK: Target = {
+/**
+ * Forgebook, from the packages under test.
+ *
+ * @remarks
+ * With its frames on an origin of their own, the dev server takes a second port for them, named so that a port taken
+ * fails the sample instead of moving the frames to one that may belong to another tool.
+ *
+ * @param frames - where its frames run.
+ */
+export const forgebookTarget = (frames: FramesMode): Target => ({
   name: "forgebook",
   form: "csf3",
   packages: ["forgebook", "@forgebook/react", "vite", "react"],
   mainPackage: "forgebook",
-  configFiles: { "forgebook.config.ts": FORGEBOOK_CONFIG, "forgebook.preview.ts": FORGEBOOK_PREVIEW },
+  configFiles: { "forgebook.config.ts": forgebookConfig(frames), "forgebook.preview.ts": FORGEBOOK_PREVIEW },
   caches: ["node_modules/.vite"],
-  dev: (port) => ({ bin: "forgebook", args: ["dev", "--host", HOST, "--port", String(port)] }),
+  ports: frames === "isolated" ? 2 : 1,
+  dev: (port) => ({
+    bin: "forgebook",
+    args: [
+      "dev",
+      "--host",
+      HOST,
+      "--port",
+      String(port),
+      ...(frames === "isolated" ? ["--frame-port", String(port + 1)] : [])
+    ]
+  }),
   build: (out) => ({ bin: "forgebook", args: ["build", "--out", out] }),
   storyUrl: (base, component) =>
     `${base}?story=${forgebookComponent(component)}--${firstStory(component).toLowerCase()}`,
   componentUrl: (base, component) => `${base}?component=${forgebookComponent(component)}`,
   propsTable: ".forgebook-api__table"
-};
+});
+
+/** Forgebook as a user gets it: its frames on an origin of their own. */
+export const FORGEBOOK: Target = forgebookTarget("isolated");
 
 /** Storybook, on React and Vite. Its id spells a number as a word of its own. */
 export const STORYBOOK: Target = {
@@ -145,6 +175,7 @@ export const STORYBOOK: Target = {
   configFiles: { ".storybook/main.js": STORYBOOK_MAIN, ".storybook/preview.jsx": STORYBOOK_PREVIEW },
   // its pre-bundled dependencies are here, not in Vite's folder: without this a cold start would be a warm one
   caches: ["node_modules/.vite", "node_modules/.cache"],
+  ports: 1,
   dev: (port) => ({
     bin: "storybook",
     args: [
@@ -182,6 +213,7 @@ export const LADLE: Target = {
   mainPackage: "@ladle/react",
   configFiles: { ".ladle/config.mjs": LADLE_CONFIG, ".ladle/components.jsx": LADLE_PROVIDER },
   caches: ["node_modules/.vite"],
+  ports: 1,
   dev: (port) => ({ bin: "ladle", args: ["serve", "--port", String(port), "--host", HOST] }),
   build: (out) => ({ bin: "ladle", args: ["build", "--outDir", out] }),
   storyUrl: (base, component) =>
@@ -190,3 +222,14 @@ export const LADLE: Target = {
 
 /** Every tool, in report order. */
 export const TARGETS: readonly Target[] = [FORGEBOOK, STORYBOOK, LADLE];
+
+/**
+ * The tools a run measures, in report order.
+ *
+ * @param frames - where Forgebook's frames run.
+ * @param isComparing - whether Storybook and Ladle are measured too.
+ */
+export const targetsOf = (frames: FramesMode, isComparing: boolean): readonly Target[] => {
+  const forgebook = forgebookTarget(frames);
+  return isComparing ? [forgebook, STORYBOOK, LADLE] : [forgebook];
+};

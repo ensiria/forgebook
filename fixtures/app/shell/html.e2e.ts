@@ -6,9 +6,9 @@
  */
 import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 
-import { HTML_PORT } from "./ports";
+import { catalogueUrl } from "./ports";
 
-test.use({ baseURL: `http://127.0.0.1:${HTML_PORT}/` });
+test.use({ baseURL: catalogueUrl("html") });
 
 /** Every story of the fixture, by its id without the source. */
 const STORY_IDS = [

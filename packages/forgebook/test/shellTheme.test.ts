@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DARK_PALETTE,
+  frameThemeCss,
   LIGHT_PALETTE,
   mergedThemes,
   shellThemeCss,
@@ -68,6 +69,22 @@ describe("shellThemeCss", () => {
       ":root{--forgebook-font-sans:Inter, sans-serif;--forgebook-font-mono:Menlo;" +
         "--forgebook-radius-control-small:2px;--forgebook-radius-control:2px;--forgebook-radius-card:4px}"
     );
+  });
+});
+
+describe("frameThemeCss", () => {
+  it("gives a frame only the failure box's fonts and colours, scoped to it", () => {
+    const css = frameThemeCss({
+      light: { "danger-text": "#a00", accent: "#123456" },
+      dark: { "danger-text": "#faa" },
+      fonts: { sans: "Inter" },
+      radius: { card: "4px" }
+    });
+    expect(css).toBe(".forgebook-frame-error{--forgebook-font-sans:Inter;--forgebook-danger-text:#a00}");
+  });
+
+  it("is nothing for a theme that sets nothing the box reads", () => {
+    expect(frameThemeCss({ light: { accent: "#123456" } })).toBe("");
   });
 });
 

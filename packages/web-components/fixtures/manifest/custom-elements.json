@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "2.1.0",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "src/Button.js",
+      "description": "A button that does one thing.",
+      "declarations": [
+        {
+          "kind": "class",
+          "name": "XButton",
+          "tagName": "x-button",
+          "customElement": true,
+          "description": "A button.\n\nIt sends one action.",
+          "attributes": [
+            {
+              "name": "variant",
+              "fieldName": "variant",
+              "type": { "text": "'primary' | 'quiet' | undefined" },
+              "default": "'primary'"
+            },
+            { "name": "max-length", "fieldName": "maxLength", "description": "The longest label it shows." },
+            { "name": "disabled", "type": { "text": "boolean" } },
+            { "name": "label", "type": { "text": "string | null" }, "description": "Its text." },
+            { "name": "size", "fieldName": "size", "type": { "text": "Size" } }
+          ],
+          "members": [
+            { "kind": "field", "name": "variant", "description": "How it looks.", "attribute": "variant" },
+            {
+              "kind": "field",
+              "name": "maxLength",
+              "type": { "text": "number" },
+              "default": "20",
+              "attribute": "max-length"
+            },
+            {
+              "kind": "field",
+              "name": "items",
+              "type": { "text": "string[]" },
+              "description": "The choices it offers."
+            },
+            {
+              "kind": "field",
+              "name": "form",
+              "type": { "text": "HTMLFormElement | null" },
+              "readonly": true
+            },
+            { "kind": "field", "name": "internal", "privacy": "private" },
+            { "kind": "field", "name": "styles", "static": true },
+            { "kind": "method", "name": "focus" }
+          ],
+          "events": [
+            {
+              "name": "press",
+              "type": { "text": "CustomEvent<{ count: number }>" },
+              "description": "The person pressed it."
+            },
+            { "name": "blur" },
+            { "description": "an event with no name, left out" }
+          ],
+          "slots": [
+            { "name": "", "description": "The label." },
+            { "name": "icon", "description": "An icon before it." }
+          ],
+          "cssParts": [{ "name": "base" }, { "name": "label" }]
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/x-icon.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "name": "XIcon",
+          "tagName": "x-icon",
+          "customElement": true,
+          "summary": "An icon.",
+          "deprecated": "Use the icon font.",
+          "attributes": [{ "name": "name", "type": { "text": "string" } }]
+        },
+        { "kind": "function", "name": "iconUrl" },
+        { "kind": "class", "name": "NotAnElement" }
+      ]
+    },
+    { "kind": "javascript-module", "declarations": [] },
+    "not a module"
+  ]
+}

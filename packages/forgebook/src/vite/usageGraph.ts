@@ -17,6 +17,7 @@
 import ts from "typescript-6";
 
 import { programFor } from "./docsProgram.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** A component, by the file that declares it and its name there. */
 export type ComponentRef = {
@@ -340,7 +341,9 @@ const reachedImports = (
 export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | string => {
   const files: StoryFileUsage[] = [];
   const programs = new Set<ts.Program>();
-  for (const request of requests) {
+  for (const asked of requests) {
+    // in Vite's form, as TypeScript names the files the graph is made of, so a story file meets its components
+    const request = { ...asked, storyFile: VITE_PATHS.normalize(asked.storyFile) };
     const docsProgram = programFor(request.storyFile);
     if (typeof docsProgram === "string") return docsProgram;
     programs.add(docsProgram.program);

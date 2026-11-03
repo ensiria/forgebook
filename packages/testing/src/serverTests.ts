@@ -116,7 +116,7 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
     describe(title, () => {
       for (const { story, component } of entries) {
         it.each(passes)(`${story.name} renders on the server ($name)`, async (pass) => {
-          const loaded = await loadedStory(source, component.file, story.exportName, preview);
+          const loaded = await loadedStory(source, story.file, story.exportName, preview);
           // the stories' own texts: what the catalogue shows when no language is chosen
           const texts = source.texts?.[BASE_LANGUAGE] ?? {};
           const args = withStoryTexts(loaded.args, storyTextOf(texts));
@@ -145,7 +145,7 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
           pass.check?.(html);
         });
         it(`${story.name} declares the controls it uses`, async () => {
-          const loaded = await loadedStory(source, component.file, story.exportName);
+          const loaded = await loadedStory(source, story.file, story.exportName);
           expect(storyControlsProblem(loaded)).toBeUndefined();
         });
       }

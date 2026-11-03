@@ -11,10 +11,10 @@
  *
  * @module
  */
-import { join } from "node:path";
-
+import type { FramesPlacement } from "../frameOrigins.ts";
 import type { PageConfig } from "../pageConfig.ts";
-import { MOCKS_MODULE, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { MOCKS_MODULES, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The pages, by their file name. */
 export const PAGE_FILES = ["index.html", "frame.html"] as const;
@@ -47,6 +47,47 @@ export const AGENT_SOURCES_FILE = ".forgebook-agent.ts";
 /** The project's own stories' source id. */
 export const OWN_SOURCE_ID = "stories";
 
+/** A module the plugin generates in the configuration's folder: a page, a page's entry, or one of the two sources. */
+export type PageModule =
+  | { readonly kind: "page"; readonly page: PageFile }
+  | { readonly kind: "entry"; readonly page: PageFile }
+  | { readonly kind: "stories-source" }
+  | { readonly kind: "agent-sources" };
+
+/**
+ * A generated module's path, in Vite's form: what the pages import, what Vite's ids name.
+ *
+ * @param dir - the configuration's folder.
+ * @param file - the module's file name (`PAGE_FILES`, `PAGE_ENTRIES`, `STORIES_SOURCE_FILE`, `AGENT_SOURCES_FILE`).
+ * @param paths - the path functions; the running system's unless a test names another.
+ */
+export const pageModulePath = (dir: string, file: string, paths: VitePaths = VITE_PATHS): string =>
+  paths.join(dir, file);
+
+/**
+ * The generated module a path names, when it names one: an id from Vite (`C:/app/.forgebook-shell.ts` on Windows) or
+ * a path from Node (`C:\app\frame.html`, as the build's inputs may arrive) both match.
+ *
+ * @param path - the id or path.
+ * @param dir - the configuration's folder.
+ * @param paths - the path functions; the running system's unless a test names another.
+ */
+export const pageModuleOf = (
+  path: string,
+  dir: string,
+  paths: VitePaths = VITE_PATHS
+): PageModule | undefined => {
+  const named = paths.normalize(path);
+  const isAt = (file: string): boolean => named === pageModulePath(dir, file, paths);
+  const entry = PAGE_FILES.find((page) => isAt(PAGE_ENTRIES[page]));
+  if (entry !== undefined) return { kind: "entry", page: entry };
+  const page = PAGE_FILES.find((candidate) => isAt(candidate));
+  if (page !== undefined) return { kind: "page", page };
+  if (isAt(STORIES_SOURCE_FILE)) return { kind: "stories-source" };
+  if (isAt(AGENT_SOURCES_FILE)) return { kind: "agent-sources" };
+  return undefined;
+};
+
 /**
  * Text set in HTML: its `<`, `>`, `&` and quotes escaped.
  *
@@ -70,6 +111,9 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
     '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
     `    <title>${escaped(page === "index.html" ? config.title : "Story")}</title>`,
     ...(page === "frame.html" && config.head !== "" ? [config.head] : []),
+    ...(page === "frame.html" && config.shell.frameCss !== ""
+      ? [`    <style>${config.shell.frameCss}</style>`]
+      : []),
     ...(page === "index.html" && config.shell.themeCss !== ""
       ? [`    <style>${config.shell.themeCss}</style>`]
       : []),
@@ -86,14 +130,16 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
  * The configuration's data, as the pages' module exports it.
  *
  * @param config - the configuration.
+ * @param frames - where the frames run: known on the dev server once both of its ports listen.
  */
-export const configModule = (config: ResolvedConfig): string => {
+export const configModule = (config: ResolvedConfig, frames: FramesPlacement): string => {
   const data: PageConfig = {
     title: config.title,
     heights: config.heights,
     switches: config.switches,
     languages: config.languages,
-    lists: config.lists
+    lists: config.lists,
+    frames
   };
   return `export default ${JSON.stringify(data)};`;
 };
@@ -104,8 +150,9 @@ export const configModule = (config: ResolvedConfig): string => {
  * @param config - the configuration.
  */
 const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; readonly list: string } => {
-  const own = config.stories.length > 0 ? [`./${STORIES_SOURCE_FILE}`] : [];
-  const specifiers = [...own.map((file) => join(config.dir, file.slice(2))), ...config.sources];
+  const hasOwn = config.stories.length > 0 || config.docs.length > 0;
+  const own = hasOwn ? [pageModulePath(config.dir, STORIES_SOURCE_FILE)] : [];
+  const specifiers = [...own, ...config.sources];
   return {
     imports: specifiers.map(
       (specifier, index) => `import { source as source${index} } from ${JSON.stringify(specifier)};`
@@ -133,9 +180,11 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "  mountShell(root, {",
     "    title: config.title,",
     ...(config.logo === undefined ? [] : ["    logo,"]),
+    ...(config.shell.hasBranding ? [] : ["    hasBranding: false,"]),
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
     `    sources: ${sources.list},`,
     '    frameUrl: "frame.html",',
+    "    frames: config.frames,",
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
@@ -163,6 +212,20 @@ const playToolsLoader = (): string => {
 };
 
 /**
+ * The frame's loader of MSW: the worker and the handlers it adds to a story's, imported for the first story with
+ * handlers, so a catalogue whose stories mock nothing never loads them.
+ */
+const mockToolsLoader = (): string => {
+  const imports = MOCKS_MODULES.map((name) => `import(${JSON.stringify(name)})`).join(", ");
+  return [
+    "    mockTools: async () => {",
+    `      const [browser, core] = await Promise.all([${imports}]);`,
+    "      return { setupWorker: browser.setupWorker, http: core.http, passthrough: core.passthrough };",
+    "    },"
+  ].join("\n");
+};
+
+/**
  * The frame's entry: the framework's frame mounted with the sources, the configuration's data and the previews.
  *
  * @param config - the configuration.
@@ -181,8 +244,9 @@ export const frameEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    "    frames: config.frames,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
-    ...(config.hasMocks ? [`    mockTools: () => import(${JSON.stringify(MOCKS_MODULE)}),`] : []),
+    ...(config.hasMocks ? [mockToolsLoader()] : []),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
     "  });",
     ""
@@ -207,7 +271,8 @@ export const agentSourcesModule = (config: ResolvedConfig): string => {
 };
 
 /**
- * The source of the project's own stories: one `?forgebook-files` import per glob, named after the catalogue.
+ * The source of the project's own stories and docs pages: one `?forgebook-files` or `?forgebook-docs-pages` import per
+ * glob, named after the catalogue.
  *
  * @param config - the configuration.
  */
@@ -217,10 +282,17 @@ export const storiesSourceModule = (config: ResolvedConfig): string =>
       (pattern, index) =>
         `import files${index} from ${JSON.stringify(`./${pattern.replace(/^\.\//, "")}?forgebook-files`)};`
     ),
+    ...config.docs.map(
+      (pattern, index) =>
+        `import docs${index} from ${JSON.stringify(`./${pattern.replace(/^\.\//, "")}?forgebook-docs-pages`)};`
+    ),
     "export const source = {",
     `  id: ${JSON.stringify(OWN_SOURCE_ID)},`,
     `  name: ${JSON.stringify(config.title)},`,
     `  files: [${config.stories.map((_pattern, index) => `files${index}`).join(", ")}],`,
+    ...(config.docs.length === 0
+      ? []
+      : [`  docs: [${config.docs.map((_pattern, index) => `docs${index}`).join(", ")}],`]),
     "  sheets: { required: [], theme: [], restyled: [] }",
     "};",
     ""

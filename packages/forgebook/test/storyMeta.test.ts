@@ -17,6 +17,17 @@ describe("componentImport", () => {
     expect(componentImport("Card.stories.tsx", fallback)).toBe("../card/Card");
   });
 
+  it("reads a meta held in a constant, exported by default or by name, as Storybook's docs read it", () => {
+    const constant = `import { Badge } from "./Badge";
+      const meta: Meta<typeof Badge> = { title: "A/B", component: Badge };
+      export default meta;`;
+    expect(componentImport("Badge.stories.tsx", constant)).toBe("./Badge");
+    const satisfied = `import { Badge } from "./Badge";
+      const meta = { title: "A/B", component: Badge } satisfies Meta<typeof Badge>;
+      export { meta as default };`;
+    expect(componentImport("Badge.stories.tsx", satisfied)).toBe("./Badge");
+  });
+
   it("has none for a meta without a component, or one not imported", () => {
     expect(componentImport("Page.stories.tsx", `export default { title: "A/B" };`)).toBeUndefined();
     expect(

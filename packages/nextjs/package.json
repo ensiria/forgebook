@@ -1,0 +1,161 @@
+{
+  "name": "@forgebook/nextjs",
+  "version": "0.1.8",
+  "description": "Forgebook for Next.js: a Next.js project's components drawn outside Next, with next/image, next/font, next/link, both routers, next/headers and server components, on Vite.",
+  "keywords": [
+    "nextjs",
+    "next",
+    "react",
+    "catalogue",
+    "stories"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/nextjs"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./docs": "./src/vite/extractDocs.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./renderer": "./src/nextRenderer.tsx",
+    "./route": "./src/storyRoute.ts",
+    "./vite": "./src/vite/nextjs.ts",
+    "./next/cache": "./src/next/cache.ts",
+    "./next/config": "./src/next/config.ts",
+    "./next/dynamic": "./src/next/dynamic.tsx",
+    "./next/empty": "./src/next/empty.ts",
+    "./next/form": "./src/next/form.tsx",
+    "./next/head": "./src/next/head.tsx",
+    "./next/headers": "./src/next/headers.ts",
+    "./next/image": "./src/next/image.ts",
+    "./next/legacy-image": "./src/next/legacyImage.ts",
+    "./next/link": "./src/next/link.tsx",
+    "./next/navigation": "./src/next/navigation.ts",
+    "./next/router": "./src/next/router.tsx",
+    "./next/script": "./src/next/script.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@forgebook/react": "workspace:*",
+    "@forgebook/story-format": "workspace:*"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "next": "^15.0.0 || ^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^8.0.0"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "next": "16.4.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/nextRenderer.d.ts",
+        "default": "./dist/src/nextRenderer.js"
+      },
+      "./route": {
+        "types": "./dist/src/storyRoute.d.ts",
+        "default": "./dist/src/storyRoute.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/nextjs.d.ts",
+        "default": "./dist/src/vite/nextjs.js"
+      },
+      "./next/cache": {
+        "types": "./dist/src/next/cache.d.ts",
+        "default": "./dist/src/next/cache.js"
+      },
+      "./next/config": {
+        "types": "./dist/src/next/config.d.ts",
+        "default": "./dist/src/next/config.js"
+      },
+      "./next/dynamic": {
+        "types": "./dist/src/next/dynamic.d.ts",
+        "default": "./dist/src/next/dynamic.js"
+      },
+      "./next/empty": {
+        "types": "./dist/src/next/empty.d.ts",
+        "default": "./dist/src/next/empty.js"
+      },
+      "./next/form": {
+        "types": "./dist/src/next/form.d.ts",
+        "default": "./dist/src/next/form.js"
+      },
+      "./next/head": {
+        "types": "./dist/src/next/head.d.ts",
+        "default": "./dist/src/next/head.js"
+      },
+      "./next/headers": {
+        "types": "./dist/src/next/headers.d.ts",
+        "default": "./dist/src/next/headers.js"
+      },
+      "./next/image": {
+        "types": "./dist/src/next/image.d.ts",
+        "default": "./dist/src/next/image.js"
+      },
+      "./next/legacy-image": {
+        "types": "./dist/src/next/legacyImage.d.ts",
+        "default": "./dist/src/next/legacyImage.js"
+      },
+      "./next/link": {
+        "types": "./dist/src/next/link.d.ts",
+        "default": "./dist/src/next/link.js"
+      },
+      "./next/navigation": {
+        "types": "./dist/src/next/navigation.d.ts",
+        "default": "./dist/src/next/navigation.js"
+      },
+      "./next/router": {
+        "types": "./dist/src/next/router.d.ts",
+        "default": "./dist/src/next/router.js"
+      },
+      "./next/script": {
+        "types": "./dist/src/next/script.d.ts",
+        "default": "./dist/src/next/script.js"
+      }
+    }
+  }
+}

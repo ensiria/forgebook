@@ -1,0 +1,11 @@
+// The Preact package's tests, run by Vitest in a simulated page (happy-dom).
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/preact.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    // the Vite plugin carries the `.ts` extension in its own imports (Node loads it directly)
+    "allowImportingTsExtensions": true
+  },
+  "include": [".", "../src"]
+}
