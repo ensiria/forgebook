@@ -1,18 +1,19 @@
 /**
- * Forgebook's renderer for a Next.js project: React's renderer, each story given its route and request, and its
- * server components awaited before it is drawn (`serverComponents.ts`).
+ * Forgebook's renderer for a Next.js project, as the frame draws with it: React's frame renderer, each story given its
+ * route and request, and its server components awaited before it is drawn (`serverComponents.ts`).
  *
  * @remarks
  * A story's route and request (`parameters.nextjs`) live in a store made when the story is mounted, so a story drawn
  * again with other args keeps where its links took it, and one that starts over starts at its own route. The store's
- * calls go to the catalogue's Events tab. Everything else is React's renderer (`@forgebook/react/renderer`), which this
- * one wraps: the decorators, the texts and the clock, the error boundary.
+ * calls go to the catalogue's Events tab. Everything else is React's frame renderer
+ * (`@forgebook/react/frame-renderer`), which this one wraps: the decorators, the texts and the clock, the error
+ * boundary. The server render is in `nextRenderer.tsx`, which the frame page does not import.
  *
  * @module
  */
-import { reactRenderer } from "@forgebook/react/renderer";
+import { reactFrameRenderer } from "@forgebook/react/frame-renderer";
 import type { StoryContext } from "@forgebook/story-format/csf";
-import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
+import type { FrameRenderer, MountedStory, StoryDrawing } from "forgebook/renderer";
 import type { LoadedArgs, LoadedDecorator, LoadedStory } from "forgebook/story-module";
 import { type ReactNode, Suspense, useEffect } from "react";
 
@@ -121,22 +122,20 @@ const withServerStory = (story: LoadedStory): LoadedStory => {
 
 /**
  * The drawing React's renderer gets: the story's server components swapped, the Next.js decorator outside the
- * catalogue's.
+ * catalogue's. The server render (`nextRenderer.tsx`) gives its drawing the same way.
  *
+ * @internal
  * @param drawing - the drawing the frame gave.
  * @param onCommit - what to call each time React put the story in the page; none on a server.
  */
-const withNext = (drawing: StoryDrawing, onCommit: (() => void) | undefined): StoryDrawing => ({
+export const withNext = (drawing: StoryDrawing, onCommit: (() => void) | undefined): StoryDrawing => ({
   ...drawing,
   story: withServerStory(drawing.story),
   decorators: [...drawing.decorators, serverComponentsDecorator(onCommit)]
 });
 
-/** The server renders under way, in order: each sets the route's store the story reads while it renders. */
-let serverRenders: Promise<void> = Promise.resolve();
-
-/** React's renderer for a Next.js project. */
-export const nextRenderer: StoryRenderer = {
+/** React's frame renderer for a Next.js project. */
+export const nextFrameRenderer: FrameRenderer = {
   mount: (canvas: HTMLElement, first: StoryDrawing, onError: (error: Error) => void): MountedStory => {
     setCurrentStore(createRouteStore(first.story.parameters, first.onEvent));
     forgetServerResults();
@@ -153,7 +152,7 @@ export const nextRenderer: StoryRenderer = {
         if (!hasFailed) markDrawn();
       });
     };
-    const mounted = reactRenderer.mount(canvas, withNext(first, onCommit), (error: Error): void => {
+    const mounted = reactFrameRenderer.mount(canvas, withNext(first, onCommit), (error: Error): void => {
       hasFailed = true;
       onError(error);
     });
@@ -165,18 +164,5 @@ export const nextRenderer: StoryRenderer = {
       },
       unmount: mounted.unmount
     };
-  },
-  renderToString: (drawing: StoryDrawing): Promise<string> => {
-    // one at a time: the route's store is the module's, and React's render waits for its server renderer to load
-    const render = serverRenders.then(async () => {
-      setCurrentStore(createRouteStore(drawing.story.parameters, drawing.onEvent));
-      forgetServerResults();
-      return await reactRenderer.renderToString(withNext(drawing, undefined));
-    });
-    serverRenders = render.then(
-      () => undefined,
-      () => undefined
-    );
-    return render;
   }
 };
