@@ -112,6 +112,56 @@ describe("preactRenderer", () => {
     story.unmount();
   });
 
+  it("keeps a story's state when a decorator draws it as <Story />, and the args change", async () => {
+    const counter = loaded({
+      render: (args: { readonly label?: unknown }) => {
+        const [clicks, setClicks] = useState(0);
+        return (
+          <button type="button" onClick={() => setClicks(clicks + 1)}>
+            {String(args.label)}: {clicks}
+          </button>
+        );
+      }
+    });
+    const asElement = (Story: () => ComponentChildren): ComponentChildren => (
+      <section>
+        <Story />
+      </section>
+    );
+    const decorators = readPreview({ decorators: [asElement] }).decorators;
+    const element = canvas();
+    const story = preactRenderer.mount(
+      element,
+      drawing(counter, { args: { label: "Clicks" }, decorators }),
+      () => undefined
+    );
+    await story.drawn;
+    element.querySelector("button")?.click();
+    await vi.waitFor(() => expect(element.textContent).toBe("Clicks: 1"));
+    story.update(drawing(counter, { args: { label: "Taps" }, decorators }));
+    await vi.waitFor(() => expect(element.textContent).toBe("Taps: 1"));
+    expect(element.querySelector("section button")).not.toBeNull();
+    story.unmount();
+  });
+
+  it("calls hooks in a decorator, which Storybook's stories do", async () => {
+    const inSection = (story: () => ComponentChildren): ComponentChildren => {
+      const [label] = useState("wrapped");
+      return <section aria-label={label}>{story()}</section>;
+    };
+    const decorators = readPreview({ decorators: [inSection] }).decorators;
+    const element = canvas();
+    const errors: string[] = [];
+    const story = preactRenderer.mount(element, drawing(greeting, { decorators }), (error) =>
+      errors.push(error.message)
+    );
+    await story.drawn;
+    expect(element.querySelector("section")?.getAttribute("aria-label")).toBe("wrapped");
+    expect(element.textContent).toBe("Ciao Ada 0");
+    expect(errors).toEqual([]);
+    story.unmount();
+  });
+
   it("starts another story over: its state is not the last one's", async () => {
     const counter = loaded({
       render: () => {
