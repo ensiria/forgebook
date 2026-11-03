@@ -26,7 +26,7 @@ import {
 } from "../shellTheme.ts";
 import { switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
-import type { ForgebookConfig } from "./config.ts";
+import type { BuildOptions, ForgebookConfig } from "./config.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
@@ -102,6 +102,8 @@ export type ResolvedConfig = {
   readonly hasMocks: boolean;
   /** Where the stories' frames run. */
   readonly frames: ResolvedFrames;
+  /** How `forgebook build` writes the catalogue, every option given its default. */
+  readonly build: Required<BuildOptions>;
 };
 
 /**
@@ -336,7 +338,8 @@ export const resolveConfig = (
     lists: mergedLists([...presets, config]),
     hasPlayTools: hasPlayToolsIn(dir),
     hasMocks: packageResolver(dir)(MOCKS_MANIFEST) !== undefined,
-    frames: resolvedFrames(config.frames)
+    frames: resolvedFrames(config.frames),
+    build: { readableNames: config.build?.readableNames === true }
   };
 };
 

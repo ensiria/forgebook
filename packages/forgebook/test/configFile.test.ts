@@ -86,6 +86,16 @@ describe("resolveConfig", () => {
   });
 });
 
+describe("the build's options", () => {
+  it("name a build's scripts by their hash alone unless the configuration asks for readable names", () => {
+    const base = { title: "A", framework: STUB_FRAMEWORK, stories: ["*.stories.tsx"] };
+    expect(resolveConfig(base, "/app").build).toEqual({ readableNames: false });
+    expect(resolveConfig({ ...base, build: { readableNames: true } }, "/app").build).toEqual({
+      readableNames: true
+    });
+  });
+});
+
 describe("findConfigFile", () => {
   it("finds forgebook.config.ts in a folder, and none in a folder without one", () => {
     const dir = folder();

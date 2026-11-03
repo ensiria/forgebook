@@ -154,10 +154,6 @@ export const indexedStoryFiles = (
   return files;
 };
 
-/** An object literal of a key per file, each value written by `value`. */
-const objectOf = (keys: readonly string[], value: (key: string) => string): string =>
-  `{${keys.map((key) => `${JSON.stringify(key)}: ${value(key)}`).join(",\n")}}`;
-
 /** The loaders a group offers besides its story files'. */
 export type GroupLoaders = {
   /** Whether it offers its "Used in" (the catalogue did not turn it off). */
@@ -198,13 +194,26 @@ export const storyFilesModule = (
   const absolute = (key: string): string => VITE_PATHS.resolve(folder, key);
   const path = (key: string): string => JSON.stringify(absolute(key));
   const query = (key: string, name: string): string => JSON.stringify(`${absolute(key)}?${name}`);
+  // a row per file, its name written once and not once per loader: a large catalogue's names are a tenth of its index
+  const rows = keys.map(
+    (key) =>
+      `[${[
+        JSON.stringify(key),
+        `() => import(${path(key)})`,
+        `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`,
+        `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`,
+        `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`
+      ].join(", ")}]`
+  );
   return [
+    `const rows = [${rows.join(",\n")}];`,
+    "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
     "export default {",
     `index: ${JSON.stringify(index)},`,
-    `stories: ${objectOf(keys, (key) => `() => import(${path(key)})`)},`,
-    `docs: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`)},`,
-    `code: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`)},`,
-    `pages: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`)},`,
+    "stories: column(1),",
+    "docs: column(2),",
+    "code: column(3),",
+    "pages: column(4),",
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasReach ? [`reach: () => import(${reach}).then((module) => module.default),`] : []),
     "};"

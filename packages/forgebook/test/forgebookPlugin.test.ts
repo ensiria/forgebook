@@ -6,6 +6,7 @@
  */
 import { join } from "node:path";
 
+import type { UserConfig } from "vite";
 import { describe, expect, it } from "vitest";
 
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
@@ -164,7 +165,8 @@ describe("forgebookPlugin's pages", () => {
     lists: {},
     hasMocks: false,
     hasPlayTools: false,
-    frames: ISOLATED_FRAMES
+    frames: ISOLATED_FRAMES,
+    build: { readableNames: false }
   };
 
   it("resolves the pages' entries by their address to their path in the folder, and answers them", async () => {
@@ -177,6 +179,31 @@ describe("forgebookPlugin's pages", () => {
     const code = typeof shell === "object" && shell !== null && "code" in shell ? String(shell.code) : "";
     expect(code).toContain("mountShell(root");
     expect(code).toContain('from "C:/Users/ada/app/.forgebook-stories.ts";');
+  });
+
+  it("names a build's scripts by their hash alone, and after their modules when the configuration asks", async () => {
+    /**
+     * The chunk names the plugin sets for a build of a configuration.
+     *
+     * @param readableNames - the configuration's option.
+     * @param userConfig - the app's Vite configuration.
+     */
+    const chunkNames = async (readableNames: boolean, userConfig: UserConfig = {}): Promise<unknown> => {
+      const { config: hook } = forgebookPlugin({ config: { ...config, build: { readableNames } } });
+      if (typeof hook !== "function") throw new Error("no config hook");
+      const set: unknown = await Reflect.apply(hook, undefined, [
+        userConfig,
+        { command: "build", mode: "production" }
+      ]);
+      const field = (value: unknown, key: string): unknown =>
+        typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+      return field(field(field(field(set, "build"), "rolldownOptions"), "output"), "chunkFileNames");
+    };
+    expect(await chunkNames(false)).toBe("assets/[hash].js");
+    expect(await chunkNames(true)).toBeUndefined();
+    // an app that names its output keeps its names
+    const named: UserConfig = { build: { rolldownOptions: { output: { entryFileNames: "[name].js" } } } };
+    expect(await chunkNames(false, named)).toBeUndefined();
   });
 
   it("answers the project's stories' source by the path the entry imports it with", async () => {

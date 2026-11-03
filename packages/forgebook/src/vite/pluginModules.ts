@@ -12,6 +12,7 @@
 import { packedUsage } from "../usedIn.ts";
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult, UsageResult } from "./docsExtractor.ts";
+import type { PackJson } from "./packedModule.ts";
 import {
   type GroupLoaders,
   type IndexedStoryFile,
@@ -127,12 +128,14 @@ const groupUsage = async (
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param usage - reads the facts in the docs worker.
  * @param cache - the pattern's index kept between starts; none reads every file.
+ * @param pack - writes the module's JSON as its value: as it is on a dev server, in a gzipped file of a build's.
  */
 export const usageModule = async (
   id: string,
   watch: (file: string) => void,
   usage: DocsExtractor["usage"],
-  cache: DiskCache<KeptIndex> | undefined
+  cache: DiskCache<KeptIndex> | undefined,
+  pack: PackJson
 ): Promise<{ code: string; moduleType: "js" }> => {
   const { files, graph } = await groupUsage(id.slice(USAGE_ID_PREFIX.length), watch, usage, cache);
   const answer =
@@ -148,7 +151,7 @@ export const usageModule = async (
             }))
           )
         );
-  return { code: `export default ${JSON.stringify(answer)};`, moduleType: "js" };
+  return { code: `export default ${pack(JSON.stringify(answer))};`, moduleType: "js" };
 };
 
 /**
