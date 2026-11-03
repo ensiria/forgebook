@@ -66,6 +66,17 @@ const pendingUpdates = (root: ParentNode): Promise<unknown>[] =>
   });
 
 /**
+ * Whether an element's first update threw: connected, its update over, never updated. Lit raises that error again,
+ * unhandled, when the element is asked to update once more, so a story drawn again over it makes its elements anew.
+ *
+ * @param element - the story's element.
+ */
+const isBroken = (element: Element): boolean =>
+  element.isConnected &&
+  Reflect.get(element, "hasUpdated") === false &&
+  Reflect.get(element, "isUpdatePending") === false;
+
+/**
  * Waits until the Lit elements under a root have updated.
  *
  * @param root - the canvas.
@@ -183,6 +194,10 @@ export const webComponentsRenderer: StoryRenderer = {
       const onPageError = (event: ErrorEvent): void => {
         reported ??= event.error ?? new Error(event.message);
       };
+      if (elementsUnder(canvas).some(isBroken)) {
+        render(nothing, canvas);
+        kept = undefined;
+      }
       const view = canvas.ownerDocument.defaultView;
       view?.addEventListener("error", onPageError);
       try {
