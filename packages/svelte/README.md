@@ -77,12 +77,14 @@ passes on to an element (`HTMLAttributes`) is left out. A function with runes in
 signature in a story about logic (`LogicMeta`).
 
 Svelte's own plugin is the adapter's, and it reads your `svelte.config.js`, so don't add `@sveltejs/vite-plugin-svelte` to
-a catalogue; in a Vite or Vitest configuration of your own that already has it (SvelteKit's `sveltekit()`), add
-`forgebookPlugin` without the adapter's `vitePlugins()`. The frame says a story is drawn once Svelte has settled, so a component that awaits (`experimental.async`)
+a catalogue; in a Vite or Vitest configuration of your own that already has it, add `forgebookPlugin` without the
+adapter's `vitePlugins()`. `svelte({ plugin })` passes options to Svelte's plugin, over what it reads from
+`svelte.config.js`; they are `@sveltejs/vite-plugin-svelte`'s own, so they follow its major version. A SvelteKit app's components, which read `$app/*`, are drawn by
+[`@forgebook/sveltekit`](https://www.npmjs.com/package/@forgebook/sveltekit), built on this adapter. The frame says a story is drawn once Svelte has settled, so a component that awaits (`experimental.async`)
 is drawn before its play runs. Generated server tests take `svelteRenderer` from `@forgebook/svelte/renderer` and run in
 Node (`environment: "node"`), since Svelte compiles a component apart for the server; the catalogue's
-`forgebook new`, `forgebook docs --framework svelte` and `forgebook init --from storybook` (from `@storybook/svelte-vite`
-or `@storybook/sveltekit`) read Svelte too.
+`forgebook new`, `forgebook docs --framework svelte` and `forgebook init --from storybook` (from `@storybook/svelte-vite`)
+read Svelte too.
 
 A snippet made from a text is drawn in a `span`, since Svelte draws a snippet made outside a component from one element.
 Stories written in `.stories.svelte` files (Svelte CSF) are not read: write them in CSF 3, as above. "Used in" follows

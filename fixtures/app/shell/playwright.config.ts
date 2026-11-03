@@ -4,11 +4,11 @@
  *
  * @remarks
  * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT` (`ports.ts`), so two
- * worktrees can run the tests at once. The Vue, Svelte, Solid, Preact, Web Components, plain HTML, Angular, Next.js,
- * Nuxt and white-label catalogues run beside the fixture app, for what a catalogue of another framework must do
- * (`vue.e2e.ts`, `svelte.e2e.ts`, `solid.e2e.ts`, `preact.e2e.ts`, `webComponents.e2e.ts`, `html.e2e.ts`,
- * `angular.e2e.ts`), what a Next.js or a Nuxt project's components need (`nextjs.e2e.ts`, `nuxt.e2e.ts`) and a
- * catalogue with no trace of Forgebook's look (`embed.e2e.ts`).
+ * worktrees can run the tests at once. The Vue, Svelte, Solid, Preact, Web Components, plain HTML, Angular, SvelteKit,
+ * Next.js, Nuxt and white-label catalogues run beside the fixture app, for what a catalogue of another framework must
+ * do (`vue.e2e.ts`, `svelte.e2e.ts`, `solid.e2e.ts`, `preact.e2e.ts`, `webComponents.e2e.ts`, `html.e2e.ts`,
+ * `angular.e2e.ts`), what a SvelteKit, Next.js or Nuxt project's components need (`sveltekit.e2e.ts`, `nextjs.e2e.ts`,
+ * `nuxt.e2e.ts`) and a catalogue with no trace of Forgebook's look (`embed.e2e.ts`).
  *
  * @module
  */
@@ -54,7 +54,8 @@ export default defineConfig({
     catalogueServer(join(import.meta.dirname, ".."), "white-label", "white-label/forgebook.config.ts"),
     catalogueServer(join(import.meta.dirname, "..", "..", "nextjs"), "nextjs"),
     catalogueServer(join(import.meta.dirname, "..", "..", "nuxt"), "nuxt"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "angular"), "angular")
+    catalogueServer(join(import.meta.dirname, "..", "..", "angular"), "angular"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "sveltekit"), "sveltekit")
   ],
   use: {
     browserName: "chromium",

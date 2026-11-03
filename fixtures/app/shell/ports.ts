@@ -31,7 +31,8 @@ const CATALOGUES = [
   "web-components",
   "html",
   "nuxt",
-  "angular"
+  "angular",
+  "sveltekit"
 ] as const;
 
 /** A catalogue the suite runs. */

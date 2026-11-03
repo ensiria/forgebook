@@ -57,6 +57,12 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   class by its name, an input or an output by the name a template binds (its alias), an output's arg a handler, projected
   content as `#default` or `#<selector>` (`"#[icon]": "*"`), and a template in a render as
   `({ props: args, template: "…" })`. The Code tab writes the story by the component's selector.
+- In a SvelteKit app (`framework: sveltekit()`), the types come from `@forgebook/sveltekit`, and a story sets the page its
+  components read with `parameters.sveltekit`: `page: { url: "/blog/hello" }` (the route and params are read from
+  `src/routes`), `page.data` or the page's own `load` (run in the frame, its fetch answered by `parameters.msw`), and
+  `forms.result` for what an enhanced form's action answers. Links and `goto` move the story's page and are listed among
+  its events; in a play, `storyPage()` from `@forgebook/sveltekit/page` reads where it went and the calls it made. A
+  component that imports `$app/env/private` or `$app/server` fails in its frame by design: give it what it reads instead.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
