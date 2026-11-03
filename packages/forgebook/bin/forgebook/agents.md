@@ -149,6 +149,9 @@ A story's frame runs on its own origin (the dev server's second port), unless th
 gives, never by building a frame's address yourself, and do not expect a story's code to reach the catalogue's page or
 its API.
 
+An edit you saved that the open story does not show may not have reached the dev server: in a container, a Windows
+drive under WSL or a network drive, run it with `forgebook dev --poll`.
+
 Run `npx forgebook <command> --help` for the options. With an MCP client, `npx forgebook mcp` offers the same as tools.
 
 A client that renders MCP Apps also gets `story_preview`, which shows a story to the person, live, inside the conversation.
