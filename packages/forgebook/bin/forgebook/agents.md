@@ -46,6 +46,12 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   render calls it with the args. A story that only has a render types it with `Meta<ButtonArgs>`, or describes its args
   in `argTypes` (plain JavaScript). A text arg written into HTML is the story's to escape; a shared link hands it only
   plain words.
+- In a Nuxt project, the same, the types from `@forgebook/nuxt`: a component's auto-imports, aliases and Nuxt's
+  components work as in the app. Set what Nuxt would have given it with `parameters.nuxt`: `route` (a path, or
+  `{ name, params }` of a page), `data` (what `useAsyncData` and `useFetch` return, by key; `useFetch`'s key is the
+  request as made, `/api/products?page=2`), `state`, `cookies`, `runtimeConfig.public` and `appConfig`. A story's
+  `nuxt` replaces the meta's, whole. Its router moves and `navigateTo` calls are listed among the story's events; a
+  play reads them with `storyNuxt()` from `@forgebook/nuxt/story`.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.

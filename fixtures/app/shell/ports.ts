@@ -29,7 +29,8 @@ const CATALOGUES = [
   "solid",
   "preact",
   "web-components",
-  "html"
+  "html",
+  "nuxt"
 ] as const;
 
 /** A catalogue the suite runs. */

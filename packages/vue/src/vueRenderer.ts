@@ -16,6 +16,10 @@
  *
  * The server render is imported when it is asked for: the page never loads it, and only Node ever runs it.
  *
+ * A framework built on Vue (Nuxt) needs each story's app before it is drawn, to install what its components read (a
+ * router, its own state): `createVueRenderer` takes a `prepareApp` for that, and `vueRenderer` is the renderer without
+ * one.
+ *
  * @module
  */
 import type { StoryClock } from "@forgebook/story-format/clock";
@@ -151,8 +155,23 @@ const assignArgs = (args: Record<string, unknown>, next: LoadedArgs): void => {
   Object.assign(args, next);
 };
 
-/** Vue as the frame draws with it. */
-export const vueRenderer: StoryRenderer = {
+/** What a framework built on Vue adds to its renderer. */
+export type VueRendererOptions = {
+  /**
+   * Called with each story's app before it is mounted, or rendered on the server, with the story's first drawing and
+   * where it is drawn: it installs what the story's components read (a router) and provides values. None by default.
+   * The app is the story's until the story is mounted anew, so what it installs is the story's own.
+   */
+  readonly prepareApp?: (app: App, drawing: StoryDrawing, place: "page" | "server") => void;
+};
+
+/**
+ * Vue as the frame draws with it, with what a framework built on Vue adds.
+ *
+ * @param options - what is done to each story's app; nothing by default.
+ * @returns the renderer.
+ */
+export const createVueRenderer = (options: VueRendererOptions = {}): StoryRenderer => ({
   mount: (canvas: HTMLElement, first: StoryDrawing, onError: (error: Error) => void): MountedStory => {
     const args = shallowReactive<Record<string, unknown>>({ ...first.args });
     const scene = shallowRef(first);
@@ -201,6 +220,7 @@ export const vueRenderer: StoryRenderer = {
       computed(() => view.texts),
       computed(() => view.clock)
     );
+    options.prepareApp?.(app, first, "page");
     app.mount(canvas);
     return {
       drawn,
@@ -221,6 +241,7 @@ export const vueRenderer: StoryRenderer = {
     const context = storyContextOf(drawing, drawing.args, () => document.body);
     const app = createSSRApp({ render: () => storyVNode(drawing.story, context, drawing.decorators) });
     provideDrawing(app, shallowRef(drawing.texts), shallowRef(drawing.clock));
+    options.prepareApp?.(app, drawing, "server");
     // the server keeps going after a render error, with an empty comment in its place: without this it would not fail
     const failures: unknown[] = [];
     app.config.errorHandler = (error: unknown): void => {
@@ -231,4 +252,7 @@ export const vueRenderer: StoryRenderer = {
     if (failure !== undefined) throw toError(failure);
     return html;
   }
-};
+});
+
+/** Vue as the frame draws with it. */
+export const vueRenderer: StoryRenderer = createVueRenderer();

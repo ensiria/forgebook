@@ -9,11 +9,22 @@ import type { StoryContext } from "@forgebook/story-format/csf";
 import type { StoryDrawing } from "forgebook/renderer";
 import { type LoadedArgs, readStory } from "forgebook/story-module";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h, isVNode, nextTick, onMounted, ref, type SetupContext, type VNode } from "vue";
+import {
+  type App,
+  defineComponent,
+  h,
+  inject,
+  isVNode,
+  nextTick,
+  onMounted,
+  ref,
+  type SetupContext,
+  type VNode
+} from "vue";
 
 import { useStoryClock, useStoryNow } from "../src/clock.ts";
 import { useStoryText } from "../src/texts.ts";
-import { vueRenderer } from "../src/vueRenderer.ts";
+import { createVueRenderer, vueRenderer } from "../src/vueRenderer.ts";
 
 /** What a decorator's `story()` gave, typed `unknown` by the frame. */
 const asVNode = (value: unknown): VNode | null => (isVNode(value) ? value : null);
@@ -332,6 +343,35 @@ describe("on a server", () => {
         )
     });
     await expect(vueRenderer.renderToString(story)).rejects.toThrow("In render");
+  });
+});
+
+describe("a framework built on Vue", () => {
+  /** Reads what the story's app provides. */
+  const Provided = defineComponent({
+    setup: () => {
+      const value = inject<string>("framework", "none");
+      return () => h("p", value);
+    }
+  });
+
+  it("prepares each story's app before it is drawn, in the page and on the server", async () => {
+    const prepared: string[] = [];
+    const renderer = createVueRenderer({
+      prepareApp: (app: App, first: StoryDrawing, place: "page" | "server"): void => {
+        prepared.push(`${first.identity.name} in the ${place}`);
+        app.provide("framework", "Nuxt");
+      }
+    });
+    const element = canvas();
+    const mounted = renderer.mount(element, drawing({ render: () => h(Provided) }), () => undefined);
+    await mounted.drawn;
+    expect(element.textContent).toBe("Nuxt");
+    mounted.update(drawing({ render: () => h(Provided) }, { label: "Other" }));
+    await nextTick();
+    expect(prepared).toEqual(["Plain in the page"]);
+    expect(await renderer.renderToString(drawing({ render: () => h(Provided) }))).toContain("Nuxt");
+    expect(prepared).toEqual(["Plain in the page", "Plain in the server"]);
   });
 });
 

@@ -225,6 +225,22 @@ describe("importStorybook", () => {
     expect(typeof imported === "string" ? imported : imported.framework).toBe("html");
   });
 
+  it("reads a Nuxt project's Storybook as Nuxt, saying what a story sets differently", async () => {
+    const project = join(scratch, "nuxt");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(project, ".storybook", "main.ts"),
+      'export default { stories: ["../components/**/*.stories.ts"], framework: { name: "@storybook-vue/nuxt" } };\n'
+    );
+    const imported = await importStorybook(project);
+    if (typeof imported === "string") throw new Error(imported);
+    expect(imported.framework).toBe("nuxt");
+    expect(imported.notes.join("\n")).toContain("parameters.nuxt");
+    const text = initConfigText(imported, "Storybook");
+    expect(text).toContain('import { nuxt } from "@forgebook/nuxt/vite";');
+    expect(text).toContain("  framework: nuxt(),");
+  });
+
   it("refuses a framework Forgebook does not read, saying what it reads", async () => {
     const project = join(scratch, "angular");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
@@ -233,7 +249,7 @@ describe("importStorybook", () => {
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
     );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/html-vite, @storybook/nextjs-vite, @storybook/nextjs; this project uses @storybook/angular"
+      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/html-vite, @storybook-vue/nuxt, @storybook/nextjs-vite, @storybook/nextjs; this project uses @storybook/angular"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package

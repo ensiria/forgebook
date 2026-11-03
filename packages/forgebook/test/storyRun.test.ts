@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
+import type { MountedStory, StoryDrawing } from "../src/frame/renderer.ts";
 import type { MockTools } from "../src/frame/storyMocks.ts";
 import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "../src/frame/storyRun.ts";
@@ -313,6 +314,41 @@ describe("runStory with a second framework", () => {
     );
     expect(calls).toEqual(["onPress(a)", "onClose(b)"]);
     expect(wasCalled).toBe(true);
+  });
+
+  it("lists a call the framework reports, as a router's push, among the story's events", async () => {
+    const calls: string[] = [];
+    const container = document.createElement("div");
+    document.body.append(container);
+    runStory({
+      container,
+      story: badge(),
+      identity: { id: "kit:kit-badge--badge", name: "Badge", title: "Kit/Badge" },
+      renderer: {
+        ...domRenderer,
+        mount: (
+          canvas: HTMLElement,
+          drawing: StoryDrawing,
+          onError: (error: Error) => void
+        ): MountedStory => {
+          drawing.onEvent?.("router.push", ["/about"]);
+          return domRenderer.mount(canvas, drawing, onError);
+        }
+      },
+      clock: heldFrameClock(0),
+      texts: {},
+      decorators: [],
+      globals: {},
+      resolveArgs: (args: PanelArgs): PanelArgs => args,
+      onControlsReady: (): undefined => undefined,
+      onEvent: (name: string, values: readonly unknown[]): void => {
+        calls.push(`${name}(${values.join(", ")})`);
+      },
+      onError: (): undefined => undefined,
+      onTrace: () => undefined
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toEqual(["router.push(/about)"]);
   });
 
   it("mounts the story anew for another matrix only, and clears its spies before each mount", async () => {

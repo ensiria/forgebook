@@ -82,6 +82,19 @@ describe("the tabs of a story's panel", () => {
     expect(dockTabs(inputOf(false)).map((tab) => tab.id)).toEqual(["props", "events", "a11y"]);
   });
 
+  it("shows Events for a story with no events of its own once a framework reported a call", () => {
+    const input: DockTabsInput = {
+      ...inputOf(false),
+      docs: { status: "ready", value: { ...HOOK_DOCS, props: [] } }
+    };
+    expect(dockTabs(input).map((tab) => tab.id)).not.toContain("events");
+    const withCall = dockTabs({
+      ...input,
+      calls: [{ storyId: "s", name: "router.push", values: ["/about"], details: [null], time: 0 }]
+    });
+    expect(withCall.map((tab) => tab.id)).toContain("events");
+  });
+
   it("offers the Design tab only to a story with a design, a story about logic too", () => {
     const design: DesignTabProps = {
       link: { url: "https://www.figma.com/design/File1/Kit", kind: "design", fileKey: "File1" },

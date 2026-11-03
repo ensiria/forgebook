@@ -6,9 +6,10 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML stories on Vite, and a
- * Next.js project's (Storybook's `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework
- * is refused with what Forgebook supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the
+ * instead. Forgebook reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML stories on Vite, a Nuxt
+ * project's among them (`@storybook-vue/nuxt`, which Nuxt's Storybook module sets up), and a Next.js project's
+ * (Storybook's `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework is refused with
+ * what Forgebook supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the
  * notes, since Forgebook reads CSF in scripts.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
@@ -33,7 +34,8 @@ export type ImportedFramework =
   | "solid"
   | "nextjs"
   | "web-components"
-  | "html";
+  | "html"
+  | "nuxt";
 
 /**
  * The function each framework's `@forgebook/<name>/vite` exports, which a configuration calls: the framework's name, or
@@ -47,7 +49,8 @@ export const ADAPTER_FUNCTIONS: Readonly<Record<ImportedFramework, string>> = {
   solid: "solid",
   nextjs: "nextjs",
   "web-components": "webComponents",
-  html: "html"
+  html: "html",
+  nuxt: "nuxt"
 };
 
 /** What a configuration takes from another tool's files. */
@@ -79,9 +82,17 @@ const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   "storybook-solidjs-vite": "solid",
   "@storybook/web-components-vite": "web-components",
   "@storybook/html-vite": "html",
+  // Nuxt's Storybook module sets up a framework of its own, on Vue's
+  "@storybook-vue/nuxt": "nuxt",
   "@storybook/nextjs-vite": "nextjs",
   "@storybook/nextjs": "nextjs"
 };
+
+/** What a Nuxt project's stories get differently once moved, said once the configuration is written. */
+const NUXT_NOTES = [
+  "Nuxt's modules and plugins are not run: a component that needs what one provides (a store, i18n) gets it from a decorator",
+  "A story's route, data, state and cookies are set with parameters.nuxt (route, data, state, cookies), not by a decorator that drives the router"
+] as const;
 
 /** Storybook's own default for a `stories` entry given as a folder. */
 const DEFAULT_FILES = "**/*.@(mdx|stories.@(js|jsx|mjs|ts|tsx))";
@@ -469,6 +480,7 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
     );
   if (Array.isArray(main["addons"]) && main["addons"].length > 0)
     notes.push("The addons are left out: Forgebook has its own panel, toolbar and checks");
+  if (framework === "nuxt") notes.push(...NUXT_NOTES);
   notes.push(...nextjs.notes);
   const previewFile = scriptFile(storybookDir, "preview");
   const read =
