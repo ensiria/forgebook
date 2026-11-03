@@ -11,10 +11,13 @@
  *   a folder's list of names, so a file added beside one an import found, which the import may now find, is a miss,
  *   while a save that replaces a file is not; a path that was missing must still be missing;
  * - the code that made it is the same (`codeStamp`): another version of Forgebook, of the framework's adapter or of
- *   the tools they read with, or an edit of their sources, is a miss.
+ *   the tools they read with, or an edit of their sources, is a miss; a file changed within the margin below is
+ *   stamped by its text, since no later answer waits for it to settle.
  *
  * Paths are stamped once the answer is made, and an answer is kept only when none of them changed after its making
  * started (`isSettledSince`): an edit made while it was being read would otherwise be stamped beside the old answer.
+ * The same wait makes a file system's time grain harmless: a kept stamp's last change is older than the margin, so a
+ * later save, even of the same size, carries a later time.
  *
  * The folder sits in Vite's cache folder, so what clears that clears this. A cache that cannot be read or written is
  * only a slower start: every failure here is a miss.
@@ -122,20 +125,48 @@ export const isSettledSince = (stamps: readonly PathStamp[], since: bigint): boo
   stamps.every(([, , changedAt]) => changedAt === null || BigInt(changedAt) < since - SETTLE_MARGIN_NS);
 
 /**
+ * A file's part of a code stamp: its stamp, or the hash of its text when it changed shortly before `since`. A file
+ * system's times have a grain (a clock tick on Windows), so two same-size saves in one tick leave the same stamp; a
+ * code stamp is taken once at a start, with no answer made after it to wait for (`isSettledSince`), so a file still
+ * within the margin is read instead. Only those are read: after an install, the first start reads the package once.
+ *
+ * @param path - a file or a folder of the code.
+ * @param since - when the code stamp is taken (`nowNs`).
+ */
+const codeFileStamp = (path: string, since: bigint): string => {
+  const stamped = stampOf(path);
+  const [, stamp] = stamped;
+  if (stamp === null) return "";
+  // a folder's stamp is its names, which have no grain
+  if (stamp.startsWith("dir:") || isSettledSince([stamped], since)) return stamp;
+  try {
+    return `text:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
+  } catch {
+    // gone since it was stamped: its stamp still tells it apart from the file that was there
+    return stamp;
+  }
+};
+
+/**
  * What the answers of a piece of code depend on besides their files: every file of its folders, and the manifests of
- * the packages it reads with, by stamp, so another version installed, or an edit of a source while developing it,
- * makes every kept answer a miss.
+ * the packages it reads with, by stamp (or by text, for a file that changed just before, `codeFileStamp`), so another
+ * version installed, or an edit of a source while developing it, makes every kept answer a miss.
  *
  * @param folders - the folders of the code that makes the answers.
  * @param files - other files it depends on (the manifests of the parser, the compiler, the highlighter).
+ * @param since - when the stamp is taken; now unless a test says otherwise.
  */
-export const codeStamp = (folders: readonly string[], files: readonly string[] = []): string => {
+export const codeStamp = (
+  folders: readonly string[],
+  files: readonly string[] = [],
+  since: bigint = nowNs()
+): string => {
   const hash = createHash("sha256");
   for (const folder of [...new Set(folders)].sort()) {
     const names = readdirSync(folder, { recursive: true, encoding: "utf8" }).sort();
-    for (const name of names) hash.update(`${name}\0${stampOf(join(folder, name))[1] ?? ""}\0`);
+    for (const name of names) hash.update(`${name}\0${codeFileStamp(join(folder, name), since)}\0`);
   }
-  for (const file of [...new Set(files)].sort()) hash.update(`${file}\0${stampOf(file)[1] ?? ""}\0`);
+  for (const file of [...new Set(files)].sort()) hash.update(`${file}\0${codeFileStamp(file, since)}\0`);
   return hash.digest("hex");
 };
 
