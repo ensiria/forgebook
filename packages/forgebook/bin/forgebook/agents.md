@@ -119,7 +119,8 @@ links to other pages by their file (`./colours.md#brand`). A page never holds a 
 
 ### Links for a person
 
-Every story's `links` hold its page (`address`), its frame (`frame`) and its component's page (`component`). A component's
+Every story's `links` hold its page (`address`), its frame (`frame`), its component's page (`component`) and its
+embed (`embed`). A component's
 page can be drawn for who reads it: add an audience to the view, and send that link. `designer` shows usage guidance first
 and no code, `coder` the API first with the code open, `tester` what the stories cover and their accessibility check:
 

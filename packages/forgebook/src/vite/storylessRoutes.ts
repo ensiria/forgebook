@@ -9,7 +9,7 @@
  * @module
  */
 import { readFile } from "node:fs/promises";
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 import type { CheckedCodeDocument } from "./agent.types.ts";
 import type { AgentAnswer } from "./agentRoutes.ts";
@@ -22,14 +22,26 @@ import { TOKEN_ANSWERS, type TokenReading, tokenSummary } from "./tokenAnswers.t
 /** Finds the file of a source's module specifier. */
 export type ResolveSource = (specifier: string) => Promise<string | undefined>;
 
-/** What one source's module declares; a module the bundler answers itself has no text to read, so it declares none. */
-const sourceDeclaration = async (specifier: string, resolveSource: ResolveSource): Promise<SourceTokens> => {
+/**
+ * What one source's module declares; a module the bundler answers itself has no text to read, so it declares none.
+ *
+ * @param specifier - the source's module, as the configuration names it.
+ * @param resolveSource - finds its file.
+ * @param watch - told of the module's file, whose edit may name other tokens files.
+ */
+const sourceDeclaration = async (
+  specifier: string,
+  resolveSource: ResolveSource,
+  watch: (file: string) => void
+): Promise<SourceTokens> => {
   const none = { id: undefined, files: [], problems: [] };
   try {
     const id = await resolveSource(specifier);
     if (id === undefined) return { ...none, unread: `${specifier}: not found` };
     const file = id.split("?")[0] ?? id;
-    return isAbsolute(file) ? sourceTokensIn(file, specifier) : none;
+    if (!isAbsolute(file)) return none;
+    watch(file);
+    return sourceTokensIn(file, specifier);
   } catch (error) {
     return { ...none, unread: `${specifier}: ${error instanceof Error ? error.message : String(error)}` };
   }
@@ -41,16 +53,19 @@ const sourceDeclaration = async (specifier: string, resolveSource: ResolveSource
  *
  * @param config - the catalogue's configuration.
  * @param resolveSource - finds the file of a source's module.
+ * @param watch - told of every file read: the sources' modules and the tokens files; none by default.
  */
 export const catalogueTokens = async (
   config: ResolvedConfig,
-  resolveSource: ResolveSource
+  resolveSource: ResolveSource,
+  watch: (file: string) => void = (): undefined => undefined
 ): Promise<TokenReading> => {
   const declared = await Promise.all(
-    config.sources.map((specifier) => sourceDeclaration(specifier, resolveSource))
+    config.sources.map((specifier) => sourceDeclaration(specifier, resolveSource, watch))
   );
   const own = config.tokens.map(({ path, mode }) => ({ path, mode, label: relative(config.dir, path) }));
   const files = [...declared.flatMap((source) => source.files), ...own];
+  for (const { path } of files) watch(path);
   const { tokens, problems, clashes } = readTokenFiles(files);
   const declaring = declared.flatMap((source) => source.problems);
   return {
@@ -64,7 +79,8 @@ export const catalogueTokens = async (
 
 /**
  * The tokens' module, for a designer's page: what a list gives, and what could not be read. A static build has no
- * server to ask, so the page imports them.
+ * server to ask, so the page imports them; a problem names a file from the catalogue's folder (`./tokens.json`),
+ * since a published page must not carry the building machine's paths.
  *
  * @param config - the catalogue's configuration.
  * @param watch - adds a file whose edit renews the module.
@@ -75,9 +91,11 @@ export const tokensModule = async (
   watch: (file: string) => void,
   resolveSource: ResolveSource
 ): Promise<{ code: string; moduleType: "js" }> => {
-  for (const { path } of config.tokens) watch(path);
-  const { tokens, problems, unread } = await catalogueTokens(config, resolveSource);
-  const value = { tokens: tokens.map(tokenSummary), problems: [...unread, ...problems] };
+  const { tokens, problems, unread } = await catalogueTokens(config, resolveSource, watch);
+  // in both forms: Vite's, and the system's, which a Windows error message writes
+  const shown = (problem: string): string =>
+    problem.replaceAll(config.dir, ".").replaceAll(resolve(config.dir), ".");
+  const value = { tokens: tokens.map(tokenSummary), problems: [...unread, ...problems].map(shown) };
   return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
 };
 

@@ -3,7 +3,7 @@
  * its words together keeps them consistent and ready for a translation.
  *
  * @remarks
- * Only `audienceTexts.ts` lives elsewhere, to stay out of the first load. A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
+ * Only the audiences' texts (`audiencePage.ts`) live elsewhere, to stay out of the first load. A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
  * its configuration): the shell applies the replacements once, before it draws (`configureStrings`), as a translation
  * is set up, so every module keeps reading `STRINGS`. A text that takes values (`allStories(count)`) stays the shell's.
  *

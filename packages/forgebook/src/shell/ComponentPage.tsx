@@ -274,6 +274,7 @@ export const ComponentPage = ({
             storyGroups: catalogue.storyGroups,
             queue,
             pageRef,
+            settled: frames.settled,
             hrefOf,
             onOpen
           },
