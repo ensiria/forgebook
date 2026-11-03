@@ -1,71 +1,18 @@
 /**
- * What a page drawn for one audience reads: which sections, in what order, the part of the documentation file it
- * shows, the tokens named after its component, and its texts. Each audience is one row of a table, the same page
- * reordered and filtered.
+ * What a page drawn for one audience reads, beside which sections it shows (`audienceLayout.ts`): the part of the
+ * documentation file it shows, the docs pages and the tokens named after its component, and its texts.
  *
  * @remarks
- * The sections sit in three places around the frames, because the frames must never move: an `iframe` moved in the
- * document loads again, losing its story's state and costing a load per story for a change of reading. So the demo
- * and the examples stay where they are, and only what goes around them changes. `everyone` is not here: its page is
- * `ComponentPage.tsx`'s own, and all of this loads with the first page drawn for someone else. Nothing records which
- * tokens a component's styles use, so a token belongs to a component by its name, the way a tokens file groups them:
- * `select.border` and `component.select.height` are the Select's. Pure, the texts aside.
+ * All of this loads with the first page drawn for someone else. Nothing records which tokens a component's styles use,
+ * so a token belongs to a component by its name, the way a tokens file groups them: `select.border` and
+ * `component.select.height` are the Select's. Pure, the texts aside.
  *
  * @module
  */
-import type { AudienceId } from "../audiences.ts";
 import type { TreePage } from "../pageTree.ts";
 import type { StoryTree } from "../storyTree.ts";
+import type { ProseReading } from "./audienceLayout.ts";
 import { textsOfGroup } from "./strings.ts";
-
-/** A part of the page around its frames. */
-export type PageSection =
-  | "lead"
-  | "guidance"
-  | "prose"
-  | "api"
-  | "parts"
-  | "pages"
-  | "tokens"
-  | "coverage"
-  | "usedIn";
-
-/** What of the documentation file an audience sees: all of it, without what is about code, or what testing reads. */
-export type ProseReading = "whole" | "design" | "testing";
-
-/** An audience's page. */
-export type AudiencePage = {
-  /** The sections above the demo, in their order. */
-  readonly beforeDemo: readonly PageSection[];
-  /** The sections between the demo and the examples. */
-  readonly afterDemo: readonly PageSection[];
-  /** The sections after the examples. */
-  readonly afterExamples: readonly PageSection[];
-  /** What of the documentation file it sees. */
-  readonly prose: ProseReading;
-};
-
-/** Each audience's page. */
-export const AUDIENCE_PAGES: Readonly<Record<Exclude<AudienceId, "everyone">, AudiencePage>> = {
-  designer: {
-    beforeDemo: ["lead", "guidance"],
-    afterDemo: ["prose", "pages", "tokens"],
-    afterExamples: ["usedIn"],
-    prose: "design"
-  },
-  coder: {
-    beforeDemo: ["lead", "api", "parts"],
-    afterDemo: ["prose"],
-    afterExamples: ["usedIn"],
-    prose: "whole"
-  },
-  tester: {
-    beforeDemo: ["lead", "coverage"],
-    afterDemo: ["prose", "parts"],
-    afterExamples: [],
-    prose: "testing"
-  }
-};
 
 /** A section of a documentation file: its heading, empty for what comes before the first one, and its HTML. */
 export type ProsePart = {

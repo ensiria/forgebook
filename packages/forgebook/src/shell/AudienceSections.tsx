@@ -1,5 +1,5 @@
 /**
- * What goes around the frames of a component's page drawn for one audience, in the order `audiencePage.ts` gives it:
+ * What goes around the frames of a component's page drawn for one audience, in the order `audienceLayout.ts` gives it:
  * the note that says so, the page's own sections, and the audience's: when to use the component, the docs pages that
  * show it, its tokens and its parts.
  *
@@ -17,11 +17,10 @@ import { Fragment, type MouseEvent, type ReactNode, type RefObject } from "react
 import type { AudienceId } from "../audiences.ts";
 import type { ComponentDocs, UsageGuidance as Guidance } from "../componentDocs.ts";
 import type { StoryTree, TreeComponent, TreeStory } from "../storyTree.ts";
+import { AUDIENCE_PAGES, type PageSection } from "./audienceLayout.ts";
 import {
-  AUDIENCE_PAGES,
   AUDIENCE_TEXTS,
   isShellTokens,
-  type PageSection,
   pagesAbout,
   proseFor,
   type ShellToken,

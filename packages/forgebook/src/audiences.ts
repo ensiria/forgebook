@@ -1,6 +1,6 @@
 /**
  * Who a component's page is read by: the address's `audience` and a catalogue's default. Each audience is the same page
- * reordered and filtered (`shell/audiencePage.ts`), never a page of its own.
+ * reordered and filtered (`shell/audienceLayout.ts`), never a page of its own.
  *
  * @remarks
  * `everyone` is the page as a catalogue that sets nothing has always drawn it. The list is short on purpose: each

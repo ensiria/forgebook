@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { AUDIENCE_PAGES, type PageSection, proseFor, proseParts } from "../src/shell/audiencePage.ts";
+import { AUDIENCE_PAGES, type PageSection, showsSection } from "../src/shell/audienceLayout.ts";
+import { proseFor, proseParts } from "../src/shell/audiencePage.ts";
 
 const AUDIENCES = ["designer", "coder", "tester"] as const;
 
@@ -31,6 +32,20 @@ describe("AUDIENCE_PAGES", () => {
     expect(AUDIENCE_PAGES.designer.beforeDemo).toContain("guidance");
     expect(AUDIENCE_PAGES.coder.beforeDemo).toContain("api");
     expect(AUDIENCE_PAGES.tester.beforeDemo).toContain("coverage");
+  });
+});
+
+describe("showsSection", () => {
+  it("finds a section in any of an audience's places, so the page starts its loads before the sections come", () => {
+    expect(showsSection("designer", "tokens")).toBe(true);
+    expect(showsSection("designer", "usedIn")).toBe(true);
+    expect(showsSection("coder", "usedIn")).toBe(true);
+    expect(showsSection("coder", "tokens")).toBe(false);
+    expect(showsSection("tester", "usedIn")).toBe(false);
+  });
+
+  it("finds none on everyone's page, which draws its own", () => {
+    expect(showsSection("everyone", "usedIn")).toBe(false);
   });
 });
 

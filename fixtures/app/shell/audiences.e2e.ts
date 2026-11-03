@@ -62,6 +62,28 @@ test.describe("audiences of a component's page", () => {
     await expect(tokens.getByRole("rowheader", { name: "color.accent" })).toBeVisible();
   });
 
+  test("asks for a designer's tokens and usage without waiting for the audience's sections", async ({
+    page
+  }) => {
+    // the sections' code held back: their data must already be on its way
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/AudienceSections\.tsx/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const tokens = page.waitForRequest(/virtual:forgebook\/tokens/);
+    const usage = page.waitForRequest(/virtual:forgebook-usage:/);
+    await page.goto(`${SELECT}&audience=designer`);
+    await Promise.all([tokens, usage]);
+    release();
+    const tokensSection = page.getByRole("region", { name: "Design tokens" });
+    await expect(tokensSection.getByRole("rowheader", { name: "select.border" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Used in" })).toBeVisible();
+  });
+
   test("opens a docs page from a designer's page, keeping the audience in the address", async ({ page }) => {
     await page.goto(`${SELECT}&audience=designer`);
     await page.getByRole("region", { name: "Read more" }).getByRole("link", { name: "Theming" }).click();
