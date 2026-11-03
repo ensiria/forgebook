@@ -16,6 +16,7 @@ import type { DocPageIndex } from "@forgebook/story-format/source";
 
 import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
 import { storyFileKeys } from "./storyFilesModule.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** The query that asks for one docs page, rendered. */
 export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
@@ -79,7 +80,7 @@ export const docPagesModule = (
   const pages = indexedDocPages(root, pattern, watch);
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
-  const page = (key: string): string => JSON.stringify(`${resolve(root, key)}${DOCS_PAGE_QUERY}`);
+  const page = (key: string): string => JSON.stringify(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);
   return [
     "export default {",
     `index: ${JSON.stringify(index)},`,
@@ -107,7 +108,9 @@ export const docPageModule = (file: string, watch: (file: string) => void, isSer
     watchedRead(watch)
   );
   return [
-    ...images.map((image, place) => `import asset${place} from ${JSON.stringify(`${image}?url`)};`),
+    ...images.map(
+      (image, place) => `import asset${place} from ${JSON.stringify(`${VITE_PATHS.normalize(image)}?url`)};`
+    ),
     `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: [${images
       .map((_image, place) => `asset${place}`)
       .join(", ")}] };`,

@@ -23,5 +23,7 @@ export const source: StorySource = {
   docs: [docs],
   texts: { en, it },
   sheets: { required: [], theme: [], restyled: [] },
+  // invented tokens, so the tools and CATALOG.md see a library's tokens reach them
+  tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }],
   home: () => import("./home.md?forgebook-markdown")
 };

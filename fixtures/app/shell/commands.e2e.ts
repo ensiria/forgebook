@@ -33,6 +33,25 @@ const forgebook = (baseURL: string, argv: readonly string[]): { status: number |
   return { status: run.status, stdout: run.stdout };
 };
 
+test.describe("forgebook story", () => {
+  test.setTimeout(180_000);
+
+  test("gives an agent a story's design: the Figma link, the file, the node, the page to see it on", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const run = forgebook(baseURL, ["story", "kit:layouts-form--signup", "--json"]);
+    expect(run.status).toBe(0);
+    const { design } = JSON.parse(run.stdout);
+    expect(design).toEqual({
+      figma: "https://www.figma.com/design/FixtureFile123?node-id=12-34",
+      fileKey: "FixtureFile123",
+      nodeId: "12:34",
+      address: expect.stringContaining("tab=design")
+    });
+  });
+});
+
 test.describe("forgebook check-page", () => {
   test.setTimeout(180_000);
 

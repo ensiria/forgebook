@@ -5,13 +5,15 @@
  * @remarks
  * Components first (by family and group, from their stories' titles), each with its import, its summary, its props in
  * short (`size=sm|md*|lg`: `*` marks the default; `!` a required prop; events with their parameters) and
- * its parts. Then the docs pages, the other modules, the Sass modules and the style sheets. Pure: data in, text out.
+ * its parts. Then the docs pages, the other modules, the Sass modules, the style sheets and the design tokens, by type,
+ * each with its value and its value in each theme. Pure: data in, text out.
  *
  * @module
  */
 import type { FunctionSignatureDocs, PropDocs } from "../../src/componentDocs.ts";
 import { pageSlug } from "../../src/pageAddress.ts";
 import { storyId } from "../../src/storyTree.ts";
+import type { DesignToken } from "../../src/vite/designTokens.ts";
 import type {
   CatalogueComponent,
   CatalogueData,
@@ -87,7 +89,8 @@ const componentLine = (
     sourceId === undefined || component.mainStory === undefined
       ? ""
       : ` · story: \`${storyId(sourceId, component.title, component.mainStory)}\``;
-  return `- **${docs.name}**${where}: ${sentence(docs.description)}. ${props}${parts}${story}`;
+  const design = component.design === undefined ? "" : ` · design: ${component.design}`;
+  return `- **${docs.name}**${where}: ${sentence(docs.description)}. ${props}${parts}${story}${design}`;
 };
 
 /** Letters and digits only, lower case: how a subpath and an export name are compared. */
@@ -150,8 +153,41 @@ const pageLine = (page: CataloguePage, sourceId: string | undefined): string => 
   return `- **${page.title}** \`${page.file}\`${about}${id}`;
 };
 
-/** The components' lines, under a heading per family and group. */
-const componentSection = (data: CatalogueData): string[] => {
+/** Text on one line, whatever its file wrote, since an entry is one line. */
+const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+/** One token's line: its value, each theme's, what it aliases, what it is for and why not to use it. */
+const tokenLine = (token: DesignToken): string => {
+  const facts = [
+    `\`${oneLine(token.value)}\``,
+    ...Object.entries(token.modes).map(([mode, value]) => `${oneLine(mode)} \`${oneLine(value)}\``),
+    ...(token.isThemeOnly === true ? ["only in themes"] : []),
+    ...(token.alias === undefined ? [] : [`alias of \`${oneLine(token.alias)}\``]),
+    ...(token.description === undefined ? [] : [sentence(oneLine(token.description))]),
+    ...(token.deprecated === undefined ? [] : [`deprecated: ${sentence(oneLine(token.deprecated))}`])
+  ];
+  return `- \`${oneLine(token.name)}\`: ${facts.join(" · ")}`;
+};
+
+/** The tokens' lines, by type, each type in the order the files first give it; none when the package has none. */
+const tokenLines = (tokens: readonly DesignToken[]): string[] => {
+  if (tokens.length === 0) return [];
+  const types = [...new Set(tokens.map((token) => token.type))];
+  return [
+    "## Tokens",
+    "",
+    "Write a token, not its value: each line gives its value, then its value in each theme.",
+    "",
+    ...types.flatMap((type) => [
+      `### ${oneLine(type)}`,
+      ...tokens.filter((token) => token.type === type).map(tokenLine)
+    ]),
+    ""
+  ];
+};
+
+/** The components' lines, by family and group. */
+const componentLines = (data: CatalogueData): string[] => {
   const lines = ["## Components", ""];
   if (data.components.length === 0) return [...lines, "None yet.", ""];
   let heading = "";
@@ -168,7 +204,7 @@ const componentSection = (data: CatalogueData): string[] => {
 
 /** The lines of one kind of entries, a heading first; none when the package has none of it. */
 const sectionLines = (data: CatalogueData, section: CatalogueSection): string[] => {
-  if (section === "components") return componentSection(data);
+  if (section === "components") return componentLines(data);
   if (section === "pages") {
     const pages = data.pages ?? [];
     if (pages.length === 0) return [];
@@ -195,6 +231,7 @@ const sectionLines = (data: CatalogueData, section: CatalogueSection): string[] 
       ""
     ];
   }
+  if (section === "tokens") return tokenLines(data.tokens);
   if (data.styleSheets.length === 0) return [];
   return [
     "## Style sheets",

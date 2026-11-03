@@ -363,7 +363,8 @@ describe("CATALOG.md and llms.txt", () => {
     pages,
     modules: [],
     sassModules: [],
-    styleSheets: []
+    styleSheets: [],
+    tokens: []
   };
 
   it("lists a package's pages, each with its id", () => {

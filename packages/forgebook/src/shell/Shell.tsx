@@ -37,6 +37,7 @@ import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewPar
 import { ComponentPage } from "./ComponentPage.tsx";
 import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
 import { HomePage } from "./HomePage.tsx";
+import { Icon } from "./icons.tsx";
 import { LogicMark } from "./LogicMark.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
@@ -470,6 +471,17 @@ const ShellHeader = ({
           <h1 className="forgebook-header__title">{location.component.name}</h1>
           {isLogic ? <LogicMark /> : null}
           {picker}
+          {location.component.design === undefined ? null : (
+            <a
+              className="forgebook-button"
+              href={location.component.design.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon name="external" size={14} />
+              {STRINGS.openInFigma}
+            </a>
+          )}
         </div>
         {related}
       </header>
