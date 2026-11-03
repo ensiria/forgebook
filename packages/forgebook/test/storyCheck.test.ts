@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { checkText } from "../bin/forgebook/agentText.ts";
-import { storiesNamed } from "../bin/forgebook/storyCheckRun.ts";
+import { diffedComponent, storiesNamed } from "../bin/forgebook/storyCheckRun.ts";
 import { isStoryCheckReport, type StoryCheckReport } from "../src/storyCheck.ts";
 import type { StoriesDocument } from "../src/vite/agent.types.ts";
 
@@ -23,10 +23,12 @@ const DOCUMENT: StoriesDocument = {
       title: "Actions/Button",
       source: "kit",
       file: "./button.stories.tsx",
+      files: ["./button.stories.tsx"],
       stories: [
         {
           id: "kit:actions-button--primary",
           name: "Primary",
+          file: "./button.stories.tsx",
           exportName: "Primary",
           description: undefined,
           tags: [],
@@ -38,6 +40,7 @@ const DOCUMENT: StoriesDocument = {
         {
           id: "kit:actions-button--internal",
           name: "Internal",
+          file: "./button.stories.tsx",
           exportName: "Internal",
           description: undefined,
           tags: ["!dev"],
@@ -75,6 +78,45 @@ describe("storiesNamed", () => {
       "kit:actions-button--primary"
     ]);
     expect(storiesNamed(DOCUMENT, "kit:nothing")).toEqual([]);
+  });
+
+  it("takes the id an earlier rule gave a story or a component, and carries it for the pictures named by it", () => {
+    const renamed: StoriesDocument = {
+      ...DOCUMENT,
+      components: [
+        {
+          id: "kit:data-readmore",
+          title: "Data/ReadMore",
+          source: "kit",
+          file: "./read-more.stories.tsx",
+          files: ["./read-more.stories.tsx"],
+          stories: [
+            {
+              id: "kit:data-readmore--open",
+              name: "Open",
+              file: "./read-more.stories.tsx",
+              exportName: "Open",
+              description: undefined,
+              tags: [],
+              isUnlisted: false,
+              isLogic: false,
+              links: LINKS
+            }
+          ]
+        }
+      ]
+    };
+    expect(storiesNamed(renamed, "kit:data-read-more--open")).toEqual([
+      { id: "kit:data-readmore--open", formerId: "kit:data-read-more--open" }
+    ]);
+    expect(storiesNamed(renamed, "kit:data-read-more").map((story) => story.id)).toEqual([
+      "kit:data-readmore--open"
+    ]);
+    // a comparison of the component, asked by either id, owns the baselines under both
+    const owners = { component: "kit:data-readmore", formerComponent: "kit:data-read-more" };
+    expect(diffedComponent(renamed, "kit:data-read-more")).toEqual(owners);
+    expect(diffedComponent(renamed, "kit:data-readmore")).toEqual(owners);
+    expect(diffedComponent(renamed, "kit:data-readmore--open")).toEqual({});
   });
 });
 

@@ -6,7 +6,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { comparePixels, diffStories, type Pixels, removedBaselines } from "../src/diffStories.ts";
+import {
+  comparePixels,
+  diffStories,
+  type Pixels,
+  removedBaselines,
+  storedBaseline
+} from "../src/diffStories.ts";
 
 describe("comparePixels", () => {
   const blank = (width: number, height: number): Pixels => ({
@@ -48,6 +54,32 @@ describe("removedBaselines", () => {
     expect(removedBaselines(files, "kit:badge", ["kit:badge--plain"])).toEqual([
       "kit-badge--gone--default.png"
     ]);
+    // a baseline stored under a story's former id is still its own while it has none under its id
+    expect(
+      removedBaselines(["kit-badge--size2-x--default.png"], "kit:badge", [
+        "kit:badge--size-2-x",
+        "kit:badge--size2-x"
+      ])
+    ).toEqual([]);
+  });
+});
+
+describe("storedBaseline", () => {
+  it("compares with the baseline stored under the story's former id while none has its id", () => {
+    const files = ["kit-data-read-more--open--default.png", "kit-data-badge--plain--default.png"];
+    expect(
+      storedBaseline(files, "kit-data-readmore--open--default.png", "kit-data-read-more--open--default.png")
+    ).toBe("kit-data-read-more--open--default.png");
+    expect(
+      storedBaseline(
+        [...files, "kit-data-readmore--open--default.png"],
+        "kit-data-readmore--open--default.png",
+        "kit-data-read-more--open--default.png"
+      )
+    ).toBe("kit-data-readmore--open--default.png");
+    expect(storedBaseline(files, "kit-data-badge--new--default.png", undefined)).toBe(
+      "kit-data-badge--new--default.png"
+    );
   });
 });
 

@@ -219,6 +219,29 @@ titles from the file's path, `args` and `argTypes` (with their controls), action
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
 `tags` (`!dev`, `!test`) and a story's `globals`.
 
+It lists what Storybook's indexer lists:
+
+- every named export as a story, whatever writes its value: an object, a function, a helper's result
+  (`export const Chromatic = storiesFor(…)`), another constant (`export const Default: StoryFn = Template`) or a
+  re-export (`export { A as B }`, from the file or another module); `includeStories` and `excludeStories` leave some
+  out, as there;
+- the meta written in place or held in a constant (`export default meta`, `export { meta as default }`);
+- files with one title as one component: its stories come from every file, in the order of their paths, each with its
+  own file's meta, and its page takes the first file's docs and documentation file. Two stories with one id are a
+  problem, and the second is left out;
+- Storybook's ids, so a link carries over: `inputs-readmore--open-by-default` for the title `Inputs/ReadMore` and the
+  export `OpenByDefault`, the meta's `id` in place of its title, and a story's own `parameters.__id`. An address,
+  `forgebook story`, `forgebook check` and the MCP tools still take the ids Forgebook gave before it followed
+  Storybook's (`inputs-read-more--open-by-default`), and open the story under its own; a picture stored under such an
+  id still counts as the story's baseline until `forgebook shot --update` stores one under its id.
+
+A story without a `name` is named from its export's words as Storybook splits them, in sentence case
+(`CustomSVGIcon` → "Custom SVG icon").
+
+A component's props are read with the configuration an editor reads its story file with: the nearest `tsconfig.json`
+up the file's folders that holds it, or a project it references. A monorepo whose packages hold only their sources
+and whose root holds the stories, with the paths to the packages' sources, gets its props tables as Storybook does.
+
 It does not read MDX, doc blocks or addons. Actions are explicit only: an `on*` prop is not turned into an action by
 its name.
 
@@ -263,7 +286,7 @@ export default defineConfig({
 ```
 
 A story's id starts with its source's (`ui:actions-button--plain`), so two packages can both have a `Button`. Props are read
-through each package's own `tsconfig.json`. This repository's fixture catalogue is built this way, on two packages, and its
+through the `tsconfig.json` that holds the story file: the package's own, or the first one up its folders that lists it. This repository's fixture catalogue is built this way, on two packages, and its
 browser tests run in CI.
 
 ## Commands

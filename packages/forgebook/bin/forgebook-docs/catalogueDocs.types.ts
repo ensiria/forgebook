@@ -66,6 +66,8 @@ export type CatalogueComponent = {
   readonly stories: readonly string[];
   /** The export name of its main story (`parameters.main`, else its first); none without stories. */
   readonly mainStory: string | undefined;
+  /** Its main story's id without the source's, as Storybook's (its own id, else the meta's and the export's). */
+  readonly mainStoryId: string | undefined;
   /** Whether every story of its file is about logic (`parameters.logic`): a hook or a function, listed by its call. */
   readonly isLogic: boolean;
 };

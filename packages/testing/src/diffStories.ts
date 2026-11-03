@@ -228,14 +228,30 @@ export const removedBaselines = (
   );
 };
 
+/**
+ * The stored baseline a picture compares with: the one with its name, else the one named by the story's former id
+ * (`StoryCheckStory.formerId`), so the baselines stored before the ids followed Storybook's still count.
+ *
+ * @param files - the baselines folder's files.
+ * @param name - the picture's name.
+ * @param formerName - the name the picture had under the story's former id; none when the id did not change.
+ * @returns the baseline's name; the picture's own when neither is stored (a new baseline).
+ */
+export const storedBaseline = (
+  files: readonly string[],
+  name: string,
+  formerName: string | undefined
+): string =>
+  !files.includes(name) && formerName !== undefined && files.includes(formerName) ? formerName : name;
+
 /** One picture's result. Read before anything is written: the pictures must not touch what they are compared with. */
 const diffOf = async (
   page: Page,
   shot: StoryShot,
-  folders: { readonly baselines: string; readonly out: string }
+  folders: { readonly baselines: string; readonly out: string; readonly baselineName: string }
 ): Promise<StoryDiff> => {
   const name = basename(shot.file);
-  const baseline = join(folders.baselines, name);
+  const baseline = join(folders.baselines, folders.baselineName);
   const current = join(folders.out, name);
   copyFileSync(shot.file, current);
   const base = { storyId: shot.storyId, view: shot.view, baseline, current };
@@ -279,13 +295,25 @@ export const diffStories = async (request: StoryDiffRequest): Promise<StoryDiffR
     const { shots } = await shotStories({ ...request, outDir: taken });
     const page = await browser.newPage();
     const results: StoryDiff[] = [];
-    for (const shot of shots) {
-      results.push(await diffOf(page, shot, { baselines: request.baselines, out: request.outDir }));
-    }
     const stored = existsSync(request.baselines) ? readdirSync(request.baselines) : [];
-    const stories = request.stories.map((story) => story.id);
-    const removed =
-      request.component === undefined ? [] : removedBaselines(stored, request.component, stories);
+    const formerIds = new Map(request.stories.map((story) => [story.id, story.formerId]));
+    for (const shot of shots) {
+      const formerId = formerIds.get(shot.storyId);
+      const formerName =
+        formerId === undefined ? undefined : shotName({ story: { id: formerId }, name: shot.view });
+      const baselineName = storedBaseline(stored, basename(shot.file), formerName);
+      results.push(
+        await diffOf(page, shot, { baselines: request.baselines, out: request.outDir, baselineName })
+      );
+    }
+    // a story's baseline may still carry its former id (`storedBaseline`): it is kept, not removed
+    const stories = request.stories.flatMap((story) =>
+      story.formerId === undefined ? [story.id] : [story.id, story.formerId]
+    );
+    const owners = [request.component, request.formerComponent].flatMap((owner) =>
+      owner === undefined ? [] : [owner]
+    );
+    const removed = [...new Set(owners.flatMap((owner) => removedBaselines(stored, owner, stories)))];
     for (const file of removed) {
       results.push({
         storyId: file.replace(/\.png$/, ""),

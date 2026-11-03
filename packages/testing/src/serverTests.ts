@@ -68,8 +68,8 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
     describe(title, () => {
       for (const { story, component } of entries) {
         it.each(passes)(`${story.name} renders on the server ($name)`, async (pass) => {
-          const load = sourceFiles(source).stories[component.file];
-          if (load === undefined) throw new Error(`No loader for ${component.file}`);
+          const load = sourceFiles(source).stories[story.file];
+          if (load === undefined) throw new Error(`No loader for ${story.file}`);
           const loaded = readStory(await load(), story.exportName, preview);
           if (typeof loaded === "string") throw new Error(loaded);
           // the stories' own texts: what the catalogue shows when no language is chosen
@@ -111,8 +111,8 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
           pass.check?.(html);
         });
         it(`${story.name} declares the controls it uses`, async () => {
-          const load = sourceFiles(source).stories[component.file];
-          if (load === undefined) throw new Error(`No loader for ${component.file}`);
+          const load = sourceFiles(source).stories[story.file];
+          if (load === undefined) throw new Error(`No loader for ${story.file}`);
           const loaded = readStory(await load(), story.exportName);
           if (typeof loaded === "string") throw new Error(loaded);
           expect(storyControlsProblem(loaded)).toBeUndefined();

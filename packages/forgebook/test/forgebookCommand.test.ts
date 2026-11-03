@@ -53,7 +53,8 @@ beforeAll(() => {
   });
   broken = catalogue(root, "Broken", {
     "button.stories.tsx": 'export default { title: "Actions/Button" };\nexport const Primary = {};\n',
-    "again.stories.tsx": 'export default { title: "Actions/Button" };\nexport const Twice = {};\n'
+    // a second file of the title, with a story whose id the first file's story has
+    "again.stories.tsx": 'export default { title: "Actions/Button" };\nexport const Primary = {};\n'
   });
 });
 

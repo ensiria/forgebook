@@ -13,13 +13,11 @@ import type { StorySource } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useState } from "react";
 
 import {
-  componentId,
   findComponent,
   findStory,
   type StoryTree,
   type TreeComponent,
-  type TreeFamily,
-  type TreeSource
+  type TreeFamily
 } from "../storyTree.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
 import { STRINGS } from "./strings.ts";
@@ -141,15 +139,13 @@ const SourceIntro = ({ load }: { readonly load: StorySource["home"] }): ReactNod
 /**
  * A family's card: its name and how many components it has, then its components, the first few until asked for all.
  *
- * @param props - the source, the family, and how to open a component.
+ * @param props - the family, and how to open a component.
  */
 const FamilyCard = ({
-  source,
   family,
   hrefOf,
   onOpen
 }: Pick<HomePageProps, "hrefOf" | "onOpen"> & {
-  readonly source: TreeSource;
   readonly family: TreeFamily;
 }): ReactNode => {
   const [isOpen, setIsOpen] = useState(false);
@@ -165,7 +161,7 @@ const FamilyCard = ({
         {shown.map((component) => (
           <li key={component.title}>
             <PageLink
-              page={{ kind: "component", id: componentId(source.id, component.title) }}
+              page={{ kind: "component", id: component.id }}
               hrefOf={hrefOf}
               onOpen={onOpen}
               className="forgebook-link"
@@ -262,13 +258,7 @@ export const HomePage = ({
               <SourceIntro load={sources.find((candidate) => candidate.id === source.id)?.home} />
               <div className="forgebook-home__families">
                 {source.families.map((family) => (
-                  <FamilyCard
-                    key={family.name}
-                    source={source}
-                    family={family}
-                    hrefOf={hrefOf}
-                    onOpen={onOpen}
-                  />
+                  <FamilyCard key={family.name} family={family} hrefOf={hrefOf} onOpen={onOpen} />
                 ))}
               </div>
             </section>

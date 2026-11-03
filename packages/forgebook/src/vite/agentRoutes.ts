@@ -19,7 +19,7 @@ import { createIdResolver, type ViteDevServer } from "vite";
 import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
+import { findComponentByTitle, findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
 import type { AgentChangedStory, ChangedStoriesDocument, ErrorsDocument } from "./agent.types.ts";
 import {
@@ -217,10 +217,13 @@ const changedAnswer = async ({
   const changed = catalogueChangedFiles(config.dir, await realpath(config.dir), root, files);
   const stories = reaches.flatMap(({ source, reach }) =>
     affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
-      const id = `${componentId(source, story.title)}--${kebab(story.exportName)}`;
-      return findStory(tree, id) === undefined
+      const component = findComponentByTitle(tree, source, story.title)?.component;
+      const found = [...(component?.stories ?? []), ...(component?.unlisted ?? [])].find(
+        (each) => each.exportName === story.exportName
+      );
+      return found === undefined
         ? []
-        : [{ id, title: story.title, links: storyLinks(pages, id, view) }];
+        : [{ id: found.id, title: story.title, links: storyLinks(pages, found.id, view) }];
     })
   );
   const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems: [] };
@@ -240,7 +243,8 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
   if (location === undefined || source === undefined)
     return { status: 404, body: { error: `No story "${id}"` } };
   const files = sourceFiles(source);
-  const file = location.component.file;
+  // the story's own file: its module, and the docs of the component its meta names, which its args are for
+  const file = location.story.file;
   const parts: LoadedStoryParts = {
     module: await settled(files.stories[file]),
     docs: await settled(files.docs[file]),

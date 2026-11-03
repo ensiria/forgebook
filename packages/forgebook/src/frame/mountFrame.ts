@@ -204,7 +204,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const load =
     location === undefined || source === undefined
       ? undefined
-      : sourceFiles(source).stories[location.component.file];
+      : sourceFiles(source).stories[location.story.file];
   if (location === undefined || source === undefined || load === undefined) {
     fail(`No story "${storyId}"`);
     return;

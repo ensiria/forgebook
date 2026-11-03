@@ -46,7 +46,7 @@ describe("collectDocs and catalogueMarkdown", () => {
     expect(text).toContain("- `@fixture/kit/kit.css`: The fixture kit's style sheet.");
     // a hook with stories about logic: its call, not its options as props
     expect(text).toContain(
-      "- **useUndo** `@fixture/kit/use-undo`: Keeps a value with its history. useUndo<TValue>(initial, limit?): UndoState<TValue> · story: `kit:hooks-use-undo--history`"
+      "- **useUndo** `@fixture/kit/use-undo`: Keeps a value with its history. useUndo<TValue>(initial, limit?): UndoState<TValue> · story: `kit:hooks-useundo--history`"
     );
     expect(text).not.toContain("Page");
   });
@@ -94,6 +94,7 @@ describe("collectDocs and catalogueMarkdown", () => {
   it("reads the source's id from the stories export, and each component's main story", () => {
     expect(data.sourceId).toBe("kit");
     expect(data.components[0]?.mainStory).toBe("InRow");
+    expect(data.components[0]?.mainStoryId).toBe("inputs-selection-select--in-row");
   });
 
   it("leaves out the excluded subpaths and writes the sections asked for, in their order", () => {
