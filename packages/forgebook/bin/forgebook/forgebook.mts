@@ -20,7 +20,7 @@ import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
 import { settleAgentIndex } from "./builtCatalogue.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
-import { catalogueVite, withFramePort } from "./catalogueVite.ts";
+import { catalogueVite, FRAMES_MODES, withFramePort, withFramesMode } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
@@ -55,6 +55,13 @@ await defineCommands({
           valueName: "number",
           description: "The stories' frames' port (their own origin); the catalogue's port + 1 by default."
         },
+        frames: {
+          type: "string",
+          choices: FRAMES_MODES,
+          valueName: "placement",
+          description:
+            "Where the stories' frames run for this run: on an origin of their own, or on the catalogue's (frames in the configuration)."
+        },
         force: {
           type: "boolean",
           description: "Pre-bundle the dependencies again, ignoring Vite's cache (as a first start does)."
@@ -70,10 +77,15 @@ await defineCommands({
       examples: [
         { command: `${COMMAND} dev`, description: "Run the catalogue of the folder you are in." },
         { command: `${COMMAND} dev --port 6006`, description: "On a given port." },
-        { command: `${COMMAND} dev --touch`, description: "And try the stories with Chromium's real touch." }
+        { command: `${COMMAND} dev --touch`, description: "And try the stories with Chromium's real touch." },
+        {
+          command: `${COMMAND} dev --frames same-origin`,
+          description: "With the frames on the catalogue's origin, as behind a proxy that forwards one port."
+        }
       ],
       run: async ({ options, onInterrupt, log }): Promise<void> => {
-        const config = withFramePort(await configOf(options.config), options["frame-port"]);
+        const read = withFramesMode(await configOf(options.config), options.frames);
+        const config = withFramePort(read, options["frame-port"]);
         const port = options.port === undefined ? undefined : Number(options.port);
         if (port !== undefined && !Number.isInteger(port))
           throw new ScriptError(`--port ${options.port} is not a port`);
