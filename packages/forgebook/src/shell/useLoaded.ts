@@ -23,7 +23,10 @@ export const useLoaded = <TValue>(
   load: (() => Promise<unknown>) | undefined,
   read: (value: unknown) => Loaded<TValue>
 ): Loaded<TValue> => {
-  const [state, setState] = useState<Loaded<TValue>>({ status: "loading" });
+  // nothing to load is known at once: a first render that said loading would hold a tab's place for nothing
+  const [state, setState] = useState<Loaded<TValue>>(
+    load === undefined ? { status: "none" } : { status: "loading" }
+  );
   // the reader of the first render: a reader written inline must not load the value again on every render
   const [reader] = useState(() => read);
   useEffect(() => {

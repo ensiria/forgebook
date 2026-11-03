@@ -29,6 +29,19 @@ const HOOK_DOCS: ComponentDocs = {
   }
 };
 
+/** A story's design, for the Design tab. */
+const DESIGN: DesignTabProps = {
+  link: { url: "https://www.figma.com/design/File1/Kit", kind: "design", fileKey: "File1" },
+  title: "Select › Small",
+  frame: {
+    address: "/frame.html?story=a",
+    width: "fill",
+    background: undefined,
+    args: {},
+    view: undefined
+  }
+};
+
 /**
  * The input of a story's panel.
  *
@@ -96,27 +109,29 @@ describe("the tabs of a story's panel", () => {
   });
 
   it("offers the Design tab only to a story with a design, a story about logic too", () => {
-    const design: DesignTabProps = {
-      link: { url: "https://www.figma.com/design/File1/Kit", kind: "design", fileKey: "File1" },
-      title: "Select › Small",
-      frame: {
-        address: "/frame.html?story=a",
-        width: "fill",
-        background: undefined,
-        args: {},
-        view: undefined
-      }
-    };
-    expect(dockTabs({ ...inputOf(false), design }).map((tab) => tab.id)).toEqual([
+    expect(dockTabs({ ...inputOf(false), design: DESIGN }).map((tab) => tab.id)).toEqual([
       "props",
       "events",
       "design",
       "a11y"
     ]);
-    expect(dockTabs({ ...inputOf(true), design }).map((tab) => tab.id)).toEqual([
+    expect(dockTabs({ ...inputOf(true), design: DESIGN }).map((tab) => tab.id)).toEqual([
       "signature",
       "design",
       "a11y"
     ]);
+  });
+
+  it("keeps the Code tab's place while the story file's code loads, so the panel opens on it, not on Design", () => {
+    const withoutComponent: DockTabsInput = { ...inputOf(false), docs: { status: "none" }, design: DESIGN };
+    const loading = dockTabs({ ...withoutComponent, code: { status: "loading" } });
+    expect(loading.map((tab) => [tab.id, tab.label])).toEqual([
+      ["code", "Code"],
+      ["design", "Design"],
+      ["a11y", "Accessibility"]
+    ]);
+    const loaded = dockTabs({ ...withoutComponent, code: { status: "ready", value: {} } });
+    expect(loaded[0]?.id).toBe("code");
+    expect(dockTabs(withoutComponent).map((tab) => tab.id)).toEqual(["design", "a11y"]);
   });
 });
