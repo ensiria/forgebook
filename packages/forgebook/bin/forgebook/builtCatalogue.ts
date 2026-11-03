@@ -77,7 +77,8 @@ export const builtCatalogueServer = async (from: string, version: string): Promi
     writeNew: unreachable,
     check: unreachable,
     checkPage: unreachable,
-    shot: unreachable
+    shot: unreachable,
+    servePreview: unreachable
   }).filter((tool) => READ_ONLY_TOOLS.has(tool.name));
   return {
     info: { name: "forgebook", version },

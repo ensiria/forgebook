@@ -12,6 +12,7 @@
  * @module
  */
 import { readFile } from "node:fs/promises";
+import { createServer as createNetServer } from "node:net";
 import { resolve } from "node:path";
 
 import { createServer, type ViteDevServer } from "vite";
@@ -171,6 +172,34 @@ export type ServedCatalogue = {
 };
 
 /**
+ * A dev server of its own, listening on the local address.
+ *
+ * @param config - the catalogue's configuration.
+ * @param port - the port, which must be free; 0 for any free one.
+ */
+const ownListening = async (config: ResolvedConfig, port: number): Promise<ServedCatalogue> => {
+  const server: ViteDevServer = await createServer(
+    await commandServerVite(config, {
+      server: { port, strictPort: port !== 0, host: "127.0.0.1" },
+      logLevel: "error"
+    })
+  );
+  try {
+    await server.listen();
+  } catch (error) {
+    // a server that could not listen still watches the files, which would keep the process alive
+    await server.close();
+    throw error;
+  }
+  const address = server.resolvedUrls?.local[0]?.replace(/\/+$/, "");
+  if (address === undefined) {
+    await server.close();
+    throw new Error("The catalogue's dev server started with no address");
+  }
+  return { origin: address, runningAt: undefined, close: () => server.close() };
+};
+
+/**
  * The catalogue served over HTTP, for a browser to open its frames: the running dev server at the address when it
  * serves this catalogue, else a dev server of its own on a free port (its answers' middleware has no address).
  *
@@ -184,16 +213,7 @@ export const servedCatalogue = async (
   const origin = (url ?? DEFAULT_ORIGIN).replace(/\/+$/, "");
   const running = await runningClient(origin, config);
   if (running !== undefined) return { origin, runningAt: origin, close: async () => undefined };
-  const server: ViteDevServer = await createServer(
-    await commandServerVite(config, { server: { port: 0, host: "127.0.0.1" }, logLevel: "error" })
-  );
-  await server.listen();
-  const address = server.resolvedUrls?.local[0]?.replace(/\/+$/, "");
-  if (address === undefined) {
-    await server.close();
-    throw new Error("The catalogue's dev server started with no address");
-  }
-  return { origin: address, runningAt: undefined, close: () => server.close() };
+  return ownListening(config, 0);
 };
 
 /**
@@ -209,4 +229,65 @@ export const catalogueClient = async (
 ): Promise<CatalogueClient> => {
   const origin = (url ?? DEFAULT_ORIGIN).replace(/\/+$/, "");
   return (await runningClient(origin, config)) ?? ownClient(config, origin);
+};
+
+/** A port free right now, asked of the system. */
+const freePort = (): Promise<number> =>
+  new Promise((done, fail) => {
+    const probe = createNetServer();
+    probe.once("error", fail);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const port = typeof address === "object" && address !== null ? address.port : 0;
+      probe.close(() => done(port));
+    });
+  });
+
+/** Where a client that renders apps gets a story's preview from. */
+export type PreviewServer = {
+  /** The address previews will come from, with nothing started: a host may read it before any story is asked for. */
+  readonly origin: () => Promise<string>;
+  /** Serves the catalogue at that address, once, and answers it. */
+  readonly serve: () => Promise<string>;
+  /** Stops what it started. */
+  readonly close: () => Promise<void>;
+};
+
+/**
+ * The previews' server: the running dev server, or one of its own started when the first preview is asked for.
+ *
+ * @remarks
+ * A host learns the origin it may frame when it reads the app's resource, which it may do at connection, long before
+ * anyone asks for a story. So the address is settled then, a port taken from the system and left free, and the server
+ * comes up on that port only when a story is asked for; were another program to take the port in between, the preview
+ * fails and the page falls back to a picture.
+ *
+ * @param config - the catalogue's configuration.
+ * @param runningAt - the running dev server, when there is one.
+ */
+export const previewServer = (config: ResolvedConfig, runningAt: string | undefined): PreviewServer => {
+  if (runningAt !== undefined)
+    return { origin: async () => runningAt, serve: async () => runningAt, close: async () => undefined };
+  let port: Promise<number> | undefined;
+  let served: Promise<ServedCatalogue> | undefined;
+  const portOf = (): Promise<number> => {
+    port ??= freePort();
+    return port;
+  };
+  const started = async (): Promise<ServedCatalogue> => ownListening(config, await portOf());
+  return {
+    origin: async () => `http://127.0.0.1:${await portOf()}`,
+    serve: async () => {
+      served ??= started();
+      try {
+        return (await served).origin;
+      } catch (error) {
+        served = undefined;
+        throw error;
+      }
+    },
+    close: async () => {
+      await (await served)?.close();
+    }
+  };
 };

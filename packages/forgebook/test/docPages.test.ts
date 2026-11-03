@@ -330,7 +330,8 @@ describe("agents", () => {
       writeNew: () => Promise.reject(new Error("not asked in these tests")),
       check: async () => "unused",
       checkPage: async () => "unused",
-      shot: async () => "unused"
+      shot: async () => "unused",
+      servePreview: async () => "unused"
     });
     const tool = (name: string): (typeof tools)[number] => {
       const found = tools.find((each) => each.name === name);
