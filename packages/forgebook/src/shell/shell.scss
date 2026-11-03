@@ -2575,6 +2575,119 @@
     }
   }
 
+  // a group that folds (a prop group): its name as a heading in the summary, a chevron turned when open, its count
+  // beside it; the content's height moves where the browser can animate to `auto`, and opens at once elsewhere
+  .forgebook-fold {
+    interpolate-size: allow-keywords;
+
+    &::details-content {
+      height: 0;
+      overflow: clip;
+      transition:
+        height $duration-medium $ease-out,
+        content-visibility $duration-medium allow-discrete;
+    }
+
+    &[open]::details-content {
+      height: auto;
+    }
+  }
+
+  .forgebook-fold__summary {
+    display: flex;
+    align-items: center;
+    gap: $space-1-5;
+    width: fit-content;
+    cursor: pointer;
+    list-style: none;
+    border-radius: $radius-control;
+    @include mixins.focus-ring;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    > svg {
+      flex: none;
+      color: $text-tertiary;
+      transition: transform $duration-quick ease-out;
+    }
+
+    .forgebook-fold[open] > & > svg {
+      transform: rotate(90deg);
+    }
+  }
+
+  .forgebook-fold__name {
+    margin: 0;
+    font: inherit;
+  }
+
+  .forgebook-fold__count {
+    font: $text-caption;
+    font-variant-numeric: tabular-nums;
+    text-transform: none;
+    letter-spacing: normal;
+    color: $text-tertiary;
+  }
+
+  // a prop group of the API reference: spaced like a part, its table under its name
+  .forgebook-api__group {
+    margin-top: $space-4;
+
+    > .forgebook-fold__summary {
+      margin-bottom: $space-2;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+  }
+
+  // a prop's object type folds open under its row, its members as a table across the row's width
+  .forgebook-api__members-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    margin-inline-start: $space-2;
+    padding: 0 $space-1;
+    border: 0;
+    border-radius: $radius-control;
+    background: none;
+    font: $text-caption;
+    color: $text-secondary;
+    white-space: nowrap;
+    cursor: pointer;
+    @include mixins.focus-ring;
+
+    &:hover {
+      color: $text;
+    }
+
+    > svg {
+      transition: transform $duration-quick ease-out;
+    }
+
+    &[aria-expanded="true"] > svg {
+      transform: rotate(90deg);
+    }
+  }
+
+  .forgebook-api__table tbody tr.forgebook-api__members {
+    &:hover {
+      background: none;
+    }
+
+    > td {
+      padding: 0 0 $space-2 $space-5;
+    }
+  }
+
+  .forgebook-prop-group__body {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2-5;
+    padding-top: $space-2-5;
+  }
+
   // the plugin's colours (`highlightCode.ts`, `forgebook-hl-`), on the catalogue's code palette
   .forgebook-hl-keyword,
   .forgebook-hl-literal,

@@ -50,6 +50,38 @@ test.describe("forgebook story", () => {
       address: expect.stringContaining("tab=design")
     });
   });
+
+  test("gives an agent each prop's group, and the members of a prop typed with a documented object", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const run = forgebook(baseURL, ["story", "kit:inputs-selection-select--overview", "--json"]);
+    expect(run.status).toBe(0);
+    const { docs } = JSON.parse(run.stdout);
+    const byName = new Map(
+      docs.props.map((prop: { readonly name: string }): [string, unknown] => [prop.name, prop])
+    );
+    expect(byName.get("rows")).toMatchObject({ group: "Behaviour" });
+    expect(byName.get("value")).not.toHaveProperty("group");
+    expect(byName.get("texts")).toMatchObject({
+      group: "Texts",
+      members: [
+        {
+          name: "empty",
+          type: "string",
+          description: "Shown in place of the list when there is no option.",
+          defaultValue: '"Nothing to pick"',
+          isRequired: false
+        },
+        {
+          name: "listLabel",
+          type: "string",
+          description: "The list's name for screen readers.",
+          isRequired: false
+        }
+      ]
+    });
+  });
 });
 
 test.describe("forgebook check-page", () => {

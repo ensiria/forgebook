@@ -1,6 +1,6 @@
 /**
  * The component docs the plugin hands the shell: a selector, for a framework that matches components by one, is checked
- * on arrival and names the component in the story's code.
+ * on arrival and names the component in the story's code; a prop's group and its type's members are checked too.
  *
  * @module
  */
@@ -27,5 +27,27 @@ describe("a component's selector", () => {
   it("is checked on arrival", () => {
     expect(isComponentDocs({ ...DOCS, selector: "button[fbButton]" })).toBe(true);
     expect(isComponentDocs({ ...DOCS, selector: 3 })).toBe(false);
+  });
+});
+
+describe("a prop's group and members", () => {
+  /** A prop of kind `other`, with what a test lays over it. */
+  const withProp = (extra: Readonly<Record<string, unknown>>): unknown => ({
+    ...DOCS,
+    props: [{ name: "texts", kind: "other", type: "Texts", description: "", isRequired: false, ...extra }]
+  });
+
+  it("are checked on arrival", () => {
+    const member = {
+      name: "empty",
+      type: "string",
+      description: "Said when nothing matches.",
+      isRequired: true
+    };
+    expect(isComponentDocs(withProp({ group: "Texts", members: [member] }))).toBe(true);
+    expect(isComponentDocs(withProp({ members: [{ ...member, defaultValue: '"None"' }] }))).toBe(true);
+    expect(isComponentDocs(withProp({ group: 3 }))).toBe(false);
+    expect(isComponentDocs(withProp({ members: [{ name: "empty" }] }))).toBe(false);
+    expect(isComponentDocs(withProp({ members: "empty" }))).toBe(false);
   });
 });

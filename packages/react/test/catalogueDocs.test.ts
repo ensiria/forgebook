@@ -35,7 +35,7 @@ describe("collectDocs and catalogueMarkdown", () => {
   it("writes one dense line per entry", () => {
     expect(text).toContain("### Inputs › Selection");
     expect(text).toContain(
-      "- **Select** `@fixture/kit/select`: Lets the user pick one value from a list. value:string size=sm|md*|lg rows:number isDisabled onValueChange(value) options!:readonly string[] hint:ReactNode · parts: root, trigger, list · story: `kit:inputs-selection-select--in-row`"
+      "- **Select** `@fixture/kit/select`: Lets the user pick one value from a list. value:string size=sm|md*|lg rows:number isDisabled onValueChange(value) options!:readonly string[] hint:ReactNode texts:SelectTexts · parts: root, trigger, list · story: `kit:inputs-selection-select--in-row`"
     );
     expect(text).toContain(
       "- `@fixture/kit/utils/format-size` formatSize(value, unit?): A size written with its unit. Also: formatSizeOf(size), SIZES, types SizeUnit"

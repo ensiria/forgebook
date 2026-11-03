@@ -80,6 +80,8 @@ export type DockTabsInput = {
   readonly namedValues: NamedValues | undefined;
   /** The props the story gives a text by its key, by name. */
   readonly textArgs: Readonly<Record<string, TextArgNote>>;
+  /** The prop groups the component's meta lists first, in order (`parameters.propGroups`); empty when none. */
+  readonly propGroups: readonly string[];
   /** The story's calls, newest first. */
   readonly calls: readonly EventCall[];
   /** Clears the calls. */
@@ -128,6 +130,7 @@ const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] 
               worstCase={input.worstCase}
               namedValues={input.namedValues}
               textArgs={input.textArgs}
+              componentGroups={input.propGroups}
             />
           )
         }

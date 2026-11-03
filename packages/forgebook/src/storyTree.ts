@@ -101,6 +101,8 @@ export type TreeComponent = {
   readonly keywords: readonly string[];
   /** Its design: the meta's `parameters.design.figma`; none by default. */
   readonly design: FigmaLink | undefined;
+  /** The prop groups its meta lists first (`parameters.propGroups`), in their order; empty when none. */
+  readonly propGroups: readonly string[];
 };
 
 /** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`). */
@@ -434,7 +436,9 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       alsoIn: metaList(component, "alsoIn"),
       related: related.get(title) ?? [],
       keywords: metaList(component, "keywords"),
-      design: componentDesign(component)
+      design: componentDesign(component),
+      // its first file's, as its docs are
+      propGroups: component.files[0]?.entry.propGroups ?? []
     });
   }
   placeAliases(source, placed, families, problems);

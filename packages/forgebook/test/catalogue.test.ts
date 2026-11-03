@@ -38,6 +38,7 @@ describe("catalogueSettings", () => {
     ]);
     expect(settings.gridStep).toBe(8);
     expect(settings.appearance).toBe("system");
+    expect(settings.propGroups).toEqual([]);
   });
 
   it("keeps the built-in backgrounds it names, adds its own, turns tabs off, and keeps 100 % among the steps", () => {
@@ -109,6 +110,16 @@ describe("mergedLists", () => {
     expect(merged.controls).toEqual({ sheets: false, width: false });
     expect(merged.toolbar).toEqual(["contrast", "theme"]);
     expect(mergedLists([{ toolbar: ["theme"] }, {}]).toolbar).toEqual(["theme"]);
+  });
+
+  it("takes the prop groups' order the last names, as a whole list", () => {
+    expect(mergedLists([{ propGroups: ["Texts"] }, {}]).propGroups).toEqual(["Texts"]);
+    expect(
+      mergedLists([{ propGroups: ["Texts"] }, { propGroups: ["Selection", "Paging"] }]).propGroups
+    ).toEqual(["Selection", "Paging"]);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { propGroups: ["Paging"] }).propGroups).toEqual([
+      "Paging"
+    ]);
   });
 });
 

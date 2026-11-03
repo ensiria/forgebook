@@ -180,14 +180,15 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
   ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar }),
   ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn }),
-  ...(lists.appearance === undefined ? {} : { appearance: lists.appearance })
+  ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
+  ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups })
 });
 
 /**
  * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
  * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
- * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar the last
- * that names one.
+ * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar and the
+ * prop groups' order the last that names one.
  *
  * @param all - the presets' lists, then the catalogue's.
  */
