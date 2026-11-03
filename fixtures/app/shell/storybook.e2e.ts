@@ -61,7 +61,8 @@ const STORY_IDS = [
   "storybook-merged--aliased",
   "storybook-merged--wrapping",
   "storybook-merged--reexported",
-  "storybook-plain-javascript--untyped"
+  "storybook-plain-javascript--untyped",
+  "storybook-preview-hooks--synced"
 ];
 
 test("every story written the Storybook way is ready in its frame, without a page error", async ({
@@ -218,6 +219,22 @@ test.describe("arg types and actions", () => {
     // a mapping's key chosen in the panel reaches the story as its value
     await page.getByRole("combobox", { name: "icon" }).selectOption("heart");
     await expect.poll(async () => (await shownArgs(page))["icon"]).toBe("♥");
+  });
+
+  test("a story changes its own args with Storybook's useArgs, and the panel and the address follow", async ({
+    page
+  }) => {
+    await page.goto(story("storybook-preview-hooks--synced"));
+    await isReady(page);
+    // the render's update, from a click in the story
+    await frameOf(page).getByRole("button", { name: "Add" }).click();
+    await expect.poll(async () => (await shownArgs(page))["count"]).toBe(1);
+    await expect(page.getByRole("spinbutton", { name: "count" })).toHaveValue("1");
+    await expect(page).toHaveURL(/args=[^&]*count/);
+    // the decorator's update, in an effect, after the panel changed the arg it follows
+    await page.getByRole("combobox", { name: "kind" }).selectOption("bot");
+    await expect.poll(async () => (await shownArgs(page))["name"]).toBe("dependabot");
+    await expect(page.getByRole("textbox", { name: "name" })).toHaveValue("dependabot");
   });
 
   test("a spy's calls are recorded in Events, and the play still checks the spy", async ({ page }) => {

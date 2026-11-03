@@ -7,6 +7,7 @@
     "coldStart": 2274,
     "shellJs": 120527,
     "frameJs": 160332,
-    "firstLoadJs": 197619
+    "firstLoadJs": 197619,
+    "searchJs": 7000
   }
 }

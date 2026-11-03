@@ -16,6 +16,7 @@ import type { ComponentDocs, UsageGuidance } from "../componentDocs.ts";
 import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
+import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
@@ -292,6 +293,58 @@ export type FoundComponentsDocument = {
   readonly query: string;
   /** Up to five, best first; none means nothing in the catalogue holds those words. */
   readonly components: readonly AgentFoundComponent[];
+};
+
+/** A line of a search's result: something inside a page that matched. */
+export type AgentSearchHit = {
+  /** What it is: a prop, an event, a story, a heading, text, a description. */
+  readonly kind: SearchHitKind;
+  /** Its name: the prop, the story, the heading; none for plain text. */
+  readonly name?: string;
+  /** The words around the match. */
+  readonly text: string;
+  /** The address that opens the page at it. */
+  readonly address: string;
+};
+
+/** A search's result: a component or a docs page. */
+export type AgentSearchResult = {
+  /** What it is. */
+  readonly kind: SearchResult["kind"];
+  /** Its id: a docs page's goes to `page`. */
+  readonly id: string;
+  /** Its name. */
+  readonly name: string;
+  /** Where it sits. */
+  readonly place: string;
+  /** How well it matches: higher is better, only comparable within an answer. */
+  readonly score: number;
+  /** The words of the query it holds. */
+  readonly matched: readonly string[];
+  /** The words of the query it does not. */
+  readonly missed: readonly string[];
+  /** Why its name is there; empty when only what is inside it matched. */
+  readonly reasons: readonly SearchReason[];
+  /** The best of what matched inside it. */
+  readonly hits: readonly AgentSearchHit[];
+  /** How many things inside it matched, those not listed included. */
+  readonly hitCount: number;
+  /** The address that opens it. */
+  readonly address: string;
+};
+
+/** What a search finds across a catalogue. */
+export type SearchDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The query. */
+  readonly query: string;
+  /** How many results there are, those past `limit` included. */
+  readonly total: number;
+  /** The results, best first; none means nothing in the catalogue holds those words. */
+  readonly results: readonly AgentSearchResult[];
+  /** What could not be read for the search: the rest still answers. */
+  readonly problems: readonly string[];
 };
 
 /** A story a change touches. */

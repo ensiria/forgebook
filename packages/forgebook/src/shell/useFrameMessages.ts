@@ -1,13 +1,14 @@
 /**
  * What the frames tell the shell: which story can replay, which reads the story clock, each frame's content height, which frames finished loading, its story's own args, the
- * calls of its events, its play function's trace, and the result of an accessibility check.
+ * calls of its events, its play function's trace, the args a story changed itself, and the result of an accessibility
+ * check.
  *
  * @module
  */
 import { useEffect, useRef, useState } from "react";
 
 import type { Violation } from "../a11y.ts";
-import { type FrameMessage, isFrameMessage } from "../messages.ts";
+import { type FrameMessage, isFrameMessage, type PanelArgs } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { isFromFrames } from "./framesOrigin.ts";
 
@@ -60,6 +61,11 @@ export type FrameHandlers = {
   readonly onSpills?: (storyId: string, count: number, frame: string) => void;
   /** A plugin's frame module told its tab about a story; none where no tab shows it. */
   readonly onPluginReport?: (message: PluginReportMessage) => void;
+  /**
+   * A story changed its own args (Storybook's `useArgs`): its id, and the panel's values the change makes; none where no
+   * panel shows them.
+   */
+  readonly onStoryArgs?: (storyId: string, args: PanelArgs) => void;
 };
 
 /** An accessibility check's result, as a frame reported it. */
@@ -122,6 +128,9 @@ const onFrameMessage = (message: FrameMessage, frame: HTMLIFrameElement, targets
       return;
     case "forgebook:plugin":
       handlers.onPluginReport?.(message);
+      return;
+    case "forgebook:story-args":
+      handlers.onStoryArgs?.(message.storyId, message.args);
       return;
     case "forgebook:call":
       handlers.onCall({

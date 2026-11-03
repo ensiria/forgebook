@@ -35,8 +35,9 @@ origin unless its configuration names two hosts, so `shellJs` and `frameJs` are 
 | `serverMemoryDocs` | the same with a component's page, where the props are read |
 | `serverMemoryCold` | as `serverMemory`, every cache removed first: a first start's peak, pre-bundling included |
 | `build`, `buildSize` | the static build with no output and no cache, and the bytes of its output |
-| `shellJs`, `frameJs` | JavaScript a first load of the build fetches, gzipped: by the top page, by the frames |
+| `shellJs`, `frameJs` | JavaScript a first load of the build fetches, gzipped: by the top page, by the frames; with the packed data (`.bin`) its modules fetch |
 | `firstLoadJs` | the same in all, each file once: a chunk both fetch counts in both columns above |
+| `searchJs` | JavaScript the first search fetches beyond a first load, gzipped: the list's code and the search index, each group's, which a build keeps packed (`.bin`) |
 | `installSize` | `node_modules` on disk of a TypeScript project with Vite, React and the tool |
 | `installAdded` | what the tool adds to that project, installed there: a tool with its own Vite keeps both |
 | `packages`, `directDependencies` | the packages installed, and what the tool's main package declares |

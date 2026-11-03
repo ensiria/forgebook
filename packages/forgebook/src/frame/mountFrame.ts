@@ -345,7 +345,10 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           name,
           values: values.map(previewValue),
           details: values.map(detailOf)
-        })
+        }),
+      panelArgsOf: (values: Readonly<Record<string, unknown>>): PanelArgs =>
+        panelArgsOf(values, source.namedValues),
+      onArgsChange: (args: PanelArgs): void => tellShell({ type: "forgebook:story-args", storyId, args })
     });
     // an edit of the story file, or of a file it re-exports stories from, draws the story anew in place: the reader keeps
     // what they did in it. A story the edit took away leaves nothing to draw in place: the page loads again
