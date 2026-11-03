@@ -89,6 +89,12 @@ describe("reportMismatches", () => {
       "corpus differs"
     ]);
   });
+
+  it("refuses Forgebook's frames measured on another origin", () => {
+    expect(reportMismatches({ ...REPORT, frames: "isolated" }, { ...later, frames: "same-origin" })).toEqual([
+      "frames differs"
+    ]);
+  });
 });
 
 describe("reportProblems", () => {
