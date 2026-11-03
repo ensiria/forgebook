@@ -20,7 +20,7 @@ export const SHELL_PORT = Number(process.env["FORGEBOOK_SHELL_PORT"] ?? "41721")
  * The catalogues the suite runs, in the order their ports are handed out: a new one goes at the end, so the others keep
  * theirs.
  */
-const CATALOGUES = [
+export const CATALOGUES = [
   "app",
   "vue",
   "nextjs",
