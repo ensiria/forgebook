@@ -14,7 +14,8 @@ import { basename, dirname } from "node:path";
 
 import type { SubcomponentDocs } from "forgebook/component-docs";
 import type { StoryComponentResult } from "forgebook/vite/adapter";
-import { moduleSummaryOf, summaryOf } from "forgebook/vite/docs-program";
+import { summaryOf } from "forgebook/vite/docs-program";
+import { moduleSummaryOf } from "forgebook/vite/module-summary";
 import { declarationOrder, declaredSymbol, isForeign, partsOf, propDocs } from "forgebook/vite/prop-docs";
 import { signatureDocs } from "forgebook/vite/signature-docs";
 import { metaSubcomponents } from "forgebook/vite/story-meta";
@@ -148,7 +149,7 @@ export const functionDocs = (
     docs: {
       name: symbol.getName(),
       description: summaryOf(symbol, checker),
-      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile),
+      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile.text),
       props: ownArgs.map((each) => propDocs(each, checker, expression)),
       parts: partsOf(argsType, checker, expression),
       subcomponents: subcomponents.docs,
@@ -184,7 +185,7 @@ export const argsTypeDocs = (
     docs: {
       name: basename(storyFile).replace(STORY_SUFFIX, ""),
       description: symbol === undefined ? "" : summaryOf(symbol, checker),
-      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile),
+      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile.text),
       props: ownArgs.map((each) => propDocs(each, checker, node)),
       parts: partsOf(argsType, checker, node),
       subcomponents: subcomponents.docs,

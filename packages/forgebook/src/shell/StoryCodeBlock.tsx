@@ -48,7 +48,7 @@ export const StoryCodeBlock = (source: StoryCodeSource): ReactNode => {
     const markup = { __html: render.html };
     return (
       <pre className="forgebook-code-block">
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: the plugin's HTML of the story file's own text, as trusted as the story's code */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: the plugin's HTML of the story file's own text, or the same kept in the project's own node_modules/.vite, as trusted as the story's code */}
         <code className="forgebook-code" dangerouslySetInnerHTML={markup} />
       </pre>
     );

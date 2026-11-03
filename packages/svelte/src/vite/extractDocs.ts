@@ -16,13 +16,8 @@ import { basename, extname } from "node:path";
 
 import type { ComponentDocs, NoComponentDocs, SubcomponentDocs } from "forgebook/component-docs";
 import type { StoryComponentResult, StoryFileShape } from "forgebook/vite/adapter";
-import {
-  chosenExport,
-  type DocsProgram,
-  moduleSummaryOf,
-  programFor,
-  summaryOf
-} from "forgebook/vite/docs-program";
+import { chosenExport, type DocsProgram, programFor, summaryOf } from "forgebook/vite/docs-program";
+import { moduleSummaryOf } from "forgebook/vite/module-summary";
 import { declaredSymbol } from "forgebook/vite/prop-docs";
 import { signatureDocs } from "forgebook/vite/signature-docs";
 import { metaComponent, metaSubcomponents } from "forgebook/vite/story-meta";
@@ -37,7 +32,7 @@ import { COMPONENT_EXTENSION, componentScriptFile, SVELTE_SOURCES } from "./svel
 export const storyTypesModule = "@forgebook/svelte";
 
 /** A story file's or a component's program, with its components read as TypeScript. */
-const svelteProgram = (file: string): DocsProgram | string => programFor(file, SVELTE_SOURCES);
+const svelteProgram = (file: string): DocsProgram | string => programFor(file, { sources: SVELTE_SOURCES });
 
 /**
  * The file that declares a symbol, a component as its `.svelte` file.
@@ -66,7 +61,7 @@ const componentProse = (
     : program.program.getSourceFile(file);
   return {
     description: summaryOf(symbol, program.checker),
-    summary: source === undefined ? "" : moduleSummaryOf(source),
+    summary: source === undefined ? "" : moduleSummaryOf(source.text),
     ...guidanceOf(symbol, program.checker)
   };
 };

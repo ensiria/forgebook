@@ -5,7 +5,8 @@
  * @remarks
  * The frame runs everything else the same for every framework (`forgebook/renderer`): the play function, Replay, the
  * matrix, the error shown in place of the story. Drawing again with other args keeps the story's state; the frame
- * mounts it anew when a story must start over.
+ * mounts it anew when a story must start over. React's server renderer loads only when a server test renders a story
+ * (`renderToString`), so it never reaches a frame, where it would be a large part of the first load.
  *
  * @module
  */
@@ -14,7 +15,6 @@ import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/render
 import { storyContextOf } from "forgebook/renderer";
 import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { renderToString } from "react-dom/server";
 
 import { StoryClockContext } from "./clock.ts";
 import { StoryErrorBoundary } from "./StoryErrorBoundary.tsx";
@@ -90,7 +90,8 @@ export const reactRenderer: StoryRenderer = {
       unmount: (): void => root.unmount()
     };
   },
-  renderToString: (drawing: StoryDrawing): string => {
+  renderToString: async (drawing: StoryDrawing): Promise<string> => {
+    const { renderToString } = await import("react-dom/server");
     const context = storyContextOf(drawing, drawing.args, () => document.body);
     return renderToString(inProviders(drawing, storyElement(drawing.story, context, drawing.decorators)));
   }

@@ -115,6 +115,8 @@ test.describe("the panel on a Vue component", () => {
   test("records the event a person sends", async ({ page }) => {
     await page.goto(story("inputs-badge--default", "tab=events"));
     await isReady(page);
+    // the frame records the events the component's docs name: they may arrive after the story on a first read
+    await expect(page.getByRole("tabpanel")).toContainText("onRemove");
     await frameOf(page).getByRole("button", { name: "Remove" }).click();
     await expect(page.locator(".forgebook-calls__item")).toContainText(["onRemove"]);
   });

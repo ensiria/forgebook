@@ -129,9 +129,10 @@ test.describe("React Native's primitives", () => {
 
   test("a press calls the story's handler, which the Events tab lists with its value", async ({ page }) => {
     await page.goto(story("crew-profile-card--plain"));
-    await frameOf(page).getByRole("button", { name: "Follow" }).click();
+    // the frame records the events the component's docs name: they may arrive after the story on a first read
     await page.getByRole("tab", { name: /Events/ }).click();
-    await expect(page.getByText(/onFollow/).first()).toBeVisible();
+    await expect(page.getByRole("tabpanel")).toContainText("onFollow");
+    await frameOf(page).getByRole("button", { name: "Follow" }).click();
     await expect(page.getByText(/Ada Brennan/).first()).toBeVisible();
   });
 

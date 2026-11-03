@@ -133,6 +133,8 @@ test.describe("the panel on an Angular component", () => {
   test("records the output a person sends, and the model's change", async ({ page }) => {
     await page.goto(story("inputs-badge--default", "tab=events"));
     await isReady(page);
+    // the frame records the events the component's docs name: they may arrive after the story on a first read
+    await expect(page.getByRole("tabpanel")).toContainText("removed");
     await frameOf(page).getByRole("button", { name: "Remove" }).click();
     await expect(page.locator(".forgebook-calls__item")).toContainText(["removed"]);
     await frameOf(page).locator(".badge__count").click();

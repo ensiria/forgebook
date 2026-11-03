@@ -132,6 +132,9 @@ const withNext = (drawing: StoryDrawing, onCommit: (() => void) | undefined): St
   decorators: [...drawing.decorators, serverComponentsDecorator(onCommit)]
 });
 
+/** The server renders under way, in order: each sets the route's store the story reads while it renders. */
+let serverRenders: Promise<void> = Promise.resolve();
+
 /** React's renderer for a Next.js project. */
 export const nextRenderer: StoryRenderer = {
   mount: (canvas: HTMLElement, first: StoryDrawing, onError: (error: Error) => void): MountedStory => {
@@ -163,9 +166,17 @@ export const nextRenderer: StoryRenderer = {
       unmount: mounted.unmount
     };
   },
-  renderToString: (drawing: StoryDrawing): Promise<string> | string => {
-    setCurrentStore(createRouteStore(drawing.story.parameters, drawing.onEvent));
-    forgetServerResults();
-    return reactRenderer.renderToString(withNext(drawing, undefined));
+  renderToString: (drawing: StoryDrawing): Promise<string> => {
+    // one at a time: the route's store is the module's, and React's render waits for its server renderer to load
+    const render = serverRenders.then(async () => {
+      setCurrentStore(createRouteStore(drawing.story.parameters, drawing.onEvent));
+      forgetServerResults();
+      return await reactRenderer.renderToString(withNext(drawing, undefined));
+    });
+    serverRenders = render.then(
+      () => undefined,
+      () => undefined
+    );
+    return render;
   }
 };

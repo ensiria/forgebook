@@ -1,10 +1,11 @@
 /**
- * A story file's meta, read from its source with the TypeScript compiler's parser: the value of one of its fields, the
- * component it names and the module it imports that component from.
+ * A story file's meta, read from its source with the TypeScript compiler's parser, for the docs: the value of one of its
+ * fields, the component it names and its subcomponents.
  *
  * @remarks
- * CSF is the same whatever framework a story is written for, so the plugin, `forgebook-docs` and every framework's
- * docs extractor read the meta through this module. Pure: a parsed file in, nodes or a specifier out.
+ * CSF is the same whatever framework a story is written for, so `forgebook-docs` and every framework's docs extractor
+ * read the meta through this module, inside their TypeScript program. The plugin's own reading, outside any program,
+ * is `componentImport.ts`. Pure: a parsed file in, nodes out.
  *
  * @module
  */
@@ -81,32 +82,6 @@ export const metaField = (source: ts.SourceFile, name: string): ts.Expression | 
  */
 export const metaComponent = (source: ts.SourceFile): ts.Expression | undefined =>
   metaField(source, "component");
-
-/**
- * The module a story file imports its meta's component from (`./Button`), read from the file alone: no program, so
- * it answers at once, where the docs need the package's program.
- *
- * @param storyFile - the story file's path, for the parser.
- * @param text - the story file's text.
- * @returns the import's module specifier, or none when the meta names no imported component.
- */
-export const componentImport = (storyFile: string, text: string): string | undefined => {
-  const source = ts.createSourceFile(storyFile, text, ts.ScriptTarget.Latest, true);
-  const expression = metaComponent(source);
-  if (expression === undefined || !ts.isIdentifier(expression)) return undefined;
-  const name = expression.text;
-  for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    const clause = statement.importClause;
-    const bindings = clause?.namedBindings;
-    const isNamed =
-      bindings !== undefined &&
-      ts.isNamedImports(bindings) &&
-      bindings.elements.some((element) => element.name.text === name);
-    if (clause?.name?.text === name || isNamed) return statement.moduleSpecifier.text;
-  }
-  return undefined;
-};
 
 /** An expression without the wrappers around a literal list (`as const`, `satisfies`, parentheses). */
 export const unwrapped = (expression: ts.Expression): ts.Expression => {

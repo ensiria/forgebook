@@ -14,11 +14,21 @@
  * A framework whose components are not TypeScript (Svelte's `.svelte`) hands the text TypeScript reads in a component's
  * place (`ProgramSources`): its programs are kept apart from the plain ones, under the same configuration.
  *
+ * A program is the largest thing a dev server holds, so three things keep the programs small:
+ * - a dev server's programs hold the files asked for and what they import (`readAskedFilesOnly`), with the files that
+ *   hold for every file (declarations, augmentations), not every file of the configuration, until enough are asked
+ *   that the whole is cheaper (`MOST_ASKED`);
+ * - parsed files are kept between programs and shared by every configuration that parses alike (`parsedFiles.ts`),
+ *   the standard library's and `@types` without their documentation;
+ * - only the programs read last are kept (`KEPT_PROGRAMS`), with the parses they hold.
+ *
  * @module
  */
 import { dirname } from "node:path";
 
 import ts from "typescript-6";
+
+import { checkFileChanges, keepParsesOf, keptParse, mayFilesChange } from "./parsedFiles.ts";
 
 /** A program and its type checker. */
 export type DocsProgram = {
@@ -50,34 +60,182 @@ export type ProgramSources = {
 };
 
 /**
- * A compiler host that reads the sources' files as if they were on disk.
+ * What the file system answered a build's programs' module resolution: in a monorepo every configuration's program
+ * resolves the same thousands of imports, and asking the disk again for each one, in `stat`, `open` and `realpath`, is
+ * most of a build's time. A dev server asks each time: an install, or a package's declarations built beside it, changes
+ * what an import finds without a source file changing.
+ */
+const answered = {
+  files: new Map<string, boolean>(),
+  folders: new Map<string, boolean>(),
+  realPaths: new Map<string, string>()
+};
+
+/**
+ * An answer of the file system: asked once in a build, each time where files may change.
+ *
+ * @param kept - the answers kept.
+ * @param path - the path asked about.
+ * @param ask - asks the file system.
+ */
+const remembered = <TValue>(
+  kept: Map<string, TValue>,
+  path: string,
+  ask: (path: string) => TValue
+): TValue => {
+  if (mayFilesChange()) return ask(path);
+  const known = kept.get(path);
+  if (known !== undefined) return known;
+  const value = ask(path);
+  kept.set(path, value);
+  return value;
+};
+
+/**
+ * A compiler host that parses through the kept parses (`parsedFiles.ts`), remembers the file system's answers, and
+ * reads a framework's written sources as if they were on disk.
  *
  * @param options - the program's compiler options.
- * @param sources - the files to read in place.
+ * @param sources - the files read in place of a framework's components; none for a plain program.
  */
-const sourcesHost = (options: ts.CompilerOptions, sources: ProgramSources): ts.CompilerHost => {
+const keepingHost = (options: ts.CompilerOptions, sources: ProgramSources | undefined): ts.CompilerHost => {
   const host = ts.createCompilerHost(options, true);
-  const { fileExists, readFile, getSourceFile } = host;
+  const { fileExists, readFile, directoryExists, realpath } = host;
+  const parse = keptParse(options, host.getSourceFile);
   return {
     ...host,
-    fileExists: (fileName: string): boolean => sources.textOf(fileName) !== undefined || fileExists(fileName),
-    readFile: (fileName: string): string | undefined => sources.textOf(fileName) ?? readFile(fileName),
+    fileExists: (fileName: string): boolean =>
+      sources?.textOf(fileName) !== undefined || remembered(answered.files, fileName, fileExists),
+    readFile: (fileName: string): string | undefined => sources?.textOf(fileName) ?? readFile(fileName),
+    ...(directoryExists === undefined
+      ? {}
+      : { directoryExists: (path: string): boolean => remembered(answered.folders, path, directoryExists) }),
+    ...(realpath === undefined
+      ? {}
+      : { realpath: (path: string): string => remembered(answered.realPaths, path, realpath) }),
     getSourceFile: (
       fileName: string,
       languageVersion: ts.ScriptTarget | ts.CreateSourceFileOptions,
       onError?: (message: string) => void,
       shouldCreate?: boolean
     ): ts.SourceFile | undefined => {
-      const text = sources.textOf(fileName);
+      const text = sources?.textOf(fileName);
       return text === undefined
-        ? getSourceFile(fileName, languageVersion, onError, shouldCreate)
+        ? parse(fileName, languageVersion, onError, shouldCreate)
         : ts.createSourceFile(fileName, text, languageVersion, true);
     }
   };
 };
 
-/** The last program of each configuration, reused by the next read. */
+/**
+ * How many programs are kept. A program holds all its package reaches, hundreds of megabytes in a monorepo whose
+ * `tsconfig` paths lead to every package's sources, and one is made per `tsconfig.json`: kept without a limit they fill
+ * the worker's heap, it stops, and every story still waiting gets that error instead of its docs. Making one again
+ * takes a second or so, which is the cheaper of the two.
+ */
+export const KEPT_PROGRAMS = 4;
+
+/** The last program of each configuration, the one read last at the end: reused by the next read. */
 const programs = new Map<string, ts.Program>();
+
+/**
+ * Keeps a program as the one read last, and lets the oldest go past the limit.
+ *
+ * @param key - the program's key.
+ * @param program - the program.
+ */
+const keepProgram = (key: string, program: ts.Program): void => {
+  programs.delete(key);
+  programs.set(key, program);
+  for (const oldest of programs.keys()) {
+    if (programs.size <= KEPT_PROGRAMS) break;
+    programs.delete(oldest);
+    outdated.delete(oldest);
+  }
+};
+
+/** The files asked for, by program; none while every program holds all its configuration's files. */
+let askedFiles: Map<string, Set<string>> | undefined;
+
+/**
+ * From now on a program holds what was asked for and what that imports, not its whole configuration: a dev server shows
+ * one component at a time. A reader of everything asks for it (`programFor`'s `reach`).
+ */
+export const readAskedFilesOnly = (): void => {
+  askedFiles ??= new Map();
+  checkFileChanges();
+};
+
+/**
+ * The files asked for before a program takes all its configuration's files: each new root makes a new type checker,
+ * so a session that walks a whole library would pay more than the whole program costs at once.
+ */
+const MOST_ASKED = 16;
+
+/** What a program is read for: what the asked file reaches, or every file of its configuration. */
+export type ProgramReach = "asked" | "whole";
+
+/** How a file's program is read. */
+export type ProgramOptions = {
+  /** The files read in place of a framework's components; none for a plain program. */
+  readonly sources?: ProgramSources;
+  /**
+   * What the reader needs: what the file reaches (a component's docs, the default), or every file of its
+   * configuration (a group's "Used in"); either way a build's programs hold every file.
+   */
+  readonly reach?: ProgramReach;
+};
+
+/** What declares types for files that do not import it: `declare global`, `declare module`. */
+const AMBIENT_DECLARATION = /\bdeclare\s+(?:global\b|module\s)/;
+
+/** The ambient files of each configuration read, found once: they are roots of every program, asked or not. */
+const ambientFiles = new WeakMap<ReadConfiguration, readonly string[]>();
+
+/**
+ * A configuration's files that hold for every file without an import: its declarations, and the sources that augment a
+ * module or the global scope (a theme's registry, a library's typed options), which nothing may import.
+ *
+ * @param read - the configuration.
+ */
+const ambientOf = (read: ReadConfiguration): readonly string[] => {
+  const known = ambientFiles.get(read);
+  if (known !== undefined) return known;
+  const found = read.parsed.fileNames.filter(
+    (name) => name.endsWith(".d.ts") || AMBIENT_DECLARATION.test(ts.sys.readFile(name) ?? "")
+  );
+  ambientFiles.set(read, found);
+  return found;
+};
+
+/**
+ * The root files of a configuration's program: all of them, or, once only what is asked for is read, its ambient
+ * files and the files asked for so far, until enough are asked that the whole is cheaper.
+ *
+ * @param key - the program's key.
+ * @param read - its configuration.
+ * @param file - the file asked for.
+ * @param reach - what the reader needs.
+ */
+const rootsOf = (
+  key: string,
+  read: ReadConfiguration,
+  file: string,
+  reach: ProgramReach
+): readonly string[] => {
+  const { fileNames } = read.parsed;
+  if (askedFiles === undefined) return fileNames;
+  const asked = askedFiles.get(key) ?? new Set<string>();
+  askedFiles.set(key, asked);
+  // a program read whole stays whole: going back and forth would build it again each time
+  if (reach === "whole") for (const name of fileNames) asked.add(name);
+  if (asked.size >= MOST_ASKED) return fileNames;
+  // a file the kept program reaches through an import needs no root of its own, while that program is current
+  const name = file.replaceAll("\\", "/");
+  const isHeld = !outdated.has(key) && programs.get(key)?.getSourceFile(name) !== undefined;
+  if (!isHeld && read.fileSet.has(name)) asked.add(name);
+  return [...new Set([...ambientOf(read), ...asked])];
+};
 
 /**
  * The configurations whose program may hold an edited file: renewed on their next read. A program read again without
@@ -104,6 +262,11 @@ const unlisted = new Set<string>();
 
 /** Marks every program as maybe holding an edited file: each is renewed on its next read. */
 export const markSourcesChanged = (): void => {
+  checkFileChanges();
+  // a reader told of an edit from now on asks the disk each time: these answers may be out of date
+  answered.files.clear();
+  answered.folders.clear();
+  answered.realPaths.clear();
   for (const configPath of programs.keys()) outdated.add(configPath);
   // an edited configuration may hold other files, or have other options
   configurations.clear();
@@ -139,15 +302,23 @@ const keptProgram = (
   sources: ProgramSources | undefined
 ): ts.Program => {
   const oldProgram = programs.get(key);
-  if (oldProgram !== undefined && !outdated.has(key)) return oldProgram;
+  const roots = sources === undefined ? rootNames : [...rootNames, ...sources.roots];
+  // a program asked for one more file is renewed: its roots grew
+  const isSameRoots = oldProgram?.getRootFileNames().length === roots.length;
+  if (oldProgram !== undefined && isSameRoots && !outdated.has(key)) {
+    keepProgram(key, oldProgram);
+    return oldProgram;
+  }
   outdated.delete(key);
   const program = ts.createProgram({
-    rootNames: sources === undefined ? rootNames : [...rootNames, ...sources.roots],
+    rootNames: roots,
     options,
-    ...(sources === undefined ? {} : { host: sourcesHost(options, sources) }),
+    host: keepingHost(options, sources),
     ...(oldProgram === undefined ? {} : { oldProgram })
   });
-  programs.set(key, program);
+  keepProgram(key, program);
+  // the parses only the programs let go held go with them
+  keepParsesOf(programs.values());
   return program;
 };
 
@@ -188,11 +359,14 @@ const looseProgram = (
   const kept = programs.get(key);
   // a file the program does not hold is new: reading the folder again finds it, and whatever else came with it
   if (kept !== undefined && kept.getSourceFile(file) === undefined) outdated.add(key);
+  // kept, its roots are read again as they were, so the program is reused
   const files =
     kept === undefined || outdated.has(key)
       ? ts.sys.readDirectory(folder, SOURCE_EXTENSIONS, NOT_SOURCES)
-      : [];
-  const program = keptProgram(key, files.includes(file) ? files : [...files, file], merged, sources);
+      : kept.getRootFileNames().filter((name) => !(sources?.roots ?? []).includes(name));
+  // in TypeScript's form, as the folder's files are listed, so a listed file is not added twice
+  const name = file.replaceAll("\\", "/");
+  const program = keptProgram(key, files.includes(name) ? files : [...files, name], merged, sources);
   return { program, checker: program.getTypeChecker() };
 };
 
@@ -254,6 +428,65 @@ const holdingConfiguration = (file: string): string | undefined => {
 };
 
 /**
+ * The files a configuration was read from: itself and those it extends.
+ *
+ * @param configPath - the `tsconfig.json`.
+ */
+const configurationSources = (configPath: string): string[] => {
+  const configFile = readConfiguration(configPath)?.parsed.options["configFile"];
+  const extended =
+    typeof configFile === "object" && configFile !== null && "extendedSourceFiles" in configFile
+      ? (configFile.extendedSourceFiles ?? [])
+      : [];
+  return [configPath, ...extended];
+};
+
+/**
+ * The files besides a source's own imports that what is read of it can change with: every configuration looked at to
+ * find the one that holds it (up its folders, with the projects they reference) and those they extend, and the files
+ * that hold for every file of that configuration (its declarations, its augmentations). Kept answers are checked
+ * against them (`diskCache.ts`).
+ *
+ * @param file - an absolute path to a source file.
+ */
+export const configurationFiles = (file: string): string[] => {
+  const name = file.replaceAll("\\", "/");
+  const files: string[] = [];
+  let folder = dirname(file);
+  for (;;) {
+    const configPath = ts.findConfigFile(folder, ts.sys.fileExists, "tsconfig.json");
+    if (configPath === undefined) break;
+    const candidates = withReferences(configPath);
+    for (const candidate of candidates) files.push(...configurationSources(candidate));
+    const holding = candidates.find((candidate) => readConfiguration(candidate)?.fileSet.has(name) === true);
+    const read = holding === undefined ? undefined : readConfiguration(holding);
+    if (read !== undefined) {
+      files.push(...ambientOf(read));
+      break;
+    }
+    const parent = dirname(dirname(configPath));
+    if (parent === dirname(configPath)) break;
+    folder = parent;
+  }
+  return [...new Set(files)];
+};
+
+/**
+ * The compiler options a file is read with, as `programFor` finds its configuration, without making a program: its
+ * imports resolve with them.
+ *
+ * @param file - an absolute path to a source file.
+ */
+export const compilerOptionsFor = (file: string): ts.CompilerOptions => {
+  const holding = holdingConfiguration(file);
+  const nearest = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
+  const configPath = holding ?? nearest;
+  return (
+    (configPath === undefined ? undefined : readConfiguration(configPath)?.parsed.options) ?? FALLBACK_OPTIONS
+  );
+};
+
+/**
  * A configuration's program, renewed when it lacks a file the configuration lists: a story file added since the
  * program was made.
  *
@@ -261,18 +494,24 @@ const holdingConfiguration = (file: string): string | undefined => {
  * @param read - the configuration, read.
  * @param file - the file the program is for.
  * @param sources - the files read in place of a framework's components; none for a plain program.
+ * @param reach - what the reader needs: what the file reaches, or every file of the configuration.
  */
 const configurationProgram = (
   configPath: string,
   read: ReadConfiguration,
   file: string,
-  sources: ProgramSources | undefined
+  sources: ProgramSources | undefined,
+  reach: ProgramReach
 ): DocsProgram => {
   const key = `${configPath}${sourcesKey(sources)}`;
+  const roots = rootsOf(key, read, file, reach);
   const kept = programs.get(key);
-  if (kept !== undefined && kept.getSourceFile(file) === undefined) outdated.add(key);
+  // a file the configuration lists that the program, with the same roots, does not hold was added since it was made
+  const keptRoots = (kept?.getRootFileNames().length ?? 0) - (sources?.roots.length ?? 0);
+  if (kept !== undefined && kept.getSourceFile(file) === undefined && roots.length === keptRoots)
+    outdated.add(key);
   const options = { ...read.parsed.options, ...sources?.options };
-  const program = keptProgram(key, read.parsed.fileNames, options, sources);
+  const program = keptProgram(key, roots, options, sources);
   return { program, checker: program.getTypeChecker() };
 };
 
@@ -282,10 +521,13 @@ const configurationProgram = (
  * configuration holds share (`FALLBACK_OPTIONS`, or the nearest configuration's with JavaScript allowed).
  *
  * @param file - an absolute path to a source file, or to a file the sources write.
- * @param sources - the files read in place of a framework's components; none for a plain program.
+ * @param options - the sources a framework writes, and what the reader needs.
  * @returns the program, or a message when the configuration above it cannot be read.
  */
-export const programFor = (file: string, sources?: ProgramSources): DocsProgram | string => {
+export const programFor = (
+  file: string,
+  { sources, reach = "asked" }: ProgramOptions = {}
+): DocsProgram | string => {
   const nearest = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
   if (nearest === undefined) return looseProgram(file, FALLBACK_OPTIONS, sources);
   // a file the sources write is on no configuration's list, so reading them again would not find it
@@ -300,14 +542,24 @@ export const programFor = (file: string, sources?: ProgramSources): DocsProgram 
   if (holding === undefined) unlisted.add(file);
   const holdingRead = holding === undefined ? undefined : readConfiguration(holding);
   if (holding !== undefined && holdingRead !== undefined)
-    return configurationProgram(holding, holdingRead, file, sources);
+    return configurationProgram(holding, holdingRead, file, sources, reach);
   const read = readConfiguration(nearest);
   if (read === undefined) return `${nearest} could not be read`;
   const options = { ...read.parsed.options, ...sources?.options };
-  const program = keptProgram(`${nearest}${sourcesKey(sources)}`, read.parsed.fileNames, options, sources);
+  const key = `${nearest}${sourcesKey(sources)}`;
+  const program = keptProgram(key, rootsOf(key, read, file, reach), options, sources);
   if (program.getSourceFile(file) === undefined) return looseProgram(file, read.parsed.options, sources);
   return { program, checker: program.getTypeChecker() };
 };
+
+/**
+ * The configuration that holds a file, as `programFor` finds it; empty for a file none holds: what "Used in" groups a
+ * library's story files by, to read one configuration at a time.
+ *
+ * @internal
+ * @param file - an absolute path to a source file.
+ */
+export const configurationOf = (file: string): string => holdingConfiguration(file) ?? "";
 
 /**
  * The first paragraph of a symbol's TSDoc.
@@ -319,33 +571,6 @@ export const summaryOf = (symbol: ts.Symbol, checker: ts.TypeChecker): string =>
   (ts.displayPartsToString(symbol.getDocumentationComment(checker)).split(/\n\s*\n/)[0] ?? "")
     .replace(/\s+/g, " ")
     .trim();
-
-/**
- * The first paragraph of a file's leading comment, its `@module` TSDoc: what the file holds, in a sentence. A
- * component's own TSDoc is often a bare name ("A button."); its file's comment says what it is and does.
- *
- * @param sourceFile - the file.
- * @returns the paragraph on one line, or an empty text when the file does not open with a `@module` comment.
- */
-export const moduleSummaryOf = (sourceFile: ts.SourceFile): string => {
-  const text = sourceFile.getFullText();
-  const [range] = ts.getLeadingCommentRanges(text, 0) ?? [];
-  if (range === undefined) return "";
-  const comment = text.slice(range.pos, range.end);
-  if (!comment.startsWith("/**") || !comment.includes("@module")) return "";
-  const lines = comment
-    .replace(/^\/\*\*/, "")
-    .replace(/\*\/$/, "")
-    .split("\n")
-    .map((line) => line.replace(/^\s*\* ?/, "").trimEnd());
-  const start = lines.findIndex((line) => line !== "");
-  const paragraph: string[] = [];
-  for (const line of lines.slice(Math.max(start, 0))) {
-    if (line === "" || line.startsWith("@")) break;
-    paragraph.push(line);
-  }
-  return paragraph.join(" ").replace(/\s+/g, " ").trim();
-};
 
 /**
  * Each of a TSDoc tag's texts, for a tag that can be written more than once.

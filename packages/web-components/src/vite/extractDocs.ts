@@ -19,7 +19,8 @@ import { basename, extname } from "node:path";
 
 import type { ComponentDocs, NoComponentDocs, SubcomponentDocs } from "forgebook/component-docs";
 import type { StoryComponentResult, StoryFileShape } from "forgebook/vite/adapter";
-import { chosenExport, moduleSummaryOf, programFor, summaryOf, tagOf } from "forgebook/vite/docs-program";
+import { chosenExport, programFor, summaryOf, tagOf } from "forgebook/vite/docs-program";
+import { moduleSummaryOf } from "forgebook/vite/module-summary";
 import { declaredSymbol } from "forgebook/vite/prop-docs";
 import { signatureDocs } from "forgebook/vite/signature-docs";
 import { metaComponent, metaField, unwrapped } from "forgebook/vite/story-meta";
@@ -126,7 +127,7 @@ const litElementDocs = (
     docs: {
       name,
       description,
-      summary: moduleSummaryOf(element.declaration.getSourceFile()),
+      summary: moduleSummaryOf(element.declaration.getSourceFile().text),
       props: [...props, ...slots, ...events],
       parts,
       subcomponents: [],
@@ -252,7 +253,7 @@ const logicOf = (
     docs: {
       name: symbol.getName(),
       description: summaryOf(symbol, checker),
-      summary: file === undefined ? "" : moduleSummaryOf(file),
+      summary: file === undefined ? "" : moduleSummaryOf(file.text),
       props: [],
       parts: [],
       subcomponents: [],

@@ -16,10 +16,8 @@ import type { DocPageIndex } from "@forgebook/story-format/source";
 
 import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
 import { storyFileKeys } from "./storyFilesModule.ts";
+import { DOCS_PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
-
-/** The query that asks for one docs page, rendered. */
-export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
 
 /** A page a pattern matches, with its key and its index. */
 export type IndexedDocPage = {

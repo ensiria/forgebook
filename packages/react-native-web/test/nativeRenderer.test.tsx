@@ -115,8 +115,8 @@ describe("the React Native renderer", () => {
     canvas.remove();
   });
 
-  it("writes a story as HTML on the server as React's renderer does, without a root of its own", () => {
-    const html = nativeRenderer.renderToString(drawing(screenStory("padded"), "Server"));
+  it("writes a story as HTML on the server as React's renderer does, without a root of its own", async () => {
+    const html = await nativeRenderer.renderToString(drawing(screenStory("padded"), "Server"));
     expect(html).toContain("Server");
     expect(html).not.toContain(NATIVE_ROOT_ATTRIBUTE);
   });

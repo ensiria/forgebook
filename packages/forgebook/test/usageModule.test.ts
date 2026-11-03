@@ -88,12 +88,28 @@ describe("a catalogue that turns Used in off", () => {
   it("offers no usage loader in its files' modules, and says so in its settings", () => {
     const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
     const offered = storyFilesModule(dir, "./*.stories.tsx", () => undefined);
-    const off = storyFilesModule(dir, "./*.stories.tsx", () => undefined, false);
+    const off = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+      hasUsage: false,
+      hasReach: false
+    });
     expect(offered).toContain(`usage: () => import("virtual:forgebook-usage:${dir}::0::*.stories.tsx")`);
     expect(off).not.toContain("usage:");
+    expect(off).not.toContain("reach:");
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES).hasUsedIn).toBe(true);
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES, mergedLists([{ usedIn: false }, {}])).hasUsedIn).toBe(
       false
     );
+  });
+});
+
+describe("a static build's files module", () => {
+  it('offers "Used in" without what each story reaches, which only the dev server\'s tools read', () => {
+    const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
+    const built = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+      hasUsage: true,
+      hasReach: false
+    });
+    expect(built).toContain("usage: () => import(");
+    expect(built).not.toContain("reach:");
   });
 });
