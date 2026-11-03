@@ -1,7 +1,8 @@
 /**
  * Paths as Vite writes its module ids: forward slashes on every system (`C:/app/src/x.tsx` on Windows), so a path the
  * plugin builds can be compared with an id Vite hands it, written into generated code, or used as a key that TypeScript's
- * file names (also forward slashes) meet.
+ * file names (also forward slashes) meet. Exported as `forgebook/vite/paths`, so an adapter's plugin builds its paths
+ * the same way, and its tests run the Windows logic anywhere (`vitePathsOf(path.win32)`).
  *
  * @remarks
  * Node's `path` writes Windows paths with backslashes (`C:\app\src\x.tsx`), and Vite's ids never have them: an id
