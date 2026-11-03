@@ -31,6 +31,14 @@ describe("createDocsExtractor", () => {
     const again = await extractor.extract(join(KIT, "Select.stories.tsx"));
     expect(typeof again === "string" ? again : again.docs).toMatchObject({ name: "Select" });
   }, 60_000);
+
+  it('reads a group\'s usage once when its "Used in" and its reach ask for it together', async () => {
+    const files = [{ storyFile: join(KIT, "Select.stories.tsx"), exports: ["Default"] }];
+    const usedIn = extractor.usage(files);
+    const reach = extractor.usage(files);
+    expect(reach).toBe(usedIn);
+    expect(typeof (await usedIn)).toBe("object");
+  }, 60_000);
 });
 
 describe("createDocsExtractor with a cache folder", () => {

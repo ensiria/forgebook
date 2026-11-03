@@ -90,6 +90,12 @@ export const storyFileKeys = (root: string, patterns: readonly string[]): string
  */
 export const USAGE_PREFIX = "virtual:forgebook-usage:";
 
+/**
+ * The id prefix of a group's reach module, what each story reaches, the same way: only the dev server's tools ask for
+ * it, so a page that shows "Used in" never downloads it.
+ */
+export const REACH_PREFIX = "virtual:forgebook-reach:";
+
 /** A story file a pattern matches, with its key and its index. */
 export type IndexedStoryFile = {
   /** Its path relative to the declaring module (`../src/x.stories.tsx`). */
@@ -152,13 +158,21 @@ export const indexedStoryFiles = (
 const objectOf = (keys: readonly string[], value: (key: string) => string): string =>
   `{${keys.map((key) => `${JSON.stringify(key)}: ${value(key)}`).join(",\n")}}`;
 
+/** The loaders a group offers besides its story files'. */
+export type GroupLoaders = {
+  /** Whether it offers its "Used in" (the catalogue did not turn it off). */
+  readonly hasUsage: boolean;
+  /** Whether it offers what each story reaches: only on a dev server, for its tools. */
+  readonly hasReach: boolean;
+};
+
 /**
  * The code of the module for one pattern.
  *
  * @param root - the declaring module's folder.
  * @param pattern - the pattern before `?forgebook-files`.
  * @param watch - adds a file whose edit renews the module (each story file: its index is in the module).
- * @param hasUsage - whether the group offers its "Used in" loader (the catalogue did not turn it off).
+ * @param loaders - the group's loaders besides its story files'; both by default.
  * @param cache - the index kept between starts.
  * @returns the module's code, or a message saying which file cannot be indexed.
  */
@@ -166,9 +180,10 @@ export const storyFilesModule = (
   root: string,
   pattern: string,
   watch: (file: string) => void,
-  hasUsage = true,
+  loaders: GroupLoaders = { hasUsage: true, hasReach: true },
   cache?: DiskCache<KeptIndex>
 ): string => {
+  const { hasUsage, hasReach } = loaders;
   const files = indexedStoryFiles(root, pattern, watch, cache);
   const keys = files.map((file) => file.key);
   // the group's id in Vite's form, as the plugin names the declaring module's folder
@@ -177,6 +192,7 @@ export const storyFilesModule = (
     files.map((file) => [file.key, file.index])
   );
   const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const reach = JSON.stringify(`${REACH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   // absolute paths in Vite's form: the module has no folder of its own, Vite serves them under /@fs/ in development,
   // and the queries' ids come back to the plugin as written here
   const absolute = (key: string): string => VITE_PATHS.resolve(folder, key);
@@ -188,9 +204,9 @@ export const storyFilesModule = (
     `stories: ${objectOf(keys, (key) => `() => import(${path(key)})`)},`,
     `docs: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`)},`,
     `code: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`)},`,
-    `pages: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`)}${hasUsage ? "," : ""}`,
+    `pages: ${objectOf(keys, (key) => `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`)},`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
-    ...(hasUsage ? [`reach: () => import(${usage}).then((module) => module.reach)`] : []),
+    ...(hasReach ? [`reach: () => import(${reach}).then((module) => module.default),`] : []),
     "};"
   ].join("\n");
 };

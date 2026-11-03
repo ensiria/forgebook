@@ -28,7 +28,7 @@ import { dirname } from "node:path";
 
 import ts from "typescript-6";
 
-import { checkFileChanges, keepParsesOf, keptParse } from "./parsedFiles.ts";
+import { checkFileChanges, keepParsesOf, keptParse, mayFilesChange } from "./parsedFiles.ts";
 
 /** A program and its type checker. */
 export type DocsProgram = {
@@ -60,21 +60,59 @@ export type ProgramSources = {
 };
 
 /**
- * A compiler host that parses through the kept parses (`parsedFiles.ts`), and reads a framework's written sources as if
- * they were on disk.
+ * What the file system answered a build's programs' module resolution: in a monorepo every configuration's program
+ * resolves the same thousands of imports, and asking the disk again for each one, in `stat`, `open` and `realpath`, is
+ * most of a build's time. A dev server asks each time: an install, or a package's declarations built beside it, changes
+ * what an import finds without a source file changing.
+ */
+const answered = {
+  files: new Map<string, boolean>(),
+  folders: new Map<string, boolean>(),
+  realPaths: new Map<string, string>()
+};
+
+/**
+ * An answer of the file system: asked once in a build, each time where files may change.
+ *
+ * @param kept - the answers kept.
+ * @param path - the path asked about.
+ * @param ask - asks the file system.
+ */
+const remembered = <TValue>(
+  kept: Map<string, TValue>,
+  path: string,
+  ask: (path: string) => TValue
+): TValue => {
+  if (mayFilesChange()) return ask(path);
+  const known = kept.get(path);
+  if (known !== undefined) return known;
+  const value = ask(path);
+  kept.set(path, value);
+  return value;
+};
+
+/**
+ * A compiler host that parses through the kept parses (`parsedFiles.ts`), remembers the file system's answers, and
+ * reads a framework's written sources as if they were on disk.
  *
  * @param options - the program's compiler options.
  * @param sources - the files read in place of a framework's components; none for a plain program.
  */
 const keepingHost = (options: ts.CompilerOptions, sources: ProgramSources | undefined): ts.CompilerHost => {
   const host = ts.createCompilerHost(options, true);
-  const { fileExists, readFile } = host;
+  const { fileExists, readFile, directoryExists, realpath } = host;
   const parse = keptParse(options, host.getSourceFile);
   return {
     ...host,
     fileExists: (fileName: string): boolean =>
-      sources?.textOf(fileName) !== undefined || fileExists(fileName),
+      sources?.textOf(fileName) !== undefined || remembered(answered.files, fileName, fileExists),
     readFile: (fileName: string): string | undefined => sources?.textOf(fileName) ?? readFile(fileName),
+    ...(directoryExists === undefined
+      ? {}
+      : { directoryExists: (path: string): boolean => remembered(answered.folders, path, directoryExists) }),
+    ...(realpath === undefined
+      ? {}
+      : { realpath: (path: string): string => remembered(answered.realPaths, path, realpath) }),
     getSourceFile: (
       fileName: string,
       languageVersion: ts.ScriptTarget | ts.CreateSourceFileOptions,
@@ -225,6 +263,10 @@ const unlisted = new Set<string>();
 /** Marks every program as maybe holding an edited file: each is renewed on its next read. */
 export const markSourcesChanged = (): void => {
   checkFileChanges();
+  // a reader told of an edit from now on asks the disk each time: these answers may be out of date
+  answered.files.clear();
+  answered.folders.clear();
+  answered.realPaths.clear();
   for (const configPath of programs.keys()) outdated.add(configPath);
   // an edited configuration may hold other files, or have other options
   configurations.clear();
@@ -509,6 +551,15 @@ export const programFor = (
   if (program.getSourceFile(file) === undefined) return looseProgram(file, read.parsed.options, sources);
   return { program, checker: program.getTypeChecker() };
 };
+
+/**
+ * The configuration that holds a file, as `programFor` finds it; empty for a file none holds: what "Used in" groups a
+ * library's story files by, to read one configuration at a time.
+ *
+ * @internal
+ * @param file - an absolute path to a source file.
+ */
+export const configurationOf = (file: string): string => holdingConfiguration(file) ?? "";
 
 /**
  * The first paragraph of a symbol's TSDoc.

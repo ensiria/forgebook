@@ -37,6 +37,9 @@ export const checkFileChanges = (): void => {
   mayChange = true;
 };
 
+/** Whether files may change while the programs read them: a dev server's, or any reader told of an edit. */
+export const mayFilesChange = (): boolean => mayChange;
+
 /**
  * A file's stamp: its change time, in nanoseconds, and its size; none for a file that is not there.
  *

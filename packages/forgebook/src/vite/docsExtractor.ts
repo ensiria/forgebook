@@ -197,6 +197,8 @@ export const createDocsExtractor = (
   let changes = 0;
   // whether kept answers are read: until a source file is added or removed while the server runs
   let isKeptRead = true;
+  // a group's usage asked again before the worker answered (its "Used in" and its reach), by request and changes
+  const usageAsked = new Map<string, Promise<UsageResult>>();
   // every request sent and not answered yet, a warm-up's included (none reads its answer)
   const pending = new Map<number, (response: DocsResponse | string) => void>();
   // the warm-ups not sent yet: one goes out only when nothing is pending, so a read never waits behind them all
@@ -256,16 +258,18 @@ export const createDocsExtractor = (
           resolve(result);
         });
       }),
-    usage: (files: readonly UsageRequestFile[]): Promise<UsageResult> =>
-      new Promise((resolve) => {
-        // a group is its story files and what each renders: the same files with other stories are another group
-        const key = JSON.stringify(files);
+    usage: (files: readonly UsageRequestFile[]): Promise<UsageResult> => {
+      // a group is its story files and what each renders: the same files with other stories are another group
+      const key = JSON.stringify(files);
+      const asked = changes;
+      const pending = usageAsked.get(`${asked}:${key}`);
+      if (pending !== undefined) return pending;
+      const read = new Promise<UsageResult>((resolve) => {
         const kept = isKeptRead ? usageCache?.read(key) : undefined;
         if (kept !== undefined) {
           resolve(kept);
           return;
         }
-        const asked = changes;
         send({ kind: "usage", id: nextId++, files }, (response) => {
           if (typeof response === "string" || response.kind !== "usage") {
             resolve(String(response));
@@ -276,7 +280,11 @@ export const createDocsExtractor = (
             usageCache?.write(key, result, stamps);
           resolve(result);
         });
-      }),
+      });
+      usageAsked.set(`${asked}:${key}`, read);
+      void read.finally(() => usageAsked.delete(`${asked}:${key}`));
+      return read;
+    },
     changed: (): void => {
       changes += 1;
       // a worker not started yet has no program to renew

@@ -57,11 +57,20 @@ import {
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
-import { docsModule, FILES_PREFIX, patternModule, USAGE_ID_PREFIX, usageModule } from "./pluginModules.ts";
+import {
+  docsModule,
+  FILES_PREFIX,
+  patternModule,
+  REACH_ID_PREFIX,
+  reachModule,
+  USAGE_ID_PREFIX,
+  usageModule
+} from "./pluginModules.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import {
   isKeptIndex,
   type KeptIndex,
+  REACH_PREFIX,
   storyFilesGroupOf,
   storyFilesGroupText,
   USAGE_PREFIX
@@ -148,6 +157,21 @@ export type ForgebookPluginOptions = {
 };
 
 /**
+ * Renews modules in every environment that loaded them: the agents' routes load them on the server too.
+ *
+ * @param server - the dev server.
+ * @param ids - the modules' ids.
+ */
+const invalidateEverywhere = (server: ViteDevServer, ids: Iterable<string>): void => {
+  for (const environment of Object.values(server.environments)) {
+    for (const id of ids) {
+      const module = environment.moduleGraph.getModuleById(id);
+      if (module !== undefined) environment.moduleGraph.invalidateModule(module);
+    }
+  }
+};
+
+/**
  * The id of a `?forgebook-files` module: its prefix, then its group (`storyFilesGroupText`), which holds no `..`.
  *
  * @param folder - the importing module's folder.
@@ -177,7 +201,7 @@ const patternId = (source: string, folder: string): string | null => {
  */
 const virtualId = (source: string): string | undefined => {
   if (source === CONFIG_MODULE) return CONFIG_ID;
-  return source.startsWith(USAGE_PREFIX) ? `\0${source}` : undefined;
+  return source.startsWith(USAGE_PREFIX) || source.startsWith(REACH_PREFIX) ? `\0${source}` : undefined;
 };
 
 /** The resolved id of the configuration's data module. */
@@ -345,14 +369,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
     if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
-    const graph = server.environments.client.moduleGraph;
-    for (const id of usageModules) {
-      const module = graph.getModuleById(id);
-      if (module !== undefined) graph.invalidateModule(module);
-    }
+    invalidateEverywhere(server, usageModules);
   };
   /**
-   * A pattern's module or a group's "Used in" module, when the id is one.
+   * A pattern's module, or a group's "Used in" or reach module, when the id is one.
    *
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
@@ -364,15 +384,23 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
-      return usageModule(id, watch, extractor().usage, isServing(), indexCache());
+      return usageModule(id, watch, extractor().usage, indexCache());
+    }
+    // what each story reaches is for the dev server's tools only: a build ships none of it
+    if (id.startsWith(REACH_ID_PREFIX)) {
+      usageModules.add(id);
+      return isServing()
+        ? reachModule(id, watch, extractor().usage, indexCache())
+        : { code: "export default [];", moduleType: "js" };
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
     filesModules.add(id);
+    const hasUsage = config?.lists.usedIn !== false;
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
     return patternModule(
       id,
       watch,
-      config?.lists.usedIn !== false,
+      { hasUsage, hasReach: hasUsage && isServing() },
       indexCache(),
       isTestRun ? undefined : extractor().warm
     );
@@ -530,11 +558,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         noteListing(file);
         const renewed = modulesListing(file);
         if (renewed === undefined) return;
-        const graph = server.environments.client.moduleGraph;
-        for (const id of renewed) {
-          const module = graph.getModuleById(id);
-          if (module !== undefined) graph.invalidateModule(module);
-        }
+        invalidateEverywhere(server, renewed);
         server.ws.send({ type: "full-reload" });
       };
       server.watcher.on("add", refresh);
