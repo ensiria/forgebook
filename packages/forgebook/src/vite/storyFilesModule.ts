@@ -91,6 +91,15 @@ export const storyFileKeys = (root: string, patterns: readonly string[]): string
 export const USAGE_PREFIX = "virtual:forgebook-usage:";
 
 /**
+ * The id prefix of a group's search index: the group follows (`storyFilesGroupText`). The plugin answers it
+ * (`searchModule.ts`) only when a page asks, on the first search.
+ */
+export const SEARCH_PREFIX = "virtual:forgebook-search:";
+
+/** The id prefix of a docs pages' search index, the same way: the plugin answers it only on the first search. */
+export const PAGES_SEARCH_PREFIX = "virtual:forgebook-search-pages:";
+
+/**
  * The id prefix of a group's reach module, what each story reaches, the same way: only the dev server's tools ask for
  * it, so a page that shows "Used in" never downloads it.
  */
@@ -213,6 +222,7 @@ export const storyFilesCode = (
     files.map((file) => [file.key, file.index])
   );
   const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const search = JSON.stringify(`${SEARCH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   const reach = JSON.stringify(`${REACH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   // absolute paths in Vite's form: the module has no folder of its own, Vite serves them under /@fs/ in development,
   // and the queries' ids come back to the plugin as written here
@@ -239,6 +249,7 @@ export const storyFilesCode = (
     "docs: column(2),",
     "code: column(3),",
     "pages: column(4),",
+    `search: () => import(${search}).then((module) => module.default),`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasReach ? [`reach: () => import(${reach}).then((module) => module.default),`] : []),
     "};"

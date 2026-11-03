@@ -159,6 +159,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   own, each with its name, logo, texts and design tokens.
 - **Docs pages**: guides and foundations in Markdown, with live stories inside, in a section of their own above the
   components ([below](#docs-pages)).
+- **Search across everything**: `/` or ⌘K, and the words find docs pages, props, events, descriptions, stories and names
+  ([below](#search)).
 - **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook, helper, design token
   and docs page of a package, from its exports, their TSDoc, its stories and its source.
 - **Tests from the stories**, with [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing): every
@@ -425,6 +427,27 @@ The buttons read their colours from the page's theme.
 ```story acme:actions-button--primary
 ```
 
+## Search
+
+The field at the top of the sidebar searches the whole catalogue. The tree filters by name as you type, for browsing;
+beside it a list ranks everything the words find, each component or page with what matched inside it and why (a prop,
+an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere, ↑ and ↓
+move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
+
+A prop has an address of its own, so a link to one can be pasted anywhere: `?component=acme:inputs-select#prop.value`,
+and `#prop.Group.label` for a prop of a part named in `subcomponents`. A heading of a component's documentation file
+has one too (`#accessibility`), as a docs page's has.
+
+There is no search server and nothing to set up: the plugin builds the index with the catalogue, and the shell loads it
+the first time someone types, so a reader who never searches pays nothing. A static build searches as the dev server
+does. Only what the page does not already hold goes in the index: under 4 KB gzipped for a small library of ten components
+with their documentation and a few guides. On a dev server, the first search waits for your packages' TypeScript for the props; names and docs
+pages answer first.
+
+Search and `forgebook find` rank alike, with the same synonyms: `modal` finds a `Dialog`, and a name counts more than a
+sentence. A sentence copied from a page finds that page first. Change the words people see with `strings`, as any
+other text of the shell (`"search.kindPage": "Guides"`).
+
 ## The props
 
 ```props acme:actions-button
@@ -610,6 +633,7 @@ conditions, those of other runtimes (`browser`) aside, unless a plugin names the
 | `forgebook changed` | Lists the stories a change touches, through what they import |
 | `forgebook verify` | Runs the checks on every story a change touches, with one exit code |
 | `forgebook find` | Finds components by what they are for, in your own words |
+| `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
 | `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
@@ -838,9 +862,7 @@ shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.b
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers sixteen tools: `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
-
-It offers seventeen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers eighteen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, and `search_catalogue`, the search people use. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
 `node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
@@ -900,6 +922,8 @@ tokens, and anyone who reaches the site can read it, so it is written only when 
 
 `forgebook find` and `find_component` search names, the meta's `keywords`, titles and stories, with the usual synonyms
 (`modal` finds a `Dialog`): write `keywords: ["radio tile group"]` on `OptionCards` and it is found.
+`forgebook search` and `search_catalogue` read the rest, with the same ranking: a prop's name, a sentence of a docs page,
+each result with the words it missed and the address that opens the exact heading or prop.
 
 `forgebook check <id> --semantic` also asks a model what axe cannot see: whether a heading describes its section, an
 image's text says what it shows, a label says what its control does. It is off unless asked, and sends each story's

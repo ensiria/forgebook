@@ -1,8 +1,8 @@
 /**
  * The dev server's answers to tools and agents, under `/__forgebook/api/`: `stories` (every story) and `story?id=…`
- * (one in detail), `pages` and `page?id=…` (the docs pages), each with an optional `view` (the view's query,
- * `theme=dark&lang=it`) the links open in; and `preview?id=…`, the page that shows a story inside a client that renders
- * apps, the one answer that is not JSON.
+ * (one in detail), `pages` and `page?id=…` (the docs pages), `search?query=…` (everything, by its text), each with an
+ * optional `view` (the view's query, `theme=dark&lang=it`) the links open in; and `preview?id=…`, the page that shows a
+ * story inside a client that renders apps, the one answer that is not JSON.
  *
  * @remarks
  * The server loads the sources with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool sees what the
@@ -46,6 +46,7 @@ import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts"
 import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { PREVIEW_ROUTE } from "./previewRoute.ts";
 import { loadPreview } from "./previewRunner.ts";
+import { searchAnswer } from "./searchRoute.ts";
 import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
@@ -309,7 +310,7 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
  * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
- *   tokens, `usedIn=true` for the list's "Used in" (a
+ *   tokens, `query` and `limit` for a search, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
  * @param origins - where the catalogue is served (`http://localhost:5173`) and where its frames are, for the links.
  * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
@@ -343,6 +344,7 @@ export const agentAnswer = async (
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
+    if (route === "search") return await searchAnswer(context);
     if (route === "pages") return pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context);

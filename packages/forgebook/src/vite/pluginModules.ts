@@ -18,7 +18,9 @@ import {
   type IndexedStoryFile,
   indexedStoryFiles,
   type KeptIndex,
+  PAGES_SEARCH_PREFIX,
   REACH_PREFIX,
+  SEARCH_PREFIX,
   storyFilesCode,
   storyFilesGroupOf,
   USAGE_PREFIX
@@ -34,6 +36,12 @@ export const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
 
 /** The resolved id of a group's reach module, the same way. */
 export const REACH_ID_PREFIX = `\0${REACH_PREFIX}`;
+
+/** The resolved id of a group of story files' search index. */
+export const SEARCH_ID_PREFIX = `\0${SEARCH_PREFIX}`;
+
+/** The resolved id of a group of docs pages' search index. */
+export const PAGES_SEARCH_ID_PREFIX = `\0${PAGES_SEARCH_PREFIX}`;
 
 /**
  * The module that answers a `?forgebook-docs` import: the story file's component docs, or `{ error }` for the panel.
@@ -171,4 +179,93 @@ export const reachModule = async (
           files.map((file) => ({ storyFile: file.file, title: file.index.title }))
         );
   return { code: `export default ${JSON.stringify(reach)};`, moduleType: "js" };
+};
+
+/** A search index, made: its module, and whether it is a group of docs pages' (renewed as pages come and go). */
+export type SearchIndexModule = {
+  /** The module. */
+  readonly module: { readonly code: string; readonly moduleType: "js" };
+  /** Whether it indexes docs pages, not story files. */
+  readonly isPages: boolean;
+};
+
+/**
+ * A group's search index, when the id names one: its story files' (what their components' docs and pages say) or its
+ * docs pages'. The search's code, and the Markdown reader it needs, load with the first.
+ *
+ * @param id - the module's id.
+ * @param watch - adds a file whose edit renews the module.
+ * @param read - a story file's component docs, and how the module writes its JSON.
+ * @returns the index; none for another id.
+ */
+export const searchIndexModule = async (
+  id: string,
+  watch: (file: string) => void,
+  read: {
+    readonly docsOf: (storyFile: string) => Promise<DocsResult>;
+    readonly isServing: boolean;
+    readonly pack: PackJson;
+  }
+): Promise<SearchIndexModule | undefined> => {
+  const isPages = id.startsWith(PAGES_SEARCH_ID_PREFIX);
+  if (!isPages && !id.startsWith(SEARCH_ID_PREFIX)) return undefined;
+  const { storySearchModule, pagesSearchModule } = await import("./searchModule.ts");
+  const { root, pattern } = storyFilesGroupOf(
+    id.slice((isPages ? PAGES_SEARCH_ID_PREFIX : SEARCH_ID_PREFIX).length)
+  );
+  const code = isPages
+    ? pagesSearchModule(root, pattern, watch, read.pack)
+    : await storySearchModule(root, pattern, watch, read.docsOf, read.isServing, read.pack);
+  return { module: { code, moduleType: "js" }, isPages };
+};
+
+/** What a catalogue's search indexes read and tell: what `searchIndexes` makes. */
+export type SearchIndexes = {
+  /** A story file's component docs: a dev server reads them again each time, as they change while it runs. */
+  readonly docsOf: (storyFile: string) => Promise<DocsResult>;
+  /**
+   * A group's search index, when the id names one; none for another id.
+   *
+   * @param id - the module's id.
+   * @param watch - adds a file whose edit renews the module.
+   * @param pack - writes the index's JSON as the module's value.
+   */
+  readonly moduleOf: (
+    id: string,
+    watch: (file: string) => void,
+    pack: PackJson
+  ) => Promise<{ code: string; moduleType: "js" } | undefined>;
+};
+
+/**
+ * The search's indexes of a plugin: a build reads each component's docs once, for its page and its index.
+ *
+ * @param read - reads a story file's component docs, says whether a dev server runs, and keeps each index's id with the
+ * modules an edit renews (a docs pages' index with the docs pages').
+ */
+export const searchIndexes = (read: {
+  readonly extract: (storyFile: string) => Promise<DocsResult>;
+  readonly isServing: () => boolean;
+  readonly track: (id: string, isPages: boolean) => void;
+}): SearchIndexes => {
+  const built = new Map<string, Promise<DocsResult>>();
+  const docsOf = (storyFile: string): Promise<DocsResult> => {
+    if (read.isServing()) return read.extract(storyFile);
+    const docs = built.get(storyFile) ?? read.extract(storyFile);
+    built.set(storyFile, docs);
+    return docs;
+  };
+  return {
+    docsOf,
+    moduleOf: async (
+      id: string,
+      watch: (file: string) => void,
+      pack: PackJson
+    ): Promise<{ code: string; moduleType: "js" } | undefined> => {
+      const search = await searchIndexModule(id, watch, { docsOf, isServing: read.isServing(), pack });
+      if (search === undefined) return undefined;
+      read.track(id, search.isPages);
+      return search.module;
+    }
+  };
 };

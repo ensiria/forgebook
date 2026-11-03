@@ -26,6 +26,7 @@ import type {
   PageDocument,
   PagesDocument,
   PluginsDocument,
+  SearchDocument,
   StoriesDocument,
   StoryDocument,
   TokensDocument
@@ -337,3 +338,22 @@ export const pagesText = (document: PagesDocument, style: OutputStyle): string =
  */
 export const pageText = (document: PageDocument): string =>
   [document.page.links.address, "", document.text].join("\n");
+
+/**
+ * What a search found as a person reads it: each result with its address, then what matched inside it.
+ *
+ * @param document - the search's document.
+ */
+export const searchText = (document: SearchDocument): string =>
+  document.results.length === 0
+    ? `Nothing in the catalogue holds "${document.query}".`
+    : document.results
+        .flatMap((result) => [
+          `${result.name} (${result.place})${result.missed.length === 0 ? "" : `, missing: ${result.missed.join(", ")}`}`,
+          `  ${result.address}`,
+          ...result.hits.flatMap((hit) => [
+            `  ${hit.kind}${hit.name === undefined ? "" : ` ${hit.name}`}: ${hit.text}`,
+            `    ${hit.address}`
+          ])
+        ])
+        .join("\n");

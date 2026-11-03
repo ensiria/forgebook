@@ -197,6 +197,11 @@ export type StoryFiles = {
   readonly usage?: () => Promise<unknown>;
   /** Each of the group's stories with the files it reaches, for tools on the dev server; none in a static build. */
   readonly reach?: () => Promise<unknown>;
+  /**
+   * The group's search index: its components' props, descriptions and documentation, loaded on the first search. None
+   * for files indexed before it existed: the search then finds them by their names.
+   */
+  readonly search?: () => Promise<unknown>;
 };
 
 /**
@@ -250,6 +255,8 @@ export type DocPages = {
   readonly pages: Readonly<Record<string, () => Promise<unknown>>>;
   /** Each page's Markdown, for tools on the dev server; none in a static build. */
   readonly text?: Readonly<Record<string, () => Promise<unknown>>>;
+  /** The group's search index: its pages' text by heading, loaded on the first search. */
+  readonly search?: () => Promise<unknown>;
 };
 
 /**

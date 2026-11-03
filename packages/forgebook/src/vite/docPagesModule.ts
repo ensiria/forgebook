@@ -17,7 +17,7 @@ import type { DocPageIndex } from "@forgebook/story-format/source";
 import type { ForgebookPlugin } from "../plugin.ts";
 import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
 import { pluginFences } from "./pluginConfig.ts";
-import { storyFileKeys } from "./storyFilesModule.ts";
+import { PAGES_SEARCH_PREFIX, storyFileKeys, storyFilesGroupText } from "./storyFilesModule.ts";
 import { DOCS_PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -81,10 +81,12 @@ export const docPagesModule = (
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
   const page = (key: string): string => JSON.stringify(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);
+  const search = JSON.stringify(`${PAGES_SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
   return [
     "export default {",
     `index: ${JSON.stringify(index)},`,
     `pages: ${objectOf(keys, (key) => `() => import(${page(key)}).then((module) => module.default)`)},`,
+    `search: () => import(${search}).then((module) => module.default),`,
     ...(isServing
       ? [`text: ${objectOf(keys, (key) => `() => import(${page(key)}).then((module) => module.text)`)}`]
       : []),

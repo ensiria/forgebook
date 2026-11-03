@@ -1,0 +1,205 @@
+// The search's results, on the shell's palette, so a catalogue's theme and both appearances reach them. Compiled with
+// the list, loaded on first use: a reader who never searches pays nothing for it.
+
+@use "../styles/tokens" as *;
+@use "../styles/mixins";
+
+@layer catalogue {
+  // beside the sidebar and over the page, so the tree stays in reach and a long line has room
+  .forgebook-search-panel {
+    position: fixed;
+    inset: auto;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    max-height: min(44rem, calc(100vh - #{$space-8}));
+    overflow: hidden;
+    border-radius: $radius-card;
+    background: $surface;
+    box-shadow: $shadow-popover;
+    color: $text;
+    animation: forgebook-search-in $duration-quick $ease-out;
+
+    // under the field, on a small window: the place comes from the field (`SidebarSearch.tsx`)
+    @media (max-width: 719px) {
+      max-height: calc(100vh - 7rem);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  @keyframes forgebook-search-in {
+    from {
+      opacity: 0;
+      transform: translateX(-0.25rem);
+    }
+  }
+
+  .forgebook-search-panel__status {
+    display: flex;
+    flex: none;
+    gap: $space-3;
+    margin: 0;
+    padding: $space-2 $space-3;
+    font: $text-caption;
+    color: $text-secondary;
+    box-shadow: $line-bottom;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .forgebook-search-panel__list {
+    flex: 1;
+    min-height: 0;
+    padding: $space-1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .forgebook-search-panel__keys {
+    flex: none;
+    margin: 0;
+    padding: $space-1-5 $space-3;
+    font: $text-caption;
+    color: $text-tertiary;
+    box-shadow: $line-top;
+
+    kbd {
+      padding: 0 $space-1;
+      border-radius: $radius-control-small;
+      box-shadow: $ring;
+      font: $text-mono-small;
+    }
+
+    // a phone has no such keys
+    @media (hover: none) {
+      display: none;
+    }
+  }
+
+  .forgebook-result + .forgebook-result {
+    margin-top: $space-1;
+  }
+
+  .forgebook-result__own,
+  .forgebook-result__hit {
+    display: flex;
+    gap: $space-2;
+    padding: $space-1-5 $space-2;
+    border-radius: $radius-control;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+
+    &[data-active] {
+      background: $selected;
+    }
+  }
+
+  .forgebook-result__own {
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+
+  .forgebook-result__hit {
+    align-items: flex-start;
+    margin-inline-start: $space-3;
+  }
+
+  .forgebook-result__name {
+    font: $text-row-label;
+  }
+
+  .forgebook-result__place {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font: $text-caption;
+    color: $text-tertiary;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .forgebook-result__kind {
+    flex: none;
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  // says why a line is here, in the words of the page it opens
+  .forgebook-result__why {
+    flex: none;
+    min-width: 3.5rem;
+    font: $text-caption;
+    color: $text-secondary;
+  }
+
+  .forgebook-result__own .forgebook-result__why {
+    min-width: 0;
+    padding: 0 $space-1;
+    border-radius: $radius-control-small;
+    background: $fill;
+  }
+
+  .forgebook-result__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .forgebook-result__label {
+    font: $text-row-compact;
+    overflow-wrap: anywhere;
+
+    &[data-code] {
+      font: $text-mono;
+    }
+  }
+
+  .forgebook-result__snippet {
+    font: $text-caption;
+    color: $text-secondary;
+    overflow-wrap: anywhere;
+  }
+
+  .forgebook-result__note {
+    display: flex;
+    gap: $space-3;
+    margin: 0;
+    padding: 0 $space-2 $space-1 calc(#{$space-3} + #{$space-2});
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  .forgebook-search-panel mark {
+    border-radius: 2px;
+    background: color-mix(in srgb, $accent 22%, transparent);
+    color: inherit;
+  }
+
+  // what an address opened from a search, lit for a moment: a table's row is hard to find with the eye
+  [data-found] {
+    border-radius: $radius-control-small;
+    outline: none;
+    animation: forgebook-found 1.6s ease-out;
+  }
+
+  @keyframes forgebook-found {
+    0%,
+    45% {
+      background-color: color-mix(in srgb, $accent 22%, transparent);
+    }
+  }
+}

@@ -6,7 +6,13 @@
  */
 import { CONFIG_MODULE, TOKENS_MODULE } from "./pages.ts";
 import { FILES_PREFIX } from "./pluginModules.ts";
-import { REACH_PREFIX, storyFilesGroupText, USAGE_PREFIX } from "./storyFilesModule.ts";
+import {
+  PAGES_SEARCH_PREFIX,
+  REACH_PREFIX,
+  SEARCH_PREFIX,
+  storyFilesGroupText,
+  USAGE_PREFIX
+} from "./storyFilesModule.ts";
 
 /** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
 const FILES_QUERY = "?forgebook-files";
@@ -39,6 +45,9 @@ export const patternId = (source: string, folder: string): string | null => {
   return `${DOCS_PAGES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
 };
 
+/** The specifiers' prefixes of a group's virtual modules: its "Used in", its reach, its search indexes. */
+const VIRTUAL_PREFIXES: readonly string[] = [USAGE_PREFIX, REACH_PREFIX, SEARCH_PREFIX, PAGES_SEARCH_PREFIX];
+
 /**
  * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in"), when the import names
  * one.
@@ -48,7 +57,7 @@ export const patternId = (source: string, folder: string): string | null => {
 export const virtualId = (source: string): string | undefined => {
   if (source === CONFIG_MODULE) return CONFIG_ID;
   if (source === TOKENS_MODULE) return TOKENS_ID;
-  return source.startsWith(USAGE_PREFIX) || source.startsWith(REACH_PREFIX) ? `\0${source}` : undefined;
+  return VIRTUAL_PREFIXES.some((prefix) => source.startsWith(prefix)) ? `\0${source}` : undefined;
 };
 
 /** The resolved id of the configuration's data module. */

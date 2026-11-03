@@ -15,7 +15,7 @@ import type { SheetsChoice, TextScale } from "../viewState.ts";
 // biome-ignore lint/nursery/useExplicitType: the texts' type is their own shape (`ShellStrings`); a written one would repeat every key
 const shellStrings = {
   searchPlaceholder: "Search",
-  searchLabel: "Search components, stories and docs",
+  searchLabel: "Search components, stories, props and docs",
   componentsNav: "Components",
   docsNav: "Docs",
   pageContents: "On this page",
@@ -27,7 +27,7 @@ const shellStrings = {
   showSidebar: "Show the sidebar",
   storiesNav: "Stories",
   allStories: (count: number): string => `All ${count} stories`,
-  noMatch: "No component matches",
+  noMatch: "No name matches",
   aliasPlace: (family: string): string => `in ${family}`,
   aliasHint: (place: string): string => `Lives in ${place}: listed here too`,
   alsoIn: (places: string): string => `also listed in ${places}`,
