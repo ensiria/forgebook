@@ -59,6 +59,22 @@ describe("serverConditionsOf", () => {
     expect(conditions).not.toContain("browser");
   });
 
+  it("leaves out every other runtime's conditions, and reads the pages' environment's own", () => {
+    const conditions = serverConditionsOf({
+      resolve: { conditions: ["module"] },
+      environments: { client: { resolve: { conditions: ["source", "worker", "react-native", "browser"] } } }
+    });
+    expect(conditions).toContain("source");
+    expect(conditions).not.toEqual(expect.arrayContaining(["worker"]));
+    expect(conditions).not.toEqual(expect.arrayContaining(["react-native"]));
+  });
+
+  it("leaves a server that runs as a web worker as Vite makes it", () => {
+    expect(
+      serverConditionsOf({ resolve: { conditions: ["source"] }, ssr: { target: "webworker" } })
+    ).toBeUndefined();
+  });
+
   it("leaves Vite's when the pages name none, and the catalogue's when it names the server's", () => {
     expect(serverConditionsOf({})).toBeUndefined();
     expect(

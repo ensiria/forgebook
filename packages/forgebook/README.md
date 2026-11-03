@@ -425,9 +425,9 @@ through the `tsconfig.json` that holds the story file: the package's own, or the
 browser tests run in CI.
 
 A monorepo that points its packages at their sources with an export condition (`"source": "./src/index.ts"` in
-`exports`, and `source` in Vite's `resolve.conditions`, set by a framework's plugins) needs nothing more: the dev server
-reads the stories and previews it answers tools with on Node under the same conditions, `browser` aside, unless the
-configuration names the server's own (`ssr.resolve.conditions`).
+`exports`, and `source` in Vite's `resolve.conditions`, set by a framework's plugins) needs nothing more with the
+`forgebook` command: its dev server reads the stories and previews it answers tools with on Node under the same
+conditions, those of other runtimes (`browser`) aside, unless a plugin names the server's own.
 
 ## Commands
 
