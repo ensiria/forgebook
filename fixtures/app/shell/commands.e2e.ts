@@ -50,6 +50,38 @@ test.describe("forgebook story", () => {
       address: expect.stringContaining("tab=figma")
     });
   });
+
+  test("gives an agent each prop's group, and the members of a prop typed with a documented object", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const run = forgebook(baseURL, ["story", "kit:inputs-selection-select--overview", "--json"]);
+    expect(run.status).toBe(0);
+    const { docs } = JSON.parse(run.stdout);
+    const byName = new Map(
+      docs.props.map((prop: { readonly name: string }): [string, unknown] => [prop.name, prop])
+    );
+    expect(byName.get("rows")).toMatchObject({ group: "Behaviour" });
+    expect(byName.get("value")).not.toHaveProperty("group");
+    expect(byName.get("texts")).toMatchObject({
+      group: "Texts",
+      members: [
+        {
+          name: "empty",
+          type: "string",
+          description: "Shown in place of the list when there is no option.",
+          defaultValue: '"Nothing to pick"',
+          isRequired: false
+        },
+        {
+          name: "listLabel",
+          type: "string",
+          description: "The list's name for screen readers.",
+          isRequired: false
+        }
+      ]
+    });
+  });
 });
 
 test.describe("forgebook check-page", () => {
@@ -239,6 +271,40 @@ test.describe("forgebook shot", () => {
       const png = readFileSync(file);
       expect(png.readUInt32BE(16)).toBe(360);
       expect(png.readUInt32BE(20)).toBeLessThan(200);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  test("frames a picture in the device a view names, and leaves a story framed by default unframed otherwise", ({
+    baseURL
+  }) => {
+    const out = mkdtempSync(join(tmpdir(), "forgebook-shots-"));
+    try {
+      const run = forgebook(baseURL ?? "", [
+        "shot",
+        "kit:layouts-app-screen--phone",
+        "--view",
+        "iphone-16",
+        "--view",
+        "",
+        "--out",
+        out,
+        "--json"
+      ]);
+      expect(run.status).toBe(0);
+      const report: unknown = JSON.parse(run.stdout);
+      const files =
+        typeof report === "object" && report !== null && "shots" in report && Array.isArray(report.shots)
+          ? report.shots.map((shot: unknown) =>
+              typeof shot === "object" && shot !== null && "file" in shot ? String(shot.file) : ""
+            )
+          : [];
+      const [framed, plain] = files.map((file: string) => readFileSync(file));
+      // the iPhone 16's viewport is 393 px wide; framed, the picture is wider by the device's band and bezel
+      expect(framed?.readUInt32BE(16)).toBeGreaterThan(393);
+      expect(framed?.readUInt32BE(20)).toBeGreaterThan(852);
+      expect(plain?.readUInt32BE(16)).toBe(1280);
     } finally {
       rmSync(out, { recursive: true, force: true });
     }

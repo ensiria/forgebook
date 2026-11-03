@@ -29,8 +29,10 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
+      device: undefined,
       design: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--danger",
@@ -44,8 +46,10 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
+      device: undefined,
       design: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--long",
@@ -59,15 +63,18 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
+      device: undefined,
       design: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     }
   ],
   unlisted: [],
   alsoIn: [],
   related: [],
   keywords: ["Pressable", "CTA"],
-  design: undefined
+  design: undefined,
+  propGroups: []
 };
 
 /** A family holding it, and an alias of a component that lives elsewhere. */

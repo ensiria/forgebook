@@ -13,7 +13,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryDeviceSetting, StoryGroup } from "@forgebook/story-format/csf";
 import type {
   FigmaLink,
   StoryBackground,
@@ -59,10 +59,14 @@ export type TreeStory = {
   readonly isLogic: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
+  /** The device it is shown in by default (`parameters.device`), its own fields over the meta's; none when neither sets one. */
+  readonly device: StoryDeviceSetting | undefined;
   /** Its design (`parameters.design.figma`): its own, else the meta's; none by default, nor when its own was refused. */
   readonly design: FigmaLink | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
+  /** Whether a `play` function acts on it. */
+  readonly hasPlay: boolean;
 };
 
 /** One component: the story files with its title. */
@@ -101,6 +105,8 @@ export type TreeComponent = {
   readonly keywords: readonly string[];
   /** Its design: the meta's `parameters.design.figma`; none by default. */
   readonly design: FigmaLink | undefined;
+  /** The prop groups its meta lists first (`parameters.propGroups`), in their order; empty when none. */
+  readonly propGroups: readonly string[];
 };
 
 /** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`). */
@@ -353,8 +359,13 @@ const treeStory = (
   isTouch: story.isTouch ?? entry.isTouch ?? false,
   isLogic: story.isLogic ?? entry.isLogic ?? false,
   height: story.height ?? entry.height,
+  device:
+    entry.device === undefined && story.device === undefined
+      ? undefined
+      : { ...entry.device, ...story.device },
   design,
-  tags: story.tags ?? []
+  tags: story.tags ?? [],
+  hasPlay: story.hasPlay === true
 });
 
 /**
@@ -434,7 +445,9 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       alsoIn: metaList(component, "alsoIn"),
       related: related.get(title) ?? [],
       keywords: metaList(component, "keywords"),
-      design: componentDesign(component)
+      design: componentDesign(component),
+      // its first file's, as its docs are
+      propGroups: component.files[0]?.entry.propGroups ?? []
     });
   }
   placeAliases(source, placed, families, problems);

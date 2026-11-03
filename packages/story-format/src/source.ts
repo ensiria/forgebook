@@ -12,7 +12,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "./csf.ts";
+import type { StoryDeviceSetting, StoryGroup } from "./csf.ts";
 import type { StoryTextTable } from "./texts.ts";
 
 /** What a Figma file is, as the embed's address names it. */
@@ -72,6 +72,8 @@ export type StoryIndexEntry = {
    * `false` to leave the meta's out.
    */
   readonly isLogic?: boolean;
+  /** The story's own `parameters.device`, when it sets one: the device it is shown in by default. */
+  readonly device?: StoryDeviceSetting;
   /**
    * The first sentence of the story's TSDoc, or its `parameters.docs.description.story`: what it shows and what to
    * notice.
@@ -79,6 +81,11 @@ export type StoryIndexEntry = {
   readonly description?: string;
   /** The story's tags, the meta's then its own, a `!name` taking `name` away (Storybook's tags). */
   readonly tags?: readonly string[];
+  /**
+   * Whether the file writes a `play` for the story: its own, one from a story of the file it spreads, or the meta's.
+   * Left out when it writes none, as far as reading the file without running it can tell.
+   */
+  readonly hasPlay?: boolean;
 };
 
 /** One story file, read statically: what the catalogue shows before loading it. */
@@ -103,12 +110,16 @@ export type StoryFileIndex = {
   readonly isTouch?: boolean;
   /** The meta's `parameters.logic`, when it sets one: every story is about logic unless it says otherwise. */
   readonly isLogic?: boolean;
+  /** The meta's `parameters.device`, when it sets one: every story's device unless it sets its own fields. */
+  readonly device?: StoryDeviceSetting;
   /** The meta's `alsoIn`, when it sets one: the other places the component is listed in. */
   readonly alsoIn?: readonly string[];
   /** The meta's `related`, when it sets one: the titles of the components its page names at its top. */
   readonly related?: readonly string[];
   /** The meta's `keywords`, when it sets one: other words the search finds the component by. */
   readonly keywords?: readonly string[];
+  /** The meta's `parameters.propGroups`, when it sets one: the component's prop groups listed first, in order. */
+  readonly propGroups?: readonly string[];
   /** The meta's `parameters.docs.description.component`, when written plainly. */
   readonly description?: string;
   /** What the index noticed without refusing the file (a title written by code, placed by its path). */

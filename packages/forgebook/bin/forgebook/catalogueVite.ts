@@ -6,7 +6,7 @@
  * @module
  */
 import { ScriptError } from "@ensiria/cli-kit/script";
-import type { InlineConfig } from "vite";
+import type { InlineConfig, ServerOptions } from "vite";
 
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
@@ -97,3 +97,29 @@ export const withFramesMode = (config: ResolvedConfig, mode: FramesMode | undefi
  */
 export const withReadableNames = (config: ResolvedConfig, isAsked: boolean | undefined): ResolvedConfig =>
   isAsked === true ? { ...config, build: { ...config.build, readableNames: true } } : config;
+
+/** What the command line sets of the dev server's own options. */
+export type DevServerChoice = {
+  /** The port to listen on; Vite's when none. */
+  readonly port: number | undefined;
+  /** The address to listen on; localhost when none. */
+  readonly host: string | undefined;
+  /** Whether file edits are noticed by checking the files (`--poll`) instead of the system's change events. */
+  readonly isPolling: boolean;
+};
+
+/**
+ * The dev server's options the command line sets (`--port`, `--host`, `--poll`).
+ *
+ * @remarks
+ * Polling is the remedy where the system's change events come late or never: a container's mounted volume, a Windows
+ * drive under WSL, a network drive, or a machine whose file-event service is overloaded. Vite checks each watched file
+ * every 100 ms then, which costs some processor time, so it is asked for, never the default.
+ *
+ * @param choice - what the command line asks.
+ */
+export const devServerOptions = (choice: DevServerChoice): ServerOptions => ({
+  ...(choice.port === undefined ? {} : { port: choice.port, strictPort: true }),
+  ...(choice.host === undefined ? {} : { host: choice.host }),
+  ...(choice.isPolling ? { watch: { usePolling: true } } : {})
+});

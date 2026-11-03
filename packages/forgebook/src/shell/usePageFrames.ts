@@ -11,7 +11,13 @@ import type { TreeStory } from "../storyTree.ts";
 import { liveView, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { framesOrigin } from "./framesOrigin.ts";
-import { type StoryTouches, storyTouchesOf, type TouchOverrides, touchedView } from "./storyTouch.ts";
+import {
+  phoneStories,
+  type StoryTouches,
+  storyTouchesOf,
+  type TouchOverrides,
+  touchedView
+} from "./storyTouch.ts";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
 import { type FrameQueue, useFrameQueue } from "./useFrameQueue.ts";
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
@@ -64,8 +70,13 @@ export const usePageFrames = ({
   // switches, the language among them) is sent to them live
   const frameView = useLoadedView(view.sheets, view);
   const catalogue = useCatalogue();
-  // each story marked for a phone with its own finger: its frame gets it in place of the toolbar's Touch
-  const touches = useMemo(() => storyTouchesOf(stories, touchOverrides), [stories, touchOverrides]);
+  // each story meant for a phone (marked so, or shown in a device touched with a finger) with its own finger: its frame
+  // gets it in place of the toolbar's Touch
+  const { device, orientation } = view;
+  const touches = useMemo(
+    () => storyTouchesOf(stories, touchOverrides, phoneStories({ device, orientation }, catalogue.device)),
+    [stories, touchOverrides, device, orientation, catalogue.device]
+  );
   const queue = useFrameQueue(queued, pageRef);
   const { heights, settled } = useFrameMessages({
     onReady: (frame: Window, message: ReadyMessage): void => {

@@ -24,6 +24,34 @@ describe("indexStoryFile", () => {
     });
   });
 
+  it("notes a story with a play function, its own or the meta's", () => {
+    const own = `export default { title: "A" }; export const X = { play: async () => undefined }; export const Y = {};`;
+    expect(indexStoryFile("A.stories.tsx", own)).toEqual({
+      title: "A",
+      stories: [{ exportName: "X", hasPlay: true }, { exportName: "Y" }]
+    });
+    const spread = `export default { title: "A" }; export const X = { play: async () => undefined };
+      export const Y = { ...X, args: {} }; export const Z = { ...X, play: undefined }; export const W = {};
+      W.play = async () => undefined;`;
+    expect(indexStoryFile("A.stories.tsx", spread)).toMatchObject({
+      stories: [
+        { exportName: "X", hasPlay: true },
+        { exportName: "Y", hasPlay: true },
+        { exportName: "Z" },
+        { exportName: "W", hasPlay: true }
+      ]
+    });
+    const looped = `export default { title: "A" }; export const X = { ...Y }; export const Y = { ...X };`;
+    expect(indexStoryFile("A.stories.tsx", looped)).toEqual({
+      title: "A",
+      stories: [{ exportName: "X" }, { exportName: "Y" }]
+    });
+    const shared = `export default { title: "A", play: async () => undefined }; export const X = {};`;
+    expect(indexStoryFile("A.stories.tsx", shared)).toMatchObject({
+      stories: [{ exportName: "X", hasPlay: true }]
+    });
+  });
+
   it("reads a `.js` story file that holds JSX, as libraries written in JavaScript do", () => {
     const text = `export default { title: "Inputs/Button" };
       export const Default = { render: () => <button>Go</button> };`;
@@ -289,6 +317,25 @@ describe("indexStoryFile", () => {
     );
   });
 
+  it("reads the meta's prop groups to list first, and refuses them written by code or wrongly", () => {
+    const text = `export default { title: "Data/Finder", parameters: { propGroups: ["Selection", "Paging"] } };
+      export const Overview = {};`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "Data/Finder",
+      propGroups: ["Selection", "Paging"],
+      stories: [{ exportName: "Overview" }]
+    });
+    // the index alone reads it, so a list written by code would be lost
+    for (const written of ['"Paging"', "[1]", "GROUPS", '[...GROUPS, "Paging"]']) {
+      expect(
+        indexStoryFile(
+          "A.stories.tsx",
+          `export default { title: "A/B", parameters: { propGroups: ${written} } };`
+        )
+      ).toBe("A.stories.tsx: the meta's `parameters.propGroups` must be written as a list of plain strings");
+    }
+  });
+
   it("refuses other places or related components written plainly but wrongly, and leaves code to the frame", () => {
     expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", alsoIn: [1] };')).toBe(
       "A.stories.tsx: the meta's `alsoIn` must be written as a list of plain strings"
@@ -334,6 +381,42 @@ describe("indexStoryFile", () => {
       isLogic: true,
       stories: [{ exportName: "History" }, { exportName: "Looks", isLogic: false }]
     });
+  });
+
+  it("reads the device a meta and a story are shown in, written plainly", () => {
+    const text = `export default { title: "A/B", parameters: { device: { frame: true, model: "iphone-16" } } };
+      export const Phone = {};
+      export const Turned = { parameters: { device: { orientation: "landscape" as const } } };
+      export const Off = { parameters: { device: { frame: false } } };
+      export const Mouse = { parameters: { device: { touch: false } } };
+`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      device: { frame: true, model: "iphone-16" },
+      stories: [
+        { exportName: "Phone" },
+        { exportName: "Turned", device: { orientation: "landscape" } },
+        { exportName: "Off", device: { frame: false } },
+        { exportName: "Mouse", device: { touch: false } }
+      ]
+    });
+  });
+
+  it("refuses a device written by code, with a field it has not, or naming a model or orientation that is none", () => {
+    const index = (device: string): unknown =>
+      indexStoryFile(
+        "A.stories.tsx",
+        `export default { title: "A/B" };\nexport const X = { parameters: { device: ${device} } };`
+      );
+    expect(index("PHONE")).toMatch(/story X: `parameters.device` must be written as a plain object/);
+    expect(index("{ size: 3 }")).toMatch(
+      /`parameters.device` has no field `size`: it takes frame, model, orientation, touch and edgeToEdge/
+    );
+    expect(index('{ model: "nokia-3310" }')).toMatch(/`parameters.device`: "nokia-3310" is no device model/);
+    expect(index('{ orientation: "flat" }')).toMatch(/"flat" is no orientation/);
+    expect(index("{ frame: 1 }")).toMatch(
+      /`parameters.device.frame` must be written as a plain `true` or `false`/
+    );
   });
 
   it("refuses touch and logic written by code: only the index reads them, so they must be plain", () => {

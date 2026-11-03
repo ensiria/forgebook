@@ -104,6 +104,11 @@ describe("cycledView", () => {
     );
   });
 
+  it("moves the audience through its values, both ways", () => {
+    expect(cycledView(DEFAULT_VIEW, "audience", 1, catalogue, NOT_FIXED, false)?.audience).toBe("designer");
+    expect(cycledView(DEFAULT_VIEW, "audience", -1, catalogue, NOT_FIXED, false)?.audience).toBe("tester");
+  });
+
   it("leaves a control the story fixes, or the compare view draws, as it is", () => {
     expect(
       cycledView(DEFAULT_VIEW, "theme", 1, catalogue, { switches: { theme: "dark" } }, true)

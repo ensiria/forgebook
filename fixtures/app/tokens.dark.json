@@ -1,0 +1,7 @@
+{
+  "color": {
+    "$type": "color",
+    "surface": { "$value": "#1c1b1b" },
+    "accent": { "$value": "#b28bff" }
+  }
+}

@@ -51,6 +51,11 @@ export type StageViewportProps = {
   /** Called with the height the foot handle or its keys set; none shows no foot handle (the component's page). */
   readonly onHeightChange?: ((height: StageHeight) => void) | undefined;
   /**
+   * Whether the room holds a device (`DeviceSlot.tsx`): the device is the story's edge, so the room draws no surface
+   * of its own; `false` by default.
+   */
+  readonly isDevice?: boolean;
+  /**
    * The frame, or a function that draws it at the height set by the foot handle (a drag's while it lasts), in the
    * story's own CSS px; `undefined` lets the frame take the story's own.
    */
@@ -178,6 +183,7 @@ export const StageViewport = ({
   background,
   height = "auto",
   onHeightChange,
+  isDevice = false,
   children
 }: StageViewportProps): ReactNode => {
   const { widthRange } = useCatalogue();
@@ -303,6 +309,7 @@ export const StageViewport = ({
               ref={roomRef}
               className="forgebook-viewport__room"
               data-dragging={isDragging ? "" : undefined}
+              data-device={isDevice ? "" : undefined}
               style={{
                 width: layoutWidth,
                 transform: scale === 1 ? undefined : `scale(${scale})`,

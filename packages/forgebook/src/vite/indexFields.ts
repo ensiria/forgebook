@@ -7,7 +7,7 @@
  */
 
 import type { StoryGroup } from "@forgebook/story-format/csf";
-import type { FigmaLink, StoryControlsSetting, StoryIndexEntry } from "@forgebook/story-format/source";
+import type { FigmaLink, StoryControlsSetting } from "@forgebook/story-format/source";
 import type { ESTree } from "vite";
 
 import { figmaLink } from "./figmaLink.ts";
@@ -32,7 +32,7 @@ export const unwrapped = (expression: ESTree.Expression): ESTree.Expression => {
 };
 
 /** A property key's name: an identifier's or a literal's; `undefined` for any other key. */
-const keyName = (key: ESTree.PropertyKey): string | undefined => {
+export const keyName = (key: ESTree.PropertyKey): string | undefined => {
   if (key.type === "Identifier") return key.name;
   return key.type === "Literal" ? String(key.value) : undefined;
 };
@@ -119,33 +119,22 @@ export const groupOf = (fields: Fields): StoryGroup | undefined | Error => {
 };
 
 /**
- * A boolean parameter only the index reads (`touch`, `logic`): `true` or `false` written plainly, `undefined` when
- * none, or a problem otherwise. Written by code it would be lost, since the frame does not read it.
- *
- * @param fields - the story's or the meta's fields.
- * @param name - the parameter's name.
+ * `parameters.propGroups`, read by the index only since a component's API reference is drawn before any story runs:
+ * `undefined` when none, the names, or a problem when it is not a list of plain strings. Written by code it would be
+ * lost, since the frame does not read it.
  */
-const booleanParameter = (fields: Fields, name: string): boolean | undefined | Error => {
-  const value = parameter(fields, name);
-  if (value === undefined) return undefined;
-  if (value.type === "Literal" && typeof value.value === "boolean") return value.value;
-  return new Error(`\`parameters.${name}\` must be written as a plain \`true\` or \`false\``);
-};
-
-/**
- * The flags a meta or a story sets (`touch`, `logic`), as the index keeps them: each only when written, or a problem.
- *
- * @param fields - the story's or the meta's fields.
- */
-export const flagsOf = (fields: Fields): Pick<StoryIndexEntry, "isTouch" | "isLogic"> | Error => {
-  const touch = booleanParameter(fields, "touch");
-  if (touch instanceof Error) return touch;
-  const logic = booleanParameter(fields, "logic");
-  if (logic instanceof Error) return logic;
-  return {
-    ...(touch === undefined ? {} : { isTouch: touch }),
-    ...(logic === undefined ? {} : { isLogic: logic })
-  };
+export const propGroupsOf = (fields: Fields): readonly string[] | undefined | Error => {
+  const groups = parameter(fields, "propGroups");
+  if (groups === undefined) return undefined;
+  const names =
+    groups.type === "ArrayExpression"
+      ? groups.elements.flatMap((element) =>
+          element?.type === "Literal" && typeof element.value === "string" ? [element.value] : []
+        )
+      : [];
+  return groups.type === "ArrayExpression" && names.length === groups.elements.length
+    ? names
+    : new Error("`parameters.propGroups` must be written as a list of plain strings");
 };
 
 /** `parameters.height`: `undefined` when none or written by code, the height in CSS px, or a problem when wrong. */
