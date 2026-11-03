@@ -43,6 +43,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fixture/app exec playwright install --with-deps chromium
       - run: pnpm --filter @fixture/app test:shell
+      # what a failed browser test saw (its page, the frames in it, the error): a failure that shows on one runner only
+      # can then be read instead of guessed; one per attempt, so a rerun keeps the failure before it
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: shell-test-results-${{ github.run_attempt }}
+          path: fixtures/app/test-results
+          retention-days: 7
       # the README's preview recipe: a build under a sub-path, kept as an artefact, its pages asked for under that path
       - run: pnpm --filter @fixture/app exec forgebook build --out preview --base "/pr-${{ github.event.number || 0 }}/"
       - run: grep -q "/pr-${{ github.event.number || 0 }}/assets/" fixtures/app/preview/index.html
@@ -67,6 +75,14 @@ jobs:
       - run: pnpm checks
       - run: pnpm --filter @fixture/app exec playwright install chromium
       - run: pnpm --filter @fixture/app test:shell
+      # what a failed browser test saw (its page, the frames in it, the error): a failure that shows on one runner only
+      # can then be read instead of guessed; one per attempt, so a rerun keeps the failure before it
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: windows-shell-test-results-${{ github.run_attempt }}
+          path: fixtures/app/test-results
+          retention-days: 7
 
   # the weight of Forgebook against tools/bench/budget.json: a heavier change fails here, with the number
   budget:
