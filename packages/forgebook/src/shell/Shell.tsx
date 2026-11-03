@@ -9,6 +9,7 @@
 import type { StoryFiles, StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
+import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
 import { anchorOf } from "../pageAddress.ts";
@@ -94,6 +95,11 @@ export type ShellConfig = {
   readonly switches?: readonly ViewSwitch[];
   /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
   readonly lists?: CatalogueLists;
+  /**
+   * How the framework's stories take the texts the address carries (`addressTexts.ts`): `plain` keeps a shared link's
+   * texts that are not plain words from a story that may write them into markup. `any` by default.
+   */
+  readonly addressTexts?: AddressTexts;
 };
 
 /** A docs page, loaded on first use: a catalogue may have none. */
@@ -191,13 +197,14 @@ const pageOf = (search: string, hash: string): Page => {
  * The current address.
  *
  * @param catalogue - the catalogue's switches and lists, for the view's values.
+ * @param addressTexts - how the framework's stories take the texts of the panel's values.
  */
-const readAddress = (catalogue: ViewCatalogue): Address => {
+const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Address => {
   const params = new URLSearchParams(window.location.search);
   return {
     page: pageOf(window.location.search, window.location.hash),
     view: parseView(window.location.search, catalogue),
-    panelArgs: parsePanelArgsParam(params.get("args")),
+    panelArgs: addressArgsFor(parsePanelArgsParam(params.get("args")), addressTexts),
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== "")
   };
 };
@@ -598,19 +605,19 @@ type AddressState = {
 };
 
 /** The address, read again when the history goes back or forth. */
-const useAddress = (catalogue: CatalogueSettings): AddressState => {
+const useAddress = (catalogue: CatalogueSettings, addressTexts: AddressTexts): AddressState => {
   const { switches } = catalogue;
-  const [address, setAddress] = useState<Address>(() => readAddress(catalogue));
+  const [address, setAddress] = useState<Address>(() => readAddress(catalogue, addressTexts));
   const [visit, setVisit] = useState<PageVisit>(() => visitOf(address, false));
   useEffect(() => {
     const onBack = (): void => {
-      const next = readAddress(catalogue);
+      const next = readAddress(catalogue, addressTexts);
       setAddress(next);
       setVisit(visitOf(next, true));
     };
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
-  }, [catalogue]);
+  }, [catalogue, addressTexts]);
   // a height set with the foot handle belongs to the story it was set on: another page starts at its own
   const pageAddress = (page: Page): Address => ({
     page,
@@ -667,7 +674,15 @@ const useOwnPageId = (
  *
  * @param props - the configuration.
  */
-const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: ShellConfig): ReactNode => {
+const ShellPage = ({
+  title,
+  logo,
+  hasBranding,
+  heights,
+  sources,
+  frameUrl,
+  addressTexts = "any"
+}: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
   const {
@@ -678,7 +693,10 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
   } = useSidebarLayout();
   const catalogue = useCatalogue();
   const { switches } = catalogue;
-  const { address, visit, pageAddress, openPage, openAnchor, replaceAddress } = useAddress(catalogue);
+  const { address, visit, pageAddress, openPage, openAnchor, replaceAddress } = useAddress(
+    catalogue,
+    addressTexts
+  );
   // each page's last scroll position, kept across the component pages and the stage
   const scrollPositions = useRef(new Map<string, number>());
   const scroll: PageScroll = { visit, positions: scrollPositions.current };

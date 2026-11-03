@@ -6,10 +6,10 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React, Vue, Svelte, Preact, Solid and Web Components stories on Vite, and a Next.js
- * project's (Storybook's `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework is
- * refused with what Forgebook supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the notes,
- * since Forgebook reads CSF in scripts.
+ * instead. Forgebook reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML stories on Vite, and a
+ * Next.js project's (Storybook's `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework
+ * is refused with what Forgebook supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the
+ * notes, since Forgebook reads CSF in scripts.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
@@ -25,7 +25,15 @@ import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 import { VITE_PATHS, type VitePaths } from "../../../src/vite/vitePaths.ts";
 
 /** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
-export type ImportedFramework = "react" | "vue" | "svelte" | "preact" | "solid" | "nextjs" | "web-components";
+export type ImportedFramework =
+  | "react"
+  | "vue"
+  | "svelte"
+  | "preact"
+  | "solid"
+  | "nextjs"
+  | "web-components"
+  | "html";
 
 /**
  * The function each framework's `@forgebook/<name>/vite` exports, which a configuration calls: the framework's name, or
@@ -38,7 +46,8 @@ export const ADAPTER_FUNCTIONS: Readonly<Record<ImportedFramework, string>> = {
   preact: "preact",
   solid: "solid",
   nextjs: "nextjs",
-  "web-components": "webComponents"
+  "web-components": "webComponents",
+  html: "html"
 };
 
 /** What a configuration takes from another tool's files. */
@@ -69,6 +78,7 @@ const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   // Solid's Storybook framework is the community's, published under its own name
   "storybook-solidjs-vite": "solid",
   "@storybook/web-components-vite": "web-components",
+  "@storybook/html-vite": "html",
   "@storybook/nextjs-vite": "nextjs",
   "@storybook/nextjs": "nextjs"
 };

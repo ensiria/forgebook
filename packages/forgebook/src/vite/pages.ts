@@ -188,6 +188,9 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    ...(config.framework.addressTexts === undefined
+      ? []
+      : [`    addressTexts: ${JSON.stringify(config.framework.addressTexts)},`]),
     "    codeOf",
     "  });",
     ""

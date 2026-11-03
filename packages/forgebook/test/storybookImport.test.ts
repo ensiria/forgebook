@@ -214,6 +214,17 @@ describe("importStorybook", () => {
     expect(typeof imported === "string" ? imported : imported.framework).toBe("web-components");
   });
 
+  it("reads a plain HTML project's Storybook as HTML", async () => {
+    const project = join(scratch, "html");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(project, ".storybook", "main.ts"),
+      'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/html-vite" };\n'
+    );
+    const imported = await importStorybook(project);
+    expect(typeof imported === "string" ? imported : imported.framework).toBe("html");
+  });
+
   it("refuses a framework Forgebook does not read, saying what it reads", async () => {
     const project = join(scratch, "angular");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
@@ -222,7 +233,7 @@ describe("importStorybook", () => {
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
     );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/nextjs-vite, @storybook/nextjs; this project uses @storybook/angular"
+      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/html-vite, @storybook/nextjs-vite, @storybook/nextjs; this project uses @storybook/angular"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package
@@ -367,5 +378,22 @@ describe("initConfigText", () => {
     );
     expect(text).toContain('import { webComponents } from "@forgebook/web-components/vite";');
     expect(text).toContain("  framework: webComponents(),");
+  });
+
+  it("imports the HTML adapter for a plain HTML project", () => {
+    const text = initConfigText(
+      {
+        framework: "html",
+        frameworkOptions: undefined,
+        title: "x",
+        stories: ["src/*.stories.ts"],
+        preview: undefined,
+        switches: undefined,
+        notes: []
+      },
+      "Storybook"
+    );
+    expect(text).toContain('import { html } from "@forgebook/html/vite";');
+    expect(text).toContain("  framework: html(),");
   });
 });

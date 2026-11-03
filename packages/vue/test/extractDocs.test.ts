@@ -22,6 +22,12 @@ import {
 /** The fixtures' folder. */
 const FIXTURES = join(import.meta.dirname, "..", "fixtures");
 
+/**
+ * How long a case that builds a TypeScript program of its own may take, in milliseconds: a second on its own, many on
+ * a runner where the other packages' tests build theirs at the same time.
+ */
+const PROGRAM_TIMEOUT = 60_000;
+
 /** A single-file component with one prop. */
 const SFC_WITH_PROP = (name: string): string =>
   `<script setup lang="ts">\ndefineProps<{ ${name}: string }>();\n</script>\n<template><i /></template>\n`;
@@ -174,7 +180,7 @@ describe("a story file without a component to draw", () => {
   });
 });
 
-describe("the ways a project is configured", () => {
+describe("the ways a project is configured", { timeout: PROGRAM_TIMEOUT }, () => {
   it("follows a configuration that only lists references", () => {
     const docs = docsOf(join(FIXTURES, "references", "src", "Chip.stories.ts"));
     expect(propOf(docs, "text")).toMatchObject({ kind: "text", isRequired: true });
@@ -186,7 +192,7 @@ describe("the ways a project is configured", () => {
   });
 });
 
-describe("reading again", () => {
+describe("reading again", { timeout: PROGRAM_TIMEOUT }, () => {
   it("sees an edit once the worker hears of it", () => {
     const folder = mkdtempSync(join(FIXTURES, "edited-"));
     try {

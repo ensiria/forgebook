@@ -40,6 +40,12 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   sets: `label` the attribute, `.items` the property, `#icon` a slot (`#default` the unnamed one), `@change` an event the
   catalogue records, which a render does not bind. A render returns a Lit template. The props come from the package's
   `custom-elements.json`: run its analyzer after changing an element, or the docs show the old one.
+- With no framework, `button.ts` and `button.stories.ts`: the types from `@forgebook/html`, the meta's `component` the
+  function that draws (`createButton(args)`, returning an HTML string or a DOM node) and `satisfies
+  Meta<typeof createButton>`, so the args are its first parameter, documented by that type's TSDoc; a story without a
+  render calls it with the args. A story that only has a render types it with `Meta<ButtonArgs>`, or describes its args
+  in `argTypes` (plain JavaScript). A text arg written into HTML is the story's to escape; a shared link hands it only
+  plain words.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.

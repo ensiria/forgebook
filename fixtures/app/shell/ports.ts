@@ -28,7 +28,8 @@ const CATALOGUES = [
   "svelte",
   "solid",
   "preact",
-  "web-components"
+  "web-components",
+  "html"
 ] as const;
 
 /** A catalogue the suite runs. */
