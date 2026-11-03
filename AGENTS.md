@@ -13,11 +13,12 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   React's), `packages/nuxt` (`@forgebook/nuxt`, on Vue's), `packages/svelte` (`@forgebook/svelte`), `packages/sveltekit`
   (`@forgebook/sveltekit`, on Svelte's), `packages/solid` (`@forgebook/solid`), `packages/preact` (`@forgebook/preact`),
   `packages/web-components` (`@forgebook/web-components`), `packages/html` (`@forgebook/html`), `packages/angular`
-  (`@forgebook/angular`), `packages/story-format` (`@forgebook/story-format`, no dependencies), `packages/testing`
-  (`@forgebook/testing`).
+  (`@forgebook/angular`), `packages/react-native-web` (`@forgebook/react-native-web`, on React's),
+  `packages/story-format` (`@forgebook/story-format`, no dependencies), `packages/testing` (`@forgebook/testing`).
 - `fixtures/`: the kit, the stories written the Storybook way, the catalogue the shell's browser tests run on, and the
-  Vue, Svelte, Solid, Preact, Web Components, plain HTML and Angular catalogues (`fixtures/vue`, `fixtures/svelte`,
-  `fixtures/solid`, `fixtures/preact`, `fixtures/web-components`, `fixtures/html`, `fixtures/angular`) and small
+  Vue, Svelte, Solid, Preact, Web Components, plain HTML, Angular and React Native catalogues (`fixtures/vue`,
+  `fixtures/svelte`, `fixtures/solid`, `fixtures/preact`, `fixtures/web-components`, `fixtures/html`,
+  `fixtures/angular`, `fixtures/react-native`) and small
   SvelteKit, Next.js and Nuxt apps (`fixtures/sveltekit`, `fixtures/nextjs`, `fixtures/nuxt`) whose catalogues they
   open beside it.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).

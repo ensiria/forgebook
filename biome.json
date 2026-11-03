@@ -194,6 +194,10 @@
       }
     },
     {
+      "includes": ["packages/react-native-web/test/project/**"],
+      "linter": { "rules": { "correctness": { "useImportExtensions": "off" } } }
+    },
+    {
       "includes": [
         "**/*.stories.tsx",
         "**/*.stories.ts",
@@ -240,6 +244,7 @@
     {
       "includes": [
         "**/*.config.ts",
+        "**/forgebook.preview.tsx",
         "**/*.config.mts",
         "**/*.config.js",
         "**/.storybook/main.ts",
@@ -301,6 +306,8 @@
     "includes": [
       "**",
       "!fixtures/*/public/mockServiceWorker.js",
+      "!fixtures/react-native/src/legacy/knots.js",
+      "!packages/react-native-web/test/project/Badge.js",
       "!**/*.md",
       "!**/*.html",
       "!**/*.css",

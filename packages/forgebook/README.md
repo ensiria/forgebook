@@ -19,7 +19,9 @@ per story, switches for theme, contrast, motion and language, and a props table 
 [`@forgebook/preact`](https://www.npmjs.com/package/@forgebook/preact), Web Components with Lit 3 through
 [`@forgebook/web-components`](https://www.npmjs.com/package/@forgebook/web-components), Angular 20 to 22 (Analog
 included) through [`@forgebook/angular`](https://www.npmjs.com/package/@forgebook/angular), a Next.js project's
-components through [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs), or no framework at all
+components through [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs), React Native through
+react-native-web with [`@forgebook/react-native-web`](https://www.npmjs.com/package/@forgebook/react-native-web), or no
+framework at all
 through [`@forgebook/html`](https://www.npmjs.com/package/@forgebook/html) (stories that return an HTML string or a DOM
 node); other frameworks plug in through the same adapter (the catalogue's own interface is React either way, and the
 frame of a story in another framework loads none) · npm, pnpm, yarn or bun ·
@@ -363,6 +365,9 @@ configuration its stories were compiled with) and Next.js (`@storybook/nextjs-vi
 whose stories are the same), never replaces a configuration without `--force`, and lists what it left out. A Next.js
 project gets `framework: nextjs()` and keeps its stories' `parameters.nextjs`:
 [`@forgebook/nextjs`](https://github.com/ensiria/forgebook/blob/develop/packages/nextjs/README.md) says what it draws.
+React Native is read from Storybook's React Native Web framework (`@storybook/react-native-web-vite`, its
+`modulesToTranspile` kept), its older webpack addon, and on-device Storybook's `.rnstorybook` folder, whose stories then
+draw in the browser through [`@forgebook/react-native-web`](https://www.npmjs.com/package/@forgebook/react-native-web).
 
 ## Monorepos
 
@@ -408,7 +413,7 @@ browser tests run in CI.
 | `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
-| `forgebook init --from storybook` | Writes `forgebook.config.ts` from a project's `.storybook` folder: its story globs, preview and toolbar globals |
+| `forgebook init --from storybook` | Writes `forgebook.config.ts` from a project's `.storybook` (or on-device `.rnstorybook`) folder: its framework, story globs, preview and toolbar globals |
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
@@ -704,6 +709,7 @@ docs page that names what is not there, and its JSON lists every story for a scr
 | [`@forgebook/web-components`](https://www.npmjs.com/package/@forgebook/web-components) | Web Components' story types, Lit renderer, and reader of the Custom Elements Manifest |
 | [`@forgebook/html`](https://www.npmjs.com/package/@forgebook/html) | Plain HTML's story types, renderer and args reader, for stories with no framework |
 | [`@forgebook/angular`](https://www.npmjs.com/package/@forgebook/angular) | Angular's and Analog's story types and helpers, renderer, and inputs, outputs and content reader |
+| [`@forgebook/react-native-web`](https://www.npmjs.com/package/@forgebook/react-native-web) | React Native's components in the browser, through react-native-web |
 | [`@forgebook/nextjs`](https://www.npmjs.com/package/@forgebook/nextjs) | A Next.js project's components outside Next.js: images, fonts, links, both routers, server components |
 | [`@forgebook/nuxt`](https://www.npmjs.com/package/@forgebook/nuxt) | A Nuxt project's components outside Nuxt, on Vue's |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
