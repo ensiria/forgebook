@@ -26,7 +26,13 @@ export default {
 export const Overview: Story<typeof Select> = {};
 
 /** The small size: a story drawn from its args, over the meta's. */
-export const Small: Story<typeof Select> = { args: { size: "sm" }, parameters: { group: "states" } };
+export const Small: Story<typeof Select> = {
+  args: { size: "sm" },
+  parameters: {
+    group: "states",
+    design: { figma: "https://www.figma.com/design/FixtureFile123/Kit?node-id=56-78" }
+  }
+};
 
 /**
  * The select in a row of its own: a story with a render, which the Code tab shows as written, and the component

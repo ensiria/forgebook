@@ -32,21 +32,20 @@ import {
   type Zoom
 } from "../viewState.ts";
 import type { CheckState } from "./A11yTab.tsx";
-import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
+import { useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { compareVariants } from "./compareVariants.ts";
+import type { DesignTabProps } from "./DesignTab.tsx";
 import { Dock } from "./Dock.tsx";
 import { DroppedArgsNote } from "./DroppedArgsNote.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
-import { Icon } from "./icons.tsx";
-import { MatrixPicker } from "./MatrixPicker.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
+import { StoryBar } from "./StoryBar.tsx";
 import { STRINGS } from "./strings.ts";
 import { useAddressArgs } from "./useAddressArgs.ts";
 import { useComponentDocs } from "./useComponentDocs.ts";
-import { useCopy } from "./useCopy.ts";
 import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
@@ -169,27 +168,6 @@ const useStoryCheck = (
 };
 
 /**
- * Copies the story's id (`kit:inputs-selection-select--overview`), the name tests and tools address it by; the id
- * shows as the button's tooltip.
- *
- * @param props - the story's id.
- */
-const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
-  const { isCopied, copy } = useCopy();
-  return (
-    <button
-      type="button"
-      className="forgebook-button forgebook-button--icon"
-      title={`${STRINGS.copyStoryId}: ${storyId}`}
-      aria-label={isCopied ? STRINGS.copied : STRINGS.copyStoryId}
-      onClick={(): void => copy(storyId)}
-    >
-      <Icon name={isCopied ? "check" : "hash"} size={14} />
-    </button>
-  );
-};
-
-/**
  * Whether a story's args change what it draws: not for a story of fixed examples, nor for one about logic, whose scene
  * takes none.
  *
@@ -197,6 +175,22 @@ const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
  */
 const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
+
+/**
+ * What the Design tab shows; none for a story without a design.
+ *
+ * @param component - the story's component.
+ * @param story - the story.
+ * @param frame - the story's frame, for the comparison.
+ */
+const designTabOf = (
+  component: TreeComponent,
+  story: TreeStory,
+  frame: DesignTabProps["frame"]
+): DesignTabProps | undefined =>
+  story.design === undefined
+    ? undefined
+    : { link: story.design, title: `${component.name} › ${story.name}`, frame };
 
 /**
  * The stage.
@@ -403,7 +397,14 @@ export const Stage = ({
       frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
     },
     check: storyCheck.check,
-    onCheck: isComparing(view) ? undefined : storyCheck.run
+    onCheck: isComparing(view) ? undefined : storyCheck.run,
+    design: designTabOf(component, story, {
+      address: frameAddress(frameUrl, story.id, view, switches),
+      width: view.width,
+      background: backgroundOf(view),
+      args: panelArgs,
+      view: isComparing(view) ? undefined : liveView(view)
+    })
   }).filter((tab) => catalogue.tabs.includes(tab.id));
 
   return (
@@ -412,37 +413,15 @@ export const Stage = ({
       <div className="forgebook-story-pane">
         <div ref={storyRef} className="forgebook-scroll">
           <section className="forgebook-story" aria-label={STRINGS.storyLabel}>
-            <div className="forgebook-story__bar">
-              <div className="forgebook-stage__heading">
-                <h2 className="forgebook-stage__title">{story.name}</h2>
-                {story.description === undefined ? null : (
-                  <p className="forgebook-stage__description" title={story.description}>
-                    {story.description}
-                  </p>
-                )}
-              </div>
-              {axisProps.length === 0 ? null : (
-                <MatrixPicker props={axisProps} axes={matrixAxes} onAxesChange={onMatrixAxesChange} />
-              )}
-              {canReplay ? (
-                <button type="button" className="forgebook-button" onClick={replay}>
-                  <Icon name="replay" size={14} />
-                  {STRINGS.replay}
-                </button>
-              ) : null}
-              {hasClock ? <ClockControls controls={clockControls} /> : null}
-              <CopyIdButton storyId={story.id} />
-              <a
-                className="forgebook-button forgebook-button--icon"
-                href={frameAddress(frameUrl, story.id, view, switches)}
-                target="_blank"
-                rel="noopener"
-                title={STRINGS.openFrame}
-                aria-label={STRINGS.openFrame}
-              >
-                <Icon name="external" size={14} />
-              </a>
-            </div>
+            <StoryBar
+              story={story}
+              axisProps={axisProps}
+              matrixAxes={matrixAxes}
+              onMatrixAxesChange={onMatrixAxesChange}
+              onReplay={canReplay ? replay : undefined}
+              clockControls={hasClock ? clockControls : undefined}
+              frameAddress={frameAddress(frameUrl, story.id, view, switches)}
+            />
             <DroppedArgsNote
               dropped={addressArgs.dropped}
               onRemove={(): void => onPanelArgsChange(acceptedArgs)}

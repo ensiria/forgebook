@@ -119,6 +119,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   component (Tree renders Row, Row renders DropLine), each with the stories to open; read from the types, never kept
   by hand. It shows only when there is such a use; a reader folds it away; `usedIn: false` in the configuration turns
   it off.
+- **The design beside the code**: a component's or a story's Figma link gives it a Design tab and a side-by-side view
+  ([below](#design-links)).
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
@@ -211,6 +213,41 @@ panel opens on Signature, with no tab of args (its scene takes none), and the ba
 Compare: the story is drawn once, never compared. A section of its own is a title's
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
+
+## Design links
+
+A component carries its own link to Figma, on its meta; a story with a design of its own writes it over the meta's:
+
+```ts
+export default {
+  title: "Actions/Button",
+  component: Button,
+  parameters: { design: { figma: "https://www.figma.com/design/AbC123/Kit?node-id=12-34" } }
+} satisfies Meta<typeof Button>;
+
+export const Danger: Story<typeof Button> = {
+  parameters: { design: { figma: "https://www.figma.com/design/AbC123/Kit?node-id=56-78" } }
+};
+```
+
+The component's header then links to Figma, and the story's panel has a **Design** tab with the node embedded and
+**Compare with the story**, the story and its design side by side over the page, at the story's width and with the
+panel's values. Comparing is for your eyes: Forgebook draws no overlay and gives no match percentage, because Figma and
+a browser render differently and such a number would mislead. The tab loads, with Figma, only when opened.
+
+Write the link plainly, as a string: the index reads it without running the file, so a link written by code is a problem.
+A link that is not `https` on `figma.com`, or does not name a `design`, `file`, `proto`, `board`, `slides` or `deck`, is
+reported with the index's problems and never embedded; the component keeps its stories. What is kept of a link is its
+file, branch and node, so a shared link's other parameters are dropped. A `design` parameter without
+`figma` (Storybook's design addon uses the same name) is left alone.
+
+Nothing here needs a Figma token: the embed shows what the reader's own Figma session or the file's sharing allows, and
+a private file asks them to sign in, inside the embed. That sign-in needs the browser's storage access, so a reader who
+blocks it uses Open in Figma. A catalogue published with a Content Security Policy allows
+`frame-src https://embed.figma.com https://www.figma.com`. Turn the tab off with `tabs: { design: false }`; the header's link stays.
+
+`forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
+`address` of the Design tab to hand a person. `list_stories` gives each component's, and `CATALOG.md` lists it.
 
 ## Coming from Storybook
 
@@ -393,6 +430,9 @@ It offers fifteen tools: `visual_diff`, `check_code`, `check_page`, which checks
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
+
+`get_story` gives a story's design too (`design`, [above](#design-links)), so an agent can read the node with a Figma tool
+and compare it with `story_shot`.
 
 #### Inline previews
 

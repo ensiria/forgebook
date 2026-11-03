@@ -40,9 +40,12 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`
   that tries it. The catalogue documents its signature from its types and TSDoc (`@param`, `@returns`), and the tests
   check it once instead of in every look. A title like `Hooks/useUndo` puts it in a Hooks section.
+- `parameters.design: { figma: "<node link>" }` on the meta links a component to its design in Figma; a story writes its
+  own over it. The catalogue adds a Design tab, and `forgebook story` returns it as `design` (the link, `fileKey`,
+  `nodeId`, and the `address` to hand a person).
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.
-- Write `title`, `parameters.main`, `group`, `height`, `touch` and `logic` as plain values: the catalogue reads them without running
+- Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic` and `design.figma` as plain values: the catalogue reads them without running
   the file.
 
 - Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
@@ -56,7 +59,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
-| `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it |
+| `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, errors, a failed play |
 | `npx forgebook tokens --category color --json` | The design tokens, of the catalogue and of the libraries it shows; `clashes` says whose value stands where two disagree |
