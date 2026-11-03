@@ -3,6 +3,8 @@
  *
  * @module
  */
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { ForgebookPlugin, PluginSwitch } from "../src/plugin.ts";
@@ -172,7 +174,7 @@ describe("a configuration with plugins", () => {
 
   it("stops at a problem, naming the configuration", () => {
     expect(() => resolveConfig({ ...config, plugins: [plain, plain] }, "/catalogue")).toThrow(
-      '/catalogue/forgebook.config: the plugin "acme" is given twice'
+      `${resolve("/catalogue", "forgebook.config")}: the plugin "acme" is given twice`
     );
   });
 
