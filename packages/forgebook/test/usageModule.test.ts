@@ -113,3 +113,30 @@ describe("a static build's files module", () => {
     expect(built).not.toContain("reach:");
   });
 });
+
+describe("a files module's loaders", () => {
+  it("name each story file once, and give every loader of it", async () => {
+    const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
+    const code = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+      hasUsage: false,
+      hasReach: false
+    });
+    const module: unknown = await import(`data:text/javascript,${encodeURIComponent(code)}`);
+    const loaders =
+      typeof module === "object" &&
+      module !== null &&
+      "default" in module &&
+      typeof module.default === "object"
+        ? module.default
+        : null;
+    if (loaders === null) throw new Error("no default export");
+    const keys = Object.keys(Reflect.get(loaders, "index"));
+    for (const name of ["stories", "docs", "code", "pages"]) {
+      const column: unknown = Reflect.get(loaders, name);
+      expect(Object.keys(column ?? {})).toEqual(keys);
+      expect(Object.values(column ?? {}).every((loader) => typeof loader === "function")).toBe(true);
+    }
+    const first = keys[0] ?? "none";
+    expect(code.split(`${JSON.stringify(first)}, () =>`)).toHaveLength(2);
+  });
+});

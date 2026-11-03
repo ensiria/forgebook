@@ -83,3 +83,13 @@ export const withFramesMode = (config: ResolvedConfig, mode: FramesMode | undefi
   if (mode === undefined || mode === config.frames.kind) return config;
   return { ...config, frames: mode === "same-origin" ? { kind: "same-origin" } : ISOLATED_FRAMES };
 };
+
+/**
+ * The configuration with the build's scripts named after their modules when the command line asks
+ * (`--readable-names`), over the file's.
+ *
+ * @param config - the configuration.
+ * @param isAsked - the option's value; none when not given.
+ */
+export const withReadableNames = (config: ResolvedConfig, isAsked: boolean | undefined): ResolvedConfig =>
+  isAsked === true ? { ...config, build: { ...config.build, readableNames: true } } : config;

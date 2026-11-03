@@ -30,7 +30,13 @@ import {
   FORGEBOOK_OPTIONS,
   printAnswer
 } from "./catalogueCommands.ts";
-import { catalogueVite, FRAMES_MODES, withFramePort, withFramesMode } from "./catalogueVite.ts";
+import {
+  catalogueVite,
+  FRAMES_MODES,
+  withFramePort,
+  withFramesMode,
+  withReadableNames
+} from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
@@ -148,6 +154,11 @@ await defineCommands({
         "agent-index": {
           type: "boolean",
           description: "Also write what agents read, for forgebook mcp --from: props, docs, tokens, public."
+        },
+        "readable-names": {
+          type: "boolean",
+          description:
+            "Name each script after its module as well as its hash (build.readableNames in the configuration)."
         }
       },
       examples: [
@@ -158,7 +169,7 @@ await defineCommands({
         }
       ],
       run: async ({ options, log }): Promise<void> => {
-        const config = await configOf(options.config);
+        const config = withReadableNames(await configOf(options.config), options["readable-names"]);
         const outDir = resolve(config.dir, options.out ?? "dist");
         await build(
           await catalogueVite(config, {
