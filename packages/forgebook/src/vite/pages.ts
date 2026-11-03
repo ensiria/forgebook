@@ -44,7 +44,7 @@ export const STORIES_SOURCE_FILE = ".forgebook-stories.ts";
 
 /**
  * The file name, in the configuration's folder, of the module the dev server loads to answer tools and agents: the
- * sources and the previews, as the frame gets them (never written to disk).
+ * sources, as the frame gets them (never written to disk).
  */
 export const AGENT_SOURCES_FILE = ".forgebook-agent.ts";
 
@@ -402,20 +402,15 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
 };
 
 /**
- * The module the dev server loads to answer tools and agents: the sources the frame mounts, and a loader for each of
- * its previews, which a browser's code may keep from loading on the server (`sources`, `previews`), with the same
- * imports the pages use.
+ * The module the dev server loads to answer tools and agents: the sources the frame mounts (`sources`), with the same
+ * imports the pages use. The previews are loaded beside it, each on its own (`previewRunner.ts`): a browser's code may
+ * keep one from loading on the server.
  *
  * @param config - the configuration.
  */
 export const agentSourcesModule = (config: ResolvedConfig): string => {
   const sources = sourcesCode(config);
-  return [
-    ...sources.imports,
-    `export const sources = ${sources.list};`,
-    `export const previews = [${config.previews.map((file) => `() => import(${JSON.stringify(file)})`).join(", ")}];`,
-    ""
-  ].join("\n");
+  return [...sources.imports, `export const sources = ${sources.list};`, ""].join("\n");
 };
 
 /**

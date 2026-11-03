@@ -340,9 +340,11 @@ titles from the file's path, `args` and `argTypes` (with their controls), action
 `.jsx` and `.tsx`, so such a library adds the plugin its own Storybook uses for them, through the framework's plugins),
 hooks in a `render` or a decorator (React and
 Preact, with the story's state kept when a decorator draws `<Story />`), a preview's named exports beside its default
-export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. A preview
-that only a browser can load (it reads `document` as it loads) leaves the answers to tools and agents working: it is
-left out of them and named among their problems. A `**` pattern skips `node_modules` unless it names it.
+export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. The answers
+to tools and agents read a preview's args and parameters on the server: a package it imports that only a browser can
+load (Storybook's docs blocks, which read `document` as they load) is left as a placeholder there, which the preview can
+keep in a parameter but not use. A preview that still cannot load (it uses one, or one of its own files reads
+`document`) leaves the answers working: it is left out of them and named among their problems. A `**` pattern skips `node_modules` unless it names it.
 
 It lists what Storybook's indexer lists:
 
