@@ -11,6 +11,12 @@ import { describe, expect, it } from "vitest";
 import { extractFileComponent, extractStoryComponent, storyTypesModule } from "../src/vite/extractDocs.ts";
 import { NATIVE_FIXTURE_DIR } from "./fixturePaths.ts";
 
+/**
+ * How long a case may take to read docs, in milliseconds: the first read builds the fixture's TypeScript program, a
+ * second on its own, many on a runner where the other packages' tests build theirs at the same time.
+ */
+const PROGRAM_TIMEOUT = 60_000;
+
 /** The fixture's components. */
 const SRC = join(NATIVE_FIXTURE_DIR, "src");
 
@@ -25,7 +31,7 @@ const propsOf = (storyFile: string): Map<string, { readonly kind: string; readon
   return new Map(read.docs.props.map((prop) => [prop.name, prop]));
 };
 
-describe("a React Native component's docs", () => {
+describe("a React Native component's docs", { timeout: PROGRAM_TIMEOUT }, () => {
   it("lists its props with their kind, a press handler among its events", () => {
     const props = propsOf("ProfileCard.stories.tsx");
     expect([...props.keys()]).toEqual(["name", "role", "isOnline", "tone", "onFollow"]);
