@@ -13,8 +13,9 @@
  *
  * @module
  */
-import type { StoryDesign, StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryGroup } from "@forgebook/story-format/csf";
 import type {
+  FigmaLink,
   StoryBackground,
   StoryControlsSetting,
   StoryFileIndex,
@@ -22,7 +23,6 @@ import type {
   StorySource
 } from "@forgebook/story-format/source";
 
-import { type FigmaLink, figmaLink } from "./figmaLink.ts";
 import { pageProblems, type TreePage, treePages } from "./pageTree.ts";
 import { sourceFiles } from "./sourceFiles.ts";
 import { csfStoryId, exportWords, idPart } from "./storyIds.ts";
@@ -59,7 +59,7 @@ export type TreeStory = {
   readonly isLogic: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
-  /** Its design (`parameters.design.figma`): its own, else the meta's; none by default. */
+  /** Its design (`parameters.design.figma`): its own, else the meta's; none by default, nor when its own was refused. */
   readonly design: FigmaLink | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
@@ -327,26 +327,6 @@ const placedComponents = (source: StorySource, problems: string[]): PlacedCompon
 const isUnlisted = (story: Pick<TreeStory, "tags">): boolean => story.tags.includes("!dev");
 
 /**
- * A written design as the tree keeps it: a link that is not Figma's is a problem and stays out of the tree, so the
- * shell never frames it, and the component keeps its stories.
- *
- * @param design - the design, as the index read it.
- * @param where - what a problem names.
- * @param problems - the tree's problems.
- */
-const designLink = (
-  design: StoryDesign | undefined,
-  where: string,
-  problems: string[]
-): FigmaLink | undefined => {
-  if (design === undefined) return undefined;
-  const link = figmaLink(design.figma);
-  if (typeof link !== "string") return link;
-  problems.push(`${where}: \`parameters.design.figma\`: ${link}`);
-  return undefined;
-};
-
-/**
  * A story of the tree: its index entry under its file's meta.
  *
  * @param id - its id.
@@ -407,10 +387,8 @@ const componentStories = (
   seenIds: Map<string, string>,
   problems: string[]
 ): TreeStory[] =>
-  component.files.flatMap(({ file, entry }) => {
-    const where = `${source.name}: ${file}`;
-    const metaDesign = designLink(entry.design, where, problems);
-    return entry.stories.flatMap((story): TreeStory[] => {
+  component.files.flatMap(({ file, entry }) =>
+    entry.stories.flatMap((story): TreeStory[] => {
       const id = treeStoryId(source.id, entry, story);
       const other = typeof id === "string" ? seenIds.get(id) : undefined;
       if (id instanceof Error || other !== undefined) {
@@ -422,27 +400,19 @@ const componentStories = (
         return [];
       }
       seenIds.set(id, file);
-      const design =
-        story.design === undefined
-          ? metaDesign
-          : designLink(story.design, `${where}: story ${story.exportName}`, problems);
+      // its own link, else its file's meta's; `null` is its own link the index refused, which stays refused
+      const design = story.design === undefined ? entry.design : (story.design ?? undefined);
       return [treeStory(id, file, entry, story, design)];
-    });
-  });
+    })
+  );
 
 /**
- * A component's design: its first file's meta's, as its docs are; a wrong link is reported with that file's stories.
+ * A component's design: its first file's meta's, as its docs are.
  *
- * @param source - the source.
  * @param component - the component.
  */
-const componentDesign = (source: StorySource, component: PlacedComponent): FigmaLink | undefined => {
-  const [first] = component.files;
-  // the problem, if any, is already reported for the file's stories (`componentStories`)
-  return first === undefined
-    ? undefined
-    : designLink(first.entry.design, `${source.name}: ${first.file}`, []);
-};
+const componentDesign = (component: PlacedComponent): FigmaLink | undefined =>
+  component.files[0]?.entry.design;
 
 /** The families of one source, from its files. */
 const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] => {
@@ -464,7 +434,7 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       alsoIn: metaList(component, "alsoIn"),
       related: related.get(title) ?? [],
       keywords: metaList(component, "keywords"),
-      design: componentDesign(source, component)
+      design: componentDesign(component)
     });
   }
   placeAliases(source, placed, families, problems);

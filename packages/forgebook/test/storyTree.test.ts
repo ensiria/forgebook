@@ -4,7 +4,7 @@
  * @module
  */
 
-import type { StoryFiles, StorySource } from "@forgebook/story-format/source";
+import type { FigmaLink, StoryFiles, StorySource } from "@forgebook/story-format/source";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -408,46 +408,71 @@ describe("ids a meta or a story writes, and former ids", () => {
 });
 
 describe("designs", () => {
-  const fileLink = "https://www.figma.com/design/File1";
+  const fileLink: FigmaLink = { url: "https://www.figma.com/design/File1", kind: "design", fileKey: "File1" };
+  const nodeLink: FigmaLink = { ...fileLink, url: `${fileLink.url}?node-id=1-2`, nodeId: "1:2" };
 
   it("gives a story the meta's design unless it has its own, and the component the meta's", () => {
     const tree = storyTree([
       source({
         "A.stories.tsx": {
           title: "Inputs/A",
-          design: { figma: fileLink },
-          stories: [
-            { exportName: "Inherits" },
-            { exportName: "Own", design: { figma: `${fileLink}?node-id=1-2` } }
-          ]
+          design: fileLink,
+          stories: [{ exportName: "Inherits" }, { exportName: "Own", design: nodeLink }]
         }
       })
     ]);
     const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
-    expect(component?.design?.url).toBe(fileLink);
+    expect(component?.design?.url).toBe(fileLink.url);
     expect(component?.stories.map((story) => story.design?.nodeId)).toEqual([undefined, "1:2"]);
     expect(tree.problems).toEqual([]);
   });
 
-  it("reports a link that is not Figma's and keeps the component, without the link", () => {
+  it("gives a story whose own link the index refused no design, not the meta's, and reports the index's note", () => {
     const tree = storyTree([
       source({
         "A.stories.tsx": {
           title: "Inputs/A",
-          design: { figma: "https://figma.evil.example/design/File1/Kit" },
-          stories: [
-            { exportName: "Inherits" },
-            { exportName: "Own", design: { figma: "javascript:alert(1)" } }
-          ]
+          design: fileLink,
+          notes: ['story Own: `parameters.design.figma`: "javascript:alert(1)" is not a link to figma.com'],
+          stories: [{ exportName: "Inherits" }, { exportName: "Own", design: null }]
         }
       })
     ]);
     const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
-    expect(component?.design).toBeUndefined();
-    expect(component?.stories.map((story) => story.design)).toEqual([undefined, undefined]);
-    expect(tree.problems).toHaveLength(2);
-    expect(tree.problems[0]).toContain("A.stories.tsx: `parameters.design.figma`: ");
-    expect(tree.problems[1]).toContain("story Own");
+    expect(component?.stories.map((story) => story.design?.url)).toEqual([fileLink.url, undefined]);
+    expect(tree.problems).toEqual([
+      'Kit: A.stories.tsx: story Own: `parameters.design.figma`: "javascript:alert(1)" is not a link to figma.com'
+    ]);
+  });
+
+  it("gives each story of files with one title its own link, else its own file's meta's, and the component the first file's", () => {
+    const otherLink: FigmaLink = {
+      url: "https://www.figma.com/design/File2",
+      kind: "design",
+      fileKey: "File2"
+    };
+    const tree = storyTree([
+      source({
+        "./a.stories.tsx": {
+          title: "Inputs/A",
+          design: fileLink,
+          stories: [{ exportName: "First" }, { exportName: "Refused", design: null }]
+        },
+        "./a2.stories.tsx": {
+          title: "Inputs/A",
+          design: otherLink,
+          stories: [{ exportName: "More" }, { exportName: "Own", design: nodeLink }]
+        }
+      })
+    ]);
+    const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
+    expect(component?.design?.url).toBe(fileLink.url);
+    expect(component?.stories.map((story) => story.design?.url)).toEqual([
+      fileLink.url,
+      undefined,
+      otherLink.url,
+      nodeLink.url
+    ]);
   });
 });
 
