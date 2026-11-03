@@ -1,0 +1,40 @@
+{
+  "name": "salt",
+  "repository": "https://github.com/jpmorganchase/salt-ds.git",
+  "commit": "9605c1efe3c3cadb84ad3a1a04e6b2c5e98a7529",
+  "licence": "Apache-2.0",
+  "install": ["node", ".yarn/releases/yarn-4.17.0.cjs", "install", "--immutable", "--mode=skip-build"],
+  "prepare": [
+    ["node", ".yarn/releases/yarn-4.17.0.cjs", "build:ag-grid-theme"],
+    ["node", ".yarn/releases/yarn-4.17.0.cjs", "bundle:css"]
+  ],
+  "folder": ".",
+  "expected": {
+    "files": 236,
+    "stories": 1417
+  },
+  "measured": {
+    "forgebookStory": "stories:core-banner--default",
+    "forgebookComponent": "stories:core-banner",
+    "text": "update to the terms and conditions",
+    "pageText": "update to the terms and conditions",
+    "sidebar": "Core",
+    "storybookStory": "core-banner--default"
+  },
+  "edits": {
+    "story": {
+      "file": "packages/core/stories/banner/banner.stories.tsx",
+      "find": "There has been an update to the terms and conditions",
+      "replace": "There has been an update to the terms and conditions {edit}"
+    },
+    "component": {
+      "file": "packages/core/src/banner/BannerContent.tsx",
+      "find": "{...rest} ref={ref} />",
+      "replace": "{...rest} ref={ref}>{rest.children} {edit}</div>"
+    }
+  },
+  "storybook": {
+    "folder": ".",
+    "configDir": ".storybook"
+  }
+}

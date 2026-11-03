@@ -1,6 +1,6 @@
 /**
  * The Vite configuration the `forgebook` command runs a catalogue with: its folder as the root, Forgebook's plugin
- * with the configuration already read, and the framework's own plugins; and the frames' port the command line gives.
+ * with the configuration already read, and the framework's own plugins; and where the command line puts the frames.
  *
  * @module
  */
@@ -9,6 +9,7 @@ import type { InlineConfig } from "vite";
 
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
+import { ISOLATED_FRAMES } from "../../src/vite/framesConfig.ts";
 
 /**
  * Vite's configuration for a catalogue.
@@ -36,7 +37,7 @@ export const catalogueVite = async (
  *
  * @param config - the configuration.
  * @param framePort - the option's value; none when not given.
- * @throws a `ScriptError` when it is not a port, or the configuration keeps the frames on the catalogue's origin.
+ * @throws a `ScriptError` when it is not a port, or the frames run on the catalogue's origin.
  */
 export const withFramePort = (config: ResolvedConfig, framePort: string | undefined): ResolvedConfig => {
   if (framePort === undefined) return config;
@@ -45,7 +46,26 @@ export const withFramePort = (config: ResolvedConfig, framePort: string | undefi
     throw new ScriptError(`--frame-port ${framePort} is not a port`);
   if (config.frames.kind === "same-origin")
     throw new ScriptError("--frame-port asks for a port the frames do not use", {
-      hint: 'The configuration keeps them on the catalogue\'s origin (frames: "same-origin")'
+      hint: 'They run on the catalogue\'s origin (frames: "same-origin", or --frames same-origin)'
     });
   return { ...config, frames: { ...config.frames, port } };
+};
+
+/** Where the command line can put the stories' frames, as `--frames` names it. */
+export const FRAMES_MODES = ["isolated", "same-origin"] as const;
+
+/** A placement `--frames` names. */
+export type FramesMode = (typeof FRAMES_MODES)[number];
+
+/**
+ * The configuration with the frames where the command line puts them (`--frames`), over the file's: on the catalogue's
+ * origin for one run behind a setup that forwards one port, or on their own for a catalogue whose file keeps them on
+ * the catalogue's; and to compare the two placements without editing the file.
+ *
+ * @param config - the configuration.
+ * @param mode - the option's value; none when not given.
+ */
+export const withFramesMode = (config: ResolvedConfig, mode: FramesMode | undefined): ResolvedConfig => {
+  if (mode === undefined || mode === config.frames.kind) return config;
+  return { ...config, frames: mode === "same-origin" ? { kind: "same-origin" } : ISOLATED_FRAMES };
 };

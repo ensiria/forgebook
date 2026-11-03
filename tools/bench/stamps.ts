@@ -29,6 +29,10 @@ export type StampWatch = {
   readonly texts: readonly string[];
   /** Selectors stamped when they match something drawn, in whichever document. */
   readonly selectors: readonly string[];
+  /** Texts stamped when a frame draws them: a real story, whose elements carry no mark of ours. */
+  readonly frameTexts?: readonly string[];
+  /** A regular expression's source: each match a frame draws is stamped, the text an edit of a real file writes. */
+  readonly frameMark?: string;
 };
 
 /** A document of a page, as the harness reads it. */
@@ -103,6 +107,16 @@ export const stampScript = (watch: StampWatch): string => `(() => {
     return true;
   };
   const isDrawn = (element) => element.getClientRects().length > 0 && isOpaque(element);
+  const frameMark = watch.frameMark === undefined ? undefined : new RegExp(watch.frameMark, "g");
+  const drawnText = (target) => {
+    const walker = target.createTreeWalker(target.body, NodeFilter.SHOW_TEXT);
+    const parts = [];
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (parent !== null && node.data.trim() !== "" && isDrawn(parent)) parts.push(node.data);
+    }
+    return parts.join(" ");
+  };
   const look = (target) => {
     const { seen, times } = stampsOf(target);
     const see = (key) => {
@@ -119,6 +133,19 @@ export const stampScript = (watch: StampWatch): string => `(() => {
     if (target === document && window === window.top && document.body !== null) {
       for (const text of watch.texts) {
         if (!(text in seen) && document.body.textContent.includes(text)) see(text);
+      }
+    }
+    // a story's document, read from above or stamping itself on an origin of its own
+    if (!(target === document && window === window.top) && target.body !== null) {
+      const raw = target.body.textContent;
+      const texts = (watch.frameTexts ?? []).filter((each) => !(each in seen) && raw.includes(each));
+      const marks = frameMark === undefined ? [] : (raw.match(frameMark) ?? []).filter((each) => !(each in seen));
+      // only then the text that is drawn, the costly read: hidden or fading text, or a script's, is not drawn yet
+      if (texts.length > 0 || marks.length > 0) {
+        const shownText = drawnText(target);
+        for (const each of [...texts, ...marks]) {
+          if (shownText.includes(each)) see(each);
+        }
       }
     }
     for (const [key, sighted] of Object.entries(seen)) {

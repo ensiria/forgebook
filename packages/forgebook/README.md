@@ -504,7 +504,7 @@ export default defineConfig({
 
 `origins` also serves a dev server behind a proxy that gives each port a host of its own. `frames: "same-origin"` keeps
 the frames on the catalogue's origin everywhere, for a place that opens one port only; then a story's code can reach the
-catalogue as before. What the frames could use on the catalogue's origin still works on theirs: storage, cookies, MSW's
+catalogue as before; `forgebook dev --frames same-origin` does the same for one run, and `--frames isolated` the reverse. What the frames could use on the catalogue's origin still works on theirs: storage, cookies, MSW's
 worker, the clipboard, full screen, the camera and the microphone. A story's link can no longer take the catalogue's
 tab to another address.
 

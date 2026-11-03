@@ -6,8 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildCorpus } from "./corpus.ts";
-import { withPorts } from "./runBench.ts";
-import { FORGEBOOK, forgebookTarget, LADLE, STORYBOOK, TARGETS, targetsOf } from "./targets.ts";
+import { FORGEBOOK, forgebookTarget, LADLE, STORYBOOK, TARGETS, targetsOf, withPorts } from "./targets.ts";
 
 const COMPONENT = buildCorpus({ components: 8, stories: 16 }).components[0];
 const BASE = "http://127.0.0.1:1/";
@@ -47,13 +46,23 @@ describe("targets", () => {
     const sameOrigin = forgebookTarget("same-origin");
     expect(sameOrigin.ports).toBe(1);
     expect(sameOrigin.dev(4000).args).not.toContain("--frame-port");
-    expect(sameOrigin.configFiles["forgebook.config.ts"]).toContain(
-      'switches: [themeSwitch()],\n  frames: "same-origin"\n});'
-    );
+    expect(sameOrigin.dev(4000).args).toEqual([
+      "dev",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "4000",
+      "--frames",
+      "same-origin"
+    ]);
+    expect(sameOrigin.configFiles).toEqual(FORGEBOOK.configFiles);
   });
 
   it("gives each tool ports of its own, after the ports of the one before", () => {
-    const ports = withPorts(targetsOf("isolated", true)).map(({ target, port }) => [target.name, port]);
+    const ports = withPorts(targetsOf("isolated", true), 62_100).map(({ target, port }) => [
+      target.name,
+      port
+    ]);
     expect(ports).toEqual([
       ["forgebook", 62_100],
       ["storybook", 62_102],
