@@ -53,19 +53,22 @@ const CallLine = ({ call }: { readonly call: EventCall }): ReactNode => {
  */
 export const EventsTab = ({ events, calls, onClearCalls }: EventsTabProps): ReactNode => (
   <div className="forgebook-tab-columns">
-    <div className="forgebook-prop-group">
-      <h3 className="forgebook-prop-group__title">{STRINGS.events}</h3>
-      {events.map((event) => (
-        <div key={event.name} className="forgebook-event">
-          <code className="forgebook-prop__name">{event.name}</code>
-          <Code
-            text={signatureText(event)}
-            names={event.signature?.parameters.map((parameter) => parameter.name) ?? []}
-          />
-          <p className="forgebook-prop__description">{event.description}</p>
-        </div>
-      ))}
-    </div>
+    {/* a story whose only calls are a framework's (a router's `push`) has no events of its own to list */}
+    {events.length === 0 ? null : (
+      <div className="forgebook-prop-group">
+        <h3 className="forgebook-prop-group__title">{STRINGS.events}</h3>
+        {events.map((event) => (
+          <div key={event.name} className="forgebook-event">
+            <code className="forgebook-prop__name">{event.name}</code>
+            <Code
+              text={signatureText(event)}
+              names={event.signature?.parameters.map((parameter) => parameter.name) ?? []}
+            />
+            <p className="forgebook-prop__description">{event.description}</p>
+          </div>
+        ))}
+      </div>
+    )}
     <div className="forgebook-prop-group forgebook-calls">
       <div className="forgebook-calls__head">
         <h3 className="forgebook-prop-group__title">{STRINGS.calls}</h3>
