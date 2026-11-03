@@ -1,13 +1,16 @@
 /**
  * What a story file's index reads of a meta's or a story's fields: each setting as written, `undefined` when it is
- * missing or left to the frame, an `Error` when it cannot stand. `indexStoryFile` says which settings are which.
+ * missing or left to the frame, an `Error` when it cannot stand, and for a design a note when it is left out.
+ * `indexStoryFile` says which settings are which.
  *
  * @module
  */
 
-import type { StoryDesign, StoryGroup } from "@forgebook/story-format/csf";
-import type { StoryControlsSetting, StoryIndexEntry } from "@forgebook/story-format/source";
+import type { StoryGroup } from "@forgebook/story-format/csf";
+import type { FigmaLink, StoryControlsSetting, StoryIndexEntry } from "@forgebook/story-format/source";
 import type { ESTree } from "vite";
+
+import { figmaLink } from "./figmaLink.ts";
 
 /** A story's or a meta's fields by name: an object's properties, or a function story's assigned properties. */
 export type Fields = (name: string) => ESTree.Expression | undefined;
@@ -157,13 +160,19 @@ export const heightOf = (fields: Fields): number | undefined | Error => {
  * `parameters.design`, read by the index only since the shell offers the Design tab before any story runs. A design
  * with no `figma`, or not written as an object, is left alone: it may be another tool's (Storybook's design addon uses
  * the same parameter).
+ *
+ * @returns the checked link; `undefined` for none; a message when the link is not a Figma file's, which the file's
+ * notes carry while the file keeps its stories and the pages never see the link; an `Error` when it is written by code.
  */
-export const designOf = (fields: Fields): StoryDesign | undefined | Error => {
+export const designOf = (fields: Fields): FigmaLink | undefined | string | Error => {
   const design = parameter(fields, "design");
   const figma = design?.type === "ObjectExpression" ? propertyValue(design, "figma") : undefined;
   if (figma === undefined) return undefined;
-  if (figma.type === "Literal" && typeof figma.value === "string") return { figma: figma.value };
-  return new Error("`parameters.design.figma` must be written as a plain string");
+  if (figma.type !== "Literal" || typeof figma.value !== "string") {
+    return new Error("`parameters.design.figma` must be written as a plain string");
+  }
+  const link = figmaLink(figma.value);
+  return typeof link === "string" ? `\`parameters.design.figma\`: ${link}` : link;
 };
 
 /** `parameters.docs.description.<kind>`, when written as a plain string. */

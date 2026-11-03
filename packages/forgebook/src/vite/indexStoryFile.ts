@@ -11,14 +11,16 @@
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
- * the story loads. `touch`, `logic` and `design.figma` are read by the index only, so written by code they are a problem. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
- * written by code is also noted, since the author meant another. A value written plainly but wrongly
+ * the story loads. `touch`, `logic` and `design.figma` are read by the index only, so written by code they are a problem.
+ * A `design.figma` is checked here too, so the pages never carry the checker: one that is not a link to a Figma file is
+ * noted and left out, and the file keeps its stories. A title written by code, or none, is the file's path
+ * (`autoTitle`, as Storybook's auto-title); one written by code is also noted, since the author meant another. A value written plainly but wrongly
  * (`controls: true`) is a problem. Pure: text in, index or problem out.
  *
  * @module
  */
 
-import type { StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
+import type { FigmaLink, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import { type ESTree, parseSync } from "vite";
 
 import {
@@ -107,13 +109,29 @@ type StoryFields = Pick<
 >;
 
 /**
- * What the index reads of one story: its name (`name`, or CSF 2's `storyName`), controls, group, height, whether it is
- * the demo, and its tags under the meta's.
+ * A story's own design as the index keeps it: a refused link stays as `null`, since the story meant to replace the
+ * meta's design, not to take it.
+ *
+ * @param design - the design, as `designOf` read it.
+ */
+const storyDesign = (design: FigmaLink | undefined | string): Pick<StoryIndexEntry, "design"> => {
+  if (design === undefined) return {};
+  return { design: typeof design === "string" ? null : design };
+};
+
+/**
+ * What the index reads of one story: its name (`name`, or CSF 2's `storyName`), controls, group, height, design, whether
+ * it is the demo, and its tags under the meta's.
  *
  * @param fields - the story's fields.
  * @param metaTags - the meta's tags.
+ * @param notes - the file's notes, which a design left out adds to.
  */
-const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): StoryFields | Error => {
+const storyFields = (
+  fields: Fields,
+  metaTags: readonly string[] | undefined,
+  notes: string[]
+): StoryFields | Error => {
   const name = stringField(fields, "name") ?? stringField(fields, "storyName");
   const controls = controlsOf(fields);
   if (controls instanceof Error) return controls;
@@ -123,6 +141,7 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   if (height instanceof Error) return height;
   const design = designOf(fields);
   if (design instanceof Error) return design;
+  if (typeof design === "string") notes.push(design);
   const ownTags = stringListOf(fields, "tags");
   if (ownTags instanceof Error) return ownTags;
   const tags = combinedTags([metaTags, ownTags]);
@@ -134,7 +153,7 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
     ...(controls === undefined ? {} : { controls }),
     ...(group === undefined ? {} : { group }),
     ...(height === undefined ? {} : { height }),
-    ...(design === undefined ? {} : { design }),
+    ...storyDesign(design),
     ...(main?.type === "Literal" && main.value === true ? { isMain: true } : {}),
     ...flags,
     ...(tags.length > 0 ? { tags } : {})
@@ -391,14 +410,16 @@ type MetaFields = Pick<
  * The meta's fields besides its title and stories, or the first problem.
  *
  * @param meta - the meta's fields.
+ * @param notes - the file's notes, which a design left out adds to.
  */
-const metaFieldsOf = (meta: Fields): MetaFields | Error => {
+const metaFieldsOf = (meta: Fields, notes: string[]): MetaFields | Error => {
   const controls = controlsOf(meta);
   if (controls instanceof Error) return controls;
   const height = heightOf(meta);
   if (height instanceof Error) return height;
   const design = designOf(meta);
   if (design instanceof Error) return design;
+  if (typeof design === "string") notes.push(design);
   const lists = metaListsOf(meta);
   if (lists instanceof Error) return lists;
   const description = docsDescription(meta, "component");
@@ -407,7 +428,7 @@ const metaFieldsOf = (meta: Fields): MetaFields | Error => {
   return {
     ...(controls === undefined ? {} : { controls }),
     ...(height === undefined ? {} : { height }),
-    ...(design === undefined ? {} : { design }),
+    ...(design === undefined || typeof design === "string" ? {} : { design }),
     ...flags,
     ...lists,
     ...(description === undefined ? {} : { description })
@@ -456,20 +477,25 @@ export const indexStoryFile = (
   const metaTags = stringListOf(meta, "tags");
   if (metaTags instanceof Error) return `${file}: the meta's ${metaTags.message}`;
   const stories: StoryIndexEntry[] = [];
+  const storyNotes: string[] = [];
   for (const { exportName, local, start } of storyExports(program, top, meta)) {
     const story = storyOf(top, local);
     if (story.node === undefined) continue;
-    const fields = storyFields(story.fields, metaTags);
+    const ownNotes: string[] = [];
+    const fields = storyFields(story.fields, metaTags, ownNotes);
     if (fields instanceof Error) return `${file}: story ${exportName}: ${fields.message}`;
+    storyNotes.push(...ownNotes.map((note) => `story ${exportName}: ${note}`));
     const description = leadingSentence(text, comments, start) ?? docsDescription(story.fields, "story");
     stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }) });
   }
-  const metaFields = metaFieldsOf(meta);
+  const metaNotes: string[] = [];
+  const metaFields = metaFieldsOf(meta, metaNotes);
   if (metaFields instanceof Error) return `${file}: the meta's ${metaFields.message}`;
+  const notes = [...title.notes, ...metaNotes, ...storyNotes];
   return {
     title: title.title,
     stories,
     ...metaFields,
-    ...(title.notes.length > 0 ? { notes: title.notes } : {})
+    ...(notes.length > 0 ? { notes } : {})
   };
 };

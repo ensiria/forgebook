@@ -275,18 +275,40 @@ describe("indexStoryFile", () => {
     ).toBe("A.stories.tsx: the meta's `parameters.touch` must be written as a plain `true` or `false`");
   });
 
-  it("reads a design from the meta and a story, written plainly", () => {
+  it("reads a design from the meta and a story, written plainly, and checks it", () => {
     const text = `export default { title: "A/B", parameters: { design: { figma: "https://www.figma.com/design/F/A" } } };
       export const X = { parameters: { design: { figma: "https://www.figma.com/design/F/A?node-id=1-2" } } };
       export const Y = {};`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
       title: "A/B",
-      design: { figma: "https://www.figma.com/design/F/A" },
+      design: { url: "https://www.figma.com/design/F", kind: "design", fileKey: "F" },
       stories: [
-        { exportName: "X", design: { figma: "https://www.figma.com/design/F/A?node-id=1-2" } },
+        {
+          exportName: "X",
+          design: {
+            url: "https://www.figma.com/design/F?node-id=1-2",
+            kind: "design",
+            fileKey: "F",
+            nodeId: "1:2"
+          }
+        },
         { exportName: "Y" }
       ]
     });
+  });
+
+  it("notes a link that is not Figma's and keeps the file, with no design", () => {
+    const text = `export default { title: "A/B", parameters: { design: { figma: "https://figma.evil.example/design/F" } } };
+      export const X = { parameters: { design: { figma: "javascript:alert(1)" } } };
+      export const Y = {};`;
+    const index = indexStoryFile("A.stories.tsx", text);
+    if (typeof index === "string") throw new Error(index);
+    expect(index.design).toBeUndefined();
+    expect(index.stories).toEqual([{ exportName: "X", design: null }, { exportName: "Y" }]);
+    expect(index.notes).toEqual([
+      '`parameters.design.figma`: "https://figma.evil.example/design/F" is not a link to figma.com',
+      'story X: `parameters.design.figma`: "javascript:alert(1)" is not a link to figma.com'
+    ]);
   });
 
   it("refuses a Figma link written by code, which only the index reads, and leaves another tool's design alone", () => {

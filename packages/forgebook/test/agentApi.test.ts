@@ -136,7 +136,7 @@ describe("a story's design, for agents", () => {
           index: {
             "./button.stories.tsx": {
               title: "Actions/Button",
-              design: { figma: figmaUrl },
+              design: { url: figmaUrl, kind: "design", fileKey: "File1", nodeId: "12:34" },
               stories: [{ exportName: "Primary" }]
             },
             "./colour.stories.tsx": { title: "Foundations/Colour", stories: [{ exportName: "Scales" }] }

@@ -13,9 +13,9 @@
  *
  * @module
  */
+import type { FigmaLink } from "@forgebook/story-format/source";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
-import type { FigmaLink } from "../figmaLink.ts";
 import { isFrameMessage, type PanelArgs, type ShellMessage } from "../messages.ts";
 import type { LiveView, StageWidth } from "../viewState.ts";
 import "./designTab.scss";

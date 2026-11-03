@@ -12,7 +12,27 @@
  *
  * @module
  */
-import type { StoryDesign, StoryGroup } from "./csf.ts";
+import type { StoryGroup } from "./csf.ts";
+
+/** What a Figma file is, as the embed's address names it. */
+export type FigmaFileKind = "design" | "proto" | "board" | "slides" | "deck";
+
+/**
+ * A design's link (`parameters.design.figma`), as the index checked it: only a link to a file on Figma's own hosts gets
+ * here, taken apart, so the pages and the tools trust it without checking it again.
+ */
+export type FigmaLink = {
+  /** The link to open in Figma, rebuilt from the parts below on `www.figma.com`. */
+  readonly url: string;
+  /** What the file is. */
+  readonly kind: FigmaFileKind;
+  /** The file's key. */
+  readonly fileKey: string;
+  /** The branch's key, for a link to a branch of the file. */
+  readonly branchKey?: string;
+  /** The node it points at, as Figma's REST API writes it (`12:34`); none for a link to the whole file. */
+  readonly nodeId?: string;
+};
 
 /** The props the panel can set for a story: every adjustable one, or only the named ones (none for fixed examples). */
 export type StoryControlsSetting = "all" | readonly string[];
@@ -29,8 +49,11 @@ export type StoryIndexEntry = {
   readonly group?: StoryGroup;
   /** The story's own `parameters.height`, when it sets one, in CSS px. */
   readonly height?: number;
-  /** The story's own `parameters.design`, when it sets one with a `figma` link. */
-  readonly design?: StoryDesign;
+  /**
+   * The story's own `parameters.design.figma`, when it sets one: `null` when that link is not a Figma file's (noted in
+   * the file's `notes`), so the story shows no design rather than the meta's.
+   */
+  readonly design?: FigmaLink | null;
   /** Whether the story sets `parameters.main: true`: the component's demo. */
   readonly isMain?: boolean;
   /**
@@ -60,8 +83,11 @@ export type StoryFileIndex = {
   readonly controls?: StoryControlsSetting;
   /** The meta's `parameters.height`, when it sets one: every story's frame height, in CSS px. */
   readonly height?: number;
-  /** The meta's `parameters.design`, when it sets one with a `figma` link: the component's, and every story's. */
-  readonly design?: StoryDesign;
+  /**
+   * The meta's `parameters.design.figma`, when it sets a valid one (a wrong one is in `notes`): the component's, and
+   * every story's.
+   */
+  readonly design?: FigmaLink;
   /** The meta's `parameters.touch`, when it sets one: every story starts in touch unless it says otherwise. */
   readonly isTouch?: boolean;
   /** The meta's `parameters.logic`, when it sets one: every story is about logic unless it says otherwise. */
