@@ -41,8 +41,11 @@ export const templateOf = (node: ts.ClassDeclaration): TemplateText | undefined 
  * @param template - the template's text.
  */
 export const contentSelectors = (template: string): (string | undefined)[] => {
-  const markup = template.replace(/<!--[\s\S]*?-->/g, "");
-  const selectors = [...markup.matchAll(/<ng-content\b([^>]*)>/g)].map((match) => {
+  // read in one pass, as a parser reads it: a comment is skipped where it starts, so what it holds is never a tag
+  const tags = [...template.matchAll(/<!--[\s\S]*?(?:-->|$)|<ng-content\b([^>]*)>/g)].filter(
+    (match) => !match[0].startsWith("<!--")
+  );
+  const selectors = tags.map((match) => {
     const select = /\bselect\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(match[1] ?? "");
     const selector = select?.[1] ?? select?.[2];
     return selector === undefined || selector.trim() === "*" ? undefined : selector.trim();

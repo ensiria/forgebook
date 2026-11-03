@@ -10,6 +10,7 @@ import type { ComponentDocs, PropDocs } from "forgebook/component-docs";
 import { describe, expect, it } from "vitest";
 
 import { extractComponentDocs, extractFileComponent, storyFileShape } from "../src/vite/extractDocs.ts";
+import { contentSelectors } from "../src/vite/templateContent.ts";
 
 /** The fixture's folder. */
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "docs", "src");
@@ -139,5 +140,19 @@ describe("a component file, for its first stories", () => {
       extension: ".stories.ts",
       importStatement: 'import { Badge } from "./badge.component";'
     });
+  });
+});
+
+describe("the content a template projects", () => {
+  it("reads each ng-content once, in order, and none a comment holds, wherever the comment starts", () => {
+    const template = [
+      '<ng-content select="[icon]" />',
+      '<!-- <ng-content select=".hidden" /> -->',
+      "<ng-content />",
+      '<!-<!---->- <ng-content select=".after" />',
+      '<ng-content select="[icon]" />',
+      '<!-- unclosed <ng-content select=".never" />'
+    ].join("\n");
+    expect(contentSelectors(template)).toEqual(["[icon]", undefined, ".after"]);
   });
 });
