@@ -73,7 +73,9 @@ export type StoryRenderer = {
    *
    * @param canvas - the element the story is drawn in.
    * @param drawing - the story, its args, texts, clock and language.
-   * @param onError - called with the error when the story throws while it is drawn; the frame shows it instead.
+   * @param onError - called with the error when the story throws while it is drawn; the frame shows it instead, until
+   *   the next `update`. Only the latest drawing's error is reported: one of a drawing an `update` replaced while it was
+   *   under way would stand over the story drawn after it.
    */
   readonly mount: (
     canvas: HTMLElement,
