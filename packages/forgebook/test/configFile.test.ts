@@ -123,10 +123,13 @@ describe("the written home", () => {
     const dir = folder();
     expect(resolveConfig(BASE, dir).home).toBeUndefined();
     writeFileSync(join(dir, "forgebook.home.md"), "# Home\n");
-    expect(resolveConfig(BASE, dir).home).toBe(join(dir, "forgebook.home.md"));
+    // in Vite's form, as every path of the resolved configuration
+    expect(resolveConfig(BASE, dir).home).toBe(VITE_PATHS.join(dir, "forgebook.home.md"));
     mkdirSync(join(dir, "docs"));
     writeFileSync(join(dir, "docs/home.md"), "# Other\n");
-    expect(resolveConfig({ ...BASE, home: "docs/home.md" }, dir).home).toBe(join(dir, "docs/home.md"));
+    expect(resolveConfig({ ...BASE, home: "docs/home.md" }, dir).home).toBe(
+      VITE_PATHS.join(dir, "docs/home.md")
+    );
   });
 
   it("keeps the generated home with false, even beside a written one", () => {
