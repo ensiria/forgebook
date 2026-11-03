@@ -167,9 +167,12 @@ describe("importStorybook", () => {
     expect(imported.frameworkOptions).toBeUndefined();
   });
 
-  it("reads a Svelte project's Storybook as Svelte, SvelteKit's too, naming its Svelte CSF files", async () => {
-    for (const framework of ["@storybook/svelte-vite", "@storybook/sveltekit"]) {
-      const project = join(scratch, framework.replace(/\W/g, "-"));
+  it("reads a Svelte project's Storybook as Svelte, SvelteKit's as SvelteKit, naming its Svelte CSF files", async () => {
+    for (const [framework, expected] of [
+      ["@storybook/svelte-vite", "svelte"],
+      ["@storybook/sveltekit", "sveltekit"]
+    ]) {
+      const project = join(scratch, String(framework).replace(/\W/g, "-"));
       cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
       writeFileSync(
         join(project, ".storybook", "main.ts"),
@@ -177,11 +180,11 @@ describe("importStorybook", () => {
       );
       const imported = await importStorybook(project);
       if (typeof imported === "string") throw new Error(imported);
-      expect(imported.framework).toBe("svelte");
+      expect(imported.framework).toBe(expected);
       expect(imported.stories).toEqual(["src/**/*.stories.ts"]);
       expect(imported.notes).toContain("src/**/*.stories.svelte: not a story file Forgebook reads");
-      expect(imported.notes.some((note) => note.startsWith("SvelteKit's $app modules"))).toBe(
-        framework === "@storybook/sveltekit"
+      expect(initConfigText(imported, "Storybook")).toContain(
+        `import { ${String(expected)} } from "@forgebook/${String(expected)}/vite";`
       );
     }
   });

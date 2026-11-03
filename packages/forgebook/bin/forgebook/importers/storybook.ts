@@ -6,12 +6,13 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML stories on Vite, a Nuxt
- * project's among them (`@storybook-vue/nuxt`, which Nuxt's Storybook module sets up), Angular's and Analog's (their
- * stories compile the same way through the Angular adapter's Vite plugin), and a Next.js project's (Storybook's
- * `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework is refused with what Forgebook
- * supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the notes, since Forgebook reads CSF in
- * scripts; an Angular project's `angular.json` adds what `importers/storybookAngular.ts` reads.
+ * instead. Forgebook reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML stories on Vite, a
+ * SvelteKit project's (whose `sveltekit_experimental` parameters are read as they are) and a Nuxt project's among them
+ * (`@storybook-vue/nuxt`, which Nuxt's Storybook module sets up), Angular's and Analog's (their stories compile the same
+ * way through the Angular adapter's Vite plugin), and a Next.js project's (Storybook's `@storybook/nextjs`, on webpack,
+ * too: the stories are the same), so another framework is refused with what Forgebook supports. A Svelte project's
+ * `.stories.svelte` files (Svelte CSF) are named in the notes, since Forgebook reads CSF in scripts; an Angular
+ * project's `angular.json` adds what `importers/storybookAngular.ts` reads.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
@@ -32,6 +33,7 @@ export type ImportedFramework =
   | "react"
   | "vue"
   | "svelte"
+  | "sveltekit"
   | "preact"
   | "solid"
   | "nextjs"
@@ -48,6 +50,7 @@ export const ADAPTER_FUNCTIONS: Readonly<Record<ImportedFramework, string>> = {
   react: "react",
   vue: "vue",
   svelte: "svelte",
+  sveltekit: "sveltekit",
   preact: "preact",
   solid: "solid",
   nextjs: "nextjs",
@@ -80,7 +83,7 @@ const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   "@storybook/react-vite": "react",
   "@storybook/vue3-vite": "vue",
   "@storybook/svelte-vite": "svelte",
-  "@storybook/sveltekit": "svelte",
+  "@storybook/sveltekit": "sveltekit",
   "@storybook/preact-vite": "preact",
   // Solid's Storybook framework is the community's, published under its own name
   "storybook-solidjs-vite": "solid",
@@ -501,10 +504,6 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
   if (globs.length === 0) return `${relative(projectDir, mainFile)} names no story file Forgebook reads`;
-  if (storybook === "@storybook/sveltekit")
-    notes.push(
-      "SvelteKit's $app modules and $lib alias are not provided: a story that imports them needs an alias of its own"
-    );
   if (Array.isArray(main["addons"]) && main["addons"].length > 0)
     notes.push("The addons are left out: Forgebook has its own panel, toolbar and checks");
   if (framework === "nuxt") notes.push(...NUXT_NOTES);

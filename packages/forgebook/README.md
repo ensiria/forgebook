@@ -13,7 +13,8 @@ per story, switches for theme, contrast, motion and language, and a props table 
 [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
 [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) (a Nuxt project's through
 [`@forgebook/nuxt`](https://www.npmjs.com/package/@forgebook/nuxt)), Svelte 5 through
-[`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte), Solid 1.9 through
+[`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte) (a SvelteKit app's through
+[`@forgebook/sveltekit`](https://www.npmjs.com/package/@forgebook/sveltekit)), Solid 1.9 through
 [`@forgebook/solid`](https://www.npmjs.com/package/@forgebook/solid), Preact 10.19 or 11 through
 [`@forgebook/preact`](https://www.npmjs.com/package/@forgebook/preact), Web Components with Lit 3 through
 [`@forgebook/web-components`](https://www.npmjs.com/package/@forgebook/web-components), Angular 20 to 22 (Analog
@@ -29,6 +30,7 @@ frame of a story in another framework loads none) · npm, pnpm, yarn or bun ·
 In a project with React and Vite, both packages: `forgebook` is the catalogue, `@forgebook/react` the adapter it draws
 React components with. On Vue, Svelte, Solid, Preact or Angular, `@forgebook/vue`, `@forgebook/svelte`,
 `@forgebook/solid`, `@forgebook/preact` or `@forgebook/angular` takes its place, `@forgebook/nuxt` in a Nuxt project,
+`@forgebook/sveltekit` in a SvelteKit app,
 `@forgebook/web-components` for custom elements, and `@forgebook/html` for stories written in plain JavaScript or
 TypeScript with no framework: each README has the configuration and the stories.
 
@@ -353,7 +355,8 @@ writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out)
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
 computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
 become switches. It reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML on Vite
-(`@storybook/react-vite`, `@storybook/vue3-vite`, `@storybook/svelte-vite`, `@storybook/sveltekit`,
+(`@storybook/react-vite`, `@storybook/vue3-vite`, `@storybook/svelte-vite`, `@storybook/sveltekit` (whose
+`sveltekit_experimental` parameters `@forgebook/sveltekit` reads as they are),
 `@storybook/preact-vite`, `storybook-solidjs-vite`, `@storybook/web-components-vite`, `@storybook/html-vite`, and
 Nuxt's `@storybook-vue/nuxt`), Angular (`@storybook/angular`, `@analogjs/storybook-angular`, with the TypeScript
 configuration its stories were compiled with) and Next.js (`@storybook/nextjs-vite`, and `@storybook/nextjs` on webpack,
@@ -695,6 +698,7 @@ docs page that names what is not there, and its JSON lists every story for a scr
 | [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react) | React's story types, renderer and props reader |
 | [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) | Vue's story types, renderer and props, events and slots reader |
 | [`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte) | Svelte's story types, renderer and props, snippets and callback props reader |
+| [`@forgebook/sveltekit`](https://www.npmjs.com/package/@forgebook/sveltekit) | SvelteKit on Svelte's adapter: `$app/state`, navigation, forms, paths, the environment and a page's `load` in a story |
 | [`@forgebook/solid`](https://www.npmjs.com/package/@forgebook/solid) | Solid's story types, renderer (args update in place) and props reader |
 | [`@forgebook/preact`](https://www.npmjs.com/package/@forgebook/preact) | Preact's story types, renderer (on Preact itself, no compat) and props reader |
 | [`@forgebook/web-components`](https://www.npmjs.com/package/@forgebook/web-components) | Web Components' story types, Lit renderer, and reader of the Custom Elements Manifest |
