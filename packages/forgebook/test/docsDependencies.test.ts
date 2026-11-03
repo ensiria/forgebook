@@ -12,8 +12,9 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { docsDependencies } from "../src/vite/docsDependencies.ts";
 
-// as the file system names it: the module resolution answers real paths (a temporary folder is behind a link on macOS)
-const ROOT = realpathSync(mkdtempSync(join(tmpdir(), "forgebook-docs-dependencies-")));
+// as the file system names it, as the module resolution answers: a temporary folder is behind a link on macOS, and
+// under a short name on Windows
+const ROOT = realpathSync.native(mkdtempSync(join(tmpdir(), "forgebook-docs-dependencies-")));
 
 afterAll(() => rmSync(ROOT, { recursive: true, force: true }));
 
