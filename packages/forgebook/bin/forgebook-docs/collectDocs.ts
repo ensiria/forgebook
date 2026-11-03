@@ -14,7 +14,6 @@ import { globSync, readFileSync } from "node:fs";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
-import { figmaLink } from "../../src/figmaLink.ts";
 import { csfStoryId } from "../../src/storyIds.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
@@ -64,16 +63,6 @@ const sourceExports = (manifest: unknown): Readonly<Record<string, string>> => {
  */
 const isLogicFile = (index: StoryFileIndex): boolean =>
   index.stories.length > 0 && index.stories.every((story) => (story.isLogic ?? index.isLogic) === true);
-
-/**
- * The link to a component's design, when its meta writes a valid one: a wrong one is the catalogue's to report.
- *
- * @param index - the file's index.
- */
-const designOf = (index: StoryFileIndex): string | undefined => {
-  const link = index.design === undefined ? undefined : figmaLink(index.design.figma);
-  return link === undefined || typeof link === "string" ? undefined : link.url;
-};
 
 /**
  * A story file's main story (`parameters.main`, else its first): its export and its id without the source's.
@@ -151,7 +140,7 @@ const collectComponents = (
       stories: index.stories.map((story) => story.name ?? story.exportName),
       ...mainStoryOf(index),
       isLogic: isLogicFile(index),
-      design: designOf(index)
+      design: index.design?.url
     };
     addComponent(components, collected);
   }

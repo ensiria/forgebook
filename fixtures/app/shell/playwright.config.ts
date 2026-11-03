@@ -4,9 +4,10 @@
  *
  * @remarks
  * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT` (`ports.ts`), so two
- * worktrees can run the tests at once. The Vue, Svelte, Next.js and white-label catalogues run beside the fixture app,
- * for what a catalogue of another framework must do (`vue.e2e.ts`, `svelte.e2e.ts`), what a Next.js project's
- * components need (`nextjs.e2e.ts`) and a catalogue with no trace of Forgebook's look (`embed.e2e.ts`).
+ * worktrees can run the tests at once. The Vue, Svelte, Solid, Preact, Next.js and white-label catalogues run beside
+ * the fixture app, for what a catalogue of another framework must do (`vue.e2e.ts`, `svelte.e2e.ts`, `solid.e2e.ts`,
+ * `preact.e2e.ts`), what a Next.js project's components need (`nextjs.e2e.ts`) and a catalogue with no trace of
+ * Forgebook's look (`embed.e2e.ts`).
  *
  * @module
  */
@@ -44,6 +45,8 @@ export default defineConfig({
     catalogueServer(join(import.meta.dirname, ".."), "app"),
     catalogueServer(join(import.meta.dirname, "..", "..", "vue"), "vue"),
     catalogueServer(join(import.meta.dirname, "..", "..", "svelte"), "svelte"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "solid"), "solid"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "preact"), "preact"),
     // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
     catalogueServer(join(import.meta.dirname, ".."), "white-label", "white-label/forgebook.config.ts"),
     catalogueServer(join(import.meta.dirname, "..", "..", "nextjs"), "nextjs")

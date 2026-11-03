@@ -6,7 +6,7 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React, Vue and Svelte stories on Vite, and a Next.js project's (Storybook's
+ * instead. Forgebook reads React, Vue, Svelte, Preact and Solid stories on Vite, and a Next.js project's (Storybook's
  * `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework is refused with what Forgebook
  * supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the notes, since Forgebook reads CSF in
  * scripts.
@@ -25,7 +25,7 @@ import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 import { VITE_PATHS, type VitePaths } from "../../../src/vite/vitePaths.ts";
 
 /** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
-export type ImportedFramework = "react" | "vue" | "svelte" | "nextjs";
+export type ImportedFramework = "react" | "vue" | "svelte" | "preact" | "solid" | "nextjs";
 
 /** What a configuration takes from another tool's files. */
 export type ImportedConfig = {
@@ -51,6 +51,9 @@ const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   "@storybook/vue3-vite": "vue",
   "@storybook/svelte-vite": "svelte",
   "@storybook/sveltekit": "svelte",
+  "@storybook/preact-vite": "preact",
+  // Solid's Storybook framework is the community's, published under its own name
+  "storybook-solidjs-vite": "solid",
   "@storybook/nextjs-vite": "nextjs",
   "@storybook/nextjs": "nextjs"
 };
