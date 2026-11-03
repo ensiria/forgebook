@@ -5,6 +5,7 @@
  */
 import { extname } from "node:path";
 
+import type { Options as ReactPluginOptions } from "@vitejs/plugin-react";
 import type { FrameworkAdapter } from "forgebook/vite/adapter";
 import type { PluginOption } from "vite";
 
@@ -13,9 +14,11 @@ import type { PluginOption } from "vite";
  * `extractDocs.ts` (the props from the first parameter's type, events as `on*` props); the generated pages draw with
  * its renderer and write code with its JSX writer; Vite gets React's plugin.
  *
+ * @param reactPlugin - the options of `@vitejs/plugin-react`, for a library whose files need them (JSX in `.js` files:
+ * `{ include: /\.[jt]sx?$/ }`); its defaults by default.
  * @returns the adapter.
  */
-export const react = (): FrameworkAdapter => ({
+export const react = (reactPlugin: ReactPluginOptions = {}): FrameworkAdapter => ({
   name: "react",
   // beside this module, with its extension: `.ts` in the sources, `.js` once built for npm
   docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
@@ -31,6 +34,6 @@ export const react = (): FrameworkAdapter => ({
   // Fast Refresh: an edited component updates in its frame and the story keeps its state
   vitePlugins: async (): Promise<readonly PluginOption[]> => {
     const { default: plugin } = await import("@vitejs/plugin-react");
-    return [plugin()];
+    return [plugin(reactPlugin)];
   }
 });
