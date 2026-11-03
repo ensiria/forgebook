@@ -6,9 +6,10 @@
  * @module
  */
 
+import type { FigmaLink } from "@forgebook/story-format/source";
+
 import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
 import { embedAddressOf } from "../embedCode.ts";
-import type { FigmaLink } from "../figmaLink.ts";
 import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
 import { isLiveErrorReport } from "../liveErrors.ts";
 import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";

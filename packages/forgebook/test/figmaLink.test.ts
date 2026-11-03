@@ -3,10 +3,11 @@
  *
  * @module
  */
+import type { FigmaLink } from "@forgebook/story-format/source";
 import { describe, expect, it } from "vitest";
 
-import { type FigmaLink, figmaLink } from "../src/figmaLink.ts";
 import { figmaEmbedAddress } from "../src/shell/figmaEmbed.ts";
+import { figmaLink } from "../src/vite/figmaLink.ts";
 
 /**
  * Reads a link that must be valid.

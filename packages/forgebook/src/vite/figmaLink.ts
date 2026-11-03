@@ -1,21 +1,19 @@
 /**
- * A design's link, as a story's `parameters.design.figma` writes it: read and checked once, then trusted by the shell,
- * the tools and the catalogue's docs alike.
+ * A design's link, as a story's `parameters.design.figma` writes it: read and checked once, by the index, then trusted
+ * by the shell, the tools and the catalogue's docs alike.
  *
  * @remarks
  * A link is anything a story file writes, and the Design tab frames it, so it is taken apart rather than passed on:
  * only `https` on Figma's own hosts is accepted, and the embed's address is built from the parts read here
- * (`shell/figmaEmbed.ts`). Figma's embed takes the kinds in `FILE_KINDS` only. Pure, and free of anything of Node or the
- * page, since both runtimes read it.
+ * (`shell/figmaEmbed.ts`). Figma's embed takes the kinds in `FILE_KINDS` only. Checking it while indexing keeps the
+ * checker out of the pages: the shell and the frame read the index's link as it is.
  *
  * @module
  */
+import type { FigmaFileKind, FigmaLink } from "@forgebook/story-format/source";
 
 /** The hosts a design's link may name; `embed.figma.com` is what a link copied from an embed code names. */
 const FIGMA_HOSTS: ReadonlySet<string> = new Set(["figma.com", "www.figma.com", "embed.figma.com"]);
-
-/** What a Figma file is, as the embed's address names it. */
-export type FigmaFileKind = "design" | "proto" | "board" | "slides" | "deck";
 
 /** The file kinds by the first segment of a link's path; `file` is the older name of `design`. */
 const FILE_KINDS: ReadonlyMap<string, FigmaFileKind> = new Map([
@@ -32,20 +30,6 @@ const KEY = /^[A-Za-z0-9]+$/;
 
 /** A node's id, in a link (`12-34`, `I12-34;56-78`) or in Figma's REST API (`12:34`). */
 const NODE_ID = /^[A-Za-z]?\d+[-:]\d+(;\d+[-:]\d+)*$/;
-
-/** A design's link, checked. */
-export type FigmaLink = {
-  /** The link to open in Figma, rebuilt from the parts below on `www.figma.com`. */
-  readonly url: string;
-  /** What the file is. */
-  readonly kind: FigmaFileKind;
-  /** The file's key. */
-  readonly fileKey: string;
-  /** The branch's key, for a link to a branch of the file. */
-  readonly branchKey?: string;
-  /** The node it points at, as Figma's REST API writes it (`12:34`); none for a link to the whole file. */
-  readonly nodeId?: string;
-};
 
 /** The most of a refused link a message repeats. */
 const MAX_QUOTED = 120;

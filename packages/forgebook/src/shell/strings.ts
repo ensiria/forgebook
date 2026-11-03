@@ -34,6 +34,7 @@ const shellStrings = {
   related: "Related",
   view: "View",
   viewChanged: "A view setting is changed",
+  viewMenuError: "The View menu could not be loaded",
   controlChanged: (control: string): string => `${control}: changed`,
   controlKey: (control: string, key: string | undefined): string =>
     key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
@@ -251,6 +252,8 @@ const shellStrings = {
   testIds: "Test ids",
   noProps: "This page has no props",
   docsLoading: "Reading the component…",
+  tabLoading: "Loading the tab…",
+  tabError: "The tab could not be loaded",
   docsError: "The component could not be read",
   indexProblems: "Some story files could not be placed"
 };
