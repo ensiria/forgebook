@@ -6,7 +6,7 @@
  *
  * @module
  */
-import type { FigmaLink } from "../figmaLink.ts";
+import type { FigmaLink } from "@forgebook/story-format/source";
 
 /** The host Figma's embeds are served from. */
 const EMBED_HOST = "embed.figma.com";
