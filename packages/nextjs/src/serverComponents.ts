@@ -7,7 +7,7 @@
  * an error in the console and the function called again on each try). Here an async component is swapped for a
  * stand-in that calls it once per set of props, suspends on its promise, then draws its result, the async components in
  * that result swapped too. The renderer's boundary takes the suspension, and the story counts as drawn once they all
- * came (`nextRenderer.tsx`).
+ * came (`nextFrameRenderer.tsx`).
  *
  * The swap reaches the story's component, what its render returns, and what the catalogue's decorators return: the
  * elements, and the elements in their props. An async component a synchronous one creates while it renders is out of

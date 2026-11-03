@@ -46,7 +46,7 @@ import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
-import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
+import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
 import { type ShellChannel, shellChannel } from "./shellChannel.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
@@ -56,7 +56,7 @@ import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.t
 /** What an app passes to the frame. */
 export type FrameConfig = {
   /** The framework that draws the stories (`@forgebook/react` passes its own). */
-  readonly renderer: StoryRenderer;
+  readonly renderer: FrameRenderer;
   /** The sources the shell shows, in the same order. */
   readonly sources: readonly StorySource[];
   /** The address of axe's script, for the Accessibility card; the generated page gives it. */

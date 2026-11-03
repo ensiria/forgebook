@@ -23,7 +23,7 @@ import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
-import type { MountedStory, StoryDrawing, StoryIdentity, StoryRenderer } from "./renderer.ts";
+import type { FrameRenderer, MountedStory, StoryDrawing, StoryIdentity } from "./renderer.ts";
 import { animationsSettled } from "./settle.ts";
 import { storyCanvas } from "./storyCanvas.ts";
 import { type PreparedStory, prepareStory } from "./storyHooks.ts";
@@ -63,7 +63,7 @@ export type StoryRunOptions = {
   /** What the plugins prepare before every mount, ahead of the story's loaders. */
   readonly pluginSetups: readonly LoadedBeforeEach[];
   /** The framework that draws it. */
-  readonly renderer: StoryRenderer;
+  readonly renderer: FrameRenderer;
   /** The story clock the story reads: running from its start for a Live story, held otherwise. */
   readonly clock: FrameClock;
   /** The texts inside the stories in the shown language. */
