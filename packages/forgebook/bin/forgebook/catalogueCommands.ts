@@ -15,6 +15,8 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 import type {
   FoundComponentsDocument,
   NearestTokensDocument,
+  PageDocument,
+  PagesDocument,
   StoriesDocument,
   StoryDocument,
   TokenDocument,
@@ -124,7 +126,9 @@ export const printAnswer = (
     | TokensDocument
     | TokenDocument
     | NearestTokensDocument
-    | FoundComponentsDocument,
+    | FoundComponentsDocument
+    | PagesDocument
+    | PageDocument,
   problems: readonly string[],
   context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
 ): void => {

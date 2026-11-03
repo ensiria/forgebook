@@ -75,6 +75,8 @@ export type ResolvedConfig = {
   readonly heights: string | undefined;
   /** The project's own story globs, from the configuration's folder. */
   readonly stories: readonly string[];
+  /** The project's own docs pages' globs, from the configuration's folder. */
+  readonly docs: readonly string[];
   /** The sources' module specifiers. */
   readonly sources: readonly string[];
   /** The switches, the presets' and the catalogue's merged; none when neither declares any. */
@@ -219,6 +221,12 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   };
 };
 
+/** Whether a configuration's list has something in it. */
+const isListed = (config: object, key: string): boolean => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list) && list.length > 0;
+};
+
 /**
  * Why a loaded configuration cannot be used, or none.
  *
@@ -230,9 +238,7 @@ const configProblem = (config: unknown): string | undefined => {
   if (!("framework" in config) || typeof config.framework !== "object" || config.framework === null)
     return "it names no framework (`framework: react()`)";
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
-  const hasStories = "stories" in config && Array.isArray(config.stories) && config.stories.length > 0;
-  const hasSources = "sources" in config && Array.isArray(config.sources) && config.sources.length > 0;
-  if (!hasStories && !hasSources)
+  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
   return undefined;
 };
@@ -243,6 +249,13 @@ const configProblem = (config: unknown): string | undefined => {
  * @param config - what the file exports by default.
  */
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
+
+/** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
+const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "docs" | "sources"> => ({
+  stories: config.stories ?? [],
+  docs: config.docs ?? [],
+  sources: config.sources ?? []
+});
 
 /**
  * Whether Forgebook's mark may stand in for a logo: on, unless the last that says so turns it off.
@@ -295,8 +308,7 @@ export const resolveConfig = (
     title: config.title,
     logo: config.logo === undefined ? undefined : absolute(config.logo),
     heights: config.heights,
-    stories: config.stories ?? [],
-    sources: config.sources ?? [],
+    ...shownFiles(config),
     switches,
     languages: mergedById([...presets.map((preset) => preset.languages), config.languages]),
     previews: [

@@ -7,10 +7,12 @@
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
+import { anchorOf } from "../pageAddress.ts";
+import { findPage, type PageLocation } from "../pageTree.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";
 import { type FixedView, NOT_FIXED } from "../storyGlobals.ts";
@@ -26,6 +28,7 @@ import {
   sidebarStoryIds,
   storyTree,
   type TreeComponent,
+  type TreeSource,
   type TreeStory
 } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
@@ -88,17 +91,28 @@ export type ShellConfig = {
   readonly lists?: CatalogueLists;
 };
 
-/** The page an address names: one story, a component's page, or the home (an address that names none). */
+/** A docs page, loaded on first use: a catalogue may have none. */
+const DocPage = lazy(() => import("./DocPage.tsx").then((module) => ({ default: module.DocPage })));
+
+/**
+ * The page an address names: one story, a component's page, a docs page with the heading it opens at, or the home (an
+ * address that names none).
+ */
 type Page =
   | { readonly kind: "story"; readonly id: string }
   | { readonly kind: "component"; readonly id: string }
+  | { readonly kind: "page"; readonly id: string; readonly anchor?: string | undefined }
   | { readonly kind: "home" };
 
 /** The home. */
 const HOME: Page = { kind: "home" };
 
 /** A page's key: the same for every view of it. */
-const pageKey = (page: Page): string => (page.kind === "home" ? page.kind : `${page.kind}:${page.id}`);
+const pageKey = (page: Page): string => {
+  if (page.kind === "home") return page.kind;
+  // a heading is a place of its own in the history: Back from it returns to where the reader was
+  return page.kind === "page" ? `page:${page.id}#${page.anchor ?? ""}` : `${page.kind}:${page.id}`;
+};
 
 /**
  * A visit of the page an address shows.
@@ -151,10 +165,20 @@ type Address = {
   readonly matrix: readonly string[];
 };
 
-/** The page of the address's `story` and `component` parameters: a story wins, none is the home. */
-const pageOf = (story: string | null, component: string | null): Page => {
+/**
+ * The page an address's query and fragment name: a story wins, then a component, then a docs page; none is the home.
+ *
+ * @param search - the address's query.
+ * @param hash - its fragment.
+ */
+const pageOf = (search: string, hash: string): Page => {
+  const params = new URLSearchParams(search);
+  const story = params.get("story");
+  const component = params.get("component");
+  const page = params.get("page");
   if (story !== null) return { kind: "story", id: story };
   if (component !== null) return { kind: "component", id: component };
+  if (page !== null) return { kind: "page", id: page, anchor: anchorOf(hash.replace(/^#/, "")) };
   return HOME;
 };
 
@@ -165,10 +189,8 @@ const pageOf = (story: string | null, component: string | null): Page => {
  */
 const readAddress = (catalogue: ViewCatalogue): Address => {
   const params = new URLSearchParams(window.location.search);
-  const story = params.get("story");
-  const component = params.get("component");
   return {
-    page: pageOf(story, component),
+    page: pageOf(window.location.search, window.location.hash),
     view: parseView(window.location.search, catalogue),
     panelArgs: parsePanelArgsParam(params.get("args")),
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== "")
@@ -188,17 +210,22 @@ const addressQuery = (
   const params = viewParams(view, switches);
   if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
+  if (page.kind === "page") params.set("page", page.id);
   const args = page.kind === "story" ? panelArgsParam(panelArgs) : "";
   if (args !== "") params.set("args", args);
   if (page.kind === "story" && matrix.length > 0) params.set("matrix", matrix.join(","));
   const query = params.toString();
-  return query === "" ? window.location.pathname : `?${query}`;
+  // the fragment is part of what is written back on every change of the view, or a change would lose the heading
+  const fragment =
+    page.kind === "page" && page.anchor !== undefined ? `#${encodeURIComponent(page.anchor)}` : "";
+  return `${query === "" ? window.location.pathname : `?${query}`}${fragment}`;
 };
 
-/** What a page shows: a story with its place, a component's page with its place, the home, or why there is nothing. */
+/** What a page shows: a story, a component's page or a docs page with its place, the home, or why there is nothing. */
 type Shown =
   | { readonly kind: "story"; readonly location: StoryLocation }
   | { readonly kind: "component"; readonly location: ComponentLocation }
+  | { readonly kind: "page"; readonly location: PageLocation; readonly anchor: string | undefined }
   | { readonly kind: "home" }
   | { readonly kind: "missing"; readonly message: string };
 
@@ -216,6 +243,12 @@ const shownPage = (tree: ReturnType<typeof storyTree>, page: Page): Shown => {
       ? { kind: "missing", message: STRINGS.unknownComponent(page.id) }
       : { kind: "component", location };
   }
+  if (page.kind === "page") {
+    const location = findPage(tree, page.id);
+    return location === undefined
+      ? { kind: "missing", message: STRINGS.unknownPage(page.id) }
+      : { kind: "page", location, anchor: page.anchor };
+  }
   return { kind: "home" };
 };
 
@@ -225,7 +258,7 @@ const recentPageOf = (shown: Shown): RecentPage | undefined => {
   if (shown.kind === "component") {
     return { kind: "component", id: componentId(shown.location.source.id, shown.location.component.title) };
   }
-  return undefined;
+  return shown.kind === "page" ? { kind: "page", id: shown.location.page.id } : undefined;
 };
 
 /**
@@ -237,6 +270,18 @@ const isLogicPage = (shown: Shown): boolean => {
   if (shown.kind === "story") return shown.location.story.isLogic;
   return shown.kind === "component" && isLogicComponent(shown.location.component);
 };
+
+/** The shown component's place, a story's too; none on any other page. */
+const componentLocationOf = (shown: Shown): ComponentLocation | undefined =>
+  shown.kind === "story" || shown.kind === "component" ? shown.location : undefined;
+
+/** The shown docs page's place; none on any other page. */
+const pageLocationOf = (shown: Shown): PageLocation | undefined =>
+  shown.kind === "page" ? shown.location : undefined;
+
+/** Whether nothing shown follows the view's switches: the home, or a docs page without a story. */
+const hasNoStories = (shown: Shown): boolean =>
+  shown.kind === "home" || (shown.kind === "page" && shown.location.page.stories.length === 0);
 
 /** What the sidebar marks: the shown component and story; none on the home or a missing page. */
 const sidebarCurrent = (
@@ -361,7 +406,8 @@ const RelatedLinks = ({
   );
 
 /**
- * What scrolls above a page: the index's problems, and the component's place and name, or why nothing is shown.
+ * What scrolls above a page: the index's problems, and the component's or the docs page's place and name, or why
+ * nothing is shown.
  *
  * @remarks
  * The place is always where the component lives, with the other places it is listed in, so a page opened from an
@@ -373,6 +419,7 @@ const RelatedLinks = ({
 const ShellHeader = ({
   problems,
   location,
+  page,
   message,
   picker,
   related,
@@ -380,6 +427,8 @@ const ShellHeader = ({
 }: {
   readonly problems: readonly string[];
   readonly location: ComponentLocation | undefined;
+  /** The shown docs page; none on any other page. */
+  readonly page: PageLocation | undefined;
   readonly message: string | undefined;
   readonly picker: ReactNode;
   readonly related: ReactNode;
@@ -436,11 +485,36 @@ const ShellHeader = ({
         {related}
       </header>
     )}
+    {page === undefined ? null : (
+      <header className="forgebook-header">
+        <p className="forgebook-header__path">
+          {[page.source.name, page.page.group].filter((part) => part !== undefined).join(" · ")}
+        </p>
+        <div className="forgebook-header__row">
+          <h1 className="forgebook-header__title">{page.page.name}</h1>
+        </div>
+      </header>
+    )}
   </>
 );
 
 /** A story's page. */
 const storyPage = (story: TreeStory): Page => ({ kind: "story", id: story.id });
+
+/**
+ * Opens the page an address of the catalogue names, written in a docs page's text.
+ *
+ * @param href - the address.
+ * @param openPage - opens a page.
+ * @returns whether it names one.
+ */
+const openLinkedPage = (href: string, openPage: (page: Page) => void): boolean => {
+  const { search, hash } = new URL(href, window.location.href);
+  const page = pageOf(search, hash);
+  if (page.kind === "home") return false;
+  openPage(page);
+  return true;
+};
 
 /** The address and how to change it: a new page as a new history entry, a change of the shown page in place. */
 type AddressState = {
@@ -452,6 +526,8 @@ type AddressState = {
   readonly pageAddress: (page: Page) => Address;
   /** Opens a page, as a new entry of the history. */
   readonly openPage: (page: Page) => void;
+  /** Goes to a heading of the shown docs page, as a new entry of the history. */
+  readonly openAnchor: (anchor: string) => void;
   /** Changes the shown page's address (the view, the panel's values), in place. */
   readonly replaceAddress: (next: Address) => void;
 };
@@ -487,6 +563,13 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
       setAddress(next);
       setVisit(visitOf(next, false));
     },
+    openAnchor: (anchor: string): void => {
+      if (address.page.kind !== "page") return;
+      const next = { ...address, page: { ...address.page, anchor } };
+      window.history.pushState(null, "", addressQuery(next, switches));
+      setAddress(next);
+      setVisit({ ...visitOf(next, false), isInPage: true });
+    },
     replaceAddress: (next: Address): void => {
       window.history.replaceState(null, "", addressQuery(next, switches));
       setAddress(next);
@@ -510,7 +593,7 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
   } = useSidebarLayout();
   const catalogue = useCatalogue();
   const { switches } = catalogue;
-  const { address, visit, pageAddress, openPage, replaceAddress } = useAddress(catalogue);
+  const { address, visit, pageAddress, openPage, openAnchor, replaceAddress } = useAddress(catalogue);
   // each page's last scroll position, kept across the component pages and the stage
   const scrollPositions = useRef(new Map<string, number>());
   const scroll: PageScroll = { visit, positions: scrollPositions.current };
@@ -537,17 +620,19 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
   );
 
   const shown = shownPage(tree, address.page);
-  const location = shown.kind === "story" || shown.kind === "component" ? shown.location : undefined;
+  const location = componentLocationOf(shown);
   const recent = useRecentPages(recentPageOf(shown));
+  const shownPageLocation = pageLocationOf(shown);
+  const pageName = shownPageLocation?.page.name ?? location?.component.name;
 
   useEffect(() => {
-    document.title = location === undefined ? title : `${location.component.name} · ${title}`;
-  }, [location, title]);
+    document.title = pageName === undefined ? title : `${pageName} · ${title}`;
+  }, [pageName, title]);
 
   const changeView = (view: ViewState): void => replaceAddress({ ...address, view });
-  const shownStoryId = shown.kind === "story" ? shown.location.story.id : undefined;
   // a story marked for a phone has its own Touch on its page, and a story about logic is never compared
   const shownStory = shown.kind === "story" ? shown.location.story : undefined;
+  const shownStoryId = shownStory?.id;
   const { view: shownView, onViewChange: changeShownView } = useShownView({
     addressView: address.view,
     story: shownStory,
@@ -566,10 +651,14 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
 
   const source = sources.find((candidate) => candidate.id === location?.source.id);
   const files = source === undefined ? undefined : sourceFiles(source);
+  const storyHrefOf = (story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches);
+  const columnHeightOf = (storyId: string): number | undefined =>
+    knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH));
   const header = (
     <ShellHeader
       problems={tree.problems}
       location={location}
+      page={shownPageLocation}
       isLogic={isLogicPage(shown)}
       message={shown.kind === "missing" ? shown.message : undefined}
       picker={
@@ -609,6 +698,9 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
         homeHref={addressQuery(pageAddress(HOME), switches)}
         onOpenHome={(): void => openPage(HOME)}
         current={sidebarCurrent(location, shownStoryId)}
+        currentPageId={shownPageLocation?.page.id}
+        pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), switches)}
+        onOpenPage={(id: string): void => openPage({ kind: "page", id })}
         componentHref={(sourceId: string, componentTitle: string): string =>
           addressQuery(pageAddress(componentPage(sourceId, componentTitle)), switches)
         }
@@ -619,7 +711,7 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
       {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
       <main className="forgebook-main">
         <ShellBar
-          isHome={shown.kind === "home"}
+          isHome={hasNoStories(shown)}
           view={shownView}
           onViewChange={changeShownView}
           isStoryPage={shown.kind === "story"}
@@ -646,7 +738,7 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
             touchOverrides={touchOverrides}
             onTouchChange={setTouchOverride}
             frameUrl={frameUrl}
-            hrefOf={(story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches)}
+            hrefOf={storyHrefOf}
             onOpen={(story: TreeStory): void => openPage(storyPage(story))}
             loadDocs={files?.docs[shown.location.component.file]}
             loadCode={files?.code[shown.location.component.file]}
@@ -657,9 +749,7 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
               catalogue,
               isSystemDark
             )}
-            heightOf={(storyId: string): number | undefined =>
-              knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH))
-            }
+            heightOf={columnHeightOf}
             header={header}
             scroll={scroll}
             usedIn={usedInLinks(source, catalogue.hasUsedIn, tree, {
@@ -667,6 +757,36 @@ const ShellPage = ({ title, logo, hasBranding, heights, sources, frameUrl }: She
               onOpen: openPage
             })}
           />
+        ) : null}
+        {shown.kind === "page" ? (
+          <Suspense fallback={<div className="forgebook-workspace">{header}</div>}>
+            {/* keyed by the page: its frames, its text and its scrolling element are that page's alone */}
+            <DocPage
+              key={shown.location.page.id}
+              location={shown.location}
+              anchor={shown.anchor}
+              tree={tree}
+              sources={sources}
+              view={address.view}
+              touchOverrides={touchOverrides}
+              onTouchChange={setTouchOverride}
+              frameUrl={frameUrl}
+              storyHrefOf={storyHrefOf}
+              onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
+              pageHrefOf={(id: string, anchor: string | undefined): string =>
+                addressQuery(pageAddress({ kind: "page", id, anchor }), switches)
+              }
+              onOpenPage={(id: string): void => openPage({ kind: "page", id })}
+              onOpenAnchor={openAnchor}
+              onOpenAddress={(href: string): boolean => openLinkedPage(href, openPage)}
+              heightOf={columnHeightOf}
+              backgroundOf={(pageSource: TreeSource): string | undefined =>
+                storyBackground(pageSource.background, address.view, catalogue, isSystemDark)
+              }
+              header={header}
+              scroll={scroll}
+            />
+          </Suspense>
         ) : null}
         {shown.kind === "story" ? (
           <Stage
