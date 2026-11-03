@@ -22,12 +22,21 @@ import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
 import { settleAgentIndex } from "./builtCatalogue.ts";
-import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
+import {
+  askCatalogue,
+  COMMAND,
+  configOf,
+  configPathOf,
+  FORGEBOOK_OPTIONS,
+  printAnswer
+} from "./catalogueCommands.ts";
 import { catalogueVite, FRAMES_MODES, withFramePort, withFramesMode } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { pagesCommands } from "./pagesCommands.mts";
+import { prebundle } from "./prebundleRun.ts";
+import { prebundleForDev } from "./prebundleStart.ts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
 import { visualCommands } from "./visualCommands.mts";
@@ -87,18 +96,23 @@ await defineCommands({
         }
       ],
       run: async ({ options, onInterrupt, log }): Promise<void> => {
+        const isForced = options.force === true;
+        // the one the entry started, when it could; it works while the configuration loads
+        const prebundling = prebundleForDev(configPathOf(options.config), options);
         const read = withFramesMode(await configOf(options.config), options.frames);
         const config = withFramePort(read, options["frame-port"]);
         const port = options.port === undefined ? undefined : Number(options.port);
         if (port !== undefined && !Number.isInteger(port))
           throw new ScriptError(`--port ${options.port} is not a port`);
+        // the server reads the cache folder the child writes; should the child have failed, it does the work itself
+        const isPrebundled = await prebundling;
         const server = await createServer(
           await catalogueVite(config, {
             server: {
               ...(port === undefined ? {} : { port, strictPort: true }),
               ...(options.host === undefined ? {} : { host: options.host })
             },
-            ...(options.force === true ? { optimizeDeps: { force: true } } : {})
+            ...(isForced && !isPrebundled ? { optimizeDeps: { force: true } } : {})
           })
         );
         await server.listen();
@@ -110,6 +124,17 @@ await defineCommands({
           });
         });
       }
+    }),
+    prebundle: forgebook.command({
+      summary: "Pre-bundle the catalogue's dependencies: what dev does on a first start.",
+      options: {
+        force: { type: "boolean", description: "Pre-bundle them again, ignoring Vite's cache." }
+      },
+      examples: [
+        { command: `${COMMAND} prebundle`, description: "Before the first start, in CI or an image." }
+      ],
+      run: async ({ options }): Promise<void> =>
+        prebundle(await configOf(options.config), options.force === true)
     }),
     build: forgebook.command({
       summary: "Build the catalogue into static files.",

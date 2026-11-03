@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * The `forgebook` command's entry: turns on Node's compile cache, then loads the commands (`forgebookCommands.mts`).
+ * The `forgebook` command's entry: turns on Node's compile cache, starts a first start's pre-bundling
+ * (`prebundleStart.ts`), then loads the commands (`forgebookCommands.mts`).
  *
  * @remarks
  * Imports run before any code of the module holding them, so the cache has to be on in a module of its own, or the
@@ -17,5 +18,9 @@ import { compileCacheFolder } from "./compileCache.ts";
 
 const folder = compileCacheFolder(import.meta.dirname);
 if (folder !== undefined) enableCompileCache(folder);
+
+// a first start's pre-bundling works while the commands load
+const { prebundleEarly } = await import("./prebundleStart.ts");
+prebundleEarly(process.argv.slice(2));
 
 await import("./forgebookCommands.mts");

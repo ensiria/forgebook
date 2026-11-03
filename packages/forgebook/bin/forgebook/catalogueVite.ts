@@ -10,6 +10,7 @@ import type { InlineConfig } from "vite";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../../src/vite/framesConfig.ts";
+import { unresolvedImports } from "./viteCache.ts";
 
 /**
  * Vite's configuration for a catalogue.
@@ -20,17 +21,30 @@ import { ISOLATED_FRAMES } from "../../src/vite/framesConfig.ts";
 export const catalogueVite = async (
   config: ResolvedConfig,
   overrides: InlineConfig
-): Promise<InlineConfig> => ({
-  ...overrides,
-  root: config.dir,
-  // the configuration file is Forgebook's: a vite.config beside it is not read
-  configFile: false,
-  plugins: [
-    forgebookPlugin({ config }),
-    ...((await config.framework.vitePlugins?.()) ?? []),
-    ...(overrides.plugins ?? [])
-  ]
-});
+): Promise<InlineConfig> => {
+  // what a first start's pre-bundling left out, left out here too: it is part of the pre-bundle's hash, and a server
+  // whose hash differed would pre-bundle everything again itself
+  const unresolved = unresolvedImports(config.dir);
+  return {
+    ...overrides,
+    ...(unresolved.length === 0
+      ? {}
+      : {
+          optimizeDeps: {
+            ...overrides.optimizeDeps,
+            exclude: [...(overrides.optimizeDeps?.exclude ?? []), ...unresolved]
+          }
+        }),
+    root: config.dir,
+    // the configuration file is Forgebook's: a vite.config beside it is not read
+    configFile: false,
+    plugins: [
+      forgebookPlugin({ config }),
+      ...((await config.framework.vitePlugins?.()) ?? []),
+      ...(overrides.plugins ?? [])
+    ]
+  };
+};
 
 /**
  * The configuration with the frames' port the command line gives (`--frame-port`), over the file's.
