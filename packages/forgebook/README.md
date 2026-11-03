@@ -112,7 +112,9 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 - **One frame per story**, so a story's styles and globals never leak into another, and its address opens it alone.
 - **Edits drawn in place**: an edited story file, preview or component is drawn anew in its open frame, which keeps
   what you did in the story (a typed field, an open menu); a story with a play, loaders or set-ups runs them again. An
-  edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does.
+  edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does. Where the
+  system's change events come late or never (a container's mounted volume, a Windows drive under WSL, a network
+  drive), `forgebook dev --poll` checks the files itself.
 - **Switches** for theme, contrast and motion, and the languages you declare; a library adds its own (density, brand)
   through a preset. A direction switch draws every story right to left, and a language declared `dir: "rtl"` does
   it by itself.
