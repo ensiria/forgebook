@@ -177,14 +177,15 @@ const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
 
 /**
- * What an embed of the story keeps of the page: its view and the values set in the panel.
+ * What an embed of the story keeps of the page: its view and the values set in the panel. An embed draws no device
+ * frame, so the device chosen is left out: the embed is the story at the width its iframe gives it.
  *
  * @param view - the reader's view, without what the story fixes, which the story fixes again.
  * @param panelArgs - the values set in the panel.
  * @param switches - the catalogue's switches.
  */
 const embedQuery = (view: ViewState, panelArgs: PanelArgs, switches: readonly ViewSwitch[]): string => {
-  const params = viewParams(view, switches);
+  const params = viewParams({ ...view, device: "auto", orientation: "auto" }, switches);
   const args = panelArgsParam(panelArgs);
   if (args !== "") params.set("args", args);
   return params.toString();
@@ -388,8 +389,9 @@ export const Stage = ({
     reports: pluginReports,
     isComparing: isComparing(view),
     aside: {
-      address: frameAddress(frameUrl, story.id, view, switches),
-      width: view.width,
+      // as the stage draws it: at its device's screen width and told its safe areas
+      address: deviceAddress(frameAddress(frameUrl, story.id, view, switches), framed),
+      width: framed?.area.width ?? view.width,
       background: backgroundOf(view),
       args: panelArgs,
       view: liveView(view)

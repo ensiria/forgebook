@@ -689,7 +689,7 @@ your theme: paste it in a wiki, in Notion, or in an iframe of your own.
 The story bar's **Embed** button gives the link and this code for the story and view on screen, with the values set in the
 panel; `forgebook story <id>` and the `story_address` tool give the same link as `links.embed`. The switches, the
 background, the language, `args`, `width` and `height` are read from the address; the stage's own settings (compare, zoom,
-the panel) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
+the panel, the device frame) are not. The story stays live, and it fills the box it gets, scrolling inside it when it is taller. Docs pages will
 be embedded the same way once they exist, and oEmbed, so that a wiki can turn a pasted link into a frame on its own, comes
 later.
 
