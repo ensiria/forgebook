@@ -16,12 +16,14 @@
  *
  * @module
  */
+import { existsSync } from "node:fs";
+
 import { expect, type Page, test } from "@playwright/test";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryProblem } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
-import { storyTree, testedStoryLocations } from "forgebook/story-tree";
+import { formerStoryId, storyTree, testedStoryLocations } from "forgebook/story-tree";
 import { DEFAULT_SWITCHES, switchWithRole, type ViewSwitch } from "forgebook/switches";
 import { defaultView, frameAddress, type ViewState } from "forgebook/view-state";
 
@@ -129,6 +131,23 @@ const expectChecksPass = async (
 };
 
 /**
+ * A story's screenshot name in a variant: by its id, or by the id an earlier rule gave it while only a screenshot of
+ * that name is stored, so the screenshots taken before the ids followed Storybook's keep comparing.
+ *
+ * @param id - the story's id.
+ * @param formerId - the id the former rule gave it.
+ * @param variant - the variant's name.
+ */
+const screenshotName = (id: string, formerId: string, variant: string): string => {
+  const named = (storyId: string): string => `${storyId.replace(":", "--")}--${variant}.png`;
+  const isStored = (name: string): boolean =>
+    existsSync(test.info().snapshotPath(name, { kind: "screenshot" }));
+  return named(formerId) !== named(id) && !isStored(named(id)) && isStored(named(formerId))
+    ? named(formerId)
+    : named(id);
+};
+
+/**
  * Declares the tests, one `describe` per component and one test per story and variant.
  *
  * @param options - where the stories are, the frame page, the variants, whether to compare screenshots, and a check of
@@ -139,7 +158,8 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
   const variants = options.variants ?? storyVariants(switches);
   const catalogue = catalogueSettings("", switches, options.lists);
   const defaults = defaultView(catalogue);
-  const tree = storyTree([indexedSource(options)]);
+  const source = indexedSource(options);
+  const tree = storyTree([source]);
   const groups = Map.groupBy(testedStoryLocations(tree), (location) => location.component.title);
   for (const [title, locations] of groups) {
     const planned = plannedStoryTests(
@@ -165,7 +185,12 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
           await page.goto(heldClockAddress(frameAddress(frameUrl, story.id, view, switches)));
           await expect(page.locator("html")).toHaveAttribute(STATUS_ATTRIBUTE, "ready");
           if (screenshot) {
-            await expect(page).toHaveScreenshot(`${story.id.replace(":", "--")}--${variant.name}.png`, {
+            const name = screenshotName(
+              story.id,
+              formerStoryId(source.id, title, story.exportName),
+              variant.name
+            );
+            await expect(page).toHaveScreenshot(name, {
               fullPage: true,
               animations: "disabled"
             });

@@ -13,9 +13,10 @@ import { describe, expect, it } from "vitest";
 import { catalogueTools } from "../bin/forgebook/mcpTools.ts";
 import { catalogueMarkdown } from "../bin/forgebook-docs/catalogueMarkdown.ts";
 import { llmsText } from "../bin/forgebook-docs/llmsText.ts";
-import { isDocPage, linkedHtml } from "../src/docPages.ts";
+import { type DocBlock, isDocPage, linkedHtml } from "../src/docPages.ts";
 import { NO_PREVIEW } from "../src/frame/storyModule.ts";
 import { findPage, pageGroups } from "../src/pageTree.ts";
+import { queuedBlocks } from "../src/shell/DocBlocks.tsx";
 import { foundPages, searchWords } from "../src/shell/treeSearch.ts";
 import { sourcePages } from "../src/sourceFiles.ts";
 import { storyTree } from "../src/storyTree.ts";
@@ -123,6 +124,32 @@ describe("the page tree", () => {
       'Kit: ./a.md links to "gone": no such page'
     ]);
     expect(tree.sources[0]?.pages).toHaveLength(1);
+  });
+
+  it("accepts a story or a component a page names by the id the former rule gave it", () => {
+    const base = sourceWith({
+      "./a.md": {
+        ...page("Start"),
+        stories: ["kit:inputs-read-more--open-by-default", "kit:inputs-readmore--open-by-default"],
+        components: ["kit:inputs-read-more"]
+      }
+    });
+    const [group] = base.files;
+    if (group === undefined) throw new Error("no files");
+    const index = {
+      "./a.stories.tsx": { title: "Inputs/ReadMore", stories: [{ exportName: "OpenByDefault" }] }
+    };
+    const tree = storyTree([{ ...base, files: [{ ...group, index }] }]);
+    expect(tree.problems).toEqual([]);
+    const blocks: DocBlock[] = [
+      { kind: "story", id: "kit:inputs-read-more--open-by-default" },
+      { kind: "props", id: "kit:inputs-readmore" }
+    ];
+    // the frame reports under the story's own id, so the page queues it by that one
+    expect(queuedBlocks(blocks, tree)).toEqual([
+      "kit:inputs-readmore--open-by-default",
+      "props:kit:inputs-readmore"
+    ]);
   });
 
   it("accepts a link across two groups of a source, and keeps titles in any language apart", () => {

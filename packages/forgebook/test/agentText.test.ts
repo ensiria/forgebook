@@ -23,10 +23,12 @@ const DOCUMENT: StoriesDocument = {
       title: "Inputs/Selection/Select",
       source: "kit",
       file: "./select.stories.tsx",
+      files: ["./select.stories.tsx"],
       stories: [
         {
           id: "kit:inputs-selection-select--overlay-in-room",
           name: "Overlay in room",
+          file: "./select.stories.tsx",
           exportName: "OverlayInRoom",
           description: undefined,
           tags: [],

@@ -34,6 +34,11 @@ export type StoryProblem = {
 export type StoryCheckStory = {
   /** The story's id. */
   readonly id: string;
+  /**
+   * The id an earlier rule gave it, when it differs from `id`: a baseline stored under that id is still its baseline
+   * until `forgebook shot --update` stores one under its id.
+   */
+  readonly formerId?: string;
   /** Its `parameters.height`, in CSS px, when it declares one: an overlay inside it is not a problem. */
   readonly height?: number;
   /** Whether it is about logic, not looks (`parameters.logic`): every variant then means its default view only. */
@@ -180,6 +185,11 @@ export type StoryDiffRequest = StoryShotRequest & {
   readonly baselines: string;
   /** The component asked for, when one was: its baselines with no story left are reported. */
   readonly component?: string;
+  /**
+   * The id an earlier rule gave that component, when it differs from `component`: its baselines stored under that id
+   * are its own too.
+   */
+  readonly formerComponent?: string;
 };
 
 /** How a picture compares with its baseline. */

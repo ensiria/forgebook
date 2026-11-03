@@ -14,7 +14,7 @@
 
 import type { StoryClock } from "@forgebook/story-format/clock";
 import type { StepFunction, StoryContext } from "@forgebook/story-format/csf";
-import type { StoryTextTable } from "@forgebook/story-format/texts";
+import { type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 
 import type { PanelArgs } from "../messages.ts";
 import type { LoadedArgs, LoadedDecorator, LoadedStory } from "./storyModule.ts";
@@ -81,11 +81,12 @@ export type StoryRenderer = {
     onError: (error: Error) => void
   ) => MountedStory;
   /**
-   * The story drawn as HTML on the server, for the generated server tests; throws when the story throws.
+   * The story drawn as HTML on the server, for the generated server tests; throws, or rejects, when the story throws.
+   * A framework whose server render is asynchronous returns a promise (Vue's waits for what `setup` awaits).
    *
    * @param drawing - the story, its args, texts, clock and language.
    */
-  readonly renderToString: (drawing: StoryDrawing) => string;
+  readonly renderToString: (drawing: StoryDrawing) => Promise<string> | string;
 };
 
 /**
@@ -104,3 +105,29 @@ export const untracedStep: StepFunction = async (
 ): Promise<void> => {
   await run();
 };
+
+/**
+ * What a render and a decorator receive.
+ *
+ * @param drawing - the story's texts, clock and switches' values.
+ * @param args - the args they read: a framework may hand reactive ones.
+ * @param canvasOf - the element the story is drawn in, read only when a story asks for it: on the server there is
+ *   none, and a story that reads it there fails as it would in a page rendered on the server.
+ */
+export const storyContextOf = (
+  drawing: StoryDrawing,
+  args: LoadedArgs,
+  canvasOf: () => HTMLElement
+): StoryContext<LoadedArgs> => ({
+  args,
+  step: untracedStep,
+  text: storyTextOf(drawing.texts),
+  clock: drawing.clock,
+  globals: drawing.globals,
+  loaded: drawing.loaded,
+  ...drawing.identity,
+  parameters: drawing.story.parameters,
+  get canvasElement(): HTMLElement {
+    return canvasOf();
+  }
+});

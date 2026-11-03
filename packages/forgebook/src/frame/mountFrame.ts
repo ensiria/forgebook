@@ -81,6 +81,11 @@ const tellDevServer = (report: LiveErrorReport): void => {
   import.meta.hot?.send(LIVE_ERROR_EVENT, report);
 };
 
+// a story that threw is gone from its frame, so a hot update has nothing to update: the fix shows only in a new page
+import.meta.hot?.on("vite:afterUpdate", (): void => {
+  if (document.documentElement.getAttribute(STATUS_ATTRIBUTE) === "error") window.location.reload();
+});
+
 /**
  * Does what a message of the shell asks of the rendered story; the view's live part is applied apart, before the story
  * loads.
@@ -194,7 +199,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const load =
     location === undefined || source === undefined
       ? undefined
-      : sourceFiles(source).stories[location.component.file];
+      : sourceFiles(source).stories[location.story.file];
   if (location === undefined || source === undefined || load === undefined) {
     fail(`No story "${storyId}"`);
     return;

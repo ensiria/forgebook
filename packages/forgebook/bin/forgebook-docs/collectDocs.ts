@@ -15,6 +15,7 @@ import { globSync, readFileSync } from "node:fs";
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { figmaLink } from "../../src/figmaLink.ts";
+import { csfStoryId } from "../../src/storyIds.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
@@ -74,6 +75,41 @@ const designOf = (index: StoryFileIndex): string | undefined => {
   return link === undefined || typeof link === "string" ? undefined : link.url;
 };
 
+/**
+ * A story file's main story (`parameters.main`, else its first): its export and its id without the source's.
+ *
+ * @param index - the file's index.
+ */
+const mainStoryOf = (index: StoryFileIndex): Pick<CatalogueComponent, "mainStory" | "mainStoryId"> => {
+  const main = index.stories.find((story) => story.isMain === true) ?? index.stories[0];
+  if (main === undefined) return { mainStory: undefined, mainStoryId: undefined };
+  return {
+    mainStory: main.exportName,
+    mainStoryId: main.id ?? csfStoryId(index.id ?? index.title, main.exportName)
+  };
+};
+
+/**
+ * Adds a story file's component to the list, or its stories to the component of its title already listed: files with
+ * one title are one component, as the catalogue lists them, with the first file's docs and main story.
+ *
+ * @param components - the components so far.
+ * @param component - the file's.
+ */
+const addComponent = (components: CatalogueComponent[], component: CatalogueComponent): void => {
+  const same = components.findIndex((each) => each.title === component.title);
+  const first = components[same];
+  if (first === undefined) {
+    components.push(component);
+    return;
+  }
+  components[same] = {
+    ...first,
+    stories: [...first.stories, ...component.stories],
+    isLogic: first.isLogic && component.isLogic
+  };
+};
+
 /** The components of the package's story files, read by the framework's extractor. */
 const collectComponents = (
   packageDir: string,
@@ -108,15 +144,16 @@ const collectComponents = (
     // a component no subpath exports is a story's own (a foundations page), not part of the package
     if (subpath === undefined || isExcluded(subpath, exclude)) continue;
     componentFiles.add(VITE_PATHS.normalize(component.file));
-    components.push({
+    const collected: CatalogueComponent = {
       title: index.title,
       subpath,
       docs: component.docs,
       stories: index.stories.map((story) => story.name ?? story.exportName),
-      mainStory: (index.stories.find((story) => story.isMain === true) ?? index.stories[0])?.exportName,
+      ...mainStoryOf(index),
       isLogic: isLogicFile(index),
       design: designOf(index)
-    });
+    };
+    addComponent(components, collected);
   }
   return { components, componentFiles };
 };

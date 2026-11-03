@@ -28,12 +28,13 @@ const trimmedHyphens = (text: string): string => {
 };
 
 /**
- * A picture's file name: the story's id and the view's name, each kept to letters, digits and hyphens.
+ * A picture's file name: the story's id and the view's name, each kept to letters, digits and hyphens. Letters of any
+ * script count, as an id keeps them: two stories whose ids differ only there would otherwise share one picture.
  *
  * @param storyPage - the story and the view.
  */
 export const shotName = (storyPage: Pick<StoryPage, "story" | "name">): string => {
-  const safe = (text: string): string => trimmedHyphens(text.replace(/[^a-zA-Z0-9-]+/g, "-"));
+  const safe = (text: string): string => trimmedHyphens(text.replace(/[^\p{L}\p{N}-]+/gu, "-"));
   return `${safe(storyPage.story.id)}--${safe(storyPage.name) || "default"}.png`;
 };
 
