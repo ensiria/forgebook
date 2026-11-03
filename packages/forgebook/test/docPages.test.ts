@@ -29,6 +29,7 @@ import {
   indexedDocPages
 } from "../src/vite/docPagesModule.ts";
 import { pageAnswer, pagesDocument } from "../src/vite/docPagesRoute.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
 /** Where the catalogue is served in these tests. */
@@ -238,7 +239,7 @@ describe("the modules", () => {
     const watched: string[] = [];
     const code = docPagesModule(KIT_DIR, "docs/**/*.md", (file) => watched.push(file), true);
     expect(code).toContain(
-      `"./docs/getting-started.md": () => import(${JSON.stringify(`${join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
+      `"./docs/getting-started.md": () => import(${JSON.stringify(`${VITE_PATHS.join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
     );
     expect(code).toContain("module.text");
     expect(new Set(watched).size).toBe(4);
@@ -254,7 +255,9 @@ describe("the modules", () => {
   it("imports a page's images, so Vite answers their addresses", () => {
     const file = join(KIT_DIR, "docs/guides/theming.md");
     const code = docPageModule(file, () => undefined, false);
-    expect(code).toContain(`import asset0 from ${JSON.stringify(`${join(KIT_DIR, "logo.svg")}?url`)};`);
+    expect(code).toContain(
+      `import asset0 from ${JSON.stringify(`${VITE_PATHS.join(KIT_DIR, "logo.svg")}?url`)};`
+    );
     expect(code).toContain("assets: [asset0]");
     expect(code).not.toContain("export const text");
     expect(readFileSync(file, "utf8")).toContain("logo.svg");
