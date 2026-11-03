@@ -26,6 +26,7 @@ const PATHS = {
   ruler: "M2 10.5 10.5 2l3.5 3.5L5.5 14zM5 8l1.5 1.5M7 6l1 1M9 4l1.5 1.5",
   sidebar: "M2 3h12v10H2zM6 3v10",
   close: "M4 4l8 8M12 4l-8 8",
+  embed: "M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5",
   external: "M9 2.5h4.5V7M13.5 2.5 8 8M11.5 9.5v4h-9v-9h4",
   width: "M2 4v8M14 4v8M4.5 8h7M6 6.5 4.5 8 6 9.5M10 6.5l1.5 1.5-1.5 1.5",
   plus: "M8 3.5v9M3.5 8h9",

@@ -36,8 +36,10 @@ import type { AppearanceState } from "./useAppearance.ts";
 export type SidebarProps = SidebarPageLinks & {
   /** The catalogue's name. */
   readonly title: string;
-  /** The catalogue's logo, the URL of a square image; none shows the catalogue's own mark. */
+  /** The catalogue's logo, the URL of a square image; none shows Forgebook's mark, or the name alone without branding. */
   readonly logo: string | undefined;
+  /** Whether a catalogue without a logo shows Forgebook's mark. */
+  readonly hasBranding: boolean;
   /** The tree. */
   readonly tree: StoryTree;
   /** Whether the home is shown: the logo, its link, is then the current page. */
@@ -115,6 +117,7 @@ const componentCount = (family: TreeFamily): number =>
 export const Sidebar = ({
   title,
   logo,
+  hasBranding,
   tree,
   isHome,
   homeHref,
@@ -130,6 +133,7 @@ export const Sidebar = ({
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
+  const mark = logo ?? (hasBranding ? FORGEBOOK_MARK_URL : undefined);
   const searchRef = useRef<HTMLInputElement>(null);
   const navRef = useRef<HTMLElement>(null);
   // the shown component stays in sight: a page opened by a key, the picker or the address scrolls the list to it
@@ -212,13 +216,9 @@ export const Sidebar = ({
           }}
         >
           {/* decorative: the name beside it says what it is */}
-          <img
-            className="forgebook-brand__logo"
-            src={logo ?? FORGEBOOK_MARK_URL}
-            alt=""
-            width={28}
-            height={28}
-          />
+          {mark === undefined ? null : (
+            <img className="forgebook-brand__logo" src={mark} alt="" width={28} height={28} />
+          )}
           <span className="forgebook-brand__name">{title}</span>
         </a>
         <button

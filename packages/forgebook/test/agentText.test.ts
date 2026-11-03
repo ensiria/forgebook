@@ -34,7 +34,8 @@ const DOCUMENT: StoriesDocument = {
           isLogic: false,
           links: {
             address: "http://localhost:5173/?story=x",
-            frame: "http://localhost:5173/frame.html?story=x"
+            frame: "http://localhost:5173/frame.html?story=x",
+            embed: "http://localhost:5173/?embed&story=x"
           }
         }
       ]

@@ -23,7 +23,7 @@ const CONFIG: ResolvedConfig = {
   languages: [],
   previews: [],
   head: "",
-  shell: { themeCss: "", styleSheets: [], problems: [] },
+  shell: { themeCss: "", frameCss: "", hasBranding: true, styleSheets: [], problems: [] },
   tokens: [],
   watch: [],
   lists: {},

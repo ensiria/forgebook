@@ -1,6 +1,6 @@
 /**
  * The bar above the shown story: its name and description, the matrix's axes, Replay, a Live story's clock controls,
- * the button that copies its id and the link to its frame alone.
+ * the button that copies its id, the Embed button and the link to its frame alone.
  *
  * @remarks
  * The bar only shows and forwards: the stage decides what the story can do (replay, a clock, a matrix) and owns the
@@ -14,6 +14,8 @@ import type { ReactNode } from "react";
 import type { PropDocs } from "../componentDocs.ts";
 import type { TreeStory } from "../storyTree.ts";
 import { ClockControls, type StoryClockControls } from "./ClockControls.tsx";
+import { EmbedButton } from "./EmbedButton.tsx";
+import type { EmbedPanelProps } from "./EmbedPanel.tsx";
 import { Icon } from "./icons.tsx";
 import { MatrixPicker } from "./MatrixPicker.tsx";
 import { STRINGS } from "./strings.ts";
@@ -35,6 +37,8 @@ export type StoryBarProps = {
   readonly clockControls: StoryClockControls | undefined;
   /** The address of the story's frame alone, in the view shown. */
   readonly frameAddress: string;
+  /** What the Embed button offers: the iframe's title, the view and args as a query, the height it starts at. */
+  readonly embed: Omit<EmbedPanelProps, "storyId">;
 };
 
 /**
@@ -61,7 +65,7 @@ const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
 /**
  * The story bar.
  *
- * @param props - the story, the matrix's axes, the actions the story allows and its frame's address.
+ * @param props - the story, the matrix's axes, the actions the story allows, its embed and its frame's address.
  */
 export const StoryBar = ({
   story,
@@ -70,7 +74,8 @@ export const StoryBar = ({
   onMatrixAxesChange,
   onReplay,
   clockControls,
-  frameAddress
+  frameAddress,
+  embed
 }: StoryBarProps): ReactNode => (
   <div className="forgebook-story__bar">
     <div className="forgebook-stage__heading">
@@ -92,6 +97,7 @@ export const StoryBar = ({
     )}
     {clockControls === undefined ? null : <ClockControls controls={clockControls} />}
     <CopyIdButton storyId={story.id} />
+    <EmbedButton storyId={story.id} {...embed} />
     <a
       className="forgebook-button forgebook-button--icon"
       href={frameAddress}

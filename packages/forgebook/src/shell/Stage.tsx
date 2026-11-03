@@ -15,11 +15,18 @@ import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } 
 
 import { type PanelArgTypes, panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import { type ArgValue, type PanelArgs, parsePanelArgsParam, type ShellMessage } from "../messages.ts";
+import {
+  type ArgValue,
+  type PanelArgs,
+  panelArgsParam,
+  parsePanelArgsParam,
+  type ShellMessage
+} from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
+import type { ViewSwitch } from "../switches.ts";
 import {
   frameAddress,
   isComparing,
@@ -29,6 +36,7 @@ import {
   type StageHeight,
   type StageWidth,
   type ViewState,
+  viewParams,
   type Zoom
 } from "../viewState.ts";
 import type { CheckState } from "./A11yTab.tsx";
@@ -175,6 +183,30 @@ const useStoryCheck = (
  */
 const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
+
+/**
+ * What an embed of the story keeps of the page: its view and the values set in the panel.
+ *
+ * @param view - the reader's view, without what the story fixes, which the story fixes again.
+ * @param panelArgs - the values set in the panel.
+ * @param switches - the catalogue's switches.
+ */
+const embedQuery = (view: ViewState, panelArgs: PanelArgs, switches: readonly ViewSwitch[]): string => {
+  const params = viewParams(view, switches);
+  const args = panelArgsParam(panelArgs);
+  if (args !== "") params.set("args", args);
+  return params.toString();
+};
+
+/**
+ * The height an embed's iframe starts at: as tall as the frame is on the stage.
+ *
+ * @param view - the view, with the height set on the stage.
+ * @param contentHeight - the story's content, in CSS px.
+ * @param story - the story, with the height its scene declares.
+ */
+const embedHeight = (view: ViewState, contentHeight: number, story: Pick<TreeStory, "height">): number =>
+  view.height === "auto" ? Math.max(contentHeight, story.height ?? 0) : view.height;
 
 /**
  * What the Design tab shows; none for a story without a design.
@@ -421,6 +453,11 @@ export const Stage = ({
               onReplay={canReplay ? replay : undefined}
               clockControls={hasClock ? clockControls : undefined}
               frameAddress={frameAddress(frameUrl, story.id, view, switches)}
+              embed={{
+                title,
+                query: embedQuery(ownView, panelArgs, switches),
+                height: embedHeight(view, reportedHeight ?? lastHeight, story)
+              }}
             />
             <DroppedArgsNote
               dropped={addressArgs.dropped}
