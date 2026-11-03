@@ -56,6 +56,23 @@ export type FunctionSignatureDocs = {
   readonly returnsDescription: string;
 };
 
+/**
+ * One member of a prop's object type (a `texts` prop's `FileFinderTexts`), listed under the prop in the API
+ * reference.
+ */
+export type MemberDocs = {
+  /** The member's name. */
+  readonly name: string;
+  /** Its type as the source writes it, without `undefined` and `null`. */
+  readonly type: string;
+  /** The first paragraph of its TSDoc; empty when it has none. */
+  readonly description: string;
+  /** Its `@defaultValue`, when the TSDoc gives one. */
+  readonly defaultValue?: string;
+  /** Whether the member must be given. */
+  readonly isRequired: boolean;
+};
+
 /** One prop of a component. */
 export type PropDocs = {
   /** The prop's name. */
@@ -83,6 +100,16 @@ export type PropDocs = {
    * field for it. Left out when `false`.
    */
   readonly canTakeText?: boolean;
+  /**
+   * The group its TSDoc puts it in (`@group Selection`): the API reference and the Props tab list it under that
+   * heading. Left out when it names none.
+   */
+  readonly group?: string;
+  /**
+   * The members of its type, when that type is an object the package declares and documents (`texts?: FileFinderTexts`),
+   * in the order the source declares them: the API reference lists them under the prop, folded. Left out otherwise.
+   */
+  readonly members?: readonly MemberDocs[];
 };
 
 /** A part the component is used with, named in the meta's `subcomponents`: listed under it on its page. */
@@ -172,6 +199,15 @@ const isStringList = (value: unknown): value is readonly string[] =>
 /** The prop kinds, for the check. */
 const PROP_KINDS: readonly PropKind[] = ["choice", "text", "number", "toggle", "event", "other"];
 
+/** Whether a value is one member's docs. */
+const isMemberDocs = (value: unknown): value is MemberDocs =>
+  isRecord(value) &&
+  typeof value["name"] === "string" &&
+  typeof value["type"] === "string" &&
+  typeof value["description"] === "string" &&
+  typeof value["isRequired"] === "boolean" &&
+  (value["defaultValue"] === undefined || typeof value["defaultValue"] === "string");
+
 /** Whether a value is one prop's docs. */
 const isPropDocs = (value: unknown): value is PropDocs =>
   isRecord(value) &&
@@ -180,7 +216,10 @@ const isPropDocs = (value: unknown): value is PropDocs =>
   typeof value["type"] === "string" &&
   typeof value["description"] === "string" &&
   typeof value["isRequired"] === "boolean" &&
-  (value["canTakeText"] === undefined || typeof value["canTakeText"] === "boolean");
+  (value["canTakeText"] === undefined || typeof value["canTakeText"] === "boolean") &&
+  (value["group"] === undefined || typeof value["group"] === "string") &&
+  (value["members"] === undefined ||
+    (Array.isArray(value["members"]) && value["members"].every(isMemberDocs)));
 
 /** Whether a value is a subcomponent's docs. */
 const isSubcomponentDocs = (value: unknown): value is SubcomponentDocs =>

@@ -283,7 +283,7 @@ export const agentLoopCommands = (
         multiple: true,
         valueName: "view",
         description:
-          'A view to picture it in: the address\'s form (theme=dark&width=360) or words ("dark it 360"); the default view when none.'
+          'A view to picture it in: the address\'s form (theme=dark&width=360) or words ("dark it 360"), a device model\'s id ("iphone-16") for a framed picture; the default view when none.'
       },
       "all-variants": {
         type: "boolean",
@@ -312,6 +312,10 @@ export const agentLoopCommands = (
       {
         command: `${COMMAND} shot kit:data-badge--default --view "dark 360"`,
         description: "Dark, 360 px wide."
+      },
+      {
+        command: `${COMMAND} shot kit:screens-settings--default --view "iphone-16" --view "dark pixel-9 landscape"`,
+        description: "Framed in an iPhone 16, then in a Pixel 9 on its side, dark."
       },
       {
         command: `${COMMAND} shot kit:data-badge --all-variants --json`,
