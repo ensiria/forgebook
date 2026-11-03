@@ -1,6 +1,6 @@
 /**
- * Forgebook's renderer for React Native in the browser: React's, each story drawn inside a root that lays out as
- * React Native's root view does.
+ * Forgebook's renderer for React Native in the browser, as the frame draws with it: React's frame renderer, each story
+ * drawn inside a root that lays out as React Native's root view does.
  *
  * @remarks
  * On a phone every screen sits in a root view that is a flex column filling the window, so a screen written
@@ -9,10 +9,13 @@
  * height otherwise, so a `centered` story is still centred in its canvas. It is an element of the renderer's own inside the canvas, so the
  * frame's canvas stays as the frame made it.
  *
+ * The server render is in `nativeRenderer.ts`, which the frame page does not import, so React's server renderer never
+ * reaches it.
+ *
  * @module
  */
-import { reactRenderer } from "@forgebook/react/renderer";
-import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
+import { reactFrameRenderer } from "@forgebook/react/frame-renderer";
+import type { FrameRenderer, MountedStory, StoryDrawing } from "forgebook/renderer";
 
 /** The root's attribute, which the tests and a catalogue's style sheet can find it by. */
 export const NATIVE_ROOT_ATTRIBUTE = "data-forgebook-native-root";
@@ -38,10 +41,10 @@ const nativeRoot = (canvas: HTMLElement, layout: StoryDrawing["story"]["layout"]
 };
 
 /** React Native, through react-native-web, as the frame draws with it. */
-export const nativeRenderer: StoryRenderer = {
+export const nativeFrameRenderer: FrameRenderer = {
   mount: (canvas: HTMLElement, drawing: StoryDrawing, onError: (error: Error) => void): MountedStory => {
     const root = nativeRoot(canvas, drawing.story.layout);
-    const mounted = reactRenderer.mount(root, drawing, onError);
+    const mounted = reactFrameRenderer.mount(root, drawing, onError);
     return {
       drawn: mounted.drawn,
       update: mounted.update,
@@ -50,6 +53,5 @@ export const nativeRenderer: StoryRenderer = {
         root.remove();
       }
     };
-  },
-  renderToString: reactRenderer.renderToString
+  }
 };
