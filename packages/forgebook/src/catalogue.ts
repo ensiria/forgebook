@@ -34,19 +34,10 @@ export type StoryGroupSetting = {
   readonly label: string;
 };
 
-/** The tabs of the panel under a story. */
-export const PANEL_TAB_IDS = [
-  "props",
-  "events",
-  "play",
-  "parts",
-  "code",
-  "design",
-  "a11y",
-  "signature"
-] as const;
+/** Forgebook's own tabs of the panel under a story. */
+export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y", "signature"] as const;
 
-/** A tab of the panel under a story. */
+/** One of Forgebook's own tabs of the panel under a story. */
 export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
 
 /**
@@ -94,8 +85,8 @@ export type CatalogueLists = {
   };
   /** The story groups, in the sidebar's order, with their headings. */
   readonly storyGroups?: readonly StoryGroupSetting[];
-  /** The panel's tabs turned off (`{ a11y: false }`). */
-  readonly tabs?: Readonly<Partial<Record<PanelTabId, false>>>;
+  /** The panel's tabs turned off, Forgebook's or a plugin's (`{ a11y: false }`). */
+  readonly tabs?: Readonly<Partial<Record<PanelTabId, false>> & Record<string, false>>;
   /** The accessibility rules. */
   readonly a11y?: Partial<A11ySettings>;
   /** The measuring grid's step, in CSS px. */
@@ -171,8 +162,8 @@ export type CatalogueSettings = {
   readonly backdrops: readonly Backdrop[];
   /** The named story groups, in their order. */
   readonly storyGroups: readonly StoryGroupSetting[];
-  /** The panel's tabs shown, in their order. */
-  readonly tabs: readonly PanelTabId[];
+  /** The panel's tabs shown, Forgebook's then the plugins', by id. */
+  readonly tabs: readonly string[];
   /** The accessibility rules. */
   readonly a11y: A11ySettings;
   /** The measuring grid's step, in CSS px. */
@@ -306,13 +297,15 @@ const namedGroups = (lists: CatalogueLists): Pick<CatalogueSettings, "storyGroup
  * @param title - the catalogue's title, for its storage's id.
  * @param switches - its switches.
  * @param lists - the lists its configuration sets.
+ * @param pluginTabs - the ids of the tabs its plugins add.
  * @throws when the toolbar it names holds an id that is no control at all, or one twice; or a key it sets cannot be
  *   used; or a view it names cannot be read.
  */
 export const catalogueSettings = (
   title: string,
   switches: readonly ViewSwitch[],
-  lists: CatalogueLists = {}
+  lists: CatalogueLists = {},
+  pluginTabs: readonly string[] = []
 ): CatalogueSettings => {
   const builtIn = lists.backgrounds?.builtIn;
   const offered =
@@ -338,7 +331,7 @@ export const catalogueSettings = (
     textSizes: withHundred(lists.textSizes, [100, 125, 150]),
     backdrops: [...offered, ...(lists.backgrounds?.custom ?? []).map(customBackdrop)],
     ...namedGroups(lists),
-    tabs: PANEL_TAB_IDS.filter((tab) => tabsOff[tab] !== false),
+    tabs: [...PANEL_TAB_IDS, ...pluginTabs].filter((tab) => tabsOff[tab] !== false),
     a11y: {
       tags: lists.a11y?.tags ?? DEFAULT_A11Y_TAGS,
       disabledRules: lists.a11y?.disabledRules ?? []

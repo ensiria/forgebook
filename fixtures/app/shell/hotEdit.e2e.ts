@@ -3,15 +3,17 @@
  * stays; an edit of the file a story file re-exports its stories from is drawn the same way, and the panel shows it.
  *
  * @remarks
- * Each test writes a fixture file and puts it back as it found it, whatever happens: the other tests read the same
- * files.
+ * The tests edit committed fixture files through `fileEdits`, which puts their bytes back whatever happens, and run in
+ * the configuration's `story file edits` project, one at a time: no other test, repetition or spec sees a file while
+ * it holds an edit. So the hot-edit stories are checked ready here, not with the other Storybook files.
  *
  * @module
  */
-import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { expect, type FrameLocator, type Page, test } from "@playwright/test";
+import { expect, type FrameLocator, type Page } from "@playwright/test";
+
+import { test } from "./fileEdits";
 
 /** The story file that writes its story. */
 const OWN_FILE = fileURLToPath(new URL("../../storybook/src/HotEdit.stories.tsx", import.meta.url));
@@ -29,73 +31,65 @@ const story = (name: string, query = ""): string =>
 const frameOf = (page: Page): FrameLocator => page.frameLocator("iframe.forgebook-frame-view");
 
 /**
- * Runs a check while a file holds one text in place of another, and puts the file back after.
+ * Replaces a text the original file must hold, so an edit that no longer applies fails instead of writing nothing.
  *
- * @param file - the file.
- * @param from - the text it holds.
- * @param to - the text it holds meanwhile.
- * @param check - what runs meanwhile.
+ * @param from - the text the file holds.
+ * @param to - the text written in its place.
  */
-const whileEdited = async (
-  file: string,
-  from: string,
-  to: string,
-  check: () => Promise<void>
-): Promise<void> => {
-  const text = readFileSync(file, "utf8");
-  expect(text).toContain(from);
-  writeFileSync(file, text.replace(from, to));
-  try {
-    await check();
-  } finally {
-    writeFileSync(file, text);
+const replacing =
+  (from: string, to: string) =>
+  (original: string): string => {
+    expect(original).toContain(from);
+    return original.replace(from, to);
+  };
+
+test("every story of the hot-edit file is ready in its frame, without a page error", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  for (const name of ["own", "behind"]) {
+    await page.goto(`/frame.html?story=sb:storybook-hot-edit--${name}`);
+    await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "ready");
   }
-};
+  expect(errors).toEqual([]);
+});
 
-test.describe("a story file edited while its story is open", () => {
-  // one at a time: a test that ran twice at once would edit the same file under itself
-  test.describe.configure({ mode: "serial" });
+test("draws the edit in place: the text typed in the story stays, and Code shows the edit", async ({
+  page,
+  fileEdits
+}) => {
+  await page.goto(story("own", "tab=code"));
+  const field = frameOf(page).getByLabel("Note");
+  await field.fill("typed before the edit");
+  await fileEdits.write(OWN_FILE, replacing('"Written here"', '"Edited here"'));
+  await expect(frameOf(page).getByText("Edited here")).toBeVisible();
+  await expect(field).toHaveValue("typed before the edit");
+  await expect(page.locator(".forgebook-code-block")).toContainText('label="Edited here"');
+});
 
-  test("draws the edit in place: the text typed in the story stays, and Code shows the edit", async ({
-    page
-  }) => {
-    await page.goto(story("own", "tab=code"));
-    const field = frameOf(page).getByLabel("Note");
-    await field.fill("typed before the edit");
-    await whileEdited(OWN_FILE, '"Written here"', '"Edited here"', async () => {
-      await expect(frameOf(page).getByText("Edited here")).toBeVisible();
-      await expect(field).toHaveValue("typed before the edit");
-      await expect(page.locator(".forgebook-code-block")).toContainText('label="Edited here"');
-    });
-  });
+test("draws the fix of an edit that threw while the file loaded", async ({ page, fileEdits }) => {
+  await page.goto(story("own"));
+  await expect(frameOf(page).getByText("Written here")).toBeVisible();
+  // the broken version reports its error and leaves the story drawn
+  const reported = page.waitForEvent("console", (message) => message.text().includes("half typed"));
+  await fileEdits.write(
+    OWN_FILE,
+    replacing("export default meta;", 'throw new Error("half typed");\nexport default meta;')
+  );
+  await reported;
+  await expect(frameOf(page).getByText("Written here")).toBeVisible();
+  // the fix is drawn in place
+  await fileEdits.write(OWN_FILE, replacing('"Written here"', '"Fixed here"'));
+  await expect(frameOf(page).getByText("Fixed here")).toBeVisible();
+});
 
-  test("draws the fix of an edit that threw while the file loaded", async ({ page }) => {
-    await page.goto(story("own"));
-    await expect(frameOf(page).getByText("Written here")).toBeVisible();
-    const text = readFileSync(OWN_FILE, "utf8");
-    try {
-      writeFileSync(
-        OWN_FILE,
-        text.replace("export default meta;", 'throw new Error("half typed");\nexport default meta;')
-      );
-      // the broken version reports its error and leaves the story drawn; the fix is drawn in place
-      await page.waitForTimeout(500);
-      writeFileSync(OWN_FILE, text.replace('"Written here"', '"Fixed here"'));
-      await expect(frameOf(page).getByText("Fixed here")).toBeVisible();
-    } finally {
-      writeFileSync(OWN_FILE, text);
-    }
-  });
-
-  test("draws an edit of the file its story is re-exported from, and keeps the text typed in it", async ({
-    page
-  }) => {
-    await page.goto(story("behind"));
-    const field = frameOf(page).getByLabel("Note");
-    await field.fill("typed before the edit");
-    await whileEdited(BEHIND_FILE, '"Written behind a re-export"', '"Edited behind"', async () => {
-      await expect(frameOf(page).getByText("Edited behind")).toBeVisible();
-      await expect(field).toHaveValue("typed before the edit");
-    });
-  });
+test("draws an edit of the file its story is re-exported from, and keeps the text typed in it", async ({
+  page,
+  fileEdits
+}) => {
+  await page.goto(story("behind"));
+  const field = frameOf(page).getByLabel("Note");
+  await field.fill("typed before the edit");
+  await fileEdits.write(BEHIND_FILE, replacing('"Written behind a re-export"', '"Edited behind"'));
+  await expect(frameOf(page).getByText("Edited behind")).toBeVisible();
+  await expect(field).toHaveValue("typed before the edit");
 });

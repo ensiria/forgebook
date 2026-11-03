@@ -1,5 +1,5 @@
 /**
- * The panel docked under a story: a row of tabs (Props, Events, Parts and styling, Code, Design, Accessibility) and the chosen
+ * The panel docked under a story: a row of tabs (Props, Events, Parts and styling, Code, a plugin's, Accessibility) and the chosen
  * tab's content, which scrolls on its own, so reading the props or the code never moves the story away.
  *
  * @remarks

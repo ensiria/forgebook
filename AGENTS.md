@@ -14,7 +14,9 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   (`@forgebook/sveltekit`, on Svelte's), `packages/solid` (`@forgebook/solid`), `packages/preact` (`@forgebook/preact`),
   `packages/web-components` (`@forgebook/web-components`), `packages/html` (`@forgebook/html`), `packages/angular`
   (`@forgebook/angular`), `packages/react-native-web` (`@forgebook/react-native-web`, on React's),
-  `packages/story-format` (`@forgebook/story-format`, no dependencies), `packages/testing` (`@forgebook/testing`).
+  `packages/story-format` (`@forgebook/story-format`, no dependencies), `packages/testing` (`@forgebook/testing`), and the plugins built on `forgebook/plugin`
+  (`packages/plugin-figma`, `packages/plugin-msw`): the contract's two real users, so a change of `PLUGINS.md` is tried
+  on them.
 - `fixtures/`: the kit, the stories written the Storybook way, the catalogue the shell's browser tests run on, and the
   Vue, Svelte, Solid, Preact, Web Components, plain HTML, Angular and React Native catalogues (`fixtures/vue`,
   `fixtures/svelte`, `fixtures/solid`, `fixtures/preact`, `fixtures/web-components`, `fixtures/html`,

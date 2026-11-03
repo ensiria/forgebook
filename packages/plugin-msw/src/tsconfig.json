@@ -1,0 +1,10 @@
+// The plugin's sources: its declaration, read on Node, and what runs in a page.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}

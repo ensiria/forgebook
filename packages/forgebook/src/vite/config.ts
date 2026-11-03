@@ -14,6 +14,7 @@
 import type { StoryLanguage, StoryTokensFile } from "@forgebook/story-format/source";
 
 import type { CatalogueLists } from "../catalogue.ts";
+import type { ForgebookPlugin } from "../plugin.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
@@ -83,6 +84,8 @@ export type ForgebookConfig = CatalogueLists & {
   readonly watch?: readonly string[];
   /** The libraries' presets, in order; the configuration's own values win over theirs. */
   readonly presets?: readonly ForgebookPreset[];
+  /** The plugins, in order (`[figma()]`): a package adds nothing to the catalogue until it is listed here. */
+  readonly plugins?: readonly ForgebookPlugin[];
   /**
    * Where the stories' frames run. On the dev server, an origin of their own by default (the catalogue's port + 1), so
    * a story's code cannot reach the catalogue's page, its agent API or the project's files; a build keeps the

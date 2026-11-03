@@ -1,6 +1,5 @@
 /**
- * The address that frames a design from Figma, made only from a checked link's parts, on a host written here. Apart from
- * the link's reading so it loads with the Design tab, not with the shell.
+ * The address that frames a design from Figma, made only from a checked link's parts, on a host written here.
  *
  * @see {@link https://developers.figma.com/docs/embeds/embed-figma-file/ | Embedding a Figma file}
  *

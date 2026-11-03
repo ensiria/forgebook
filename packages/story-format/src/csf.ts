@@ -179,7 +179,8 @@ export type StoryParameters = {
   readonly logic?: boolean;
   /**
    * The design this is drawn from: on a meta, the component's and every story's; on a story, its own in place of the
-   * meta's. The catalogue links to it and shows it in a Design tab beside the story.
+   * meta's. The catalogue links to it, and with a design plugin (`@forgebook/plugin-figma`) shows it in a Design tab
+   * beside the story.
    */
   readonly design?: StoryDesign;
   /**

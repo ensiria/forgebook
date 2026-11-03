@@ -127,6 +127,12 @@ importers:
       '@fixture/storybook':
         specifier: workspace:*
         version: link:../storybook
+      '@forgebook/plugin-figma':
+        specifier: workspace:*
+        version: link:../../packages/plugin-figma
+      '@forgebook/plugin-msw':
+        specifier: workspace:*
+        version: link:../../packages/plugin-msw
       '@forgebook/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -314,6 +320,9 @@ importers:
       '@forgebook/nuxt':
         specifier: workspace:*
         version: link:../../packages/nuxt
+      '@forgebook/plugin-msw':
+        specifier: workspace:*
+        version: link:../../packages/plugin-msw
       '@forgebook/story-format':
         specifier: workspace:*
         version: link:../../packages/story-format
@@ -566,6 +575,9 @@ importers:
       '@types/react-dom':
         specifier: 19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      forgebook:
+        specifier: workspace:*
+        version: link:../../packages/forgebook
       msw:
         specifier: 3.0.3
         version: 3.0.3(@types/node@24.19.2)(typescript@7.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
@@ -638,6 +650,9 @@ importers:
 
   fixtures/sveltekit:
     devDependencies:
+      '@forgebook/plugin-msw':
+        specifier: workspace:*
+        version: link:../../packages/plugin-msw
       '@forgebook/story-format':
         specifier: workspace:*
         version: link:../../packages/story-format
@@ -894,9 +909,6 @@ importers:
       marked:
         specifier: 18.1.0
         version: 18.1.0
-      msw:
-        specifier: ^2.0.0 || ^3.0.0
-        version: 3.0.3(@types/node@24.19.2)(typescript@7.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
       typescript-6:
         specifier: npm:typescript@6.0.3
         version: typescript@6.0.3
@@ -1072,6 +1084,79 @@ importers:
       vue-router:
         specifier: 5.4.0
         version: 5.4.0(@vue/compiler-sfc@3.5.44)(esbuild@0.28.2)(rolldown@1.2.16)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))(vue@3.5.44(typescript@7.0.2))
+
+  packages/plugin-figma:
+    dependencies:
+      '@forgebook/story-format':
+        specifier: workspace:*
+        version: link:../story-format
+    devDependencies:
+      '@forgebook/tools':
+        specifier: workspace:*
+        version: link:../../tools
+      '@forgebook/typescript-config':
+        specifier: workspace:*
+        version: link:../../config/typescript
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      forgebook:
+        specifier: workspace:*
+        version: link:../forgebook
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0)
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(msw@3.0.3(@types/node@24.19.2)(typescript@7.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0)))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
+
+  packages/plugin-msw:
+    devDependencies:
+      '@forgebook/tools':
+        specifier: workspace:*
+        version: link:../../tools
+      '@forgebook/typescript-config':
+        specifier: workspace:*
+        version: link:../../config/typescript
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      forgebook:
+        specifier: workspace:*
+        version: link:../forgebook
+      msw:
+        specifier: 3.0.3
+        version: 3.0.3(@types/node@24.19.2)(typescript@7.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0)
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(msw@3.0.3(@types/node@24.19.2)(typescript@7.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0)))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
 
   packages/preact:
     dependencies:

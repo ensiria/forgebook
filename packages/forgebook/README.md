@@ -149,8 +149,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   component (Tree renders Row, Row renders DropLine), each with the stories to open; read from the types, never kept
   by hand. It shows only when there is such a use; a reader folds it away; `usedIn: false` in the configuration turns
   it off.
-- **The design beside the code**: a component's or a story's Figma link gives it a Design tab and a side-by-side view
-  ([below](#design-links)).
+- **The design beside the code**: a component's or a story's Figma link gives it a link to Figma and, with
+  `@forgebook/plugin-figma`, a Design tab and a side-by-side view ([below](#design-links)).
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
@@ -351,10 +351,12 @@ export const Danger: Story<typeof Button> = {
 };
 ```
 
-The component's header then links to Figma, and the story's panel has a **Design** tab with the node embedded and
-**Compare with the story**, the story and its design side by side over the page, at the story's width and with the
-panel's values. Comparing is for your eyes: Forgebook draws no overlay and gives no match percentage, because Figma and
-a browser render differently and such a number would mislead. The tab loads, with Figma, only when opened.
+The component's header then links to Figma. With [`@forgebook/plugin-figma`](https://www.npmjs.com/package/@forgebook/plugin-figma)
+listed in `plugins`, the story's panel has a **Design** tab with the node embedded and **Compare with the story**, the
+story and its design side by side over the page, at the story's width and with the panel's values. Comparing is for your
+eyes: Forgebook draws no overlay and gives no match percentage, because Figma and a browser render differently and such a
+number would mislead. The tab loads, with Figma, only when opened. A docs page shows a design with a fence named `figma`, its
+link after the name.
 
 Write the link plainly, as a string: the index reads it without running the file, so a link written by code is a problem.
 A link that is not `https` on `figma.com`, or does not name a `design`, `file`, `proto`, `board`, `slides` or `deck`, is
@@ -365,10 +367,10 @@ file, branch and node, so a shared link's other parameters are dropped. A `desig
 Nothing here needs a Figma token: the embed shows what the reader's own Figma session or the file's sharing allows, and
 a private file asks them to sign in, inside the embed. That sign-in needs the browser's storage access, so a reader who
 blocks it uses Open in Figma. A catalogue published with a Content Security Policy allows
-`frame-src https://embed.figma.com https://www.figma.com`. Turn the tab off with `tabs: { design: false }`; the header's link stays.
+`frame-src https://embed.figma.com https://www.figma.com`. Turn the tab off with `tabs: { figma: false }`; the header's link stays.
 
 `forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
-`address` of the Design tab to hand a person. `list_stories` gives each component's, and `CATALOG.md` lists it.
+`address` of the Design tab to hand a person (it opens the story alone without the plugin). `list_stories` gives each component's, and `CATALOG.md` lists it.
 
 ## Coming from Storybook
 
@@ -502,24 +504,59 @@ export default defineConfig({ /* … */ build: { readableNames: true } });
 ```
 
 ## Mocking an API
-A story that fetches gets its answers from [MSW](https://mswjs.io), an optional peer. Install it and write its worker into
-the catalogue's public folder:
+
+A story that fetches gets its answers from [MSW](https://mswjs.io), through
+[`@forgebook/plugin-msw`](https://www.npmjs.com/package/@forgebook/plugin-msw). Install both, list the plugin, and write
+MSW's worker into the catalogue's public folder:
+
 ```sh
-npm install --save-dev msw
+npm install --save-dev msw @forgebook/plugin-msw
 npx msw init public
 ```
+
+```ts
+// forgebook.config.ts
+import { msw } from "@forgebook/plugin-msw";
+
+export default defineConfig({ /* … */ plugins: [msw()] });
+```
+
 ```tsx
 import { http, HttpResponse } from "msw";
+
 /** The list, from a mocked API. */
 export const Loaded: Story<typeof Users> = {
   parameters: {
     msw: { handlers: [http.get("/api/users", () => HttpResponse.json([{ name: "Ada" }]))] }
   }
 };
+```
+
 `parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
 unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. On a
 component page, where one worker serves every frame, each story's handlers answer its own frame only: a story with none
-goes to the network. It works on the dev server and in a static build.
+goes to the network. The panel's **Network** tab lists the story's handlers and its requests, each answered by a mock or
+by the network, its query left out. It works on the dev server and in a static build. Without the plugin listed,
+`parameters.msw` does nothing, and a story's requests reach the network.
+
+## Plugins
+
+A plugin is a package a catalogue lists; until it is listed, it adds nothing and costs nothing:
+
+```ts
+import { figma } from "@forgebook/plugin-figma";
+import { msw } from "@forgebook/plugin-msw";
+
+export default defineConfig({ /* … */ plugins: [figma(), msw()] });
+```
+
+A plugin can add a panel tab, a toolbar switch, a docs block, and what runs around a story in its frame; it cannot rearrange
+the shell. Turn a plugin's tab off like any other (`tabs: { figma: false }`), rename it (`strings: { "tabs.figma": "Figma" }`)
+or translate its texts (`strings: { "plugin.figma.compare": "Confronta" }`). `forgebook plugins --json` and `list_plugins`
+say what a catalogue has.
+
+The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
+
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. A host that sets a `Content-Security-Policy` needs `blob:` in `script-src` for
@@ -782,6 +819,8 @@ docs page that names what is not there, and its JSON lists every story for a scr
 | [`@forgebook/nuxt`](https://www.npmjs.com/package/@forgebook/nuxt) | A Nuxt project's components outside Nuxt, on Vue's |
 | [`@forgebook/story-format`](https://www.npmjs.com/package/@forgebook/story-format) | The story format, for a library whose stories must not depend on a catalogue |
 | [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing) | Tests generated from the stories |
+| [`@forgebook/plugin-figma`](https://www.npmjs.com/package/@forgebook/plugin-figma) | A story's design in the panel, and beside the story |
+| [`@forgebook/plugin-msw`](https://www.npmjs.com/package/@forgebook/plugin-msw) | A story's API answered by its handlers, and a Network tab |
 
 ## Contributing
 

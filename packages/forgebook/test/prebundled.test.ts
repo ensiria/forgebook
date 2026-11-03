@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { ForgebookPlugin } from "../src/plugin.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import { prebundled, type Resolve, scannedEntries } from "../src/vite/prebundled.ts";
@@ -28,7 +29,7 @@ const CONFIG: ResolvedConfig = {
   tokens: [],
   watch: [],
   lists: {},
-  hasMocks: false,
+  plugins: [],
   hasPlayTools: false,
   frames: ISOLATED_FRAMES,
   build: { readableNames: false }
@@ -76,12 +77,25 @@ describe("prebundled", () => {
   });
 });
 
-describe("a project with MSW", () => {
-  it("pre-bundles its modules, the browser one which Node cannot resolve, so a page does not reload to find them", () => {
-    const names = prebundled({ ...CONFIG, hasMocks: true }, resolverOf({}));
-    expect(names).toContain("msw/browser");
-    expect(names).toContain("msw");
-    expect(prebundled(CONFIG, resolverOf({}))).not.toContain("msw/browser");
+describe("a catalogue's plugins", () => {
+  const plugin: ForgebookPlugin = {
+    apiVersion: 1,
+    id: "acme",
+    frame: "@acme/plugin/frame",
+    browserDependencies: ["acme/browser"]
+  };
+
+  it("pre-bundles what a plugin names, unresolved since a browser-only module fails Node's resolver", () => {
+    expect(prebundled({ ...CONFIG, plugins: [plugin] }, resolverOf({}))).toContain("acme/browser");
+    expect(prebundled(CONFIG, resolverOf({}))).not.toContain("acme/browser");
+  });
+
+  it("pre-bundles a plugin's modules when it is installed, not when it is linked", () => {
+    const listed: ResolvedConfig = { ...CONFIG, plugins: [plugin] };
+    const installed = resolverOf({ "@acme/plugin/frame": "/app/node_modules/@acme/plugin/frame.js" });
+    expect(prebundled(listed, installed)).toContain("@acme/plugin/frame");
+    const linked = resolverOf({ "@acme/plugin/frame": "/repo/plugin/frame.ts" });
+    expect(prebundled(listed, linked)).not.toContain("@acme/plugin/frame");
   });
 });
 

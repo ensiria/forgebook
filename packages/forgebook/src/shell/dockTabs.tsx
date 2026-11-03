@@ -1,12 +1,12 @@
 /**
  * The tabs a story's panel shows: Props, Events and Parts and styling from its component's docs, Code from its file,
- * Design from its link, Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
- * and shows no tab of args (`logicTabs`).
+ * the plugins', Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's
+ * Signature and shows no tab of args (`logicTabs`).
  *
  * @remarks
  * The dock draws only the chosen tab's content, and most stories open on Props: the other tabs' modules (Events,
- * Interactions, Parts and styling, Code, Accessibility, Design) load the first time each is chosen
- * (`lazyModule.tsx`), so a first load fetches none of them. What the row of tabs shows of them (a hint, whether there is one) is in `tabSummaries`.
+ * Interactions, Parts and styling, Code, Accessibility) load the first time each is chosen (`lazyModule.tsx`), and a
+ * plugin's the first time it is shown, so a first load fetches none of them. What the row of tabs shows of them (a hint, whether there is one) is in `tabSummaries`.
  *
  * @module
  */
@@ -20,8 +20,6 @@ import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { CheckState } from "./A11yTab.tsx";
-import type { DesignTabProps } from "./DesignTab.tsx";
-import { DesignTabLoader } from "./DesignTabLoader.tsx";
 import type { DockTab } from "./Dock.tsx";
 import { lazyModule } from "./lazyModule.tsx";
 import { LazyTab } from "./lazyTab.tsx";
@@ -94,8 +92,8 @@ export type DockTabsInput = {
   readonly check: CheckState;
   /** Runs it; none when it cannot run. */
   readonly onCheck: (() => void) | undefined;
-  /** What the Design tab shows; none for a story without a design. */
-  readonly design: DesignTabProps | undefined;
+  /** The plugins' tabs the story has something for. */
+  readonly pluginTabs: readonly DockTab[];
 };
 
 /** A message in place of a tab's content: the docs or the code are loading or could not be read. */
@@ -253,7 +251,7 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
   // without the file's code, a story with a render would show the JSX of its args, which is not what it draws
   if (code.status === "none") return [];
   // the code's place while it loads: a story without props opens on the first tab, and without this one the first
-  // would be the next (Design), opened, its module loaded and Figma asked, before the code arrives and takes its place
+  // would be the next (a plugin's), opened and its module loaded, before the code arrives and takes its place
   if (code.status === "loading") {
     return [{ id: "code", label: STRINGS.tabs.code, content: notice(STRINGS.codeLoading, false) }];
   }
@@ -281,12 +279,6 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
   ];
 };
 
-/** The Design tab, for a story with a design. */
-const designTabs = ({ design }: DockTabsInput): DockTab[] =>
-  design === undefined
-    ? []
-    : [{ id: "design", label: STRINGS.tabs.design, content: <DesignTabLoader {...design} /> }];
-
 /**
  * The tabs of a story's panel, in order.
  *
@@ -295,7 +287,7 @@ const designTabs = ({ design }: DockTabsInput): DockTab[] =>
 export const dockTabs = (input: DockTabsInput): DockTab[] => [
   ...docsTabs(input),
   ...codeTabs(input),
-  ...designTabs(input),
+  ...input.pluginTabs,
   {
     id: "a11y",
     label: STRINGS.tabs.a11y,

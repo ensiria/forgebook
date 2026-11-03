@@ -37,7 +37,7 @@ import type { ViewSwitch } from "../switches.ts";
 import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
 import type { ComponentPageProps } from "./ComponentPage.tsx";
-import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import { CatalogueContext, NO_PLUGINS, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
 import type { DocPageProps } from "./DocPage.tsx";
 import { filesCodeLoader } from "./filesCode.ts";
 import type { HomePageProps } from "./HomePage.tsx";
@@ -45,6 +45,7 @@ import { Icon } from "./icons.tsx";
 import { LazyPage } from "./LazyPage.tsx";
 import { LogicMark } from "./LogicMark.tsx";
 import { lazyModule } from "./lazyModule.tsx";
+import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
@@ -98,6 +99,8 @@ export type ShellConfig = {
   readonly switches?: readonly ViewSwitch[];
   /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
   readonly lists?: CatalogueLists;
+  /** The plugins with views (the generated page passes them); none by default. */
+  readonly plugins?: readonly ShellPlugin[];
   /**
    * How the framework's stories take the texts the address carries (`addressTexts.ts`): `plain` keeps a shared link's
    * texts that are not plain words from a story that may write them into markup. `any` by default.
@@ -692,7 +695,8 @@ const ShellPage = ({
   heights,
   sources,
   frameUrl,
-  addressTexts = "any"
+  addressTexts = "any",
+  plugins = NO_PLUGINS
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
@@ -893,6 +897,7 @@ const ShellPage = ({
               touchOverrides,
               onTouchChange: setTouchOverride,
               frameUrl,
+              plugins,
               storyHrefOf,
               onOpenStory: (story: TreeStory): void => openPage(storyPage(story)),
               pageHrefOf: (id: string, anchor: string | undefined): string =>
@@ -922,6 +927,7 @@ const ShellPage = ({
             matrixAxes={address.matrix}
             onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
             frameUrl={frameUrl}
+            plugins={plugins}
             {...storyLoaders(files, shown.location.story)}
             namedValues={source?.namedValues}
             header={header}
