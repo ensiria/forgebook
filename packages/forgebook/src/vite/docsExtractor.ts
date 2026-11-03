@@ -3,12 +3,14 @@
  * (`docsWorker.ts`) so the dev server keeps answering while a package's TypeScript program is built.
  *
  * @remarks
- * One worker per plugin, started on the first request the disk cannot answer, and kept: its programs make every later
- * read quick, until a source file changes (`changed`, which the dev server's watcher sends). A TypeScript program is
- * the largest thing the server holds, and an answer kept on disk from an earlier start (`diskCache.ts`, with the files
- * it was read from, `docsDependencies.ts`) needs none: a pattern's first story starts the worker early (`warm`) only
- * when the disk keeps no docs at all (a first start, a build), one warm-up at a time and only while nothing waits. Requests are answered in
- * order. The worker never keeps the process alive (`unref`), and `close` ends it when the build or the server ends.
+ * One worker per plugin, started on the first request the disk cannot answer: its programs make every later read
+ * quick, until a source file changes (`changed`, which the dev server's watcher sends). A TypeScript program is the
+ * largest thing the server holds, and an answer kept on disk from an earlier start (`diskCache.ts`, with the files it
+ * was read from, `docsDependencies.ts`) needs none: a pattern's first story starts the worker early (`warm`) only when
+ * the disk keeps no docs at all (a first start, a build), one warm-up at a time and only while nothing waits. For the
+ * same reason a dev server's worker left with nothing to do ends (`IDLE_MS`), so the memory a first start took does
+ * not stay with the server until it stops. Requests are answered in order. The worker never keeps the process alive
+ * (`unref`), and `close` ends it when the build or the server ends.
  *
  * @module
  */
@@ -126,6 +128,11 @@ export type DocsExtractorOptions = {
   readonly readsEverything?: boolean;
   /** Where answers are kept between starts (`diskCache.ts`); none reads every time. */
   readonly cacheFolder?: string;
+  /**
+   * How long the worker stays with nothing to do before it ends, in milliseconds; `IDLE_MS` by default. A build's
+   * never ends before the build does.
+   */
+  readonly idleMs?: number;
 };
 
 /** Whether what a cache file holds is a story file's docs, never a message. */
@@ -142,6 +149,13 @@ const isKeptUsage = (value: unknown): value is UsageGraph =>
  * component at a time, where collecting more often costs little.
  */
 const YOUNG_GENERATION_MB = 8;
+
+/**
+ * How long a dev server's worker stays with nothing to do, in milliseconds, before it ends. Its programs are the
+ * largest thing the server holds: a session that stops reading docs gives their memory back, while one that edits and
+ * looks keeps them, renewed after each edit rather than built again (seconds, in a large monorepo).
+ */
+export const IDLE_MS = 5 * 60_000;
 
 /**
  * The worker's young generation in a build, in MB: a build reads every story's docs in one go, and with the dev
@@ -178,7 +192,7 @@ const codeStampOf = (docsModule: string): string | undefined => {
  */
 export const createDocsExtractor = (
   docsModule: string,
-  { readsEverything = false, cacheFolder }: DocsExtractorOptions = {}
+  { readsEverything = false, cacheFolder, idleMs = IDLE_MS }: DocsExtractorOptions = {}
 ): DocsExtractor => {
   // the code that writes the answers: this package's and the framework's docs, whose edit or new version is a miss
   const code = cacheFolder === undefined ? undefined : codeStampOf(docsModule);
@@ -203,12 +217,26 @@ export const createDocsExtractor = (
   const pending = new Map<number, (response: DocsResponse | string) => void>();
   // the warm-ups not sent yet: one goes out only when nothing is pending, so a read never waits behind them all
   const warmUps: string[] = [];
+  let idle: ReturnType<typeof setTimeout> | undefined;
+  // ends the worker once nothing is asked of it for a while; a request in the meantime keeps it
+  const stopWhenIdle = (): void => {
+    clearTimeout(idle);
+    // a build reads every story, and a quiet stretch in it would build every program again
+    if (readsEverything || pending.size > 0 || warmUps.length > 0) return;
+    idle = setTimeout(() => {
+      const running = worker;
+      worker = undefined;
+      void running?.terminate();
+    }, idleMs);
+    idle.unref();
+  };
   const sendWarmUp = (): void => {
     if (pending.size > 0) return;
     const storyFile = warmUps.shift();
     if (storyFile !== undefined) send({ kind: "extract", id: nextId++, storyFile }, () => sendWarmUp());
   };
   const started = (): Worker => {
+    clearTimeout(idle);
     if (worker !== undefined) return worker;
     const workerData: DocsWorkerData = { docsModule, readsEverything, keepsAnswers: code !== undefined };
     const created = new Worker(WORKER_URL, {
@@ -222,12 +250,14 @@ export const createDocsExtractor = (
       pending.get(response.id)?.(response);
       pending.delete(response.id);
       sendWarmUp();
+      stopWhenIdle();
     });
     // a worker that dies answers every request still waiting with why, and the next request starts a new one
     created.on("error", (error: Error): void => {
       for (const resolve of pending.values()) resolve(`The docs' worker stopped: ${error.message}`);
       pending.clear();
-      worker = undefined;
+      // a worker ended when idle and replaced since leaves the new one in place
+      if (worker === created) worker = undefined;
     });
     worker = created;
     return created;
@@ -305,6 +335,7 @@ export const createDocsExtractor = (
       worker?.postMessage(request);
     },
     close: async (): Promise<void> => {
+      clearTimeout(idle);
       const running = worker;
       worker = undefined;
       warmUps.length = 0;

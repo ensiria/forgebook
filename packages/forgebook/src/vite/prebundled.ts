@@ -80,8 +80,8 @@ const FILES_IMPORT = /["']([^"']+)\?forgebook-files["']/g;
 
 /**
  * The story files Vite scans for what their components import, before the first page opens: the project's own
- * patterns, and each source's, read from its module's `?forgebook-files` imports (relative to the module). A source
- * the project cannot resolve, or read, adds none.
+ * patterns, each source's, read from its module's `?forgebook-files` imports (relative to the module), and the
+ * previews. A source the project cannot resolve, or read, adds none.
  *
  * @remarks
  * Without the sources' files, a package a source's stories import (`storybook/test`, a component's own dependency) is
@@ -104,5 +104,6 @@ export const scannedEntries = (
       match[1] === undefined ? [] : [VITE_PATHS.join(VITE_PATHS.dirname(file), match[1])]
     );
   });
-  return [...config.stories, ...fromSources];
+  // the previews too: what they import loads with the first story, and found then it reloads the page
+  return [...config.stories, ...fromSources, ...config.previews];
 };
