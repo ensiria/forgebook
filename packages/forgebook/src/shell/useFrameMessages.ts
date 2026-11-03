@@ -9,6 +9,13 @@ import { useEffect, useRef, useState } from "react";
 import type { Violation } from "../a11y.ts";
 import { type FrameMessage, isFrameMessage } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
+import { isFromFrames } from "./framesOrigin.ts";
+
+/**
+ * Marks a frame shown beside the page's own, which answers it itself: a story's second frame reporting here would
+ * replace the stage's play trace and add to its spills and its calls, though it runs at another size.
+ */
+export const FRAME_ASIDE_ATTRIBUTE = "data-forgebook-aside";
 
 /** A message of a frame that the stage answers. */
 export type ReadyMessage = Extract<FrameMessage, { type: "forgebook:ready" }>;
@@ -37,8 +44,8 @@ export type FrameHandlers = {
   readonly onReady: (frame: Window, message: ReadyMessage) => void;
   /** An event was called. */
   readonly onCall: (call: EventCall) => void;
-  /** A frame could not show its story; none where nothing waits for it. */
-  readonly onFailed?: (storyId: string) => void;
+  /** A frame could not show its story, and why; none where nothing waits for it. */
+  readonly onFailed?: (storyId: string, message: string) => void;
   /** A story's play function reported its trace; none where nothing shows it. */
   readonly onPlay?: (storyId: string, trace: PlayTrace) => void;
   /** An accessibility check is over: the rules broken, or why it could not run; none where nothing asks for one. */
@@ -80,25 +87,21 @@ const isSettling = (message: FrameMessage): boolean =>
   message.type === "forgebook:ready" || message.type === "forgebook:error";
 
 /** Acts on one message of a frame. */
-const onFrameMessage = (
-  message: FrameMessage,
-  frame: HTMLIFrameElement | undefined,
-  targets: MessageTargets
-): void => {
-  const address = frame?.getAttribute("src") ?? undefined;
+const onFrameMessage = (message: FrameMessage, frame: HTMLIFrameElement, targets: MessageTargets): void => {
+  const address = frame.getAttribute("src") ?? undefined;
   if (isSettling(message) && address !== undefined) targets.markSettled(address);
   const { handlers } = targets;
   switch (message.type) {
     case "forgebook:ready":
       if (message.canReplay) targets.setReplayable(message.storyId);
       if (message.hasClock) targets.setClocked(message.storyId);
-      if (frame?.contentWindow) handlers.onReady(frame.contentWindow, message);
+      if (frame.contentWindow) handlers.onReady(frame.contentWindow, message);
       return;
     case "forgebook:size":
       if (address !== undefined) targets.setHeight(address, message.height);
       return;
     case "forgebook:error":
-      handlers.onFailed?.(message.storyId);
+      handlers.onFailed?.(message.storyId, message.message);
       return;
     case "forgebook:play":
       handlers.onPlay?.(message.storyId, message.trace);
@@ -143,8 +146,11 @@ export const useFrameMessages = (handlers: FrameHandlers): FrameReports => {
 
   useEffect(() => {
     const listen = (event: MessageEvent): void => {
-      if (event.origin !== window.location.origin || !isFrameMessage(event.data)) return;
-      onFrameMessage(event.data, frameOf(event.source), {
+      if (!isFromFrames(event) || !isFrameMessage(event.data)) return;
+      // a frame of this page, not a window a story opened on the frames' origin or another page's frame
+      const frame = frameOf(event.source);
+      if (frame === undefined || frame.hasAttribute(FRAME_ASIDE_ATTRIBUTE)) return;
+      onFrameMessage(event.data, frame, {
         handlers: handlersRef.current,
         setReplayable,
         setClocked,

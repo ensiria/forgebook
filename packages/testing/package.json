@@ -33,6 +33,7 @@
     "./check": "./src/checkStories.ts",
     "./check-page": "./src/checkPage.ts",
     "./conformance": "./src/conformance.ts",
+    "./diff": "./src/diffStories.ts",
     "./shot": "./src/shotStories.ts",
     "./touch": "./src/touchWindow.ts",
     "./fonts.css": "./src/fonts/fonts.css"
@@ -108,6 +109,10 @@
       "./conformance": {
         "types": "./dist/src/conformance.d.ts",
         "default": "./dist/src/conformance.js"
+      },
+      "./diff": {
+        "types": "./dist/src/diffStories.d.ts",
+        "default": "./dist/src/diffStories.js"
       },
       "./shot": {
         "types": "./dist/src/shotStories.d.ts",

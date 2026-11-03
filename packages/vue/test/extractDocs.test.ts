@@ -8,6 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { type ComponentDocs, isComponentDocs, type PropDocs } from "forgebook/component-docs";
+import { normalizePath } from "vite";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -135,9 +136,10 @@ describe("a single-file component", () => {
   it("names the files its docs come from, so an edit to any renews them", () => {
     const component = extractStoryComponent(docsFile("Badge.stories.ts"));
     if (typeof component === "string" || !("file" in component)) throw new Error("No component");
-    expect(component.file).toBe(docsFile("Badge.vue"));
-    expect(component.sources).toContain(docsFile("Badge.vue"));
-    expect(component.sources).toContain(docsFile("Item.vue"));
+    // TypeScript names files with forward slashes on every system, as Vite does
+    expect(component.file).toBe(normalizePath(docsFile("Badge.vue")));
+    expect(component.sources).toContain(normalizePath(docsFile("Badge.vue")));
+    expect(component.sources).toContain(normalizePath(docsFile("Item.vue")));
   });
 });
 

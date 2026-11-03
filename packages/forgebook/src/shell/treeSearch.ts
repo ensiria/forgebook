@@ -10,6 +10,7 @@
  *
  * @module
  */
+import type { TreePage } from "../pageTree.ts";
 import type { TreeAlias, TreeComponent, TreeFamily, TreeGroup, TreeStory } from "../storyTree.ts";
 
 /**
@@ -92,3 +93,16 @@ export const foundFamily = (family: TreeFamily, words: readonly string[]): TreeF
     .filter((group) => group.components.length > 0 || group.aliases.length > 0);
   return groups.length === 0 ? undefined : { ...family, groups };
 };
+
+/**
+ * The docs pages the search finds: by their title and description; every page for no words.
+ *
+ * @param pages - the pages.
+ * @param words - the query's words (`searchWords`).
+ */
+export const foundPages = (pages: readonly TreePage[], words: readonly string[]): readonly TreePage[] =>
+  words.length === 0
+    ? pages
+    : pages.filter((page) =>
+        holdsEvery(folded(`${page.title.replaceAll("/", " ")} ${page.description ?? ""}`), words)
+      );

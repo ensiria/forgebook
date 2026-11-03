@@ -6,6 +6,8 @@ fixtures/app/preview/
 test-results/
 playwright-report/
 .heights-build/
+# svelte-check's incremental output
+.svelte-check/
 
 # Nx release's cache
 .nx/

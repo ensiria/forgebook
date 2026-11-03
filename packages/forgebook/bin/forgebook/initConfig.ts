@@ -35,8 +35,12 @@ const sourceOf = (value: unknown, indent: string): string =>
  */
 export const initConfigText = (imported: ImportedConfig, tool: string): string => {
   const adapter = ADAPTER_FUNCTIONS[imported.framework];
+  const options =
+    imported.frameworkOptions === undefined
+      ? ""
+      : sourceOf(imported.frameworkOptions, "  ").replace(/\n\s*/g, " ");
   const fields = [
-    `  framework: ${adapter}(),`,
+    `  framework: ${adapter}(${options}),`,
     `  title: ${JSON.stringify(imported.title)},`,
     `  stories: ${sourceOf(imported.stories, "  ")},`,
     ...(imported.preview === undefined ? [] : [`  preview: ${JSON.stringify(imported.preview)},`]),

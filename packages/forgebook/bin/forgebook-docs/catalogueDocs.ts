@@ -39,7 +39,7 @@ export type CatalogueDocsRequest = {
  * @param request - the package, its framework, whether to check, and the command that fixes them.
  * @param log - where to report.
  * @returns the report, for `--json`.
- * @throws a `ScriptError` in a check when a file is stale or a file could not be read, or when the package's options
+ * @throws a `ScriptError` in a check when a file is stale or something could not be read, or when the package's options
  *   are wrong.
  */
 export const catalogueDocs = async (
@@ -67,17 +67,22 @@ export const catalogueDocs = async (
   const llms = llmsText({
     packageName: data.packageName,
     description: data.description,
-    catalogueFile: options.file
+    catalogueFile: options.file,
+    pages: data.pages ?? [],
+    hasTokens: options.sections.includes("tokens") && data.tokens.length > 0
   });
   const counts = {
     components: data.components.length,
+    pages: data.pages?.length ?? 0,
     modules: data.modules.length,
     sassModules: data.sassModules.length,
-    styleSheets: data.styleSheets.length
+    styleSheets: data.styleSheets.length,
+    tokens: data.tokens.length
   };
   const report = { file: shown(file), llmsFile: shown(llmsFile), counts, problems };
   if (request.isCheck) {
-    if (problems.length > 0) throw new ScriptError(`${plural(problems.length, "file")} could not be read`);
+    if (problems.length > 0)
+      throw new ScriptError(`${plural(problems.length, "problem")} reading the package`);
     const written: readonly (readonly [string, string])[] = [
       [file, text],
       [llmsFile, llms]
