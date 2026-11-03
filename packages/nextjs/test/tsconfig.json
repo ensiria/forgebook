@@ -1,0 +1,10 @@
+// The Next.js package's tests, run by Vitest: the stand-ins in a simulated page (happy-dom), the plugins on Node.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "allowImportingTsExtensions": true
+  },
+  "include": [".", "../src"]
+}

@@ -6,7 +6,8 @@
  * A running `forgebook dev` answers at once and its links work. A server of their own is started in the same process
  * (Vite in middleware mode: no port, nothing reachable from outside) and the same function answers; its links name
  * where `forgebook dev` serves by default, so they work once it runs. A server found at the address is used only when
- * it says it serves this catalogue's folder (`ROOT_HEADER`), never another project's catalogue on the same port.
+ * it says it serves this catalogue's folder (`ROOT_HEADER`), never another project's catalogue on the same port. A
+ * server of their own keeps its pre-bundled dependencies apart from the dev server's (`commandServer.ts`).
  *
  * @module
  */
@@ -26,7 +27,7 @@ import {
   rootHeaderValue
 } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
-import { catalogueVite } from "./catalogueVite.ts";
+import { commandServerVite } from "./commandServer.ts";
 
 /** Where `forgebook dev` serves when no port is given: Vite's default. */
 export const DEFAULT_ORIGIN = "http://localhost:5173";
@@ -74,7 +75,7 @@ const runningClient = async (
  */
 const ownClient = async (config: ResolvedConfig, origin: string): Promise<CatalogueClient> => {
   const server: ViteDevServer = await createServer(
-    await catalogueVite(config, {
+    await commandServerVite(config, {
       server: { middlewareMode: true, hmr: false },
       appType: "custom",
       logLevel: "error"
@@ -178,7 +179,7 @@ export type ServedCatalogue = {
  */
 const ownListening = async (config: ResolvedConfig, port: number): Promise<ServedCatalogue> => {
   const server: ViteDevServer = await createServer(
-    await catalogueVite(config, {
+    await commandServerVite(config, {
       server: { port, strictPort: port !== 0, host: "127.0.0.1" },
       logLevel: "error"
     })

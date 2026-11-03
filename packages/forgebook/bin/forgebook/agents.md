@@ -47,10 +47,23 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.
 - Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic` and `design.figma` as plain values: the catalogue reads them without running
   the file.
+- In a Next.js project (`framework: nextjs()`), stories take their types from `@forgebook/nextjs`. A story says where
+  its component is with `parameters.nextjs.navigation` (`pathname`, `query`, `params`; `router` for the Pages Router),
+  and what its server code reads with `nextjs.cookies`, `headers` and `draftMode`. A link or a router call moves the
+  story's route and is listed among its events; a `play` reads where it went with `storyRoute()`
+  (`@forgebook/nextjs/route`). Async server components are drawn; what they reach on a server (a database, the file
+  system) is not there: fetch it and mock it with `parameters.msw`.
 
 - Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
   `@replacedBy`. `forgebook story` returns them as `docs.guidance`: read them before using a component, and never use a
   deprecated one.
+
+### Docs pages
+
+Guides live in Markdown files, listed in the catalogue's Docs section. Read one before writing against it
+(`npx forgebook page <id>`). When you write one: front matter with `title` (`Guides/Theming`), `order` and `description`, a
+fence named `story <id>` for a live story and `props <component id>` for an API table, both at the page's top level, and
+links to other pages by their file (`./colours.md#brand`). A page never holds a story's code: show the story.
 
 ### Commands
 
@@ -60,6 +73,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
+| `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |
+| `npx forgebook page <id> --json` | One docs page: its Markdown, its headings, the address that opens it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, errors, a failed play |
 | `npx forgebook tokens --category color --json` | The design tokens, of the catalogue and of the libraries it shows; `clashes` says whose value stands where two disagree |

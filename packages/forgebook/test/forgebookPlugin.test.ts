@@ -151,6 +151,7 @@ describe("forgebookPlugin's pages", () => {
     logo: undefined,
     heights: undefined,
     stories: ["src/**/*.stories.tsx"],
+    docs: [],
     sources: [],
     switches: undefined,
     languages: [],

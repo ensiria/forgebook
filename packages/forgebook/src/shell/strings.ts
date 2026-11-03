@@ -15,8 +15,13 @@ import type { SheetsChoice, TextScale } from "../viewState.ts";
 // biome-ignore lint/nursery/useExplicitType: the texts' type is their own shape (`ShellStrings`); a written one would repeat every key
 const shellStrings = {
   searchPlaceholder: "Search",
-  searchLabel: "Search components and stories",
+  searchLabel: "Search components, stories and docs",
   componentsNav: "Components",
+  docsNav: "Docs",
+  pageContents: "On this page",
+  previousPage: "Previous",
+  nextPage: "Next",
+  docPageError: "The page could not be read",
   sidebarWidth: "Sidebar width",
   hideSidebar: "Hide the sidebar",
   showSidebar: "Show the sidebar",
@@ -196,6 +201,7 @@ const shellStrings = {
   showFewer: "Show fewer",
   unknownStory: (id: string): string =>
     `No story "${id}": it may have been renamed. Pick one in the sidebar.`,
+  unknownPage: (id: string): string => `No page "${id}": it may have been renamed. Pick one in the sidebar.`,
   unknownComponent: (id: string): string =>
     `No component "${id}": it may have been renamed. Pick one in the sidebar.`,
   props: "Props",
