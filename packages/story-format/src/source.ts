@@ -7,11 +7,12 @@
  * catalogue's Vite plugin answers (`import files from "../src/**\/*.stories.tsx?forgebook-files"`, typed by
  * `@forgebook/story-format/client`): one module with every file's index (read without running the files), and the loaders
  * of its stories, its component's docs and its code. The style sheets are the URLs the frame loads for each
- * Styles setting.
+ * Styles setting. Its design tokens are paths, not imports: tools read them without loading the source, and the pages
+ * carry nothing of them.
  *
  * @module
  */
-import type { StoryGroup } from "./csf.ts";
+import type { StoryDesign, StoryGroup } from "./csf.ts";
 
 /** The props the panel can set for a story: every adjustable one, or only the named ones (none for fixed examples). */
 export type StoryControlsSetting = "all" | readonly string[];
@@ -28,6 +29,8 @@ export type StoryIndexEntry = {
   readonly group?: StoryGroup;
   /** The story's own `parameters.height`, when it sets one, in CSS px. */
   readonly height?: number;
+  /** The story's own `parameters.design`, when it sets one with a `figma` link. */
+  readonly design?: StoryDesign;
   /** Whether the story sets `parameters.main: true`: the component's demo. */
   readonly isMain?: boolean;
   /**
@@ -57,6 +60,8 @@ export type StoryFileIndex = {
   readonly controls?: StoryControlsSetting;
   /** The meta's `parameters.height`, when it sets one: every story's frame height, in CSS px. */
   readonly height?: number;
+  /** The meta's `parameters.design`, when it sets one with a `figma` link: the component's, and every story's. */
+  readonly design?: StoryDesign;
   /** The meta's `parameters.touch`, when it sets one: every story starts in touch unless it says otherwise. */
   readonly isTouch?: boolean;
   /** The meta's `parameters.logic`, when it sets one: every story is about logic unless it says otherwise. */
@@ -165,6 +170,12 @@ export type StoryMarkdown = {
   readonly html: string;
 };
 
+/**
+ * A design tokens file of a package: its path from the module that declares the source, with its theme when it is a
+ * theme's (the format has no themes of its own, so a theme is a file over the base).
+ */
+export type StoryTokensFile = string | { readonly file: string; readonly mode: string };
+
 /** A package's stories, as the catalogue reads them. */
 export type StorySource = {
   /** A stable id, part of every story id's URL (`acme-ui`). */
@@ -215,4 +226,12 @@ export type StorySource = {
    * (`home: () => import("./home.md?forgebook-markdown")`). None by default: the home then shows only its families.
    */
   readonly home?: () => Promise<{ readonly default: StoryMarkdown }>;
+  /**
+   * The package's design tokens, DTCG 2025.10 files, the base first
+   * (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`): every catalogue that shows the source adds them to
+   * its own, and `forgebook docs` lists them in `CATALOG.md`. They are read from the module's text, never by running it,
+   * so a broken story cannot hide them: write the list here, in the object of `export const source`, with plain strings
+   * (a source re-exported or spread from another module gives none) and paths inside the package. None by default.
+   */
+  readonly tokens?: readonly StoryTokensFile[];
 };

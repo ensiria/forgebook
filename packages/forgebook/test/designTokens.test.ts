@@ -287,3 +287,110 @@ describe("filteredTokens", () => {
     expect(filteredTokens(tokens, undefined)).toHaveLength(tokens.length);
   });
 });
+
+describe("readTokens over several authors", () => {
+  const color = (value: string, extra: Readonly<Record<string, unknown>> = {}): unknown =>
+    token({ type: "color", value, ...extra });
+
+  it("reads each source before the catalogue, whose aliases reach the library and whose value stands", () => {
+    const { tokens, clashes, problems } = readTokens([
+      {
+        label: "@acme/ui: tokens.json",
+        mode: undefined,
+        source: "acme",
+        file: { red: color("#ff0000", { description: "The red." }), danger: token({ value: "{red}" }) }
+      },
+      {
+        label: "tokens.json",
+        mode: undefined,
+        // only the value: the library's type and description stay
+        file: { red: token({ value: "#ee0000" }), error: token({ value: "{danger}" }) }
+      }
+    ]);
+    expect(problems).toEqual([]);
+    expect(tokens.map(({ name, value, source }) => [name, value, source])).toEqual([
+      ["red", "#ee0000", undefined],
+      ["danger", "#ee0000", "acme"],
+      ["error", "#ee0000", undefined]
+    ]);
+    expect(tokens[0]).toMatchObject({ type: "color", description: "The red." });
+    expect(clashes).toEqual([{ name: "red", kept: "tokens.json", replaced: ["@acme/ui: tokens.json"] }]);
+  });
+
+  it("keeps what an override leaves out, a type given only by an alias and a deprecation among it", () => {
+    const { tokens, problems } = readTokens([
+      {
+        label: "lib",
+        mode: undefined,
+        source: "lib",
+        file: {
+          danger: token({ value: "{red}", deprecated: "Use error." }),
+          red: color("#ff0000")
+        }
+      },
+      { label: "own", mode: undefined, file: { danger: token({ value: "#ee0000" }) } }
+    ]);
+    expect(problems).toEqual([]);
+    expect(tokens.find(({ name }) => name === "danger")).toMatchObject({
+      type: "color",
+      value: "#ee0000",
+      deprecated: "Use error."
+    });
+  });
+
+  it("gives the later source a clash between two, naming every file replaced", () => {
+    const file = (value: string): unknown => ({ a: color(value) });
+    const { tokens, clashes } = readTokens([
+      { label: "one", mode: undefined, source: "one", file: file("#111111") },
+      { label: "two", mode: undefined, source: "two", file: file("#222222") },
+      { label: "own", mode: undefined, file: file("#333333") }
+    ]);
+    expect(tokens).toMatchObject([{ value: "#333333" }]);
+    expect(clashes).toEqual([{ name: "a", kept: "own", replaced: ["one", "two"] }]);
+  });
+
+  it("calls no clash what agrees, one author's layers, or a theme a token did not have, but sees past a layer", () => {
+    const same = { a: color("#111111") };
+    expect(
+      readTokens([
+        { label: "lib", mode: undefined, source: "lib", file: same },
+        { label: "own", mode: undefined, file: same },
+        { label: "own layer", mode: undefined, file: { a: color("#222222") } },
+        { label: "dark", mode: "dark", file: { a: color("#000000") } }
+      ]).clashes
+    ).toEqual([{ name: "a", kept: "own layer", replaced: ["lib"] }]);
+    expect(
+      readTokens([
+        { label: "lib", mode: undefined, source: "lib", file: same },
+        { label: "own", mode: undefined, file: same },
+        { label: "dark", mode: "dark", file: { a: color("#000000") } }
+      ]).clashes
+    ).toEqual([]);
+    expect(
+      readTokens([
+        { label: "own", mode: undefined, file: same },
+        { label: "own layer", mode: undefined, file: { a: color("#222222") } }
+      ]).clashes
+    ).toEqual([]);
+  });
+
+  it("reports a theme two authors set, the catalogue's standing", () => {
+    const { tokens, clashes } = readTokens([
+      { label: "lib", mode: undefined, source: "lib", file: { a: color("#111111") } },
+      { label: "lib dark", mode: "dark", source: "lib", file: { a: color("#222222") } },
+      { label: "own dark", mode: "dark", file: { a: color("#333333") } }
+    ]);
+    expect(tokens[0]?.modes).toEqual({ dark: "#333333" });
+    expect(clashes).toEqual([{ name: "a", mode: "dark", kept: "own dark", replaced: ["lib dark"] }]);
+  });
+
+  it("lets a catalogue's theme follow what a library's theme sets", () => {
+    const { tokens, problems } = readTokens([
+      { label: "lib", mode: undefined, source: "lib", file: { a: color("#111111"), b: color("#222222") } },
+      { label: "lib dark", mode: "dark", source: "lib", file: { a: color("#aaaaaa") } },
+      { label: "own dark", mode: "dark", file: { b: token({ value: "{a}" }) } }
+    ]);
+    expect(problems).toEqual([]);
+    expect(tokens.find(({ name }) => name === "b")?.modes).toEqual({ dark: "#aaaaaa" });
+  });
+});

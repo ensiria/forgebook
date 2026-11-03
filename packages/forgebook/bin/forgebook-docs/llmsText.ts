@@ -14,6 +14,8 @@ export type LlmsTextInput = {
   readonly description: string | undefined;
   /** The catalogue's file name (`CATALOG.md`). */
   readonly catalogueFile: string;
+  /** Whether the catalogue lists design tokens. @defaultValue `false` */
+  readonly hasTokens?: boolean;
 };
 
 /**
@@ -32,7 +34,7 @@ export const llmsText = (input: LlmsTextInput): string =>
     "",
     "## Docs",
     "",
-    `- [${input.catalogueFile}](${input.catalogueFile}): every component, hook, helper and style module, one line each: what it is, how to import it, its props, and the id of a story that shows it`,
+    `- [${input.catalogueFile}](${input.catalogueFile}): every component, hook, helper and style module, one line each: what it is, how to import it, its props, and the id of a story that shows it${input.hasTokens === true ? ", then its design tokens" : ""}`,
     "",
     "## Optional",
     "",
@@ -40,5 +42,8 @@ export const llmsText = (input: LlmsTextInput): string =>
     "",
     "- `npx forgebook story <id> --json`: a story's args and its component's props",
     "- `npx forgebook mcp`: the same for an agent, over the Model Context Protocol (`list_stories`, `get_story`)",
+    ...(input.hasTokens === true
+      ? ['- `npx forgebook tokens --nearest "#1c1b1b" --json`: the token to write instead of a raw value']
+      : []),
     ""
   ].join("\n");

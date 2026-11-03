@@ -13,13 +13,14 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import ts from "typescript-6";
 
 import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
+import { VITE_PATHS, type VitePaths } from "../../../src/vite/vitePaths.ts";
 
 /** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
 export type ImportedFramework = "react" | "nextjs";
@@ -132,24 +133,24 @@ const entryGlob = (
  * @param entries - `main`'s `stories`.
  * @param storybookDir - the `.storybook` folder, absolute.
  * @param projectDir - the project's folder, absolute.
- * @returns the globs, and what was not read.
+ * @param paths - the path functions; the running system's unless a test names another.
+ * @returns the globs, with forward slashes on every system as globs take them, and what was not read.
  */
 export const storyGlobs = (
   entries: readonly unknown[],
   storybookDir: string,
-  projectDir: string
+  projectDir: string,
+  paths: VitePaths = VITE_PATHS
 ): { readonly globs: string[]; readonly notes: string[] } => {
   const globs: string[] = [];
   const notes: string[] = [];
-  const fromProject = (path: string): string => relative(projectDir, resolve(storybookDir, path)) || ".";
+  const fromProject = (path: string): string =>
+    paths.relative(projectDir, paths.resolve(storybookDir, path)) || ".";
   for (const entry of entries) {
     const glob = entryGlob(entry, fromProject, notes);
     if (glob === undefined) continue;
     // `.stories.*` names every script extension: written out as the ones Forgebook reads
-    const named = glob
-      .split("\\")
-      .join("/")
-      .replace(/\.stories\.\*$/, ".stories.@(js|jsx|mjs|ts|tsx)");
+    const named = glob.replace(/\.stories\.\*$/, ".stories.@(js|jsx|mjs|ts|tsx)");
     for (const each of expandedGlobs(named)) {
       if (STORY_FILE.test(each)) globs.push(each);
       else if (!each.endsWith(".mdx")) notes.push(`${each}: not a story file Forgebook reads`);
@@ -368,7 +369,7 @@ const loadedMain = async (
  */
 const storybookFramework = (framework: string | undefined): string | undefined => {
   if (framework === undefined) return undefined;
-  const path = framework.split("\\").join("/").replace(/\/$/, "");
+  const path = VITE_PATHS.normalize(framework).replace(/\/$/, "");
   return Object.keys(STORYBOOK_FRAMEWORKS).find((name) => path === name || path.endsWith(`/${name}`));
 };
 
@@ -396,8 +397,9 @@ const nextjsSettings = (
     notes.push("experimentalRSC is not needed: Forgebook draws async server components without a flag");
   const { nextConfigPath } = frameworkOf(main).options;
   // the Next.js app's folder is where its next.config is: its tsconfig, .env files and PostCSS are there too
-  const file = typeof nextConfigPath === "string" ? resolve(projectDir, nextConfigPath) : undefined;
-  const appDir = file === undefined ? "" : relative(projectDir, dirname(file));
+  const file =
+    typeof nextConfigPath === "string" ? VITE_PATHS.resolve(projectDir, nextConfigPath) : undefined;
+  const appDir = file === undefined ? "" : VITE_PATHS.relative(projectDir, VITE_PATHS.dirname(file));
   const options =
     file === undefined
       ? undefined
@@ -441,7 +443,8 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
     frameworkOptions: nextjs.options,
     title: projectTitle(projectDir),
     stories: globs,
-    preview: previewFile === undefined ? undefined : relative(projectDir, previewFile),
+    // with forward slashes: it is written into the configuration, which may be shared across systems
+    preview: previewFile === undefined ? undefined : VITE_PATHS.relative(projectDir, previewFile),
     switches: read.switches,
     notes: [...notes, ...read.notes]
   };

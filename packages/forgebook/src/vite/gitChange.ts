@@ -13,6 +13,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
+
 /** The largest output read, in bytes: a change this size is for a person, not for this check. */
 const MAX_OUTPUT = 64 * 1024 * 1024;
 
@@ -75,6 +77,24 @@ export const changedFiles = async (
   const untracked = listed(await gitOutput(dir, "ls-files", "--others", "--exclude-standard", "--full-name"));
   return { root, files: [...new Set([...tracked, ...untracked])] };
 };
+
+/**
+ * The changed files as the catalogue's graph names them: absolute, under the catalogue's folder as configured, in Vite's
+ * form. Git names real paths (with forward slashes on Windows too), and a folder reached through a link has another.
+ *
+ * @param dir - the catalogue's folder, as configured.
+ * @param realDir - the same folder with its links followed.
+ * @param root - the repository's folder, as git names it.
+ * @param files - the files, relative to the repository.
+ * @param paths - the path functions; the running system's unless a test names another.
+ */
+export const catalogueChangedFiles = (
+  dir: string,
+  realDir: string,
+  root: string,
+  files: readonly string[],
+  paths: VitePaths = VITE_PATHS
+): string[] => files.map((file) => paths.join(dir, paths.relative(realDir, paths.join(root, file))));
 
 /**
  * Reads a change.

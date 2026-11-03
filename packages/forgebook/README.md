@@ -106,6 +106,11 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
   their TSDoc, nothing written twice.
+- **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
+  Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
+  `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
+  (`onclick`, `innerHTML`, a text for a number) is left out and listed above the story, with a button that removes it
+  from the address. A value that is code never comes from a link.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break and every number a huge one, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
@@ -115,12 +120,14 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   component (Tree renders Row, Row renders DropLine), each with the stories to open; read from the types, never kept
   by hand. It shows only when there is such a use; a reader folds it away; `usedIn: false` in the configuration turns
   it off.
+- **The design beside the code**: a component's or a story's Figma link gives it a Design tab and a side-by-side view
+  ([below](#design-links)).
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
-  own, each with its name, logo and texts.
-- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook and helper of a
-  package, from its exports, their TSDoc and its stories.
+  own, each with its name, logo, texts and design tokens.
+- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook, helper and
+  design token of a package, from its exports, their TSDoc, its stories and its source.
 - **Tests from the stories**, with [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing): every
   story in the browser with axe, spills and overlays, screenshots, and every story rendered on the server.
 
@@ -208,6 +215,41 @@ Compare: the story is drawn once, never compared. A section of its own is a titl
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
 
+## Design links
+
+A component carries its own link to Figma, on its meta; a story with a design of its own writes it over the meta's:
+
+```ts
+export default {
+  title: "Actions/Button",
+  component: Button,
+  parameters: { design: { figma: "https://www.figma.com/design/AbC123/Kit?node-id=12-34" } }
+} satisfies Meta<typeof Button>;
+
+export const Danger: Story<typeof Button> = {
+  parameters: { design: { figma: "https://www.figma.com/design/AbC123/Kit?node-id=56-78" } }
+};
+```
+
+The component's header then links to Figma, and the story's panel has a **Design** tab with the node embedded and
+**Compare with the story**, the story and its design side by side over the page, at the story's width and with the
+panel's values. Comparing is for your eyes: Forgebook draws no overlay and gives no match percentage, because Figma and
+a browser render differently and such a number would mislead. The tab loads, with Figma, only when opened.
+
+Write the link plainly, as a string: the index reads it without running the file, so a link written by code is a problem.
+A link that is not `https` on `figma.com`, or does not name a `design`, `file`, `proto`, `board`, `slides` or `deck`, is
+reported with the index's problems and never embedded; the component keeps its stories. What is kept of a link is its
+file, branch and node, so a shared link's other parameters are dropped. A `design` parameter without
+`figma` (Storybook's design addon uses the same name) is left alone.
+
+Nothing here needs a Figma token: the embed shows what the reader's own Figma session or the file's sharing allows, and
+a private file asks them to sign in, inside the embed. That sign-in needs the browser's storage access, so a reader who
+blocks it uses Open in Figma. A catalogue published with a Content Security Policy allows
+`frame-src https://embed.figma.com https://www.figma.com`. Turn the tab off with `tabs: { design: false }`; the header's link stays.
+
+`forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
+`address` of the Design tab to hand a person. `list_stories` gives each component's, and `CATALOG.md` lists it.
+
 ## Coming from Storybook
 
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and
@@ -276,6 +318,7 @@ browser tests run in CI.
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
+| `forgebook diff <id>` | Compares a story's pictures with the baselines `forgebook shot --update` stored: the region, the percentage and a marked picture; fails when anything differs |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
@@ -305,8 +348,9 @@ export const Loaded: Story<typeof Users> = {
   }
 };
 `parameters.msw.handlers` is a list, or a record of lists as MSW's Storybook addon writes it, so those stories move over
-unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. It works
-on the dev server and in a static build.
+unchanged. MSW loads only for a story that has handlers, and a request none of them answers goes to the network. On a
+component page, where one worker serves every frame, each story's handlers answer its own frame only: a story with none
+goes to the network. It works on the dev server and in a static build.
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. This workflow builds on every pull request and keeps the result as an
@@ -372,14 +416,26 @@ A coding agent can use the catalogue while it works: find a story's id, read a s
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for
 example `.mcp.json` for Claude Code:
 
+```
+
+A library with design tokens (`tokens` in the configuration) can theme the shell from them in a few lines. Each role takes the
+token's value in both appearances, its `light` and `dark` themes first; colours written by hand win, and a token that
+is not there or is no colour is warned about and leaves the shell's own. The theme is read when the configuration is, so
+restart after editing the tokens.
+
+```ts
+shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.background.card" } } }
 ```json
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers fourteen tools: `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers fifteen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
+
+`get_story` gives a story's design too (`design`, [above](#design-links)), so an agent can read the node with a Figma tool
+and compare it with `story_shot`.
 
 A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
 `@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
@@ -389,6 +445,18 @@ its own, and agents can ask what to write instead:
 ```ts
 tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
 ```
+A library gives its tokens to every catalogue that shows it: the same list on its source, by path from the module that
+declares the source. It is read from that module's text, never by running it, so a broken story cannot hide a token: write
+it in the object of `export const source`, with plain strings and paths inside the package. A source re-exported or
+spread from another module gives no tokens.
+```ts
+export const source: StorySource = { id: "acme-ui", tokens: ["tokens.json"] /* … */ };
+```
+A catalogue reads each source's files in its `sources` order, then its own, so its aliases reach a library's palette. When
+two authors give one token different values in the same theme the last stands, which makes the catalogue's own the final
+word: it is what puts the libraries together. The answer says so in `clashes` (`kept`, `replaced`), the command warns,
+and neither fails: a clash is a choice to review, not a token that cannot be read. A file over another may write only
+`$value`: the token keeps its type, description and deprecation.
 ```sh
 npx forgebook tokens --category color --json
 npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whether each is really close
@@ -398,8 +466,19 @@ in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed 
 reference the base; a `$ref` reaches only its own file.
 
 An agent that cannot find a component writes a new one, often because the code and the designers use different words.
+`forgebook build --agent-index` adds `forgebook-agent.json` to the built catalogue, and `forgebook mcp --from <address or
+folder>` serves it with no dev server and no repository: a team that consumes a published library gives its agents
+`list_stories`, `get_story`, `story_address`, `find_component` and the token tools. It holds your stories' props, docs and
+tokens, and anyone who reaches the site can read it, so it is written only when asked. From a folder, links are paths.
+
 `forgebook find` and `find_component` search names, the meta's `keywords`, titles and stories, with the usual synonyms
 (`modal` finds a `Dialog`): write `keywords: ["radio tile group"]` on `OptionCards` and it is found.
+
+`forgebook check <id> --semantic` also asks a model what axe cannot see: whether a heading describes its section, an
+image's text says what it shows, a label says what its control does. It is off unless asked, and sends each story's
+accessibility tree and picture to the OpenAI-compatible API in `FORGEBOOK_SEMANTIC_URL`, with `FORGEBOOK_SEMANTIC_MODEL` and,
+when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and no key is stored. What it answers lands in
+`judgements`, apart from the problems, as an opinion: it does not fail the check.
 
 `forgebook check-code` and `check_code` read what a change adds, new files included, from where it left `--since`: a colour
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
@@ -408,8 +487,8 @@ are read for values: stories, tests, token definitions and generated files are l
 code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
-component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),
-and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the
+component, hook, helper, style module (what it is, how to import it, its props, the id of a story that shows it) and
+design token of its source (its value, each theme's, what it aliases, what it is for), and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the
 package's `package.json`:
 
 ```json

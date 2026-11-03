@@ -39,6 +39,10 @@ case, with the reason (`// biome-ignore lint/…: the protocol names this field`
 - **Two runtimes.** `src/shell` and `src/frame` run in the page. `src/vite` and `bin/` run on Node directly, their
   types stripped, so their relative imports carry `.ts` (each folder has its own `tsconfig.json`).
   `src/componentDocs.ts` is the shape both sides share. `packages/testing` runs inside Playwright or Vitest.
+- **Windows too.** CI runs the checks and the shell's suite on Windows. A path the Node side compares with a Vite id,
+  writes into generated code or uses as a key goes through `src/vite/vitePaths.ts` (forward slashes on every system,
+  as Vite's ids), and its logic is tested with `path.win32`; a package's command (`pnpm`, `npm`) is a `.cmd` there,
+  which only a shell starts.
 - **The props extractor reads types, never runs code**: TypeScript 6's compiler API (`typescript-6`, an alias: the
   repository type-checks with TypeScript 7, which has no compiler API), the props declared in the package only.
 - **Tools and agents get what the shell shows**: the dev server's answers (`src/vite/agentRoutes.ts`) load the same

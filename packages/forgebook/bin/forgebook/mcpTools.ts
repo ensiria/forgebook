@@ -171,7 +171,7 @@ export const catalogueTools = ({
   {
     name: "list_tokens",
     description:
-      "The design tokens of this catalogue, to use instead of a colour, size or duration written by hand: how many of each type, and the first of them. To replace a raw value, call nearest_token; for one token's description, get_token.",
+      "The design tokens of this catalogue and of the libraries it shows, to use instead of a colour, size or duration written by hand: how many of each type, the first of them, and `clashes` where two authors disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
     inputSchema: {
       type: "object",
       properties: {
@@ -266,7 +266,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -354,6 +354,11 @@ export const catalogueTools = ({
         allVariants: {
           type: "boolean",
           description: "Check every variant the catalogue's browser tests check."
+        },
+        semantic: {
+          type: "boolean",
+          description:
+            "Also ask the model the user configured whether headings, labels and alternatives say the right thing. Its judgements are opinions, in `judgements`."
         }
       },
       required: ["id"],
@@ -366,7 +371,8 @@ export const catalogueTools = ({
       const report = await check({
         id: textOf(args, "id") ?? "",
         views,
-        isAllVariants: args["allVariants"] === true
+        isAllVariants: args["allVariants"] === true,
+        isSemantic: args["semantic"] === true
       });
       if (typeof report === "string") return { structured: { error: report }, isError: true };
       return { structured: report, isError: report.results.some((result) => result.problems.length > 0) };
