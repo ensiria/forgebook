@@ -36,6 +36,7 @@
     ".": "./src/vite/config.ts",
     "./agent": "./src/vite/agent.types.ts",
     "./story-tree": "./src/storyTree.ts",
+    "./page-tree": "./src/pageTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
@@ -80,7 +81,6 @@
     "@ensiria/cli-kit": "^0.1.1",
     "@forgebook/story-format": "workspace:*",
     "axe-core": "4.14.0",
-    "highlight.js": "11.12.0",
     "lightningcss": "1.33.0",
     "marked": "18.1.0",
     "typescript-6": "npm:typescript@6.0.3"
@@ -137,6 +137,10 @@
       "./story-tree": {
         "types": "./dist/src/storyTree.d.ts",
         "default": "./dist/src/storyTree.js"
+      },
+      "./page-tree": {
+        "types": "./dist/src/pageTree.d.ts",
+        "default": "./dist/src/pageTree.js"
       },
       "./shell": {
         "types": "./dist/src/shell/mountShell.d.ts",

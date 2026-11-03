@@ -54,7 +54,8 @@ describe("storyLinks", () => {
   it("opens the story's page and its frame in the view asked for, the shell's own parameters off the frame", () => {
     expect(storyLinks(PAGES, "kit:actions-button--primary", "theme=dark&lang=it&panel=props")).toEqual({
       address: "http://localhost:5173/?theme=dark&lang=it&panel=props&story=kit%3Aactions-button--primary",
-      frame: "http://localhost:5173/frame.html?theme=dark&lang=it&story=kit%3Aactions-button--primary"
+      frame: "http://localhost:5173/frame.html?theme=dark&lang=it&story=kit%3Aactions-button--primary",
+      embed: "http://localhost:5173/?embed&theme=dark&lang=it&story=kit%3Aactions-button--primary"
     });
   });
 });
@@ -122,6 +123,51 @@ describe("storyDocument", () => {
       "Its component's docs failed: no program"
     ]);
     expect(document.story.links.frame).toContain("theme=dark");
+  });
+});
+
+describe("a story's design, for agents", () => {
+  const figmaUrl = "https://www.figma.com/design/File1?node-id=12-34";
+  const tree = storyTree([
+    {
+      ...SOURCE,
+      files: [
+        {
+          ...(SOURCE.files[0] ?? { index: {}, stories: {}, docs: {}, code: {}, pages: {} }),
+          index: {
+            "./button.stories.tsx": {
+              title: "Actions/Button",
+              design: { figma: figmaUrl },
+              stories: [{ exportName: "Primary" }]
+            },
+            "./colour.stories.tsx": { title: "Foundations/Colour", stories: [{ exportName: "Scales" }] }
+          }
+        }
+      ]
+    }
+  ]);
+  const parts = { module: { value: { default: {}, Primary: {}, Scales: {} } }, docs: { value: undefined } };
+
+  it("gives its Figma link, what a tool that reads Figma takes, and the page to look at it on", () => {
+    const location = findStory(tree, "kit:actions-button--primary");
+    if (location === undefined) throw new Error("the fixture's story is missing");
+    const document = storyDocument(location, parts, PAGES, "theme=dark");
+    expect(document.design).toEqual({
+      figma: figmaUrl,
+      fileKey: "File1",
+      nodeId: "12:34",
+      address: "http://localhost:5173/?theme=dark&tab=design&story=kit%3Aactions-button--primary"
+    });
+    expect(document.component.design).toEqual({ figma: figmaUrl, fileKey: "File1", nodeId: "12:34" });
+  });
+
+  it("says nothing of a design for a story without one, and lists a component's in the stories", () => {
+    const location = findStory(tree, "kit:foundations-colour--scales");
+    if (location === undefined) throw new Error("the fixture's story is missing");
+    expect("design" in storyDocument(location, parts, PAGES, "")).toBe(false);
+    const [button, colour] = storiesDocument("Kit", tree, PAGES, "").components;
+    expect(button?.design?.figma).toBe(figmaUrl);
+    expect(colour === undefined ? true : "design" in colour).toBe(false);
   });
 });
 

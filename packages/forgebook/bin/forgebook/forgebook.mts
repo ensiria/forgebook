@@ -8,28 +8,26 @@
  */
 import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { createInterface } from "node:readline";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
-import { readPackageVersion } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 import { build, createServer } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
-import { answerMcpMessage, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
 import { catalogueDocs } from "../forgebook-docs/catalogueDocs.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
-import { catalogueClient } from "./agentClient.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
+import { settleAgentIndex } from "./builtCatalogue.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite, withFramePort } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
-import { catalogueTools } from "./mcpTools.ts";
+import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
-import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { pagesCommands } from "./pagesCommands.mts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
+import { visualCommands } from "./visualCommands.mts";
 
 await defineCommands({
   name: "forgebook",
@@ -106,6 +104,10 @@ await defineCommands({
           type: "string",
           valueName: "path",
           description: "The path the catalogue is served under (/pr-12/); the root by default."
+        },
+        "agent-index": {
+          type: "boolean",
+          description: "Also write what agents read, for forgebook mcp --from: props, docs, tokens, public."
         }
       },
       examples: [
@@ -117,12 +119,14 @@ await defineCommands({
       ],
       run: async ({ options, log }): Promise<void> => {
         const config = await configOf(options.config);
+        const outDir = resolve(config.dir, options.out ?? "dist");
         await build(
           await catalogueVite(config, {
             ...(options.base === undefined ? {} : { base: options.base }),
-            build: { outDir: resolve(config.dir, options.out ?? "dist") }
+            build: { outDir }
           })
         );
+        await settleAgentIndex(config, outDir, options["agent-index"] === true, log);
         log.success(`${config.title} built`);
       }
     }),
@@ -317,55 +321,10 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...pagesCommands(forgebook),
+    ...visualCommands(forgebook),
     ...initCommands(forgebook),
-    mcp: forgebook.command({
-      summary:
-        "Serve the catalogue's stories to an agent over the Model Context Protocol, on stdin and stdout.",
-      header: false,
-      options: {
-        url: {
-          type: "string",
-          env: "FORGEBOOK_URL",
-          valueName: "address",
-          description: "Where forgebook dev runs, when not at Vite's default address (http://localhost:5173)."
-        }
-      },
-      examples: [
-        {
-          command: `${COMMAND} mcp`,
-          description: "What an agent's MCP configuration runs (npx forgebook mcp)."
-        }
-      ],
-      run: async ({ options, io, log }): Promise<void> => {
-        const config = await configOf(options.config);
-        // kept for the server's life: an agent's questions in a row each answer at once
-        const client = await catalogueClient(config, options.url);
-        log.debug(
-          client.runningAt === undefined ? "Answering from a server of its own" : `Asking ${client.runningAt}`
-        );
-        const server = {
-          info: { name: "forgebook", version: readPackageVersion(import.meta.dirname) },
-          instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it.`,
-          tools: catalogueTools({
-            ask: client.ask,
-            writeNew: (file, exportName) =>
-              newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
-            check: (input) => runStoryCheck(config, options.url, input),
-            shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
-            checkPage: (address) => runPageCheck(config, [address])
-          })
-        };
-        let session = NEW_SESSION;
-        // stdout carries only the protocol's messages, one per line, answered in the order they came
-        for await (const line of createInterface({ input: io.stdin })) {
-          if (line.trim() === "") continue;
-          const step = await answerMcpMessage(line, session, server);
-          session = step.session;
-          if (step.reply !== undefined) io.stdout.write(`${step.reply}\n`);
-        }
-        await client.close();
-      }
-    }),
+    ...mcpCommands(forgebook),
     story: forgebook.command({
       summary:
         "One story in detail: its args, its component's props, its links; fail when it cannot be read.",

@@ -104,6 +104,14 @@ const isAnyFromAnotherOrigin = (request: RequestFacts): boolean =>
     ? isOriginForeign(request)
     : request.site === "same-site" || request.site === "cross-site";
 
+/**
+ * Whether a request opens a document: a navigation, or something that opens one.
+ *
+ * @param request - what the browser says of it.
+ */
+const isDocumentRequest = (request: RequestFacts): boolean =>
+  request.mode === "navigate" || DOCUMENT_DESTS.has(request.dest ?? "");
+
 /** What the catalogue's origin does with a request. */
 export type CatalogueAnswer = "serve" | "refuse" | "to-frames";
 
@@ -112,11 +120,15 @@ export type CatalogueAnswer = "serve" | "refuse" | "to-frames";
  * request is refused, the rest is served.
  *
  * @param request - what the browser says of it.
+ * @param framedPages - the server's routes that are pages made to be framed by another origin's page (a client's
+ *   inline preview), which only show a story and act on nothing.
  */
-export const catalogueAnswer = (request: RequestFacts): CatalogueAnswer => {
+export const catalogueAnswer = (request: RequestFacts, framedPages: ReadonlySet<string>): CatalogueAnswer => {
   if (isFromAnotherOrigin(request)) return "refuse";
+  const isFramedPage = framedPages.has(request.path) && isDocumentRequest(request);
   // a route of the server acts when it is opened (`/__open-in-editor` opens a file): not on another page's say
-  if (request.path.startsWith(SERVER_ROUTE_PREFIX) && isAnyFromAnotherOrigin(request)) return "refuse";
+  if (request.path.startsWith(SERVER_ROUTE_PREFIX) && !isFramedPage && isAnyFromAnotherOrigin(request))
+    return "refuse";
   return request.path === FRAME_PAGE_PATH ? "to-frames" : "serve";
 };
 
@@ -138,14 +150,6 @@ export type FramesPaths = {
 
 /** Vite's own client and helpers, which the project's code does not hold. */
 const VITE_PREFIXES = ["/@vite/", "/@id/__x00__vite/"];
-
-/**
- * Whether a request opens a document: a navigation, or something that opens one.
- *
- * @param request - what the browser says of it.
- */
-const isDocumentRequest = (request: RequestFacts): boolean =>
-  request.mode === "navigate" || DOCUMENT_DESTS.has(request.dest ?? "");
 
 /**
  * Whether the frames' origin serves a request as it is, without asking the graph: what a script cannot read as text,

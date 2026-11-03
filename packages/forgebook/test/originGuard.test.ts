@@ -40,46 +40,63 @@ const request = (
 /** A request from a tool, which says nothing of a page. */
 const TOOL = { site: undefined, mode: undefined, dest: undefined } as const;
 
+/** The server's pages another origin may frame: the preview's. */
+const FRAMED: ReadonlySet<string> = new Set(["/__forgebook/api/preview"]);
+
 /** A path that is neither public nor named by the frame page. */
 const PLAIN = { isPublic: false, isPageEntry: false, isServedAlike: false };
 
 describe("catalogueAnswer", () => {
   it("refuses what another origin's page asks, a frame's first", () => {
-    expect(catalogueAnswer(request("/__forgebook/api/stories", { site: "same-site", dest: "empty" }))).toBe(
+    expect(
+      catalogueAnswer(request("/__forgebook/api/stories", { site: "same-site", dest: "empty" }), FRAMED)
+    ).toBe("refuse");
+    expect(catalogueAnswer(request("/@fs/project/src/secret.ts", { site: "cross-site" }), FRAMED)).toBe(
       "refuse"
     );
-    expect(catalogueAnswer(request("/@fs/project/src/secret.ts", { site: "cross-site" }))).toBe("refuse");
   });
 
   it("serves its own page's requests, a navigation from anywhere, and a tool's", () => {
-    expect(catalogueAnswer(request("/src/Button.tsx"))).toBe("serve");
-    expect(catalogueAnswer(request("/", { site: "cross-site", mode: "navigate", dest: "iframe" }))).toBe(
-      "serve"
-    );
-    expect(catalogueAnswer(request("/__forgebook/api/stories", TOOL))).toBe("serve");
+    expect(catalogueAnswer(request("/src/Button.tsx"), FRAMED)).toBe("serve");
+    expect(
+      catalogueAnswer(request("/", { site: "cross-site", mode: "navigate", dest: "iframe" }), FRAMED)
+    ).toBe("serve");
+    expect(catalogueAnswer(request("/__forgebook/api/stories", TOOL), FRAMED)).toBe("serve");
   });
 
   it("tells another origin's page by its Origin when the browser sends no Sec-Fetch-Site", () => {
     const old = { ...TOOL, origin: "http://127.0.0.1:5174" };
-    expect(catalogueAnswer(request("/__forgebook/api/stories", old))).toBe("refuse");
-    expect(catalogueAnswer(request("/src/a.ts", { ...TOOL, origin: "null" }))).toBe("refuse");
-    expect(catalogueAnswer(request("/src/a.ts", { ...TOOL, origin: "http://127.0.0.1:5173" }))).toBe("serve");
+    expect(catalogueAnswer(request("/__forgebook/api/stories", old), FRAMED)).toBe("refuse");
+    expect(catalogueAnswer(request("/src/a.ts", { ...TOOL, origin: "null" }), FRAMED)).toBe("refuse");
+    expect(catalogueAnswer(request("/src/a.ts", { ...TOOL, origin: "http://127.0.0.1:5173" }), FRAMED)).toBe(
+      "serve"
+    );
     // a browser that sends Sec-Fetch-Site is believed, whatever a proxy did to the Host
     const proxied = { site: "same-origin", origin: "https://ui-6006.example.dev", host: "localhost:6006" };
-    expect(catalogueAnswer(request("/src/a.ts", proxied))).toBe("serve");
+    expect(catalogueAnswer(request("/src/a.ts", proxied), FRAMED)).toBe("serve");
   });
 
   it("refuses to open the server's own routes for another origin's page, even as a navigation", () => {
     const opened = { site: "same-site", mode: "navigate", dest: "iframe" } as const;
-    expect(catalogueAnswer(request("/__open-in-editor?file=a.ts", opened))).toBe("refuse");
-    expect(catalogueAnswer(request("/__open-in-editor?file=a.ts", { ...opened, site: "same-origin" }))).toBe(
-      "serve"
-    );
+    expect(catalogueAnswer(request("/__open-in-editor?file=a.ts", opened), FRAMED)).toBe("refuse");
+    expect(
+      catalogueAnswer(request("/__open-in-editor?file=a.ts", { ...opened, site: "same-origin" }), FRAMED)
+    ).toBe("serve");
+  });
+
+  it("opens a page made to be framed for another origin's page, only as a page", () => {
+    const framed = { site: "cross-site", mode: "navigate", dest: "iframe" } as const;
+    expect(catalogueAnswer(request("/__forgebook/api/preview?id=a--b", framed), FRAMED)).toBe("serve");
+    expect(
+      catalogueAnswer(request("/__forgebook/api/preview", { site: "cross-site", dest: "empty" }), FRAMED)
+    ).toBe("refuse");
+    expect(catalogueAnswer(request("/__forgebook/api/preview?id=a--b", framed), new Set())).toBe("refuse");
+    expect(catalogueAnswer(request("/__forgebook/api/stories", framed), FRAMED)).toBe("refuse");
   });
 
   it("sends the frame page to the frames' origin", () => {
     expect(
-      catalogueAnswer(request("/frame.html", { site: "none", mode: "navigate", dest: "document" }))
+      catalogueAnswer(request("/frame.html", { site: "none", mode: "navigate", dest: "document" }), FRAMED)
     ).toBe("to-frames");
   });
 });

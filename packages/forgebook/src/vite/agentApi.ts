@@ -7,6 +7,8 @@
  */
 
 import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
+import { embedAddressOf } from "../embedCode.ts";
+import type { FigmaLink } from "../figmaLink.ts";
 import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
 import { isLiveErrorReport } from "../liveErrors.ts";
 import {
@@ -20,6 +22,8 @@ import type { UsageIndex } from "../usedIn.ts";
 import { frameAddressOf, storyAddressOf } from "../viewState.ts";
 import type {
   AgentComponent,
+  AgentDesign,
+  AgentDesignLink,
   AgentStory,
   AgentUsingComponent,
   ChangedStoriesDocument,
@@ -27,6 +31,8 @@ import type {
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
+  PageDocument,
+  PagesDocument,
   StoriesDocument,
   StoryDocument,
   StoryLinks,
@@ -51,7 +57,8 @@ export type CataloguePages = {
  */
 export const storyLinks = (pages: CataloguePages, id: string, view: string): StoryLinks => ({
   address: storyAddressOf(pages.page, id, view),
-  frame: frameAddressOf(pages.frame, id, view)
+  frame: frameAddressOf(pages.frame, id, view),
+  embed: embedAddressOf(pages.page, id, view)
 });
 
 /** A story of the tree as the documents give it. */
@@ -71,6 +78,37 @@ const agentStory = (
   isLogic: story.isLogic,
   links: storyLinks(pages, story.id, view)
 });
+
+/** A design's link as the documents give it. */
+const agentDesignLink = (link: FigmaLink): AgentDesignLink => ({
+  figma: link.url,
+  fileKey: link.fileKey,
+  ...(link.branchKey === undefined ? {} : { branchKey: link.branchKey }),
+  ...(link.nodeId === undefined ? {} : { nodeId: link.nodeId })
+});
+
+/**
+ * A story's design as its document gives it.
+ *
+ * @param story - the story.
+ * @param pages - where the catalogue is served, for the link to its Design tab.
+ * @param view - the view the link opens in; empty for the default view.
+ */
+const agentDesign = (
+  story: TreeStory,
+  pages: CataloguePages,
+  view: string
+): { readonly design?: AgentDesign } => {
+  if (story.design === undefined) return {};
+  const onTab = new URLSearchParams(view);
+  onTab.set("tab", "design");
+  return {
+    design: {
+      ...agentDesignLink(story.design),
+      address: storyLinks(pages, story.id, onTab.toString()).address
+    }
+  };
+};
 
 /**
  * A component's "Used in" as the documents give it: the users the tree still has, by their ids and their stories' ids.
@@ -113,6 +151,7 @@ const agentComponent = (
       ...component.stories.map((story) => agentStory(story, false, pages, view)),
       ...component.unlisted.map((story) => agentStory(story, true, pages, view))
     ],
+    ...(component.design === undefined ? {} : { design: agentDesignLink(component.design) }),
     ...(usage === undefined
       ? {}
       : { usedIn: agentUsers(usage.tree, source.id, usage.index, component.title) })
@@ -242,8 +281,10 @@ export const storyDocument = (
       title: component.title,
       source: component.source,
       file: component.file,
+      ...(component.design === undefined ? {} : { design: component.design }),
       ...(component.usedIn === undefined ? {} : { usedIn: component.usedIn })
     },
+    ...agentDesign(location.story, pages, view),
     docs,
     args,
     problems
@@ -329,7 +370,8 @@ export const isTokensDocument = (value: unknown): value is TokensDocument =>
   isRecord(value) &&
   value["schema"] === 1 &&
   Array.isArray(value["tokens"]) &&
-  Array.isArray(value["problems"]);
+  Array.isArray(value["problems"]) &&
+  Array.isArray(value["clashes"]);
 
 /**
  * Whether a value is one token's document, as a client receives it over HTTP.
@@ -337,7 +379,11 @@ export const isTokensDocument = (value: unknown): value is TokensDocument =>
  * @param value - the answer's body.
  */
 export const isTokenDocument = (value: unknown): value is TokenDocument =>
-  isRecord(value) && value["schema"] === 1 && isRecord(value["token"]) && Array.isArray(value["problems"]);
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  isRecord(value["token"]) &&
+  Array.isArray(value["problems"]) &&
+  Array.isArray(value["clashes"]);
 
 /**
  * Whether a value is the nearest tokens' document, as a client receives it over HTTP.
@@ -381,4 +427,27 @@ export const isCheckedCodeDocument = (value: unknown): value is CheckedCodeDocum
   isRecord(value) &&
   value["schema"] === 1 &&
   typeof value["since"] === "string" &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is the docs pages' document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isPagesDocument = (value: unknown): value is PagesDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["pages"]) &&
+  Array.isArray(value["problems"]);
+
+/**
+ * Whether a value is one docs page's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isPageDocument = (value: unknown): value is PageDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  isRecord(value["page"]) &&
+  typeof value["text"] === "string" &&
   Array.isArray(value["problems"]);

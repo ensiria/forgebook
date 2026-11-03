@@ -7,45 +7,8 @@
 import type { ReactNode, Ref } from "react";
 
 import type { ShellMessage } from "../messages.ts";
-import { framesOrigin } from "./framesOrigin.ts";
+import { framesOrigin, storyFrameAttributes } from "./framesOrigin.ts";
 import { STRINGS } from "./strings.ts";
-
-/**
- * The browser features a story may use, delegated to its frame. A frame on the catalogue's own origin had each of them;
- * on an origin of its own it gets only those its element allows (a copy button, a video's full screen, a scanner's
- * camera).
- */
-export const FRAME_PERMISSIONS = [
-  "clipboard-read",
-  "clipboard-write",
-  "fullscreen",
-  "camera",
-  "microphone",
-  "geolocation",
-  "display-capture",
-  "autoplay",
-  "picture-in-picture",
-  "encrypted-media",
-  "screen-wake-lock"
-].join("; ");
-
-/**
- * What a story's frame may do, as a sandbox: everything a page does but navigate the catalogue's tab, which a story's
- * link could otherwise send to any address. The frames keep their own origin (`allow-same-origin`): it is not the
- * catalogue's, so the pair gives the story nothing of the catalogue's. Frames on the catalogue's own origin get none:
- * there the pair would let a story lift its own sandbox, and browsers warn of it.
- */
-export const FRAME_SANDBOX = [
-  "allow-scripts",
-  "allow-same-origin",
-  "allow-forms",
-  "allow-modals",
-  "allow-popups",
-  "allow-popups-to-escape-sandbox",
-  "allow-downloads",
-  "allow-pointer-lock",
-  "allow-presentation"
-].join(" ");
 
 /** The frame view's props. */
 export type FrameViewProps = {
@@ -103,8 +66,7 @@ export const FrameView = ({
         className="forgebook-frame-view"
         title={title}
         src={address}
-        allow={FRAME_PERMISSIONS}
-        sandbox={framesOrigin() === window.location.origin ? undefined : FRAME_SANDBOX}
+        {...storyFrameAttributes()}
         style={{ height }}
       />
       {/* a story's modules may take seconds the first time: an empty frame would look broken */}

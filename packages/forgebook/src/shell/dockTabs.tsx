@@ -1,6 +1,6 @@
 /**
  * The tabs a story's panel shows: Props, Events and Parts and styling from its component's docs, Code from its file,
- * Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
+ * Design from its link, Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
  * and shows no tab of args (`logicTabs`).
  *
  * @module
@@ -16,6 +16,8 @@ import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { A11yTab, a11yHint, type CheckState } from "./A11yTab.tsx";
 import { CodeTab } from "./CodeTab.tsx";
+import type { DesignTabProps } from "./DesignTab.tsx";
+import { DesignTabLoader } from "./DesignTabLoader.tsx";
 import type { DockTab } from "./Dock.tsx";
 import { EventsTab } from "./EventsTab.tsx";
 import { InteractionsTab, interactionsHint } from "./InteractionsTab.tsx";
@@ -69,6 +71,8 @@ export type DockTabsInput = {
   readonly check: CheckState;
   /** Runs it; none when it cannot run. */
   readonly onCheck: (() => void) | undefined;
+  /** What the Design tab shows; none for a story without a design. */
+  readonly design: DesignTabProps | undefined;
 };
 
 /** A message in place of a tab's content: the docs or the code are loading or could not be read. */
@@ -127,13 +131,13 @@ const eventsOf = (props: readonly PropDocs[], actions: readonly string[]): reado
 };
 
 /**
- * The Events tab, when the story has an event or an action.
+ * The Events tab, when the story has an event or an action, or made a call a framework reports (a router's `push`).
  *
  * @param input - what the tabs are built from.
  * @param events - the events and actions.
  */
 const eventsTab = (input: DockTabsInput, events: readonly PropDocs[]): DockTab[] =>
-  events.length === 0
+  events.length === 0 && input.calls.length === 0
     ? []
     : [
         {
@@ -240,6 +244,12 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
   ];
 };
 
+/** The Design tab, for a story with a design. */
+const designTabs = ({ design }: DockTabsInput): DockTab[] =>
+  design === undefined
+    ? []
+    : [{ id: "design", label: STRINGS.tabs.design, content: <DesignTabLoader {...design} /> }];
+
 /**
  * The tabs of a story's panel, in order.
  *
@@ -248,6 +258,7 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
 export const dockTabs = (input: DockTabsInput): DockTab[] => [
   ...docsTabs(input),
   ...codeTabs(input),
+  ...designTabs(input),
   {
     id: "a11y",
     label: STRINGS.tabs.a11y,

@@ -454,7 +454,8 @@ const SHELL_PARAMETERS = [
   "tools",
   "args",
   "matrix",
-  "component"
+  "component",
+  "embed"
 ];
 
 /**
@@ -484,7 +485,23 @@ export const frameAddressOf = (frameUrl: string, id: string, search: string): st
 export const storyAddressOf = (pageUrl: string, id: string, search: string): string => {
   const params = new URLSearchParams(search);
   params.delete("component");
+  params.delete("page");
   params.delete("story");
   params.set("story", id);
+  return `${pageUrl}?${params.toString()}`;
+};
+
+/**
+ * A docs page's address in the catalogue, in a view.
+ *
+ * @param pageUrl - the catalogue's page.
+ * @param id - the page's id.
+ * @param search - the view's query; empty for the default view.
+ */
+export const docPageAddressOf = (pageUrl: string, id: string, search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("component");
+  params.delete("story");
+  params.set("page", id);
   return `${pageUrl}?${params.toString()}`;
 };

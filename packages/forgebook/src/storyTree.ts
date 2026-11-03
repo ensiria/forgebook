@@ -11,7 +11,7 @@
  *
  * @module
  */
-import type { StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryDesign, StoryGroup } from "@forgebook/story-format/csf";
 import type {
   StoryBackground,
   StoryControlsSetting,
@@ -19,6 +19,8 @@ import type {
   StorySource
 } from "@forgebook/story-format/source";
 
+import { type FigmaLink, figmaLink } from "./figmaLink.ts";
+import { pageProblems, type TreePage, treePages } from "./pageTree.ts";
 import { sourceFiles } from "./sourceFiles.ts";
 
 /** One story in the tree. */
@@ -43,6 +45,8 @@ export type TreeStory = {
   readonly isLogic: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
+  /** Its design (`parameters.design.figma`): its own, else the meta's; none by default. */
+  readonly design: FigmaLink | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
 };
@@ -71,6 +75,8 @@ export type TreeComponent = {
   readonly related: readonly string[];
   /** Other words the search finds it by, as the meta writes them; empty when none. */
   readonly keywords: readonly string[];
+  /** Its design: the meta's `parameters.design.figma`; none by default. */
+  readonly design: FigmaLink | undefined;
 };
 
 /** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`). */
@@ -114,11 +120,13 @@ export type TreeSource = {
   readonly background: StoryBackground | undefined;
   /** Its families, in the source's order, then alphabetically. */
   readonly families: readonly TreeFamily[];
+  /** Its docs pages: by `order`, the pages without one after, then by title. Empty when it has none. */
+  readonly pages: readonly TreePage[];
 };
 
 /** The tree, with what is wrong in the indexes (a title without a family, two files with the same title). */
 export type StoryTree = {
-  /** Every source with stories. */
+  /** Every source with stories or docs pages. */
   readonly sources: readonly TreeSource[];
   /** One message per problem; the files concerned are left out of the tree. */
   readonly problems: readonly string[];
@@ -341,12 +349,34 @@ const placeAliases = (
 /** Whether a story is kept out of the catalogue's lists: tagged `!dev`, as Storybook's sidebar leaves it out. */
 const isUnlisted = (story: Pick<TreeStory, "tags">): boolean => story.tags.includes("!dev");
 
+/**
+ * A written design as the tree keeps it: a link that is not Figma's is a problem and stays out of the tree, so the
+ * shell never frames it, and the component keeps its stories.
+ *
+ * @param design - the design, as the index read it.
+ * @param where - what a problem names.
+ * @param problems - the tree's problems.
+ */
+const designLink = (
+  design: StoryDesign | undefined,
+  where: string,
+  problems: string[]
+): FigmaLink | undefined => {
+  if (design === undefined) return undefined;
+  const link = figmaLink(design.figma);
+  if (typeof link !== "string") return link;
+  problems.push(`${where}: \`parameters.design.figma\`: ${link}`);
+  return undefined;
+};
+
 /** The families of one source, from its files. */
 const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] => {
   const placed = placedFiles(source, problems);
   const related = relatedTitles(source, placed, problems);
   const families: GroupsByFamily = new Map();
   for (const { file, entry, family, group, name } of placed) {
+    const where = `${source.name}: ${file}`;
+    const design = designLink(entry.design, where, problems);
     const stories = entry.stories.map((story) => ({
       id: storyId(source.id, entry.title, story.exportName),
       name: story.name ?? storyName(story.exportName),
@@ -358,6 +388,10 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       isTouch: story.isTouch ?? entry.isTouch ?? false,
       isLogic: story.isLogic ?? entry.isLogic ?? false,
       height: story.height ?? entry.height,
+      design:
+        story.design === undefined
+          ? design
+          : designLink(story.design, `${where}: story ${story.exportName}`, problems),
       tags: story.tags ?? []
     }));
     groupAt(families, family, group).components.push({
@@ -368,7 +402,8 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       unlisted: stories.filter(isUnlisted),
       alsoIn: entry.alsoIn ?? [],
       related: related.get(entry.title) ?? [],
-      keywords: entry.keywords ?? []
+      keywords: entry.keywords ?? [],
+      design
     });
   }
   placeAliases(source, placed, families, problems);
@@ -392,6 +427,16 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
     });
 };
 
+/** The ids of the sources' components. */
+const componentIds = (sources: readonly TreeSource[]): string[] =>
+  sources.flatMap((source) =>
+    source.families.flatMap((family) =>
+      family.groups.flatMap((group) =>
+        group.components.map((component) => componentId(source.id, component.title))
+      )
+    )
+  );
+
 /**
  * The catalogue's tree from the sources.
  *
@@ -404,9 +449,21 @@ export const storyTree = (sources: readonly StorySource[]): StoryTree => {
     name: source.name,
     logo: source.logo,
     background: source.background,
-    families: sourceFamilies(source, problems)
+    families: sourceFamilies(source, problems),
+    pages: treePages(source, problems)
   }));
-  return { sources: tree.filter((source) => source.families.length > 0), problems };
+  const shown = tree.filter((source) => source.families.length > 0 || source.pages.length > 0);
+  return {
+    sources: shown,
+    problems: [
+      ...problems,
+      ...pageProblems(
+        shown,
+        new Set(storyLocations({ sources: shown, problems: [] }).map(({ story }) => story.id)),
+        new Set(componentIds(shown))
+      )
+    ]
+  };
 };
 
 /**

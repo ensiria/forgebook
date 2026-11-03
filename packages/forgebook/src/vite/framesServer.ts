@@ -225,11 +225,13 @@ const framesHttpServer = (
  * @param server - the dev server.
  * @param frames - where the configuration puts the frames.
  * @param frameHtml - the frame page's HTML, before Vite transforms it.
+ * @param framedPages - the server's pages another origin's page may frame (`catalogueAnswer`).
  */
 export const framesServing = (
   server: ViteDevServer,
   frames: ResolvedFrames,
-  frameHtml: string
+  frameHtml: string,
+  framedPages: ReadonlySet<string>
 ): FramesServing => {
   /** The requests that came in on the frames' port: the catalogue's guard leaves them to the frames'. */
   const framesRequests = new WeakSet<IncomingMessage>();
@@ -269,7 +271,7 @@ export const framesServing = (
       next();
       return;
     }
-    const answer = catalogueAnswer(factsOf(request));
+    const answer = catalogueAnswer(factsOf(request), framedPages);
     if (answer === "refuse") {
       turnDown(response, 403);
       return;
@@ -359,13 +361,15 @@ export const framesServing = (
  * @param server - the dev server.
  * @param config - the catalogue's configuration.
  * @param place - receives where the frames run, for the pages' configuration.
+ * @param framedPages - the server's pages another origin's page may frame (a client's inline preview).
  */
 export const serveFrames = (
   server: ViteDevServer,
   config: ResolvedConfig,
-  place: (placement: () => Promise<FramesPlacement>) => void
+  place: (placement: () => Promise<FramesPlacement>) => void,
+  framedPages: ReadonlySet<string>
 ): void => {
-  const frames = framesServing(server, config.frames, pageHtml("frame.html", config));
+  const frames = framesServing(server, config.frames, pageHtml("frame.html", config), framedPages);
   place(frames.placement);
   server.middlewares.use(frames.catalogueGuard);
   // in middleware mode nothing listens here: the frames stay on the catalogue's origin, known at once
