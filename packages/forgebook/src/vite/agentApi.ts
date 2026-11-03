@@ -6,17 +6,13 @@
  * @module
  */
 
+import type { FigmaLink } from "@forgebook/story-format/source";
+
 import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
-import type { FigmaLink } from "../figmaLink.ts";
+import { embedAddressOf } from "../embedCode.ts";
 import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
 import { isLiveErrorReport } from "../liveErrors.ts";
-import {
-  componentId,
-  findComponent,
-  type StoryLocation,
-  type StoryTree,
-  type TreeStory
-} from "../storyTree.ts";
+import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
 import type { UsageIndex } from "../usedIn.ts";
 import { frameAddressOf, storyAddressOf } from "../viewState.ts";
 import type {
@@ -56,7 +52,8 @@ export type CataloguePages = {
  */
 export const storyLinks = (pages: CataloguePages, id: string, view: string): StoryLinks => ({
   address: storyAddressOf(pages.page, id, view),
-  frame: frameAddressOf(pages.frame, id, view)
+  frame: frameAddressOf(pages.frame, id, view),
+  embed: embedAddressOf(pages.page, id, view)
 });
 
 /** A story of the tree as the documents give it. */
@@ -68,6 +65,7 @@ const agentStory = (
 ): AgentStory => ({
   id: story.id,
   name: story.name,
+  file: story.file,
   exportName: story.exportName,
   description: story.description,
   tags: story.tags,
@@ -123,13 +121,12 @@ const agentUsers = (
   title: string
 ): AgentUsingComponent[] =>
   (usage[title] ?? []).flatMap((user) => {
-    const id = componentId(sourceId, user.title);
-    const found = findComponent(tree, id)?.component;
+    const found = findComponentByTitle(tree, sourceId, user.title)?.component;
     if (found === undefined) return [];
     const stories = [...found.stories, ...found.unlisted]
       .filter((story) => user.stories.includes(story.exportName))
       .map((story) => story.id);
-    return [{ id, title: user.title, isDirect: user.isDirect, stories }];
+    return [{ id: found.id, title: user.title, isDirect: user.isDirect, stories }];
   });
 
 /** A component of the tree as the documents give it, its listed stories first, its "Used in" when given. */
@@ -141,10 +138,11 @@ const agentComponent = (
 ): AgentComponent => {
   const { source, component } = location;
   return {
-    id: componentId(source.id, component.title),
+    id: component.id,
     title: component.title,
     source: source.id,
     file: component.file,
+    files: component.files,
     stories: [
       ...component.stories.map((story) => agentStory(story, false, pages, view)),
       ...component.unlisted.map((story) => agentStory(story, true, pages, view))
@@ -279,6 +277,7 @@ export const storyDocument = (
       title: component.title,
       source: component.source,
       file: component.file,
+      files: component.files,
       ...(component.design === undefined ? {} : { design: component.design }),
       ...(component.usedIn === undefined ? {} : { usedIn: component.usedIn })
     },
@@ -368,7 +367,8 @@ export const isTokensDocument = (value: unknown): value is TokensDocument =>
   isRecord(value) &&
   value["schema"] === 1 &&
   Array.isArray(value["tokens"]) &&
-  Array.isArray(value["problems"]);
+  Array.isArray(value["problems"]) &&
+  Array.isArray(value["clashes"]);
 
 /**
  * Whether a value is one token's document, as a client receives it over HTTP.
@@ -376,7 +376,11 @@ export const isTokensDocument = (value: unknown): value is TokensDocument =>
  * @param value - the answer's body.
  */
 export const isTokenDocument = (value: unknown): value is TokenDocument =>
-  isRecord(value) && value["schema"] === 1 && isRecord(value["token"]) && Array.isArray(value["problems"]);
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  isRecord(value["token"]) &&
+  Array.isArray(value["problems"]) &&
+  Array.isArray(value["clashes"]);
 
 /**
  * Whether a value is the nearest tokens' document, as a client receives it over HTTP.

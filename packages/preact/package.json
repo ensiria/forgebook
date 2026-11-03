@@ -1,0 +1,93 @@
+{
+  "name": "@forgebook/preact",
+  "version": "0.1.8",
+  "description": "Forgebook for Preact: the story types and hooks, the renderer the frame mounts a story with on Preact itself, and the adapter that reads a Preact component's props.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/preact"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./clock": "./src/clock.ts",
+    "./texts": "./src/texts.ts",
+    "./renderer": "./src/preactRenderer.tsx",
+    "./frame": "./src/mountFrame.ts",
+    "./code": "./src/code.ts",
+    "./vite": "./src/vite/preact.ts",
+    "./docs": "./src/vite/extractDocs.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "@prefresh/vite": "4.0.1",
+    "preact-render-to-string": "6.8.2"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "preact": "^10.19.0 || ^11.0.0"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "preact": "11.1.1",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./clock": {
+        "types": "./dist/src/clock.d.ts",
+        "default": "./dist/src/clock.js"
+      },
+      "./texts": {
+        "types": "./dist/src/texts.d.ts",
+        "default": "./dist/src/texts.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/preactRenderer.d.ts",
+        "default": "./dist/src/preactRenderer.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/code.d.ts",
+        "default": "./dist/src/code.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/preact.d.ts",
+        "default": "./dist/src/vite/preact.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
+  }
+}

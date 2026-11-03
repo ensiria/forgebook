@@ -6,7 +6,7 @@
  *
  * @module
  */
-import type { FigmaLink } from "forgebook/figma-link";
+import type { FigmaLink } from "@forgebook/story-format/source";
 import type { PluginViewContext } from "forgebook/plugin";
 import { type ReactNode, useState } from "react";
 

@@ -7,6 +7,7 @@ import { type RefObject, useState } from "react";
 
 import type { ShellMessage } from "../messages.ts";
 import type { CheckState } from "./A11yTab.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
 import type { CheckResult } from "./useFrameMessages.ts";
 
 /**
@@ -31,7 +32,7 @@ export const useStoryCheck = (
     run: (): void => {
       setCheck({ status: "running" });
       const message: ShellMessage = { type: "forgebook:check" };
-      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+      frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
     },
     receive: (result: CheckResult): void =>
       setCheck(

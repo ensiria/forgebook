@@ -42,7 +42,8 @@ const comparedStory = (page: Page): FrameLocator =>
  */
 const reportFrom = async (iframe: Locator, report: unknown): Promise<void> => {
   const frame = await (await iframe.elementHandle())?.contentFrame();
-  await frame?.evaluate((message) => window.parent.postMessage(message, window.location.origin), report);
+  // to whatever page holds it: the frame runs on the frames' origin, the shell on the catalogue's
+  await frame?.evaluate((message) => window.parent.postMessage(message, "*"), report);
 };
 
 test.describe("the Design tab", () => {
@@ -50,10 +51,24 @@ test.describe("the Design tab", () => {
     const asked = await standInForFigma(page);
     const modules: string[] = [];
     page.on("request", (request) => modules.push(request.url()));
+    // the story file's code held back, as on a slow machine: the form has no props, so the panel opens on its first
+    // tab, which is Code from the start and never Design
+    let releaseCode = (): void => undefined;
+    const codeHeld = new Promise<void>((resolve) => {
+      releaseCode = resolve;
+    });
+    await page.route(/\?forgebook-code$/, async (route) => {
+      await codeHeld;
+      await route.continue();
+    });
     await page.goto(FORM);
     const tab = page.getByRole("tab", { name: "Design" });
     await expect(tab).toBeVisible();
     await expect(page.locator("iframe.forgebook-frame-view")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
+    releaseCode();
+    await expect(page.getByRole("tabpanel", { name: "Code" }).getByText("the story's render")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
     expect(modules.filter((url) => /DesignTab\.tsx|designTab\.css/.test(url))).toEqual([]);
     expect(asked).toEqual([]);
 

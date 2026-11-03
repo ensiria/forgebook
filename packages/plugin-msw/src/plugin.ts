@@ -20,5 +20,5 @@ export const msw = (): ForgebookPlugin =>
     id: "msw",
     frame: "@forgebook/plugin-msw/frame",
     tabs: [{ id: "msw", label: "Network", view: "@forgebook/plugin-msw/tab", when: { parameter: "msw" } }],
-    browserDependencies: ["msw/browser"]
+    browserDependencies: ["msw/browser", "msw"]
   });

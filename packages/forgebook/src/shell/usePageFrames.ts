@@ -10,6 +10,7 @@ import type { PanelArgs, ShellMessage } from "../messages.ts";
 import type { TreeStory } from "../storyTree.ts";
 import { liveView, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
+import { framesOrigin } from "./framesOrigin.ts";
 import { type StoryTouches, storyTouchesOf, type TouchOverrides, touchedView } from "./storyTouch.ts";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
 import { type FrameQueue, useFrameQueue } from "./useFrameQueue.ts";
@@ -70,8 +71,7 @@ export const usePageFrames = ({
     onReady: (frame: Window, message: ReadyMessage): void => {
       queue.markReady(message.storyId);
       setStoryArgs((current) => new Map(current).set(message.storyId, message.args));
-      const send = (shellMessage: ShellMessage): void =>
-        frame.postMessage(shellMessage, window.location.origin);
+      const send = (shellMessage: ShellMessage): void => frame.postMessage(shellMessage, framesOrigin());
       send({
         type: "forgebook:view",
         view: touchedView(liveView(view), message.storyId, touches, catalogue.touch)

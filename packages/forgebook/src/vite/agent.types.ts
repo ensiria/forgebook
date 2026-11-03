@@ -18,6 +18,7 @@ import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
+import type { TokenClash } from "./tokenClashes.ts";
 
 /** The version of the documents' shape. */
 export type AgentSchema = 1;
@@ -28,6 +29,8 @@ export type StoryLinks = {
   readonly address: string;
   /** Its frame alone: the story's own document, as the tests open it. */
   readonly frame: string;
+  /** The story with no chrome, in the catalogue's theme: what a person pastes in a wiki or an iframe. */
+  readonly embed: string;
 };
 
 /** A design's place in Figma: what to give a person, or a tool that reads Figma. */
@@ -50,10 +53,15 @@ export type AgentDesign = AgentDesignLink & {
 
 /** A story, as the list of stories gives it. */
 export type AgentStory = {
-  /** `<source>:<title>--<export>` in kebab case: what `forgebook story` takes. */
+  /**
+   * `<source>:<component>--<story>`, the rest as Storybook's id: what `forgebook story` takes, which also takes the id
+   * an earlier rule gave it.
+   */
   readonly id: string;
   /** The name the catalogue shows. */
   readonly name: string;
+  /** The story file it is written in, relative to the module that declares the source. */
+  readonly file: string;
   /** The named export in the story file. */
   readonly exportName: string;
   /** What it shows and what to notice, from its TSDoc; none when it has none. */
@@ -82,16 +90,20 @@ export type AgentUsingComponent = {
   readonly stories: readonly string[];
 };
 
-/** A component (a story file) and its stories. */
+/** A component (the story files with its title) and its stories. */
 export type AgentComponent = {
-  /** `<source>:<title>` in kebab case. */
+  /** `<source>:<component>`, the part of its stories' ids before `--`. */
   readonly id: string;
   /** Its whole title (`Inputs/Selection/Select`). */
   readonly title: string;
   /** The id of the source it belongs to. */
   readonly source: string;
-  /** The story file, relative to the module that declares the source. */
+  /**
+   * Its first story file, relative to the module that declares the source: the one its docs and its page come from.
+   */
   readonly file: string;
+  /** Every story file with its title, `file` first: one, unless the title is written in several files. */
+  readonly files: readonly string[];
   /** Its stories: the listed ones in the catalogue's order, then the unlisted ones. */
   readonly stories: readonly AgentStory[];
   /** Its design (the meta's `parameters.design.figma`), when it has one. */
@@ -132,7 +144,10 @@ export type StoryDocument = {
   /** The story, with its links in the view asked for. */
   readonly story: AgentStory;
   /** Its component's id and title, and its "Used in" when the catalogue offers it. */
-  readonly component: Pick<AgentComponent, "id" | "title" | "source" | "file" | "design" | "usedIn">;
+  readonly component: Pick<
+    AgentComponent,
+    "id" | "title" | "source" | "file" | "files" | "design" | "usedIn"
+  >;
   /**
    * The component's docs as the props panel reads them (its props, their types, defaults and TSDoc); none when the
    * story file names no component, or its docs could not be read (the reason is then in `problems`).
@@ -208,7 +223,7 @@ export type AgentTokenSummary = Pick<
 export type TokensDocument = {
   /** The shape's version. */
   readonly schema: AgentSchema;
-  /** Whether the catalogue names a tokens file at all. */
+  /** Whether the catalogue or one of its sources names a tokens file at all. */
   readonly isConfigured: boolean;
   /** How many tokens match, whatever the limit. */
   readonly total: number;
@@ -218,6 +233,8 @@ export type TokensDocument = {
   readonly tokens: readonly AgentTokenSummary[];
   /** What in the tokens files could not be read. */
   readonly problems: readonly string[];
+  /** The tokens listed here that two authors give different values, with whose stands. */
+  readonly clashes: readonly TokenClash[];
 };
 
 /** One token, with all that is known of it. */
@@ -228,6 +245,8 @@ export type TokenDocument = {
   readonly token: DesignToken;
   /** What in the tokens files could not be read. */
   readonly problems: readonly string[];
+  /** Whose value stands, when two authors give this token different ones. */
+  readonly clashes: readonly TokenClash[];
 };
 
 /** The tokens nearest a value written by hand. */

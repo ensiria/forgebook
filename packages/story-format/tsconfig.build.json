@@ -1,6 +1,7 @@
 // The package published to npm: JavaScript and declarations in `dist/`, the `.ts` extensions of relative imports
 // rewritten to `.js`, since Node strips no types inside `node_modules`. One program for the page's code and Node's:
 // each folder's own tsconfig.json checks it with its runtime's types (`pnpm typecheck`); this one only emits.
+// No maps: they point into sources the package does not ship, and would be much of what it weighs.
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@forgebook/typescript-config/react.json",
@@ -9,8 +10,8 @@
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    "declarationMap": false,
+    "sourceMap": false,
     "types": [],
     "rootDir": ".",
     "outDir": "dist",

@@ -10,7 +10,9 @@
  * @module
  */
 
-import { type ESTree, parseSync } from "vite";
+import type { ESTree } from "vite";
+
+import { parseStoryFile } from "./storyParse.ts";
 
 /** An expression without the TypeScript wrappers around it (`satisfies`, `as`, parentheses). */
 const unwrapped = (expression: ESTree.Expression): ESTree.Expression => {
@@ -72,7 +74,7 @@ const renderText = (declarator: ESTree.VariableDeclarator, text: string): string
  * @returns the texts by export name, or a message saying why the file cannot be read.
  */
 export const storyCode = (file: string, text: string): Readonly<Record<string, string>> | string => {
-  const { program, errors } = parseSync(file, text);
+  const { program, errors } = parseStoryFile(file, text);
   const [error] = errors;
   if (error !== undefined) return `${file} does not parse: ${error.message}`;
   const code: Record<string, string> = {};

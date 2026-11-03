@@ -1,0 +1,12 @@
+// The Vue fixture: components and stories checked by `vue-tsc`, which reads single-file components, so a story's args
+// are checked against the real component.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    "jsx": "preserve",
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "stories.ts", "forgebook.preview.ts"]
+}

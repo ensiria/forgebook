@@ -4,8 +4,10 @@
  *
  * @module
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import type { PluginStory } from "../plugin.ts";
+import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { DockTab } from "./Dock.tsx";
 import type { PluginTabsInput } from "./pluginTabs.tsx";
 
@@ -29,3 +31,21 @@ export const usePluginTabs = (input: PluginTabsInput): readonly DockTab[] => {
   }, [hasPlugins]);
   return build?.tabs(input) ?? [];
 };
+
+/**
+ * The story as a plugin's tab is told it, kept while the story stays.
+ *
+ * @param component - the story's component.
+ * @param story - the story.
+ */
+export const usePluginStory = (component: TreeComponent, story: TreeStory): PluginStory =>
+  useMemo(
+    (): PluginStory => ({
+      id: story.id,
+      name: story.name,
+      title: component.title,
+      componentName: component.name,
+      design: story.design === undefined ? {} : { figma: story.design }
+    }),
+    [story, component]
+  );

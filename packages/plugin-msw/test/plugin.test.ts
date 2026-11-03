@@ -10,6 +10,6 @@ import { msw } from "../src/plugin.ts";
 describe("msw", () => {
   it("offers its tab only for a story with mocks, and pre-bundles MSW", () => {
     expect(msw().tabs?.map((tab) => [tab.id, tab.when])).toEqual([["msw", { parameter: "msw" }]]);
-    expect(msw().browserDependencies).toEqual(["msw/browser"]);
+    expect(msw().browserDependencies).toEqual(["msw/browser", "msw"]);
   });
 });

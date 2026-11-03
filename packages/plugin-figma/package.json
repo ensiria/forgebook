@@ -35,6 +35,9 @@
     "test": "vitest run",
     "typecheck": "tsc -p src && tsc -p test"
   },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*"
+  },
   "peerDependencies": {
     "forgebook": "workspace:^",
     "react": "^19.0.0",

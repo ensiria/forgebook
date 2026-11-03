@@ -42,6 +42,7 @@ describe("catalogueMarkdown", () => {
       },
       stories: ["Overview"],
       mainStory: "Overview",
+      mainStoryId: "actions-button--overview",
       isLogic: false,
       design: "https://www.figma.com/design/File1/Kit?node-id=1-2"
     };
@@ -53,7 +54,8 @@ describe("catalogueMarkdown", () => {
         components: [component],
         modules: [],
         sassModules: [],
-        styleSheets: []
+        styleSheets: [],
+        tokens: []
       },
       ["components"]
     );

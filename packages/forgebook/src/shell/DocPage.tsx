@@ -215,7 +215,7 @@ export const DocPage = ({
     () => page.stories.flatMap((id) => findStory(tree, id)?.story ?? []),
     [page.stories, tree]
   );
-  const queued = useMemo(() => queuedBlocks(content.blocks), [content.blocks]);
+  const queued = useMemo(() => queuedBlocks(content.blocks, tree), [content.blocks, tree]);
   const frames = usePageFrames({ stories, queued, pageRef, view, touchOverrides });
   useScrollMemory(pageRef, scroll);
   const placeAgain = useAnchorScroll(pageRef, anchor, scroll.visit, loaded.status === "ready");

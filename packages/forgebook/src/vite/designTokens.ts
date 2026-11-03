@@ -10,8 +10,14 @@
  * known. A token that cannot be used is named in `problems` with its file, and the others stay usable: nothing vanishes
  * in silence, since a token an agent cannot find is a colour it writes by hand.
  *
+ * Files of a catalogue's sources are read before its own, so its aliases reach a library's palette and a later file
+ * replaces an earlier one's token. Within one author's files that is plain layering; between authors it is a clash,
+ * reported and never refused: the catalogue is what puts the libraries together, so its value is the one in use.
+ *
  * @module
  */
+
+import { type TokenClash, tokenClashes } from "./tokenClashes.ts";
 
 /** A token, ready to read. */
 export type DesignToken = {
@@ -31,6 +37,8 @@ export type DesignToken = {
   readonly modes: Readonly<Record<string, string>>;
   /** Whether only themes define it, so `value` does not hold everywhere. */
   readonly isThemeOnly?: true;
+  /** The source that gives it, by its id or, when it writes none, by its module; none for the catalogue's own. */
+  readonly source?: string;
 };
 
 /** What the files gave. */
@@ -39,6 +47,8 @@ export type ParsedTokens = {
   readonly tokens: readonly DesignToken[];
   /** What could not be used, one line each, naming its file. */
   readonly problems: readonly string[];
+  /** The names two authors give different values, with whose stands. */
+  readonly clashes: readonly TokenClash[];
 };
 
 /** A tokens file, parsed. */
@@ -49,6 +59,8 @@ export type TokensInput = {
   readonly mode: string | undefined;
   /** The file's content. */
   readonly file: unknown;
+  /** The source it comes from; none for the catalogue's own. */
+  readonly source?: string;
 };
 
 /** A token as a file writes it, before references are followed. */
@@ -61,10 +73,16 @@ type RawToken = {
   readonly value: unknown;
   readonly description: string | undefined;
   readonly deprecated: string | undefined;
+  /** What a problem calls its file. */
+  readonly label: string;
+  /** The id of the source it comes from. */
+  readonly source: string | undefined;
+  /** The token of an earlier file it replaces, whose type stands when it gives none. */
+  readonly replaces?: RawToken;
 };
 
 /** What walking a group passes down. */
-type Inherited = {
+type Inherited = Pick<RawToken, "label" | "source"> & {
   readonly type: string | undefined;
   readonly deprecated: string | undefined;
 };
@@ -192,7 +210,9 @@ const rawToken = (node: Readonly<Record<string, unknown>>, name: string, inherit
   groupType: inherited.type,
   value: node["$value"],
   description: textField(node, "$description"),
-  deprecated: deprecationOf(node, inherited.deprecated)
+  deprecated: deprecationOf(node, inherited.deprecated),
+  label: inherited.label,
+  source: inherited.source
 });
 
 /** Every token under a group, what the group says of type and deprecation reaching its tokens. */
@@ -203,6 +223,7 @@ const collected = (
   problems: string[]
 ): RawToken[] => {
   const passed: Inherited = {
+    ...inherited,
     type: textField(group, "$type") ?? inherited.type,
     deprecated: deprecationOf(group, inherited.deprecated)
   };
@@ -225,20 +246,18 @@ const collected = (
 /** A file's raw tokens. */
 const fileTokens = (input: TokensInput, problems: string[]): RawToken[] => {
   const local: string[] = [];
-  const raw = isRecord(input.file)
-    ? collected(
-        withExtends(
-          asRecord(withoutRefs(input.file, input.file, new Set(), local)),
-          asRecord(input.file),
-          new Set(),
-          local
-        ),
-        [],
-        { type: undefined, deprecated: undefined },
-        local
-      )
-    : [];
+  const inherited = { type: undefined, deprecated: undefined, label: input.label, source: input.source };
+  let raw: RawToken[] = [];
   if (!isRecord(input.file)) local.push("the file is not a group of tokens");
+  else {
+    try {
+      const root = withoutRefs(input.file, input.file, new Set(), local);
+      raw = collected(withExtends(asRecord(root), input.file, new Set(), local), [], inherited, local);
+    } catch (error) {
+      // a file nested past the stack costs that file, not every other author's tokens
+      local.push(error instanceof Error ? error.message : String(error));
+    }
+  }
   problems.push(...local.map((problem) => `${input.label}: ${problem}`));
   return raw;
 };
@@ -345,7 +364,8 @@ const typeOf = (
   const name = aliasOf(raw.value);
   const target = name === undefined || seen.has(name) ? undefined : byName.get(name);
   const aliased = target === undefined ? undefined : typeOf(target, byName, new Set([...seen, target.name]));
-  return aliased ?? raw.groupType;
+  const replaced = raw.replaces === undefined ? undefined : typeOf(raw.replaces, byName, seen);
+  return aliased ?? raw.groupType ?? replaced;
 };
 
 /** What a token comes to under a set of tokens, or why it cannot be used. */
@@ -378,13 +398,33 @@ const tokenOf = (raw: RawToken, value: string, type: string): DesignToken => {
     ...(alias === undefined ? {} : { alias }),
     ...(raw.description === undefined ? {} : { description: raw.description }),
     ...(raw.deprecated === undefined ? {} : { deprecated: raw.deprecated }),
+    ...(raw.source === undefined ? {} : { source: raw.source }),
     modes: {}
   };
 };
 
-/** The tokens of files by name, the later file replacing. */
-const byNameOf = (lists: readonly (readonly RawToken[])[]): Map<string, RawToken> =>
-  new Map(lists.flat().map((token) => [token.name, token]));
+/**
+ * The tokens of files by name, the later file replacing. A file over another writes the value and little else, so what
+ * it leaves out is the replaced token's: it retunes the token, it does not make a new one.
+ */
+const byNameOf = (lists: readonly (readonly RawToken[])[]): Map<string, RawToken> => {
+  const merged = new Map<string, RawToken>();
+  for (const token of lists.flat()) {
+    const known = merged.get(token.name);
+    merged.set(
+      token.name,
+      known === undefined
+        ? token
+        : {
+            ...token,
+            replaces: known,
+            description: token.description ?? known.description,
+            deprecated: token.deprecated ?? known.deprecated
+          }
+    );
+  }
+  return merged;
+};
 
 /** A token's value in a theme. */
 type ThemeValue = { readonly text: string; readonly type: string; readonly raw: RawToken };
@@ -393,23 +433,15 @@ type ThemeValue = { readonly text: string; readonly type: string; readonly raw: 
 const themeValues = (
   own: readonly RawToken[],
   base: ReadonlyMap<string, RawToken>,
-  label: string,
   problems: string[]
 ): Map<string, ThemeValue> => {
-  // a theme writes the value and little else: what it leaves out is the base token's
-  const overlaid = own.map((token) => {
-    const known = base.get(token.name);
-    return known === undefined
-      ? token
-      : { ...token, groupType: token.groupType ?? known.ownType ?? known.groupType };
-  });
-  const merged = byNameOf([[...base.values()], overlaid]);
+  const merged = byNameOf([[...base.values()], own]);
   const names = new Set(own.map((token) => token.name));
   const values = new Map<string, ThemeValue>();
   for (const raw of merged.values()) {
     const result = resolvedValue(raw, merged);
     if (typeof result !== "string") values.set(raw.name, { ...result, raw });
-    else if (names.has(raw.name)) problems.push(`${label}: ${result}`);
+    else if (names.has(raw.name)) problems.push(`${raw.label}: ${result}`);
   }
   return values;
 };
@@ -437,25 +469,28 @@ const applyTheme = (
 
 /**
  * Reads the files of a catalogue: the base first, then each theme over it. A theme gives a token a value when it names
- * the token, or when a reference brings it a different one.
+ * the token, or when a reference brings it a different one. The files of one theme are one layer, the later replacing,
+ * so a catalogue's dark file reaches what a library's dark file sets.
  *
- * @param inputs - the files, in the configuration's order.
+ * @param inputs - the files: each source's in the catalogue's order, then the catalogue's own.
  */
 export const readTokens = (inputs: readonly TokensInput[]): ParsedTokens => {
   const problems: string[] = [];
-  const files = inputs.map((input) => ({ ...input, raw: fileTokens(input, problems) }));
-  const baseFiles = files.filter((file) => file.mode === undefined);
-  const base = byNameOf(baseFiles.map((file) => file.raw));
+  const files = inputs.map(({ mode, ...input }) => ({ mode, raw: fileTokens({ mode, ...input }, problems) }));
+  const layer = (mode: string | undefined): Map<string, RawToken> =>
+    byNameOf(files.filter((file) => file.mode === mode).map((file) => file.raw));
+  const base = layer(undefined);
   const tokens = new Map<string, DesignToken>();
   for (const raw of base.values()) {
     const result = resolvedValue(raw, base);
     if (typeof result !== "string") tokens.set(raw.name, tokenOf(raw, result.text, result.type));
-    else problems.push(`${baseFiles.find((file) => file.raw.includes(raw))?.label ?? "tokens"}: ${result}`);
+    else problems.push(`${raw.label}: ${result}`);
   }
-  for (const { mode, raw, label } of files) {
-    if (mode !== undefined) applyTheme(tokens, mode, raw, themeValues(raw, base, label, problems));
+  for (const mode of new Set(files.flatMap((file) => (file.mode === undefined ? [] : [file.mode])))) {
+    const own = [...layer(mode).values()];
+    applyTheme(tokens, mode, own, themeValues(own, base, problems));
   }
-  return { tokens: [...tokens.values()], problems };
+  return { tokens: [...tokens.values()], problems, clashes: tokenClashes(files) };
 };
 
 /**

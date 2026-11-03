@@ -8,15 +8,14 @@
  * then, and reloads the page, more than once on a first start. The list is the shell's and the frame's packages (the
  * shell is React), the framework's, Testing Library's when the project installs it, what the plugins name, and
  * Forgebook's own modules and the plugins' when they come from an installed package (a linked one is source, which Vite
- * does not pre-bundle). A package the project
+ * does not pre-bundle). axe is not among them: the frame loads it as a script (`axeScript.ts`). A package the project
  * cannot resolve is left out, since Vite fails on one it cannot find. Pure: a resolver in, names out.
  *
  * @module
  */
-import { dirname, join } from "node:path";
-
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { pluginModules } from "./pluginConfig.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
 const CORE_BROWSER_DEPENDENCIES = [
@@ -25,12 +24,6 @@ const CORE_BROWSER_DEPENDENCIES = [
   "react/jsx-dev-runtime",
   "react-dom/client"
 ] as const;
-
-/**
- * What the frame imports in the browser from the core's own dependencies: named through the core, as
- * `forgebook > axe-core`, since a project need not be able to resolve them itself.
- */
-const CORE_OWN_DEPENDENCIES = ["axe-core"] as const;
 
 /** Forgebook's modules the generated pages import, besides the framework's. */
 const PAGE_MODULES = ["forgebook/shell"] as const;
@@ -50,9 +43,8 @@ const isInstalled = (file: string): boolean => file.split(/[\\/]/).includes("nod
  *
  * @param config - the catalogue's configuration.
  * @param resolve - resolves a package from the catalogue's folder.
- * @param resolveOwn - resolves a package from the core's own folder.
  */
-export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn: Resolve): string[] => {
+export const prebundled = (config: ResolvedConfig, resolve: Resolve): string[] => {
   const pageModules = [
     ...PAGE_MODULES,
     config.framework.pages.frame,
@@ -70,14 +62,10 @@ export const prebundled = (config: ResolvedConfig, resolve: Resolve, resolveOwn:
     const file = resolve(name);
     return file !== undefined && isInstalled(file);
   });
-  const own = CORE_OWN_DEPENDENCIES.filter((name) => resolveOwn(name) !== undefined).map(
-    (name) => `forgebook > ${name}`
-  );
   return [
     ...new Set([
       ...candidates.filter((name) => resolve(name) !== undefined),
       ...pluginDependencies,
-      ...own,
       ...installedPages
     ])
   ];
@@ -88,8 +76,8 @@ const FILES_IMPORT = /["']([^"']+)\?forgebook-files["']/g;
 
 /**
  * The story files Vite scans for what their components import, before the first page opens: the project's own
- * patterns, and each source's, read from its module's `?forgebook-files` imports (relative to the module). A source
- * the project cannot resolve, or read, adds none.
+ * patterns, each source's, read from its module's `?forgebook-files` imports (relative to the module), and the
+ * previews. A source the project cannot resolve, or read, adds none.
  *
  * @remarks
  * Without the sources' files, a package a source's stories import (`storybook/test`, a component's own dependency) is
@@ -109,8 +97,9 @@ export const scannedEntries = (
     const text = file === undefined ? undefined : readText(file);
     if (file === undefined || text === undefined) return [];
     return [...text.matchAll(FILES_IMPORT)].flatMap((match) =>
-      match[1] === undefined ? [] : [join(dirname(file), match[1]).split("\\").join("/")]
+      match[1] === undefined ? [] : [VITE_PATHS.join(VITE_PATHS.dirname(file), match[1])]
     );
   });
-  return [...config.stories, ...fromSources];
+  // the previews too: what they import loads with the first story, and found then it reloads the page
+  return [...config.stories, ...fromSources, ...config.previews];
 };

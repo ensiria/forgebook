@@ -31,6 +31,11 @@ export type Renderer = {
   readonly component: unknown;
   /** What a story draws (`ReactNode` in React). */
   readonly storyResult: unknown;
+  /**
+   * What a decorator's `story()` gives, for a framework where it is narrower than what a story may return (Vue: a story
+   * may return a component, but `story()` is a virtual node); `storyResult` without it.
+   */
+  readonly decoratedStory?: unknown;
 };
 
 /** A value a story's args may write for a prop: the prop's own, or, where it takes a text, a text named by its key. */
@@ -185,6 +190,15 @@ export type StoryParameters = {
   readonly clock?: StoryClockSetting;
   /** How the story sits in its frame: padded (default), centred, or the whole frame. */
   readonly layout?: "padded" | "centered" | "fullscreen";
+  /**
+   * The story's mocked API: MSW's request handlers, which answer what the story fetches while it is shown. A list, or
+   * a record of lists as MSW's Storybook addon writes it. Typed `unknown` here, since this package depends on nothing:
+   * they are MSW's `http.get(…)` values.
+   */
+  readonly msw?: {
+    /** The handlers. */
+    readonly handlers: readonly unknown[] | Readonly<Record<string, readonly unknown[]>>;
+  };
   /** CSF's documentation block; the catalogue reads the component's one-line description from it. */
   readonly docs?: { readonly description?: { readonly component?: string } };
 };
@@ -211,8 +225,9 @@ export type StoryContext<TArgs> = {
    */
   readonly clock: StoryClock;
   /**
-   * The values of the catalogue's switches applied by code, by the switch's id (CSF's name): what a decorator reads
-   * to pick a provider's theme, a density, a locale. Empty outside a catalogue.
+   * The globals a decorator reads to pick a provider's theme, a density, a locale, by id (CSF's name): the preview's
+   * starting values (its `globalTypes` defaults, under `initialGlobals`), under the meta's and the story's own, under
+   * the catalogue's switches applied by code. Text values only. Empty outside a catalogue.
    */
   readonly globals: Readonly<Record<string, string>>;
   /** What the story's loaders returned, merged: the preview's, then the meta's, then the story's (CSF's `loaded`). */
@@ -275,7 +290,9 @@ export type OneOrMany<TFunction> = TFunction | readonly TFunction[];
 
 /** Wraps a story: a provider, a container of a given width. */
 export type Decorator<TRenderer extends Renderer, TArgs> = (
-  story: () => TRenderer["storyResult"],
+  story: () => TRenderer extends { readonly decoratedStory: infer TStory }
+    ? TStory
+    : TRenderer["storyResult"],
   context: StoryContext<TArgs>
 ) => TRenderer["storyResult"];
 

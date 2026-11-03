@@ -4,34 +4,18 @@
  *
  * @remarks
  * The TypeScript family (TypeScript, TSX, JavaScript, JSX) is split by the TypeScript compiler
- * (`typeScriptPieces.ts`): highlight.js reads JSX as HTML and loses the rest of the example at the first function or
- * `>` in an attribute. highlight.js keeps the other languages a component's documentation writes (CSS, SCSS,
- * JSON, bash, HTML), on its own instance, so nothing else that uses highlight.js in the same process sees these
- * settings. Both write the same classes, with the catalogue's prefix (`forgebook-hl-keyword`), coloured by the
- * shell's style sheet with its code palette. A language neither knows is escaped and left plain.
+ * (`typeScriptPieces.ts`), and the other languages a component's documentation writes by short grammars
+ * (`plainGrammars.ts`). Both give the same roles, written as the same classes, with the catalogue's prefix
+ * (`forgebook-hl-keyword`), coloured by the shell's style sheet with its code palette. A language neither knows is escaped
+ * and left plain.
  *
  * @module
  */
-import hljs from "highlight.js/lib/core";
-import bash from "highlight.js/lib/languages/bash";
-import css from "highlight.js/lib/languages/css";
-import json from "highlight.js/lib/languages/json";
-import scss from "highlight.js/lib/languages/scss";
-import xml from "highlight.js/lib/languages/xml";
-
+import { grammarPieces } from "./plainGrammars.ts";
 import { type CodePiece, type CodeRole, isTypeScriptLanguage, typeScriptPieces } from "./typeScriptPieces.ts";
 
 /** The class prefix of every coloured piece. */
 export const HIGHLIGHT_PREFIX = "forgebook-hl-";
-
-/** The catalogue's own highlighter: the languages outside the TypeScript family a component's documentation writes. */
-const highlighter = hljs.newInstance();
-highlighter.configure({ classPrefix: HIGHLIGHT_PREFIX });
-highlighter.registerLanguage("xml", xml);
-highlighter.registerLanguage("css", css);
-highlighter.registerLanguage("scss", scss);
-highlighter.registerLanguage("json", json);
-highlighter.registerLanguage("bash", bash);
 
 /** The characters HTML gives a meaning to, as entities. */
 const ENTITIES: Readonly<Record<string, string>> = {
@@ -50,10 +34,7 @@ const ENTITIES: Readonly<Record<string, string>> = {
 export const escapeHtml = (text: string): string =>
   text.replace(/[&<>"']/g, (character) => ENTITIES[character] ?? character);
 
-/**
- * The classes of each role a TypeScript piece can have: the ones highlight.js gives the same thing, so the palette
- * colours both alike.
- */
+/** The classes of each role a piece can have. */
 const ROLE_CLASSES: Readonly<Record<CodeRole, string>> = {
   keyword: `${HIGHLIGHT_PREFIX}keyword`,
   string: `${HIGHLIGHT_PREFIX}string`,
@@ -83,6 +64,6 @@ const pieceHtml = ({ text, role }: CodePiece): string =>
 export const highlightCode = (code: string, language: string | undefined): string => {
   if (language === undefined) return escapeHtml(code);
   if (isTypeScriptLanguage(language)) return typeScriptPieces(code, language).map(pieceHtml).join("");
-  if (highlighter.getLanguage(language) === undefined) return escapeHtml(code);
-  return highlighter.highlight(code, { language, ignoreIllegals: true }).value;
+  const pieces = grammarPieces(code, language);
+  return pieces === undefined ? escapeHtml(code) : pieces.map(pieceHtml).join("");
 };

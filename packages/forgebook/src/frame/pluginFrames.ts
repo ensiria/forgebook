@@ -27,16 +27,16 @@ export type PluginFrames = {
 /**
  * Makes the plugins' frame modules.
  *
- * @param plugins - the plugins with one.
+ * @param plugins - the plugins with one; none when the catalogue lists none.
  * @param storyId - the frame's story.
  * @param tell - tells the shell.
  */
 export const startPluginFrames = (
-  plugins: readonly FramePlugin[],
+  plugins: readonly FramePlugin[] | undefined,
   storyId: string,
   tell: (message: FrameMessage) => void
 ): PluginFrames => {
-  const frames = plugins.map((plugin) =>
+  const frames = (plugins ?? []).map((plugin) =>
     plugin.create({
       report: (value: JsonValue, options: PluginReportOptions = {}): void =>
         tell({

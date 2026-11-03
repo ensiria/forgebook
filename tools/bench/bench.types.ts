@@ -4,8 +4,13 @@
  * @module
  */
 
+import type { SweepResult } from "./sweep.ts";
+
 /** A tool the benchmark can drive. */
 export type ToolName = "forgebook" | "storybook" | "ladle";
+
+/** Where Forgebook's frames run: on an origin of their own, its default, or on the catalogue's. */
+export type FramesMode = "isolated" | "same-origin";
 
 /** What a metric's samples come to. Times in milliseconds, sizes in bytes. */
 export type Summary = {
@@ -77,6 +82,18 @@ export type MachineInfo = {
   readonly node: string;
 };
 
+/** The real library a run took place on. */
+export type RealCorpusInfo = {
+  /** The corpus's name. */
+  readonly name: string;
+  /** The repository. */
+  readonly repository: string;
+  /** The commit. */
+  readonly commit: string;
+  /** Its licence's SPDX id. */
+  readonly licence: string;
+};
+
 /** The `--json` document. */
 export type BenchReport = {
   /** The shape's version, raised when a field changes meaning. */
@@ -85,14 +102,23 @@ export type BenchReport = {
   readonly startedAt: string;
   /** The commit the Forgebook packages were packed from, or the published version measured. */
   readonly forgebook: string;
-  /** The corpus measured. */
-  readonly corpus: { readonly components: number; readonly stories: number };
+  /** The corpus measured: on a real library, `components` counts its story files, as its definition states them. */
+  readonly corpus: {
+    readonly components: number;
+    readonly stories: number;
+    readonly real?: RealCorpusInfo;
+  };
   /** The component the story metrics were taken on. */
   readonly measured: string;
   /** The runs of each time. */
   readonly runs: number;
   /** The CPU throttle of the browser, 1 for none. */
   readonly throttle: number;
+  /**
+   * Where Forgebook's frames ran: on an origin of their own, or on the catalogue's. Absent from a report of a Forgebook
+   * that had no such choice, whose frames always shared the catalogue's origin.
+   */
+  readonly frames?: FramesMode;
   /** The machine. */
   readonly machine: MachineInfo;
   /** Its load before each group and at the end, where it can be read. */
@@ -101,4 +127,6 @@ export type BenchReport = {
   readonly warnings: readonly string[];
   /** The results by tool. */
   readonly tools: Readonly<Partial<Record<ToolName, ToolResult>>>;
+  /** What became of every story, with the `sweep` group. */
+  readonly sweep?: SweepResult;
 };

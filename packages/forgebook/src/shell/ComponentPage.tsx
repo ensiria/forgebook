@@ -14,7 +14,7 @@
 import { type ReactNode, useMemo, useRef } from "react";
 
 import { groupLabel } from "../catalogue.ts";
-import type { ComponentDocs } from "../componentDocs.ts";
+import { type ComponentDocs, codeNameOf } from "../componentDocs.ts";
 import {
   groupedStories,
   isLogicComponent,
@@ -164,7 +164,7 @@ export const ComponentPage = ({
     switches: catalogue.switches,
     onTouchChange,
     code,
-    componentName: componentDocs?.name ?? component.name,
+    componentName: componentDocs === undefined ? component.name : codeNameOf(componentDocs),
     heightOf,
     background
   };

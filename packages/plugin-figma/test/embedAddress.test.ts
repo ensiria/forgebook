@@ -3,7 +3,7 @@
  *
  * @module
  */
-import type { FigmaLink } from "forgebook/figma-link";
+import type { FigmaLink } from "@forgebook/story-format/source";
 import { describe, expect, it } from "vitest";
 
 import { figmaEmbedAddress } from "../src/embedAddress.ts";

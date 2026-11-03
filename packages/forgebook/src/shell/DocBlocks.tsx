@@ -66,13 +66,15 @@ export type DocBlocksContext = {
 const propsKey = (id: string): string => `props:${id}`;
 
 /**
- * What a page's blocks load as they come near, in the page's order.
+ * What a page's blocks load as they come near, in the page's order: a story by its own id, as its frame reports, though
+ * the page may name it by a former one (`formerStoryId`).
  *
  * @param blocks - the page's blocks.
+ * @param tree - the tree, which finds a story by either id.
  */
-export const queuedBlocks = (blocks: readonly DocBlock[]): string[] =>
+export const queuedBlocks = (blocks: readonly DocBlock[], tree: StoryTree): string[] =>
   blocks.flatMap((block) => {
-    if (block.kind === "story") return [block.id];
+    if (block.kind === "story") return [findStory(tree, block.id)?.story.id ?? block.id];
     return block.kind === "props" ? [propsKey(block.id)] : [];
   });
 
@@ -121,11 +123,14 @@ const StoryBlock = ({
 }): ReactNode => {
   const { frames, tree, sources } = context;
   const location = findStory(tree, id);
+  // a page may name a story by a former id (`formerStoryId`): its frame reports under its own
+  const storyId = location?.story.id ?? id;
   const source = sources.find((candidate) => candidate.id === location?.source.id);
-  const isMounted = frames.queue.mounted.has(id);
+  const isMounted = frames.queue.mounted.has(storyId);
+  // the story's own file: a component may span several (`TreeComponent.files`)
   const code = useStoryCode(
     isMounted && source !== undefined && location !== undefined
-      ? sourceFiles(source).code[location.component.file]
+      ? sourceFiles(source).code[location.story.file]
       : undefined
   );
   if (location === undefined) return <MissingBlock message={STRINGS.unknownStory(id)} />;
@@ -145,7 +150,7 @@ const StoryBlock = ({
       story={location.story}
       isDemo={true}
       isMounted={isMounted}
-      observe={frames.queue.observerOf(id, place)}
+      observe={frames.queue.observerOf(storyId, place)}
     />
   );
 };

@@ -14,11 +14,12 @@ import { resolve } from "node:path";
 
 import type { DocPageIndex } from "@forgebook/story-format/source";
 
+import type { ForgebookPlugin } from "../plugin.ts";
 import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
+import { pluginFences } from "./pluginConfig.ts";
 import { storyFileKeys } from "./storyFilesModule.ts";
-
-/** The query that asks for one docs page, rendered. */
-export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
+import { DOCS_PAGE_QUERY } from "./textQueries.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** A page a pattern matches, with its key and its index. */
 export type IndexedDocPage = {
@@ -79,7 +80,7 @@ export const docPagesModule = (
   const pages = indexedDocPages(root, pattern, watch);
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
-  const page = (key: string): string => JSON.stringify(`${resolve(root, key)}${DOCS_PAGE_QUERY}`);
+  const page = (key: string): string => JSON.stringify(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);
   return [
     "export default {",
     `index: ${JSON.stringify(index)},`,
@@ -98,23 +99,25 @@ export const docPagesModule = (
  * @param file - the page's file, absolute.
  * @param watch - adds a file whose edit renews the module.
  * @param isServing - whether a dev server runs.
- * @param fences - the fences the catalogue's plugins draw.
+ * @param plugins - the catalogue's plugins, whose fences a page may draw.
  */
 export const docPageModule = (
   file: string,
   watch: (file: string) => void,
   isServing: boolean,
-  fences: readonly string[] = []
+  plugins: readonly ForgebookPlugin[] = []
 ): string => {
   watch(file);
   const { blocks, headings, images, text } = compiledDocPage(
     file,
     readFileSync(file, "utf8"),
     watchedRead(watch),
-    fences
+    pluginFences(plugins)
   );
   return [
-    ...images.map((image, place) => `import asset${place} from ${JSON.stringify(`${image}?url`)};`),
+    ...images.map(
+      (image, place) => `import asset${place} from ${JSON.stringify(`${VITE_PATHS.normalize(image)}?url`)};`
+    ),
     `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: [${images
       .map((_image, place) => `asset${place}`)
       .join(", ")}] };`,

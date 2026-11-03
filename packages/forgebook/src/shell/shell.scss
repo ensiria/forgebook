@@ -467,6 +467,16 @@
     gap: $space-2;
   }
 
+  // on the window, placed by its button (`EmbedButton.tsx`): the story's pane would clip it, and its first draw comes
+  // before the lazy sheet, so the rule that takes it out of the pane is here
+  .forgebook-popover.forgebook-popover--embed {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: auto;
+    z-index: 4;
+  }
+
   // the matrix's two axes as one control: their selects quiet inside a tinted group, as the width's presets are
   .forgebook-matrix-picker {
     display: flex;
@@ -1485,6 +1495,38 @@
     ul {
       margin: $space-1 0 0;
       padding-inline-start: $space-4;
+    }
+  }
+
+  // above the story: the values a shared link named that the story does not take
+  .forgebook-dropped-args {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: $space-1 $space-3;
+    margin-block-start: $space-2;
+    padding: $space-2 $space-3;
+    border-radius: $radius-card;
+    background: $surface;
+    box-shadow: $ring-quiet;
+    font: $text-caption;
+    color: $text-secondary;
+  }
+
+  .forgebook-dropped-args__text {
+    margin: 0;
+  }
+
+  .forgebook-dropped-args__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1 $space-3;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    code {
+      color: $text;
     }
   }
 
@@ -2533,7 +2575,7 @@
     }
   }
 
-  // the plugin's colours (highlight.js classes, `forgebook-hl-`), on the catalogue's code palette
+  // the plugin's colours (`highlightCode.ts`, `forgebook-hl-`), on the catalogue's code palette
   .forgebook-hl-keyword,
   .forgebook-hl-literal,
   .forgebook-hl-built_in {

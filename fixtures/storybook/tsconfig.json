@@ -9,5 +9,5 @@
     // the plugin's types are Forgebook's, whose modules carry `.ts` (Node loads them)
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "plugin", "stories.ts", ".storybook"]
+  "include": ["src", "plugin", "reexported", "stories.ts", ".storybook"]
 }

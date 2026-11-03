@@ -13,7 +13,7 @@
  *
  * @module
  */
-import type { FigmaLink } from "forgebook/figma-link";
+import type { FigmaLink } from "@forgebook/story-format/source";
 import type { PluginTabContext } from "forgebook/plugin";
 import { type PluginViewProps, reactView } from "forgebook/plugin-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";

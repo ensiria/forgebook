@@ -5,11 +5,12 @@
  * @remarks
  * English is the table every key is in (`stories/locales/en.json`); a language that lacks a key shows the English
  * one, so a story is never empty while a translation is under way. An arg written `storyText("key")` becomes the text
- * of its key before the story receives it. Pure.
+ * of its key before the story receives it. A language a source gives as a loader is loaded when it is shown, and only
+ * then. Pure apart from those loaders.
  *
  * @module
  */
-import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
+import type { StoryLanguage, StorySource, StoryTexts } from "@forgebook/story-format/source";
 import { isStoryTextArg, type StoryTextFunction, type StoryTextTable } from "@forgebook/story-format/texts";
 
 /** The language every key is in. */
@@ -54,21 +55,33 @@ export const pseudoText = (text: string): string => {
 };
 
 /**
+ * A language's table, its loader awaited when the source gives one; empty for a language it has no texts in.
+ *
+ * @param texts - the language's texts in the source.
+ */
+export const textTable = async (texts: StoryTexts | undefined): Promise<StoryTextTable> => {
+  if (texts === undefined) return {};
+  return typeof texts === "function" ? (await texts()).default : texts;
+};
+
+/**
  * The texts of the shown language.
  *
- * @param texts - the source's tables, by language id; none when the source has none.
+ * @param texts - the source's tables or their loaders, by language id; none when the source has none.
  * @param language - the shown language, when one is chosen; none for the stories' own (English).
  */
-export const shownTexts = (
+export const shownTexts = async (
   texts: StorySource["texts"],
   language: StoryLanguage | undefined
-): StoryTextTable => {
-  const base = texts?.[BASE_LANGUAGE] ?? {};
+): Promise<StoryTextTable> => {
+  // both at once: the shown language's table does not wait for English's
+  const shown = language === undefined || language.isPseudo === true ? undefined : texts?.[language.id];
+  const [base, own] = await Promise.all([textTable(texts?.[BASE_LANGUAGE]), textTable(shown)]);
   if (language === undefined) return base;
   if (language.isPseudo === true) {
     return Object.fromEntries(Object.entries(base).map(([key, text]) => [key, pseudoText(text)]));
   }
-  return { ...base, ...texts?.[language.id] };
+  return { ...base, ...own };
 };
 
 /**

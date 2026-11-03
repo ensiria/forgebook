@@ -1,25 +1,28 @@
 /**
- * What `forgebook-docs` reads from a package: its exports, their TSDoc and types, its stories, its Sass modules and
- * style sheets.
+ * What `forgebook-docs` reads from a package: its exports, their TSDoc and types, its stories, its Sass modules, its
+ * style sheets and the design tokens its source declares.
  *
  * @remarks
  * The package's `exports` (the source map, `./src/…`) say what is public; its `*.stories.tsx` say which components
  * exist and where they sit. Components are read with the catalogue's extractor (the props panel's data), modules with
- * TypeScript 6, Sass modules and style sheets from their text. The development-only `./stories` export is left out.
+ * TypeScript 6, Sass modules and style sheets from their text. The development-only `./stories` export is left out of
+ * the lists; the id and the tokens of the source it declares are read from its text.
  *
  * @module
  */
 import { globSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
-import { figmaLink } from "../../src/figmaLink.ts";
+import { csfStoryId } from "../../src/storyIds.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
+import type { DesignToken } from "../../src/vite/designTokens.ts";
 import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
 import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
+import { readTokenFiles, type SourceTokens, sourceTokensIn } from "../../src/vite/sourceTokens.ts";
+import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type {
   CatalogueComponent,
   CatalogueData,
@@ -31,13 +34,15 @@ import type {
 import { type CatalogueOptions, isExcluded } from "./catalogueOptions.ts";
 import { moduleDocs } from "./moduleDocs.ts";
 import { sassMembers, styleSheetSummary } from "./sassDocs.ts";
-import { sourceIdOf } from "./sourceId.ts";
+
+/** Whether a folder's name is one whose story files are not the package's own: its dependencies, its build. */
+const isLeftOutFolder = (name: string): boolean => name === "node_modules" || name === "dist";
 
 /** What was read, and what could not be. */
 export type CollectedDocs = {
   /** The catalogue's data. */
   readonly data: CatalogueData;
-  /** One message per file that could not be read. */
+  /** One message per thing that could not be read: a file, a token. */
   readonly problems: readonly string[];
 };
 
@@ -63,13 +68,38 @@ const isLogicFile = (index: StoryFileIndex): boolean =>
   index.stories.length > 0 && index.stories.every((story) => (story.isLogic ?? index.isLogic) === true);
 
 /**
- * The link to a component's design, when its meta writes a valid one: a wrong one is the catalogue's to report.
+ * A story file's main story (`parameters.main`, else its first): its export and its id without the source's.
  *
  * @param index - the file's index.
  */
-const designOf = (index: StoryFileIndex): string | undefined => {
-  const link = index.design === undefined ? undefined : figmaLink(index.design.figma);
-  return link === undefined || typeof link === "string" ? undefined : link.url;
+const mainStoryOf = (index: StoryFileIndex): Pick<CatalogueComponent, "mainStory" | "mainStoryId"> => {
+  const main = index.stories.find((story) => story.isMain === true) ?? index.stories[0];
+  if (main === undefined) return { mainStory: undefined, mainStoryId: undefined };
+  return {
+    mainStory: main.exportName,
+    mainStoryId: main.id ?? csfStoryId(index.id ?? index.title, main.exportName)
+  };
+};
+
+/**
+ * Adds a story file's component to the list, or its stories to the component of its title already listed: files with
+ * one title are one component, as the catalogue lists them, with the first file's docs and main story.
+ *
+ * @param components - the components so far.
+ * @param component - the file's.
+ */
+const addComponent = (components: CatalogueComponent[], component: CatalogueComponent): void => {
+  const same = components.findIndex((each) => each.title === component.title);
+  const first = components[same];
+  if (first === undefined) {
+    components.push(component);
+    return;
+  }
+  components[same] = {
+    ...first,
+    stories: [...first.stories, ...component.stories],
+    isLogic: first.isLogic && component.isLogic
+  };
 };
 
 /** The components of the package's story files, read by the framework's extractor. */
@@ -82,12 +112,15 @@ const collectComponents = (
 ): { components: CatalogueComponent[]; componentFiles: Set<string> } => {
   const components: CatalogueComponent[] = [];
   const componentFiles = new Set<string>();
-  const storyFiles = globSync("**/*.stories.*", { cwd: packageDir })
+  // with forward slashes: the glob gives backslashes on Windows, and the folders and the title are read by `/`
+  // the dependencies and the build are never walked: a package's node_modules alone can hold thousands of folders
+  const storyFiles = globSync("**/*.stories.*", { cwd: packageDir, exclude: isLeftOutFolder })
+    .map((file) => VITE_PATHS.normalize(file))
     .filter((file) => STORY_FILE.test(file))
-    .filter((file) => !file.split("/").some((segment) => segment === "node_modules" || segment === "dist"))
+    .filter((file) => !file.split("/").some(isLeftOutFolder))
     .sort();
   for (const relative of storyFiles) {
-    const file = join(packageDir, relative);
+    const file = VITE_PATHS.join(packageDir, relative);
     // a meta without a title is placed by its path from the package's folder: the catalogue's patterns are not known
     const title = autoTitle("", relative);
     const options = title === undefined ? {} : { autoTitle: title };
@@ -98,21 +131,22 @@ const collectComponents = (
       continue;
     }
     if (!("file" in component)) continue;
-    const subpath = Object.entries(exports).find(
-      ([, source]) => resolve(packageDir, source) === component.file
+    const subpath = Object.entries(exports).find(([, source]) =>
+      VITE_PATHS.isSame(VITE_PATHS.resolve(packageDir, source), component.file)
     )?.[0];
     // a component no subpath exports is a story's own (a foundations page), not part of the package
     if (subpath === undefined || isExcluded(subpath, exclude)) continue;
-    componentFiles.add(component.file);
-    components.push({
+    componentFiles.add(VITE_PATHS.normalize(component.file));
+    const collected: CatalogueComponent = {
       title: index.title,
       subpath,
       docs: component.docs,
       stories: index.stories.map((story) => story.name ?? story.exportName),
-      mainStory: (index.stories.find((story) => story.isMain === true) ?? index.stories[0])?.exportName,
+      ...mainStoryOf(index),
       isLogic: isLogicFile(index),
-      design: designOf(index)
-    });
+      design: index.design?.url
+    };
+    addComponent(components, collected);
   }
   return { components, componentFiles };
 };
@@ -147,16 +181,28 @@ const manifestText = (manifest: unknown, key: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
-/** The id the package's stories carry, from its `./stories` export's module, when it writes it plainly. */
-const sourceIdIn = (packageDir: string, exports: Readonly<Record<string, string>>): string | undefined => {
+/** What the package's `./stories` export declares, its tokens files named from the package's folder. */
+const declaredIn = (
+  packageDir: string,
+  exports: Readonly<Record<string, string>>
+): SourceTokens | undefined => {
   const source = exports[STORIES_SUBPATH];
   if (source === undefined) return undefined;
-  const file = resolve(packageDir, source);
-  try {
-    return sourceIdOf(file, readFileSync(file, "utf8"));
-  } catch {
-    return undefined;
-  }
+  const declared = sourceTokensIn(VITE_PATHS.resolve(packageDir, source), STORIES_SUBPATH);
+  return {
+    ...declared,
+    files: declared.files.map((file) => ({ ...file, label: VITE_PATHS.relative(packageDir, file.path) }))
+  };
+};
+
+/** The package's tokens, with what could not be read of them; nothing is read for a section left out. */
+const collectTokens = (
+  declared: SourceTokens | undefined,
+  sections: CatalogueOptions["sections"] | undefined
+): { readonly tokens: readonly DesignToken[]; readonly problems: readonly string[] } => {
+  if (declared === undefined || sections?.includes("tokens") === false) return { tokens: [], problems: [] };
+  const { tokens, problems } = readTokenFiles(declared.files);
+  return { tokens, problems: [...declared.problems, ...problems] };
 };
 
 /** A `?forgebook-docs-pages` import of a source module: its pattern, before the query. */
@@ -180,13 +226,16 @@ const collectPages = (
 ): CataloguePage[] => {
   const source = exports[STORIES_SUBPATH];
   if (source === undefined) return [];
-  const file = resolve(packageDir, source);
+  const file = VITE_PATHS.resolve(packageDir, source);
   const patterns = [...(readLinkedFile(file) ?? "").matchAll(PAGES_IMPORT)].flatMap(
     (match) => match[1] ?? []
   );
-  const pages = patterns.flatMap((pattern) => indexedDocPages(dirname(file), pattern, (): void => undefined));
+  const pages = patterns.flatMap((pattern) =>
+    indexedDocPages(VITE_PATHS.dirname(file), pattern, (): void => undefined)
+  );
   for (const page of pages)
-    for (const note of page.index.notes ?? []) problems.push(`${relative(packageDir, page.file)}: ${note}`);
+    for (const note of page.index.notes ?? [])
+      problems.push(`${VITE_PATHS.relative(packageDir, page.file)}: ${note}`);
   return pages
     .sort(
       (left, right) =>
@@ -195,7 +244,7 @@ const collectPages = (
     )
     .map((page) => ({
       title: page.index.title,
-      file: relative(packageDir, page.file).split("\\").join("/"),
+      file: VITE_PATHS.relative(packageDir, page.file),
       description: page.index.description
     }));
 };
@@ -205,14 +254,15 @@ const collectPages = (
  *
  * @param packageDir - the package's folder.
  * @param extractStoryComponent - the framework's reading of a story file's component (its docs module).
- * @param options - the package's catalogue options: the subpaths it leaves out.
+ * @param options - the package's catalogue options: the subpaths it leaves out, and the sections it lists, which leave
+ *   the tokens unread when they do not name them (every section by default).
  */
 export const collectDocs = (
   packageDir: string,
   extractStoryComponent: ExtractStoryComponent,
-  options: Pick<CatalogueOptions, "exclude">
+  options: Pick<CatalogueOptions, "exclude"> & Partial<Pick<CatalogueOptions, "sections">>
 ): CollectedDocs => {
-  const manifest: unknown = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
+  const manifest: unknown = JSON.parse(readFileSync(VITE_PATHS.join(packageDir, "package.json"), "utf8"));
   const packageName = manifestText(manifest, "name") ?? packageDir;
   const exports = sourceExports(manifest);
   const problems: string[] = [];
@@ -227,7 +277,7 @@ export const collectDocs = (
   const sassModules: SassModuleDocs[] = [];
   const styleSheets: StyleSheetDocs[] = [];
   for (const [subpath, source] of Object.entries(exports)) {
-    const file = resolve(packageDir, source);
+    const file = VITE_PATHS.resolve(packageDir, source);
     if (subpath === STORIES_SUBPATH || componentFiles.has(file) || isExcluded(subpath, options.exclude))
       continue;
     const entry = readExport(subpath, source, file);
@@ -237,18 +287,20 @@ export const collectDocs = (
     if (entry.kind === "problem") problems.push(entry.message);
   }
   const description = manifestText(manifest, "description");
-  const sourceId = sourceIdIn(packageDir, exports);
+  const declared = declaredIn(packageDir, exports);
+  const { tokens, problems: tokenProblems } = collectTokens(declared, options.sections);
   return {
     data: {
       packageName,
       description,
-      sourceId,
+      sourceId: declared?.id,
       components,
       pages: collectPages(packageDir, exports, problems),
       modules,
       sassModules,
-      styleSheets
+      styleSheets,
+      tokens
     },
-    problems
+    problems: [...problems, ...tokenProblems]
   };
 };

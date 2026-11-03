@@ -3,14 +3,9 @@
  *
  * @module
  */
-import ts from "typescript-6";
 import { describe, expect, it } from "vitest";
 
-import { moduleSummaryOf } from "../src/vite/docsProgram.ts";
-
-/** A file with this text. */
-const fileOf = (text: string): ts.SourceFile =>
-  ts.createSourceFile("Button.tsx", text, ts.ScriptTarget.Latest);
+import { moduleSummaryOf } from "../src/vite/moduleSummary.ts";
 
 describe("moduleSummaryOf", () => {
   it("takes the first paragraph of the module comment, on one line", () => {
@@ -24,18 +19,29 @@ describe("moduleSummaryOf", () => {
  * @module
  */
 export const Button = () => null;`;
-    expect(moduleSummaryOf(fileOf(text))).toBe(
+    expect(moduleSummaryOf(text)).toBe(
       "A button: a word that runs an action, or with `href` goes somewhere."
     );
   });
 
   it("stops at the first tag when the paragraph has no blank line after it", () => {
-    expect(moduleSummaryOf(fileOf("/**\n * A card.\n * @module\n */\nexport {};"))).toBe("A card.");
+    expect(moduleSummaryOf("/**\n * A card.\n * @module\n */\nexport {};")).toBe("A card.");
   });
 
   it("is empty for a file that opens with another comment, or with none", () => {
-    expect(moduleSummaryOf(fileOf("/** A button. */\nexport const Button = () => null;"))).toBe("");
-    expect(moduleSummaryOf(fileOf("// a line\nexport {};"))).toBe("");
-    expect(moduleSummaryOf(fileOf("export {};"))).toBe("");
+    expect(moduleSummaryOf("/** A button. */\nexport const Button = () => null;")).toBe("");
+    expect(moduleSummaryOf("// a line\nexport {};")).toBe("");
+    expect(moduleSummaryOf("export {};")).toBe("");
+    expect(moduleSummaryOf("/** Unclosed @module")).toBe("");
+  });
+
+  it("reads past a shebang with Windows line ends", () => {
+    expect(moduleSummaryOf("#!/usr/bin/env node\r\n/**\r\n * A tool.\r\n *\r\n * @module\r\n */")).toBe(
+      "A tool."
+    );
+  });
+
+  it("reads past a shebang and blank lines", () => {
+    expect(moduleSummaryOf("#!/usr/bin/env node\n\n/**\n * A tool.\n *\n * @module\n */")).toBe("A tool.");
   });
 });

@@ -17,7 +17,8 @@
  *
  * @module
  */
-import type { FigmaLink } from "./figmaLink.ts";
+import type { FigmaLink } from "@forgebook/story-format/source";
+
 import type { LoadedBeforeEach, LoadedDecorator } from "./frame/storyModule.ts";
 import type { ViewSwitch } from "./switches.ts";
 

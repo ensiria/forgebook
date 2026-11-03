@@ -4,13 +4,15 @@
  * @module
  */
 
-import type { StoryFiles, StorySource } from "@forgebook/story-format/source";
+import type { FigmaLink, StoryFiles, StorySource } from "@forgebook/story-format/source";
 import { describe, expect, it } from "vitest";
 
 import {
   componentId,
   findComponent,
+  findComponentByTitle,
   findStory,
+  formerStoryId,
   groupedStories,
   kebab,
   mainStory,
@@ -35,16 +37,42 @@ const source = (index: StoryFiles["index"], families?: readonly string[]): Story
 });
 
 describe("ids and names", () => {
-  it("writes ids in kebab case, as CSF does, with the source's id first", () => {
-    expect(kebab("Inputs/Selection/Select")).toBe("inputs-selection-select");
-    expect(kebab("KeyboardOpen")).toBe("keyboard-open");
+  it("writes ids as Storybook does, with the source's id first", () => {
     expect(storyId("kit", "Actions/Button", "DangerSmall")).toBe("kit:actions-button--danger-small");
+    // the title is lower-cased as written, never split at its case changes; the export is split into words
+    expect(storyId("kit", "Disclosure/ReadMore", "Default")).toBe("kit:disclosure-readmore--default");
+    expect(componentId("kit", "Disclosure/ReadMore")).toBe("kit:disclosure-readmore");
+    expect(storyId("kit", "A/B", "PaddingInherit1")).toBe("kit:a-b--padding-inherit-1");
+    expect(storyId("kit", "A/B", "HTMLButton")).toBe("kit:a-b--html-button");
+    expect(storyId("kit", "A/B", "Size2X")).toBe("kit:a-b--size-2-x");
+    expect(storyId("kit", "A/B", "with_snake-case.dot")).toBe("kit:a-b--with-snake-case-dot");
+    // letters of any script stay, punctuation and spaces become one hyphen
+    expect(storyId("kit", "Skjema/Knapp på (ny)", "ÆrligTalt")).toBe("kit:skjema-knapp-på-ny--ærlig-talt");
+  });
+
+  it("stays quick on a title that is a long run of punctuation", () => {
+    const title = `${"-".repeat(200_000)}A${"/".repeat(200_000)}`;
+    const started = performance.now();
+    expect(componentId("kit", title)).toBe("kit:a");
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
+  it("keeps the former ids' rule, which split titles at their case changes", () => {
+    expect(kebab("Inputs/Selection/Select")).toBe("inputs-selection-select");
+    expect(kebab("ReadMore")).toBe("read-more");
+    expect(formerStoryId("kit", "Disclosure/ReadMore", "Size2X")).toBe("kit:disclosure-read-more--size2-x");
   });
 
   it("names a story from its export in sentence case", () => {
     expect(storyName("KeyboardOpen")).toBe("Keyboard open");
     expect(storyName("Overview")).toBe("Overview");
-    expect(storyName("Size2X")).toBe("Size 2 x");
+    expect(storyName("Size2X")).toBe("Size 2 X");
+    // split into words as Storybook splits an export, a word written in capitals kept so
+    expect(storyName("CustomSVGIcon")).toBe("Custom SVG icon");
+    expect(storyName("XSmall")).toBe("X small");
+    expect(storyName("WithHGrid")).toBe("With H grid");
+    expect(storyName("A11yTest")).toBe("A 11 y test");
+    expect(storyName("with_snake-case.dot")).toBe("With snake case dot");
   });
 });
 
@@ -259,65 +287,192 @@ describe("storyTree", () => {
     ]);
   });
 
-  it("leaves out and reports titles it cannot place and titles used twice", () => {
+  it("leaves out and reports titles it cannot place, and titles that make no id", () => {
     const broken = storyTree([
       source({
         "./y.stories.tsx": { title: "A//D", stories: [] },
-        "./z.stories.tsx": { title: "A/B", stories: [] },
-        "./w.stories.tsx": { title: "A/B", stories: [] }
+        "./z.stories.tsx": { title: "A/B", stories: [{ exportName: "Overview" }, { exportName: "_" }] },
+        "./w.stories.tsx": { title: "?/!", stories: [{ exportName: "Overview" }] }
       })
     ]);
     expect(broken.problems).toEqual([
+      'Kit: ./w.stories.tsx: "?/!" makes no id: it needs a letter or a digit',
       'Kit: ./y.stories.tsx: "A//D" has an empty segment',
-      'Kit: ./w.stories.tsx and ./z.stories.tsx have the same title "A/B"'
+      "Kit: ./z.stories.tsx: story _ makes no id: its name needs a letter or a digit"
     ]);
-    expect(broken.sources[0]?.families[0]?.groups[0]?.components.map((component) => component.file)).toEqual([
-      "./z.stories.tsx"
+    const [component] = broken.sources[0]?.families[0]?.groups[0]?.components ?? [];
+    expect(component?.file).toBe("./z.stories.tsx");
+    expect(component?.stories.map((story) => story.exportName)).toEqual(["Overview"]);
+  });
+});
+
+describe("a component in several files", () => {
+  const merged = storyTree([
+    source({
+      "./text.stories.tsx": {
+        title: "Type/Text",
+        description: "Text in the type scale.",
+        keywords: ["copy"],
+        stories: [{ exportName: "Overview" }, { exportName: "Sizes" }]
+      },
+      "./text-playground.stories.tsx": {
+        title: "Type/Text",
+        controls: ["size"],
+        keywords: ["playground", "copy"],
+        stories: [{ exportName: "Playground" }, { exportName: "Hidden", tags: ["!dev"] }]
+      },
+      "./text-qa.stories.tsx": {
+        title: "Type/Text",
+        stories: [{ exportName: "Sizes" }, { exportName: "Wrapping" }]
+      }
+    })
+  ]);
+  const components = merged.sources[0]?.families[0]?.groups[0]?.components ?? [];
+  const [text] = components;
+
+  it("lists one component with every file's stories, in the order of the files' paths", () => {
+    expect(components).toHaveLength(1);
+    expect(text?.files).toEqual([
+      "./text-playground.stories.tsx",
+      "./text-qa.stories.tsx",
+      "./text.stories.tsx"
     ]);
+    expect(text?.stories.map((story) => [story.exportName, story.file])).toEqual([
+      ["Playground", "./text-playground.stories.tsx"],
+      ["Sizes", "./text-qa.stories.tsx"],
+      ["Wrapping", "./text-qa.stories.tsx"],
+      ["Overview", "./text.stories.tsx"]
+    ]);
+    expect(text?.unlisted.map((story) => story.id)).toEqual(["kit:type-text--hidden"]);
+  });
+
+  it("takes the docs and the page from the first file, each meta's settings for its own stories", () => {
+    expect(text?.file).toBe("./text-playground.stories.tsx");
+    expect(text?.stories[0]?.controls).toEqual(["size"]);
+    expect(text?.stories[3]?.controls).toBe("all");
+    expect(text?.keywords).toEqual(["playground", "copy"]);
+  });
+
+  it("refuses a second story with the same id, as Storybook does, and keeps the first", () => {
+    expect(merged.problems).toEqual([
+      'Kit: ./text.stories.tsx: story Sizes has the id "kit:type-text--sizes" of a story in ./text-qa.stories.tsx'
+    ]);
+    expect(findStory(merged, "kit:type-text--sizes")?.story.file).toBe("./text-qa.stories.tsx");
+  });
+});
+
+describe("ids a meta or a story writes, and former ids", () => {
+  const tree = storyTree([
+    source({
+      "./read-more.stories.tsx": { title: "Disclosure/ReadMore", stories: [{ exportName: "OpenByDefault" }] },
+      "./menu.stories.tsx": {
+        title: "Navigation/Menu",
+        id: "menus",
+        stories: [{ exportName: "Overview" }, { exportName: "Nested", id: "menus--deep" }]
+      }
+    })
+  ]);
+
+  it("takes the meta's id instead of its title, and a story's own id as written", () => {
+    expect(findComponentByTitle(tree, "kit", "Navigation/Menu")?.component.id).toBe("kit:menus");
+    expect(findStory(tree, "kit:menus--overview")?.story.exportName).toBe("Overview");
+    expect(findStory(tree, "kit:menus--deep")?.story.exportName).toBe("Nested");
+    expect(findComponent(tree, "kit:menus")?.component.title).toBe("Navigation/Menu");
+  });
+
+  it("refuses an empty id a story writes, and a component id another title already has", () => {
+    const clashing = storyTree([
+      source({
+        "./a.stories.tsx": { title: "Inputs/Read More", stories: [{ exportName: "Overview" }] },
+        "./b.stories.tsx": { title: "Inputs/Read-More", stories: [{ exportName: "Open" }] },
+        "./c.stories.tsx": { title: "Inputs/Badge", stories: [{ exportName: "Overview", id: "" }] }
+      })
+    ]);
+    expect(clashing.problems).toEqual([
+      'Kit: ./b.stories.tsx: "Inputs/Read-More" has the id "kit:inputs-read-more" of "Inputs/Read More"',
+      "Kit: ./c.stories.tsx: story Overview writes an empty id (`parameters.__id`)"
+    ]);
+    const components = clashing.sources[0]?.families[0]?.groups[0]?.components ?? [];
+    expect(components.map((component) => component.title)).toEqual(["Inputs/Badge", "Inputs/Read More"]);
+  });
+
+  it("still finds a story and a component by the id the former rule gave them", () => {
+    expect(findStory(tree, "kit:disclosure-read-more--open-by-default")?.story.id).toBe(
+      "kit:disclosure-readmore--open-by-default"
+    );
+    expect(findComponent(tree, "kit:disclosure-read-more")?.component.id).toBe("kit:disclosure-readmore");
+    expect(findStory(tree, "kit:disclosure-readmore--open-by-default")?.story.exportName).toBe(
+      "OpenByDefault"
+    );
   });
 });
 
 describe("designs", () => {
-  const fileLink = "https://www.figma.com/design/File1";
+  const fileLink: FigmaLink = { url: "https://www.figma.com/design/File1", kind: "design", fileKey: "File1" };
+  const nodeLink: FigmaLink = { ...fileLink, url: `${fileLink.url}?node-id=1-2`, nodeId: "1:2" };
 
   it("gives a story the meta's design unless it has its own, and the component the meta's", () => {
     const tree = storyTree([
       source({
         "A.stories.tsx": {
           title: "Inputs/A",
-          design: { figma: fileLink },
-          stories: [
-            { exportName: "Inherits" },
-            { exportName: "Own", design: { figma: `${fileLink}?node-id=1-2` } }
-          ]
+          design: fileLink,
+          stories: [{ exportName: "Inherits" }, { exportName: "Own", design: nodeLink }]
         }
       })
     ]);
     const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
-    expect(component?.design?.url).toBe(fileLink);
+    expect(component?.design?.url).toBe(fileLink.url);
     expect(component?.stories.map((story) => story.design?.nodeId)).toEqual([undefined, "1:2"]);
     expect(tree.problems).toEqual([]);
   });
 
-  it("reports a link that is not Figma's and keeps the component, without the link", () => {
+  it("gives a story whose own link the index refused no design, not the meta's, and reports the index's note", () => {
     const tree = storyTree([
       source({
         "A.stories.tsx": {
           title: "Inputs/A",
-          design: { figma: "https://figma.evil.example/design/File1/Kit" },
-          stories: [
-            { exportName: "Inherits" },
-            { exportName: "Own", design: { figma: "javascript:alert(1)" } }
-          ]
+          design: fileLink,
+          notes: ['story Own: `parameters.design.figma`: "javascript:alert(1)" is not a link to figma.com'],
+          stories: [{ exportName: "Inherits" }, { exportName: "Own", design: null }]
         }
       })
     ]);
     const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
-    expect(component?.design).toBeUndefined();
-    expect(component?.stories.map((story) => story.design)).toEqual([undefined, undefined]);
-    expect(tree.problems).toHaveLength(2);
-    expect(tree.problems[0]).toContain("A.stories.tsx: `parameters.design.figma`: ");
-    expect(tree.problems[1]).toContain("story Own");
+    expect(component?.stories.map((story) => story.design?.url)).toEqual([fileLink.url, undefined]);
+    expect(tree.problems).toEqual([
+      'Kit: A.stories.tsx: story Own: `parameters.design.figma`: "javascript:alert(1)" is not a link to figma.com'
+    ]);
+  });
+
+  it("gives each story of files with one title its own link, else its own file's meta's, and the component the first file's", () => {
+    const otherLink: FigmaLink = {
+      url: "https://www.figma.com/design/File2",
+      kind: "design",
+      fileKey: "File2"
+    };
+    const tree = storyTree([
+      source({
+        "./a.stories.tsx": {
+          title: "Inputs/A",
+          design: fileLink,
+          stories: [{ exportName: "First" }, { exportName: "Refused", design: null }]
+        },
+        "./a2.stories.tsx": {
+          title: "Inputs/A",
+          design: otherLink,
+          stories: [{ exportName: "More" }, { exportName: "Own", design: nodeLink }]
+        }
+      })
+    ]);
+    const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
+    expect(component?.design?.url).toBe(fileLink.url);
+    expect(component?.stories.map((story) => story.design?.url)).toEqual([
+      fileLink.url,
+      undefined,
+      otherLink.url,
+      nodeLink.url
+    ]);
   });
 });
 
@@ -356,11 +511,11 @@ describe("aliases and related components", () => {
       { name: undefined, components: [], aliases: [{ name: "DataTable", title: "Recipes/DataTable" }] }
     ]);
     // one story per export: the alias adds no story, so no second test or image
-    expect(sidebarStoryIds(tree, GROUPS).filter((id) => id.startsWith("kit:recipes-data-table"))).toEqual([
-      "kit:recipes-data-table--overview",
-      "kit:recipes-data-table--sorted"
+    expect(sidebarStoryIds(tree, GROUPS).filter((id) => id.startsWith("kit:recipes-datatable"))).toEqual([
+      "kit:recipes-datatable--overview",
+      "kit:recipes-datatable--sorted"
     ]);
-    expect(findComponent(tree, "kit:recipes-data-table")?.component.alsoIn).toEqual(["Data/Tables", "Lists"]);
+    expect(findComponent(tree, "kit:recipes-datatable")?.component.alsoIn).toEqual(["Data/Tables", "Lists"]);
     expect(tree.problems).toEqual([]);
   });
 
