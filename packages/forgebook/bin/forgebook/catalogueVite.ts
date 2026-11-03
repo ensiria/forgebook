@@ -1,6 +1,7 @@
 /**
  * The Vite configuration the `forgebook` command runs a catalogue with: its folder as the root, Forgebook's plugin
- * with the configuration already read, and the framework's own plugins; and where the command line puts the frames.
+ * with the configuration already read, the framework's own plugins, and the server's export conditions taken from the
+ * pages'; and where the command line puts the frames.
  *
  * @module
  */
@@ -10,6 +11,7 @@ import type { InlineConfig } from "vite";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../../src/vite/framesConfig.ts";
+import { serverConditions } from "../../src/vite/serverConditions.ts";
 import { unresolvedImports } from "./viteCache.ts";
 
 /**
@@ -41,7 +43,9 @@ export const catalogueVite = async (
     plugins: [
       forgebookPlugin({ config }),
       ...((await config.framework.vitePlugins?.()) ?? []),
-      ...(overrides.plugins ?? [])
+      ...(overrides.plugins ?? []),
+      // the server loads the stories and previews for tools: it resolves them as the pages do
+      serverConditions()
     ]
   };
 };
