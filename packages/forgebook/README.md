@@ -577,6 +577,11 @@ A story's id starts with its source's (`ui:actions-button--plain`), so two packa
 through the `tsconfig.json` that holds the story file: the package's own, or the first one up its folders that lists it. This repository's fixture catalogue is built this way, on two packages, and its
 browser tests run in CI.
 
+A monorepo that points its packages at their sources with an export condition (`"source": "./src/index.ts"` in
+`exports`, and `source` in Vite's `resolve.conditions`, set by a framework's plugins) needs nothing more with the
+`forgebook` command: its dev server reads the stories and previews it answers tools with on Node under the same
+conditions, those of other runtimes (`browser`) aside, unless a plugin names the server's own.
+
 ## Commands
 
 | Command | What it does |
