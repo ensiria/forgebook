@@ -56,6 +56,25 @@ const settled = (): Promise<void> =>
   });
 
 /**
+ * Calls back each time React puts the story in the page: its effect runs after every commit of the story, and not
+ * when the story threw.
+ *
+ * @param props - the story, and what to call.
+ */
+const Committed = ({
+  children,
+  onCommit
+}: {
+  readonly children: ReactNode;
+  readonly onCommit: () => void;
+}): ReactNode => {
+  useEffect(() => {
+    onCommit();
+  });
+  return children;
+};
+
+/**
  * The decorator outside every other: what the catalogue's decorators return, its server components swapped for their
  * stand-ins, in a boundary that waits for them.
  *
@@ -65,15 +84,21 @@ const settled = (): Promise<void> =>
  * A server render (the generated tests) has no boundary: one would turn the story's error into an empty boundary, and
  * the test must see it fail.
  *
- * @param hasBoundary - whether the story is drawn in a boundary.
+ * @param onCommit - what to call each time React put the story in the page; none on a server, with no boundary.
  * @returns the decorator.
  */
 const serverComponentsDecorator =
-  (hasBoundary: boolean): LoadedDecorator =>
+  (onCommit: (() => void) | undefined): LoadedDecorator =>
   (story: () => unknown): unknown => {
     const tree = withServerComponents(story());
     const drawable = isDrawable(tree) ? tree : null;
-    return hasBoundary ? <Suspense fallback={<Waiting />}>{drawable}</Suspense> : drawable;
+    return onCommit === undefined ? (
+      drawable
+    ) : (
+      <Committed onCommit={onCommit}>
+        <Suspense fallback={<Waiting />}>{drawable}</Suspense>
+      </Committed>
+    );
   };
 
 /**
@@ -99,12 +124,12 @@ const withServerStory = (story: LoadedStory): LoadedStory => {
  * catalogue's.
  *
  * @param drawing - the drawing the frame gave.
- * @param hasBoundary - whether the story is drawn in a boundary (in the page, not on a server).
+ * @param onCommit - what to call each time React put the story in the page; none on a server.
  */
-const withNext = (drawing: StoryDrawing, hasBoundary: boolean): StoryDrawing => ({
+const withNext = (drawing: StoryDrawing, onCommit: (() => void) | undefined): StoryDrawing => ({
   ...drawing,
   story: withServerStory(drawing.story),
-  decorators: [...drawing.decorators, serverComponentsDecorator(hasBoundary)]
+  decorators: [...drawing.decorators, serverComponentsDecorator(onCommit)]
 });
 
 /** React's renderer for a Next.js project. */
@@ -113,24 +138,34 @@ export const nextRenderer: StoryRenderer = {
     setCurrentStore(createRouteStore(first.story.parameters, first.onEvent));
     forgetServerResults();
     let hasFailed = false;
-    const mounted = reactRenderer.mount(canvas, withNext(first, true), (error: Error): void => {
+    let markDrawn = (): void => undefined;
+    const drawn = new Promise<void>((resolve) => {
+      markDrawn = resolve;
+    });
+    // a drawing counts once nothing it waits for is left, unless it threw meanwhile (a server component that calls
+    // `notFound`), as React's renderer does not count one that throws at once; new args are a new drawing, so a story
+    // that threw is drawn when other args draw it
+    const onCommit = (): void => {
+      void settled().then(() => {
+        if (!hasFailed) markDrawn();
+      });
+    };
+    const mounted = reactRenderer.mount(canvas, withNext(first, onCommit), (error: Error): void => {
       hasFailed = true;
       onError(error);
     });
-    // a story that throws while it waits (a server component that calls `notFound`) is never drawn, as React's
-    // renderer leaves one that throws at once
-    const drawn = mounted.drawn
-      .then(settled)
-      .then(() => (hasFailed ? new Promise<void>(() => undefined) : undefined));
     return {
       drawn,
-      update: (next: StoryDrawing): void => mounted.update(withNext(next, true)),
+      update: (next: StoryDrawing): void => {
+        hasFailed = false;
+        mounted.update(withNext(next, onCommit));
+      },
       unmount: mounted.unmount
     };
   },
   renderToString: (drawing: StoryDrawing): Promise<string> | string => {
     setCurrentStore(createRouteStore(drawing.story.parameters, drawing.onEvent));
     forgetServerResults();
-    return reactRenderer.renderToString(withNext(drawing, false));
+    return reactRenderer.renderToString(withNext(drawing, undefined));
   }
 };
