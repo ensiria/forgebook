@@ -11,11 +11,11 @@ import { useEffect } from "react";
 
 import { useStored } from "./useStored.ts";
 
-/** A page the home can list: a story's or a component's, by id. */
+/** A page the home can list: a story's, a component's or a docs page, by id. */
 export type RecentPage = {
   /** Which kind of page. */
-  readonly kind: "story" | "component";
-  /** The story's or the component's id. */
+  readonly kind: "story" | "component" | "page";
+  /** The story's, the component's or the docs page's id. */
   readonly id: string;
 };
 
@@ -30,7 +30,7 @@ const isRecentPage = (value: unknown): value is RecentPage =>
   typeof value === "object" &&
   value !== null &&
   "kind" in value &&
-  (value.kind === "story" || value.kind === "component") &&
+  (value.kind === "story" || value.kind === "component" || value.kind === "page") &&
   "id" in value &&
   typeof value.id === "string";
 

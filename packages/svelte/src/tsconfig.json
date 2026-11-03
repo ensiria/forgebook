@@ -1,0 +1,11 @@
+// The Svelte package's sources that run in a page: the renderer, its host component, the frame page and the code writer,
+// checked by `svelte-check`, which reads `.svelte` files. `vite/` runs on Node and has its own tsconfig.json.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": ["."],
+  "exclude": ["vite"]
+}

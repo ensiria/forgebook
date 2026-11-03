@@ -4,6 +4,7 @@
  * @module
  */
 import type { ComponentDocs } from "../../src/componentDocs.ts";
+import type { DesignToken } from "../../src/vite/designTokens.ts";
 
 /** One exported function, value or type of a module. */
 export type ExportDocs = {
@@ -65,8 +66,22 @@ export type CatalogueComponent = {
   readonly stories: readonly string[];
   /** The export name of its main story (`parameters.main`, else its first); none without stories. */
   readonly mainStory: string | undefined;
+  /** Its main story's id without the source's, as Storybook's (its own id, else the meta's and the export's). */
+  readonly mainStoryId: string | undefined;
   /** Whether every story of its file is about logic (`parameters.logic`): a hook or a function, listed by its call. */
   readonly isLogic: boolean;
+  /** The link to its design in Figma (the meta's `parameters.design.figma`), when it has a valid one. */
+  readonly design: string | undefined;
+};
+
+/** One docs page of the package. */
+export type CataloguePage = {
+  /** Its title (`Guides/Theming`). */
+  readonly title: string;
+  /** Its file, relative to the package's folder. */
+  readonly file: string;
+  /** What it is about, in a sentence; none when it does not say. */
+  readonly description: string | undefined;
 };
 
 /** Everything `CATALOG.md` lists. */
@@ -79,12 +94,16 @@ export type CatalogueData = {
   readonly sourceId: string | undefined;
   /** The components with stories, by title. */
   readonly components: readonly CatalogueComponent[];
+  /** The docs pages its source declares, in reading order; none by default. */
+  readonly pages?: readonly CataloguePage[];
   /** The other exported modules. */
   readonly modules: readonly ModuleDocs[];
   /** The public Sass modules. */
   readonly sassModules: readonly SassModuleDocs[];
   /** The published style sheets. */
   readonly styleSheets: readonly StyleSheetDocs[];
+  /** The design tokens its source gives, in the files' order. */
+  readonly tokens: readonly DesignToken[];
 };
 
 /** The `--json` document. */
@@ -95,13 +114,15 @@ export type CatalogueDocsReport = {
   readonly file: string;
   /** `llms.txt`, beside it, relative to the folder the command runs in. */
   readonly llmsFile: string;
-  /** How many components, modules, Sass modules and style sheets it lists. */
+  /** How many components, modules, Sass modules, style sheets and design tokens it lists. */
   readonly counts: {
     readonly components: number;
+    readonly pages: number;
     readonly modules: number;
     readonly sassModules: number;
     readonly styleSheets: number;
+    readonly tokens: number;
   };
-  /** Story files that could not be read, with why. */
+  /** What could not be read, with why: a story file, a tokens file, a token. */
   readonly problems: readonly string[];
 };

@@ -35,7 +35,16 @@ export type StoryGroupSetting = {
 };
 
 /** The tabs of the panel under a story. */
-export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y", "signature"] as const;
+export const PANEL_TAB_IDS = [
+  "props",
+  "events",
+  "play",
+  "parts",
+  "code",
+  "design",
+  "a11y",
+  "signature"
+] as const;
 
 /** A tab of the panel under a story. */
 export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
@@ -50,8 +59,11 @@ export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width"] as const;
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
 
-/** What `controls` turns off: one of Forgebook's own controls, or its ready-made direction or touch switch. */
-export type TurnedOffControl = OwnControlId | "direction" | "touch";
+/**
+ * What `controls` turns off: one of Forgebook's own controls, its ready-made direction or touch switch, or the story
+ * bar's Embed button.
+ */
+export type TurnedOffControl = OwnControlId | "direction" | "touch" | "embed";
 
 /** The accessibility rules the Accessibility tab and the generated tests check. */
 export type A11ySettings = {
@@ -93,7 +105,8 @@ export type CatalogueLists = {
   /**
    * Forgebook's own controls turned off (`{ sheets: false }`): shown nowhere, and the background, the style sheets
    * and the text size keep their default; the stage's width is still set by the stage's handle. `direction: false`
-   * and `touch: false` drop the ready-made direction and touch switches.
+   * and `touch: false` drop the ready-made direction and touch switches. `embed: false` takes the Embed button off
+   * the story bar; a `?embed` address still works, since any page can frame what it can open.
    */
   readonly controls?: Readonly<Partial<Record<TurnedOffControl, false>>>;
   /**
@@ -166,6 +179,8 @@ export type CatalogueSettings = {
   readonly toolbar: readonly string[];
   /** Whether a component's page offers "Used in". */
   readonly hasUsedIn: boolean;
+  /** Whether the story bar offers the Embed button. */
+  readonly hasEmbed: boolean;
   /** The shell's appearance before a reader picks one. */
   readonly appearance: Appearance;
   /** The keys that cycle the controls, by control id. */
@@ -315,6 +330,7 @@ export const catalogueSettings = (
     ownControls,
     toolbar,
     hasUsedIn: lists.usedIn !== false,
+    hasEmbed: controlsOff.embed !== false,
     appearance: lists.appearance ?? "system",
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
     views: catalogueViews(switches, lists.views)

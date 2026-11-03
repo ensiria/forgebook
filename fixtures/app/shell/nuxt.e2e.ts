@@ -6,9 +6,9 @@
  */
 import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 
-import { NUXT_PORT } from "./ports";
+import { catalogueUrl } from "./ports";
 
-test.use({ baseURL: `http://127.0.0.1:${NUXT_PORT}/` });
+test.use({ baseURL: catalogueUrl("nuxt") });
 
 /** Every story of the fixture, by its id without the source. */
 const STORY_IDS = [

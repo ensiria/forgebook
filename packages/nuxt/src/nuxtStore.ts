@@ -68,7 +68,7 @@ export type AsyncDataEntry = {
   refresh: (() => Promise<void>) | undefined;
 };
 
-/** Tells the catalogue about a call: the frame's event report, when the catalogue gives one. */
+/** Tells the catalogue about a call: the drawing's `onEvent`, when the catalogue gives one. */
 export type CallReport = (name: string, values: readonly unknown[]) => void;
 
 /** The app `useNuxtApp` returns: what of Nuxt's a component reads from it. */
@@ -233,13 +233,13 @@ const recordMoves = (router: Router, record: (name: string, values: readonly unk
  *
  * @param project - what the page knows of the project.
  * @param parameters - the story's parameters, which give its route, data, state, cookies and config.
- * @param report - tells the catalogue about each call; none outside a catalogue.
+ * @param onEvent - tells the catalogue about each call (the drawing's `onEvent`); none outside a catalogue.
  * @param place - where the story is drawn: in the page, or on the server; the page by default.
  */
 export const createNuxtStore = (
   project: NuxtProject,
   parameters: Readonly<Record<string, unknown>>,
-  report: CallReport | undefined,
+  onEvent: CallReport | undefined,
   place: "page" | "server" = "page"
 ): NuxtStore => {
   const read = storyNuxtOf(parameters);
@@ -266,7 +266,7 @@ export const createNuxtStore = (
   const made: NuxtCall[] = [];
   const record = (name: string, values: readonly unknown[]): void => {
     made.push({ name, values });
-    report?.(name, values);
+    onEvent?.(name, values);
   };
   recordMoves(router, record);
   let keys = 0;

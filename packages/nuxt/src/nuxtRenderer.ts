@@ -42,12 +42,12 @@ export const createNuxtRenderer = (project: NuxtProject): StoryRenderer => {
   const storeFor = (drawing: StoryDrawing, place: "page" | "server"): SharedStore => {
     // a server render is never taken away, so each has a store of its own
     if (place === "server")
-      return { store: createNuxtStore(project, drawing.story.parameters, drawing.report, place), apps: 0 };
+      return { store: createNuxtStore(project, drawing.story.parameters, drawing.onEvent, place), apps: 0 };
     const id = drawing.identity.id;
     const known = shared.get(id);
     if (known !== undefined) return known;
     const created: SharedStore = {
-      store: createNuxtStore(project, drawing.story.parameters, drawing.report, place),
+      store: createNuxtStore(project, drawing.story.parameters, drawing.onEvent, place),
       apps: 0
     };
     shared.set(id, created);

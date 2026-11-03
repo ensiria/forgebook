@@ -33,12 +33,12 @@ const canvas = (): HTMLElement => {
  *
  * @param render - what the story draws.
  * @param nuxt - its `parameters.nuxt`.
- * @param report - where its calls are told.
+ * @param onEvent - where its calls are told.
  */
 export const drawing = (
   render: () => VNode,
   nuxt: Readonly<Record<string, unknown>> = {},
-  report?: (name: string, values: readonly unknown[]) => void
+  onEvent?: (name: string, values: readonly unknown[]) => void
 ): StoryDrawing => {
   const story = readStory(
     { default: { title: "Shop/Thing" }, Plain: { render, parameters: { nuxt } } },
@@ -54,7 +54,7 @@ export const drawing = (
     decorators: [],
     globals: {},
     loaded: {},
-    ...(report === undefined ? {} : { report })
+    ...(onEvent === undefined ? {} : { onEvent })
   };
 };
 

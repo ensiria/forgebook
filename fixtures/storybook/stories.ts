@@ -7,6 +7,7 @@
 /// <reference types="@forgebook/story-format/client" />
 import type { StorySource } from "@forgebook/story-format/source";
 
+import docs from "./docs/*.md?forgebook-docs-pages";
 import jsxFiles from "./src/**/*.stories.jsx?forgebook-files";
 import tsxFiles from "./src/**/*.stories.tsx?forgebook-files";
 
@@ -15,5 +16,6 @@ export const source: StorySource = {
   id: "sb",
   name: "Storybook stories",
   files: [tsxFiles, jsxFiles],
+  docs: [docs],
   sheets: { required: [], theme: [], restyled: [] }
 };

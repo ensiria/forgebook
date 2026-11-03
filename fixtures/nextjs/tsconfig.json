@@ -1,0 +1,21 @@
+// The Next.js fixture: the app's own settings (its `@/` paths), and the catalogue's configuration read by Node.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": { "@/*": ["./*"] },
+    "allowImportingTsExtensions": true,
+    // a Next.js app reads a CSS module's classes as `styles.hero`, as create-next-app writes it
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": [
+    "app",
+    "components",
+    "lib",
+    "forgebook.config.ts",
+    "forgebook.preview.tsx",
+    "next.config.ts",
+    "types.d.ts"
+  ]
+}
