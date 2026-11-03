@@ -28,6 +28,7 @@
     ".": "./src/stories.ts",
     "./docs": "./src/vite/extractDocs.ts",
     "./frame": "./src/mountFrame.ts",
+    "./frame-renderer": "./src/nativeFrameRenderer.ts",
     "./renderer": "./src/nativeRenderer.ts",
     "./vite": "./src/vite/reactNativeWeb.ts"
   },
@@ -100,6 +101,10 @@
       "./frame": {
         "types": "./dist/src/mountFrame.d.ts",
         "default": "./dist/src/mountFrame.js"
+      },
+      "./frame-renderer": {
+        "types": "./dist/src/nativeFrameRenderer.d.ts",
+        "default": "./dist/src/nativeFrameRenderer.js"
       },
       "./renderer": {
         "types": "./dist/src/nativeRenderer.d.ts",

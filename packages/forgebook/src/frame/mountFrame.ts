@@ -45,18 +45,18 @@ import { storyFrameClock } from "./frameClock.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
-import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
+import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
+import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
 import { type ShellChannel, shellChannel } from "./shellChannel.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
-import type { MockToolsLoader } from "./storyMocks.ts";
 import { mergedPreviews, readPreview, readStory, startingGlobals } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {
   /** The framework that draws the stories (`@forgebook/react` passes its own). */
-  readonly renderer: StoryRenderer;
+  readonly renderer: FrameRenderer;
   /** The sources the shell shows, in the same order. */
   readonly sources: readonly StorySource[];
   /** The address of axe's script, for the Accessibility card; the generated page gives it. */
@@ -74,8 +74,8 @@ export type FrameConfig = {
   readonly lists?: CatalogueLists;
   /** Loads the play tools, when the project installs Testing Library (the generated frame passes it then). */
   readonly playTools?: PlayToolsLoader;
-  /** Loads MSW, for a story that mocks its API; none when the project does not install it. */
-  readonly mockTools?: MockToolsLoader;
+  /** The plugins with a frame module (the generated frame passes them); none by default. */
+  readonly plugins?: readonly FramePlugin[];
   /** Where the frames run, so the frame hears only its shell: on the catalogue's own origin by default. */
   readonly frames?: FramesPlacement;
 };
@@ -134,14 +134,9 @@ const answerShell = (
   }
 };
 
-/** The tools a project installed, for a story that uses them. */
-const optionalTools = ({
-  playTools,
-  mockTools
-}: FrameConfig): Pick<StoryRunOptions, "playTools" | "mockTools"> => ({
-  ...(playTools === undefined ? {} : { playTools }),
-  ...(mockTools === undefined ? {} : { mockTools })
-});
+/** The play tools a project installed, for a story that uses them. */
+const playToolsOf = ({ playTools }: FrameConfig): Pick<StoryRunOptions, "playTools"> =>
+  playTools === undefined ? {} : { playTools };
 
 /**
  * Shows the story the address names in the given element.
@@ -252,6 +247,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       fail(first);
       return;
     }
+    const plugins = startPluginFrames(config.plugins, storyId, tellShell);
     let story = first;
     fixed = fixedViewOf(story.globals, story.parameters, catalogue);
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
@@ -290,17 +286,20 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         argTypes: panelArgTypesOf(story.argTypes, excludedControls(story.parameters["controls"])),
         controls: story.controls,
         actions: actionNames(story.args, story.argTypes),
-        fixed
+        fixed,
+        parameters: Object.keys(story.parameters)
       });
     };
     const running = runStory({
       container,
       story,
       identity: { id: storyId, name: location.story.name, title: location.component.title },
-      ...optionalTools(config),
+      ...playToolsOf(config),
+      pluginSetups: plugins.setups,
       renderer: config.renderer,
       clock,
-      decorators: preview.decorators,
+      // the first of the list is the innermost
+      decorators: [...preview.decorators, ...plugins.decorators],
       ...shown,
       resolveArgs: (args: PanelArgs): Readonly<Record<string, unknown>> =>
         storyArgsOf(args, source.namedValues),
@@ -375,7 +374,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         return;
       }
       story = next;
-      running.setStory(next, preview.decorators);
+      running.setStory(next, [...preview.decorators, ...plugins.decorators]);
       if (controls !== undefined) tellReady();
     };
     // the shell opens another story by loading another page: the set-ups' cleanups run as this one goes (a page kept

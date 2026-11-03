@@ -17,6 +17,7 @@ import { isViolation, type Violation } from "./a11y.ts";
 import { isPanelArgTypes, type PanelArgTypes } from "./argTypes.ts";
 import { isMatrix, type Matrix } from "./matrix.ts";
 import { isPlayTrace, type PlayTrace } from "./playTrace.ts";
+import type { JsonValue } from "./plugin.ts";
 import { type ClockState, isClockRate } from "./storyClock.ts";
 import { type FixedView, isFixedView } from "./storyGlobals.ts";
 import { type LiveView, MEASURE_TOOLS, type MeasureTool } from "./viewState.ts";
@@ -64,6 +65,8 @@ export type FrameMessage =
       readonly actions: readonly string[];
       /** What the story fixes of the view (its `globals`, Storybook's backgrounds and viewport). */
       readonly fixed: FixedView;
+      /** The names of the story's parameters, which decide the plugins' tabs. */
+      readonly parameters: readonly string[];
     }
   | {
       /** The story's height changed. */
@@ -124,6 +127,20 @@ export type FrameMessage =
       readonly storyId: string;
       /** How many elements spill out of their parents. */
       readonly count: number;
+    }
+  | {
+      /** A plugin's frame module told its tab about the story. */
+      readonly type: "forgebook:plugin";
+      /** The story's id. */
+      readonly storyId: string;
+      /** The plugin's id. */
+      readonly plugin: string;
+      /** What its tabs receive. */
+      readonly value: JsonValue;
+      /** A short note beside a tab's name; none shows nothing. */
+      readonly hint: string | null;
+      /** The tab the note is for; none for the plugin's first. */
+      readonly tab: string | null;
     };
 
 /** From the shell to a frame. */
@@ -244,6 +261,19 @@ const isControlsSetting = (value: unknown): value is StoryControlsSetting =>
 const isTextKeys = (value: unknown): value is Readonly<Record<string, string>> =>
   isRecord(value) && Object.values(value).every((key) => typeof key === "string");
 
+/** Whether a value stays what it is as JSON. */
+const isJsonValue = (value: unknown): value is JsonValue => {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  // a date or a map crosses between the documents as it is, and would not be what a tab reads as JSON
+  return (
+    isRecord(value) &&
+    Object.getPrototypeOf(value) === Object.prototype &&
+    Object.values(value).every(isJsonValue)
+  );
+};
+
 /**
  * Whether a received message is one a frame sends.
  *
@@ -261,7 +291,8 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
         isPanelArgTypes(value["argTypes"]) &&
         isControlsSetting(value["controls"]) &&
         isStringList(value["actions"]) &&
-        isFixedView(value["fixed"])
+        isFixedView(value["fixed"]) &&
+        isStringList(value["parameters"])
       );
     case "forgebook:size":
       return typeof value["height"] === "number";
@@ -281,6 +312,13 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
       return isPlayTrace(value["trace"]);
     case "forgebook:checked":
       return Array.isArray(value["violations"]) && value["violations"].every(isViolation);
+    case "forgebook:plugin":
+      return (
+        typeof value["plugin"] === "string" &&
+        isJsonValue(value["value"]) &&
+        (value["hint"] === null || typeof value["hint"] === "string") &&
+        (value["tab"] === null || typeof value["tab"] === "string")
+      );
     default:
       return false;
   }

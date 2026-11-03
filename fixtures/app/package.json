@@ -13,6 +13,8 @@
   "devDependencies": {
     "@fixture/kit": "workspace:*",
     "@fixture/storybook": "workspace:*",
+    "@forgebook/plugin-figma": "workspace:*",
+    "@forgebook/plugin-msw": "workspace:*",
     "@forgebook/react": "workspace:*",
     "@forgebook/testing": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",

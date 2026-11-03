@@ -23,12 +23,11 @@ import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
-import type { MountedStory, StoryDrawing, StoryIdentity, StoryRenderer } from "./renderer.ts";
+import type { FrameRenderer, MountedStory, StoryDrawing, StoryIdentity } from "./renderer.ts";
 import { animationsSettled } from "./settle.ts";
 import { storyCanvas } from "./storyCanvas.ts";
 import { type PreparedStory, prepareStory } from "./storyHooks.ts";
-import { type MockToolsLoader, startStoryMocks } from "./storyMocks.ts";
-import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
+import type { LoadedArgs, LoadedBeforeEach, LoadedStory } from "./storyModule.ts";
 
 /** What the shell can do to a running story. */
 export type StoryControls = {
@@ -61,10 +60,10 @@ export type StoryRunOptions = {
   readonly identity: StoryIdentity;
   /** Loads the play tools the project installed, for the first play; none without them. */
   readonly playTools?: PlayToolsLoader;
-  /** Loads MSW, for a story that mocks its API; none when the project does not install it. */
-  readonly mockTools?: MockToolsLoader;
+  /** What the plugins prepare before every mount, ahead of the story's loaders. */
+  readonly pluginSetups: readonly LoadedBeforeEach[];
   /** The framework that draws it. */
-  readonly renderer: StoryRenderer;
+  readonly renderer: FrameRenderer;
   /** The story clock the story reads: running from its start for a Live story, held otherwise. */
   readonly clock: FrameClock;
   /** The texts inside the stories in the shown language. */
@@ -125,7 +124,7 @@ export type RunningStory = {
   /**
    * Draws the story as its edited file now writes it, in place: what the reader did in it stays (a typed field, an
    * open menu), and so do the values set in the panel. A story with a play, loaders or set-ups is mounted anew, and
-   * they run again; its mocks stay those its first mount started.
+   * they run again, as do the plugins' preparations.
    *
    * @param next - the story, read from the edited file.
    * @param decorators - the decorators around it, when an edit of a preview changed them; the same ones by default.
@@ -156,6 +155,25 @@ const clearSpies = (args: LoadedArgs): void => {
   }
 };
 
+/** How long a mount waits for the mount before it to be undone, in milliseconds. */
+const CLEANUP_WAIT = 2000;
+
+/**
+ * Waits for a cleanup, for so long: one that never ends (a mocked request held open) must not keep the story blank for
+ * good, with every later mount behind it.
+ *
+ * @param cleanup - the cleanup, running.
+ * @param wait - the most to wait, in milliseconds.
+ * @throws What the cleanup throws, in time.
+ */
+const settledWithin = async (cleanup: Promise<void>, wait: number): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, wait);
+  });
+  await Promise.race([cleanup, late]).finally(() => clearTimeout(timer));
+};
+
 /** A story before its loaders ran, or after its set-ups were undone: nothing loaded, nothing to undo. */
 const NOT_PREPARED: PreparedStory = { loaded: {}, cleanup: async (): Promise<void> => undefined };
 
@@ -182,10 +200,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let mountCount = 0;
   let hasPlayed = false;
   let prepared: PreparedStory = NOT_PREPARED;
-  // the story's mocks, started by its first mount and kept until the page is left: a story drawn again has the same
-  // handlers, and stopping MSW's worker to start it at once again lets the worker forget the page after it started
-  // serving it again, so the new mount's requests would go to the network
-  let mocks: Promise<() => void> | undefined;
+  let preparing: Promise<void> = Promise.resolve();
 
   // the story's actions are recorded whatever the shell names: a spy, an `argTypes` action
   let actions = actionNames(story.args, story.argTypes);
@@ -365,17 +380,31 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     const previous = prepared;
     prepared = NOT_PREPARED;
     try {
-      await previous.cleanup();
-      mocks ??= startStoryMocks(story.parameters, options.mockTools);
-      await mocks;
-      const next = await prepareStory(story, {
+      await settledWithin(previous.cleanup(), CLEANUP_WAIT);
+      const context = {
         ...options.identity,
         args: shownArgs(),
         text,
         clock,
         globals,
         parameters: story.parameters
+      };
+      // ahead of the story's loaders, which may depend on them: a mocked API answers a loader's fetch
+      const plugins = await prepareStory({ loaders: [], beforeEach: options.pluginSetups }, context);
+      const hooks = await prepareStory(story, context).catch(async (error: unknown) => {
+        await plugins.cleanup();
+        throw error;
       });
+      const next: PreparedStory = {
+        ...hooks,
+        cleanup: async (): Promise<void> => {
+          try {
+            await hooks.cleanup();
+          } finally {
+            await plugins.cleanup();
+          }
+        }
+      };
       // a later mount started while this one loaded: its set-ups are undone, the later one draws
       if (count !== mountCount) {
         await next.cleanup();
@@ -390,11 +419,18 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   };
 
   // a new mount draws the story from scratch: its loaders and set-ups run again, its own state starts over and its
-  // play function runs again
+  // play function runs again; it waits for the mount before it, whose set-ups it must undo, and one overtaken meanwhile
+  // never starts: two at once would hold what only one can (a mocked API's worker)
   const mountStory = (): void => {
     unmountAll();
     mountCount += 1;
-    void prepareMount(mountCount).then((isLast) => {
+    const count = mountCount;
+    const turn = preparing.then(() => (count === mountCount ? prepareMount(count) : false));
+    preparing = turn.then(
+      () => undefined,
+      () => undefined
+    );
+    void turn.then((isLast) => {
       if (!isLast) return;
       // a framework may throw while it starts drawing, before its own error capture is in place: shown as any error
       try {
@@ -414,10 +450,6 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       const previous = prepared;
       prepared = NOT_PREPARED;
       void previous.cleanup();
-      void mocks?.then(
-        (stopMocks) => stopMocks(),
-        () => undefined
-      );
     },
     setShown: (shown: Pick<StoryDrawing, "texts" | "globals">): void => {
       ({ texts, globals } = shown);

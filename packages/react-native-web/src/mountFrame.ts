@@ -7,7 +7,7 @@
  */
 import { type FrameConfig, mountFrame as mountForgebookFrame } from "forgebook/frame";
 
-import { nativeRenderer } from "./nativeRenderer.ts";
+import { nativeFrameRenderer } from "./nativeFrameRenderer.ts";
 
 /**
  * Shows the story the address names in the given element, drawn with React Native's components.
@@ -16,4 +16,4 @@ import { nativeRenderer } from "./nativeRenderer.ts";
  * @param config - the sources and the languages, as the shell's configuration gives them.
  */
 export const mountFrame = (container: HTMLElement, config: Omit<FrameConfig, "renderer">): Promise<void> =>
-  mountForgebookFrame(container, { ...config, renderer: nativeRenderer });
+  mountForgebookFrame(container, { ...config, renderer: nativeFrameRenderer });

@@ -163,7 +163,7 @@ describe("forgebookPlugin's pages", () => {
     tokens: [],
     watch: [],
     lists: {},
-    hasMocks: false,
+    plugins: [],
     hasPlayTools: false,
     frames: ISOLATED_FRAMES,
     build: { readableNames: false }

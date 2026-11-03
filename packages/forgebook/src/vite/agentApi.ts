@@ -97,7 +97,7 @@ const agentDesign = (
 ): { readonly design?: AgentDesign } => {
   if (story.design === undefined) return {};
   const onTab = new URLSearchParams(view);
-  onTab.set("tab", "design");
+  onTab.set("tab", "figma");
   return {
     design: {
       ...agentDesignLink(story.design),

@@ -181,11 +181,13 @@ import { describeAdapter } from "@forgebook/testing/conformance";
 describeAdapter({ name: "Solid", renderer, drawing, decorator, codeOf, docsOf });
 ```
 
-`drawing(name)` gives a story with a button showing `Hello <name> <clicks>`, its clicks in its own state, which throws for
-`THROWING_NAME`. `decorator(label)` draws a story inside a `section` with that `data-decorator`. A renderer's
-`renderToString` may return a promise. A framework whose page and server builds differ runs the suite twice, with
-`half: "page"` in a simulated page and `half: "server"` in Node: Svelte compiles a component apart for each, and Solid's
-`solid-js/web` is its browser build or its server build, never both. `test/conformance.test.tsx` in `@forgebook/react`
-and `@forgebook/preact`, `test/conformance.test.ts` in `@forgebook/vue`, `@forgebook/web-components`,
-`@forgebook/html` and `@forgebook/angular`, and the two `conformance` tests of `@forgebook/svelte` and of
-`@forgebook/solid` are complete examples.
+`drawing(name)` gives a story with a button showing `Hello <name> <clicks>`, its clicks in its own state, which throws
+for `THROWING_NAME`. `decorator(label)` draws a story inside a `section` with that `data-decorator`. A renderer's
+`renderToString` may return a promise. The frame takes only the drawing half, a `FrameRenderer` of `forgebook/renderer`:
+a framework's frame page imports a module without the server render, so the server renderer stays out of a static
+catalogue and of a first start's pre-bundle (`reactFrameRenderer` in `@forgebook/react`). A framework whose page and
+server builds differ runs the suite twice, with `half: "page"` in a simulated page and `half: "server"` in Node: Svelte
+compiles a component apart for each, and Solid's `solid-js/web` is its browser build or its server build, never both.
+`test/conformance.test.tsx` in `@forgebook/react` and `@forgebook/preact`, `test/conformance.test.ts` in
+`@forgebook/vue`, `@forgebook/web-components`, `@forgebook/html` and `@forgebook/angular`, and the two `conformance`
+tests of `@forgebook/svelte` and of `@forgebook/solid` are complete examples.
