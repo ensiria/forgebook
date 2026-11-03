@@ -14,6 +14,8 @@
  * @module
  */
 import type { AudienceId } from "../audiences.ts";
+import type { TreePage } from "../pageTree.ts";
+import type { StoryTree } from "../storyTree.ts";
 import { textsOfGroup } from "./strings.ts";
 
 /** A part of the page around its frames. */
@@ -258,3 +260,17 @@ export const AUDIENCE_TEXTS = textsOfGroup("audienceTexts", {
   coverageCheckAll: "Check every story",
   coverageChecked: (done: number, total: number): string => `${done} of ${total} checked`
 });
+
+/**
+ * The docs pages that show a component: one of its stories, or its API table.
+ *
+ * @param tree - the tree.
+ * @param id - the component's id.
+ * @param storyIds - its stories' ids.
+ */
+export const pagesAbout = (tree: StoryTree, id: string, storyIds: readonly string[]): TreePage[] =>
+  tree.sources.flatMap((source) =>
+    source.pages.filter(
+      (page) => page.components.includes(id) || page.stories.some((story) => storyIds.includes(story))
+    )
+  );

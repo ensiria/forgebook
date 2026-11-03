@@ -144,20 +144,6 @@ export const findPage = (tree: StoryTree, id: string): PageLocation | undefined 
   return undefined;
 };
 
-/**
- * The docs pages that show a component: one of its stories, or its API table.
- *
- * @param tree - the tree.
- * @param id - the component's id.
- * @param storyIds - its stories' ids.
- */
-export const pagesAbout = (tree: StoryTree, id: string, storyIds: readonly string[]): TreePage[] =>
-  tree.sources.flatMap((source) =>
-    source.pages.filter(
-      (page) => page.components.includes(id) || page.stories.some((story) => storyIds.includes(story))
-    )
-  );
-
 /** A source's docs pages under one heading. */
 export type PageGroup = {
   /** The heading; none for pages outside any group. */

@@ -16,13 +16,13 @@ import { Fragment, type MouseEvent, type ReactNode, type RefObject } from "react
 
 import type { AudienceId } from "../audiences.ts";
 import type { ComponentDocs, UsageGuidance as Guidance } from "../componentDocs.ts";
-import { pagesAbout } from "../pageTree.ts";
 import type { StoryTree, TreeComponent, TreeStory } from "../storyTree.ts";
 import {
   AUDIENCE_PAGES,
   AUDIENCE_TEXTS,
   isShellTokens,
   type PageSection,
+  pagesAbout,
   proseFor,
   type ShellToken,
   type ShellTokens,
