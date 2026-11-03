@@ -13,12 +13,12 @@
  */
 import { type MouseEvent, type ReactNode, useEffect, useLayoutEffect, useState } from "react";
 
-import type { PlacedControl } from "../toolbarLayout.ts";
+import type { ToolbarControl as Control, PlacedControl } from "../toolbarLayout.ts";
 import { hasViewChanges, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
-import type { ControlContext } from "./ToolbarControl.tsx";
+import { type ControlContext, ToolbarControl } from "./ToolbarControl.tsx";
 import type { Loaded } from "./useLoaded.ts";
 import { usePopover } from "./usePopover.ts";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
@@ -157,7 +157,16 @@ export const ViewMenu = ({
           aria-label={STRINGS.view}
         >
           {panel.status === "ready" ? (
-            <panel.value layout={layout} ownView={ownView} movedIds={movedIds} ids={ids} {...context} />
+            <panel.value
+              layout={layout}
+              ownView={ownView}
+              movedIds={movedIds}
+              ids={ids}
+              drawControl={(control: Control): ReactNode => (
+                <ToolbarControl control={control} form="row" {...context} />
+              )}
+              {...context}
+            />
           ) : null}
           {panel.status === "error" ? (
             <p className="forgebook-problems" role="alert">

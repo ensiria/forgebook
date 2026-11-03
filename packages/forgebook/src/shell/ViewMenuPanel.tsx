@@ -23,14 +23,15 @@ import {
 } from "react";
 
 import type { ViewSwitch } from "../switches.ts";
-import type { PlacedControl } from "../toolbarLayout.ts";
+import type { ToolbarControl as Control, PlacedControl } from "../toolbarLayout.ts";
 import { DEFAULT_VIEW, hasViewChanges, type ViewState } from "../viewState.ts";
 import { ControlRow } from "./ControlRow.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
+import { controlLabel } from "./controlLabel.ts";
 import { Icon } from "./icons.tsx";
 import { NamedViews } from "./NamedViews.tsx";
 import { STRINGS } from "./strings.ts";
-import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
+import type { ControlContext } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
 
 /** How long the rows take to move out of a dragged row's way, in ms: the shell's `$duration-quick`. */
@@ -112,15 +113,14 @@ const useShiftedRows = (
  * while it stays hidden, with its pin (a hidden control may still sit on the toolbar) and a button that shows it
  * again in its place.
  *
- * @param props - the hidden controls, the arrangement, and what every control shares.
+ * @param props - the hidden controls, the arrangement, and how a control is drawn.
  */
 const HiddenControls = ({
   hidden,
   layout,
-  ...context
-}: ControlContext & {
+  drawControl
+}: Pick<ViewMenuPanelProps, "layout" | "drawControl"> & {
   readonly hidden: readonly PlacedControl[];
-  readonly layout: ToolbarLayout;
 }): ReactNode => {
   const [isOpen, setIsOpen] = useState(false);
   const listId = useId();
@@ -146,9 +146,7 @@ const HiddenControls = ({
                 {/* no handle: shown again, it takes back its place in the order */}
                 <span className="forgebook-arrange__no-handle" />
                 <span className="forgebook-popover__label">{label}</span>
-                <div className="forgebook-arrange__control">
-                  <ToolbarControl control={control} form="row" {...context} />
-                </div>
+                <div className="forgebook-arrange__control">{drawControl(control)}</div>
                 <button
                   type="button"
                   className="forgebook-icon-button"
@@ -187,6 +185,12 @@ export type ViewMenuPanelProps = ControlContext & {
   readonly ownView: ViewState;
   /** The ids of the controls whose values the menu answers for (`menuControlIds`), which its reset puts back. */
   readonly ids: readonly string[];
+  /**
+   * Draws a control in a row's form. The menu hands in the toolbar's own controls, which the page already has: imported
+   * here, they would take the modules they share with the page into chunks of their own, and the first load would grow
+   * by more than the panel saves.
+   */
+  readonly drawControl: (control: Control) => ReactNode;
 };
 
 /**
@@ -200,6 +204,7 @@ export const ViewMenuPanel = ({
   ownView,
   movedIds,
   ids,
+  drawControl,
   ...context
 }: ViewMenuPanelProps): ReactNode => {
   const { switches } = useCatalogue();
@@ -315,7 +320,7 @@ export const ViewMenuPanel = ({
               hintId={hintId}
               onGrab={grab}
               onAnnounce={setAnnounced}
-              {...context}
+              drawControl={drawControl}
             />
           ))}
         </ol>
@@ -325,7 +330,7 @@ export const ViewMenuPanel = ({
         <span className="forgebook-visually-hidden" aria-live="polite">
           {announced}
         </span>
-        <HiddenControls hidden={hidden} layout={layout} {...context} />
+        <HiddenControls hidden={hidden} layout={layout} drawControl={drawControl} />
         <label className="forgebook-wrap-choice">
           <input
             type="checkbox"
