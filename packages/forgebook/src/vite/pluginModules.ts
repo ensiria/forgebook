@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 import ts from "typescript-6";
 
+import type { ComponentFiles } from "./adapter.ts";
 import { componentPage, markdownHtml } from "./componentPage.ts";
 import type { DocsResult } from "./docsExtractor.ts";
 import { moduleSummaryOf } from "./docsProgram.ts";
@@ -68,6 +69,19 @@ export const componentFileOf = async (
 };
 
 /**
+ * The text a component's file opens with, as TypeScript reads it: a framework's own kind of file (`.vue`) by its script.
+ *
+ * @param file - the file's absolute path.
+ * @param componentFiles - the framework's own kind of file; none when it has none.
+ */
+const scriptOfFile = (file: string, componentFiles: ComponentFiles | undefined): string => {
+  const text = readFileSync(file, "utf8");
+  return componentFiles !== undefined && file.endsWith(componentFiles.extension)
+    ? componentFiles.scriptOf(text)
+    : text;
+};
+
+/**
  * The module that answers a `?forgebook-page` import: the component's documentation file as HTML (empty without
  * one), and its file's summary, the first paragraph of its `@module` comment, for the page's lead.
  *
@@ -78,11 +92,13 @@ export const componentFileOf = async (
  * @param storyFile - the story file's absolute path.
  * @param componentFile - the component's file, as the story file's import resolves; none when it names none.
  * @param watch - adds a file whose edit renews the module (the documentation file, the component's file).
+ * @param componentFiles - the framework's own kind of component file; none when it has none.
  */
 export const pageModule = (
   storyFile: string,
   componentFile: string | undefined,
-  watch: (file: string) => void
+  watch: (file: string) => void,
+  componentFiles: ComponentFiles | undefined
 ): { code: string; moduleType: "js" } => {
   const page = componentPage(storyFile);
   if (page !== undefined) watch(page.file);
@@ -93,7 +109,7 @@ export const pageModule = (
       : moduleSummaryOf(
           ts.createSourceFile(
             componentFile,
-            readFileSync(componentFile, "utf8"),
+            scriptOfFile(componentFile, componentFiles),
             ts.ScriptTarget.Latest,
             true
           )

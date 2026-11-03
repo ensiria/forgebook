@@ -18,7 +18,7 @@ import { newStories } from "./newStories.ts";
 
 /** A component's first stories, ready to write. */
 export type NewStoriesFile = {
-  /** Where they go: `<Component>.stories.tsx` beside the component. */
+  /** Where they go: `<Component>.stories.tsx` beside the component, or the framework's own extension. */
   readonly file: string;
   /** The file's text. */
   readonly text: string;
@@ -32,40 +32,52 @@ const titleBase = async (packageDir: string, storiesFile: string): Promise<strin
   return VITE_PATHS.relative(packageDir, storiesFile).split("/")[0] === "src" ? "src" : "";
 };
 
+/** The framework of the package's catalogue; React's in a package with none. */
+const catalogueFramework = async (packageDir: string): Promise<string> => {
+  const config = findConfigFile(packageDir);
+  return config === undefined ? "react" : (await loadConfigFile(config)).framework.name;
+};
+
 /**
  * A component's first stories.
  *
  * @param componentFile - the component's file, absolute.
  * @param exportName - the export to read; the file's only component when none.
- * @param framework - the framework the stories are written for (`react`).
+ * @param framework - the framework the stories are written for (`react`); the catalogue's when none.
  * @throws a `ScriptError` when the file is in no package, the framework cannot read it, or it exports no single
  *   component.
  */
 export const newStoriesFile = async (
   componentFile: string,
   exportName: string | undefined,
-  framework: string
+  framework: string | undefined
 ): Promise<NewStoriesFile> => {
   const manifest = findUp("package.json", dirname(componentFile));
   if (manifest === undefined) throw new ScriptError(`${componentFile} is in no package`);
   const packageDir = dirname(manifest);
-  const docsModule = await frameworkDocsModule(packageDir, framework);
+  const frameworkName = framework ?? (await catalogueFramework(packageDir));
+  const docsModule = await frameworkDocsModule(packageDir, frameworkName);
   if (docsModule.extractFileComponent === undefined)
-    throw new ScriptError(`@forgebook/${framework} cannot read a component from its file yet`, {
-      hint: `Update @forgebook/${framework}`
+    throw new ScriptError(`@forgebook/${frameworkName} cannot read a component from its file yet`, {
+      hint: `Update @forgebook/${frameworkName}`
     });
   const component = docsModule.extractFileComponent(componentFile, exportName);
   if (typeof component === "string") throw new ScriptError(component);
   if (!("file" in component)) throw new ScriptError(`${componentFile} exports no component`);
   const name = component.docs.name;
-  const file = join(dirname(componentFile), `${name}.stories.tsx`);
+  const importPath = `./${basename(componentFile).replace(/\.[cm]?[jt]sx?$/, "")}`;
+  const shape = docsModule.storyFileShape?.(name, componentFile) ?? {
+    extension: ".stories.tsx",
+    importStatement: `import { ${name} } from ${JSON.stringify(importPath)};`
+  };
+  const file = join(dirname(componentFile), `${name}${shape.extension}`);
   // the title is read by `/`, so the path is written with them on Windows too
   const title = autoTitle(await titleBase(packageDir, file), VITE_PATHS.relative(packageDir, file)) ?? name;
   const text = newStories({
     docs: component.docs,
-    importPath: `./${basename(componentFile).replace(/\.[cm]?[jt]sx?$/, "")}`,
+    importStatement: shape.importStatement,
     title,
-    typesModule: docsModule.storyTypesModule ?? `@forgebook/${framework}`
+    typesModule: docsModule.storyTypesModule ?? `@forgebook/${frameworkName}`
   });
   return { file, text };
 };

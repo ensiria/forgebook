@@ -1,0 +1,38 @@
+{
+  "name": "@fixture/vue",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Vue fixture catalogue: Forgebook's shell and frame over Vue components, single-file ones among them, its stories tested on the server.",
+  "type": "module",
+  "exports": {
+    "./badge": "./src/Badge.vue",
+    "./stories": "./stories.ts"
+  },
+  "scripts": {
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "test": "vitest run",
+    "typecheck": "vue-tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@forgebook/vue": "workspace:*",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "@vitejs/plugin-vue": "6.0.10",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "msw": "3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sass-embedded": "1.106.1",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "vue": "3.5.44",
+    "vue-tsc": "3.3.14"
+  }
+}

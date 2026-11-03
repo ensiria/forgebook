@@ -128,7 +128,7 @@ export const nextRenderer: StoryRenderer = {
       unmount: mounted.unmount
     };
   },
-  renderToString: (drawing: StoryDrawing): string => {
+  renderToString: (drawing: StoryDrawing): Promise<string> | string => {
     setCurrentStore(createRouteStore(drawing.story.parameters, drawing.onEvent));
     forgetServerResults();
     return reactRenderer.renderToString(withNext(drawing, false));

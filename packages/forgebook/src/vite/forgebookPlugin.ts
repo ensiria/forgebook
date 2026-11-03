@@ -20,7 +20,7 @@
  * @module
  */
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 
 import {
   type ConfigEnv,
@@ -393,7 +393,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param file - the edited file.
    */
   const renewOnChange = (server: ViteDevServer, file: string): void => {
-    if (!SOURCE_FILE.test(file)) return;
+    const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+    if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
     const graph = server.environments.client.moduleGraph;
     for (const id of usageModules) {
@@ -450,7 +451,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const componentFile = await componentFileOf(storyFile, (specifier: string) =>
         resolveImport(specifier, storyFile)
       );
-      return pageModule(storyFile, componentFile, watch);
+      const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+      return pageModule(storyFile, componentFile, watch, componentFiles);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
     return docsModuleOf(id, watch, isServing()) ?? textModule(id, watch);

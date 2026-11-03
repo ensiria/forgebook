@@ -1,11 +1,12 @@
 /**
- * A hook's or a function's signature, read from its types and TSDoc: what a story about logic documents first. Part of
- * the docs module of `@forgebook/react` (`extractDocs.ts`).
+ * A hook's or a function's signature, read from its types and TSDoc: what a story about logic documents first. Shared
+ * by the frameworks' docs modules.
  *
  * @module
  */
-import type { FunctionSignatureDocs } from "forgebook/component-docs";
 import ts from "typescript-6";
+
+import type { FunctionSignatureDocs } from "../componentDocs.ts";
 
 /**
  * A type as the source writes it, on one line.
