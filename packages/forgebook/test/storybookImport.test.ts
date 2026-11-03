@@ -241,15 +241,51 @@ describe("importStorybook", () => {
     expect(text).toContain("  framework: nuxt(),");
   });
 
-  it("refuses a framework Forgebook does not read, saying what it reads", async () => {
+  it("reads an Angular project's Storybook, its TypeScript configuration and what angular.json holds", async () => {
     const project = join(scratch, "angular");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
     writeFileSync(
       join(project, ".storybook", "main.ts"),
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/angular" };\n'
     );
+    writeFileSync(join(project, ".storybook", "tsconfig.json"), "{}\n");
+    const builder = { builder: "@storybook/angular:start-storybook" };
+    const options = { styles: ["src/styles.css"], compodoc: true };
+    writeFileSync(
+      join(project, "angular.json"),
+      JSON.stringify({ projects: { app: { architect: { storybook: { ...builder, options } } } } })
+    );
+    const imported = await importStorybook(project);
+    if (typeof imported === "string") throw new Error(imported);
+    expect(imported.framework).toBe("angular");
+    expect(imported.frameworkOptions).toEqual({ tsconfig: ".storybook/tsconfig.json" });
+    expect(imported.notes).toContain(
+      "angular.json's Storybook styles are not loaded (src/styles.css): import them in the preview"
+    );
+    expect(imported.notes.some((note) => note.startsWith("Compodoc is not run"))).toBe(true);
+    // Analog's framework names its own TypeScript configuration, from the .storybook folder (a folder of its own: Node
+    // keeps a main it loaded)
+    const analogProject = join(scratch, "analog");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(analogProject, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(analogProject, ".storybook", "main.ts"),
+      'export default { stories: ["../src/**/*.stories.ts"], framework: { name: "@analogjs/storybook-angular", options: { tsconfig: "../tsconfig.app.json" } } };\n'
+    );
+    const analog = await importStorybook(analogProject);
+    expect(typeof analog === "string" ? analog : analog.frameworkOptions).toEqual({
+      tsconfig: "tsconfig.app.json"
+    });
+  });
+
+  it("refuses a framework Forgebook does not read, saying what it reads", async () => {
+    const project = join(scratch, "ember");
+    cpSync(join(STORYBOOK_DIR, ".storybook"), join(project, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(project, ".storybook", "main.ts"),
+      'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/ember" };\n'
+    );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/html-vite, @storybook-vue/nuxt, @storybook/nextjs-vite, @storybook/nextjs; this project uses @storybook/angular"
+      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/html-vite, @storybook-vue/nuxt, @storybook/angular, @analogjs/storybook-angular, @storybook/nextjs-vite, @storybook/nextjs; this project uses @storybook/ember"
     );
     expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
     // Storybook's monorepo template writes the framework as a path to its package
@@ -394,6 +430,23 @@ describe("initConfigText", () => {
     );
     expect(text).toContain('import { webComponents } from "@forgebook/web-components/vite";');
     expect(text).toContain("  framework: webComponents(),");
+  });
+
+  it("writes the framework's options read from the project", () => {
+    const text = initConfigText(
+      {
+        framework: "angular",
+        frameworkOptions: { tsconfig: ".storybook/tsconfig.json" },
+        title: "x",
+        stories: ["src/*.stories.ts"],
+        preview: undefined,
+        switches: undefined,
+        notes: []
+      },
+      "Storybook"
+    );
+    expect(text).toContain('import { angular } from "@forgebook/angular/vite";');
+    expect(text).toContain('  framework: angular({ tsconfig: ".storybook/tsconfig.json" }),');
   });
 
   it("imports the HTML adapter for a plain HTML project", () => {

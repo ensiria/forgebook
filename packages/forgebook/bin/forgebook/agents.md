@@ -52,6 +52,11 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   request as made, `/api/products?page=2`), `state`, `cookies`, `runtimeConfig.public` and `appConfig`. A story's
   `nuxt` replaces the meta's, whole. Its router moves and `navigateTo` calls are listed among the story's events; a
   play reads them with `storyNuxt()` from `@forgebook/nuxt/story`.
+- In an Angular or Analog project, `badge.component.ts` and `Badge.stories.ts`: the types and Storybook's helpers
+  (`applicationConfig`, `moduleMetadata`, `componentWrapperDecorator`, `argsToTemplate`) from `@forgebook/angular`, the
+  class by its name, an input or an output by the name a template binds (its alias), an output's arg a handler, projected
+  content as `#default` or `#<selector>` (`"#[icon]": "*"`), and a template in a render as
+  `({ props: args, template: "…" })`. The Code tab writes the story by the component's selector.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
@@ -100,7 +105,7 @@ links to other pages by their file (`./colours.md#brand`). A page never holds a 
 | Command | What it is for |
 |---|---|
 | `npx forgebook find "selectable card" --json` | Whether what you need already exists, in your own words: ask before writing a component |
-| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` writes `Badge.stories.ts`) |
+| `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` or `badge.component.ts` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |

@@ -7,10 +7,11 @@
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
  * instead. Forgebook reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML stories on Vite, a Nuxt
- * project's among them (`@storybook-vue/nuxt`, which Nuxt's Storybook module sets up), and a Next.js project's
- * (Storybook's `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework is refused with
- * what Forgebook supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the
- * notes, since Forgebook reads CSF in scripts.
+ * project's among them (`@storybook-vue/nuxt`, which Nuxt's Storybook module sets up), Angular's and Analog's (their
+ * stories compile the same way through the Angular adapter's Vite plugin), and a Next.js project's (Storybook's
+ * `@storybook/nextjs`, on webpack, too: the stories are the same), so another framework is refused with what Forgebook
+ * supports. A Svelte project's `.stories.svelte` files (Svelte CSF) are named in the notes, since Forgebook reads CSF in
+ * scripts; an Angular project's `angular.json` adds what `importers/storybookAngular.ts` reads.
  * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
@@ -24,6 +25,7 @@ import ts from "typescript-6";
 import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 import { VITE_PATHS, type VitePaths } from "../../../src/vite/vitePaths.ts";
+import { importAngular } from "./storybookAngular.ts";
 
 /** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
 export type ImportedFramework =
@@ -35,7 +37,8 @@ export type ImportedFramework =
   | "nextjs"
   | "web-components"
   | "html"
-  | "nuxt";
+  | "nuxt"
+  | "angular";
 
 /**
  * The function each framework's `@forgebook/<name>/vite` exports, which a configuration calls: the framework's name, or
@@ -50,7 +53,8 @@ export const ADAPTER_FUNCTIONS: Readonly<Record<ImportedFramework, string>> = {
   nextjs: "nextjs",
   "web-components": "webComponents",
   html: "html",
-  nuxt: "nuxt"
+  nuxt: "nuxt",
+  angular: "angular"
 };
 
 /** What a configuration takes from another tool's files. */
@@ -84,6 +88,9 @@ const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
   "@storybook/html-vite": "html",
   // Nuxt's Storybook module sets up a framework of its own, on Vue's
   "@storybook-vue/nuxt": "nuxt",
+  // Angular's two compile a story the same way, through the Angular adapter's Vite plugin
+  "@storybook/angular": "angular",
+  "@analogjs/storybook-angular": "angular",
   "@storybook/nextjs-vite": "nextjs",
   "@storybook/nextjs": "nextjs"
 };
@@ -452,6 +459,27 @@ const nextjsSettings = (
 };
 
 /**
+ * What a framework takes from a project's Storybook besides its stories: its adapter's options, and what was not read.
+ *
+ * @param framework - the Forgebook framework.
+ * @param storybook - Storybook's framework package.
+ * @param main - `main`'s configuration.
+ * @param projectDir - the project's folder, absolute.
+ * @param storybookDir - the `.storybook` folder, absolute.
+ */
+const frameworkSettings = (
+  framework: ImportedFramework,
+  storybook: string,
+  main: Readonly<Record<string, unknown>>,
+  projectDir: string,
+  storybookDir: string
+): { readonly options: Readonly<Record<string, string>> | undefined; readonly notes: readonly string[] } => {
+  if (framework === "nextjs") return nextjsSettings(main, storybook, projectDir);
+  if (framework === "angular") return importAngular(projectDir, storybookDir, frameworkOf(main).options);
+  return { options: undefined, notes: [] };
+};
+
+/**
  * Reads a project's Storybook configuration.
  *
  * @param projectDir - the project's folder, absolute.
@@ -469,8 +497,7 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
     return `Forgebook reads the stories of Storybook's ${supported}; this project uses ${frameworkOf(main).name ?? "no framework"}`;
   }
   const framework = STORYBOOK_FRAMEWORKS[storybook] ?? "react";
-  const nextjs =
-    framework === "nextjs" ? nextjsSettings(main, storybook, projectDir) : { options: undefined, notes: [] };
+  const settings = frameworkSettings(framework, storybook, main, projectDir, storybookDir);
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
   if (globs.length === 0) return `${relative(projectDir, mainFile)} names no story file Forgebook reads`;
@@ -481,7 +508,7 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   if (Array.isArray(main["addons"]) && main["addons"].length > 0)
     notes.push("The addons are left out: Forgebook has its own panel, toolbar and checks");
   if (framework === "nuxt") notes.push(...NUXT_NOTES);
-  notes.push(...nextjs.notes);
+  notes.push(...settings.notes);
   const previewFile = scriptFile(storybookDir, "preview");
   const read =
     previewFile === undefined
@@ -489,7 +516,7 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
       : previewSwitches(readFileSync(previewFile, "utf8"), previewFile);
   return {
     framework,
-    frameworkOptions: nextjs.options,
+    frameworkOptions: settings.options,
     title: projectTitle(projectDir),
     stories: globs,
     // with forward slashes: it is written into the configuration, which may be shared across systems

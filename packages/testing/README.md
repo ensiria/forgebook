@@ -186,6 +186,6 @@ describeAdapter({ name: "Solid", renderer, drawing, decorator, codeOf, docsOf })
 `renderToString` may return a promise. A framework whose page and server builds differ runs the suite twice, with
 `half: "page"` in a simulated page and `half: "server"` in Node: Svelte compiles a component apart for each, and Solid's
 `solid-js/web` is its browser build or its server build, never both. `test/conformance.test.tsx` in `@forgebook/react`
-and `@forgebook/preact`, `test/conformance.test.ts` in `@forgebook/vue`, `@forgebook/web-components` and
-`@forgebook/html`, and the two `conformance` tests of `@forgebook/svelte` and of `@forgebook/solid` are complete
-examples.
+and `@forgebook/preact`, `test/conformance.test.ts` in `@forgebook/vue`, `@forgebook/web-components`,
+`@forgebook/html` and `@forgebook/angular`, and the two `conformance` tests of `@forgebook/svelte` and of
+`@forgebook/solid` are complete examples.
