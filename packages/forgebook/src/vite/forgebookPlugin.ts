@@ -36,6 +36,7 @@ import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveEr
 import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
+import { axeAddress, axeBuildAsset } from "./axeScript.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
@@ -249,15 +250,18 @@ const docsModuleOf = async (
  *
  * @param id - the module's id.
  * @param config - the catalogue's configuration.
+ * @param command - whether a dev server runs, or a build: where the frame finds axe's script.
  */
 const generatedModule = (
   id: string,
-  config: ResolvedConfig
+  config: ResolvedConfig,
+  command: ConfigEnv["command"]
 ): { code: string; moduleType: "js" } | string | undefined => {
   const named = pageModuleOf(id, config.dir);
   if (named === undefined) return undefined;
   if (named.kind === "entry") {
-    const code = named.page === "index.html" ? shellEntry(config) : frameEntry(config);
+    const code =
+      named.page === "index.html" ? shellEntry(config) : frameEntry(config, axeAddress(command, PACKAGE_DIR));
     return { code, moduleType: "js" };
   }
   if (named.kind === "stories-source") return { code: storiesSourceModule(config), moduleType: "js" };
@@ -312,7 +316,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   ): Promise<{ code: string; moduleType: "js" } | string | undefined> => {
     if (config === undefined) return undefined;
     if (id === CONFIG_ID) return { code: configModule(config, await framesPlacement()), moduleType: "js" };
-    return generatedModule(id, config);
+    return generatedModule(id, config, command);
   };
   /** The dev server; none in a build. */
   let devServer: ViteDevServer | undefined;
@@ -469,7 +473,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
               // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
               // story files (the project's and the sources') are scanned for what their components import
               optimizeDeps: {
-                include: prebundled(config, packageResolver(config.dir), packageResolver(PACKAGE_DIR)),
+                include: prebundled(config, packageResolver(config.dir)),
                 entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
               },
               build: {
@@ -563,6 +567,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       };
       server.watcher.on("add", refresh);
       server.watcher.on("unlink", refresh);
+    },
+    generateBundle(): void {
+      // axe's script, for the frames' Accessibility card: loaded by the frame, never imported; the browser's build only
+      if (this.environment.name !== "client") return;
+      const axe = config === undefined ? undefined : axeBuildAsset(PACKAGE_DIR);
+      if (axe !== undefined) this.emitFile({ type: "asset", fileName: axe.fileName, source: axe.source });
     },
     closeBundle: async (): Promise<void> => {
       await docs?.close();
