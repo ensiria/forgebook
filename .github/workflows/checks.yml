@@ -72,13 +72,16 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm checks
+      # the browser before the checks: a failed unit test then still leaves the shell tests a browser to run in, so
+      # their results show beside the failure instead of a missing executable
       - run: pnpm --filter @fixture/app exec playwright install chromium
+      - run: pnpm checks
       # a third of the catalogues at a time: each is a dev server of about a gigabyte, and all of them at once fill the
       # runner's 16 GB up to its commit limit, where sockets fail (net::ERR_NO_BUFFER_SPACE) and the machine stalls for
       # seconds; a trace of each failed test (its requests, the frames' consoles), for a failure only this runner shows;
-      # each group runs even when one before it failed, and keeps its results apart
-      - run: pnpm --filter @fixture/app test:shell --trace retain-on-failure
+      # each group runs even when the checks or a group before it failed, and keeps its results apart
+      - if: ${{ !cancelled() }}
+        run: pnpm --filter @fixture/app test:shell --trace retain-on-failure
         env:
           FORGEBOOK_SHELL_GROUP: 1/3
       - if: ${{ !cancelled() }}
