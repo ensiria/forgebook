@@ -5,14 +5,14 @@
  *
  * @remarks
  * The dock draws only the chosen tab's content, and most stories open on Props: the other tabs' modules (Events,
- * Interactions, Parts and styling, Code, Accessibility, Design) load the first time each is chosen, so a first load
- * fetches none of them. What the row of tabs shows of them (a hint, whether there is one) is in `tabSummaries`.
+ * Interactions, Parts and styling, Code, Accessibility, Design) load the first time each is chosen (`lazyTab`), so a
+ * first load fetches none of them. What the row of tabs shows of them (a hint, whether there is one) is in `tabSummaries`.
  *
  * @module
  */
 
 import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-format/source";
-import { lazy, type ReactNode, Suspense } from "react";
+import type { ReactNode } from "react";
 
 import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
 import type { ComponentDocs, PropDocs } from "../componentDocs.ts";
@@ -23,6 +23,7 @@ import type { CheckState } from "./A11yTab.tsx";
 import type { DesignTabProps } from "./DesignTab.tsx";
 import { DesignTabLoader } from "./DesignTabLoader.tsx";
 import type { DockTab } from "./Dock.tsx";
+import { LazyTab, tabModule } from "./lazyTab.tsx";
 import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
 import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
@@ -31,22 +32,22 @@ import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
 
-/** The Events tab, loaded when first chosen. */
-const EventsTab = lazy(() => import("./EventsTab.tsx").then((module) => ({ default: module.EventsTab })));
+/** The Events tab, its module, loaded when the tab is first chosen. */
+const EVENTS_TAB = tabModule(() => import("./EventsTab.tsx").then((module) => module.EventsTab));
 
-/** The Interactions tab, loaded when first chosen. */
-const InteractionsTab = lazy(() =>
-  import("./InteractionsTab.tsx").then((module) => ({ default: module.InteractionsTab }))
+/** The Interactions tab, its module, loaded when the tab is first chosen. */
+const INTERACTIONS_TAB = tabModule(() =>
+  import("./InteractionsTab.tsx").then((module) => module.InteractionsTab)
 );
 
-/** The Parts and styling tab, loaded when first chosen. */
-const PartsTab = lazy(() => import("./PartsTab.tsx").then((module) => ({ default: module.PartsTab })));
+/** The Parts and styling tab, its module, loaded when the tab is first chosen. */
+const PARTS_TAB = tabModule(() => import("./PartsTab.tsx").then((module) => module.PartsTab));
 
-/** The Code tab, loaded when first chosen. */
-const CodeTab = lazy(() => import("./CodeTab.tsx").then((module) => ({ default: module.CodeTab })));
+/** The Code tab, its module, loaded when the tab is first chosen. */
+const CODE_TAB = tabModule(() => import("./CodeTab.tsx").then((module) => module.CodeTab));
 
-/** The Accessibility tab, loaded when first chosen. */
-const A11yTab = lazy(() => import("./A11yTab.tsx").then((module) => ({ default: module.A11yTab })));
+/** The Accessibility tab, its module, loaded when the tab is first chosen. */
+const A11Y_TAB = tabModule(() => import("./A11yTab.tsx").then((module) => module.A11yTab));
 
 /** What the tabs are built from. */
 export type DockTabsInput = {
@@ -102,15 +103,6 @@ const notice = (text: string, isProblem: boolean): ReactNode => (
   >
     {text}
   </p>
-);
-
-/**
- * A tab's content whose module loads when the tab is first chosen, with a note until it is there.
- *
- * @param content - the tab's content.
- */
-const loading = (content: ReactNode): ReactNode => (
-  <Suspense fallback={notice(STRINGS.tabLoading, false)}>{content}</Suspense>
 );
 
 /**
@@ -172,8 +164,11 @@ const eventsTab = (input: DockTabsInput, events: readonly PropDocs[]): DockTab[]
           id: "events",
           label: STRINGS.tabs.events,
           hint: input.calls.length === 0 ? undefined : String(input.calls.length),
-          content: loading(
-            <EventsTab events={events} calls={input.calls} onClearCalls={input.onClearCalls} />
+          content: (
+            <LazyTab
+              module={EVENTS_TAB}
+              tabProps={{ events, calls: input.calls, onClearCalls: input.onClearCalls }}
+            />
           )
         }
       ];
@@ -209,7 +204,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
       id: "parts",
       label: STRINGS.tabs.parts,
       hint: component.parts.length === 0 ? undefined : STRINGS.partCount(component.parts.length),
-      content: loading(<PartsTab docs={component} />)
+      content: <LazyTab module={PARTS_TAB} tabProps={{ docs: component }} />
     });
   }
   return tabs;
@@ -245,7 +240,7 @@ const interactionsTab = (trace: PlayTrace, onPlayAgain: () => void): DockTab => 
   id: "play",
   label: STRINGS.tabs.play,
   hint: interactionsHint(trace),
-  content: loading(<InteractionsTab trace={trace} onPlayAgain={onPlayAgain} />)
+  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayAgain }} />
 });
 
 /** The Code tab, when the story file's code is loaded or failed to load. */
@@ -262,12 +257,15 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
     {
       id: "code",
       label: STRINGS.tabs.code,
-      content: loading(
-        <CodeTab
-          code={code.value}
-          exportName={input.exportName}
-          componentName={docs.status === "ready" ? docs.value.name : input.componentName}
-          args={input.values}
+      content: (
+        <LazyTab
+          module={CODE_TAB}
+          tabProps={{
+            code: code.value,
+            exportName: input.exportName,
+            componentName: docs.status === "ready" ? docs.value.name : input.componentName,
+            args: input.values
+          }}
         />
       )
     }
@@ -293,6 +291,6 @@ export const dockTabs = (input: DockTabsInput): DockTab[] => [
     id: "a11y",
     label: STRINGS.tabs.a11y,
     hint: a11yHint(input.check),
-    content: loading(<A11yTab check={input.check} onCheck={input.onCheck} />)
+    content: <LazyTab module={A11Y_TAB} tabProps={{ check: input.check, onCheck: input.onCheck }} />
   }
 ];
