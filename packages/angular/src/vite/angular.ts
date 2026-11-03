@@ -61,6 +61,8 @@ export const angular = (options: AngularOptions = {}): FrameworkAdapter => {
     docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
     pages: { frame: "@forgebook/angular/frame", code: "@forgebook/angular/code" },
     browserDependencies: BROWSER_DEPENDENCIES,
+    // Analog compiles a story file from its own program, without the code that draws an edit in place: edits reload
+    redrawsEditedStories: false,
     vitePlugins: async (): Promise<readonly PluginOption[]> => {
       const { default: analog } = await import("@analogjs/vite-plugin-angular");
       const tsconfig = (): string =>

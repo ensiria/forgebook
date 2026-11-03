@@ -114,6 +114,21 @@ export const isKeptIndex = (value: unknown): value is KeptIndex =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
+ * One story file a pattern matches, indexed from its text on disk, with the title its path makes when it writes none.
+ *
+ * @internal
+ * @param root - the declaring module's folder.
+ * @param pattern - the pattern.
+ * @param key - the file's path relative to the declaring module.
+ * @returns the index, or a message saying why the file cannot be indexed.
+ */
+export const storyFileIndex = (root: string, pattern: string, key: string): StoryFileIndex | string => {
+  const file = VITE_PATHS.resolve(root, key);
+  const title = autoTitle(patternBase(pattern), key);
+  return indexStoryFile(file, readFileSync(file, "utf8"), title === undefined ? {} : { autoTitle: title });
+};
+
+/**
  * Every story file a pattern matches, indexed.
  *
  * @param root - the declaring module's folder.
@@ -136,12 +151,7 @@ export const indexedStoryFiles = (
     watch(file);
     const known = kept?.[key];
     if (known !== undefined) return { key, file, index: known };
-    const title = autoTitle(patternBase(pattern), key);
-    const index = indexStoryFile(
-      file,
-      readFileSync(file, "utf8"),
-      title === undefined ? {} : { autoTitle: title }
-    );
+    const index = storyFileIndex(root, pattern, key);
     if (typeof index === "string") throw new Error(index);
     return { key, file, index };
   });
@@ -178,9 +188,24 @@ export const storyFilesModule = (
   watch: (file: string) => void,
   loaders: GroupLoaders = { hasUsage: true, hasReach: true },
   cache?: DiskCache<KeptIndex>
+): string => storyFilesCode(root, pattern, indexedStoryFiles(root, pattern, watch, cache), loaders);
+
+/**
+ * The code of the module for one pattern, from its story files indexed.
+ *
+ * @internal
+ * @param root - the declaring module's folder.
+ * @param pattern - the pattern before `?forgebook-files`.
+ * @param files - the story files it matches, indexed.
+ * @param loaders - the group's loaders besides its story files'.
+ */
+export const storyFilesCode = (
+  root: string,
+  pattern: string,
+  files: readonly IndexedStoryFile[],
+  loaders: GroupLoaders
 ): string => {
   const { hasUsage, hasReach } = loaders;
-  const files = indexedStoryFiles(root, pattern, watch, cache);
   const keys = files.map((file) => file.key);
   // the group's id in Vite's form, as the plugin names the declaring module's folder
   const folder = VITE_PATHS.normalize(root);

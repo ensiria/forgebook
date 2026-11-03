@@ -44,6 +44,7 @@ import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
+import { FILES_MODULE_HOT, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
 import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   agentSourcesModule,
@@ -126,6 +127,9 @@ const DOCS_QUERY = "?forgebook-docs";
 
 /** The queries `textModules.ts` answers. */
 const TEXT_QUERIES: readonly string[] = [CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY];
+
+/** The queries of a story file's modules the shell reads, which hand an edit to it in place on a dev server. */
+const RENEWED_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY];
 
 /** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
 const FILE_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY, DOCS_PAGE_QUERY];
@@ -340,6 +344,8 @@ const catalogueConfig = (config: ResolvedConfig, userConfig: UserConfig): UserCo
 export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin => {
   /** The modules of the patterns, renewed when a story file is added or removed. */
   const filesModules = new Set<string>();
+  // what each pattern's module was served with: an edit of a story file that changes its list reloads the pages
+  const served = servedPatterns();
   /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
   const usageModules = new Set<string>();
   /** The docs pages' modules, renewed when a Markdown file is added or removed. */
@@ -368,6 +374,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
+  // whether an edited story file is drawn anew in its open frames: a dev server's, unless the framework cannot
+  const isRedrawing = (): boolean =>
+    isServing() && (config?.framework ?? options.framework)?.redrawsEditedStories !== false;
   /**
    * Whether the server runs tests (Vitest's mode): no person waits for a page, so no docs program is warmed. A worker
    * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
@@ -448,13 +457,16 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     filesModules.add(id);
     const hasUsage = config?.lists.usedIn !== false;
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
-    return patternModule(
+    const { files, code } = patternModule(
       id,
       watch,
       { hasUsage, hasReach: hasUsage && isServing() },
       indexCache(),
       isTestRun ? undefined : extractor().warm
     );
+    if (!isRedrawing()) return { code, moduleType: "js" };
+    served.keep(id, files);
+    return { code: `${code}\n${FILES_MODULE_HOT}`, moduleType: "js" };
   };
   /**
    * Tells the docs a source file was added or removed: it may be what an import now finds, so no kept docs are read
@@ -600,6 +612,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
+    ...storyFileHotHooks(isRedrawing, served.changedBy),
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = await pagesModule(id);
       if (generated !== undefined) return generated;
@@ -611,7 +624,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const resolved = await this.resolve(specifier, importer);
         return resolved?.id;
       });
-      if (answered !== undefined) return answered;
+      if (answered !== undefined) return renewedModule(id, answered, RENEWED_QUERIES, isServing());
       try {
         // a build's browser files only: a server environment's output is no page's to fetch
         const pack =

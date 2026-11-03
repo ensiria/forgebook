@@ -19,6 +19,7 @@ import { storyTextOf } from "@forgebook/story-format/texts";
 import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
+import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
 import { shownLanguage } from "../languages.ts";
 import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
 import { detailOf, type PanelArgs, previewValue, type ShellMessage } from "../messages.ts";
@@ -156,7 +157,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const languages = config.languages ?? [];
   const switches = catalogueSwitches(config.switches, languages, config.lists?.controls);
   const catalogue = catalogueSettings("", switches, config.lists);
-  const preview = mergedPreviews((config.previews ?? []).map(readPreview));
+  // the previews' modules: an edit of one (or of what it imports) brings its successor
+  let previews: readonly unknown[] = config.previews ?? [];
+  let preview = mergedPreviews(previews.map(readPreview));
   const view = parseView(window.location.search, catalogue);
   const shell = shellChannel(config.frames ?? SAME_ORIGIN, window);
   const tellShell = shell.tell;
@@ -215,6 +218,16 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
     window.history.replaceState(null, "", address);
   });
+  // until the story runs, or when it cannot, an edit of a file the frame loaded loads the page again: there is no story
+  // drawn to renew in place, and a story file that failed to load keeps no other way to show its fix
+  const reloadOnEdit = (event: Event): void => {
+    event.preventDefault();
+    window.location.reload();
+  };
+  let followStoryFile = reloadOnEdit;
+  let followPreviews = reloadOnEdit;
+  window.addEventListener(STORY_FILE_EVENT, (event: Event): void => followStoryFile(event));
+  window.addEventListener(PREVIEWS_EVENT, (event: Event): void => followPreviews(event));
   const location = findStory(storyTree(config.sources), storyId);
   const source = config.sources.find((candidate) => candidate.id === location?.source.id);
   const load =
@@ -232,11 +245,14 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     await source.setup?.();
     await preview.setup?.();
     await loadSheets(document, viewSheets(source.sheets, view));
-    const story = readStory(await load(), location.story.exportName, preview);
-    if (typeof story === "string") {
-      fail(story);
+    // the story file's exports: an edit of the file hands them on with its successor's
+    let shownFile: unknown = await load();
+    const first = readStory(shownFile, location.story.exportName, preview);
+    if (typeof first === "string") {
+      fail(first);
       return;
     }
+    let story = first;
     fixed = fixedViewOf(story.globals, story.parameters, catalogue);
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
     let controls: StoryControls | undefined;
@@ -260,6 +276,23 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     // the view the reader chose last: a language that loads slower than the next one chosen is never drawn
     let shownCount = 0;
     const { texts } = shown;
+    // what the panel shows of the story; told again when an edit of its file changes it
+    const tellReady = (): void => {
+      // the panel shows a text an arg names as the story shows it, with its key beside it
+      const args = panelArgsOf(withStoryTexts(story.args, storyTextOf(texts)), source.namedValues);
+      tellShell({
+        type: "forgebook:ready",
+        storyId,
+        canReplay: story.replay !== undefined,
+        hasClock: story.clockStart !== undefined,
+        args,
+        textKeys: storyTextKeysOf(story.args),
+        argTypes: panelArgTypesOf(story.argTypes, excludedControls(story.parameters["controls"])),
+        controls: story.controls,
+        actions: actionNames(story.args, story.argTypes),
+        fixed
+      });
+    };
     const running = runStory({
       container,
       story,
@@ -278,21 +311,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         // waiting on the resize observer, which may report after the ready status
         reportSize();
         document.documentElement.setAttribute(STATUS_ATTRIBUTE, "ready");
-        // the panel shows a text an arg names as the story shows it, with its key beside it
-        const args = panelArgsOf(withStoryTexts(story.args, storyTextOf(texts)), source.namedValues);
-        const textKeys = storyTextKeysOf(story.args);
-        tellShell({
-          type: "forgebook:ready",
-          storyId,
-          canReplay: story.replay !== undefined,
-          hasClock: story.clockStart !== undefined,
-          args,
-          textKeys,
-          argTypes: panelArgTypesOf(story.argTypes, excludedControls(story.parameters["controls"])),
-          controls: story.controls,
-          actions: actionNames(story.args, story.argTypes),
-          fixed
-        });
+        tellReady();
         changeShown = (live: LiveView): void => {
           shownCount += 1;
           const count = shownCount;
@@ -326,6 +345,39 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           details: values.map(detailOf)
         })
     });
+    // an edit of the story file, or of a file it re-exports stories from, draws the story anew in place: the reader keeps
+    // what they did in it. A story the edit took away leaves nothing to draw in place: the page loads again
+    followStoryFile = (event: Event): void => {
+      const succession = successionOf(event);
+      if (succession === undefined || succession.previous !== shownFile) return;
+      event.preventDefault();
+      shownFile = succession.next;
+      const next = readStory(succession.next, location.story.exportName, preview);
+      if (typeof next === "string") {
+        window.location.reload();
+        return;
+      }
+      story = next;
+      running.setStory(next);
+      if (controls !== undefined) tellReady();
+    };
+    // an edit of a preview, or of a component it imports through a library's index, draws the story anew with the new
+    // previews; the set-ups they run already ran, and stay as they were
+    followPreviews = (event: Event): void => {
+      const renewal = previewsRenewalOf(event);
+      // the entry sends one module, or none, for each of its previews
+      if (renewal === undefined || renewal.next.length !== previews.length) return;
+      previews = previews.map((module, index) => renewal.next[index] ?? module);
+      preview = mergedPreviews(previews.map(readPreview));
+      const next = readStory(shownFile, location.story.exportName, preview);
+      if (typeof next === "string") {
+        window.location.reload();
+        return;
+      }
+      story = next;
+      running.setStory(next, preview.decorators);
+      if (controls !== undefined) tellReady();
+    };
     // the shell opens another story by loading another page: the set-ups' cleanups run as this one goes (a page kept
     // for the back button keeps its story)
     window.addEventListener("pagehide", (event: PageTransitionEvent): void => {
