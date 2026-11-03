@@ -4,28 +4,43 @@
  *
  * @remarks
  * A story's place comes from its file's title (`Family/Name` or `Family/Group/Name`, or Storybook's titles of any
- * depth), so the sidebar needs no list kept by hand. Ids follow CSF: the title and the export name in lower-case kebab, joined by `--`, here prefixed by
- * the source's id, so two packages can hold the same title. A component its meta lists in other places (`alsoIn`)
- * gets an alias entry in each, and related components (`related`) name each other both ways: an alias is not
- * a component, so the stories, the ids and the tests stay one per file. Pure.
+ * depth), so the sidebar needs no list kept by hand. Files with the same title make one component, as Storybook merges
+ * them: its stories come from each file in the order of their paths, and its docs and page from the first. Ids are
+ * Storybook's (`storyIds.ts`), prefixed by the source's id so two packages can hold the same title; the ids an earlier
+ * rule gave (titles split at their case changes) still find their story, so old addresses keep working. A component
+ * its meta lists in other places (`alsoIn`) gets an alias entry in each, and related components (`related`) name each
+ * other both ways: an alias is not a component, so the stories, the ids and the tests stay one per story. Pure.
  *
  * @module
  */
-import type { StoryGroup } from "@forgebook/story-format/csf";
+import type { StoryDeviceSetting, StoryGroup } from "@forgebook/story-format/csf";
 import type {
+  FigmaLink,
   StoryBackground,
   StoryControlsSetting,
   StoryFileIndex,
+  StoryIndexEntry,
   StorySource
 } from "@forgebook/story-format/source";
 
 import { pageProblems, type TreePage, treePages } from "./pageTree.ts";
 import { sourceFiles } from "./sourceFiles.ts";
+import { csfStoryId, exportWords, idPart } from "./storyIds.ts";
+import {
+  type GroupsByFamily,
+  groupAt,
+  metaList,
+  type PlacedComponent,
+  placeAliases,
+  relatedTitles
+} from "./treePlaces.ts";
 
 /** One story in the tree. */
 export type TreeStory = {
-  /** `<source>:<title>--<export>` in kebab case: the URL's `story` parameter. */
+  /** `<source>:<component>--<story>`, the rest as Storybook's id (`storyId`): the URL's `story` parameter. */
   readonly id: string;
+  /** The story file it comes from, a key of the source's `index` and `stories`. */
+  readonly file: string;
   /** The name shown in the tabs. */
   readonly name: string;
   /** The named export. */
@@ -44,19 +59,35 @@ export type TreeStory = {
   readonly isLogic: boolean;
   /** The height its scene needs, in CSS px: its own `parameters.height`, else the meta's; none by default. */
   readonly height: number | undefined;
+  /** The device it is shown in by default (`parameters.device`), its own fields over the meta's; none when neither sets one. */
+  readonly device: StoryDeviceSetting | undefined;
+  /** Its design (`parameters.design.figma`): its own, else the meta's; none by default, nor when its own was refused. */
+  readonly design: FigmaLink | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
+  /** Whether a `play` function acts on it. */
+  readonly hasPlay: boolean;
 };
 
-/** One component (one story file). */
+/** One component: the story files with its title. */
 export type TreeComponent = {
+  /**
+   * `<source>:<component>` (`componentId`), from its first file's meta: the part of its stories' ids before `--`, but
+   * for a later file whose meta writes another `id`, whose stories start with that one, as in Storybook.
+   */
+  readonly id: string;
   /** The last segment of the title (`Select`). */
   readonly name: string;
   /** The whole title (`Inputs/Selection/Select`). */
   readonly title: string;
-  /** The story file, a key of the source's `index` and `stories`. */
+  /**
+   * Its first story file, a key of the source's `index` and `stories`: the one its docs and its page come from, as
+   * Storybook's docs come from the first file of a title.
+   */
   readonly file: string;
-  /** Its stories the catalogue lists (the sidebar's count, the picker, the page), in the order of the file. */
+  /** Every story file with its title, in the order of their paths; `file` first. */
+  readonly files: readonly string[];
+  /** Its stories the catalogue lists (the sidebar's count, the picker, the page), in the order of the files. */
   readonly stories: readonly TreeStory[];
   /**
    * Its stories tagged `!dev`, as Storybook's: listed nowhere, still opened by their address and tested; empty when
@@ -72,6 +103,10 @@ export type TreeComponent = {
   readonly related: readonly string[];
   /** Other words the search finds it by, as the meta writes them; empty when none. */
   readonly keywords: readonly string[];
+  /** Its design: the meta's `parameters.design.figma`; none by default. */
+  readonly design: FigmaLink | undefined;
+  /** The prop groups its meta lists first (`parameters.propGroups`), in their order; empty when none. */
+  readonly propGroups: readonly string[];
 };
 
 /** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`). */
@@ -119,16 +154,17 @@ export type TreeSource = {
   readonly pages: readonly TreePage[];
 };
 
-/** The tree, with what is wrong in the indexes (a title without a family, two files with the same title). */
+/** The tree, with what is wrong in the indexes (a title without a family, a story id used twice). */
 export type StoryTree = {
   /** Every source with stories or docs pages. */
   readonly sources: readonly TreeSource[];
-  /** One message per problem; the files concerned are left out of the tree. */
+  /** One message per problem; the files or stories concerned are left out of the tree. */
   readonly problems: readonly string[];
 };
 
 /**
- * A text in lower-case kebab case, as CSF writes ids: every run of other characters becomes one `-`.
+ * A text in lower-case kebab case, split at its case changes: the rule ids had before they followed Storybook's, kept
+ * to find a story by an id written then (`formerStoryId`).
  *
  * @param text - any text.
  */
@@ -140,37 +176,55 @@ export const kebab = (text: string): string =>
     .replace(/^-|-$/g, "");
 
 /**
- * A story's id.
+ * A story's id: the source's id, then Storybook's id of the story.
  *
  * @param sourceId - the source's id (`acme-ui`).
- * @param title - the file's title.
+ * @param component - the meta's `id` when it writes one, else the title.
  * @param exportName - the story's export.
  */
-export const storyId = (sourceId: string, title: string, exportName: string): string =>
-  `${sourceId}:${kebab(title)}--${kebab(exportName)}`;
+export const storyId = (sourceId: string, component: string, exportName: string): string =>
+  `${sourceId}:${csfStoryId(component, exportName)}`;
 
 /**
- * A component's id: its source and title, the part of its stories' ids before `--`.
+ * A component's id: its source and Storybook's id of the component, the part of its stories' ids before `--`.
  *
  * @param sourceId - the source's id (`acme-ui`).
- * @param title - the file's title.
+ * @param component - the meta's `id` when it writes one, else the title.
  */
-export const componentId = (sourceId: string, title: string): string => `${sourceId}:${kebab(title)}`;
+export const componentId = (sourceId: string, component: string): string =>
+  `${sourceId}:${idPart(component)}`;
 
 /**
- * A story's name from its export, in sentence case: `KeyboardOpen` → "Keyboard open", `Size2X` → "Size 2 x".
+ * The id a component had under the former rule (`kebab`), which an address written then still names.
+ *
+ * @param sourceId - the source's id.
+ * @param title - the component's title.
+ */
+export const formerComponentId = (sourceId: string, title: string): string => `${sourceId}:${kebab(title)}`;
+
+/**
+ * The id a story had under the former rule (`kebab`), which an address written then still names.
+ *
+ * @param sourceId - the source's id.
+ * @param title - the component's title.
+ * @param exportName - the story's export.
+ */
+export const formerStoryId = (sourceId: string, title: string, exportName: string): string =>
+  `${formerComponentId(sourceId, title)}--${kebab(exportName)}`;
+
+/**
+ * A story's name from its export: its words as Storybook splits them (`exportWords`), in sentence case, a word written
+ * in capitals kept so: `KeyboardOpen` → "Keyboard open", `CustomSVGIcon` → "Custom SVG icon", `Size2X` → "Size 2 X".
  *
  * @param exportName - the named export.
  */
-export const storyName = (exportName: string): string => {
-  const words = exportName
-    .replace(/([a-z])([A-Z0-9])/g, "$1 $2")
-    .replace(/([0-9])([A-Za-z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .trim()
-    .toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-};
+export const storyName = (exportName: string): string =>
+  exportWords(exportName)
+    .map((word, index) => {
+      if (index === 0) return word.charAt(0).toUpperCase() + word.slice(1);
+      return word === word.toUpperCase() ? word : word.toLowerCase();
+    })
+    .join(" ");
 
 /** Where a title places a component: its family, its group within the family, its name. */
 type TitlePlace = { readonly family: string; readonly group: string | undefined; readonly name: string };
@@ -218,160 +272,182 @@ const byGroup =
     return rankIn(order, left) - rankIn(order, right) || left.localeCompare(right);
   };
 
-/** A story file placed by its title, before its related components are known. */
-type PlacedFile = {
-  readonly file: string;
-  readonly entry: StoryFileIndex;
-  readonly family: string;
-  readonly group: string | undefined;
-  readonly name: string;
+/** A placed component while its files are gathered. */
+type GatheredComponent = { -readonly [Key in keyof PlacedComponent]: PlacedComponent[Key] };
+
+/**
+ * The component a file's title starts, or why it cannot: its title has no place, or makes no id, or an id another
+ * title already has (Storybook would merge their stories under one id; the catalogue could open only one).
+ *
+ * @param source - the source.
+ * @param file - the file.
+ * @param entry - its index.
+ * @param titlesById - the titles of the source's components so far, by id.
+ */
+const startedComponent = (
+  source: StorySource,
+  file: string,
+  entry: StoryFileIndex,
+  titlesById: ReadonlyMap<string, string>
+): GatheredComponent | string => {
+  const place = titlePlace(entry.title);
+  if (typeof place === "string") return place;
+  const component = entry.id ?? entry.title;
+  if (idPart(component) === "") return `"${component}" makes no id: it needs a letter or a digit`;
+  const id = componentId(source.id, component);
+  const other = titlesById.get(id);
+  if (other !== undefined) return `"${entry.title}" has the id "${id}" of "${other}"`;
+  return { title: entry.title, id, files: [{ file, entry }], ...place };
 };
 
-/** The files of one source placed by their titles; a title that cannot be placed, or is taken, is a problem. */
-const placedFiles = (source: StorySource, problems: string[]): PlacedFile[] => {
-  const placed: PlacedFile[] = [];
-  const seenTitles = new Map<string, string>();
-  for (const [file, entry] of Object.entries<StoryFileIndex>(sourceFiles(source).index)) {
+/**
+ * The components of one source, its files placed by their titles and merged when they share one; a title that cannot
+ * be placed, or that makes no id or a taken one, is a problem.
+ */
+const placedComponents = (source: StorySource, problems: string[]): PlacedComponent[] => {
+  const byTitle = new Map<string, GatheredComponent>();
+  const titlesById = new Map<string, string>();
+  const index = sourceFiles(source).index;
+  // sorted, so a component's files, and so its stories, its docs and a clash's winner, never depend on the groups' order
+  for (const file of Object.keys(index).sort()) {
+    const entry = index[file];
+    if (entry === undefined) continue;
     for (const note of entry.notes ?? []) problems.push(`${source.name}: ${file}: ${note}`);
-    const place = titlePlace(entry.title);
-    if (typeof place === "string") {
-      problems.push(`${source.name}: ${file}: ${place}`);
+    const placed = byTitle.get(entry.title);
+    if (placed !== undefined) {
+      placed.files = [...placed.files, { file, entry }];
       continue;
     }
-    const other = seenTitles.get(entry.title);
-    if (other !== undefined) {
-      problems.push(`${source.name}: ${file} and ${other} have the same title "${entry.title}"`);
+    const started = startedComponent(source, file, entry, titlesById);
+    if (typeof started === "string") {
+      problems.push(`${source.name}: ${file}: ${started}`);
       continue;
     }
-    seenTitles.set(entry.title, file);
-    placed.push({ file, entry, ...place });
+    byTitle.set(entry.title, started);
+    titlesById.set(started.id, entry.title);
   }
-  return placed;
-};
-
-/**
- * Each component's related titles, both ways, by its title: a link written in one meta reaches both pages. A title
- * that names no component of the source, or the component itself, is a problem.
- */
-const relatedTitles = (
-  source: StorySource,
-  placed: readonly PlacedFile[],
-  problems: string[]
-): ReadonlyMap<string, readonly string[]> => {
-  const names = new Map(placed.map((file) => [file.entry.title, file.name]));
-  const links = new Map<string, Set<string>>();
-  const link = (from: string, to: string): void => {
-    links.set(from, (links.get(from) ?? new Set()).add(to));
-  };
-  for (const { file, entry } of placed) {
-    for (const title of entry.related ?? []) {
-      if (title === entry.title) problems.push(`${source.name}: ${file} names itself as related`);
-      else if (!names.has(title))
-        problems.push(`${source.name}: ${file} names "${title}" as related: no such title`);
-      else {
-        link(entry.title, title);
-        link(title, entry.title);
-      }
-    }
-  }
-  return new Map(
-    [...links.entries()].map(([title, others]) => [
-      title,
-      [...others].sort((left, right) => (names.get(left) ?? left).localeCompare(names.get(right) ?? right))
-    ])
-  );
-};
-
-/** The family and group a place of `alsoIn` names (`Data/Tables`, `Data`), or why it cannot be one. */
-const aliasPlace = (place: string): { family: string; group: string | undefined } | string => {
-  const segments = place.split("/").map((segment) => segment.trim());
-  if (segments.some((segment) => segment === "")) return `"${place}" has an empty segment`;
-  const [family = "", group, ...rest] = segments;
-  if (rest.length > 0) return `"${place}" is not Family or Family/Group`;
-  return { family, group };
-};
-
-/** The groups of the families as they are being built: by family, then by group. */
-type GroupsByFamily = Map<
-  string,
-  Map<string | undefined, { components: TreeComponent[]; aliases: TreeAlias[] }>
->;
-
-/** A family's group as it is being built, created when it is not there yet. */
-const groupAt = (
-  families: GroupsByFamily,
-  family: string,
-  group: string | undefined
-): { components: TreeComponent[]; aliases: TreeAlias[] } => {
-  const groups = families.get(family) ?? new Map();
-  families.set(family, groups);
-  const found = groups.get(group) ?? { components: [], aliases: [] };
-  groups.set(group, found);
-  return found;
-};
-
-/**
- * Lists each component in the other places its meta names, beside the components that live there. A place that is
- * the component's own, or that already holds a component of the same name, is a problem.
- */
-const placeAliases = (
-  source: StorySource,
-  placed: readonly PlacedFile[],
-  families: GroupsByFamily,
-  problems: string[]
-): void => {
-  for (const { file, entry, family, group, name } of placed) {
-    for (const place of entry.alsoIn ?? []) {
-      const at = aliasPlace(place);
-      if (typeof at === "string") {
-        problems.push(`${source.name}: ${file}: also in ${at}`);
-        continue;
-      }
-      if (at.family === family && at.group === group) {
-        problems.push(`${source.name}: ${file} is also in "${place}", its own place`);
-        continue;
-      }
-      const target = groupAt(families, at.family, at.group);
-      if ([...target.components, ...target.aliases].some((other) => other.name === name)) {
-        problems.push(`${source.name}: ${file} is also in "${place}", which already lists a ${name}`);
-        continue;
-      }
-      target.aliases.push({ name, title: entry.title });
-    }
-  }
+  return [...byTitle.values()];
 };
 
 /** Whether a story is kept out of the catalogue's lists: tagged `!dev`, as Storybook's sidebar leaves it out. */
 const isUnlisted = (story: Pick<TreeStory, "tags">): boolean => story.tags.includes("!dev");
 
+/**
+ * A story of the tree: its index entry under its file's meta.
+ *
+ * @param id - its id.
+ * @param file - its file.
+ * @param entry - its file's index.
+ * @param story - its entry in the index.
+ * @param design - its design: its own, else its file's meta's.
+ */
+const treeStory = (
+  id: string,
+  file: string,
+  entry: StoryFileIndex,
+  story: StoryIndexEntry,
+  design: FigmaLink | undefined
+): TreeStory => ({
+  id,
+  file,
+  name: story.name ?? storyName(story.exportName),
+  exportName: story.exportName,
+  controls: story.controls ?? entry.controls ?? "all",
+  group: story.group,
+  description: story.description,
+  isMain: story.isMain === true,
+  isTouch: story.isTouch ?? entry.isTouch ?? false,
+  isLogic: story.isLogic ?? entry.isLogic ?? false,
+  height: story.height ?? entry.height,
+  device:
+    entry.device === undefined && story.device === undefined
+      ? undefined
+      : { ...entry.device, ...story.device },
+  design,
+  tags: story.tags ?? [],
+  hasPlay: story.hasPlay === true
+});
+
+/**
+ * A story's id: the one it writes, else the one its meta and its export make; or why it has none.
+ *
+ * @param sourceId - the source's id.
+ * @param entry - its file's index.
+ * @param story - its entry in the index.
+ */
+const treeStoryId = (sourceId: string, entry: StoryFileIndex, story: StoryIndexEntry): string | Error => {
+  if (story.id === "") return new Error(`story ${story.exportName} writes an empty id (\`parameters.__id\`)`);
+  if (story.id !== undefined) return `${sourceId}:${story.id}`;
+  if (idPart(exportWords(story.exportName).join(" ")) === "")
+    return new Error(`story ${story.exportName} makes no id: its name needs a letter or a digit`);
+  return storyId(sourceId, entry.id ?? entry.title, story.exportName);
+};
+
+/**
+ * The stories of a component's files, each meta's settings under its own stories. A story whose id is empty or taken
+ * (by any story of the source: Storybook refuses both) is a problem, and left out.
+ *
+ * @param source - the source.
+ * @param component - the component.
+ * @param seenIds - the ids of the source's stories so far, with their files; the new ones are added.
+ * @param problems - where a problem goes.
+ */
+const componentStories = (
+  source: StorySource,
+  component: PlacedComponent,
+  seenIds: Map<string, string>,
+  problems: string[]
+): TreeStory[] =>
+  component.files.flatMap(({ file, entry }) =>
+    entry.stories.flatMap((story): TreeStory[] => {
+      const id = treeStoryId(source.id, entry, story);
+      const other = typeof id === "string" ? seenIds.get(id) : undefined;
+      if (id instanceof Error || other !== undefined) {
+        const problem =
+          id instanceof Error
+            ? id.message
+            : `story ${story.exportName} has the id "${id}" of a story in ${other}`;
+        problems.push(`${source.name}: ${file}: ${problem}`);
+        return [];
+      }
+      seenIds.set(id, file);
+      // its own link, else its file's meta's; `null` is its own link the index refused, which stays refused
+      const design = story.design === undefined ? entry.design : (story.design ?? undefined);
+      return [treeStory(id, file, entry, story, design)];
+    })
+  );
+
+/**
+ * A component's design: its first file's meta's, as its docs are.
+ *
+ * @param component - the component.
+ */
+const componentDesign = (component: PlacedComponent): FigmaLink | undefined =>
+  component.files[0]?.entry.design;
+
 /** The families of one source, from its files. */
 const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] => {
-  const placed = placedFiles(source, problems);
+  const placed = placedComponents(source, problems);
   const related = relatedTitles(source, placed, problems);
   const families: GroupsByFamily = new Map();
-  for (const { file, entry, family, group, name } of placed) {
-    const stories = entry.stories.map((story) => ({
-      id: storyId(source.id, entry.title, story.exportName),
-      name: story.name ?? storyName(story.exportName),
-      exportName: story.exportName,
-      controls: story.controls ?? entry.controls ?? "all",
-      group: story.group,
-      description: story.description,
-      isMain: story.isMain === true,
-      isTouch: story.isTouch ?? entry.isTouch ?? false,
-      isLogic: story.isLogic ?? entry.isLogic ?? false,
-      height: story.height ?? entry.height,
-      tags: story.tags ?? []
-    }));
+  const seenIds = new Map<string, string>();
+  for (const component of placed) {
+    const { title, family, group, name, files } = component;
+    const stories = componentStories(source, component, seenIds, problems);
     groupAt(families, family, group).components.push({
+      id: component.id,
       name,
-      title: entry.title,
-      file,
+      title,
+      file: files[0]?.file ?? "",
+      files: files.map((each) => each.file),
       stories: stories.filter((story) => !isUnlisted(story)),
       unlisted: stories.filter(isUnlisted),
-      alsoIn: entry.alsoIn ?? [],
-      related: related.get(entry.title) ?? [],
-      keywords: entry.keywords ?? []
+      alsoIn: metaList(component, "alsoIn"),
+      related: related.get(title) ?? [],
+      keywords: metaList(component, "keywords"),
+      design: componentDesign(component),
+      // its first file's, as its docs are
+      propGroups: component.files[0]?.entry.propGroups ?? []
     });
   }
   placeAliases(source, placed, families, problems);
@@ -395,15 +471,25 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
     });
 };
 
-/** The ids of the sources' components. */
+/**
+ * The ids a docs page may name the sources' components by: their own, and the ones the former rule gave them
+ * (`formerComponentId`), which a page written then still uses.
+ */
 const componentIds = (sources: readonly TreeSource[]): string[] =>
   sources.flatMap((source) =>
     source.families.flatMap((family) =>
       family.groups.flatMap((group) =>
-        group.components.map((component) => componentId(source.id, component.title))
+        group.components.flatMap((component) => [component.id, formerComponentId(source.id, component.title)])
       )
     )
   );
+
+/** The ids a docs page may name the sources' stories by: their own, and their former ones (`formerStoryId`). */
+const storyIds = (sources: readonly TreeSource[]): string[] =>
+  storyLocations({ sources, problems: [] }).flatMap(({ source, component, story }) => [
+    story.id,
+    formerStoryId(source.id, component.title, story.exportName)
+  ]);
 
 /**
  * The catalogue's tree from the sources.
@@ -423,14 +509,7 @@ export const storyTree = (sources: readonly StorySource[]): StoryTree => {
   const shown = tree.filter((source) => source.families.length > 0 || source.pages.length > 0);
   return {
     sources: shown,
-    problems: [
-      ...problems,
-      ...pageProblems(
-        shown,
-        new Set(storyLocations({ sources: shown, problems: [] }).map(({ story }) => story.id)),
-        new Set(componentIds(shown))
-      )
-    ]
+    problems: [...problems, ...pageProblems(shown, new Set(storyIds(shown)), new Set(componentIds(shown)))]
   };
 };
 
@@ -491,35 +570,72 @@ export const testedStoryLocations = (tree: StoryTree): StoryLocation[] =>
   storyLocations(tree).filter((location) => !location.story.tags.includes("!test"));
 
 /**
- * Where a story sits.
+ * Where a story sits: the story with this id, else the one an earlier rule gave this id (`formerStoryId`), so an
+ * address written then still opens it.
  *
  * @param tree - the tree.
  * @param id - the story's id.
  * @returns its place, or `undefined` when no story has this id.
  */
-export const findStory = (tree: StoryTree, id: string): StoryLocation | undefined =>
-  storyLocations(tree).find((location) => location.story.id === id);
+export const findStory = (tree: StoryTree, id: string): StoryLocation | undefined => {
+  const locations = storyLocations(tree);
+  return (
+    locations.find((location) => location.story.id === id) ??
+    locations.find(
+      ({ source, component, story }) => formerStoryId(source.id, component.title, story.exportName) === id
+    )
+  );
+};
 
 /** Where a component sits: its source, family and group. */
 export type ComponentLocation = Omit<StoryLocation, "story">;
 
 /**
- * Where a component sits.
+ * Every component of the tree with its place.
  *
  * @param tree - the tree.
- * @param id - the component's id (`componentId`).
- * @returns its place, or `undefined` when no component has this id.
  */
-export const findComponent = (tree: StoryTree, id: string): ComponentLocation | undefined =>
-  tree.sources
-    .flatMap((source) =>
-      source.families.flatMap((family) =>
-        family.groups.flatMap((group) =>
-          group.components.map((component) => ({ source, family, group, component }))
-        )
+const componentLocations = (tree: StoryTree): ComponentLocation[] =>
+  tree.sources.flatMap((source) =>
+    source.families.flatMap((family) =>
+      family.groups.flatMap((group) =>
+        group.components.map((component) => ({ source, family, group, component }))
       )
     )
-    .find((location) => componentId(location.source.id, location.component.title) === id);
+  );
+
+/**
+ * Where a component sits: the component with this id, else the one an earlier rule gave this id (its title in
+ * `kebab`), so an address written then still opens it.
+ *
+ * @param tree - the tree.
+ * @param id - the component's id (`TreeComponent.id`).
+ * @returns its place, or `undefined` when no component has this id.
+ */
+export const findComponent = (tree: StoryTree, id: string): ComponentLocation | undefined => {
+  const locations = componentLocations(tree);
+  return (
+    locations.find((location) => location.component.id === id) ??
+    locations.find(({ source, component }) => formerComponentId(source.id, component.title) === id)
+  );
+};
+
+/**
+ * Where the component with a title sits, in one source: what a meta's `related` or `alsoIn`, or "Used in", names.
+ *
+ * @param tree - the tree.
+ * @param sourceId - the source's id.
+ * @param title - the component's title.
+ * @returns its place, or `undefined` when the source has no component with this title.
+ */
+export const findComponentByTitle = (
+  tree: StoryTree,
+  sourceId: string,
+  title: string
+): ComponentLocation | undefined =>
+  componentLocations(tree).find(
+    (location) => location.source.id === sourceId && location.component.title === title
+  );
 
 /** A component's stories under one group heading in the sidebar. */
 export type StoryGroupSection = {

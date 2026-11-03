@@ -1,0 +1,5 @@
+{
+  "name": "react-native-styled-test",
+  "private": true,
+  "description": "A small project with a PostCSS configuration, which the plugin's build test compiles."
+}

@@ -9,7 +9,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { isNearestTokensDocument, isTokenDocument, isTokensDocument } from "../../src/vite/agentApi.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
-import { nearestTokensText, tokensText, tokenText } from "./agentText.ts";
+import { clashText, nearestTokensText, tokensText, tokenText } from "./agentText.ts";
 import { askCatalogue, printAnswer, printTokenAnswer } from "./catalogueCommands.ts";
 
 /** Where the answers come from and go. */
@@ -63,11 +63,13 @@ export const runTokens = async (
   if (name !== undefined) {
     const body = await askCatalogue(config, url, "token", new URLSearchParams({ name }), log);
     if (!isTokenDocument(body)) throw unexpected();
+    for (const clash of body.clashes) log.warn(clashText(clash));
     printTokenAnswer(tokenText(body.token), body, context);
     return;
   }
   const params = new URLSearchParams({ category: category ?? "", limit: limit ?? "" });
   const body = await askCatalogue(config, url, "tokens", params, log);
   if (!isTokensDocument(body)) throw unexpected();
+  for (const clash of body.clashes) log.warn(clashText(clash));
   printAnswer(tokensText(body), body, body.problems, context);
 };

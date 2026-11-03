@@ -87,7 +87,6 @@ export const HomePieceView = ({
               each.families.map((family) => (
                 <FamilyCard
                   key={`${each.id}:${family.name}`}
-                  source={each}
                   family={family}
                   hrefOf={hrefOf}
                   onOpen={onOpen}

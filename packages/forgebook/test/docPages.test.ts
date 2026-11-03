@@ -13,22 +13,23 @@ import { describe, expect, it } from "vitest";
 import { catalogueTools } from "../bin/forgebook/mcpTools.ts";
 import { catalogueMarkdown } from "../bin/forgebook-docs/catalogueMarkdown.ts";
 import { llmsText } from "../bin/forgebook-docs/llmsText.ts";
-import { isDocPage, linkedHtml } from "../src/docPages.ts";
+import { type DocBlock, isDocPage, linkedHtml } from "../src/docPages.ts";
 import { NO_PREVIEW } from "../src/frame/storyModule.ts";
 import { findPage, pageGroups } from "../src/pageTree.ts";
+import { pagesAbout } from "../src/shell/audiencePage.ts";
+import { queuedBlocks } from "../src/shell/DocBlocks.tsx";
 import { foundPages, searchWords } from "../src/shell/treeSearch.ts";
 import { sourcePages } from "../src/sourceFiles.ts";
 import { storyTree } from "../src/storyTree.ts";
 import { storyAddressOf } from "../src/viewState.ts";
 import { isPageDocument, isPagesDocument } from "../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../src/vite/agentRoutes.ts";
-import {
-  DOCS_PAGE_QUERY,
-  docPageModule,
-  docPagesModule,
-  indexedDocPages
-} from "../src/vite/docPagesModule.ts";
+import { compiledDocPage } from "../src/vite/docPageMarkdown.ts";
+import { docPageModule, docPagesModule, indexedDocPages } from "../src/vite/docPagesModule.ts";
 import { pageAnswer, pagesDocument } from "../src/vite/docPagesRoute.ts";
+import { pluginsDocument } from "../src/vite/pluginConfig.ts";
+import { DOCS_PAGE_QUERY } from "../src/vite/textQueries.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 
 /** Where the catalogue is served in these tests. */
@@ -73,6 +74,36 @@ const page = (title: string, order?: number): DocPageIndex => ({
   stories: [],
   components: [],
   links: []
+});
+
+describe("a plugin's block", () => {
+  const page = (fences: readonly string[]): readonly DocBlock[] =>
+    compiledDocPage(
+      "/docs/a.md",
+      "Text\n\n```acme kit:a--b rest\nInside\n```\n\n```ts\nconst a = 1;\n```\n",
+      undefined,
+      fences
+    ).blocks;
+
+  it("is compiled for a fence a plugin draws, with what its line and its body say", () => {
+    expect(page(["acme"])[1]).toEqual({
+      kind: "plugin",
+      fence: "acme",
+      argument: "kit:a--b rest",
+      body: "Inside"
+    });
+    expect(page(["acme"])[2]?.kind).toBe("code");
+  });
+
+  it("stays code in a catalogue no plugin draws it for", () => {
+    expect(page([])[1]?.kind).toBe("code");
+  });
+
+  it("passes as a block of a page", () => {
+    expect(isDocPage({ blocks: page(["acme"]), headings: [], assets: [] })).toBe(true);
+    const broken = { kind: "plugin", fence: "acme", argument: 1, body: "" };
+    expect(isDocPage({ blocks: [broken], headings: [], assets: [] })).toBe(false);
+  });
 });
 
 describe("the page tree", () => {
@@ -124,6 +155,32 @@ describe("the page tree", () => {
     expect(tree.sources[0]?.pages).toHaveLength(1);
   });
 
+  it("accepts a story or a component a page names by the id the former rule gave it", () => {
+    const base = sourceWith({
+      "./a.md": {
+        ...page("Start"),
+        stories: ["kit:inputs-read-more--open-by-default", "kit:inputs-readmore--open-by-default"],
+        components: ["kit:inputs-read-more"]
+      }
+    });
+    const [group] = base.files;
+    if (group === undefined) throw new Error("no files");
+    const index = {
+      "./a.stories.tsx": { title: "Inputs/ReadMore", stories: [{ exportName: "OpenByDefault" }] }
+    };
+    const tree = storyTree([{ ...base, files: [{ ...group, index }] }]);
+    expect(tree.problems).toEqual([]);
+    const blocks: DocBlock[] = [
+      { kind: "story", id: "kit:inputs-read-more--open-by-default" },
+      { kind: "props", id: "kit:inputs-readmore" }
+    ];
+    // the frame reports under the story's own id, so the page queues it by that one
+    expect(queuedBlocks(blocks, tree)).toEqual([
+      "kit:inputs-readmore--open-by-default",
+      "props:kit:inputs-readmore"
+    ]);
+  });
+
   it("accepts a link across two groups of a source, and keeps titles in any language apart", () => {
     const one = sourceWith({ "./a.md": { ...page("主题"), links: ["обзор"] } });
     const two = sourceWith({ "./b.md": page("Обзор") });
@@ -144,6 +201,19 @@ describe("the page tree", () => {
     const tree = storyTree([sourceWith({ "./a.md": page("Start") })]);
     expect(findPage(tree, "kit:start")?.page.file).toBe("./a.md");
     expect(findPage(tree, "kit:gone")).toBeUndefined();
+  });
+
+  it("finds the pages that show a component, by a story or by its table", () => {
+    const tree = storyTree([
+      sourceWith({
+        "./a.md": { ...page("Stories"), stories: ["kit:select--overview"] },
+        "./b.md": { ...page("Table"), components: ["kit:select"] },
+        "./c.md": page("Other")
+      })
+    ]);
+    const shown = pagesAbout(tree, "kit:select", ["kit:select--overview"]);
+    expect(shown.map((each) => each.name)).toEqual(["Stories", "Table"]);
+    expect(pagesAbout(tree, "kit:badge", [])).toEqual([]);
   });
 
   it("merges a source's groups of pages", () => {
@@ -238,7 +308,7 @@ describe("the modules", () => {
     const watched: string[] = [];
     const code = docPagesModule(KIT_DIR, "docs/**/*.md", (file) => watched.push(file), true);
     expect(code).toContain(
-      `"./docs/getting-started.md": () => import(${JSON.stringify(`${join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
+      `"./docs/getting-started.md": () => import(${JSON.stringify(`${VITE_PATHS.join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
     );
     expect(code).toContain("module.text");
     expect(new Set(watched).size).toBe(5);
@@ -254,7 +324,9 @@ describe("the modules", () => {
   it("imports a page's images, so Vite answers their addresses", () => {
     const file = join(KIT_DIR, "docs/guides/theming.md");
     const code = docPageModule(file, () => undefined, false);
-    expect(code).toContain(`import asset0 from ${JSON.stringify(`${join(KIT_DIR, "logo.svg")}?url`)};`);
+    expect(code).toContain(
+      `import asset0 from ${JSON.stringify(`${VITE_PATHS.join(KIT_DIR, "logo.svg")}?url`)};`
+    );
     expect(code).toContain("assets: [asset0]");
     expect(code).not.toContain("export const text");
     expect(readFileSync(file, "utf8")).toContain("logo.svg");
@@ -266,7 +338,7 @@ describe("agents", () => {
   const tree = storyTree([source]);
   const context = {
     tree,
-    loaded: { sources: [source], preview: NO_PREVIEW },
+    loaded: { sources: [source], preview: NO_PREVIEW, problems: [] },
     pages: PAGES,
     view: "theme=dark",
     params: new URLSearchParams({ id: "kit:guides-start" })
@@ -305,7 +377,7 @@ describe("agents", () => {
     };
     const { status, body } = await pageAnswer({
       ...context,
-      loaded: { sources: [broken], preview: NO_PREVIEW }
+      loaded: { sources: [broken], preview: NO_PREVIEW, problems: [] }
     });
     expect(status).toBe(200);
     expect(body).toMatchObject({ text: "", problems: ["The page failed to load: broken"] });
@@ -327,7 +399,9 @@ describe("agents", () => {
       writeNew: () => Promise.reject(new Error("not asked in these tests")),
       check: async () => "unused",
       checkPage: async () => "unused",
-      shot: async () => "unused"
+      shot: async () => "unused",
+      servePreview: async () => "unused",
+      plugins: pluginsDocument([])
     });
     const tool = (name: string): (typeof tools)[number] => {
       const found = tools.find((each) => each.name === name);
@@ -363,7 +437,8 @@ describe("CATALOG.md and llms.txt", () => {
     pages,
     modules: [],
     sassModules: [],
-    styleSheets: []
+    styleSheets: [],
+    tokens: []
   };
 
   it("lists a package's pages, each with its id", () => {

@@ -63,6 +63,7 @@ test.describe("docs pages", () => {
       "Choosing a select",
       "Writing for the kit",
       "Blocks",
+      "Plugin blocks",
       "About these stories"
     ]);
   });
@@ -244,9 +245,12 @@ test.describe("docs pages", () => {
     await contents.getByRole("link", { name: "The last section" }).click();
     await expect(last).toBeInViewport();
     await scrollSettled(page);
-    await scroller(page).evaluate((element) => {
-      element.scrollTop = 0;
-    });
+    // the reader scrolls back up with the wheel, over the text: a page that still loads keeps placing the heading
+    // until the person scrolls, and a script setting `scrollTop` is not the person, so a frame arriving late would
+    // bring the heading back
+    await last.hover();
+    await page.mouse.wheel(0, -(await scroller(page).evaluate((element) => element.scrollHeight)));
+    await expect.poll(() => scroller(page).evaluate((element) => element.scrollTop)).toBe(0);
     await expect(last).not.toBeInViewport();
     const entries = await page.evaluate(() => window.history.length);
     await contents.getByRole("link", { name: "The last section" }).click();
@@ -256,6 +260,39 @@ test.describe("docs pages", () => {
     await page.goBack();
     await expect(page).not.toHaveURL(/#the-last-section$/);
     await expect.poll(() => scroller(page).evaluate((element) => element.scrollTop)).toBe(0);
+  });
+
+  test("a reader who scrolls away from a heading stays there when a frame above arrives late", async ({
+    page
+  }) => {
+    // no height measured before, and the frame held back: its story takes its own height after the reader scrolled
+    await page.route("**/story-heights.json", (route) => route.fulfill({ json: {} }));
+    let release: () => void = () => undefined;
+    const isReleased = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/frame.html*", async (route) => {
+      await isReleased;
+      await route.continue();
+    });
+    await page.setViewportSize({ width: 1440, height: 600 });
+    await page.goto(docs("kit:guides-choosing-a-select"));
+    const last = page.locator('[id="doc-the-last-section"]');
+    await page
+      .getByRole("navigation", { name: "On this page" })
+      .getByRole("link", { name: "The last section" })
+      .click();
+    await expect(last).toBeInViewport();
+    await scrollSettled(page);
+    await last.hover();
+    await page.mouse.wheel(0, -(await scroller(page).evaluate((element) => element.scrollHeight)));
+    await expect.poll(() => scroller(page).evaluate((element) => element.scrollTop)).toBe(0);
+    const height = await scroller(page).evaluate((element) => element.scrollHeight);
+    release();
+    await expect(frameAt(page, 0).locator("html[data-forgebook-status='ready']")).toHaveCount(1);
+    await expect.poll(() => scroller(page).evaluate((element) => element.scrollHeight)).not.toBe(height);
+    await scrollSettled(page);
+    expect(await scroller(page).evaluate((element) => element.scrollTop)).toBe(0);
   });
 
   test("a link to a heading of another page arrives at it", async ({ page }) => {

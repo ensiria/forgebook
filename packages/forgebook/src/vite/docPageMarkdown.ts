@@ -52,14 +52,22 @@ const withoutTitle = (nodes: readonly PageNode[]): readonly PageNode[] => {
  * @param text - its text.
  * @param read - reads a linked page's text.
  * @param isHome - whether it is the catalogue's written home.
+ * @param pluginFences - the fences the catalogue's plugins draw.
  */
-const readDocPage = (file: string, text: string, read: ReadPage, isHome: boolean): ReadDocPage => {
+const readDocPage = (
+  file: string,
+  text: string,
+  read: ReadPage,
+  isHome: boolean,
+  pluginFences: readonly string[]
+): ReadDocPage => {
   const frontMatter = frontMatterOf(text);
   let version: { readonly value: string | undefined } | undefined;
   const reading: PageReading = {
     file,
     read,
     isHome,
+    pluginFences,
     version: (): string | undefined => {
       version ??= { value: packageVersionOf(file) };
       return version.value;
@@ -89,9 +97,15 @@ const notesOf = (reading: PageReading): string[] => inFileOrder(reading.notes).m
  * @param file - the page's file, absolute.
  * @param text - its text.
  * @param read - reads a linked page's text; from the disk by default.
+ * @param fences - the fences the catalogue's plugins draw; none by default.
  */
-export const docPageIndex = (file: string, text: string, read: ReadPage = readLinkedFile): DocPageIndex => {
-  const { frontMatter, reading } = readDocPage(file, text, read, false);
+export const docPageIndex = (
+  file: string,
+  text: string,
+  read: ReadPage = readLinkedFile,
+  fences: readonly string[] = []
+): DocPageIndex => {
+  const { frontMatter, reading } = readDocPage(file, text, read, false, fences);
   const { order, description } = frontMatter;
   const notes = notesOf(reading);
   return {
@@ -119,13 +133,15 @@ export type CompiledDocPage = Omit<DocPage, "assets"> & {
  * @param file - the page's file, absolute.
  * @param text - its text.
  * @param read - reads a linked page's text; from the disk by default.
+ * @param fences - the fences the catalogue's plugins draw; none by default.
  */
 export const compiledDocPage = (
   file: string,
   text: string,
-  read: ReadPage = readLinkedFile
+  read: ReadPage = readLinkedFile,
+  fences: readonly string[] = []
 ): CompiledDocPage => {
-  const { frontMatter, nodes, reading } = readDocPage(file, text, read, false);
+  const { frontMatter, nodes, reading } = readDocPage(file, text, read, false, fences);
   const { blocks, headings } = renderedPage(nodes, reading.fences);
   return { blocks, headings, images: reading.images, text: frontMatter.body.trim() };
 };
@@ -160,9 +176,15 @@ const homeTitle = (frontMatter: FrontMatter, reading: PageReading): string | und
  * @param file - the home's file, absolute.
  * @param text - its text.
  * @param read - reads a linked page's text; from the disk by default.
+ * @param fences - the fences the catalogue's plugins draw; none by default.
  */
-export const homeIndex = (file: string, text: string, read: ReadPage = readLinkedFile): HomeIndex => {
-  const { frontMatter, reading } = readDocPage(file, text, read, true);
+export const homeIndex = (
+  file: string,
+  text: string,
+  read: ReadPage = readLinkedFile,
+  fences: readonly string[] = []
+): HomeIndex => {
+  const { frontMatter, reading } = readDocPage(file, text, read, true, fences);
   return {
     title: homeTitle(frontMatter, reading),
     description: withVersion(frontMatter.description, reading),
@@ -191,9 +213,15 @@ export type CompiledHome = Omit<CompiledDocPage, "headings"> & {
  * @param file - the home's file, absolute.
  * @param text - its text.
  * @param read - reads a linked page's text; from the disk by default.
+ * @param fences - the fences the catalogue's plugins draw; none by default.
  */
-export const compiledHome = (file: string, text: string, read: ReadPage = readLinkedFile): CompiledHome => {
-  const { frontMatter, nodes, reading } = readDocPage(file, text, read, true);
+export const compiledHome = (
+  file: string,
+  text: string,
+  read: ReadPage = readLinkedFile,
+  fences: readonly string[] = []
+): CompiledHome => {
+  const { frontMatter, nodes, reading } = readDocPage(file, text, read, true, fences);
   const { blocks } = renderedPage(nodes, reading.fences);
   return {
     title: homeTitle(frontMatter, reading),

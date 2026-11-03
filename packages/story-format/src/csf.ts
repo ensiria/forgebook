@@ -31,6 +31,11 @@ export type Renderer = {
   readonly component: unknown;
   /** What a story draws (`ReactNode` in React). */
   readonly storyResult: unknown;
+  /**
+   * What a decorator's `story()` gives, for a framework where it is narrower than what a story may return (Vue: a story
+   * may return a component, but `story()` is a virtual node); `storyResult` without it.
+   */
+  readonly decoratedStory?: unknown;
 };
 
 /** A value a story's args may write for a prop: the prop's own, or, where it takes a text, a text named by its key. */
@@ -51,6 +56,37 @@ export type ReplayMode =
       /** How long the arg stays false once the exit has played, in ms (a loading phase to watch); none by default. */
       readonly hold?: number;
     };
+
+/** How a device is held: upright, or turned on its side with its top to the left. */
+export type DeviceOrientation = "portrait" | "landscape";
+
+/**
+ * The device a story is shown in by default (`parameters.device`): a drawn phone or tablet around it, at the model's
+ * real viewport size, which the person can still turn off, change or rotate. Each field is optional: a story's own
+ * fields win over the meta's, which win over the catalogue's `device`.
+ */
+export type StoryDeviceSetting = {
+  /** Whether the story starts in the device frame; `false` by default, and on a story it leaves the meta's out. */
+  readonly frame?: boolean;
+  /**
+   * The model, by id (`iphone-16`; the catalogue's documentation lists them): the one the frame shows, and the one
+   * the toolbar's toggle turns on; `phone`, a generic phone, by default.
+   */
+  readonly model?: string;
+  /** How the device is held; `portrait` by default. */
+  readonly orientation?: DeviceOrientation;
+  /**
+   * Whether the story is touched with the catalogue's simulated finger while it is in the device, as a phone is;
+   * `true` by default. The reader can still turn touch off for it.
+   */
+  readonly touch?: boolean;
+  /**
+   * Whether the story draws edge to edge, under the status bar and the home indicator, as a full-screen app does; it
+   * then pads itself with the safe areas the frame writes as custom properties (`--forgebook-safe-area-top`…), since
+   * `env(safe-area-inset-*)` stays zero in a frame. `false` by default: the story sits inside the safe areas.
+   */
+  readonly edgeToEdge?: boolean;
+};
 
 /**
  * A group of stories in the sidebar (`states`, `in-context`): its order and heading come from the catalogue's
@@ -120,6 +156,15 @@ export type ArgTypes<TArgs> = { readonly [Name in keyof TArgs]?: ArgType } & Rea
   Record<string, ArgType>
 >;
 
+/** A component's or a story's design, in the tool it was drawn in. */
+export type StoryDesign = {
+  /**
+   * The link to its node in Figma (`https://www.figma.com/design/<file>/<name>?node-id=12-34`), or to its file. Written
+   * plainly (the index reads it). A link that is not Figma's is reported and never embedded.
+   */
+  readonly figma: string;
+};
+
 /** The settings the catalogue reads from a meta or a story; anything else under `parameters` is left alone. */
 export type StoryParameters = {
   /** The states forced on the whole story; a part can force its own with `data-forgebook-force`. */
@@ -164,6 +209,18 @@ export type StoryParameters = {
    */
   readonly logic?: boolean;
   /**
+   * The device the story is shown in by default: `{ frame: true, model: "iphone-16" }` draws an iPhone 16 around it,
+   * at its viewport, on the story's page and on its component's page. On a meta, for every story of the file; a
+   * story's own fields win. Written plainly (the index reads it); off by default.
+   */
+  readonly device?: StoryDeviceSetting;
+  /**
+   * The design this is drawn from: on a meta, the component's and every story's; on a story, its own in place of the
+   * meta's. The catalogue links to it, and with a design plugin (`@forgebook/plugin-figma`) shows it in a Design tab
+   * beside the story.
+   */
+  readonly design?: StoryDesign;
+  /**
    * The story reads the story clock (`context.clock`, `useStoryNow`): a Live story, which starts at this moment and
    * then runs; the catalogue shows pause, resume, restart and the speed, and the tests hold it at its start.
    * None by default: the clock is held at the Unix epoch and the catalogue shows no clock controls.
@@ -171,6 +228,21 @@ export type StoryParameters = {
   readonly clock?: StoryClockSetting;
   /** How the story sits in its frame: padded (default), centred, or the whole frame. */
   readonly layout?: "padded" | "centered" | "fullscreen";
+  /**
+   * The story's mocked API: MSW's request handlers, which answer what the story fetches while it is shown. A list, or
+   * a record of lists as MSW's Storybook addon writes it. Typed `unknown` here, since this package depends on nothing:
+   * they are MSW's `http.get(…)` values.
+   */
+  readonly msw?: {
+    /** The handlers. */
+    readonly handlers: readonly unknown[] | Readonly<Record<string, readonly unknown[]>>;
+  };
+  /**
+   * On a meta: the component's prop groups to list first in its API reference and Props tab, in this order, by the
+   * name their props' TSDoc gives (`@group Selection`), ahead of the catalogue's own order; the others follow as they
+   * first appear. Written plainly, a list of string literals (the index reads it).
+   */
+  readonly propGroups?: readonly string[];
   /** CSF's documentation block; the catalogue reads the component's one-line description from it. */
   readonly docs?: { readonly description?: { readonly component?: string } };
 };
@@ -197,8 +269,9 @@ export type StoryContext<TArgs> = {
    */
   readonly clock: StoryClock;
   /**
-   * The values of the catalogue's switches applied by code, by the switch's id (CSF's name): what a decorator reads
-   * to pick a provider's theme, a density, a locale. Empty outside a catalogue.
+   * The globals a decorator reads to pick a provider's theme, a density, a locale, by id (CSF's name): the preview's
+   * starting values (its `globalTypes` defaults, under `initialGlobals`), under the meta's and the story's own, under
+   * the catalogue's switches applied by code. Text values only. Empty outside a catalogue.
    */
   readonly globals: Readonly<Record<string, string>>;
   /** What the story's loaders returned, merged: the preview's, then the meta's, then the story's (CSF's `loaded`). */
@@ -261,7 +334,9 @@ export type OneOrMany<TFunction> = TFunction | readonly TFunction[];
 
 /** Wraps a story: a provider, a container of a given width. */
 export type Decorator<TRenderer extends Renderer, TArgs> = (
-  story: () => TRenderer["storyResult"],
+  story: () => TRenderer extends { readonly decoratedStory: infer TStory }
+    ? TStory
+    : TRenderer["storyResult"],
   context: StoryContext<TArgs>
 ) => TRenderer["storyResult"];
 

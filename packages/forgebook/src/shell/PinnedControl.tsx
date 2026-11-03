@@ -17,9 +17,10 @@ import {
 } from "react";
 
 import type { ToolbarControl as Control } from "../toolbarLayout.ts";
+import { controlLabel } from "./controlLabel.ts";
 import { InfoTip } from "./InfoTip.tsx";
 import { STRINGS } from "./strings.ts";
-import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
+import { type ControlContext, ToolbarControl } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
 
 /** The room the menu keeps from the window's edges, in CSS px. */

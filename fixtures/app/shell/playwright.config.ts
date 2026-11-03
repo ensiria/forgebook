@@ -3,8 +3,19 @@
  * the unit tests cannot reach (the address, the panel, the stage, the keys, the errors).
  *
  * @remarks
- * Run with `pnpm --filter @fixture/app test:shell`. The port comes from `FORGEBOOK_SHELL_PORT`, so two
- * worktrees can run the tests at once.
+ * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT` (`ports.ts`), so two
+ * worktrees can run the tests at once. The Vue, Svelte, Solid, Preact, Web Components, plain HTML, Angular, SvelteKit,
+ * Next.js, Nuxt, React Native and white-label catalogues run beside the fixture app, for what a catalogue of another
+ * framework must do (`vue.e2e.ts`, `svelte.e2e.ts`, `solid.e2e.ts`, `preact.e2e.ts`, `webComponents.e2e.ts`,
+ * `html.e2e.ts`, `angular.e2e.ts`), what a SvelteKit, Next.js, Nuxt or React Native project's components need
+ * (`sveltekit.e2e.ts`, `nextjs.e2e.ts`, `nuxt.e2e.ts`, `reactNative.e2e.ts`) and a catalogue with no trace of
+ * Forgebook's look (`embed.e2e.ts`).
+ *
+ * `FORGEBOOK_SHELL_GROUP=<index>/<count>` runs one group of catalogues and their specs instead of all of them at once
+ * (`catalogueGroups.ts`), for a machine whose memory does not hold every dev server together.
+ *
+ * The specs that edit fixture files run in a project of their own, `story file edits`, on one worker; every other spec
+ * runs in `catalogues`, in parallel.
  *
  * @module
  */
@@ -12,39 +23,88 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-/** The port the fixture app listens on. */
-const PORT = Number(process.env["FORGEBOOK_SHELL_PORT"] ?? "41721");
+import { runGroup } from "./catalogueGroups";
+import { type Catalogue, catalogueUrl, framesPortOf, portOf } from "./ports";
 
-/** The port the same catalogue listens on with its generated home (`forgebook.generated.config.ts`): the next one. */
-const GENERATED_PORT = PORT + 1;
+/**
+ * The catalogues whose dev server notices edits by polling (`--poll`): the fixture app's, whose files the
+ * `story file edits` specs write. On a busy machine the system's change events come seconds late, past an assertion's
+ * wait; polling checks the files itself, every 100 ms, without the system's event service.
+ */
+const POLLING_CATALOGUES: readonly Catalogue[] = ["app"];
+
+/**
+ * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
+ * dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here.
+ *
+ * @param folder - the catalogue's folder.
+ * @param catalogue - which catalogue it is, for its ports (`ports.ts`): its frames listen on their own.
+ * @param configFile - its configuration, relative to the folder; the folder's `forgebook.config.ts` when absent.
+ */
+const catalogueServer = (
+  folder: string,
+  catalogue: Catalogue,
+  configFile?: string
+): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
+  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${portOf(catalogue)} --frame-port ${framesPortOf(catalogue)} --force${POLLING_CATALOGUES.includes(catalogue) ? " --poll" : ""}`,
+  cwd: folder,
+  url: catalogueUrl(catalogue),
+  reuseExistingServer: false
+});
+
+/** Each catalogue's server: its folder, and its configuration when not the folder's `forgebook.config.ts`. */
+const SERVERS: Readonly<Record<Catalogue, { folder: string; configFile?: string }>> = {
+  app: { folder: join(import.meta.dirname, "..") },
+  vue: { folder: join(import.meta.dirname, "..", "..", "vue") },
+  svelte: { folder: join(import.meta.dirname, "..", "..", "svelte") },
+  solid: { folder: join(import.meta.dirname, "..", "..", "solid") },
+  preact: { folder: join(import.meta.dirname, "..", "..", "preact") },
+  "web-components": { folder: join(import.meta.dirname, "..", "..", "web-components") },
+  html: { folder: join(import.meta.dirname, "..", "..", "html") },
+  // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
+  "white-label": { folder: join(import.meta.dirname, ".."), configFile: "white-label/forgebook.config.ts" },
+  nextjs: { folder: join(import.meta.dirname, "..", "..", "nextjs") },
+  nuxt: { folder: join(import.meta.dirname, "..", "..", "nuxt") },
+  angular: { folder: join(import.meta.dirname, "..", "..", "angular") },
+  sveltekit: { folder: join(import.meta.dirname, "..", "..", "sveltekit") },
+  "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") },
+  // the fixture app without its written home, for the home every catalogue without one keeps (`home.e2e.ts`)
+  "generated-home": { folder: join(import.meta.dirname, ".."), configFile: "forgebook.generated.config.ts" }
+};
+
+/** The catalogues and specs this run takes: all of them, or one group (`catalogueGroups.ts`). */
+const group = runGroup(import.meta.dirname);
+
+/**
+ * The specs that edit committed fixture files while the catalogue serves them (`fileEdits.ts`): run on one worker, so
+ * no two of their tests, nor two repetitions of one (`--repeat-each`), edit the same file at once.
+ */
+const EDITING_SPECS: readonly string[] = ["hotEdit.e2e.ts"];
+
+/** This run's specs that edit fixture files. */
+const editingSpecs = group.specs.filter((spec) => EDITING_SPECS.includes(spec));
+
+/** This run's other specs. */
+const otherSpecs = group.specs.filter((spec) => !EDITING_SPECS.includes(spec));
 
 export default defineConfig({
   testDir: import.meta.dirname,
-  testMatch: "*.e2e.ts",
+  projects: [
+    ...(otherSpecs.length === 0 ? [] : [{ name: "catalogues", testMatch: otherSpecs }]),
+    ...(editingSpecs.length === 0 ? [] : [{ name: "story file edits", testMatch: editingSpecs, workers: 1 }])
+  ],
+  // a group keeps its results apart, so the next group's run does not clear a failure before it
+  ...(group.place === undefined
+    ? {}
+    : { outputDir: join(import.meta.dirname, "..", "test-results", `group-${group.place.index}`) }),
   fullyParallel: true,
   reporter: [["list"]],
-  webServer: [
-    {
-      // the catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
-      // dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here
-      command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${PORT} --force`,
-      cwd: join(import.meta.dirname, ".."),
-      url: `http://127.0.0.1:${PORT}/`,
-      reuseExistingServer: false
-    },
-    {
-      // the same catalogue without its written home, for the home every catalogue without one keeps (`home.e2e.ts`)
-      command: `pnpm exec forgebook dev --config forgebook.generated.config.ts --host 127.0.0.1 --port ${GENERATED_PORT}`,
-      cwd: join(import.meta.dirname, ".."),
-      url: `http://127.0.0.1:${GENERATED_PORT}/`,
-      reuseExistingServer: false
-    }
-  ],
-  // where the tests of the generated home go (`home.e2e.ts`)
-  metadata: { generatedHome: `http://127.0.0.1:${GENERATED_PORT}/` },
+  webServer: group.catalogues.map((catalogue) =>
+    catalogueServer(SERVERS[catalogue].folder, catalogue, SERVERS[catalogue].configFile)
+  ),
   use: {
     browserName: "chromium",
-    baseURL: `http://127.0.0.1:${PORT}/`,
+    baseURL: catalogueUrl("app"),
     viewport: { width: 1280, height: 900 }
   }
 });

@@ -14,13 +14,8 @@ import "./docPage.scss";
 
 import { type ReactNode, useCallback, useMemo, useRef } from "react";
 
-import {
-  filledText,
-  type HomeDocument,
-  headingElementId,
-  isHomeDocument,
-  OWN_SOURCE_ID
-} from "../docPages.ts";
+import { headingElementId } from "../docAnchors.ts";
+import { filledText, type HomeDocument, isHomeDocument, OWN_SOURCE_ID } from "../docPages.ts";
 import { anchorOf } from "../pageAddress.ts";
 import { findStory } from "../storyTree.ts";
 import { CodeText } from "./CodeText.tsx";
@@ -84,6 +79,7 @@ const HomeNotes = ({ notes }: { readonly notes: readonly string[] }): ReactNode 
 export const AuthoredHome = ({
   load,
   title,
+  plugins,
   tree,
   sources,
   recent,
@@ -111,7 +107,7 @@ export const AuthoredHome = ({
     () => content.stories.flatMap((id) => findStory(tree, id)?.story ?? []),
     [content.stories, tree]
   );
-  const queued = useMemo(() => queuedBlocks(content.blocks), [content.blocks]);
+  const queued = useMemo(() => queuedBlocks(content.blocks, tree), [content.blocks, tree]);
   const places = useMemo(() => blockPlaces(content.blocks), [content.blocks]);
   const values = useMemo(() => catalogueValues(title, tree), [title, tree]);
   const frames = usePageFrames({ stories, queued, pageRef, view, touchOverrides });
@@ -146,7 +142,9 @@ export const AuthoredHome = ({
     values,
     onOpenAddress: openLink,
     home: { tree, sources, recent, hrefOf, onOpen },
-    places
+    places,
+    plugins,
+    strings: catalogue.strings
   };
   return (
     <div className="forgebook-workspace">

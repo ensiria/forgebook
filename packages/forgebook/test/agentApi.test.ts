@@ -37,7 +37,8 @@ const SOURCE: StorySource = {
           ]
         },
         "./colour.stories.tsx": { title: "Foundations/Colour", stories: [{ exportName: "Scales" }] },
-        "./again.stories.tsx": { title: "Actions/Button", stories: [{ exportName: "Twice" }] }
+        // a second file of the title: its story with the id of one already listed is refused
+        "./other.stories.tsx": { title: "Actions/Button", stories: [{ exportName: "Primary" }] }
       },
       stories: {},
       docs: {},
@@ -54,8 +55,26 @@ describe("storyLinks", () => {
   it("opens the story's page and its frame in the view asked for, the shell's own parameters off the frame", () => {
     expect(storyLinks(PAGES, "kit:actions-button--primary", "theme=dark&lang=it&panel=props")).toEqual({
       address: "http://localhost:5173/?theme=dark&lang=it&panel=props&story=kit%3Aactions-button--primary",
-      frame: "http://localhost:5173/frame.html?theme=dark&lang=it&story=kit%3Aactions-button--primary"
+      component: "http://localhost:5173/?theme=dark&lang=it&panel=props&component=kit%3Aactions-button",
+      frame: "http://localhost:5173/frame.html?theme=dark&lang=it&story=kit%3Aactions-button--primary",
+      embed: "http://localhost:5173/?embed&theme=dark&lang=it&story=kit%3Aactions-button--primary"
     });
+  });
+});
+
+describe("a source with `--` in its id", () => {
+  it("still names the component's page", () => {
+    expect(storyLinks(PAGES, "my--lib:button--primary", "").component).toBe(
+      "http://localhost:5173/?component=my--lib%3Abutton"
+    );
+  });
+});
+
+describe("an audience in the view", () => {
+  it("opens the component's page for them, and leaves the story's frame alone", () => {
+    const links = storyLinks(PAGES, "kit:actions-button--primary", "audience=designer");
+    expect(links.component).toBe("http://localhost:5173/?audience=designer&component=kit%3Aactions-button");
+    expect(links.frame).toBe("http://localhost:5173/frame.html?story=kit%3Aactions-button--primary");
   });
 });
 
@@ -72,10 +91,36 @@ describe("storiesDocument", () => {
     expect(button?.stories[0]?.description).toBe("The main action.");
   });
 
+  it("gives a story's device as its parameter says, and none to a story without one", () => {
+    const tree = storyTree([
+      {
+        ...SOURCE,
+        files: [
+          {
+            index: {
+              "./screen.stories.tsx": {
+                title: "Layouts/Screen",
+                device: { frame: true },
+                stories: [{ exportName: "Phone", device: { model: "pixel-9" } }]
+              }
+            },
+            stories: {},
+            docs: {},
+            code: {},
+            pages: {}
+          }
+        ]
+      }
+    ]);
+    const [screen] = storiesDocument("Kit catalogue", tree, PAGES, "").components;
+    expect(screen?.stories[0]?.device).toEqual({ frame: true, model: "pixel-9" });
+    expect(document.components[0]?.stories[0]).not.toHaveProperty("device");
+  });
+
   it("carries the schema, the sources and the index's problems", () => {
     expect(document.schema).toBe(1);
     expect(document.sources).toEqual([{ id: "kit", name: "Kit" }]);
-    expect(document.problems.join("\n")).toContain("again.stories.tsx");
+    expect(document.problems.join("\n")).toContain("other.stories.tsx");
   });
 });
 
@@ -122,6 +167,54 @@ describe("storyDocument", () => {
       "Its component's docs failed: no program"
     ]);
     expect(document.story.links.frame).toContain("theme=dark");
+    expect(document.story.links.component).toContain("theme=dark");
+    expect(document.story.links.component).toContain("component=");
+    expect(document.story.links.component).not.toContain("--");
+  });
+});
+
+describe("a story's design, for agents", () => {
+  const figmaUrl = "https://www.figma.com/design/File1?node-id=12-34";
+  const tree = storyTree([
+    {
+      ...SOURCE,
+      files: [
+        {
+          ...(SOURCE.files[0] ?? { index: {}, stories: {}, docs: {}, code: {}, pages: {} }),
+          index: {
+            "./button.stories.tsx": {
+              title: "Actions/Button",
+              design: { url: figmaUrl, kind: "design", fileKey: "File1", nodeId: "12:34" },
+              stories: [{ exportName: "Primary" }]
+            },
+            "./colour.stories.tsx": { title: "Foundations/Colour", stories: [{ exportName: "Scales" }] }
+          }
+        }
+      ]
+    }
+  ]);
+  const parts = { module: { value: { default: {}, Primary: {}, Scales: {} } }, docs: { value: undefined } };
+
+  it("gives its Figma link, what a tool that reads Figma takes, and the page to look at it on", () => {
+    const location = findStory(tree, "kit:actions-button--primary");
+    if (location === undefined) throw new Error("the fixture's story is missing");
+    const document = storyDocument(location, parts, PAGES, "theme=dark");
+    expect(document.design).toEqual({
+      figma: figmaUrl,
+      fileKey: "File1",
+      nodeId: "12:34",
+      address: "http://localhost:5173/?theme=dark&tab=figma&story=kit%3Aactions-button--primary"
+    });
+    expect(document.component.design).toEqual({ figma: figmaUrl, fileKey: "File1", nodeId: "12:34" });
+  });
+
+  it("says nothing of a design for a story without one, and lists a component's in the stories", () => {
+    const location = findStory(tree, "kit:foundations-colour--scales");
+    if (location === undefined) throw new Error("the fixture's story is missing");
+    expect("design" in storyDocument(location, parts, PAGES, "")).toBe(false);
+    const [button, colour] = storiesDocument("Kit", tree, PAGES, "").components;
+    expect(button?.design?.figma).toBe(figmaUrl);
+    expect(colour === undefined ? true : "design" in colour).toBe(false);
   });
 });
 

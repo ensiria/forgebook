@@ -6,23 +6,25 @@
  */
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
-import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
+import type { StoryFiles, StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import {
   type ComponentType,
-  lazy,
   type MouseEvent,
   type ReactNode,
-  Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState
 } from "react";
 
-import { type CatalogueLists, type CatalogueSettings, catalogueSettings } from "../catalogue.ts";
+import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
+import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
+import { type DeviceDefault, deviceDefaultOf, pageDeviceDefault } from "../deviceView.ts";
 import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
 import { anchorOf } from "../pageAddress.ts";
 import { findPage, type PageLocation } from "../pageTree.ts";
+import type { SearchTarget } from "../search.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";
 import { type FixedView, NOT_FIXED } from "../storyGlobals.ts";
@@ -31,6 +33,7 @@ import {
   type ComponentLocation,
   componentId,
   findComponent,
+  findComponentByTitle,
   findStory,
   isLogicComponent,
   type StoryLocation,
@@ -41,13 +44,20 @@ import {
   type TreeSource,
   type TreeStory
 } from "../storyTree.ts";
-import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
+import type { ViewSwitch } from "../switches.ts";
 import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
 import type { WrittenHomeProps } from "./AuthoredHome.tsx";
-import { ComponentPage } from "./ComponentPage.tsx";
-import { CatalogueContext, useCatalogue } from "./catalogueContext.ts";
+import type { ComponentPageProps } from "./ComponentPage.tsx";
+import { CatalogueContext, NO_PLUGINS, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import type { DocPageProps } from "./DocPage.tsx";
+import { filesCodeLoader } from "./filesCode.ts";
+import type { HomePageProps } from "./HomePage.tsx";
+import { Icon } from "./icons.tsx";
+import { LazyPage } from "./LazyPage.tsx";
 import { LogicMark } from "./LogicMark.tsx";
+import { type LazyModule, lazyModule } from "./lazyModule.tsx";
+import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
@@ -72,9 +82,11 @@ export type ShellConfig = {
   readonly title: string;
   /**
    * The catalogue's logo, the URL of a square image: beside its name in the sidebar and as the page's icon. None by
-   * default: the catalogue's own mark. The catalogue belongs to whoever mounts it, so the logo is theirs to give.
+   * default: Forgebook's mark. The catalogue belongs to whoever mounts it, so the logo is theirs to give.
    */
   readonly logo?: string;
+  /** Whether a catalogue without a logo shows Forgebook's mark; off, it shows its name alone. On by default. */
+  readonly hasBranding?: boolean;
   /**
    * The stories' measured heights, the address of the file `forgebook-heights` writes (relative to the page): a story's
    * box waits at its height while it loads. None by default, and a missing file is none: boxes then wait at a guess.
@@ -82,7 +94,10 @@ export type ShellConfig = {
   readonly heights?: string;
   /** The sources, in the order the sidebar lists them. */
   readonly sources: readonly StorySource[];
-  /** The frame page's address, relative to the shell's (`frame.html`). */
+  /**
+   * The frame page's address: relative to the shell's (`frame.html`) when the frames share its origin, on the frames'
+   * origin otherwise (`mountShell` makes it).
+   */
   readonly frameUrl: string;
   /**
    * The languages every story can be drawn in (the View menu's Language row); none turns them off. Give the frame
@@ -97,34 +112,62 @@ export type ShellConfig = {
   /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
   readonly lists?: CatalogueLists;
   /**
-   * The catalogue's written home (`forgebook.home.md`), drawn in place of the generated home: the page's entry makes
-   * it, lazily, only for a catalogue that has one, so the others' first load carries nothing of it. None keeps the
+   * Loads the catalogue's written home (`forgebook.home.md`), drawn in place of the generated home: the page's entry
+   * gives it only for a catalogue that has one, so the others' first load carries nothing of it. None keeps the
    * generated home.
    */
-  readonly home?: ComponentType<WrittenHomeProps>;
+  readonly home?: () => Promise<ComponentType<WrittenHomeProps>>;
+  /** Loads the catalogue's design tokens, on first use; none when it has none. */
+  readonly loadTokens?: () => Promise<unknown>;
+  /** The plugins with views (the generated page passes them); none by default. */
+  readonly plugins?: readonly ShellPlugin[];
+  /**
+   * How the framework's stories take the texts the address carries (`addressTexts.ts`): `plain` keeps a shared link's
+   * texts that are not plain words from a story that may write them into markup. `any` by default.
+   */
+  readonly addressTexts?: AddressTexts;
 };
 
 /** A docs page, loaded on first use: a catalogue may have none. */
-const DocPage = lazy(() => import("./DocPage.tsx").then((module) => ({ default: module.DocPage })));
+const DOC_PAGE = lazyModule<DocPageProps>(() => import("./DocPage.tsx").then((module) => module.DocPage));
+
+/** The home, loaded when it is opened. */
+const HOME_PAGE = lazyModule<HomePageProps>(() => import("./HomePage.tsx").then((module) => module.HomePage));
+
+/** A component's page, loaded when one is opened. */
+const COMPONENT_PAGE = lazyModule<ComponentPageProps>(() =>
+  import("./ComponentPage.tsx").then((module) => module.ComponentPage)
+);
 
 /**
- * The generated home, loaded on first use: a story or a component opened from its address, as a link shares one, pays
- * nothing for it.
+ * The home: the catalogue's written one when it has one, the generated one otherwise, each loaded when first opened.
+ *
+ * @param props - the written home's module, if any, and each home's props.
  */
-const HomePage = lazy(() => import("./HomePage.tsx").then((module) => ({ default: module.HomePage })));
+const ShellHome = ({
+  written,
+  home,
+  writtenProps
+}: {
+  readonly written: LazyModule<WrittenHomeProps> | undefined;
+  readonly home: HomePageProps;
+  readonly writtenProps: WrittenHomeProps;
+}): ReactNode =>
+  written === undefined ? (
+    <LazyPage module={HOME_PAGE} header={home.header} pageProps={home} />
+  ) : (
+    <LazyPage module={written} header={home.header} pageProps={writtenProps} />
+  );
 
 /**
- * The page an address names: one story, a component's page, a docs page with the heading it opens at, or the home (an
- * address that names none).
+ * The page an address names: one story, a component's page or a docs page with the heading or prop it opens at, or the
+ * home (an address that names none).
  */
 type Page =
   | { readonly kind: "story"; readonly id: string }
-  | { readonly kind: "component"; readonly id: string }
+  | { readonly kind: "component"; readonly id: string; readonly anchor?: string | undefined }
   | { readonly kind: "page"; readonly id: string; readonly anchor?: string | undefined }
   | { readonly kind: "home" };
-
-/** No languages: a catalogue that offers none. */
-const NO_LANGUAGES: readonly StoryLanguage[] = [];
 
 /** The home. */
 const HOME: Page = { kind: "home" };
@@ -133,7 +176,7 @@ const HOME: Page = { kind: "home" };
 const pageKey = (page: Page): string => {
   if (page.kind === "home") return page.kind;
   // a heading is a place of its own in the history: Back from it returns to where the reader was
-  return page.kind === "page" ? `page:${page.id}#${page.anchor ?? ""}` : `${page.kind}:${page.id}`;
+  return page.kind === "story" ? `story:${page.id}` : `${page.kind}:${page.id}#${page.anchor ?? ""}`;
 };
 
 /**
@@ -199,8 +242,9 @@ const pageOf = (search: string, hash: string): Page => {
   const component = params.get("component");
   const page = params.get("page");
   if (story !== null) return { kind: "story", id: story };
-  if (component !== null) return { kind: "component", id: component };
-  if (page !== null) return { kind: "page", id: page, anchor: anchorOf(hash.replace(/^#/, "")) };
+  const anchor = anchorOf(hash.replace(/^#/, ""));
+  if (component !== null) return { kind: "component", id: component, anchor };
+  if (page !== null) return { kind: "page", id: page, anchor };
   return HOME;
 };
 
@@ -208,28 +252,29 @@ const pageOf = (search: string, hash: string): Page => {
  * The current address.
  *
  * @param catalogue - the catalogue's switches and lists, for the view's values.
+ * @param addressTexts - how the framework's stories take the texts of the panel's values.
  */
-const readAddress = (catalogue: ViewCatalogue): Address => {
+const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Address => {
   const params = new URLSearchParams(window.location.search);
   return {
     page: pageOf(window.location.search, window.location.hash),
     view: parseView(window.location.search, catalogue),
-    panelArgs: parsePanelArgsParam(params.get("args")),
+    panelArgs: addressArgsFor(parsePanelArgsParam(params.get("args")), addressTexts),
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== "")
   };
 };
+
+/** What an address's query reads of the catalogue. */
+type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience">;
 
 /**
  * The query of an address.
  *
  * @param address - the page, the view, the panel's values and the matrix's axes.
- * @param switches - the catalogue's switches, for the view's values.
+ * @param catalogue - the catalogue's switches and default audience, for the view's values.
  */
-const addressQuery = (
-  { page, view, panelArgs, matrix }: Address,
-  switches: readonly ViewSwitch[]
-): string => {
-  const params = viewParams(view, switches);
+const addressQuery = ({ page, view, panelArgs, matrix }: Address, catalogue: AddressCatalogue): string => {
+  const params = viewParams(view, catalogue.switches, catalogue.audience);
   if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
   if (page.kind === "page") params.set("page", page.id);
@@ -239,14 +284,16 @@ const addressQuery = (
   const query = params.toString();
   // the fragment is part of what is written back on every change of the view, or a change would lose the heading
   const fragment =
-    page.kind === "page" && page.anchor !== undefined ? `#${encodeURIComponent(page.anchor)}` : "";
+    (page.kind === "page" || page.kind === "component") && page.anchor !== undefined
+      ? `#${encodeURIComponent(page.anchor)}`
+      : "";
   return `${query === "" ? window.location.pathname : `?${query}`}${fragment}`;
 };
 
 /** What a page shows: a story, a component's page or a docs page with its place, the home, or why there is nothing. */
 type Shown =
   | { readonly kind: "story"; readonly location: StoryLocation }
-  | { readonly kind: "component"; readonly location: ComponentLocation }
+  | { readonly kind: "component"; readonly location: ComponentLocation; readonly anchor: string | undefined }
   | { readonly kind: "page"; readonly location: PageLocation; readonly anchor: string | undefined }
   | { readonly kind: "home" }
   | { readonly kind: "missing"; readonly message: string };
@@ -263,7 +310,7 @@ const shownPage = (tree: ReturnType<typeof storyTree>, page: Page): Shown => {
     const location = findComponent(tree, page.id);
     return location === undefined
       ? { kind: "missing", message: STRINGS.unknownComponent(page.id) }
-      : { kind: "component", location };
+      : { kind: "component", location, anchor: page.anchor };
   }
   if (page.kind === "page") {
     const location = findPage(tree, page.id);
@@ -278,7 +325,7 @@ const shownPage = (tree: ReturnType<typeof storyTree>, page: Page): Shown => {
 const recentPageOf = (shown: Shown): RecentPage | undefined => {
   if (shown.kind === "story") return { kind: "story", id: shown.location.story.id };
   if (shown.kind === "component") {
-    return { kind: "component", id: componentId(shown.location.source.id, shown.location.component.title) };
+    return { kind: "component", id: shown.location.component.id };
   }
   return shown.kind === "page" ? { kind: "page", id: shown.location.page.id } : undefined;
 };
@@ -315,6 +362,23 @@ const sidebarCurrent = (
     : { sourceId: location.source.id, title: location.component.title, storyId };
 
 /**
+ * The page's default device for the toolbar: the shown story's, a component's stories' on its page (`pageDeviceDefault`),
+ * the catalogue's elsewhere.
+ *
+ * @param catalogueDevice - the catalogue's default.
+ * @param shown - the page shown.
+ */
+const deviceOfShown = (catalogueDevice: DeviceDefault, shown: Shown): DeviceDefault => {
+  if (shown.kind === "story") return deviceDefaultOf(catalogueDevice, shown.location.story.device);
+  if (shown.kind === "component")
+    return pageDeviceDefault(
+      catalogueDevice,
+      shown.location.component.stories.map((story) => story.device)
+    );
+  return catalogueDevice;
+};
+
+/**
  * What the shown story fixes of the view, for the toolbar; nothing on any other page.
  *
  * @param fixedViews - what each story's frame reported.
@@ -340,10 +404,74 @@ const ShellBar = ({ isHome, ...toolbar }: ToolbarProps & { readonly isHome: bool
     <Toolbar {...toolbar} />
   );
 
-/** A component's page, by its title. */
-const componentPage = (sourceId: string, title: string): Page => ({
+/** What a page loads of its story files: the docs, the code, and for a component its page. */
+type FileLoaders = {
+  readonly loadDocs: (() => Promise<unknown>) | undefined;
+  readonly loadCode: (() => Promise<unknown>) | undefined;
+};
+
+/**
+ * What a component's page loads: its first file's docs and page, as Storybook's docs come from the first file of a
+ * title, and the code of every file, for each example's Code card.
+ *
+ * @param files - the source's files; none without a source.
+ * @param component - the component.
+ */
+const componentLoaders = (
+  files: StoryFiles | undefined,
+  component: TreeComponent
+): FileLoaders & { readonly loadPage: (() => Promise<unknown>) | undefined } => ({
+  loadDocs: files?.docs[component.file],
+  loadCode: files === undefined ? undefined : filesCodeLoader(files.code, component.files),
+  loadPage: files?.pages[component.file]
+});
+
+/**
+ * What a story's page loads: its own file's code, and the docs of the component its file's meta names, which its
+ * controls are for.
+ *
+ * @param files - the source's files; none without a source.
+ * @param story - the story.
+ */
+const storyLoaders = (files: StoryFiles | undefined, story: TreeStory): FileLoaders => ({
+  loadDocs: files?.docs[story.file],
+  loadCode: files?.code[story.file]
+});
+
+/** A component's page. */
+const componentPage = (component: TreeComponent): Page => ({ kind: "component", id: component.id });
+
+/**
+ * Each component's id by its source and title, made once per tree: the sidebar names a component by its title, for
+ * every component on every render.
+ *
+ * @param tree - the tree.
+ */
+const componentIdsByTitle = (tree: StoryTree): ReadonlyMap<string, string> =>
+  new Map(
+    tree.sources.flatMap((source) =>
+      source.families.flatMap((family) =>
+        family.groups.flatMap((group) =>
+          group.components.map((component): [string, string] => [
+            `${source.id}\n${component.title}`,
+            component.id
+          ])
+        )
+      )
+    )
+  );
+
+/**
+ * The page of a source's component with a title, as the sidebar names a component and an alias its place; a title no
+ * component has gives the id it would have, which the page reports as missing.
+ *
+ * @param idsByTitle - the components' ids by source and title (`componentIdsByTitle`).
+ * @param sourceId - the source's id.
+ * @param title - the component's title.
+ */
+const titledPage = (idsByTitle: ReadonlyMap<string, string>, sourceId: string, title: string): Page => ({
   kind: "component",
-  id: componentId(sourceId, title)
+  id: idsByTitle.get(`${sourceId}\n${title}`) ?? componentId(sourceId, title)
 });
 
 /**
@@ -366,11 +494,9 @@ const usedInLinks = (
     : {
         load: usageLoader(source),
         componentOf: (title: string): TreeComponent | undefined =>
-          findComponent(tree, componentId(source.id, title))?.component,
-        componentHrefOf: (component: TreeComponent): string =>
-          pages.hrefOf(componentPage(source.id, component.title)),
-        onOpenComponent: (component: TreeComponent): void =>
-          pages.onOpen(componentPage(source.id, component.title)),
+          findComponentByTitle(tree, source.id, title)?.component,
+        componentHrefOf: (component: TreeComponent): string => pages.hrefOf(componentPage(component)),
+        onOpenComponent: (component: TreeComponent): void => pages.onOpen(componentPage(component)),
         storyHrefOf: (story: TreeStory): string => pages.hrefOf(storyPage(story)),
         onOpenStory: (story: TreeStory): void => pages.onOpen(storyPage(story))
       };
@@ -387,10 +513,8 @@ type LinkedComponent = { readonly page: Page; readonly name: string };
 const relatedComponents = (tree: StoryTree, location: ComponentLocation | undefined): LinkedComponent[] =>
   (location?.component.related ?? []).flatMap((title) => {
     if (location === undefined) return [];
-    const found = findComponent(tree, componentId(location.source.id, title));
-    return found === undefined
-      ? []
-      : [{ page: componentPage(location.source.id, title), name: found.component.name }];
+    const found = findComponentByTitle(tree, location.source.id, title);
+    return found === undefined ? [] : [{ page: componentPage(found.component), name: found.component.name }];
   });
 
 /**
@@ -492,6 +616,17 @@ const ShellHeader = ({
           <h1 className="forgebook-header__title">{location.component.name}</h1>
           {isLogic ? <LogicMark /> : null}
           {picker}
+          {location.component.design === undefined ? null : (
+            <a
+              className="forgebook-button"
+              href={location.component.design.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon name="external" size={14} />
+              {STRINGS.openInFigma}
+            </a>
+          )}
         </div>
         {related}
       </header>
@@ -537,6 +672,8 @@ type AddressState = {
   readonly pageAddress: (page: Page) => Address;
   /** Opens a page, as a new entry of the history. */
   readonly openPage: (page: Page) => void;
+  /** Opens what a search found, the focus going with it. */
+  readonly openFound: (page: Page) => void;
   /** Goes to a heading of the shown docs page, as a new entry of the history. */
   readonly openAnchor: (anchor: string) => void;
   /** Changes the shown page's address (the view, the panel's values), in place. */
@@ -544,19 +681,18 @@ type AddressState = {
 };
 
 /** The address, read again when the history goes back or forth. */
-const useAddress = (catalogue: CatalogueSettings): AddressState => {
-  const { switches } = catalogue;
-  const [address, setAddress] = useState<Address>(() => readAddress(catalogue));
+const useAddress = (catalogue: CatalogueSettings, addressTexts: AddressTexts): AddressState => {
+  const [address, setAddress] = useState<Address>(() => readAddress(catalogue, addressTexts));
   const [visit, setVisit] = useState<PageVisit>(() => visitOf(address, false));
   useEffect(() => {
     const onBack = (): void => {
-      const next = readAddress(catalogue);
+      const next = readAddress(catalogue, addressTexts);
       setAddress(next);
       setVisit(visitOf(next, true));
     };
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
-  }, [catalogue]);
+  }, [catalogue, addressTexts]);
   // a height set with the foot handle belongs to the story it was set on: another page starts at its own
   const pageAddress = (page: Page): Address => ({
     page,
@@ -564,28 +700,49 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
     panelArgs: {},
     matrix: []
   });
+  const open = (page: Page, movesFocus: boolean): void => {
+    const next = pageAddress(page);
+    window.history.pushState(null, "", addressQuery(next, catalogue));
+    setAddress(next);
+    setVisit({ ...visitOf(next, false), movesFocus });
+  };
   return {
     address,
     visit,
     pageAddress,
-    openPage: (page: Page): void => {
-      const next = pageAddress(page);
-      window.history.pushState(null, "", addressQuery(next, switches));
-      setAddress(next);
-      setVisit(visitOf(next, false));
-    },
+    openPage: (page: Page): void => open(page, false),
+    openFound: (page: Page): void => open(page, true),
     openAnchor: (anchor: string): void => {
       if (address.page.kind !== "page") return;
       const next = { ...address, page: { ...address.page, anchor } };
-      window.history.pushState(null, "", addressQuery(next, switches));
+      window.history.pushState(null, "", addressQuery(next, catalogue));
       setAddress(next);
       setVisit({ ...visitOf(next, false), isInPage: true });
     },
     replaceAddress: (next: Address): void => {
-      window.history.replaceState(null, "", addressQuery(next, switches));
+      window.history.replaceState(null, "", addressQuery(next, catalogue));
       setAddress(next);
     }
   };
+};
+
+/**
+ * Writes the shown page's own id into the address when the address named it by a former id (`formerStoryId`), as a
+ * redirect would: a link written then keeps opening its page, and the address then shown is the page's own.
+ *
+ * @param address - the address.
+ * @param ownPage - the shown page by its own id; none on the home or a missing page.
+ * @param replaceAddress - changes the address in place.
+ */
+const useOwnPageId = (
+  address: Address,
+  ownPage: RecentPage | undefined,
+  replaceAddress: (next: Address) => void
+): void => {
+  useEffect(() => {
+    if (ownPage === undefined || address.page.kind === "home" || ownPage.id === address.page.id) return;
+    replaceAddress({ ...address, page: { ...address.page, id: ownPage.id } });
+  }, [address, ownPage, replaceAddress]);
 };
 
 /**
@@ -594,17 +751,34 @@ const useAddress = (catalogue: CatalogueSettings): AddressState => {
  *
  * @param props - the configuration.
  */
-const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfig): ReactNode => {
+const ShellPage = ({
+  title,
+  logo,
+  hasBranding,
+  heights,
+  sources,
+  frameUrl,
+  addressTexts = "any",
+  plugins = NO_PLUGINS,
+  loadTokens,
+  home
+}: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
+  // the written home's module, loaded when the home is first opened
+  const writtenHome = useMemo(() => (home === undefined ? undefined : lazyModule(home)), [home]);
+  const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
   const {
     width: sidebarWidth,
     setWidth: setSidebarWidth,
     isOpen: isSidebarOpen,
     setIsOpen: setIsSidebarOpen
   } = useSidebarLayout();
+  const showSidebar = useCallback((): void => setIsSidebarOpen(true), [setIsSidebarOpen]);
   const catalogue = useCatalogue();
-  const { switches } = catalogue;
-  const { address, visit, pageAddress, openPage, openAnchor, replaceAddress } = useAddress(catalogue);
+  const { address, visit, pageAddress, openPage, openFound, openAnchor, replaceAddress } = useAddress(
+    catalogue,
+    addressTexts
+  );
   // each page's last scroll position, kept across the component pages and the stage
   const scrollPositions = useRef(new Map<string, number>());
   const scroll: PageScroll = { visit, positions: scrollPositions.current };
@@ -632,7 +806,9 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
 
   const shown = shownPage(tree, address.page);
   const location = componentLocationOf(shown);
-  const recent = useRecentPages(recentPageOf(shown));
+  const ownPage = recentPageOf(shown);
+  const recent = useRecentPages(ownPage);
+  useOwnPageId(address, ownPage, replaceAddress);
   const shownPageLocation = pageLocationOf(shown);
   const pageName = shownPageLocation?.page.name ?? location?.component.name;
 
@@ -650,6 +826,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
     touchOverrides,
     onTouchChange: setTouchOverride,
     touch: catalogue.touch,
+    catalogueDevice: catalogue.device,
     onAddressViewChange: changeView
   });
 
@@ -662,7 +839,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
 
   const source = sources.find((candidate) => candidate.id === location?.source.id);
   const files = source === undefined ? undefined : sourceFiles(source);
-  const storyHrefOf = (story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), switches);
+  const storyHrefOf = (story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), catalogue);
   const columnHeightOf = (storyId: string): number | undefined =>
     knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH));
   const header = (
@@ -677,9 +854,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
           <StoryPicker
             component={location.component}
             currentStoryId={shownStoryId}
-            onOpenComponent={(): void =>
-              openPage(componentPage(location.source.id, location.component.title))
-            }
+            onOpenComponent={(): void => openPage(componentPage(location.component))}
             onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
           />
         )
@@ -687,25 +862,25 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
       related={
         <RelatedLinks
           related={relatedComponents(tree, location)}
-          hrefOf={(page: Page): string => addressQuery(pageAddress(page), switches)}
+          hrefOf={(page: Page): string => addressQuery(pageAddress(page), catalogue)}
           onOpen={openPage}
         />
       }
     />
   );
 
-  const Home = home ?? HomePage;
   const homeProps = {
     title,
     tree,
     sources,
     recent,
-    hrefOf: (page: RecentPage): string => addressQuery(pageAddress(page), switches),
+    hrefOf: (page: RecentPage): string => addressQuery(pageAddress(page), catalogue),
     onOpen: (page: RecentPage): void => openPage(page),
     header
   };
   const docProps = {
     title,
+    plugins,
     tree,
     sources,
     view: address.view,
@@ -715,7 +890,7 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
     storyHrefOf,
     onOpenStory: (story: TreeStory): void => openPage(storyPage(story)),
     pageHrefOf: (id: string, anchor: string | undefined): string =>
-      addressQuery(pageAddress({ kind: "page", id, anchor }), switches),
+      addressQuery(pageAddress({ kind: "page", id, anchor }), catalogue),
     onOpenAddress: (href: string): boolean => openLinkedPage(href, openPage),
     heightOf: columnHeightOf,
     backgroundOf: (pageSource: TreeSource): string | undefined =>
@@ -730,22 +905,27 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
         width={sidebarWidth}
         isOpen={isSidebarOpen}
         onHide={(): void => setIsSidebarOpen(false)}
+        onShow={showSidebar}
         appearance={appearance}
         title={title}
         logo={logo}
+        hasBranding={hasBranding !== false}
         tree={tree}
+        sources={sources}
+        searchHref={(target: SearchTarget): string => addressQuery(pageAddress(target), catalogue)}
+        onOpenResult={openFound}
         isHome={shown.kind === "home"}
-        homeHref={addressQuery(pageAddress(HOME), switches)}
+        homeHref={addressQuery(pageAddress(HOME), catalogue)}
         onOpenHome={(): void => openPage(HOME)}
         current={sidebarCurrent(location, shownStoryId)}
         currentPageId={shownPageLocation?.page.id}
-        pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), switches)}
+        pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), catalogue)}
         onOpenPage={(id: string): void => openPage({ kind: "page", id })}
         componentHref={(sourceId: string, componentTitle: string): string =>
-          addressQuery(pageAddress(componentPage(sourceId, componentTitle)), switches)
+          addressQuery(pageAddress(titledPage(idsByTitle, sourceId, componentTitle)), catalogue)
         }
         onOpenComponent={(sourceId: string, componentTitle: string): void =>
-          openPage(componentPage(sourceId, componentTitle))
+          openPage(titledPage(idsByTitle, sourceId, componentTitle))
         }
       />
       {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
@@ -755,54 +935,67 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
           view={shownView}
           onViewChange={changeShownView}
           isStoryPage={shown.kind === "story"}
+          isComponentPage={shown.kind === "component"}
           isLogic={isLogicPage(shown)}
           onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}
+          deviceDefault={deviceOfShown(catalogue.device, shown)}
         />
         {shown.kind === "component" ? (
-          <ComponentPage
-            component={shown.location.component}
-            view={address.view}
-            touchOverrides={touchOverrides}
-            onTouchChange={setTouchOverride}
-            frameUrl={frameUrl}
-            hrefOf={storyHrefOf}
-            onOpen={(story: TreeStory): void => openPage(storyPage(story))}
-            loadDocs={files?.docs[shown.location.component.file]}
-            loadCode={files?.code[shown.location.component.file]}
-            loadPage={files?.pages[shown.location.component.file]}
-            background={storyBackground(
-              shown.location.source.background,
-              address.view,
-              catalogue,
-              isSystemDark
-            )}
-            heightOf={columnHeightOf}
+          <LazyPage
+            module={COMPONENT_PAGE}
             header={header}
-            scroll={scroll}
-            usedIn={usedInLinks(source, catalogue.hasUsedIn, tree, {
-              hrefOf: (page: Page): string => addressQuery(pageAddress(page), switches),
-              onOpen: openPage
-            })}
+            pageProps={{
+              component: shown.location.component,
+              anchor: shown.anchor,
+              view: address.view,
+              touchOverrides,
+              onTouchChange: setTouchOverride,
+              frameUrl,
+              hrefOf: storyHrefOf,
+              onOpen: (story: TreeStory): void => openPage(storyPage(story)),
+              ...componentLoaders(files, shown.location.component),
+              background: storyBackground(
+                shown.location.source.background,
+                address.view,
+                catalogue,
+                isSystemDark
+              ),
+              heightOf: columnHeightOf,
+              header,
+              scroll,
+              usedIn: usedInLinks(source, catalogue.hasUsedIn, tree, {
+                hrefOf: (page: Page): string => addressQuery(pageAddress(page), catalogue),
+                onOpen: openPage
+              }),
+              onViewChange: changeView,
+              tree,
+              componentId: shown.location.component.id,
+              pageHrefOf: (id: string): string => addressQuery(pageAddress({ kind: "page", id }), catalogue),
+              onOpenPage: (id: string): void => openPage({ kind: "page", id }),
+              loadTokens
+            }}
           />
         ) : null}
-        {/* the pages loaded on first use: the home, generated or written, and a docs page; keyed by the kind of page, so
-            the home left behind is never kept, hidden, beside the docs page that loads */}
-        <Suspense key={shown.kind} fallback={<div className="forgebook-workspace">{header}</div>}>
-          {shown.kind === "home" ? <Home {...homeProps} {...docProps} /> : null}
-          {shown.kind === "page" ? (
-            // keyed by the page: its frames, its text and its scrolling element are that page's alone
-            <DocPage
-              {...docProps}
-              key={shown.location.page.id}
-              location={shown.location}
-              anchor={shown.anchor}
-              onOpenPage={(id: string): void => openPage({ kind: "page", id })}
-              onOpenAnchor={openAnchor}
-            />
-          ) : null}
-        </Suspense>
+        {shown.kind === "home" ? (
+          <ShellHome written={writtenHome} home={homeProps} writtenProps={{ ...homeProps, ...docProps }} />
+        ) : null}
+        {shown.kind === "page" ? (
+          // keyed by the page: its frames, its text and its scrolling element are that page's alone
+          <LazyPage
+            key={shown.location.page.id}
+            module={DOC_PAGE}
+            header={header}
+            pageProps={{
+              ...docProps,
+              location: shown.location,
+              anchor: shown.anchor,
+              onOpenPage: (id: string): void => openPage({ kind: "page", id }),
+              onOpenAnchor: openAnchor
+            }}
+          />
+        ) : null}
         {shown.kind === "story" ? (
           <Stage
             component={shown.location.component}
@@ -817,8 +1010,8 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
             matrixAxes={address.matrix}
             onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
             frameUrl={frameUrl}
-            loadCode={files?.code[shown.location.component.file]}
-            loadDocs={files?.docs[shown.location.component.file]}
+            plugins={plugins}
+            {...storyLoaders(files, shown.location.story)}
             namedValues={source?.namedValues}
             header={header}
             onShownWidthChange={setShownWidth}
@@ -846,15 +1039,8 @@ const ShellPage = ({ title, logo, heights, sources, frameUrl, home }: ShellConfi
  *
  * @param props - the configuration.
  */
-export const Shell = (props: ShellConfig): ReactNode => {
-  const { title, switches, languages = NO_LANGUAGES, lists } = props;
-  const catalogue = useMemo(
-    () => catalogueSettings(title, catalogueSwitches(switches, languages, lists?.controls), lists),
-    [title, switches, languages, lists]
-  );
-  return (
-    <CatalogueContext.Provider value={catalogue}>
-      <ShellPage {...props} />
-    </CatalogueContext.Provider>
-  );
-};
+export const Shell = (props: ShellConfig): ReactNode => (
+  <CatalogueContext.Provider value={useConfiguredCatalogue(props)}>
+    <ShellPage {...props} />
+  </CatalogueContext.Provider>
+);

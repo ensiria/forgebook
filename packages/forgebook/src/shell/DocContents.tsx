@@ -6,7 +6,8 @@
  */
 import { type MouseEvent, type ReactNode, type RefObject, useEffect, useState } from "react";
 
-import { type DocHeading, filledText, headingElementId, type PageValues } from "../docPages.ts";
+import { headingElementId } from "../docAnchors.ts";
+import { type DocHeading, filledText, type PageValues } from "../docPages.ts";
 import { PAGE_STRINGS } from "./pageStrings.ts";
 
 /** How far below the page's top a heading counts as being read, in CSS px. */

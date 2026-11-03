@@ -6,13 +6,14 @@
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, win32 } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { contrastSwitch, themeSwitch } from "../src/switches.ts";
 import type { ForgebookConfig } from "../src/vite/config.ts";
 import { findConfigFile, resolveConfig } from "../src/vite/configFile.ts";
+import { VITE_PATHS, vitePathsOf } from "../src/vite/vitePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A configuration with the least it needs. */
@@ -26,6 +27,13 @@ const BASE: ForgebookConfig = {
 const folder = (): string => mkdtempSync(join(tmpdir(), "forgebook-config-"));
 
 describe("resolveConfig", () => {
+  it("refuses an audience that is none, from the catalogue or a preset", () => {
+    expect(() => resolveConfig({ ...BASE, ...JSON.parse('{"audience":"manager"}') }, "/catalogue")).toThrow(
+      'the audience "manager" is none of everyone, designer, coder, tester'
+    );
+    expect(resolveConfig({ ...BASE, audience: "tester" }, "/catalogue").lists.audience).toBe("tester");
+  });
+
   it("merges the presets under the configuration: a switch or language of the same id is replaced in its place", () => {
     const dark = { ...themeSwitch(), default: "dark" };
     const resolved = resolveConfig(
@@ -72,14 +80,41 @@ describe("resolveConfig", () => {
       { ...BASE, logo: "logo.svg", presets: [{ name: "a", preview: "/a.ts" }] },
       dir
     );
-    expect(resolved.logo).toBe(join(dir, "logo.svg"));
-    expect(resolved.previews).toEqual(["/a.ts", join(dir, "forgebook.preview.tsx")]);
+    expect(resolved.logo).toBe(VITE_PATHS.join(dir, "logo.svg"));
+    expect(resolved.previews).toEqual(["/a.ts", VITE_PATHS.join(dir, "forgebook.preview.tsx")]);
   });
 
   it("names a problem of the merged switches with the configuration's file", () => {
     expect(() =>
       resolveConfig({ ...BASE, switches: [{ ...themeSwitch(), id: "width" }] }, "/catalogue")
-    ).toThrow('/catalogue/forgebook.config: "width" is a parameter of the address, not a switch\'s name');
+    ).toThrow(
+      `${resolve("/catalogue", "forgebook.config")}: "width" is a parameter of the address, not a switch's name`
+    );
+  });
+});
+
+describe("the build's options", () => {
+  it("name a build's scripts by their hash alone unless the configuration asks for readable names", () => {
+    const base = { title: "A", framework: STUB_FRAMEWORK, stories: ["*.stories.tsx"] };
+    expect(resolveConfig(base, "/app").build).toEqual({ readableNames: false });
+    expect(resolveConfig({ ...base, build: { readableNames: true } }, "/app").build).toEqual({
+      readableNames: true
+    });
+  });
+
+  it("refuses a device that names a model no one has, and lays the catalogue's fields over a preset's", () => {
+    expect(() => resolveConfig({ ...BASE, device: { model: "nokia-3310" } }, "/catalogue")).toThrow(
+      `${resolve("/catalogue", "forgebook.config")}: Forgebook's device: "nokia-3310" is no device model`
+    );
+    // a configuration is code: its types are not a promise
+    const loose: ForgebookConfig = { ...BASE };
+    Reflect.set(loose, "device", "pixel-9");
+    expect(() => resolveConfig(loose, "/catalogue")).toThrow(/Forgebook's device: write it as an object/);
+    const resolved = resolveConfig(
+      { ...BASE, device: { frame: true }, presets: [{ name: "a", device: { model: "pixel-9" } }] },
+      "/catalogue"
+    );
+    expect(resolved.lists.device).toEqual({ model: "pixel-9", frame: true });
   });
 });
 
@@ -127,6 +162,18 @@ describe("findConfigFile", () => {
   });
 });
 
+describe("the shell's branding", () => {
+  it("stays on unless turned off, the catalogue winning over its presets", () => {
+    const off = { shell: { branding: false } };
+    const on = { shell: { branding: true } };
+    const preset = { name: "p", ...off };
+    expect(resolveConfig(BASE, "/c").shell.hasBranding).toBe(true);
+    expect(resolveConfig({ ...BASE, ...off }, "/c").shell.hasBranding).toBe(false);
+    expect(resolveConfig({ ...BASE, presets: [preset] }, "/c").shell.hasBranding).toBe(false);
+    expect(resolveConfig({ ...BASE, presets: [preset], ...on }, "/c").shell.hasBranding).toBe(true);
+  });
+});
+
 describe("the shell's look", () => {
   const base = { framework: STUB_FRAMEWORK, title: "T", stories: ["s"] };
 
@@ -149,7 +196,7 @@ describe("the shell's look", () => {
       { ...base, presets: [{ name: "p", shell: { css: "/lib/shell.css" } }], shell: { css: "own.css" } },
       "/c"
     );
-    expect(shell.styleSheets).toEqual(["/lib/shell.css", "/c/own.css"]);
+    expect(shell.styleSheets).toEqual(["/lib/shell.css", VITE_PATHS.resolve("/c", "own.css")]);
   });
 
   it("refuses a value that would break the page, naming it", () => {
@@ -161,5 +208,43 @@ describe("the shell's look", () => {
   it("keeps what will not work, for a warning", () => {
     const { shell } = resolveConfig({ ...base, shell: { theme: { light: { text: "#eeeeee" } } } }, "/c");
     expect(shell.problems.length).toBeGreaterThan(0);
+  });
+});
+
+describe("resolveConfig on Windows", () => {
+  it("writes every path in Vite's form, forward slashes, and keeps a preset's package specifier as written", () => {
+    const resolved = resolveConfig(
+      {
+        ...BASE,
+        logo: "assets\\logo.svg",
+        preview: "..\\shared\\preview.tsx",
+        tokens: ["tokens.json", { file: "C:\\Users\\ada\\tokens\\dark.json", mode: "dark" }],
+        watch: ["../kit/src"],
+        shell: { css: "shell.css" },
+        presets: [
+          {
+            name: "files",
+            preview: "C:\\Users\\ada\\kit\\preview.ts",
+            shell: { css: "C:\\Users\\ada\\kit\\shell.css" }
+          },
+          { name: "package", preview: "@acme/ui/preview" }
+        ]
+      },
+      "C:\\Users\\ada\\app",
+      vitePathsOf(win32)
+    );
+    expect(resolved.dir).toBe("C:/Users/ada/app");
+    expect(resolved.logo).toBe("C:/Users/ada/app/assets/logo.svg");
+    expect(resolved.previews).toEqual([
+      "C:/Users/ada/kit/preview.ts",
+      "@acme/ui/preview",
+      "C:/Users/ada/shared/preview.tsx"
+    ]);
+    expect(resolved.shell.styleSheets).toEqual(["C:/Users/ada/kit/shell.css", "C:/Users/ada/app/shell.css"]);
+    expect(resolved.tokens).toEqual([
+      { path: "C:/Users/ada/app/tokens.json", mode: undefined },
+      { path: "C:/Users/ada/tokens/dark.json", mode: "dark" }
+    ]);
+    expect(resolved.watch).toEqual(["C:/Users/ada/kit/src"]);
   });
 });

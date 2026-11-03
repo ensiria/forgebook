@@ -40,6 +40,7 @@ import {
 import { DocContents } from "./DocContents.tsx";
 import { Icon } from "./icons.tsx";
 import { PAGE_STRINGS } from "./pageStrings.ts";
+import type { ShellPlugin } from "./pluginTabs.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { useAnchorScroll } from "./useAnchorScroll.ts";
@@ -64,6 +65,8 @@ const pageState = (value: unknown): Loaded<LoadedDocPage> =>
 export type DocPageProps = {
   /** The catalogue's name, for the values a page's text names. */
   readonly title: string;
+  /** The plugins, whose blocks the page may hold. */
+  readonly plugins: readonly ShellPlugin[];
   /** The page and its source. */
   readonly location: PageLocation;
   /** The heading the address names; none when it names none. */
@@ -190,6 +193,7 @@ const loadedPage = (loaded: Loaded<LoadedDocPage>): LoadedDocPage =>
  */
 export const DocPage = ({
   title,
+  plugins,
   location,
   anchor,
   tree,
@@ -221,7 +225,7 @@ export const DocPage = ({
     () => page.stories.flatMap((id) => findStory(tree, id)?.story ?? []),
     [page.stories, tree]
   );
-  const queued = useMemo(() => queuedBlocks(content.blocks), [content.blocks]);
+  const queued = useMemo(() => queuedBlocks(content.blocks, tree), [content.blocks, tree]);
   const places = useMemo(() => blockPlaces(content.blocks), [content.blocks]);
   const values = useMemo(() => catalogueValues(title, tree), [title, tree]);
   const frames = usePageFrames({ stories, queued, pageRef, view, touchOverrides });
@@ -252,6 +256,8 @@ export const DocPage = ({
     frames,
     view,
     frameUrl,
+    plugins,
+    strings: catalogue.strings,
     switches: catalogue.switches,
     assets: content.assets,
     pageHrefOf: (slug: string, target: string | undefined): string =>

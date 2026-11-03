@@ -15,7 +15,7 @@ import { Marked, type Token, type Tokens } from "marked";
 
 import type { DocBlock, DocHeading } from "../docPages.ts";
 import { fencedCode } from "./codeFence.ts";
-import { codeHtml } from "./componentPage.ts";
+import { codeHtml, headingAnchors } from "./componentPage.ts";
 import { isValueToken, VALUES_EXTENSION } from "./docMarkdown.ts";
 import type { PageNode } from "./docPageBlocks.ts";
 import { type FenceRead, isCode } from "./docPageTokens.ts";
@@ -43,19 +43,7 @@ const plainText = (tokens: readonly Token[]): string =>
  * @param headings - receives the page's second- and third-level headings.
  */
 const pageRenderer = (headings: DocHeading[]): Marked => {
-  const seen = new Set<string>();
-  const anchorOf = (text: string): string => {
-    const slug =
-      text
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, "-")
-        .replace(/^-|-$/g, "") || "section";
-    let anchor = slug;
-    // "Tokens", "Tokens", "Tokens 1": counting alone would give the last two the same anchor
-    for (let count = 1; seen.has(anchor); count += 1) anchor = `${slug}-${count}`;
-    seen.add(anchor);
-    return anchor;
-  };
+  const anchorOf = headingAnchors();
   return new Marked(VALUES_EXTENSION, {
     async: false,
     gfm: true,
@@ -84,6 +72,8 @@ const pageRenderer = (headings: DocHeading[]): Marked => {
 const codeBlock = (token: Tokens.Code, fence: FenceRead | undefined): DocBlock => {
   const code = token.text;
   if (fence === undefined) return { kind: "code", text: code, html: escapeHtml(code) };
+  if (fence.kind === "plugin")
+    return { kind: "plugin", fence: fence.fence, argument: fence.argument, body: code };
   if (fence.kind !== "code") return { kind: fence.kind, id: fence.id };
   const drawn = fencedCode(code, fence.info);
   return {

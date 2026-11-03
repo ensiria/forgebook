@@ -1,7 +1,7 @@
 /**
  * The mark of a window where Chromium's own touch emulation runs (`forgebook dev --touch`): its pages see real touch,
  * so the catalogue's simulated touch stays off there. Shared by the window that sets it (`@forgebook/testing/touch`)
- * and the frame that reads it (`touchLayer.ts`).
+ * and the frame that reads it (`followTouch.ts`).
  *
  * @module
  */

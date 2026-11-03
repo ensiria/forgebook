@@ -6,12 +6,7 @@
  */
 import { expect, test } from "@playwright/test";
 
-/** The same catalogue with its generated home, served by the playwright configuration beside the fixture's. */
-const generatedHome = (): string => {
-  const address: unknown = test.info().config.metadata["generatedHome"];
-  if (typeof address !== "string") throw new Error("The playwright configuration serves no generated home");
-  return address;
-};
+import { catalogueUrl } from "./ports";
 
 test.describe("the written home", () => {
   test("shows the authors' text, the catalogue's title, and the values filled in", async ({ page }) => {
@@ -56,7 +51,7 @@ test.describe("the written home", () => {
 
 test.describe("the generated home", () => {
   test("stays as it was for a catalogue without a written home", async ({ page }) => {
-    await page.goto(generatedHome());
+    await page.goto(catalogueUrl("generated-home"));
     await expect(page.locator("h1")).toHaveText("Fixture catalogue");
     await expect(page.locator(".forgebook-home__head .forgebook-doc__lead")).toHaveText(
       /^\d+ components in 2 libraries\.$/

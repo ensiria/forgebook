@@ -28,6 +28,7 @@ import {
 /** What a top-level code fence is. */
 export type FenceRead =
   | { readonly kind: "story" | "props"; readonly id: string }
+  | { readonly kind: "plugin"; readonly fence: string; readonly argument: string }
   | { readonly kind: "code"; readonly info: FenceInfo };
 
 /** What reading a page gathers as it goes. */
@@ -38,6 +39,8 @@ export type PageReading = {
   readonly read: ReadPage;
   /** Whether the page is the catalogue's written home, where the home's pieces may be placed. */
   readonly isHome: boolean;
+  /** The fences the catalogue's plugins draw: such a fence is the plugin's block, not code. */
+  readonly pluginFences: readonly string[];
   /** The version `{{version}}` shows: the page's package's; none without one. */
   readonly version: () => string | undefined;
   /** What it gets wrong. */
@@ -138,6 +141,10 @@ const readFence = (token: Tokens.Code, position: SourcePosition, reading: PageRe
   const info = typeof token.lang === "string" ? token.lang.trim() : "";
   const words = info === "" ? [] : info.split(/\s+/);
   const [kind, id, ...rest] = words;
+  if (kind !== undefined && reading.pluginFences.includes(kind)) {
+    reading.fences.set(token, { kind: "plugin", fence: kind, argument: words.slice(1).join(" ") });
+    return;
+  }
   if (kind === "story" || kind === "props") {
     if (id === undefined) {
       reading.notes.push({ position, message: `a \`${kind}\` block names no id` });

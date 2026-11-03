@@ -131,6 +131,16 @@ export type DocBlock =
       readonly kind: "problem";
       /** What is wrong, with its line and column. */
       readonly message: string;
+    }
+  | {
+      /** A plugin's block: a fence named as one of the plugin's. */
+      readonly kind: "plugin";
+      /** The fence's name. */
+      readonly fence: string;
+      /** What the fence's line says after its name. */
+      readonly argument: string;
+      /** The text inside the fence. */
+      readonly body: string;
     };
 
 /** A heading of a docs page, as its contents list names it. */
@@ -180,16 +190,6 @@ export const PAGE_LINK_SCHEME = "forgebook-page:";
 
 /** What an image's address starts with in the compiled HTML: its place in the page's `assets` follows. */
 export const ASSET_SCHEME = "forgebook-asset:";
-
-/** What every heading's element id starts with. */
-const HEADING_ID_PREFIX = "doc-";
-
-/**
- * A heading's element id.
- *
- * @param anchor - its anchor, as the address's fragment writes it.
- */
-export const headingElementId = (anchor: string): string => `${HEADING_ID_PREFIX}${anchor}`;
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -244,6 +244,12 @@ const isBlock = (value: unknown): boolean => {
       return HOME_PIECES.some((piece) => piece === value["piece"]) && isOptionalText(value["source"]);
     case "problem":
       return typeof value["message"] === "string";
+    case "plugin":
+      return (
+        typeof value["fence"] === "string" &&
+        typeof value["argument"] === "string" &&
+        typeof value["body"] === "string"
+      );
     default:
       return isContainer(value);
   }

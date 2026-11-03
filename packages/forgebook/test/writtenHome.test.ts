@@ -159,7 +159,7 @@ describe("for agents", () => {
   it("reads the written home as the page `home`, and says so when the catalogue has none", async () => {
     const context = {
       tree,
-      loaded: { sources: [source], preview: NO_PREVIEW },
+      loaded: { sources: [source], preview: NO_PREVIEW, problems: [] },
       pages: PAGES,
       view: "",
       params: new URLSearchParams({ id: HOME_PAGE_ID })

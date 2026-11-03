@@ -6,12 +6,14 @@
 import { describe, expect, it } from "vitest";
 
 import { type CatalogueSettings, catalogueSettings } from "../src/catalogue.ts";
-import { touchChoiceOf, type ViewSwitch } from "../src/switches.ts";
+import { switchesProblem, touchChoiceOf, type ViewSwitch } from "../src/switches.ts";
 import {
   codeGlobalsOf,
+  componentAddressOf,
   DEFAULT_VIEW,
   defaultView,
   frameAddress,
+  frameAddressOf,
   hasViewChanges,
   isMoreContrastOf,
   isTouchView,
@@ -168,6 +170,48 @@ describe("the view in the address", () => {
       zoom: 100
     });
   });
+
+  it("keeps an audience in the page's address, never in a frame's", () => {
+    const view = parseView("?audience=designer", CATALOGUE);
+    expect(view.audience).toBe("designer");
+    expect(viewParams(view, SWITCHES).toString()).toBe("audience=designer");
+    expect(frameAddress("frame.html", "a--b", view, SWITCHES)).toBe("frame.html?story=a--b");
+    expect(frameAddressOf("frame.html", "a--b", "audience=designer&theme=dark")).toBe(
+      "frame.html?theme=dark&story=a--b"
+    );
+    expect(parseView("?audience=manager", CATALOGUE).audience).toBe("everyone");
+  });
+
+  it("writes nothing for everyone, so today's addresses and pages stay as they are", () => {
+    expect(viewParams(DEFAULTS, SWITCHES).toString()).toBe("");
+    expect(DEFAULTS.audience).toBe("everyone");
+  });
+
+  it("starts from the catalogue's audience, whose everyone a link must then name", () => {
+    const catalogue = catalogueSettings("Fixture", SWITCHES, { audience: "designer" });
+    const view = defaultView(catalogue);
+    expect(view.audience).toBe("designer");
+    expect(viewParams(view, SWITCHES, "designer").toString()).toBe("");
+    const all = viewParams({ ...view, audience: "everyone" }, SWITCHES, "designer").toString();
+    expect(all).toBe("audience=everyone");
+    expect(parseView(all, catalogue).audience).toBe("everyone");
+    expect(hasViewChanges(view, SWITCHES, ["audience"], "designer")).toBe(false);
+    expect(hasViewChanges({ ...view, audience: "coder" }, SWITCHES, ["audience"], "designer")).toBe(true);
+  });
+
+  it("leaves the catalogue's audience alone when it turned the control off", () => {
+    const catalogue = catalogueSettings("Fixture", SWITCHES, {
+      audience: "tester",
+      controls: { audience: false }
+    });
+    expect(parseView("?audience=designer", catalogue).audience).toBe("tester");
+  });
+
+  it("names a component's page in an audience's view, for a tool", () => {
+    expect(componentAddressOf("http://a/", "kit:select", "audience=designer&story=x&page=y")).toBe(
+      "http://a/?audience=designer&component=kit%3Aselect"
+    );
+  });
 });
 
 describe("what the catalogue reads of the switches", () => {
@@ -225,5 +269,64 @@ describe("the touch a story marked for a phone is drawn with", () => {
     const changed = withSwitches({ touch: "touch", theme: "dark" });
     expect(withTouchOf(changed, DEFAULTS, choice).switches).toEqual(withSwitches({ theme: "dark" }).switches);
     expect(withTouchOf(changed, changed, choice)).toBe(changed);
+  });
+});
+
+describe("the device in the address", () => {
+  it("reads off and a model's id, the story's own (auto) for anything else, and writes only what is set", () => {
+    expect(parseView("", CATALOGUE)).toMatchObject({ device: "auto", orientation: "auto" });
+    expect(parseView("forgebook.device=pixel-9&forgebook.orientation=landscape", CATALOGUE)).toMatchObject({
+      device: "pixel-9",
+      orientation: "landscape"
+    });
+    expect(parseView("forgebook.device=off", CATALOGUE).device).toBe("off");
+    expect(
+      parseView("forgebook.device=nokia-3310&forgebook.orientation=upside-down", CATALOGUE)
+    ).toMatchObject({
+      device: "auto",
+      orientation: "auto"
+    });
+    const view: ViewState = { ...DEFAULT_VIEW, device: "ipad-mini", orientation: "landscape" };
+    expect(viewParams(view, SWITCHES).toString()).toBe(
+      "forgebook.device=ipad-mini&forgebook.orientation=landscape"
+    );
+    expect(viewParams(DEFAULT_VIEW, SWITCHES).toString()).toBe("");
+  });
+
+  it("leaves the device out of a frame's address: the frame is the story's own document, never the device", () => {
+    const view: ViewState = { ...DEFAULT_VIEW, device: "iphone-16" };
+    expect(frameAddress("frame.html", "kit:a--b", view, SWITCHES)).toBe("frame.html?story=kit%3Aa--b");
+    expect(
+      frameAddressOf(
+        "frame.html",
+        "kit:a--b",
+        "forgebook.device=iphone-16&forgebook.orientation=landscape&theme=dark"
+      )
+    ).toBe("frame.html?theme=dark&story=kit%3Aa--b");
+  });
+
+  it("leaves `device` and `orientation` to a catalogue's own switches of those names", () => {
+    const own = (id: string): ViewSwitch => ({
+      id,
+      label: id,
+      apply: { kind: "attribute", name: `data-${id}` },
+      default: "desktop",
+      values: [
+        { value: "desktop", label: "Desktop" },
+        { value: "tablet", label: "Tablet" }
+      ]
+    });
+    const switches = [own("device"), own("orientation")];
+    expect(switchesProblem(switches)).toBeUndefined();
+    const catalogue = catalogueSettings("Fixture", switches);
+    const view = parseView("device=tablet&orientation=tablet&forgebook.device=pixel-9", catalogue);
+    expect(view).toMatchObject({
+      switches: { device: "tablet", orientation: "tablet" },
+      device: "pixel-9",
+      orientation: "auto"
+    });
+    expect(viewParams(view, switches).toString()).toBe(
+      "device=tablet&orientation=tablet&forgebook.device=pixel-9"
+    );
   });
 });

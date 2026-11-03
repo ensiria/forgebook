@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type NamedValues, nameOf, panelArgsOf, storyArgsOf } from "../src/namedValues.ts";
+import { type NamedValues, namedValueOf, nameOf, panelArgsOf, storyArgsOf } from "../src/namedValues.ts";
 
 /** Two components a source names. */
 const IconBell = (): null => null;
@@ -56,5 +56,21 @@ describe("named values", () => {
         NAMED
       )
     ).toEqual({ size: "sm", icon: IconFolder });
+  });
+
+  it("never reaches a value through a prototype: a name is looked up among the source's own entries", () => {
+    expect(
+      storyArgsOf(
+        {
+          viaObject: { of: "constructor", named: "constructor" },
+          viaPrototype: { of: "__proto__", named: "constructor" },
+          viaEntry: { of: "IconComponent", named: "constructor" },
+          viaToString: { of: "IconComponent", named: "toString" }
+        },
+        NAMED
+      )
+    ).toEqual({});
+    expect(namedValueOf({}, "constructor", "constructor")).toBeUndefined();
+    expect(namedValueOf(NAMED, "IconComponent", "IconBell")).toBe(IconBell);
   });
 });

@@ -27,7 +27,7 @@ describe("component pages", () => {
   it("turns the file into HTML, tables and coloured code included", () => {
     const page = componentPage(join(KIT, "Select.stories.tsx"));
     expect(page?.html).toContain("<p>Lets the user pick one value");
-    expect(page?.html).toContain("<h2>Accessibility</h2>");
+    expect(page?.html).toContain('<h2 id="doc-accessibility">Accessibility</h2>');
     expect(page?.html).toContain("<table>");
     expect(page?.html).toContain(
       '<code class="language-tsx"><span class="forgebook-hl-keyword">import</span>'
