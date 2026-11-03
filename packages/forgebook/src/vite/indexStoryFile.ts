@@ -17,7 +17,8 @@
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
- * the story loads. `touch`, `logic` and `design.figma` are read by the index only, so written by code they are a problem.
+ * the story loads. `touch`, `logic`, `design.figma` and the meta's `propGroups` are read by the index only, so written by
+ * code they are a problem.
  * A `design.figma` is checked here too, so the pages never carry the checker: one that is not a link to a Figma file is
  * noted and left out, and the file keeps its stories. A title written by code, or none, is the file's path
  * (`autoTitle`, as Storybook's auto-title); one written by code is also noted, since the author meant another. A value written plainly but wrongly
@@ -40,6 +41,7 @@ import {
   objectFields,
   parameter,
   propertyValue,
+  propGroupsOf,
   stringField,
   stringListOf,
   unwrapped
@@ -418,7 +420,7 @@ const titleOf = (
 /** The meta's fields besides its title and stories, each only when set. */
 type MetaFields = Pick<
   StoryFileIndex,
-  "id" | "controls" | "height" | "design" | "alsoIn" | "related" | "keywords" | "description"
+  "id" | "controls" | "height" | "design" | "alsoIn" | "related" | "keywords" | "propGroups" | "description"
 >;
 
 /**
@@ -456,6 +458,8 @@ const metaFieldsOf = (meta: Fields, notes: string[]): MetaFields | Error => {
   if (design instanceof Error) return design;
   const lists = metaListsOf(meta);
   if (lists instanceof Error) return lists;
+  const propGroups = propGroupsOf(meta);
+  if (propGroups instanceof Error) return propGroups;
   const description = docsDescription(meta, "component");
   const flags = flagsOf(meta);
   if (flags instanceof Error) return flags;
@@ -467,6 +471,7 @@ const metaFieldsOf = (meta: Fields, notes: string[]): MetaFields | Error => {
     ...design,
     ...flags,
     ...lists,
+    ...(propGroups === undefined ? {} : { propGroups }),
     ...(description === undefined ? {} : { description })
   };
 };
