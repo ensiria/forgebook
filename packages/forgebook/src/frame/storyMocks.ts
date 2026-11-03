@@ -108,8 +108,18 @@ const NOTHING = (): void => undefined;
 /** How long a page waits for a worker to take it over, in milliseconds. */
 const TAKEOVER_WAIT = 500;
 
-/** Where a frame notes the reload it did for its worker, so it does one at most. */
-const RELOADED_KEY = "forgebook:mocks-reloaded";
+/**
+ * Where a frame notes the reload it did for its worker, so it does one at most: by its address.
+ *
+ * @remarks
+ * Every frame of a page shares the page's session storage. One mark for them all would let the first frame that reloads
+ * stop the others: on a page whose frames the worker all missed, they would draw their stories with no mocks.
+ */
+const reloadedKey = (): string => `forgebook:mocks-reloaded:${location.href}`;
+
+/** Whether this page came from a reload: its own, or a person's of this frame alone. */
+const isReloaded = (): boolean =>
+  performance.getEntriesByType("navigation").some((entry) => "type" in entry && entry.type === "reload");
 
 /** Whether the service worker serves this page, waiting briefly for it to take the page over. */
 const isServedByWorker = async (): Promise<boolean> => {
@@ -135,17 +145,22 @@ const pageStorage = (): Storage | undefined => {
  * Reloads a page the worker did not take over, once.
  *
  * @remarks
- * MSW's script unregisters itself when its last page closes. When that page is the one this story replaces, the new
- * page can end up with an active registration that never claims it: `start` resolves and every request goes to the
- * network, however many times it starts again. A new document is served from its first request.
+ * MSW's script unregisters itself when its last page closes. When that page is the one this story replaces, or when a
+ * whole page reloads on a busy machine and the old frames close before the new ones are ready, the new pages can end up
+ * with an active registration that never claims them: `start` resolves and every request goes to the network, however
+ * many times it starts again. A new document is served from its first request; each frame needs its own.
  *
  * @returns whether the page is going away, which leaves the story nothing to draw.
  */
 const reloadForWorker = (): boolean => {
   // with no storage, as a third-party frame may have, a reload could not know it already happened: it would never end
   const storage = pageStorage();
-  if (storage === undefined || storage.getItem(RELOADED_KEY) !== null) return false;
-  storage.setItem(RELOADED_KEY, "1");
+  if (storage === undefined) return false;
+  // the mark alone may be an earlier visit's, left by a reload that did not help: this page is that reload only when it
+  // came from one too
+  const key = reloadedKey();
+  if (storage.getItem(key) !== null && isReloaded()) return false;
+  storage.setItem(key, "1");
   location.reload();
   return true;
 };
@@ -170,7 +185,7 @@ export const startStoryMocks = async (
   const tools = await load();
   const worker = tools.setupWorker(ownFrameOnly(tools), ...handlers);
   await worker.start(WORKER_OPTIONS);
-  if (await isServedByWorker()) pageStorage()?.removeItem(RELOADED_KEY);
+  if (await isServedByWorker()) pageStorage()?.removeItem(reloadedKey());
   else if (reloadForWorker()) await new Promise<never>(() => undefined);
   return (): void => worker.stop();
 };
