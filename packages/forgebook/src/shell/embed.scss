@@ -1,0 +1,91 @@
+// A story shown alone in someone else's page, and the panel that gives its link and its code. Loaded with them, so the
+// catalogue's first screen carries none of it. Everything here reads the shell's tokens, which is what makes an
+// embedded story wear the catalogue's theme.
+
+@use "../styles/tokens" as *;
+@use "../styles/mixins";
+
+@layer catalogue {
+  // at least the window's whole height, whatever the story's: the page around it never shows a colour of its own
+  .forgebook-embed {
+    min-height: 100vh;
+    background: $surface;
+  }
+
+  // a width from the address, when one is set, centred; never wider than the page that embeds it
+  .forgebook-embed__story {
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  .forgebook-embed__message {
+    margin: 0;
+    padding: $space-4;
+    font: $text-body;
+    color: $text-secondary;
+  }
+
+  .forgebook-embed__message[data-failed] {
+    color: $danger-text;
+  }
+
+  .forgebook-embed__detail {
+    margin: $space-1 0 0;
+    color: $text-secondary;
+    overflow-wrap: anywhere;
+  }
+
+  // inside the window on a phone or a short window, and its text wraps, unlike the story bar it hangs from
+  .forgebook-popover--embed {
+    box-sizing: border-box;
+    width: min(26rem, calc(100vw - #{$space-6}));
+    max-height: calc(100vh - #{$space-6});
+    overflow-y: auto;
+    white-space: normal;
+  }
+
+  .forgebook-embed-panel__hint {
+    margin: 0;
+    font: $text-caption;
+    color: $text-secondary;
+  }
+
+  .forgebook-embed-panel__hint[data-warning] {
+    color: $danger-text;
+  }
+
+  .forgebook-embed-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: $space-1 $space-2;
+    align-items: center;
+  }
+
+  .forgebook-embed-field__label {
+    grid-column: 1 / -1;
+    font: $text-control;
+    color: $text-secondary;
+  }
+
+  .forgebook-embed-field__value {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: $space-1-5 $space-2;
+    border: 0;
+    border-radius: $radius-control;
+    font: $text-mono-small;
+    color: $text;
+    background: $fill-quiet;
+    box-shadow: $ring-field;
+    @include mixins.focus-ring;
+  }
+
+  .forgebook-embed-panel__follow {
+    display: flex;
+    gap: $space-2;
+    align-items: center;
+    font: $text-control;
+    color: $text;
+  }
+}

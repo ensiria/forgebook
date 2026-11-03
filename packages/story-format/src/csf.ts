@@ -125,6 +125,15 @@ export type ArgTypes<TArgs> = { readonly [Name in keyof TArgs]?: ArgType } & Rea
   Record<string, ArgType>
 >;
 
+/** A component's or a story's design, in the tool it was drawn in. */
+export type StoryDesign = {
+  /**
+   * The link to its node in Figma (`https://www.figma.com/design/<file>/<name>?node-id=12-34`), or to its file. Written
+   * plainly (the index reads it). A link that is not Figma's is reported and never embedded.
+   */
+  readonly figma: string;
+};
+
 /** The settings the catalogue reads from a meta or a story; anything else under `parameters` is left alone. */
 export type StoryParameters = {
   /** The states forced on the whole story; a part can force its own with `data-forgebook-force`. */
@@ -168,6 +177,11 @@ export type StoryParameters = {
    * story's own `false` leaves it out. Written plainly (`logic: true`, the index reads it).
    */
   readonly logic?: boolean;
+  /**
+   * The design this is drawn from: on a meta, the component's and every story's; on a story, its own in place of the
+   * meta's. The catalogue links to it and shows it in a Design tab beside the story.
+   */
+  readonly design?: StoryDesign;
   /**
    * The story reads the story clock (`context.clock`, `useStoryNow`): a Live story, which starts at this moment and
    * then runs; the catalogue shows pause, resume, restart and the speed, and the tests hold it at its start.

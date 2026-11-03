@@ -6,7 +6,14 @@
  */
 
 /** The kinds of entries the file lists, in the order they are written by default. */
-export const CATALOGUE_SECTIONS = ["components", "modules", "sassModules", "styleSheets"] as const;
+export const CATALOGUE_SECTIONS = [
+  "components",
+  "pages",
+  "modules",
+  "sassModules",
+  "styleSheets",
+  "tokens"
+] as const;
 
 /** One kind of entries. */
 export type CatalogueSection = (typeof CATALOGUE_SECTIONS)[number];

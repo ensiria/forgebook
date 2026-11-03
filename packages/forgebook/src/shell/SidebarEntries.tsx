@@ -30,7 +30,7 @@ export type SidebarLinks = {
 };
 
 /** A link that opens a page in place, keeping a real address for a new tab. */
-const PageLink = ({
+export const PageLink = ({
   href,
   className,
   current,

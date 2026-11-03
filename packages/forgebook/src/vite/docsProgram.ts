@@ -6,6 +6,11 @@
  * The repo type-checks with TypeScript 7, whose native compiler has no JavaScript API; TypeScript 6 (the version
  * typescript-eslint uses too) reads the same configurations.
  *
+ * A file is read with the configuration an editor reads it with: the nearest `tsconfig.json` up its folders that holds
+ * it, or a project it references. A monorepo's package often holds only its sources while the root's configuration
+ * holds the stories too, with the paths that lead a package's name to its sources: reading a story with the package's
+ * configuration would leave its component's type unknown.
+ *
  * A framework whose components are not TypeScript (Svelte's `.svelte`) hands the text TypeScript reads in a component's
  * place (`ProgramSources`): its programs are kept apart from the plain ones, under the same configuration.
  *
@@ -80,9 +85,29 @@ const programs = new Map<string, ts.Program>();
  */
 const outdated = new Set<string>();
 
+/** Each configuration read, with the files it holds, kept until a source changes; `undefined` when it cannot be read. */
+const configurations = new Map<string, ReadConfiguration | undefined>();
+
+/** A configuration read: its options and files, and the files as a set to look one up. */
+type ReadConfiguration = {
+  /** What TypeScript read. */
+  readonly parsed: ts.ParsedCommandLine;
+  /** Its files, in TypeScript's form (forward slashes). */
+  readonly fileSet: ReadonlySet<string>;
+};
+
+/**
+ * The files read since the configurations were last read that none of them lists: they are not read again for each,
+ * which a project whose stories no configuration holds would otherwise pay on every read.
+ */
+const unlisted = new Set<string>();
+
 /** Marks every program as maybe holding an edited file: each is renewed on its next read. */
 export const markSourcesChanged = (): void => {
   for (const configPath of programs.keys()) outdated.add(configPath);
+  // an edited configuration may hold other files, or have other options
+  configurations.clear();
+  unlisted.clear();
 };
 
 /**
@@ -172,16 +197,13 @@ const looseProgram = (
 };
 
 /**
- * The program that holds a file: the one of the nearest `tsconfig.json` up its folders, or, when none holds it, the one
- * the files no configuration holds share (`FALLBACK_OPTIONS`, or the configuration's with JavaScript allowed).
+ * A configuration, read once until a source changes.
  *
- * @param file - an absolute path to a source file, or to a file the sources write.
- * @param sources - the files read in place of a framework's components; none for a plain program.
- * @returns the program, or a message when the configuration above it cannot be read.
+ * @param configPath - the `tsconfig.json`.
+ * @returns it with its files, or `undefined` when it cannot be read.
  */
-export const programFor = (file: string, sources?: ProgramSources): DocsProgram | string => {
-  const configPath = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
-  if (configPath === undefined) return looseProgram(file, FALLBACK_OPTIONS, sources);
+const readConfiguration = (configPath: string): ReadConfiguration | undefined => {
+  if (configurations.has(configPath)) return configurations.get(configPath);
   const parsed = ts.getParsedCommandLineOfConfigFile(
     configPath,
     {},
@@ -190,10 +212,100 @@ export const programFor = (file: string, sources?: ProgramSources): DocsProgram 
       onUnRecoverableConfigFileDiagnostic: () => undefined
     }
   );
-  if (parsed === undefined) return `${configPath} could not be read`;
-  const options = { ...parsed.options, ...sources?.options };
-  const program = keptProgram(`${configPath}${sourcesKey(sources)}`, parsed.fileNames, options, sources);
-  if (program.getSourceFile(file) === undefined) return looseProgram(file, parsed.options, sources);
+  const read = parsed === undefined ? undefined : { parsed, fileSet: new Set(parsed.fileNames) };
+  configurations.set(configPath, read);
+  return read;
+};
+
+/**
+ * The configuration a config file stands for, then the projects it references (a root's `tsconfig.json` that only
+ * lists its packages' projects), in an editor's order.
+ *
+ * @param configPath - the `tsconfig.json`.
+ */
+const withReferences = (configPath: string): string[] => [
+  configPath,
+  ...(readConfiguration(configPath)?.parsed.projectReferences ?? []).map((reference) =>
+    ts.resolveProjectReferencePath(reference)
+  )
+];
+
+/**
+ * The first configuration up a file's folders (or a project one references) that lists it, as an editor finds it.
+ * Each is read only when the ones below it do not list the file, so a configuration far above (a home folder's) is
+ * read only for a file nothing closer holds.
+ *
+ * @param file - an absolute path to a source file.
+ */
+const holdingConfiguration = (file: string): string | undefined => {
+  const name = file.replaceAll("\\", "/");
+  let folder = dirname(file);
+  for (;;) {
+    const configPath = ts.findConfigFile(folder, ts.sys.fileExists, "tsconfig.json");
+    if (configPath === undefined) return undefined;
+    const holding = withReferences(configPath).find(
+      (candidate) => readConfiguration(candidate)?.fileSet.has(name) === true
+    );
+    if (holding !== undefined) return holding;
+    const parent = dirname(dirname(configPath));
+    if (parent === dirname(configPath)) return undefined;
+    folder = parent;
+  }
+};
+
+/**
+ * A configuration's program, renewed when it lacks a file the configuration lists: a story file added since the
+ * program was made.
+ *
+ * @param configPath - the `tsconfig.json`.
+ * @param read - the configuration, read.
+ * @param file - the file the program is for.
+ * @param sources - the files read in place of a framework's components; none for a plain program.
+ */
+const configurationProgram = (
+  configPath: string,
+  read: ReadConfiguration,
+  file: string,
+  sources: ProgramSources | undefined
+): DocsProgram => {
+  const key = `${configPath}${sourcesKey(sources)}`;
+  const kept = programs.get(key);
+  if (kept !== undefined && kept.getSourceFile(file) === undefined) outdated.add(key);
+  const options = { ...read.parsed.options, ...sources?.options };
+  const program = keptProgram(key, read.parsed.fileNames, options, sources);
+  return { program, checker: program.getTypeChecker() };
+};
+
+/**
+ * The program that holds a file: the one of the first configuration up its folders (or a project it references) that
+ * lists it; else the nearest one's, when the file reaches it through an import; else the one the files no
+ * configuration holds share (`FALLBACK_OPTIONS`, or the nearest configuration's with JavaScript allowed).
+ *
+ * @param file - an absolute path to a source file, or to a file the sources write.
+ * @param sources - the files read in place of a framework's components; none for a plain program.
+ * @returns the program, or a message when the configuration above it cannot be read.
+ */
+export const programFor = (file: string, sources?: ProgramSources): DocsProgram | string => {
+  const nearest = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
+  if (nearest === undefined) return looseProgram(file, FALLBACK_OPTIONS, sources);
+  // a file the sources write is on no configuration's list, so reading them again would not find it
+  const isWritten = sources?.textOf(file) !== undefined;
+  // a file added since the configurations were read is in none of their lists: they are read again, once per file
+  let holding = holdingConfiguration(file);
+  if (holding === undefined && !isWritten && !unlisted.has(file)) {
+    configurations.clear();
+    unlisted.clear();
+    holding = holdingConfiguration(file);
+  }
+  if (holding === undefined) unlisted.add(file);
+  const holdingRead = holding === undefined ? undefined : readConfiguration(holding);
+  if (holding !== undefined && holdingRead !== undefined)
+    return configurationProgram(holding, holdingRead, file, sources);
+  const read = readConfiguration(nearest);
+  if (read === undefined) return `${nearest} could not be read`;
+  const options = { ...read.parsed.options, ...sources?.options };
+  const program = keptProgram(`${nearest}${sourcesKey(sources)}`, read.parsed.fileNames, options, sources);
+  if (program.getSourceFile(file) === undefined) return looseProgram(file, read.parsed.options, sources);
   return { program, checker: program.getTypeChecker() };
 };
 

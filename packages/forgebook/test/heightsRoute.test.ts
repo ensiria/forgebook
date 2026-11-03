@@ -3,6 +3,8 @@
  *
  * @module
  */
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { type HeightsFile, isMissingHeights } from "../src/vite/heightsRoute.ts";
@@ -19,7 +21,11 @@ describe("the heights' file before it is measured", () => {
 
   it("leaves the file to Vite once it exists, and every other address", () => {
     expect(
-      isMissingHeights("/story-heights.json", FILE, (path) => path === "/project/public/story-heights.json")
+      isMissingHeights(
+        "/story-heights.json",
+        FILE,
+        (path) => path === join("/project/public", "story-heights.json")
+      )
     ).toBe(false);
     expect(isMissingHeights("/other.json", FILE, () => false)).toBe(false);
   });
