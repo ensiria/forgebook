@@ -26,7 +26,16 @@ describe("catalogueSettings", () => {
       "darkDesktop",
       "content"
     ]);
-    expect(settings.tabs).toEqual(["props", "events", "play", "parts", "code", "a11y", "signature"]);
+    expect(settings.tabs).toEqual([
+      "props",
+      "events",
+      "play",
+      "parts",
+      "code",
+      "design",
+      "a11y",
+      "signature"
+    ]);
     expect(settings.gridStep).toBe(8);
     expect(settings.appearance).toBe("system");
   });
@@ -42,13 +51,20 @@ describe("catalogueSettings", () => {
       textSizes: [110, 120]
     });
     expect(settings.backdrops.map((backdrop) => backdrop.id)).toEqual(["checkerboard", "paper"]);
-    expect(settings.tabs).toEqual(["props", "events", "play", "code", "signature"]);
+    expect(settings.tabs).toEqual(["props", "events", "play", "code", "design", "signature"]);
     expect(settings.zooms).toEqual([50, 100, 150]);
     // without 100 %, the view without change would have no text size: the default list stays
     expect(settings.textSizes).toEqual([100, 125, 150]);
     expect(catalogueSettings("A", DEFAULT_SWITCHES, { backgrounds: { builtIn: false } }).backdrops).toEqual(
       []
     );
+  });
+});
+
+describe("the Embed button", () => {
+  it("is offered unless a catalogue turns it off", () => {
+    expect(catalogueSettings("A", DEFAULT_SWITCHES).hasEmbed).toBe(true);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { controls: { embed: false } }).hasEmbed).toBe(false);
   });
 });
 
@@ -109,9 +125,11 @@ describe("story groups", () => {
     const sections = groupedStories(
       [story("zeta"), story("behaviour"), story(undefined), story("alpha"), story("states")].map((each) => ({
         ...each,
+        file: "x.stories.tsx",
         controls: "all" as const,
         description: undefined,
         height: undefined,
+        design: undefined,
         tags: [],
         isMain: false,
         isTouch: false,

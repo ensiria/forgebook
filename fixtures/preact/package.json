@@ -1,0 +1,33 @@
+{
+  "name": "@fixture/preact",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Preact fixture catalogue: Forgebook's shell and frame over Preact components, drawn by Preact itself, its stories tested on the server.",
+  "type": "module",
+  "exports": {
+    "./stories": "./stories.ts"
+  },
+  "scripts": {
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@forgebook/preact": "workspace:*",
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "msw": "3.0.3",
+    "preact": "11.1.1",
+    "preact-render-to-string": "6.8.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

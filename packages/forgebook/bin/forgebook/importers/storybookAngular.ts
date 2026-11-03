@@ -15,8 +15,8 @@ import { join, relative, resolve } from "node:path";
 
 /** What the Angular adapter's options take from the project, and what was not read. */
 export type AngularImport = {
-  /** The adapter's options, as `angular({ … })` writes them; empty for the defaults. */
-  readonly options: Readonly<Record<string, string>>;
+  /** The adapter's options, as `angular({ … })` writes them; none for the defaults. */
+  readonly options: Readonly<Record<string, string>> | undefined;
   /** What was not read, each a sentence for the person who runs the command. */
   readonly notes: readonly string[];
 };
@@ -114,5 +114,8 @@ export const importAngular = (
       ? ["Compodoc is not run: Forgebook reads the components' inputs, outputs and content from their types"]
       : [])
   ];
-  return { options: tsconfig === undefined ? {} : { tsconfig: tsconfig.split("\\").join("/") }, notes };
+  return {
+    options: tsconfig === undefined ? undefined : { tsconfig: tsconfig.split("\\").join("/") },
+    notes
+  };
 };

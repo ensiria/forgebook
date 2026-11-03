@@ -19,7 +19,7 @@ import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import type { CorpusComponent } from "./corpus.ts";
 import { contentSize } from "./diskUsage.ts";
-import { stampScript, waitForStamps } from "./stamps.ts";
+import { type StampedPage, stampedPage, stampScript, waitForStamps } from "./stamps.ts";
 import { serveStatic } from "./staticServer.ts";
 import { HOST, type Target, type TargetCommand } from "./targets.ts";
 
@@ -58,7 +58,7 @@ export type MeasureContext = {
   readonly directory: string;
   /** The browser. */
   readonly browser: Browser;
-  /** The port its servers listen on. */
+  /** The first of the ports its servers listen on, as many as the target takes. */
   readonly port: number;
   /** The story and component measured. */
   readonly component: CorpusComponent;
@@ -92,10 +92,13 @@ const isPortTaken = (port: number): Promise<boolean> =>
 /**
  * A dev server, in a process group of its own, so stopping it stops whatever it started.
  *
- * @throws when the port is taken: what answered there would pass for this server, with a time near zero.
+ * @throws when one of its ports is taken: what answered there would pass for this server, with a time near zero.
  */
 const startServer = async (context: MeasureContext): Promise<ChildProcess> => {
-  if (await isPortTaken(context.port)) throw new Error(`port ${context.port} is already taken`);
+  const ports = Array.from({ length: context.target.ports }, (_, offset) => context.port + offset);
+  for (const port of ports) {
+    if (await isPortTaken(port)) throw new Error(`port ${port} is already taken`);
+  }
   const command = context.target.dev(context.port);
   const server = spawn(join(context.directory, "node_modules", ".bin", command.bin), [...command.args], {
     cwd: context.directory,
@@ -149,7 +152,11 @@ const waitForServer = async (server: ChildProcess, address: string): Promise<voi
 const openPage = async (
   context: MeasureContext,
   viewport: { readonly width: number; readonly height: number }
-): Promise<{ readonly browserContext: BrowserContext; readonly page: Page }> => {
+): Promise<{
+  readonly browserContext: BrowserContext;
+  readonly page: Page;
+  readonly stamped: StampedPage;
+}> => {
   const browserContext = await context.browser.newContext({ viewport });
   await browserContext.addInitScript({
     content: stampScript({
@@ -163,14 +170,18 @@ const openPage = async (
     const session = await browserContext.newCDPSession(page);
     await session.send("Emulation.setCPUThrottlingRate", { rate: context.throttle });
   }
-  return { browserContext, page };
+  return { browserContext, page, stamped: stampedPage(page) };
 };
 
 /**
  * The stamps of keys once the page stopped replacing itself: a document that reloads later starts them over, and the
  * draw a person keeps is the last one.
  */
-const settledStamps = async (page: Page, keys: readonly string[], deadline: number): Promise<number[]> => {
+const settledStamps = async (
+  page: StampedPage,
+  keys: readonly string[],
+  deadline: number
+): Promise<number[]> => {
   let times = await waitForStamps(page, keys, deadline);
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, SETTLE));
@@ -203,14 +214,14 @@ export type StartSample = {
  */
 export const measureStart = async (context: MeasureContext, isCold: boolean): Promise<StartSample> => {
   if (isCold) await removeCaches(context);
-  const { browserContext, page } = await openPage(context, VIEWPORT);
+  const { browserContext, page, stamped } = await openPage(context, VIEWPORT);
   const start = Date.now();
   const server = await startServer(context);
   try {
     await waitForServer(server, baseOf(context));
     await page.goto(context.target.storyUrl(baseOf(context), context.component));
     const keys = [storyLabel(context.component), LAST_GROUP];
-    const [story = 0, sidebar = 0] = await settledStamps(page, keys, start + SAMPLE_TIMEOUT);
+    const [story = 0, sidebar = 0] = await settledStamps(stamped, keys, start + SAMPLE_TIMEOUT);
     return { story: story - start, sidebar: sidebar - start };
   } finally {
     await browserContext.close();
@@ -242,19 +253,19 @@ export const measureEdits = async (
   );
   const original = await readFile(file, "utf8");
   const before = kind === "story" ? /label: "[^"]*"/ : /const BUILD = "[^"]*"/;
-  const { browserContext, page } = await openPage(context, VIEWPORT);
+  const { browserContext, page, stamped } = await openPage(context, VIEWPORT);
   const server = await startServer(context);
   try {
     await waitForServer(server, baseOf(context));
     await page.goto(context.target.storyUrl(baseOf(context), context.component));
-    await settledStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
+    await settledStamps(stamped, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
     const samples: number[] = [];
     for (let edit = 0; edit < edits; edit += 1) {
       const text = `edit ${edit}`;
       const replacement = kind === "story" ? `label: "${text}"` : `const BUILD = "${text}"`;
       const start = Date.now();
       await writeFile(file, original.replace(before, replacement));
-      const [drawn = 0] = await waitForStamps(page, [text], start + SAMPLE_TIMEOUT);
+      const [drawn = 0] = await waitForStamps(stamped, [text], start + SAMPLE_TIMEOUT);
       samples.push(drawn - start);
       await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE));
     }
@@ -281,7 +292,7 @@ export type PageSample = {
  * @param address - the page's address.
  */
 export const measureComponentPage = async (context: MeasureContext, address: string): Promise<PageSample> => {
-  const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
+  const { browserContext, page, stamped } = await openPage(context, TALL_VIEWPORT);
   const server = await startServer(context);
   try {
     await waitForServer(server, baseOf(context));
@@ -291,7 +302,7 @@ export const measureComponentPage = async (context: MeasureContext, address: str
     const labels = context.component.stories.map((story) => story.label);
     const table = context.target.propsTable;
     const keys = table === undefined ? labels : [...labels, table];
-    const times = await settledStamps(page, keys, start + SAMPLE_TIMEOUT);
+    const times = await settledStamps(stamped, keys, start + SAMPLE_TIMEOUT);
     const props = table === undefined ? undefined : times.at(-1);
     return {
       stories: Math.max(...times.slice(0, labels.length)) - start,
@@ -416,7 +427,7 @@ export type LoadSample = {
  */
 export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSample> => {
   const server = await serveStatic(join(context.directory, BUILD_FOLDER), HOST, context.port);
-  const { browserContext, page } = await openPage(context, VIEWPORT);
+  const { browserContext, page, stamped } = await openPage(context, VIEWPORT);
   const main = new Set<string>();
   const frames = new Set<string>();
   page.on("request", (request) => {
@@ -426,7 +437,7 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
   });
   try {
     await page.goto(context.target.storyUrl(server.base, context.component));
-    await waitForStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
+    await waitForStamps(stamped, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
     await page.waitForLoadState("networkidle");
     const total = (paths: ReadonlySet<string>): number =>
       [...paths].reduce((sum, path) => sum + server.gzippedSize(path), 0);

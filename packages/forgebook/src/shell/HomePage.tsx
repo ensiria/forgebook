@@ -1,6 +1,6 @@
 /**
- * The catalogue's home: the pages opened last, then each source with its own introduction and its families, each
- * family a card of its components. The logo opens it, and so does an address that names no page.
+ * The catalogue's home: the pages opened last, then each source with its own introduction, its docs pages and its
+ * families, each family a card of its components. The logo opens it, and so does an address that names no page.
  *
  * @remarks
  * Everything but a source's introduction is drawn from the tree, so it never goes stale; the introduction is the
@@ -12,8 +12,8 @@
 import type { StorySource } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useState } from "react";
 
+import { findPage } from "../pageTree.ts";
 import {
-  componentId,
   findComponent,
   findStory,
   type StoryTree,
@@ -96,6 +96,12 @@ const recentEntries = (tree: StoryTree, recent: readonly RecentPage[]): RecentEn
       const place = [location.source.name, location.family.name, location.component.name].join(" · ");
       return [{ page, name: location.story.name, place }];
     }
+    if (page.kind === "page") {
+      const location = findPage(tree, page.id);
+      if (location === undefined) return [];
+      const place = [location.source.name, location.page.group].filter((part) => part !== undefined);
+      return [{ page, name: location.page.name, place: place.join(" · ") }];
+    }
     const location = findComponent(tree, page.id);
     if (location === undefined) return [];
     const place = [location.source.name, location.family.name, location.group.name]
@@ -141,15 +147,13 @@ const SourceIntro = ({ load }: { readonly load: StorySource["home"] }): ReactNod
 /**
  * A family's card: its name and how many components it has, then its components, the first few until asked for all.
  *
- * @param props - the source, the family, and how to open a component.
+ * @param props - the family, and how to open a component.
  */
 const FamilyCard = ({
-  source,
   family,
   hrefOf,
   onOpen
 }: Pick<HomePageProps, "hrefOf" | "onOpen"> & {
-  readonly source: TreeSource;
   readonly family: TreeFamily;
 }): ReactNode => {
   const [isOpen, setIsOpen] = useState(false);
@@ -165,7 +169,7 @@ const FamilyCard = ({
         {shown.map((component) => (
           <li key={component.title}>
             <PageLink
-              page={{ kind: "component", id: componentId(source.id, component.title) }}
+              page={{ kind: "component", id: component.id }}
               hrefOf={hrefOf}
               onOpen={onOpen}
               className="forgebook-link"
@@ -188,6 +192,35 @@ const FamilyCard = ({
     </article>
   );
 };
+
+/**
+ * A source's docs pages as a card, in their reading order, first among its families.
+ *
+ * @param props - the source, and how to open a page.
+ */
+const DocsCard = ({
+  source,
+  hrefOf,
+  onOpen
+}: Pick<HomePageProps, "hrefOf" | "onOpen"> & { readonly source: TreeSource }): ReactNode => (
+  <article className="forgebook-home__card" aria-label={STRINGS.docsNav}>
+    <h3 className="forgebook-home__card-title">{STRINGS.docsNav}</h3>
+    <ul className="forgebook-home__components">
+      {source.pages.map((page) => (
+        <li key={page.id}>
+          <PageLink
+            page={{ kind: "page", id: page.id }}
+            hrefOf={hrefOf}
+            onOpen={onOpen}
+            className="forgebook-link"
+          >
+            {page.name}
+          </PageLink>
+        </li>
+      ))}
+    </ul>
+  </article>
+);
 
 /**
  * The home.
@@ -223,7 +256,10 @@ export const HomePage = ({
             <p className="forgebook-doc__lead">
               {tree.sources.length === 0
                 ? STRINGS.homeEmpty
-                : STRINGS.homeSummary(componentCount, tree.sources.length)}
+                : STRINGS.homeSummary(
+                    componentCount,
+                    tree.sources.filter((source) => source.families.length > 0).length
+                  )}
             </p>
           </header>
           {entries.length === 0 ? null : (
@@ -261,14 +297,11 @@ export const HomePage = ({
               </h2>
               <SourceIntro load={sources.find((candidate) => candidate.id === source.id)?.home} />
               <div className="forgebook-home__families">
+                {source.pages.length === 0 ? null : (
+                  <DocsCard source={source} hrefOf={hrefOf} onOpen={onOpen} />
+                )}
                 {source.families.map((family) => (
-                  <FamilyCard
-                    key={family.name}
-                    source={source}
-                    family={family}
-                    hrefOf={hrefOf}
-                    onOpen={onOpen}
-                  />
+                  <FamilyCard key={family.name} family={family} hrefOf={hrefOf} onOpen={onOpen} />
                 ))}
               </div>
             </section>

@@ -79,7 +79,7 @@ jobs:
       - name: Stage on npm
         run: |
           mkdir -p "$RUNNER_TEMP/packages"
-          for folder in story-format forgebook react testing vue angular; do
+          for folder in story-format forgebook react testing vue nextjs svelte solid preact web-components html nuxt angular; do
             name=$(node -p "require('./packages/$folder/package.json').name")
             version=$(node -p "require('./packages/$folder/package.json').version")
             # npm can stage only a package it knows: a new one is published by hand once these are public (CONTRIBUTING.md)

@@ -17,7 +17,7 @@ import type { EventSignature, PropDocs, PropKind } from "../componentDocs.ts";
 import { summaryOf, tagOf } from "./docsProgram.ts";
 import { unwrapped } from "./storyMeta.ts";
 
-/** An event: a function prop named `on` and a capital. */
+/** An event: a function prop named `on` and a capital (React's `onPress`). */
 const EVENT_NAME = /^on[A-Z]/;
 
 /** Whether a type is a union of string or number literals (a choice). */
@@ -305,8 +305,8 @@ const signatureOf = (type: ts.Type, checker: ts.TypeChecker, node: ts.Node): Eve
 };
 
 /** A prop's kind, from its name and its type without `undefined`. */
-const kindOf = (name: string, type: ts.Type): PropKind => {
-  if (EVENT_NAME.test(name) && type.getCallSignatures().length > 0) return "event";
+const kindOf = (name: string, type: ts.Type, eventName: RegExp): PropKind => {
+  if (eventName.test(name) && type.getCallSignatures().length > 0) return "event";
   if (type.flags & ts.TypeFlags.Boolean || type.flags & ts.TypeFlags.BooleanLiteral) return "toggle";
   if (literalValues(type) !== undefined) return "choice";
   if (type.flags & ts.TypeFlags.String) return "text";
@@ -334,25 +334,37 @@ export type BoundType = {
   readonly typeNode: ts.TypeNode | undefined;
 };
 
+/** How a framework's props differ from a plain function's, for `propDocs`. */
+export type PropReading = {
+  /** What the prop takes, when it is not the symbol's own type; none reads the symbol's. */
+  readonly taken?: BoundType | undefined;
+  /**
+   * What an event's name is, for a framework that names its callback props otherwise (Svelte's `onclick`); `on` and a
+   * capital by default.
+   */
+  readonly eventName?: RegExp | undefined;
+};
+
 /**
  * One prop's docs.
  *
  * @param symbol - the prop: its name, its TSDoc, whether it is optional.
  * @param checker - the program's checker.
  * @param node - where the code names the component.
- * @param taken - what the prop takes, when it is not the symbol's own type; none reads the symbol's.
+ * @param reading - how the framework's props differ from a plain function's; none for a plain prop.
  */
 export const propDocs = (
   symbol: ts.Symbol,
   checker: ts.TypeChecker,
   node: ts.Node,
-  taken?: BoundType
+  reading: PropReading = {}
 ): PropDocs => {
+  const { taken, eventName = EVENT_NAME } = reading;
   const type = checker.getNonNullableType(taken?.type ?? checker.getTypeOfSymbolAtLocation(symbol, node));
   const takenNodes = taken?.typeNode === undefined ? [] : [taken.typeNode];
   const declared = taken === undefined ? declaredTypesOf(symbol) : takenNodes;
   const name = symbol.getName();
-  const kind = kindOf(name, type);
+  const kind = kindOf(name, type, eventName);
   const defaultValue = tagOf(symbol, checker, "defaultValue");
   const checkerChoices = kind === "choice" ? literalValues(type) : undefined;
   const choices = checkerChoices === undefined ? undefined : writtenOrder(checkerChoices, declared, checker);

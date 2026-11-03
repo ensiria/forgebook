@@ -9,7 +9,7 @@
  *
  * @module
  */
-import type { ImportedConfig } from "./importers/storybook.ts";
+import { ADAPTER_FUNCTIONS, type ImportedConfig } from "./importers/storybook.ts";
 
 /** The file `forgebook init` writes. */
 export const CONFIG_FILE = "forgebook.config.ts";
@@ -28,25 +28,19 @@ const sourceOf = (value: unknown, indent: string): string =>
     .join(`\n${indent}`);
 
 /**
- * The framework's options as its adapter's argument (`{ tsconfig: ".storybook/tsconfig.json" }`), empty for none.
- *
- * @param options - the options read.
- */
-const adapterOptions = (options: Readonly<Record<string, string>> | undefined): string => {
-  const entries = Object.entries(options ?? {});
-  if (entries.length === 0) return "";
-  return `{ ${entries.map(([name, value]) => `${name}: ${JSON.stringify(value)}`).join(", ")} }`;
-};
-
-/**
  * The configuration file's text.
  *
  * @param imported - what the importer read.
  * @param tool - the tool's name, for the file's comment (`Storybook`).
  */
 export const initConfigText = (imported: ImportedConfig, tool: string): string => {
+  const adapter = ADAPTER_FUNCTIONS[imported.framework];
+  const options =
+    imported.frameworkOptions === undefined
+      ? ""
+      : sourceOf(imported.frameworkOptions, "  ").replace(/\n\s*/g, " ");
   const fields = [
-    `  framework: ${imported.framework}(${adapterOptions(imported.frameworkOptions)}),`,
+    `  framework: ${adapter}(${options}),`,
     `  title: ${JSON.stringify(imported.title)},`,
     `  stories: ${sourceOf(imported.stories, "  ")},`,
     ...(imported.preview === undefined ? [] : [`  preview: ${JSON.stringify(imported.preview)},`]),
@@ -66,7 +60,7 @@ export const initConfigText = (imported: ImportedConfig, tool: string): string =
     " *",
     " * @module",
     " */",
-    `import { ${imported.framework} } from "@forgebook/${imported.framework}/vite";`,
+    `import { ${adapter} } from "@forgebook/${imported.framework}/vite";`,
     'import { defineConfig } from "forgebook";',
     "",
     "export default defineConfig({",

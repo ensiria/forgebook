@@ -7,6 +7,9 @@
 /** A tool the benchmark can drive. */
 export type ToolName = "forgebook" | "storybook" | "ladle";
 
+/** Where Forgebook's frames run: on an origin of their own, its default, or on the catalogue's. */
+export type FramesMode = "isolated" | "same-origin";
+
 /** What a metric's samples come to. Times in milliseconds, sizes in bytes. */
 export type Summary = {
   /** The middle sample. */
@@ -93,6 +96,11 @@ export type BenchReport = {
   readonly runs: number;
   /** The CPU throttle of the browser, 1 for none. */
   readonly throttle: number;
+  /**
+   * Where Forgebook's frames ran: on an origin of their own, or on the catalogue's. Absent from a report of a Forgebook
+   * that had no such choice, whose frames always shared the catalogue's origin.
+   */
+  readonly frames?: FramesMode;
   /** The machine. */
   readonly machine: MachineInfo;
   /** Its load before each group and at the end, where it can be read. */

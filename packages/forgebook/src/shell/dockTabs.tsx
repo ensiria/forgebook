@@ -1,7 +1,12 @@
 /**
  * The tabs a story's panel shows: Props, Events and Parts and styling from its component's docs, Code from its file,
- * Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
+ * Design from its link, Accessibility always; a tab the story has nothing for is left out. A story about logic opens on its hook's Signature
  * and shows no tab of args (`logicTabs`).
+ *
+ * @remarks
+ * The dock draws only the chosen tab's content, and most stories open on Props: the other tabs' modules (Events,
+ * Interactions, Parts and styling, Code, Accessibility, Design) load the first time each is chosen (`lazyTab`), so a
+ * first load fetches none of them. What the row of tabs shows of them (a hint, whether there is one) is in `tabSummaries`.
  *
  * @module
  */
@@ -14,18 +19,35 @@ import { type ComponentDocs, codeNameOf, type PropDocs } from "../componentDocs.
 import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
-import { A11yTab, a11yHint, type CheckState } from "./A11yTab.tsx";
-import { CodeTab } from "./CodeTab.tsx";
+import type { CheckState } from "./A11yTab.tsx";
+import type { DesignTabProps } from "./DesignTab.tsx";
+import { DesignTabLoader } from "./DesignTabLoader.tsx";
 import type { DockTab } from "./Dock.tsx";
-import { EventsTab } from "./EventsTab.tsx";
-import { InteractionsTab, interactionsHint } from "./InteractionsTab.tsx";
-import { PartsTab, styleHooks } from "./PartsTab.tsx";
+import { LazyTab, tabModule } from "./lazyTab.tsx";
 import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
 import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
+import { a11yHint, interactionsHint, styleHooks } from "./tabSummaries.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
+
+/** The Events tab, its module, loaded when the tab is first chosen. */
+const EVENTS_TAB = tabModule(() => import("./EventsTab.tsx").then((module) => module.EventsTab));
+
+/** The Interactions tab, its module, loaded when the tab is first chosen. */
+const INTERACTIONS_TAB = tabModule(() =>
+  import("./InteractionsTab.tsx").then((module) => module.InteractionsTab)
+);
+
+/** The Parts and styling tab, its module, loaded when the tab is first chosen. */
+const PARTS_TAB = tabModule(() => import("./PartsTab.tsx").then((module) => module.PartsTab));
+
+/** The Code tab, its module, loaded when the tab is first chosen. */
+const CODE_TAB = tabModule(() => import("./CodeTab.tsx").then((module) => module.CodeTab));
+
+/** The Accessibility tab, its module, loaded when the tab is first chosen. */
+const A11Y_TAB = tabModule(() => import("./A11yTab.tsx").then((module) => module.A11yTab));
 
 /** What the tabs are built from. */
 export type DockTabsInput = {
@@ -69,6 +91,8 @@ export type DockTabsInput = {
   readonly check: CheckState;
   /** Runs it; none when it cannot run. */
   readonly onCheck: (() => void) | undefined;
+  /** What the Design tab shows; none for a story without a design. */
+  readonly design: DesignTabProps | undefined;
 };
 
 /** A message in place of a tab's content: the docs or the code are loading or could not be read. */
@@ -127,20 +151,25 @@ const eventsOf = (props: readonly PropDocs[], actions: readonly string[]): reado
 };
 
 /**
- * The Events tab, when the story has an event or an action.
+ * The Events tab, when the story has an event or an action, or made a call a framework reports (a router's `push`).
  *
  * @param input - what the tabs are built from.
  * @param events - the events and actions.
  */
 const eventsTab = (input: DockTabsInput, events: readonly PropDocs[]): DockTab[] =>
-  events.length === 0
+  events.length === 0 && input.calls.length === 0
     ? []
     : [
         {
           id: "events",
           label: STRINGS.tabs.events,
           hint: input.calls.length === 0 ? undefined : String(input.calls.length),
-          content: <EventsTab events={events} calls={input.calls} onClearCalls={input.onClearCalls} />
+          content: (
+            <LazyTab
+              module={EVENTS_TAB}
+              tabProps={{ events, calls: input.calls, onClearCalls: input.onClearCalls }}
+            />
+          )
         }
       ];
 
@@ -175,7 +204,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
       id: "parts",
       label: STRINGS.tabs.parts,
       hint: component.parts.length === 0 ? undefined : STRINGS.partCount(component.parts.length),
-      content: <PartsTab docs={component} />
+      content: <LazyTab module={PARTS_TAB} tabProps={{ docs: component }} />
     });
   }
   return tabs;
@@ -211,7 +240,7 @@ const interactionsTab = (trace: PlayTrace, onPlayAgain: () => void): DockTab => 
   id: "play",
   label: STRINGS.tabs.play,
   hint: interactionsHint(trace),
-  content: <InteractionsTab trace={trace} onPlayAgain={onPlayAgain} />
+  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayAgain }} />
 });
 
 /** The Code tab, when the story file's code is loaded or failed to load. */
@@ -229,16 +258,25 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
       id: "code",
       label: STRINGS.tabs.code,
       content: (
-        <CodeTab
-          code={code.value}
-          exportName={input.exportName}
-          componentName={docs.status === "ready" ? codeNameOf(docs.value) : input.componentName}
-          args={input.values}
+        <LazyTab
+          module={CODE_TAB}
+          tabProps={{
+            code: code.value,
+            exportName: input.exportName,
+            componentName: docs.status === "ready" ? codeNameOf(docs.value) : input.componentName,
+            args: input.values
+          }}
         />
       )
     }
   ];
 };
+
+/** The Design tab, for a story with a design. */
+const designTabs = ({ design }: DockTabsInput): DockTab[] =>
+  design === undefined
+    ? []
+    : [{ id: "design", label: STRINGS.tabs.design, content: <DesignTabLoader {...design} /> }];
 
 /**
  * The tabs of a story's panel, in order.
@@ -248,10 +286,11 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
 export const dockTabs = (input: DockTabsInput): DockTab[] => [
   ...docsTabs(input),
   ...codeTabs(input),
+  ...designTabs(input),
   {
     id: "a11y",
     label: STRINGS.tabs.a11y,
     hint: a11yHint(input.check),
-    content: <A11yTab check={input.check} onCheck={input.onCheck} />
+    content: <LazyTab module={A11Y_TAB} tabProps={{ check: input.check, onCheck: input.onCheck }} />
   }
 ];

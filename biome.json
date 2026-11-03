@@ -194,11 +194,30 @@
       }
     },
     {
-      "includes": ["**/*.stories.tsx", "**/*.stories.ts", "**/forgebook.preview.ts"],
+      "includes": [
+        "**/*.stories.tsx",
+        "**/*.stories.ts",
+        "**/forgebook.preview.ts",
+        "**/forgebook.preview.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {
             "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.svelte"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
+          },
+          "style": {
+            "useConst": "off"
           }
         }
       }
@@ -235,6 +254,33 @@
       }
     },
     {
+      "includes": [
+        "packages/nextjs/src/next/**",
+        "fixtures/nextjs/app/**/page.tsx",
+        "fixtures/nextjs/app/**/layout.tsx",
+        "**/forgebook.preview.tsx",
+        "fixtures/nextjs/types.d.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off",
+            "useNamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["fixtures/nextjs/components/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/testing/src/playwrightConfig.ts", "fixtures/app/shell/ports.ts"],
       "linter": {
         "rules": {
@@ -255,6 +301,7 @@
     "includes": [
       "**",
       "!fixtures/app/public/mockServiceWorker.js",
+      "!fixtures/nuxt/public/mockServiceWorker.js",
       "!**/*.md",
       "!**/*.html",
       "!**/*.css",

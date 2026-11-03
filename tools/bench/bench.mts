@@ -21,7 +21,7 @@ import { type BenchFolders, packForgebook, publishedForgebook } from "./prepare.
 import { parseReport, reportMarkdown, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
 import { statusWriter } from "./statusFile.ts";
-import { FORGEBOOK, TARGETS } from "./targets.ts";
+import { FRAMES_MODES, targetsOf } from "./targets.ts";
 
 /** The share two runs' medians may differ by and still count as reproduced. */
 const REPRODUCIBLE_WITHIN = 0.1;
@@ -91,6 +91,14 @@ await defineScript({
       valueName: "group",
       description: `Only these groups: ${METRIC_GROUPS.join(", ")}.`
     },
+    frames: {
+      type: "string",
+      choices: FRAMES_MODES,
+      default: "isolated",
+      valueName: "mode",
+      description:
+        "Where Forgebook's frames run: on an origin of their own (its default) or on the catalogue's."
+    },
     throttle: {
       type: "number",
       default: 1,
@@ -121,7 +129,11 @@ await defineScript({
   examples: [
     { command: "bench", description: "Forgebook alone, every metric." },
     { command: "bench --compare --json", description: "The three tools, as a report." },
-    { command: "bench --metric hmr --runs 3", description: "Only the edits." }
+    { command: "bench --metric hmr --runs 3", description: "Only the edits." },
+    {
+      command: "bench --frames same-origin",
+      description: "Forgebook with its frames on the catalogue's origin."
+    }
   ],
   run: async ({ options, io, log, style, isJson, onExit }) => {
     onExit(stopAllServers);
@@ -144,7 +156,7 @@ await defineScript({
     const removeEnd = onExit(() => write({ state: "finished", warnings: 0 }));
     const report = await runBench({
       folders,
-      targets: options.compare ? TARGETS : [FORGEBOOK],
+      targets: targetsOf(options.frames, options.compare),
       forgebookPackages,
       forgebookLabel,
       size: { components: options.components, stories: options.stories },
@@ -152,6 +164,7 @@ await defineScript({
       edits: options.edits,
       groups,
       throttle: options.throttle,
+      frames: options.frames,
       io,
       onStep: (step) => {
         write(step);

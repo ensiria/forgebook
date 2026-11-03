@@ -320,7 +320,7 @@ const emittedType = (type: ts.Type, checker: ts.TypeChecker, node: ts.Node): ts.
  * @param node - where the class is.
  */
 const inputDocs = (input: InputMember, checker: ts.TypeChecker, node: ts.Node): PropDocs => {
-  const docs = propDocs(input.symbol, checker, node, input.signal ?? input.setter);
+  const docs = propDocs(input.symbol, checker, node, { taken: input.signal ?? input.setter });
   const field = input.symbol.declarations?.find(ts.isPropertyDeclaration);
   const initial = input.signal === undefined ? initialText(field?.initializer) : input.signal.initial;
   // a `@defaultValue` the TSDoc writes says more than the code's initial value
