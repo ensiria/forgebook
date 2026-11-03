@@ -18,33 +18,27 @@ const SOURCE = {
 };
 
 describe("agentSourcesModule", () => {
-  it("imports a preview only when it is asked for: a static import would stop every answer on the server", () => {
+  it("leaves the previews out: one only a browser can load would stop every answer on the server", () => {
     const config = resolveConfig(
       { framework: STUB_FRAMEWORK, title: "Library", stories: ["*.stories.tsx"], preview: "./preview.ts" },
       "/library"
     );
-    const code = agentSourcesModule(config);
-    expect(code).not.toContain("import * as preview");
-    expect(code).toMatch(/\(\) => import\(".*preview\.ts"\)/);
+    expect(agentSourcesModule(config)).not.toContain("preview");
   });
 });
 
 describe("agentModuleOf", () => {
   it("keeps the stories and the previews that load when one only a browser can load fails on the server", async () => {
-    const module = {
-      sources: [SOURCE],
-      previews: [
-        (): Promise<unknown> => Promise.reject(new ReferenceError("document is not defined")),
-        (): Promise<unknown> => Promise.resolve({ parameters: { layout: "centered" } })
-      ]
-    };
-    const loaded = await agentModuleOf(module);
+    const loaded = await agentModuleOf({ sources: [SOURCE] }, [
+      (): Promise<unknown> => Promise.reject(new ReferenceError("document is not defined")),
+      (): Promise<unknown> => Promise.resolve({ parameters: { layout: "centered" } })
+    ]);
     expect(loaded.sources).toEqual([SOURCE]);
     expect(loaded.preview.parameters).toMatchObject({ layout: "centered" });
     expect(loaded.problems).toEqual([expect.stringContaining("document is not defined")]);
   });
 
   it("refuses what is not the module the plugin writes", async () => {
-    await expect(agentModuleOf({ sources: [] })).rejects.toThrow("did not load");
+    await expect(agentModuleOf({ previews: [] }, [])).rejects.toThrow("did not load");
   });
 });
