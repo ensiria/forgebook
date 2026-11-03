@@ -1,0 +1,5 @@
+{
+  "name": "react-native-build-test",
+  "private": true,
+  "description": "The small React Native project the plugin's build test compiles: its own package, as a project is, not Forgebook's."
+}

@@ -73,6 +73,11 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   A story reads it as `context.globals.touch` (`"mouse"` or `"touch"`) or fixes it with
   `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
   catalogue draws it with a finger and offers a toggle to turn that off.
+- In a React Native project (`reactNativeWeb()` in `forgebook.config.ts`), stories are written as React's, their
+  types from `@forgebook/react-native-web`, and drawn in the browser through react-native-web. A screen that fills
+  the window (`style={{ flex: 1 }}`) needs `parameters.layout: "fullscreen"`; the app's root providers
+  (`SafeAreaProvider`, a theme) go in the preview's decorators. A component that calls a native module or a gesture
+  of native code does not draw in a browser: give it a `.web.tsx` file, or mock what it calls in the preview.
 - A link may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the props the
   story's panel can set, with a value of their type; to show a story with other values, write a story with those
   args rather than a link.

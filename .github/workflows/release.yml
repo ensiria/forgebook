@@ -79,13 +79,18 @@ jobs:
       - name: Stage on npm
         run: |
           mkdir -p "$RUNNER_TEMP/packages"
-          for folder in story-format forgebook react testing vue nextjs svelte solid preact web-components html nuxt angular sveltekit; do
+          for folder in story-format forgebook react testing vue nextjs svelte solid preact web-components html nuxt angular sveltekit react-native-web; do
             name=$(node -p "require('./packages/$folder/package.json').name")
             version=$(node -p "require('./packages/$folder/package.json').version")
-            # npm can stage only a package it knows: a new one is published by hand once these are public (CONTRIBUTING.md)
-            if ! npm view "$name" version >/dev/null 2>&1; then
-              echo "::warning::$name is not on npm yet: publish it by hand, see CONTRIBUTING.md"
-              continue
+            # npm can stage only a package it knows: a new one is published by hand once these are public (CONTRIBUTING.md);
+            # any other failure of the registry stops the release rather than skip a package quietly
+            if ! known=$(npm view "$name" version 2>&1); then
+              if printf '%s' "$known" | grep -q E404; then
+                echo "::warning::$name is not on npm yet: publish it by hand, see CONTRIBUTING.md"
+                continue
+              fi
+              printf '%s\n' "$known"
+              exit 1
             fi
             if [ -n "$(npm view "$name@$version" version 2>/dev/null)" ]; then
               echo "$name@$version is on npm already"

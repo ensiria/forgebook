@@ -288,9 +288,9 @@ describe("importStorybook", () => {
       'export default { stories: ["../src/**/*.stories.ts"], framework: "@storybook/ember" };\n'
     );
     expect(await importStorybook(project)).toBe(
-      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/html-vite, @storybook-vue/nuxt, @storybook/angular, @analogjs/storybook-angular, @storybook/nextjs-vite, @storybook/nextjs; this project uses @storybook/ember"
+      "Forgebook reads the stories of Storybook's @storybook/react-vite, @storybook/vue3-vite, @storybook/svelte-vite, @storybook/sveltekit, @storybook/preact-vite, storybook-solidjs-vite, @storybook/web-components-vite, @storybook/html-vite, @storybook-vue/nuxt, @storybook/angular, @analogjs/storybook-angular, @storybook/nextjs-vite, @storybook/nextjs, @storybook/react-native-web-vite, @storybook/addon-react-native-web, @storybook/react-native; this project uses @storybook/ember"
     );
-    expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main file");
+    expect(await importStorybook(join(scratch, "none"))).toContain("No .storybook/main");
     // Storybook's monorepo template writes the framework as a path to its package
     const monorepo = join(scratch, "monorepo");
     cpSync(join(STORYBOOK_DIR, ".storybook"), join(monorepo, ".storybook"), { recursive: true });
@@ -362,6 +362,8 @@ describe("initConfigText", () => {
       },
       "Storybook"
     );
+    expect(text).toContain('import { react } from "@forgebook/react/vite";');
+    expect(text).toContain("  framework: react(),");
     expect(text).toContain('import { defineConfig } from "forgebook";');
     expect(text).toContain('  title: "acme-ui",');
     expect(text).toContain('  preview: ".storybook/preview.tsx",');

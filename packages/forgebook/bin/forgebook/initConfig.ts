@@ -9,7 +9,8 @@
  *
  * @module
  */
-import { ADAPTER_FUNCTIONS, type ImportedConfig } from "./importers/storybook.ts";
+import type { ImportedConfig } from "./importers/storybook.ts";
+import { ADAPTER_FUNCTIONS } from "./importers/storybookFrameworks.ts";
 
 /** The file `forgebook init` writes. */
 export const CONFIG_FILE = "forgebook.config.ts";
@@ -28,6 +29,19 @@ const sourceOf = (value: unknown, indent: string): string =>
     .join(`\n${indent}`);
 
 /**
+ * A framework's options as its adapter's argument: on one line when each is a single value
+ * (`{ dir: "web", nextConfig: "next.config.mjs" }`), one field a line when one holds a list or an object.
+ *
+ * @param options - the options read; none for the adapter's defaults.
+ */
+const adapterArgument = (options: Readonly<Record<string, unknown>> | undefined): string => {
+  if (options === undefined) return "";
+  const isFlat = Object.values(options).every((value) => typeof value !== "object" || value === null);
+  const source = sourceOf(options, "  ");
+  return isFlat ? source.replace(/\n\s*/g, " ") : source;
+};
+
+/**
  * The configuration file's text.
  *
  * @param imported - what the importer read.
@@ -35,12 +49,8 @@ const sourceOf = (value: unknown, indent: string): string =>
  */
 export const initConfigText = (imported: ImportedConfig, tool: string): string => {
   const adapter = ADAPTER_FUNCTIONS[imported.framework];
-  const options =
-    imported.frameworkOptions === undefined
-      ? ""
-      : sourceOf(imported.frameworkOptions, "  ").replace(/\n\s*/g, " ");
   const fields = [
-    `  framework: ${adapter}(${options}),`,
+    `  framework: ${adapter}(${adapterArgument(imported.frameworkOptions)}),`,
     `  title: ${JSON.stringify(imported.title)},`,
     `  stories: ${sourceOf(imported.stories, "  ")},`,
     ...(imported.preview === undefined ? [] : [`  preview: ${JSON.stringify(imported.preview)},`]),

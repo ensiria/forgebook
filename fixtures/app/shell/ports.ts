@@ -32,7 +32,8 @@ const CATALOGUES = [
   "html",
   "nuxt",
   "angular",
-  "sveltekit"
+  "sveltekit",
+  "react-native"
 ] as const;
 
 /** A catalogue the suite runs. */
