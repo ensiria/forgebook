@@ -24,6 +24,7 @@ import {
   useSyncExternalStore
 } from "react";
 
+import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import { EMBED_SIZE_TYPE, type EmbedSizeMessage } from "../embed.ts";
 import { type PanelArgs, parsePanelArgsParam, type ShellMessage } from "../messages.ts";
 import { storyBackground } from "../storyBackground.ts";
@@ -210,13 +211,16 @@ const EmbedStory = ({ location, view, panelArgs, frameUrl }: EmbedStoryProps): R
 /**
  * The page: the story the address names, or why there is none.
  *
- * @param props - the catalogue's name, its sources and its frame page.
+ * @param props - the catalogue's name, its sources, its frame page, and how its stories take the address's texts.
  */
 const EmbedContent = ({
   title,
   sources,
-  frameUrl
-}: Pick<ShellConfig, "title" | "sources" | "frameUrl">): ReactNode => {
+  frameUrl,
+  addressTexts
+}: Pick<ShellConfig, "title" | "sources" | "frameUrl"> & {
+  readonly addressTexts: AddressTexts;
+}): ReactNode => {
   const catalogue = useCatalogue();
   const tree = useMemo(() => storyTree(sources), [sources]);
   // the address is read once: an embed has nowhere to go, so nothing rewrites it
@@ -238,7 +242,8 @@ const EmbedContent = ({
     <EmbedStory
       location={location}
       view={parseView(params.toString(), catalogue)}
-      panelArgs={parsePanelArgsParam(params.get("args"))}
+      // whoever embeds the story writes its address, as whoever shares a link does: the same rule applies
+      panelArgs={addressArgsFor(parsePanelArgsParam(params.get("args")), addressTexts)}
       frameUrl={frameUrl}
     />
   );
@@ -251,6 +256,11 @@ const EmbedContent = ({
  */
 export const EmbedPage = (props: ShellConfig): ReactNode => (
   <CatalogueContext.Provider value={useConfiguredCatalogue(props)}>
-    <EmbedContent title={props.title} sources={props.sources} frameUrl={props.frameUrl} />
+    <EmbedContent
+      title={props.title}
+      sources={props.sources}
+      frameUrl={props.frameUrl}
+      addressTexts={props.addressTexts ?? "any"}
+    />
   </CatalogueContext.Provider>
 );

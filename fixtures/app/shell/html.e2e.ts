@@ -161,6 +161,17 @@ test.describe("a shared link's args", () => {
     await frameOf(page).getByTestId("tile").hover();
     expect(dialogs).toEqual([]);
   });
+
+  test("follow the same rule in an embedded story, whose address the page around it writes", async ({
+    page
+  }) => {
+    const args = { text: "<img src=x onerror=alert(document.domain)>", size: "large" };
+    await page.goto(story("cards-tile--default", `embed&args=${encodeURIComponent(JSON.stringify(args))}`));
+    await isReady(page);
+    await expect(frameOf(page).getByTestId("tile")).toHaveText("A tile");
+    await expect(frameOf(page).getByTestId("tile")).toHaveAttribute("data-size", "large");
+    await expect(frameOf(page).locator("img")).toHaveCount(0);
+  });
 });
 
 test("a function's story shows its signature first", async ({ page }) => {
