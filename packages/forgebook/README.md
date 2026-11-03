@@ -146,8 +146,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   component (Tree renders Row, Row renders DropLine), each with the stories to open; read from the types, never kept
   by hand. It shows only when there is such a use; a reader folds it away; `usedIn: false` in the configuration turns
   it off.
-- **The design beside the code**: a component's or a story's Figma link gives it a Design tab and a side-by-side view
-  ([below](#design-links)).
+- **The design beside the code**: a component's or a story's Figma link gives it a link to Figma and, with
+  `@forgebook/plugin-figma`, a Design tab and a side-by-side view ([below](#design-links)).
 - **Interaction states and motion**: `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` forced on a
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its

@@ -15,14 +15,14 @@ const WORKER_FILE = "mockServiceWorker.js";
 
 /** One of the worker's events, as much of it as the log reads. */
 export type MockEvent = {
-  /** The request. */
-  readonly request: { readonly method: string; readonly url: string };
+  /** The request, with the address of the page that sent it. */
+  readonly request: { readonly method: string; readonly url: string; readonly referrer: string };
   /** The answer. */
   readonly response: { readonly status: number };
 };
 
 /** What of MSW's worker a story uses. */
-export type MockWorker = {
+export type MockWorker<THandler> = {
   /** Registers the service worker. */
   readonly start: (options: {
     readonly serviceWorker: { readonly url: string };
@@ -31,6 +31,8 @@ export type MockWorker = {
   }) => Promise<unknown>;
   /** Stops answering; MSW 3 waits for its last requests. */
   readonly stop: () => unknown;
+  /** Answers with these handlers from now on, the worker kept running. */
+  readonly resetHandlers: (...handlers: THandler[]) => void;
   /** What the worker tells of each request. */
   readonly events: {
     /** Listens to an answer: a handler's, or the network's. */
@@ -50,7 +52,7 @@ export type MockRequest = {
 /** What of `msw/browser` and `msw` a story uses. */
 export type MockTools<THandler, TAnswer> = {
   /** Makes a worker of handlers. */
-  readonly setupWorker: (...handlers: THandler[]) => MockWorker;
+  readonly setupWorker: (...handlers: THandler[]) => MockWorker<THandler>;
   /** Makes request handlers. */
   readonly http: {
     /** A handler of every request; when its resolver gives no answer, the next handler answers. */
@@ -194,27 +196,43 @@ const reloadForWorker = (): boolean => {
   return true;
 };
 
+/** A story's mocks, running. */
+export type StoryMocks<THandler> = {
+  /** Answers with other handlers, the worker kept running: an edit of the story file wrote new ones. */
+  readonly renew: (handlers: readonly THandler[]) => void;
+  /** Stops them, once they stopped. */
+  readonly stop: () => Promise<void>;
+};
+
 /**
  * Starts a story's mocks, before its loaders.
  *
  * @param handlers - the story's handlers, at least one.
  * @param load - loads MSW.
- * @param onEvent - told of each answer; a handler's or the network's.
- * @returns what stops them, once they stopped.
+ * @param onEvent - told of each answer to this frame's requests; a handler's or the network's.
+ * @returns what renews and stops them.
  */
 export const startStoryMocks = async <THandler, TAnswer>(
   handlers: readonly THandler[],
   load: MockToolsLoader<THandler, TAnswer>,
   onEvent: (event: MockEvent, isMocked: boolean) => void
-): Promise<() => Promise<void>> => {
+): Promise<StoryMocks<THandler>> => {
   const tools = await load();
-  const worker = tools.setupWorker(ownFrameOnly(tools), ...handlers);
-  worker.events.on("response:mocked", (event) => onEvent(event, true));
-  worker.events.on("response:bypass", (event) => onEvent(event, false));
+  const first = ownFrameOnly(tools);
+  const worker = tools.setupWorker(first, ...handlers);
+  // the worker tells this page of the requests it relays for another frame too, which are that frame's to list
+  const tell = (event: MockEvent, isMocked: boolean): void => {
+    if (!isFromAnotherFrame(event.request)) onEvent(event, isMocked);
+  };
+  worker.events.on("response:mocked", (event) => tell(event, true));
+  worker.events.on("response:bypass", (event) => tell(event, false));
   await worker.start(WORKER_OPTIONS);
   if (await isServedByWorker()) pageStorage()?.removeItem(reloadedKey());
   else if (reloadForWorker()) await new Promise<never>(() => undefined);
-  return async (): Promise<void> => {
-    await worker.stop();
+  return {
+    renew: (next: readonly THandler[]): void => worker.resetHandlers(first, ...next),
+    stop: async (): Promise<void> => {
+      await worker.stop();
+    }
   };
 };

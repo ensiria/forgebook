@@ -5,7 +5,7 @@ order: 9
 
 A plugin draws the fences it declares.
 
-```probe sb:testing-plugin-probe--probe
+```probe sb:testing-pluginprobe--probe
 The probe's own text
 ```
 

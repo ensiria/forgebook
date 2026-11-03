@@ -61,7 +61,7 @@ describe("storyText", () => {
       design: {
         figma: "https://www.figma.com/design/File1",
         fileKey: "File1",
-        address: "http://x/?tab=design"
+        address: "http://x/?tab=figma"
       }
     };
     const wide: OutputStyle = { ...NARROW, width: 120 };

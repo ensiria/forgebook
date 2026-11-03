@@ -5,8 +5,10 @@
  * @remarks
  * A link is anything a story file writes, and the Design tab frames it, so it is taken apart rather than passed on:
  * only `https` on Figma's own hosts is accepted, and the embed's address is built from the parts read here
- * (`@forgebook/plugin-figma`). Figma's embed takes the kinds in `FILE_KINDS` only. Checking it while indexing keeps the
- * checker out of the pages: the shell and the frame read the index's link as it is.
+ * (`@forgebook/plugin-figma`). Figma's embed takes the kinds in `FILE_KINDS` only. Checking a story's link while
+ * indexing keeps the checker out of the shell's and the frame's first load: they read the index's link as it is. A docs
+ * page's `figma` fence is checked in the page, by the plugin's block, which loads only where a page draws one; this
+ * module imports nothing of Node for that reason (`forgebook/figma-link`).
  *
  * @module
  */

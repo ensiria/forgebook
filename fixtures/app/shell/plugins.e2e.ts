@@ -11,7 +11,7 @@ import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 const story = (id: string): string => `/?story=${id}`;
 
 /** The story that asks for the probe. */
-const PROBE = story("sb:testing-plugin-probe--probe");
+const PROBE = story("sb:testing-pluginprobe--probe");
 
 /** A story that asks for nothing. */
 const PLAIN = story("kit:inputs-selection-select--small");
@@ -46,7 +46,7 @@ test.describe("a plugin's tab", () => {
     expect(modules.filter((url) => url.includes("ProbeTab"))).toEqual([]);
     await tab.click();
     const shown = page.getByTestId("probe-tab");
-    await expect(shown).toContainText("Probe sb:testing-plugin-probe--probe light");
+    await expect(shown).toContainText("Probe sb:testing-pluginprobe--probe light");
     await expect(shown).toContainText('{"reports":1}');
     expect(modules.some((url) => url.includes("ProbeTab"))).toBe(true);
   });
@@ -148,12 +148,14 @@ test.describe("the Network tab", () => {
     await expect(greeting).toHaveText("Loading", { timeout: WORKER_START });
     const frame = page.frameLocator("iframe.forgebook-frame-view").locator("html");
     await expect(frame).toHaveAttribute("data-forgebook-status", "ready", { timeout: WORKER_START });
-    await frame.evaluate((root) => {
-      const view = root.ownerDocument.defaultView;
-      view?.postMessage({ type: "forgebook:play-again" }, view.location.origin);
-    });
-    await expect(greeting).toHaveCount(0);
-    await expect(greeting).toHaveText("Loading", { timeout: 10_000 });
+    // marked, so the story drawn again is told from the first one
+    await greeting.evaluate((element) => element.setAttribute("data-first", ""));
+    // from the shell's page: a frame hears only its shell
+    await page.evaluate(() =>
+      document.querySelector("iframe")?.contentWindow?.postMessage({ type: "forgebook:play-again" }, "*")
+    );
+    // the mocks run on, so the new mount waits on nothing the first one held
+    await expect(frameOf(page).locator('[data-testid="greeting"]:not([data-first])')).toHaveText("Loading");
   });
 
   test("is not offered to a story with no handlers", async ({ page }) => {

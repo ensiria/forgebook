@@ -1,6 +1,6 @@
 /**
- * The plugin's frame module: starts a story's mocks before its first mount's loaders, keeps them until the page is left,
- * and tells the Network tab what they do.
+ * The plugin's frame module: starts a story's mocks before its first mount's loaders, keeps them until the page is left
+ * (renewing its handlers when an edit of the story file changes them), and tells the Network tab what they do.
  *
  * @module
  */
@@ -18,7 +18,7 @@ import {
   shownUrl,
   withRequest
 } from "./networkReport.ts";
-import { handlerLabel, handlersOf, type MockTools, startStoryMocks } from "./storyMocks.ts";
+import { handlerLabel, handlersOf, type MockTools, type StoryMocks, startStoryMocks } from "./storyMocks.ts";
 
 /** MSW's browser module. */
 type MswBrowser = typeof import("msw/browser");
@@ -38,46 +38,65 @@ const loadMsw = async (): Promise<MockTools<Handler, Passthrough>> => {
 /** Whether a value a story's parameters list can be a handler; MSW itself says what a wrong one lacks. */
 const isHandler = (value: unknown): value is Handler => typeof value === "object" && value !== null;
 
+/**
+ * Whether two lists hold the same handlers: a story mounted again hands the same ones, an edit of its file new ones.
+ *
+ * @param shown - the handlers answering now.
+ * @param next - the story's handlers at this mount.
+ */
+const isSameHandlers = (shown: readonly Handler[], next: readonly Handler[]): boolean =>
+  shown.length === next.length && shown.every((handler, index) => handler === next[index]);
+
 /** The plugin's frame. */
 export const frame = definePluginFrame(({ report }: PluginFrameHost): PluginFrame => {
-  // the story's mocks, started by its first mount and kept until the page is left: a frame shows one story, every mount
-  // has its handlers, and stopping MSW's worker to start it at once again lets the worker forget the page after it
-  // started serving it again, so the new mount's requests would go to the network
-  let mocks: Promise<() => Promise<void>> | undefined;
+  // the story's mocks, started by its first mount and kept until the page is left: stopping MSW's worker to start it at
+  // once again lets the worker forget the page after it started serving it again, so the new mount's requests would go
+  // to the network. An edit of the story file renews the handlers in the running worker instead
+  let mocks: Promise<StoryMocks<Handler>> | undefined;
+  let shown: readonly Handler[] = [];
+  let requests: readonly NetworkRequest[] = [];
+  const tell = (): void => {
+    const value: NetworkReport = {
+      handlers: shown.map((handler) => ({ label: handlerLabel(handler) })),
+      requests
+    };
+    report(value, { hint: String(requests.length) });
+  };
   // the shell opens another story by loading another page; a page kept for the back button keeps its mocks
   window.addEventListener("pagehide", (event: PageTransitionEvent): void => {
     if (event.persisted || mocks === undefined) return;
     void mocks.then(
-      (stop) => stop(),
+      (running) => running.stop(),
       () => undefined
     );
   });
+  const start = (handlers: readonly Handler[]): Promise<StoryMocks<Handler>> =>
+    startStoryMocks(handlers, loadMsw, ({ request, response }, isMocked) => {
+      const { origin } = window.location;
+      if (!isMocked && !isStoryRequest(request.url, origin)) return;
+      requests = withRequest(requests, {
+        method: request.method,
+        url: shownUrl(request.url, origin),
+        status: response.status,
+        isMocked
+      });
+      tell();
+    });
   return {
     prepare: async ({ parameters }: PluginPrepareContext): Promise<undefined> => {
+      const handlers = handlersOf(parameters).filter(isHandler);
       if (mocks !== undefined) {
-        await mocks;
+        const running = await mocks;
+        if (isSameHandlers(shown, handlers)) return undefined;
+        running.renew(handlers);
+        shown = handlers;
+        tell();
         return undefined;
       }
-      const handlers = handlersOf(parameters).filter(isHandler);
       if (handlers.length === 0) return undefined;
-      const labels = handlers.map((handler) => ({ label: handlerLabel(handler) }));
-      let requests: readonly NetworkRequest[] = [];
-      const tell = (): void => {
-        const value: NetworkReport = { handlers: labels, requests };
-        report(value, { hint: String(requests.length) });
-      };
+      shown = handlers;
       tell();
-      mocks = startStoryMocks(handlers, loadMsw, ({ request, response }, isMocked) => {
-        const { origin } = window.location;
-        if (!isMocked && !isStoryRequest(request.url, origin)) return;
-        requests = withRequest(requests, {
-          method: request.method,
-          url: shownUrl(request.url, origin),
-          status: response.status,
-          isMocked
-        });
-        tell();
-      });
+      mocks = start(handlers);
       // a start that failed is tried again by the next mount
       await mocks.catch((error: unknown) => {
         mocks = undefined;

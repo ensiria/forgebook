@@ -20,6 +20,9 @@ vi.mock("msw/browser", () => ({
     stop: (): void => {
       calls.push("stop");
     },
+    resetHandlers: (...handlers: readonly unknown[]): void => {
+      calls.push(`reset:${handlers.length}`);
+    },
     events: { on: (): undefined => undefined }
   })
 }));
@@ -96,6 +99,15 @@ describe("the frame module", () => {
     for (const hide of pageHides) hide({ persisted: false });
     await settled();
     expect(calls).toEqual(["start", "stop"]);
+  });
+
+  it("renews the handlers in the running worker when an edit of the story file wrote new ones", async () => {
+    const reports: unknown[] = [];
+    const plugin = frame({ report: (value: unknown): number => reports.push(value) });
+    await plugin.prepare?.(contextOf({ msw: { handlers: [{ info: { header: "GET /a" } }] } }));
+    await plugin.prepare?.(contextOf({ msw: { handlers: [{ info: { header: "GET /b" } }] } }));
+    expect(calls).toEqual(["start", "reset:2"]);
+    expect(reports.at(-1)).toEqual({ handlers: [{ label: "GET /b" }], requests: [] });
   });
 
   it("loads nothing for a story without handlers", async () => {

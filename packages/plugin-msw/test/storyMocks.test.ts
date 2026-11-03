@@ -40,15 +40,18 @@ const TOOLS: MockTools<string, string> = {
     }
   },
   passthrough: (): string => PASSTHROUGH,
-  setupWorker: (...handlers: string[]): MockWorker => {
+  setupWorker: (...handlers: string[]): MockWorker<string> => {
     calls.push(`setup:${handlers.join(",")}`);
     return {
-      start: async (options: Parameters<MockWorker["start"]>[0]): Promise<unknown> => {
+      start: async (options: Parameters<MockWorker<string>["start"]>[0]): Promise<unknown> => {
         calls.push(`start:${options.serviceWorker.url}:${options.onUnhandledRequest}`);
         return undefined;
       },
       stop: (): void => {
         calls.push("stop");
+      },
+      resetHandlers: (...next: string[]): void => {
+        calls.push(`reset:${next.join(",")}`);
       },
       events: {
         on: (event: string, listener: (event: MockEvent) => void): void => {
@@ -146,16 +149,45 @@ describe("handlerLabel", () => {
 
 describe("startStoryMocks", () => {
   it("starts the worker with the handlers, leaves other requests alone, and stops it", async () => {
-    const stop = await startStoryMocks(["a", "b"], load, quiet);
+    const mocks = await startStoryMocks(["a", "b"], load, quiet);
     expect(calls).toEqual(["setup:all *,a,b", "start:mockServiceWorker.js:bypass"]);
-    await stop();
+    await mocks.stop();
     expect(calls.at(-1)).toBe("stop");
+  });
+
+  it("renews the handlers in the running worker, keeping each frame to its own", async () => {
+    const mocks = await startStoryMocks(["a"], load, quiet);
+    mocks.renew(["b", "c"]);
+    expect(calls.slice(-1)).toEqual(["reset:all *,b,c"]);
+    expect(calls).not.toContain("stop");
+  });
+
+  it("tells nothing of the requests it relays for another frame", async () => {
+    const heard: string[] = [];
+    await startStoryMocks(["a"], load, (event) => heard.push(event.request.url));
+    const response = { status: 200 };
+    listeners.get("response:bypass")?.({
+      request: {
+        method: "GET",
+        url: "/other",
+        referrer: "http://localhost:5173/frame.html?story=kit%3Aprofile--empty"
+      },
+      response
+    });
+    listeners.get("response:bypass")?.({
+      request: { method: "GET", url: "/own", referrer: FRAME_ADDRESS },
+      response
+    });
+    expect(heard).toEqual(["/own"]);
   });
 
   it("says who answered each request, listening before the worker starts", async () => {
     const heard: boolean[] = [];
     await startStoryMocks(["a"], load, (_event, isMocked) => heard.push(isMocked));
-    const event = { request: { method: "GET", url: "/a" }, response: { status: 200 } };
+    const event = {
+      request: { method: "GET", url: "/a", referrer: FRAME_ADDRESS },
+      response: { status: 200 }
+    };
     listeners.get("response:mocked")?.(event);
     listeners.get("response:bypass")?.(event);
     expect(heard).toEqual([true, false]);
@@ -182,7 +214,7 @@ describe("startStoryMocks", () => {
     const second = startStoryMocks(["a"], load, quiet);
     await vi.advanceTimersByTimeAsync(1000);
     vi.useRealTimers();
-    await expect(second).resolves.toBeTypeOf("function");
+    await expect(second).resolves.toHaveProperty("stop");
     expect(reloads).toBe(1);
   });
 
@@ -226,7 +258,7 @@ describe("startStoryMocks", () => {
     const started = startStoryMocks(["a"], load, quiet);
     await vi.advanceTimersByTimeAsync(1000);
     vi.useRealTimers();
-    await expect(started).resolves.toBeTypeOf("function");
+    await expect(started).resolves.toHaveProperty("stop");
     expect(reloads).toBe(0);
   });
 });

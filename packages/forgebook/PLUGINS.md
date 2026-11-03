@@ -93,7 +93,7 @@ A tab is also told:
 
 | Context | What it is |
 |---|---|
-| `story` | `id`, `name`, `title`, `componentName`, and `design`: `{ figma? }`, a checked `FigmaLink` of `forgebook/figma-link`. |
+| `story` | `id`, `name`, `title`, `componentName`, and `design`: `{ figma? }`, a checked `FigmaLink` of `@forgebook/story-format/source`. |
 | `report` | The last value the plugin's frame module reported for this story; none before that, and none in the compare view, where no frame is the story's. |
 | `showStory(target, { title })` | Draws the story again in an element, as the stage has it now; `{ remove }` takes it away. |
 
@@ -129,7 +129,9 @@ export const frame = definePluginFrame(({ report }) => ({
 
 - `prepare` runs before every mount, ahead of the story's loaders, with the context of a CSF `beforeEach`. What it returns
   runs when the story is mounted again or left, and the next mount waits for it, for two seconds at most. What it throws is
-  shown as the story's error.
+  shown as the story's error. A tool that must live as long as the frame (a service worker, which forgets a page stopped
+  and started again at once) starts in the first `prepare`, returns nothing, and stops itself on the page's `pagehide`:
+  `@forgebook/plugin-msw` does so, and renews its handlers in place when an edit of the story file changes them.
 - `decorators` wrap every story, outside the catalogue's own.
 - `report(value, { hint?, tab? })` tells the plugin's tabs. The value is JSON and replaces the last one, so it holds
   everything they need. `hint` is a short note beside the name of `tab`, the plugin's first by default.

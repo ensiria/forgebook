@@ -47,7 +47,10 @@ export type AgentDesignLink = {
 
 /** A story's design: its place in Figma, and where a person sees it beside the story. */
 export type AgentDesign = AgentDesignLink & {
-  /** The story's page in the catalogue, on its Design tab (on its first tab where the catalogue turned that one off). */
+  /**
+   * The story's page in the catalogue, on the Design tab `@forgebook/plugin-figma` adds; on its first tab where the
+   * catalogue lists no such plugin or turned the tab off.
+   */
   readonly address: string;
 };
 
