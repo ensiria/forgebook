@@ -48,6 +48,7 @@ import {
 } from "./indexFields.ts";
 import { moduleName, type NamedExport, namedExports } from "./storyExports.ts";
 import { parseStoryFile } from "./storyParse.ts";
+import { playField } from "./storyPlay.ts";
 
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
@@ -548,7 +549,8 @@ export const indexStoryFile = (
     if (fields instanceof Error) return `${file}: story ${exportName}: ${fields.message}`;
     storyNotes.push(...ownNotes.map((note) => `story ${exportName}: ${note}`));
     const description = leadingSentence(text, comments, start) ?? docsDescription(sources.fields, "story");
-    stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }) });
+    const played = playField(named.local, top, meta("play"));
+    stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }), ...played });
   }
   const metaNotes: string[] = [];
   const metaFields = metaFieldsOf(meta, metaNotes);

@@ -65,6 +65,8 @@ export type TreeStory = {
   readonly design: FigmaLink | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
+  /** Whether a `play` function acts on it. */
+  readonly hasPlay: boolean;
 };
 
 /** One component: the story files with its title. */
@@ -362,7 +364,8 @@ const treeStory = (
       ? undefined
       : { ...entry.device, ...story.device },
   design,
-  tags: story.tags ?? []
+  tags: story.tags ?? [],
+  hasPlay: story.hasPlay === true
 });
 
 /**

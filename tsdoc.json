@@ -7,6 +7,26 @@
       "allowMultiple": false
     },
     {
+      "tagName": "@useWhen",
+      "syntaxKind": "block",
+      "allowMultiple": true
+    },
+    {
+      "tagName": "@avoidWhen",
+      "syntaxKind": "block",
+      "allowMultiple": true
+    },
+    {
+      "tagName": "@alternatives",
+      "syntaxKind": "block",
+      "allowMultiple": false
+    },
+    {
+      "tagName": "@replacedBy",
+      "syntaxKind": "block",
+      "allowMultiple": false
+    },
+    {
       "tagName": "@group",
       "syntaxKind": "block",
       "allowMultiple": false

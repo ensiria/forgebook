@@ -31,7 +31,8 @@ const BUTTON: TreeComponent = {
       height: undefined,
       device: undefined,
       design: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--danger",
@@ -47,7 +48,8 @@ const BUTTON: TreeComponent = {
       height: undefined,
       device: undefined,
       design: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--long",
@@ -63,7 +65,8 @@ const BUTTON: TreeComponent = {
       height: undefined,
       device: undefined,
       design: undefined,
-      tags: []
+      tags: [],
+      hasPlay: false
     }
   ],
   unlisted: [],

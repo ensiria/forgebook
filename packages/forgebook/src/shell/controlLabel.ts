@@ -18,6 +18,7 @@ const OWN_LABELS: Readonly<Record<OwnControlId, () => string>> = {
   sheets: () => STRINGS.sheets,
   text: () => STRINGS.text,
   width: () => STRINGS.width,
+  audience: () => STRINGS.audience,
   [DEVICE_PARAMETER]: () => STRINGS.device
 };
 

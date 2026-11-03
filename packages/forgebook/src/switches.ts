@@ -90,7 +90,8 @@ const RESERVED_IDS: readonly string[] = [
   ORIENTATION_PARAMETER,
   "args",
   "matrix",
-  "clock"
+  "clock",
+  "audience"
 ];
 
 /**

@@ -9,6 +9,7 @@ import { type CatalogueSettings, catalogueSettings } from "../src/catalogue.ts";
 import { switchesProblem, touchChoiceOf, type ViewSwitch } from "../src/switches.ts";
 import {
   codeGlobalsOf,
+  componentAddressOf,
   DEFAULT_VIEW,
   defaultView,
   frameAddress,
@@ -168,6 +169,48 @@ describe("the view in the address", () => {
       tools: ["outline", "measure"],
       zoom: 100
     });
+  });
+
+  it("keeps an audience in the page's address, never in a frame's", () => {
+    const view = parseView("?audience=designer", CATALOGUE);
+    expect(view.audience).toBe("designer");
+    expect(viewParams(view, SWITCHES).toString()).toBe("audience=designer");
+    expect(frameAddress("frame.html", "a--b", view, SWITCHES)).toBe("frame.html?story=a--b");
+    expect(frameAddressOf("frame.html", "a--b", "audience=designer&theme=dark")).toBe(
+      "frame.html?theme=dark&story=a--b"
+    );
+    expect(parseView("?audience=manager", CATALOGUE).audience).toBe("everyone");
+  });
+
+  it("writes nothing for everyone, so today's addresses and pages stay as they are", () => {
+    expect(viewParams(DEFAULTS, SWITCHES).toString()).toBe("");
+    expect(DEFAULTS.audience).toBe("everyone");
+  });
+
+  it("starts from the catalogue's audience, whose everyone a link must then name", () => {
+    const catalogue = catalogueSettings("Fixture", SWITCHES, { audience: "designer" });
+    const view = defaultView(catalogue);
+    expect(view.audience).toBe("designer");
+    expect(viewParams(view, SWITCHES, "designer").toString()).toBe("");
+    const all = viewParams({ ...view, audience: "everyone" }, SWITCHES, "designer").toString();
+    expect(all).toBe("audience=everyone");
+    expect(parseView(all, catalogue).audience).toBe("everyone");
+    expect(hasViewChanges(view, SWITCHES, ["audience"], "designer")).toBe(false);
+    expect(hasViewChanges({ ...view, audience: "coder" }, SWITCHES, ["audience"], "designer")).toBe(true);
+  });
+
+  it("leaves the catalogue's audience alone when it turned the control off", () => {
+    const catalogue = catalogueSettings("Fixture", SWITCHES, {
+      audience: "tester",
+      controls: { audience: false }
+    });
+    expect(parseView("?audience=designer", catalogue).audience).toBe("tester");
+  });
+
+  it("names a component's page in an audience's view, for a tool", () => {
+    expect(componentAddressOf("http://a/", "kit:select", "audience=designer&story=x&page=y")).toBe(
+      "http://a/?audience=designer&component=kit%3Aselect"
+    );
   });
 });
 

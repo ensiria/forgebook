@@ -1,6 +1,6 @@
 /**
  * One control of the toolbar or the View menu, wherever the person placed it: a switch the catalogue declares, or one
- * of Forgebook's own (the background, the style sheets, the text size, the stage's width), drawn for the toolbar or for
+ * of Forgebook's own (the background, the style sheets, the text size, the stage's width, the audience), drawn for the toolbar or for
  * a row of the View menu; off while the compare view sets it or the story fixes it.
  *
  * @remarks
@@ -12,6 +12,7 @@
  */
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
+import { AUDIENCE_IDS, type AudienceId } from "../audiences.ts";
 import type { OwnControlId } from "../catalogue.ts";
 import { DEVICE_PARAMETER, type DeviceDefault, shownDevice } from "../deviceView.ts";
 import type { FixedView } from "../storyGlobals.ts";
@@ -44,6 +45,8 @@ export type ControlContext = {
   readonly onViewChange: (view: ViewState) => void;
   /** Whether a story's page is shown: the compare view sets values there, never on a component's page. */
   readonly isStoryPage: boolean;
+  /** Whether a component's page is shown: the only page the audience changes. */
+  readonly isComponentPage: boolean;
   /** What the shown story fixes of the view. */
   readonly fixed: FixedView;
   /** The width the shown story really has, in CSS px, for the width field; none on a component's page. */
@@ -289,8 +292,23 @@ const OwnControl = ({
   ...context
 }: ControlContext & { readonly id: OwnControlId; readonly form: ControlForm }): ReactNode => {
   const catalogue = useCatalogue();
-  const { view, onViewChange, isStoryPage, fixed } = context;
+  const { view, onViewChange, isStoryPage, isComponentPage, fixed } = context;
   if (id === "width") return <WidthControl form={form} {...context} />;
+  if (id === "audience") {
+    return (
+      <FormChoice
+        form={form}
+        // its names are too long for segments, and a list stays quiet on the bar
+        isList={true}
+        label={STRINGS.audience}
+        options={AUDIENCE_IDS.map((audience) => ({ value: audience, label: STRINGS.audiences[audience] }))}
+        value={view.audience}
+        onValueChange={(audience: AudienceId): void => onViewChange({ ...view, audience })}
+        isDisabled={!isComponentPage}
+        disabledNote={isComponentPage ? undefined : STRINGS.audienceElsewhere}
+      />
+    );
+  }
   if (id === DEVICE_PARAMETER)
     return (
       <DeviceControl form={form} view={view} onViewChange={onViewChange} defaults={context.deviceDefault} />

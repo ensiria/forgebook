@@ -27,6 +27,13 @@ const BASE: ForgebookConfig = {
 const folder = (): string => mkdtempSync(join(tmpdir(), "forgebook-config-"));
 
 describe("resolveConfig", () => {
+  it("refuses an audience that is none, from the catalogue or a preset", () => {
+    expect(() => resolveConfig({ ...BASE, ...JSON.parse('{"audience":"manager"}') }, "/catalogue")).toThrow(
+      'the audience "manager" is none of everyone, designer, coder, tester'
+    );
+    expect(resolveConfig({ ...BASE, audience: "tester" }, "/catalogue").lists.audience).toBe("tester");
+  });
+
   it("merges the presets under the configuration: a switch or language of the same id is replaced in its place", () => {
     const dark = { ...themeSwitch(), default: "dark" };
     const resolved = resolveConfig(

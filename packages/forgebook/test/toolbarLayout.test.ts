@@ -43,7 +43,8 @@ describe("placedControls", () => {
       "touch:-",
       "backdrop:-",
       "sheets:-",
-      "text:-"
+      "text:-",
+      "audience:-"
     ]);
   });
 
@@ -63,7 +64,8 @@ describe("placedControls", () => {
       "touch:-",
       "forgebook.device:-",
       "backdrop:-",
-      "text:-"
+      "text:-",
+      "audience:-"
     ]);
   });
 
@@ -107,7 +109,8 @@ describe("placedControls", () => {
       "lang:-",
       "dir:-",
       "touch:-",
-      "forgebook.device:-"
+      "forgebook.device:-",
+      "audience:-"
     ]);
   });
 });

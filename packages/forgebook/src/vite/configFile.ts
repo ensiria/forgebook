@@ -9,6 +9,7 @@
  *
  * @module
  */
+
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -17,6 +18,7 @@ import { pathToFileURL } from "node:url";
 import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
+import { AUDIENCE_IDS } from "../audiences.ts";
 import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
 import { deviceSettingProblem } from "../deviceView.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
@@ -175,6 +177,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
   ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar }),
   ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn }),
+  ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
   ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups })
 });
@@ -370,9 +373,15 @@ export const resolveConfig = (
   const fromTokens = Object.assign({}, ...declaredThemes.map((each) => each.fromTokens));
   const tokenThemed = tokenThemeOf(fromTokens, tokens, dir);
   const theme = mergedThemes([tokenThemed.theme, ...declaredThemes]);
+  const lists = mergedLists(checkedLists([...presets, config], dir));
+  // the page reads it as one of the ids, and a configuration is written by JavaScript too, which no type stops
+  if (lists.audience !== undefined && !AUDIENCE_IDS.includes(lists.audience)) {
+    throw new Error(
+      `${resolve(dir, "forgebook.config")}: the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`
+    );
+  }
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
-  const lists = mergedLists(checkedLists([...presets, config], dir));
   const ownPreview =
     config.preview === undefined
       ? PREVIEW_FILES.map((name) => paths.join(dir, name)).find((file) => existsSync(file))

@@ -29,6 +29,8 @@ export type AgentSchema = 1;
 export type StoryLinks = {
   /** Its page in the catalogue (the shell, the story selected). */
   readonly address: string;
+  /** Its component's page, where an audience in the view (`audience=designer`) reorders and filters what is drawn. */
+  readonly component: string;
   /** Its frame alone: the story's own document, as the tests open it. */
   readonly frame: string;
   /** The story with no chrome, in the catalogue's theme: what a person pastes in a wiki or an iframe. */
@@ -79,6 +81,8 @@ export type AgentStory = {
   readonly height?: number;
   /** Whether it is about logic, not looks (`parameters.logic`): a hook's or a function's scene. */
   readonly isLogic: boolean;
+  /** Whether a `play` function acts on it. */
+  readonly hasPlay: boolean;
   /**
    * The device it is shown in by default (`parameters.device`, its own fields over the meta's), when either sets one;
    * the catalogue's `device` sits under it. Add the model's id to a view (`forgebook shot <id> --view iphone-16`) for

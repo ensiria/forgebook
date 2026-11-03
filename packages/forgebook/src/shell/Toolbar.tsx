@@ -4,7 +4,7 @@
  *
  * @remarks
  * The controls are the catalogue's switches and Forgebook's own (the background, the style sheets, the text size, the
- * stage's width); which start pinned is the catalogue's choice, where each sits is the person's (`toolbarLayout.ts`).
+ * stage's width, the audience); which start pinned is the catalogue's choice, where each sits is the person's (`toolbarLayout.ts`).
  * The panel and Compare belong to the page, not to the view: they stay at the end.
  *
  * @module
@@ -35,6 +35,8 @@ export type ToolbarProps = {
   readonly onViewChange: (view: ViewState) => void;
   /** Whether a story's page is shown: the props panel and Compare belong to it, not to a component's page. */
   readonly isStoryPage?: boolean;
+  /** Whether a component's page is shown: the audience changes nothing elsewhere. */
+  readonly isComponentPage?: boolean;
   /** Shows the hidden sidebar; none while it is shown. */
   readonly onShowSidebar?: (() => void) | undefined;
   /** The width the shown story really has, in CSS px, for the width field; none on a component's page. */
@@ -174,6 +176,7 @@ export const Toolbar = ({
   view: ownView,
   onViewChange: onOwnViewChange,
   isStoryPage = true,
+  isComponentPage = false,
   onShowSidebar,
   shownWidth,
   fixed = NOT_FIXED,
@@ -185,8 +188,8 @@ export const Toolbar = ({
   // the story's fixed values are shown, and a change of anything else keeps the user's own in the address
   const view = withFixed(ownView, fixed);
   const onViewChange = (changed: ViewState): void => onOwnViewChange(withOwnFixed(changed, ownView, fixed));
-  const context = { view, onViewChange, isStoryPage, fixed, shownWidth, deviceDefault };
-  useControlKeys({ keys: layout.keys, view, onViewChange, fixed, isStoryPage });
+  const context = { view, onViewChange, isStoryPage, isComponentPage, fixed, shownWidth, deviceDefault };
+  useControlKeys({ keys: layout.keys, view, onViewChange, fixed, isStoryPage, isComponentPage });
   const pinnedRef = useRef<HTMLDivElement>(null);
   // a page about logic puts away the pinned controls that only change looks: the View menu then counts them
   const putAway = layout.placed
@@ -216,7 +219,7 @@ export const Toolbar = ({
             key={each.control.id}
             control={each.control}
             isHidden={each.isHidden}
-            isChanged={hasViewChanges(ownView, catalogue.switches, [each.control.id])}
+            isChanged={hasViewChanges(ownView, catalogue.switches, [each.control.id], catalogue.audience)}
             layout={layout}
             {...context}
           />

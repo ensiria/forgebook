@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { catalogueSettings, groupLabel } from "../src/catalogue.ts";
-import { configureStrings, STRINGS } from "../src/shell/strings.ts";
+import { configureStrings, STRINGS, textsOfGroup } from "../src/shell/strings.ts";
 import { groupedStories } from "../src/storyTree.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { mergedLists } from "../src/vite/configFile.ts";
@@ -50,6 +50,28 @@ describe("catalogueSettings", () => {
     expect(catalogueSettings("A", DEFAULT_SWITCHES, { backgrounds: { builtIn: false } }).backdrops).toEqual(
       []
     );
+  });
+});
+
+describe("the audience", () => {
+  it("is everyone unless the catalogue says otherwise, with its control in the View menu only", () => {
+    const settings = catalogueSettings("Acme", DEFAULT_SWITCHES);
+    expect(settings.audience).toBe("everyone");
+    expect(settings.ownControls).toContain("audience");
+    expect(settings.toolbar).not.toContain("audience");
+  });
+
+  it("takes the catalogue's audience, and pins it when asked", () => {
+    const settings = catalogueSettings("Acme", DEFAULT_SWITCHES, {
+      audience: "tester",
+      toolbar: ["audience"]
+    });
+    expect(settings.audience).toBe("tester");
+    expect(settings.toolbar).toEqual(["audience"]);
+  });
+
+  it("keeps a configuration's audience through the merge of its lists", () => {
+    expect(mergedLists([{ audience: "coder" }, { audience: "tester" }]).audience).toBe("tester");
   });
 });
 
@@ -134,6 +156,7 @@ describe("story groups", () => {
         device: undefined,
         design: undefined,
         tags: [],
+        hasPlay: false,
         isMain: false,
         isTouch: false,
         isLogic: false
@@ -152,6 +175,15 @@ describe("story groups", () => {
 });
 
 describe("configureStrings", () => {
+  it("reaches the texts that load after it", () => {
+    configureStrings({ "lateTexts.title": "Replaced" });
+    expect(textsOfGroup("lateTexts", { title: "Written", other: "Kept" })).toEqual({
+      title: "Replaced",
+      other: "Kept"
+    });
+    configureStrings({});
+  });
+
   it("replaces plain texts by their path, and leaves a text that takes values and an unknown path alone", () => {
     const allStories = STRINGS.allStories;
     configureStrings({

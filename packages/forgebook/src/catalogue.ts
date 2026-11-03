@@ -14,6 +14,7 @@
 
 import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 
+import { type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
 import { DEVICE_PARAMETER, type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "./deviceView.ts";
@@ -46,10 +47,11 @@ export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
 /**
  * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the device frame (first,
  * so it sits beside the Touch switch, the last of the ready-made ones), the background, the style sheets, the text
- * size and the stage's width. Their ids are their parameters in the address, so no switch takes one; the device's is
- * under Forgebook's name (`forgebook.device`), so a catalogue's own `device` switch keeps its id.
+ * size, the stage's width and who a component's page is read by. Their ids are their parameters in the address, so no
+ * switch takes one; the device's is under Forgebook's name (`forgebook.device`), so a catalogue's own `device` switch
+ * keeps its id.
  */
-export const OWN_CONTROL_IDS = [DEVICE_PARAMETER, "backdrop", "sheets", "text", "width"] as const;
+export const OWN_CONTROL_IDS = [DEVICE_PARAMETER, "backdrop", "sheets", "text", "width", "audience"] as const;
 
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
@@ -115,6 +117,12 @@ export type CatalogueLists = {
    * `false` builds nothing for it (no import graph is read) and leaves it out of the agents' answers.
    */
   readonly usedIn?: boolean;
+  /**
+   * Who a component's page is read by before a person picks: `designer`, `coder` or `tester` reorder and filter the
+   * page for them, and `everyone` (the default) draws all of it. The address's `audience` wins, so a link keeps its view;
+   * with `controls: { audience: false }` the catalogue's choice is the only one.
+   */
+  readonly audience?: AudienceId;
   /**
    * The shell's appearance before a reader picks one; `story` follows the colour scheme of the story shown, for a
    * library that wants one page with its stories: `system` (the default) follows the system's light or dark. A
@@ -186,6 +194,8 @@ export type CatalogueSettings = {
   readonly toolbar: readonly string[];
   /** Whether a component's page offers "Used in". */
   readonly hasUsedIn: boolean;
+  /** Who a component's page is read by when the address does not say. */
+  readonly audience: AudienceId;
   /** Whether the story bar offers the Embed button. */
   readonly hasEmbed: boolean;
   /** The shell's appearance before a reader picks one. */
@@ -320,6 +330,7 @@ export const catalogueSettings = (
   lists: CatalogueLists = {},
   pluginTabs: readonly string[] = []
 ): CatalogueSettings => {
+  const { audience = DEFAULT_AUDIENCE } = lists;
   const builtIn = lists.backgrounds?.builtIn;
   const offered =
     builtIn === false
@@ -354,6 +365,7 @@ export const catalogueSettings = (
     ownControls,
     toolbar,
     hasUsedIn: lists.usedIn !== false,
+    audience,
     hasEmbed: controlsOff.embed !== false,
     appearance: lists.appearance ?? "system",
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
