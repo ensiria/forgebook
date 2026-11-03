@@ -6,9 +6,9 @@
  */
 import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 
-import { NEXTJS_PORT } from "./ports";
+import { catalogueUrl } from "./ports";
 
-test.use({ baseURL: `http://127.0.0.1:${NEXTJS_PORT}/` });
+test.use({ baseURL: catalogueUrl("nextjs") });
 
 /** Every story of the fixture that draws, by its id without the source. */
 const STORY_IDS = [

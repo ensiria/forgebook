@@ -29,6 +29,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - In a Vue project, the same with `Badge.vue` and `Badge.stories.ts`: the types from `@forgebook/vue`, the component by its
   default import, a slot as the arg `#name` (`"#default": "Text"`) and an event as its listener (`onRemove`). Open a `.vue`
   file's script with its TSDoc block: that comment is the component's.
+- In a Svelte project, the same with `Badge.svelte` and `Badge.stories.ts`: the types from `@forgebook/svelte`, the
+  component by its default import, a snippet's text as the arg `#name` (`"#children": "Text"`), a callback prop as it is
+  (`onremove`), and a render returning `{ Component, props }`. The `<!-- @component -->` comment is the component's.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
