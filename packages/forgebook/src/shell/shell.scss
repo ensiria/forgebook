@@ -875,6 +875,7 @@
     box-shadow: $ring;
     font: $text-control;
     color: $text;
+    text-decoration: none;
     white-space: nowrap;
     @include mixins.focus-ring($shadow: $ring);
 
