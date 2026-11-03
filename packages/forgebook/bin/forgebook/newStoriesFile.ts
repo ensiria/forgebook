@@ -5,13 +5,14 @@
  *
  * @module
  */
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { findUp } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { autoTitle, patternBase } from "../../src/vite/autoTitle.ts";
 import { findConfigFile, loadConfigFile } from "../../src/vite/configFile.ts";
+import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import { frameworkDocsModule } from "../frameworkDocs.ts";
 import { newStories } from "./newStories.ts";
 
@@ -28,7 +29,7 @@ const titleBase = async (packageDir: string, storiesFile: string): Promise<strin
   const config = findConfigFile(packageDir);
   const [pattern] = config === undefined ? [] : (await loadConfigFile(config)).stories;
   if (pattern !== undefined) return patternBase(pattern).replace(/^\.\//, "");
-  return relative(packageDir, storiesFile).split("/")[0] === "src" ? "src" : "";
+  return VITE_PATHS.relative(packageDir, storiesFile).split("/")[0] === "src" ? "src" : "";
 };
 
 /**
@@ -58,7 +59,8 @@ export const newStoriesFile = async (
   if (!("file" in component)) throw new ScriptError(`${componentFile} exports no component`);
   const name = component.docs.name;
   const file = join(dirname(componentFile), `${name}.stories.tsx`);
-  const title = autoTitle(await titleBase(packageDir, file), relative(packageDir, file)) ?? name;
+  // the title is read by `/`, so the path is written with them on Windows too
+  const title = autoTitle(await titleBase(packageDir, file), VITE_PATHS.relative(packageDir, file)) ?? name;
   const text = newStories({
     docs: component.docs,
     importPath: `./${basename(componentFile).replace(/\.[cm]?[jt]sx?$/, "")}`,

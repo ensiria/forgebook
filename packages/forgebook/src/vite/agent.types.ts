@@ -16,6 +16,7 @@ import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
+import type { TokenClash } from "./tokenClashes.ts";
 
 /** The version of the documents' shape. */
 export type AgentSchema = 1;
@@ -154,7 +155,7 @@ export type AgentTokenSummary = Pick<
 export type TokensDocument = {
   /** The shape's version. */
   readonly schema: AgentSchema;
-  /** Whether the catalogue names a tokens file at all. */
+  /** Whether the catalogue or one of its sources names a tokens file at all. */
   readonly isConfigured: boolean;
   /** How many tokens match, whatever the limit. */
   readonly total: number;
@@ -164,6 +165,8 @@ export type TokensDocument = {
   readonly tokens: readonly AgentTokenSummary[];
   /** What in the tokens files could not be read. */
   readonly problems: readonly string[];
+  /** The tokens listed here that two authors give different values, with whose stands. */
+  readonly clashes: readonly TokenClash[];
 };
 
 /** One token, with all that is known of it. */
@@ -174,6 +177,8 @@ export type TokenDocument = {
   readonly token: DesignToken;
   /** What in the tokens files could not be read. */
   readonly problems: readonly string[];
+  /** Whose value stands, when two authors give this token different ones. */
+  readonly clashes: readonly TokenClash[];
 };
 
 /** The tokens nearest a value written by hand. */

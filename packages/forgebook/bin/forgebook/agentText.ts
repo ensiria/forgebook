@@ -11,7 +11,12 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
-import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type {
+  StoryCheckReport,
+  StoryCheckResult,
+  StoryDiffReport,
+  StoryShotReport
+} from "../../src/storyCheck.ts";
 import type {
   AgentTokenSummary,
   CheckedCodeDocument,
@@ -23,6 +28,7 @@ import type {
   TokensDocument
 } from "../../src/vite/agent.types.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
+import type { TokenClash } from "../../src/vite/tokenClashes.ts";
 
 /** The style with no width to fit, so no cell is cut. */
 const uncut = (style: OutputStyle): OutputStyle => ({ ...style, width: Number.POSITIVE_INFINITY });
@@ -67,6 +73,21 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
   return keyValue(entries, uncut(style));
 };
 
+/** What a model judged, each line saying it is an opinion. */
+const judgementLines = (result: StoryCheckResult): readonly string[][] => {
+  const row = (text: string): string[] => [
+    result.storyId,
+    result.view || "default",
+    `model's opinion: ${text}`
+  ];
+  const { judgements } = result;
+  if (judgements === undefined) return [];
+  if (typeof judgements === "string") return [row(judgements)];
+  return judgements.length === 0
+    ? [row("nothing to report")]
+    : judgements.map((each) => row(`${each.criterion} ${each.message}`.trim()));
+};
+
 /**
  * A check's report as a table: one row per problem, its story, its view and its kind; a story that passes in a view gets
  * one row saying so.
@@ -76,15 +97,16 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
  */
 export const checkText = (report: StoryCheckReport, style: OutputStyle): string =>
   table(
-    report.results.flatMap((result) =>
-      result.problems.length === 0
+    report.results.flatMap((result) => [
+      ...(result.problems.length === 0
         ? [[result.storyId, result.view || "default", "passes"]]
         : result.problems.map((problem) => [
             result.storyId,
             result.view || "default",
             `${problem.kind}: ${problem.message}`
-          ])
-    ),
+          ])),
+      ...judgementLines(result)
+    ]),
     { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Result" }] },
     uncut(style)
   );
@@ -141,13 +163,45 @@ export const shotText = (
   );
 
 /**
+ * A comparison with the baselines as a person reads it.
+ *
+ * @param report - the results.
+ * @param shownFile - how a file is named.
+ * @param style - the output's style.
+ */
+export const diffText = (
+  report: StoryDiffReport,
+  shownFile: (file: string) => string,
+  style: OutputStyle
+): string =>
+  table(
+    report.results.map((each) => [
+      each.storyId,
+      each.view || "default",
+      each.status,
+      each.status === "changed" ? `${each.percent.toFixed(2)} %` : "",
+      each.diff === undefined ? "" : shownFile(each.diff)
+    ]),
+    {
+      columns: [
+        { header: "Story" },
+        { header: "View", tone: "muted" },
+        { header: "Status" },
+        { header: "Changed" },
+        { header: "Marked" }
+      ]
+    },
+    uncut(style)
+  );
+
+/**
  * Tokens as a person reads them: one line each, how many there are when it is more than the list, and why when none.
  *
  * @param document - the answer.
  */
 export const tokensText = (document: TokensDocument): string => {
   if (!document.isConfigured)
-    return 'No tokens file: name one in forgebook.config.ts (`tokens: ["tokens.json"]`).';
+    return 'No tokens file: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
   if (document.total === 0) return "No tokens here.";
   const lines = document.tokens.map((token) => tokenLine(token));
   const more = document.total - document.tokens.length;
@@ -174,8 +228,17 @@ export const tokenText = (token: DesignToken): string =>
   [
     tokenLine(token),
     ...(token.alias === undefined ? [] : [`alias of ${token.alias}`]),
+    ...(token.source === undefined ? [] : [`from ${token.source}`]),
     ...(token.description === undefined ? [] : [token.description])
   ].join("\n");
+
+/**
+ * A clash as a person reads it: which file's value stands, and which it replaced.
+ *
+ * @param clash - the clash.
+ */
+export const clashText = ({ name, mode, kept, replaced }: TokenClash): string =>
+  `${name}${mode === undefined ? "" : ` (${mode})`}: ${kept} replaces ${replaced.join(", ")}`;
 
 /**
  * The tokens nearest a value as a person reads them, saying which are really near.

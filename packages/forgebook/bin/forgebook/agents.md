@@ -32,6 +32,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   A story reads it as `context.globals.touch` (`"mouse"` or `"touch"`) or fixes it with
   `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
   catalogue draws it with a finger and offers a toggle to turn that off.
+- A link may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the props the
+  story's panel can set, with a value of their type; to show a story with other values, write a story with those
+  args rather than a link.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
 - A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook
   (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`
@@ -59,7 +62,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, errors, a failed play |
-| `npx forgebook tokens --category color --json` | The design tokens, when the catalogue names a tokens file |
+| `npx forgebook tokens --category color --json` | The design tokens, of the catalogue and of the libraries it shows; `clashes` says whose value stands where two disagree |
 | `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw value; the type comes from the value, or `--type padding` |
 | `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |
 | `npx forgebook changed --json` | The stories your change touches, through what they import |
@@ -67,6 +70,7 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 | `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`) |
+| `npx forgebook shot <id> --update` then `npx forgebook diff <id> --json` | Baselines, then what changed against them: the region, the percentage, a marked picture |
 
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.

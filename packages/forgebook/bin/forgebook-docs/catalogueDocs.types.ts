@@ -4,6 +4,7 @@
  * @module
  */
 import type { ComponentDocs } from "../../src/componentDocs.ts";
+import type { DesignToken } from "../../src/vite/designTokens.ts";
 
 /** One exported function, value or type of a module. */
 export type ExportDocs = {
@@ -87,6 +88,8 @@ export type CatalogueData = {
   readonly sassModules: readonly SassModuleDocs[];
   /** The published style sheets. */
   readonly styleSheets: readonly StyleSheetDocs[];
+  /** The design tokens its source gives, in the files' order. */
+  readonly tokens: readonly DesignToken[];
 };
 
 /** The `--json` document. */
@@ -97,13 +100,14 @@ export type CatalogueDocsReport = {
   readonly file: string;
   /** `llms.txt`, beside it, relative to the folder the command runs in. */
   readonly llmsFile: string;
-  /** How many components, modules, Sass modules and style sheets it lists. */
+  /** How many components, modules, Sass modules, style sheets and design tokens it lists. */
   readonly counts: {
     readonly components: number;
     readonly modules: number;
     readonly sassModules: number;
     readonly styleSheets: number;
+    readonly tokens: number;
   };
-  /** Story files that could not be read, with why. */
+  /** What could not be read, with why: a story file, a tokens file, a token. */
   readonly problems: readonly string[];
 };
