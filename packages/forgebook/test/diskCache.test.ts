@@ -10,7 +10,14 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { codeStamp, diskCache, isSettledSince, nowNs, stampPaths } from "../src/vite/diskCache.ts";
+import {
+  codeStamp,
+  diskCache,
+  isSettledSince,
+  nowNs,
+  SETTLE_MARGIN_NS,
+  stampPaths
+} from "../src/vite/diskCache.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "forgebook-disk-cache-"));
 
@@ -92,7 +99,7 @@ describe("stamps", () => {
     const before = nowNs();
     writeFileSync(file, "export const a = 6;\n");
     expect(isSettledSince(stampPaths([file]), before)).toBe(false);
-    expect(isSettledSince(stampPaths([file]), nowNs() + 1_000_000n)).toBe(true);
+    expect(isSettledSince(stampPaths([file]), nowNs() + SETTLE_MARGIN_NS + 60_000_000_000n)).toBe(true);
   });
 });
 

@@ -85,7 +85,8 @@ describe("docsDependencies", () => {
       "ui/src/index.ts": 'export const tone = "a";\n'
     });
     mkdirSync(join(ROOT, "ws", "node_modules"), { recursive: true });
-    symlinkSync(join(ROOT, "ui"), join(ROOT, "ws", "node_modules", "ui"), "dir");
+    // a junction on Windows, which needs no privilege; a plain link elsewhere
+    symlinkSync(join(ROOT, "ui"), join(ROOT, "ws", "node_modules", "ui"), "junction");
     const paths = named(docsDependencies([join(ROOT, "ws", "src", "Card.stories.ts")]));
     expect(paths).toContain("ws/src/Card.vue");
     expect(paths).toContain("ws/src/size.ts");

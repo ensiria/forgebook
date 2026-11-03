@@ -103,14 +103,21 @@ export const stampPaths = (paths: readonly string[]): PathStamp[] => [...new Set
 export const nowNs = (): bigint => BigInt(Date.now()) * 1_000_000n;
 
 /**
- * Whether no path changed since an answer's making started: one that did may have been read before or after its
- * change, so the answer is not kept.
+ * How long before an answer's making a change still counts as made during it, in nanoseconds. A file system writes
+ * times with its own clock and grain (two seconds on FAT, a coarse kernel clock on Linux) and some update them late,
+ * so a change made while the answer was read can carry a time a little before its start.
+ */
+export const SETTLE_MARGIN_NS = 3_000_000_000n;
+
+/**
+ * Whether no path changed since shortly before an answer's making started (`SETTLE_MARGIN_NS`): one that did may have
+ * been read before or after its change, so the answer is not kept; the next one made after it settles is.
  *
  * @param stamps - the paths' stamps, taken once the answer was made.
  * @param since - when its making started (`nowNs`).
  */
 export const isSettledSince = (stamps: readonly PathStamp[], since: bigint): boolean =>
-  stamps.every(([, , changedAt]) => changedAt === null || BigInt(changedAt) < since);
+  stamps.every(([, , changedAt]) => changedAt === null || BigInt(changedAt) < since - SETTLE_MARGIN_NS);
 
 /**
  * What the answers of a piece of code depend on besides their files: every file of its folders, and the manifests of

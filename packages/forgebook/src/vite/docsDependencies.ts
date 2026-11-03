@@ -54,7 +54,7 @@ const mappedPath = (specifier: string, options: ts.CompilerOptions): string | un
     const star = matchedStar(pattern, specifier);
     if (star === undefined) continue;
     for (const target of targets) {
-      const candidate = resolve(folder, target.replace("*", star));
+      const candidate = resolve(folder, target.replaceAll("*", star));
       if (ts.sys.fileExists(candidate)) return candidate;
     }
   }
@@ -141,12 +141,13 @@ const walkFrom = (
     const file = queue.pop() ?? "";
     if (walk.reached.has(file)) continue;
     walk.reached.add(file);
-    walk.paths.add(file);
-    walk.paths.add(dirname(file));
+    // in the system's form, so one path read through two spellings is stamped once
+    walk.paths.add(resolve(file));
+    walk.paths.add(resolve(dirname(file)));
     // a framework's component file is read for its imports too, as plain text
     const { followed, named } = namedBy(file, walk.options, walk.cache);
     queue.push(...followed);
-    for (const path of named) walk.paths.add(path);
+    for (const path of named) walk.paths.add(resolve(path));
   }
 };
 
