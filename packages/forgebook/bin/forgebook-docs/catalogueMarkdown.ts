@@ -5,15 +5,21 @@
  * @remarks
  * Components first (by family and group, from their stories' titles), each with its import, its summary, its props in
  * short (`size=sm|md*|lg`: `*` marks the default; `!` a required prop; events with their parameters) and
- * its parts. Then the other modules, the Sass modules, the style sheets and the design tokens, by type, each with its
- * value and its value in each theme. Pure: data in, text out.
+ * its parts. Then the docs pages, the other modules, the Sass modules, the style sheets and the design tokens, by type,
+ * each with its value and its value in each theme. Pure: data in, text out.
  *
  * @module
  */
 import type { FunctionSignatureDocs, PropDocs } from "../../src/componentDocs.ts";
-import { storyId } from "../../src/storyTree.ts";
+import { pageSlug } from "../../src/pageAddress.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
-import type { CatalogueComponent, CatalogueData, ExportDocs, ModuleDocs } from "./catalogueDocs.types.ts";
+import type {
+  CatalogueComponent,
+  CatalogueData,
+  CataloguePage,
+  ExportDocs,
+  ModuleDocs
+} from "./catalogueDocs.types.ts";
 import type { CatalogueSection } from "./catalogueOptions.ts";
 
 /** The props whose keys are the parts. */
@@ -79,10 +85,11 @@ const componentLine = (
           .join(" ");
   const parts = docs.parts.length === 0 ? "" : ` · parts: ${docs.parts.join(", ")}`;
   const story =
-    sourceId === undefined || component.mainStory === undefined
+    sourceId === undefined || component.mainStoryId === undefined
       ? ""
-      : ` · story: \`${storyId(sourceId, component.title, component.mainStory)}\``;
-  return `- **${docs.name}**${where}: ${sentence(docs.description)}. ${props}${parts}${story}`;
+      : ` · story: \`${sourceId}:${component.mainStoryId}\``;
+  const design = component.design === undefined ? "" : ` · design: ${component.design}`;
+  return `- **${docs.name}**${where}: ${sentence(docs.description)}. ${props}${parts}${story}${design}`;
 };
 
 /** Letters and digits only, lower case: how a subpath and an export name are compared. */
@@ -138,6 +145,13 @@ const byPlace = (left: { readonly title: string }, right: { readonly title: stri
   );
 };
 
+/** One docs page's line, ending with its id when the package's source id is known. */
+const pageLine = (page: CataloguePage, sourceId: string | undefined): string => {
+  const about = page.description === undefined ? "" : `: ${sentence(page.description)}`;
+  const id = sourceId === undefined ? "" : ` · page: \`${sourceId}:${pageSlug(page.title)}\``;
+  return `- **${page.title}** \`${page.file}\`${about}${id}`;
+};
+
 /** Text on one line, whatever its file wrote, since an entry is one line. */
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
@@ -190,6 +204,11 @@ const componentLines = (data: CatalogueData): string[] => {
 /** The lines of one kind of entries, a heading first; none when the package has none of it. */
 const sectionLines = (data: CatalogueData, section: CatalogueSection): string[] => {
   if (section === "components") return componentLines(data);
+  if (section === "pages") {
+    const pages = data.pages ?? [];
+    if (pages.length === 0) return [];
+    return ["## Docs", "", ...pages.map((page) => pageLine(page, data.sourceId)), ""];
+  }
   if (section === "modules") {
     if (data.modules.length === 0) return [];
     const modules = [...data.modules].sort((left, right) => left.subpath.localeCompare(right.subpath));

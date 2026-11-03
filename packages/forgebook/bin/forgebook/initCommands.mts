@@ -18,31 +18,41 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { CONFIG_FILES } from "../../src/vite/configFile.ts";
 import { COMMAND, type ForgebookOptions } from "./catalogueCommands.ts";
-import { importStorybook } from "./importers/storybook.ts";
-import type { ImportedFramework } from "./importers/storybookFrameworks.ts";
+import { type ImportedConfig, importStorybook } from "./importers/storybook.ts";
+import { frameworkPeers } from "./importers/storybookFrameworks.ts";
 import { CONFIG_FILE, initConfigText } from "./initConfig.ts";
 
 /**
  * The modules the written configuration needs, by the package that has each: what it imports, and the framework's
  * peers.
  *
- * @param framework - the framework.
+ * @param imported - what the importer read: the framework and its options.
  */
-const configImports = (framework: ImportedFramework): Readonly<Record<string, string>> => ({
+const configImports = (
+  imported: Pick<ImportedConfig, "framework" | "frameworkOptions">
+): Readonly<Record<string, string>> => ({
   forgebook: "forgebook",
-  [framework.packageName]: `${framework.packageName}/vite`,
-  ...Object.fromEntries((framework.peers ?? []).map((peer) => [peer, `${peer}/package.json`]))
+  [`@forgebook/${imported.framework}`]: `@forgebook/${imported.framework}/vite`,
+  ...Object.fromEntries(
+    frameworkPeers(imported.framework, imported.frameworkOptions).map((peer) => [
+      peer,
+      `${peer}/package.json`
+    ])
+  )
 });
 
 /**
  * The packages the written configuration needs that the project cannot load yet.
  *
  * @param dir - the project's folder.
- * @param framework - the framework.
+ * @param imported - what the importer read: the framework and its options.
  */
-const missingPackages = (dir: string, framework: ImportedFramework): string[] => {
+const missingPackages = (
+  dir: string,
+  imported: Pick<ImportedConfig, "framework" | "frameworkOptions">
+): string[] => {
   const require = createRequire(join(dir, "package.json"));
-  return Object.entries(configImports(framework)).flatMap(([name, specifier]) => {
+  return Object.entries(configImports(imported)).flatMap(([name, specifier]) => {
     try {
       require.resolve(specifier);
       return [];
@@ -93,7 +103,7 @@ export const initCommands = (
       writeFileSync(file, initConfigText(imported, "Storybook"));
       log.success(`${CONFIG_FILE} written: ${imported.stories.length} story globs`);
       for (const note of imported.notes) log.warn(note);
-      const missing = missingPackages(process.cwd(), imported.framework);
+      const missing = missingPackages(process.cwd(), imported);
       if (missing.length > 0)
         log.info(`Install what it imports first: npm install --save-dev ${missing.join(" ")}`);
       log.info(

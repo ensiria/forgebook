@@ -1,0 +1,15 @@
+// The SvelteKit fixture: its app checked by `svelte-check` with the types `svelte-kit sync` writes (`./$types`, the
+// `$app` modules), and its stories with them, so a story's args are checked against the real component.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "$app/tsconfig",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "types": ["$app/types", "node", "vite/client", "@forgebook/story-format/client"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "*"],
+  "exclude": ["src/service-worker"]
+}

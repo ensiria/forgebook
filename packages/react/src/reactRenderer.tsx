@@ -10,11 +10,8 @@
  * @module
  */
 
-import type { StoryContext } from "@forgebook/story-format/csf";
-import { storyTextOf } from "@forgebook/story-format/texts";
 import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
-import { untracedStep } from "forgebook/renderer";
-import type { LoadedArgs } from "forgebook/story-module";
+import { storyContextOf } from "forgebook/renderer";
 import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
@@ -36,27 +33,6 @@ const inProviders = (drawing: StoryDrawing, story: ReactNode): ReactNode => (
     <StoryClockContext.Provider value={drawing.clock}>{story}</StoryClockContext.Provider>
   </StoryTextsContext.Provider>
 );
-
-/**
- * What a render and a decorator receive.
- *
- * @param drawing - the story's args, texts, clock and switches' values.
- * @param canvasOf - the element the story is drawn in, read only when a story asks for it: on the server there is
- *   none, and a story that reads it there fails as it would in a page rendered on the server.
- */
-const contextOf = (drawing: StoryDrawing, canvasOf: () => HTMLElement): StoryContext<LoadedArgs> => ({
-  args: drawing.args,
-  step: untracedStep,
-  text: storyTextOf(drawing.texts),
-  clock: drawing.clock,
-  globals: drawing.globals,
-  loaded: drawing.loaded,
-  ...drawing.identity,
-  parameters: drawing.story.parameters,
-  get canvasElement(): HTMLElement {
-    return canvasOf();
-  }
-});
 
 /**
  * The story, telling once that it is drawn: its effect runs after React put it in the page, and does not run when the
@@ -96,7 +72,7 @@ export const reactRenderer: StoryRenderer = {
             <Drawn onDrawn={markDrawn}>
               {storyElement(
                 drawing.story,
-                contextOf(drawing, () => canvas),
+                storyContextOf(drawing, drawing.args, () => canvas),
                 drawing.decorators
               )}
             </Drawn>
@@ -115,7 +91,7 @@ export const reactRenderer: StoryRenderer = {
     };
   },
   renderToString: (drawing: StoryDrawing): string => {
-    const context = contextOf(drawing, () => document.body);
+    const context = storyContextOf(drawing, drawing.args, () => document.body);
     return renderToString(inProviders(drawing, storyElement(drawing.story, context, drawing.decorators)));
   }
 };

@@ -10,13 +10,16 @@ import { codeOf } from "@forgebook/react/code";
 import { heldStoryClock } from "@forgebook/story-format/clock";
 import { describeAdapter, THROWING_NAME } from "@forgebook/testing/conformance";
 import type { StoryDrawing } from "forgebook/renderer";
-import { readStory } from "forgebook/story-module";
-import { type ReactNode, useState } from "react";
+import { type LoadedDecorator, readStory } from "forgebook/story-module";
+import { isValidElement, type ReactNode, useState } from "react";
 import { Pressable, Text } from "react-native";
 
 import { nativeRenderer } from "../src/nativeRenderer.ts";
 import { extractStoryComponent } from "../src/vite/extractDocs.ts";
 import { NATIVE_FIXTURE_DIR } from "./fixturePaths.ts";
+
+/** What a decorator's `story()` gave, typed `unknown` by the frame. */
+const asNode = (value: unknown): ReactNode => (isValidElement(value) ? value : null);
 
 /** The subject's story: a greeting with a counter of its own, written with React Native's components. */
 const Greeting = ({ name }: { readonly name?: unknown }): ReactNode => {
@@ -59,6 +62,10 @@ describeAdapter({
   name: "React Native Web",
   renderer: nativeRenderer,
   drawing,
+  // the catalogue's decorators are markup of the page around the React Native root, as a web preview's are
+  decorator:
+    (label: string): LoadedDecorator =>
+    (story: () => unknown): ReactNode => <section data-decorator={label}>{asNode(story())}</section>,
   codeOf,
   docsOf: () => {
     const read = extractStoryComponent(join(NATIVE_FIXTURE_DIR, "src", "ProfileCard.stories.tsx"));

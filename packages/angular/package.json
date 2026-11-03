@@ -1,0 +1,113 @@
+{
+  "name": "@forgebook/angular",
+  "version": "0.1.8",
+  "description": "Forgebook for Angular and Analog: the story types and helpers, the renderer the frame mounts a story with, and the adapter that compiles components through Analog's Vite plugin and reads their inputs, outputs and projected content.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/angular"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./clock": "./src/clock.ts",
+    "./texts": "./src/texts.ts",
+    "./renderer": "./src/angularRenderer.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./code": "./src/storyTemplate.ts",
+    "./vite": "./src/vite/angular.ts",
+    "./docs": "./src/vite/extractDocs.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@analogjs/vite-plugin-angular": "2.9.5",
+    "@forgebook/story-format": "workspace:*",
+    "typescript-6": "npm:typescript@6.0.3"
+  },
+  "peerDependencies": {
+    "@angular/build": "^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@angular/common": "^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@angular/compiler": "^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@angular/compiler-cli": "^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@angular/core": "^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@angular/platform-browser": "^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@angular/platform-server": "^20.0.0 || ^21.0.0 || ^22.0.0",
+    "forgebook": "workspace:^",
+    "vite": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@angular/platform-server": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@angular/build": "22.2.4",
+    "@angular/common": "22.2.4",
+    "@angular/compiler": "22.2.4",
+    "@angular/compiler-cli": "22.2.4",
+    "@angular/core": "22.2.4",
+    "@angular/platform-browser": "22.2.4",
+    "@angular/platform-server": "22.2.4",
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "rxjs": "7.8.2",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./clock": {
+        "types": "./dist/src/clock.d.ts",
+        "default": "./dist/src/clock.js"
+      },
+      "./texts": {
+        "types": "./dist/src/texts.d.ts",
+        "default": "./dist/src/texts.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/angularRenderer.d.ts",
+        "default": "./dist/src/angularRenderer.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyTemplate.d.ts",
+        "default": "./dist/src/storyTemplate.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/angular.d.ts",
+        "default": "./dist/src/vite/angular.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
+  }
+}

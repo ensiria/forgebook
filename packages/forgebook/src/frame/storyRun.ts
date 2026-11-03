@@ -170,6 +170,10 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let mountCount = 0;
   let hasPlayed = false;
   let prepared: PreparedStory = NOT_PREPARED;
+  // the story's mocks, started by its first mount and kept until the page is left: a story drawn again has the same
+  // handlers, and stopping MSW's worker to start it at once again lets the worker forget the page after it started
+  // serving it again, so the new mount's requests would go to the network
+  let mocks: Promise<() => void> | undefined;
 
   // the story's actions are recorded whatever the shell names: a spy, an `argTypes` action
   const actions = actionNames(story.args, story.argTypes);
@@ -214,7 +218,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     clock,
     decorators,
     globals,
-    loaded: prepared.loaded
+    loaded: prepared.loaded,
+    onEvent: options.onEvent
   });
 
   const clearError = (): void => {
@@ -348,8 +353,9 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     prepared = NOT_PREPARED;
     try {
       await previous.cleanup();
-      const stopMocks = await startStoryMocks(story.parameters, options.mockTools);
-      const hooks = await prepareStory(story, {
+      mocks ??= startStoryMocks(story.parameters, options.mockTools);
+      await mocks;
+      const next = await prepareStory(story, {
         ...options.identity,
         args: shownArgs(),
         text,
@@ -357,13 +363,6 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
         globals,
         parameters: story.parameters
       });
-      const next: PreparedStory = {
-        ...hooks,
-        cleanup: async (): Promise<void> => {
-          await hooks.cleanup();
-          stopMocks();
-        }
-      };
       // a later mount started while this one loaded: its set-ups are undone, the later one draws
       if (count !== mountCount) {
         await next.cleanup();
@@ -402,6 +401,10 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       const previous = prepared;
       prepared = NOT_PREPARED;
       void previous.cleanup();
+      void mocks?.then(
+        (stopMocks) => stopMocks(),
+        () => undefined
+      );
     },
     setShown: (shown: Pick<StoryDrawing, "texts" | "globals">): void => {
       ({ texts, globals } = shown);

@@ -1,0 +1,31 @@
+{
+  "name": "@fixture/nextjs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A small Next.js app (App Router) whose components have stories: Forgebook's Next.js catalogue, which the shell's browser tests open.",
+  "type": "module",
+  "scripts": {
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "next": "next dev",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@forgebook/nextjs": "workspace:*",
+    "@forgebook/react": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "forgebook": "workspace:*",
+    "msw": "3.0.3",
+    "next": "16.4.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "vite": "8.3.5"
+  }
+}

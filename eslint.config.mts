@@ -32,6 +32,8 @@ const config: Linter.Config[] = [
       "**/node_modules/**",
       "**/dist/**",
       "**/.heights-build/**",
+      "**/.svelte-check/**",
+      "**/.svelte-kit/**",
       "**/public/**",
       // React Native's JavaScript as Metro reads it (JSX in `.js`, Flow): the React Native plugin's fixtures
       "fixtures/react-native/src/legacy/**",

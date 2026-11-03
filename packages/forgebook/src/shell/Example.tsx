@@ -58,7 +58,7 @@ export type ExampleContext = {
   readonly settled: ReadonlySet<string>;
   /** The story file's code. */
   readonly code: Loaded<StoryFileCode>;
-  /** The component's name, for the JSX of a story drawn from its args. */
+  /** The component's name as code writes it (`codeNameOf`), for the code of a story drawn from its args. */
   readonly componentName: string;
   /** A story's own args, as its frame reported them; none before it loads. */
   readonly argsOf: (storyId: string) => PanelArgs;

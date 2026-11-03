@@ -1,0 +1,5 @@
+// A project as create-vue makes it: this file holds nothing, the references do.
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "@fixture/sveltekit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The SvelteKit fixture catalogue: a small SvelteKit 3 app whose components read $app/state, $app/navigation, $app/forms, $app/paths, the environment and a page's load, drawn by Forgebook.",
+  "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
+  "scripts": {
+    "prepare": "svelte-kit sync",
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "test": "vitest run",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig tsconfig.json --fail-on-warnings"
+  },
+  "devDependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/sveltekit": "workspace:*",
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@sveltejs/kit": "3.1.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "msw": "3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sass-embedded": "1.106.1",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

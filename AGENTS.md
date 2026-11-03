@@ -9,9 +9,18 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
 - `packages/forgebook`: the core (`forgebook` on npm): `src/shell` (the catalogue's page), `src/frame` (a story's
   frame), `src/vite` (the plugin, the props extractor, the answers to tools and agents), `bin/` (`forgebook`,
   `forgebook-docs`, `forgebook-texts`).
-- `packages/react` (`@forgebook/react`), `packages/story-format` (`@forgebook/story-format`, no dependencies),
-  `packages/testing` (`@forgebook/testing`).
-- `fixtures/`: the kit, the stories written the Storybook way, and the catalogue the shell's browser tests run on.
+- `packages/react` (`@forgebook/react`), `packages/vue` (`@forgebook/vue`), `packages/nextjs` (`@forgebook/nextjs`, on
+  React's), `packages/nuxt` (`@forgebook/nuxt`, on Vue's), `packages/svelte` (`@forgebook/svelte`), `packages/sveltekit`
+  (`@forgebook/sveltekit`, on Svelte's), `packages/solid` (`@forgebook/solid`), `packages/preact` (`@forgebook/preact`),
+  `packages/web-components` (`@forgebook/web-components`), `packages/html` (`@forgebook/html`), `packages/angular`
+  (`@forgebook/angular`), `packages/react-native-web` (`@forgebook/react-native-web`, on React's),
+  `packages/story-format` (`@forgebook/story-format`, no dependencies), `packages/testing` (`@forgebook/testing`).
+- `fixtures/`: the kit, the stories written the Storybook way, the catalogue the shell's browser tests run on, and the
+  Vue, Svelte, Solid, Preact, Web Components, plain HTML, Angular and React Native catalogues (`fixtures/vue`,
+  `fixtures/svelte`, `fixtures/solid`, `fixtures/preact`, `fixtures/web-components`, `fixtures/html`,
+  `fixtures/angular`, `fixtures/react-native`) and small
+  SvelteKit, Next.js and Nuxt apps (`fixtures/sveltekit`, `fixtures/nextjs`, `fixtures/nuxt`) whose catalogues they
+  open beside it.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
 
 ## Before you say a change is done
@@ -46,7 +55,9 @@ case, with the reason (`// biome-ignore lint/…: the protocol names this field`
 - **Tools and agents get what the shell shows**: the dev server's answers (`src/vite/agentRoutes.ts`) load the same
   sources and previews as the pages; `forgebook stories`, `forgebook story` and `forgebook mcp` are its clients.
 - The shell's texts are in `src/shell/strings.ts`, one place. Messages between the shell and a frame are typed in
-  `src/messages.ts` and checked on arrival, same origin only.
+  `src/messages.ts` and checked on arrival, from the other side's origin only: the frames run on an origin of their
+  own (`src/frameOrigins.ts`, the dev server's second port in `src/vite/framesServer.ts`), so a story cannot reach the
+  catalogue; nothing in the shell reads a frame's document directly.
 - **The core stays light.** No new dependency of `forgebook` without an issue first; a heavy tool (Playwright, Testing
   Library, Sass) is an optional peer the project installs.
 

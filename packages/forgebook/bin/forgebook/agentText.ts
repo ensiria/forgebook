@@ -11,13 +11,20 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
-import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type {
+  StoryCheckReport,
+  StoryCheckResult,
+  StoryDiffReport,
+  StoryShotReport
+} from "../../src/storyCheck.ts";
 import type {
   AgentTokenSummary,
   CheckedCodeDocument,
   ErrorsDocument,
   FoundComponentsDocument,
   NearestTokensDocument,
+  PageDocument,
+  PagesDocument,
   StoriesDocument,
   StoryDocument,
   TokensDocument
@@ -60,11 +67,28 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["File", document.component.file],
     ["Opens at", document.story.links.address],
     ["Frame", document.story.links.frame],
+    ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
     ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
+  if (document.design !== undefined) entries.push(["Design", document.design.figma]);
   return keyValue(entries, uncut(style));
+};
+
+/** What a model judged, each line saying it is an opinion. */
+const judgementLines = (result: StoryCheckResult): readonly string[][] => {
+  const row = (text: string): string[] => [
+    result.storyId,
+    result.view || "default",
+    `model's opinion: ${text}`
+  ];
+  const { judgements } = result;
+  if (judgements === undefined) return [];
+  if (typeof judgements === "string") return [row(judgements)];
+  return judgements.length === 0
+    ? [row("nothing to report")]
+    : judgements.map((each) => row(`${each.criterion} ${each.message}`.trim()));
 };
 
 /**
@@ -76,15 +100,16 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
  */
 export const checkText = (report: StoryCheckReport, style: OutputStyle): string =>
   table(
-    report.results.flatMap((result) =>
-      result.problems.length === 0
+    report.results.flatMap((result) => [
+      ...(result.problems.length === 0
         ? [[result.storyId, result.view || "default", "passes"]]
         : result.problems.map((problem) => [
             result.storyId,
             result.view || "default",
             `${problem.kind}: ${problem.message}`
-          ])
-    ),
+          ])),
+      ...judgementLines(result)
+    ]),
     { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Result" }] },
     uncut(style)
   );
@@ -137,6 +162,38 @@ export const shotText = (
   table(
     report.shots.map((shot) => [shot.storyId, shot.view || "default", shownFile(shot.file)]),
     { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Picture" }] },
+    uncut(style)
+  );
+
+/**
+ * A comparison with the baselines as a person reads it.
+ *
+ * @param report - the results.
+ * @param shownFile - how a file is named.
+ * @param style - the output's style.
+ */
+export const diffText = (
+  report: StoryDiffReport,
+  shownFile: (file: string) => string,
+  style: OutputStyle
+): string =>
+  table(
+    report.results.map((each) => [
+      each.storyId,
+      each.view || "default",
+      each.status,
+      each.status === "changed" ? `${each.percent.toFixed(2)} %` : "",
+      each.diff === undefined ? "" : shownFile(each.diff)
+    ]),
+    {
+      columns: [
+        { header: "Story" },
+        { header: "View", tone: "muted" },
+        { header: "Status" },
+        { header: "Changed" },
+        { header: "Marked" }
+      ]
+    },
     uncut(style)
   );
 
@@ -232,3 +289,29 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
     ...document.skipped.map((each) => `Not checked: ${each}`)
   ].join("\n");
 };
+
+/**
+ * The docs pages as a table: one row per page, its id first (what `forgebook page` takes), then its title and how many
+ * stories it shows.
+ *
+ * @param document - the pages document.
+ * @param style - colours, glyphs and width.
+ */
+export const pagesText = (document: PagesDocument, style: OutputStyle): string =>
+  document.pages.length === 0
+    ? "No docs pages here."
+    : table(
+        document.pages.map((page) => [page.id, page.title, String(page.stories.length)]),
+        {
+          columns: [{ header: "Id" }, { header: "Page", tone: "muted" }, { header: "Stories", tone: "muted" }]
+        },
+        uncut(style)
+      );
+
+/**
+ * One docs page as a person reads it: where it opens, then its Markdown.
+ *
+ * @param document - the page's document.
+ */
+export const pageText = (document: PageDocument): string =>
+  [document.page.links.address, "", document.text].join("\n");

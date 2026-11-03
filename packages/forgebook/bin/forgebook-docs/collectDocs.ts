@@ -14,15 +14,19 @@ import { globSync, readFileSync } from "node:fs";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
+import { csfStoryId } from "../../src/storyIds.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
+import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
+import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import { readTokenFiles, type SourceTokens, sourceTokensIn } from "../../src/vite/sourceTokens.ts";
 import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type {
   CatalogueComponent,
   CatalogueData,
+  CataloguePage,
   ModuleDocs,
   SassModuleDocs,
   StyleSheetDocs
@@ -60,6 +64,41 @@ const sourceExports = (manifest: unknown): Readonly<Record<string, string>> => {
 const isLogicFile = (index: StoryFileIndex): boolean =>
   index.stories.length > 0 && index.stories.every((story) => (story.isLogic ?? index.isLogic) === true);
 
+/**
+ * A story file's main story (`parameters.main`, else its first): its export and its id without the source's.
+ *
+ * @param index - the file's index.
+ */
+const mainStoryOf = (index: StoryFileIndex): Pick<CatalogueComponent, "mainStory" | "mainStoryId"> => {
+  const main = index.stories.find((story) => story.isMain === true) ?? index.stories[0];
+  if (main === undefined) return { mainStory: undefined, mainStoryId: undefined };
+  return {
+    mainStory: main.exportName,
+    mainStoryId: main.id ?? csfStoryId(index.id ?? index.title, main.exportName)
+  };
+};
+
+/**
+ * Adds a story file's component to the list, or its stories to the component of its title already listed: files with
+ * one title are one component, as the catalogue lists them, with the first file's docs and main story.
+ *
+ * @param components - the components so far.
+ * @param component - the file's.
+ */
+const addComponent = (components: CatalogueComponent[], component: CatalogueComponent): void => {
+  const same = components.findIndex((each) => each.title === component.title);
+  const first = components[same];
+  if (first === undefined) {
+    components.push(component);
+    return;
+  }
+  components[same] = {
+    ...first,
+    stories: [...first.stories, ...component.stories],
+    isLogic: first.isLogic && component.isLogic
+  };
+};
+
 /** The components of the package's story files, read by the framework's extractor. */
 const collectComponents = (
   packageDir: string,
@@ -94,14 +133,16 @@ const collectComponents = (
     // a component no subpath exports is a story's own (a foundations page), not part of the package
     if (subpath === undefined || isExcluded(subpath, exclude)) continue;
     componentFiles.add(VITE_PATHS.normalize(component.file));
-    components.push({
+    const collected: CatalogueComponent = {
       title: index.title,
       subpath,
       docs: component.docs,
       stories: index.stories.map((story) => story.name ?? story.exportName),
-      mainStory: (index.stories.find((story) => story.isMain === true) ?? index.stories[0])?.exportName,
-      isLogic: isLogicFile(index)
-    });
+      ...mainStoryOf(index),
+      isLogic: isLogicFile(index),
+      design: index.design?.url
+    };
+    addComponent(components, collected);
   }
   return { components, componentFiles };
 };
@@ -160,6 +201,50 @@ const collectTokens = (
   return { tokens, problems: [...declared.problems, ...problems] };
 };
 
+/** A `?forgebook-docs-pages` import of a source module: its pattern, before the query. */
+const PAGES_IMPORT = /["']([^"']+)\?forgebook-docs-pages["']/g;
+
+/** A page's position: its `order`, or after every page with one. */
+const orderOf = (order: number | undefined): number => order ?? Number.POSITIVE_INFINITY;
+
+/**
+ * The docs pages a package's `./stories` export declares, read from its `?forgebook-docs-pages` imports, in reading
+ * order.
+ *
+ * @param packageDir - the package's folder.
+ * @param exports - its exports.
+ * @param problems - receives what the pages' index noticed.
+ */
+const collectPages = (
+  packageDir: string,
+  exports: Readonly<Record<string, string>>,
+  problems: string[]
+): CataloguePage[] => {
+  const source = exports[STORIES_SUBPATH];
+  if (source === undefined) return [];
+  const file = VITE_PATHS.resolve(packageDir, source);
+  const patterns = [...(readLinkedFile(file) ?? "").matchAll(PAGES_IMPORT)].flatMap(
+    (match) => match[1] ?? []
+  );
+  const pages = patterns.flatMap((pattern) =>
+    indexedDocPages(VITE_PATHS.dirname(file), pattern, (): void => undefined)
+  );
+  for (const page of pages)
+    for (const note of page.index.notes ?? [])
+      problems.push(`${VITE_PATHS.relative(packageDir, page.file)}: ${note}`);
+  return pages
+    .sort(
+      (left, right) =>
+        orderOf(left.index.order) - orderOf(right.index.order) ||
+        left.index.title.localeCompare(right.index.title)
+    )
+    .map((page) => ({
+      title: page.index.title,
+      file: VITE_PATHS.relative(packageDir, page.file),
+      description: page.index.description
+    }));
+};
+
 /**
  * Reads a package for its catalogue.
  *
@@ -206,6 +291,7 @@ export const collectDocs = (
       description,
       sourceId: declared?.id,
       components,
+      pages: collectPages(packageDir, exports, problems),
       modules,
       sassModules,
       styleSheets,

@@ -1,0 +1,11 @@
+// The Web Components package's sources that run in a page: the renderer, the frame page and the code writer, and the
+// server render the renderer loads on Node. `vite/` runs on Node and has its own tsconfig.json.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": ["."],
+  "exclude": ["vite"]
+}

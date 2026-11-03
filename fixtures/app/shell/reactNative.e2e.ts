@@ -7,9 +7,9 @@
  */
 import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 
-import { REACT_NATIVE_PORT } from "./ports";
+import { catalogueUrl } from "./ports";
 
-test.use({ baseURL: `http://127.0.0.1:${REACT_NATIVE_PORT}/` });
+test.use({ baseURL: catalogueUrl("react-native") });
 
 /** Every story of the fixture, by its id without the source. */
 const STORY_IDS = [

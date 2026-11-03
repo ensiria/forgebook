@@ -1,73 +1,109 @@
 /**
- * The Forgebook framework a project's Storybook moves to: React's for `@storybook/react-vite`, React Native's (through
- * react-native-web) for `@storybook/react-native-web-vite`, for Storybook's older React Native Web addon and for
- * on-device Storybook (`@storybook/react-native`), with what each says that Forgebook reads.
+ * The Forgebook framework a project's Storybook moves to, chosen from the Storybook framework `main` names (or, for
+ * React Native, the addon or the folder that says it), with what that framework takes from the project: its adapter's
+ * options and what was not read.
  *
  * @remarks
- * Pure: `main`'s configuration in, the framework and the notes out; `storybook.ts` loads `main` and calls it. The
- * React Native frameworks give the packages they compile (`modulesToTranspile`) to `reactNativeWeb({ nativePackages })`;
- * their `pluginReactOptions` (the JSX import source, Babel's plugins and presets, the files) become the adapter's
- * options of the same meaning; what cannot be written as a plain value (a function, a regular expression) is named
- * in a note.
+ * One table maps Storybook's frameworks to Forgebook's; `storybook.ts` loads `main` and asks this module which one it
+ * is, so a framework is added in one place. A framework whose project says more than its stories (a Next.js app's
+ * `next.config`, an Angular project's `angular.json`, React Native's compiled packages and Babel) has a reader of its
+ * own beside this one, called from `frameworkSettings`.
  *
  * @module
  */
-import { VITE_PATHS } from "../../../src/vite/vitePaths.ts";
+import { basename } from "node:path";
 
-/** A Forgebook framework, as the written configuration names it. */
-export type ImportedFramework = {
-  /** The package whose `./vite` export has the adapter (`@forgebook/react`). */
-  readonly packageName: string;
-  /** The adapter's function, called in the configuration (`react`). */
-  readonly adapter: string;
-  /** The adapter's options, plain values written into the configuration; none when there are none. */
-  readonly options?: Readonly<Record<string, unknown>>;
-  /** The packages it needs beside its own that a project may not have yet (`react-native-web`); none by default. */
-  readonly peers?: readonly string[];
+import { VITE_PATHS } from "../../../src/vite/vitePaths.ts";
+import { importAngular } from "./storybookAngular.ts";
+import {
+  importReactNative,
+  ON_DEVICE_STORYBOOK,
+  REACT_NATIVE_WEB_ADDON,
+  REACT_NATIVE_WEB_VITE,
+  reactNativePeers
+} from "./storybookReactNative.ts";
+
+/** The frameworks a project's stories can move to Forgebook with: `@forgebook/<name>`. */
+export type ImportedFramework =
+  | "react"
+  | "vue"
+  | "svelte"
+  | "sveltekit"
+  | "preact"
+  | "solid"
+  | "nextjs"
+  | "web-components"
+  | "html"
+  | "nuxt"
+  | "angular"
+  | "react-native-web";
+
+/**
+ * The function each framework's `@forgebook/<name>/vite` exports, which a configuration calls: the framework's name, or
+ * its camel case where the name is no identifier.
+ */
+export const ADAPTER_FUNCTIONS: Readonly<Record<ImportedFramework, string>> = {
+  react: "react",
+  vue: "vue",
+  svelte: "svelte",
+  sveltekit: "sveltekit",
+  preact: "preact",
+  solid: "solid",
+  nextjs: "nextjs",
+  "web-components": "webComponents",
+  html: "html",
+  nuxt: "nuxt",
+  angular: "angular",
+  "react-native-web": "reactNativeWeb"
 };
 
-/** The framework and what was not read. */
-export type FrameworkReading = {
+/** The Forgebook frameworks a project's Storybook can move to, by Storybook's framework. */
+const STORYBOOK_FRAMEWORKS: Readonly<Record<string, ImportedFramework>> = {
+  "@storybook/react-vite": "react",
+  "@storybook/vue3-vite": "vue",
+  "@storybook/svelte-vite": "svelte",
+  "@storybook/sveltekit": "sveltekit",
+  "@storybook/preact-vite": "preact",
+  // Solid's Storybook framework is the community's, published under its own name
+  "storybook-solidjs-vite": "solid",
+  "@storybook/web-components-vite": "web-components",
+  "@storybook/html-vite": "html",
+  // Nuxt's Storybook module sets up a framework of its own, on Vue's
+  "@storybook-vue/nuxt": "nuxt",
+  // Angular's two compile a story the same way, through the Angular adapter's Vite plugin
+  "@storybook/angular": "angular",
+  "@analogjs/storybook-angular": "angular",
+  "@storybook/nextjs-vite": "nextjs",
+  "@storybook/nextjs": "nextjs",
+  [REACT_NATIVE_WEB_VITE]: "react-native-web",
+  // an addon beside a React framework on webpack, which makes the stories React Native's whatever the framework
+  [REACT_NATIVE_WEB_ADDON]: "react-native-web",
+  // on-device Storybook, drawn in the browser through react-native-web
+  [ON_DEVICE_STORYBOOK]: "react-native-web"
+};
+
+/** The Storybook packages Forgebook reads, as a refusal names them. */
+export const STORYBOOK_PACKAGES: readonly string[] = Object.keys(STORYBOOK_FRAMEWORKS);
+
+/** What a Nuxt project's stories get differently once moved, said once the configuration is written. */
+const NUXT_NOTES = [
+  "Nuxt's modules and plugins are not run: a component that needs what one provides (a store, i18n) gets it from a decorator",
+  "A story's route, data, state and cookies are set with parameters.nuxt (route, data, state, cookies), not by a decorator that drives the router"
+] as const;
+
+/** What a framework takes from a project's Storybook besides its stories. */
+export type FrameworkSettings = {
   /** The Forgebook framework. */
   readonly framework: ImportedFramework;
-  /** What Forgebook does not read of the Storybook framework, each a sentence. */
+  /** Its adapter's options, plain values; none for its defaults. */
+  readonly options: Readonly<Record<string, unknown>> | undefined;
+  /** What was not read, each a sentence for the person who runs the command. */
   readonly notes: readonly string[];
 };
-
-/** Storybook's React framework on Vite. */
-const REACT_VITE = "@storybook/react-vite";
-
-/** Storybook's React Native framework for the browser, on Vite. */
-const REACT_NATIVE_WEB_VITE = "@storybook/react-native-web-vite";
-
-/** Storybook's older React Native Web addon, on webpack, beside a React framework. */
-const REACT_NATIVE_WEB_ADDON = "@storybook/addon-react-native-web";
-
-/** The Storybook frameworks Forgebook reads, as a refusal names them. */
-export const STORYBOOK_FRAMEWORKS: readonly string[] = [
-  REACT_VITE,
-  REACT_NATIVE_WEB_VITE,
-  "on-device @storybook/react-native"
-];
-
-/** React, as Forgebook's configuration names it. */
-const REACT: ImportedFramework = { packageName: "@forgebook/react", adapter: "react" };
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-/**
- * Whether a package name or a path to it names a package: Storybook's monorepo template writes the path
- * (`getAbsolutePath("@storybook/react-vite")`).
- *
- * @param written - the name or the path.
- * @param name - the package.
- */
-const names = (written: string, name: string): boolean => {
-  const path = VITE_PATHS.normalize(written).replace(/\/$/, "");
-  return path === name || path.endsWith(`/${name}`);
-};
 
 /**
  * A framework or an addon as `main` writes it: a text, or an object with its `name` and its `options`.
@@ -85,210 +121,127 @@ const entryOf = (
   };
 };
 
-/** Options read from Storybook, written into the configuration, with what could not be. */
-type ReadOptions = {
-  /** The options, plain values. */
-  readonly options: Readonly<Record<string, unknown>>;
-  /** What was left out, each a sentence. */
-  readonly notes: readonly string[];
-};
-
 /**
- * A value read as a list: a list as it is, nothing as none, anything else as a list of itself.
- *
- * @param value - the value.
- */
-const listOf = (value: unknown): readonly unknown[] => {
-  if (Array.isArray(value)) return value;
-  return value === undefined ? [] : [value];
-};
-
-/**
- * The texts of a list, with a note when it holds something else (a function, a regular expression), which cannot be
- * written as a plain value.
- *
- * @param value - the list, as `main` writes it.
- * @param field - its name, for the note.
- */
-const texts = (value: unknown, field: string): { readonly values: string[]; readonly notes: string[] } => {
-  const list = listOf(value);
-  const values = list.filter((item) => typeof item === "string");
-  const notes =
-    values.length === list.length ? [] : [`${field}: only names are written; copy the others by hand`];
-  return { values, notes };
-};
-
-/**
- * Whether a value is written as it is in JSON: texts, finite numbers, booleans, `null`, and lists and objects of them.
- *
- * @param value - the value.
- */
-const isPlain = (value: unknown): boolean => {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
-  if (typeof value === "number") return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every(isPlain);
-  return (
-    isRecord(value) &&
-    Object.getPrototypeOf(value) === Object.prototype &&
-    Object.values(value).every(isPlain)
-  );
-};
-
-/**
- * Babel's plugins or presets as the configuration writes them: a name, or a name and plain options.
- *
- * @param value - the list, as `main` writes it.
- * @param field - its name, for the note.
- */
-const babelItems = (
-  value: unknown,
-  field: string
-): { readonly values: unknown[]; readonly notes: string[] } => {
-  const list = Array.isArray(value) ? value : [];
-  const values = list.filter(
-    (item) =>
-      typeof item === "string" ||
-      (Array.isArray(item) &&
-        item.length === 2 &&
-        typeof item[0] === "string" &&
-        isRecord(item[1]) &&
-        isPlain(item[1]))
-  );
-  const notes =
-    values.length === list.length
-      ? []
-      : [
-          `${field}: an item that is not a name, or a name with plain options (a function, a regular expression, a third element), is not written; copy it by hand`
-        ];
-  return { values, notes };
-};
-
-/**
- * The notes on Storybook options that are not read at all: the deprecated `pluginBabelOptions`, and a `babel` that is
- * not a plain object.
- *
- * @param options - the framework's options.
- * @param react - its `pluginReactOptions`.
- */
-const shapeNotes = (
-  options: Readonly<Record<string, unknown>>,
-  react: Readonly<Record<string, unknown>>
-): string[] => {
-  const notes: string[] = [];
-  if (options["pluginBabelOptions"] !== undefined)
-    notes.push(
-      "pluginBabelOptions is not read (Storybook no longer reads it either): name Babel's plugins in babel"
-    );
-  if (react["babel"] !== undefined && !isRecord(react["babel"]))
-    notes.push(
-      "pluginReactOptions.babel is not a plain object: copy its plugins and presets into babel by hand"
-    );
-  return notes;
-};
-
-/**
- * `reactNativeWeb()`'s options from a Storybook React Native framework's: `modulesToTranspile` as `nativePackages`,
- * `pluginReactOptions`' JSX import source, Babel plugins and presets, and files.
- *
- * @param options - the framework's or the addon's options.
- */
-export const reactNativeWebOptions = (options: Readonly<Record<string, unknown>>): ReadOptions => {
-  const react = isRecord(options["pluginReactOptions"]) ? options["pluginReactOptions"] : {};
-  const babel = isRecord(react["babel"]) ? react["babel"] : {};
-  const nativePackages = texts(options["modulesToTranspile"], "modulesToTranspile");
-  // the older addon names its Babel plugins beside its options
-  const plugins = babelItems(babel["plugins"] ?? options["babelPlugins"], "babel.plugins");
-  const presets = babelItems(babel["presets"], "babel.presets");
-  const include = texts(react["include"], "pluginReactOptions.include");
-  const exclude = texts(react["exclude"], "pluginReactOptions.exclude");
-  const jsxImportSource = react["jsxImportSource"];
-  const notes = [
-    ...shapeNotes(options, react),
-    ...nativePackages.notes,
-    ...plugins.notes,
-    ...presets.notes,
-    ...include.notes,
-    ...exclude.notes,
-    ...(react["jsxRuntime"] === "classic"
-      ? ["jsxRuntime classic is not read: JSX is compiled for the automatic runtime"]
-      : [])
-  ];
-  const written: Record<string, unknown> = {
-    ...(nativePackages.values.length === 0 ? {} : { nativePackages: nativePackages.values }),
-    ...(typeof jsxImportSource === "string" && jsxImportSource !== "react" ? { jsxImportSource } : {}),
-    ...(plugins.values.length === 0 && presets.values.length === 0
-      ? {}
-      : {
-          babel: {
-            ...(plugins.values.length === 0 ? {} : { plugins: plugins.values }),
-            ...(presets.values.length === 0 ? {} : { presets: presets.values })
-          }
-        }),
-    ...(include.values.length === 0 ? {} : { include: include.values }),
-    ...(exclude.values.length === 0 ? {} : { exclude: exclude.values })
-  };
-  return { options: written, notes };
-};
-
-/**
- * React Native through react-native-web, with a Storybook framework's options.
- *
- * @param read - the options read.
- */
-const reactNativeWeb = (read: ReadOptions): ImportedFramework => ({
-  packageName: "@forgebook/react-native-web",
-  adapter: "reactNativeWeb",
-  peers: [
-    "react-native-web",
-    // Babel runs through Rolldown's plugin, which a catalogue without Babel installs not
-    ...("babel" in read.options ? ["@rolldown/plugin-babel", "@babel/core"] : [])
-  ],
-  ...(Object.keys(read.options).length === 0 ? {} : { options: read.options })
-});
-
-/**
- * The Forgebook framework of a project's Storybook.
+ * The framework `main` names: a text, or an object with its `name` and its `options`.
  *
  * @param main - `main`'s configuration.
- * @param isOnDevice - whether `main` is on-device Storybook's (`.rnstorybook`, or a project on
- *   `@storybook/react-native`), which names no framework or names that package.
- * @returns the framework and the notes, or none for a framework Forgebook does not read.
  */
-export const storybookFramework = (
+export const frameworkOf = (
+  main: Readonly<Record<string, unknown>>
+): { readonly name: string | undefined; readonly options: Readonly<Record<string, unknown>> } =>
+  entryOf(main["framework"]);
+
+/**
+ * The Storybook package a name or a path stands for, among the table's: its name, or a path to its package, as
+ * Storybook's monorepo template writes it (`getAbsolutePath("@storybook/react-vite")`).
+ *
+ * @param written - the name or the path.
+ */
+const knownPackage = (written: string | undefined): string | undefined => {
+  if (written === undefined) return undefined;
+  const path = VITE_PATHS.normalize(written).replace(/\/$/, "");
+  return STORYBOOK_PACKAGES.find((name) => path === name || path.endsWith(`/${name}`));
+};
+
+/**
+ * The addon `main` lists by a package, with its options.
+ *
+ * @param main - `main`'s configuration.
+ * @param name - the addon's package.
+ */
+const addonOf = (
+  main: Readonly<Record<string, unknown>>,
+  name: string
+): { readonly options: Readonly<Record<string, unknown>> } | undefined => {
+  const addons = Array.isArray(main["addons"]) ? main["addons"].map(entryOf) : [];
+  return addons.find((addon) => knownPackage(addon.name) === name);
+};
+
+/**
+ * The Storybook package that decides a project's framework: React Native Web's addon when `main` lists it, else the
+ * framework `main` names, else on-device Storybook's for a project on it whose `main` names none.
+ *
+ * @param main - `main`'s configuration.
+ * @param isOnDevice - whether the project is on-device Storybook's (`.rnstorybook`, or `@storybook/react-native`).
+ * @returns the package, or none for a framework Forgebook does not read.
+ */
+export const storybookPackage = (
   main: Readonly<Record<string, unknown>>,
   isOnDevice: boolean
-): FrameworkReading | undefined => {
-  const framework = entryOf(main["framework"]);
-  const addons = Array.isArray(main["addons"]) ? main["addons"].map(entryOf) : [];
-  if (framework.name !== undefined && names(framework.name, REACT_NATIVE_WEB_VITE)) {
-    const read = reactNativeWebOptions(framework.options);
-    return { framework: reactNativeWeb(read), notes: read.notes };
-  }
-  const addon = addons.find((each) => each.name !== undefined && names(each.name, REACT_NATIVE_WEB_ADDON));
-  if (addon !== undefined) {
-    const read = reactNativeWebOptions(addon.options);
-    return {
-      framework: reactNativeWeb(read),
-      notes: [
-        `${REACT_NATIVE_WEB_ADDON} ran on webpack: Forgebook draws React Native through react-native-web on Vite`,
-        ...read.notes
-      ]
-    };
-  }
-  const isOnDeviceFramework =
-    framework.name !== undefined && names(framework.name, "@storybook/react-native");
-  if (isOnDeviceFramework || (framework.name === undefined && isOnDevice)) {
-    return {
-      framework: reactNativeWeb({ options: {}, notes: [] }),
-      notes: [
-        "On-device Storybook: the stories are drawn in the browser through react-native-web, so a component that needs a native module does not draw",
-        ...(main["deviceAddons"] === undefined
-          ? []
-          : ["The device addons are left out: Forgebook has its own panel"])
-      ]
-    };
-  }
-  return framework.name !== undefined && names(framework.name, REACT_VITE)
-    ? { framework: REACT, notes: [] }
-    : undefined;
+): string | undefined => {
+  if (addonOf(main, REACT_NATIVE_WEB_ADDON) !== undefined) return REACT_NATIVE_WEB_ADDON;
+  const { name } = frameworkOf(main);
+  if (name === undefined) return isOnDevice ? ON_DEVICE_STORYBOOK : undefined;
+  return knownPackage(name);
 };
+
+/**
+ * What a Next.js project's Storybook says that the Next.js framework reads: its `next.config` when not where Next.js
+ * looks, and what Forgebook does without being told.
+ *
+ * @param main - `main`'s configuration.
+ * @param storybook - Storybook's framework package.
+ * @param projectDir - the project's folder.
+ * @returns the framework's options, and the notes.
+ */
+const nextjsSettings = (
+  main: Readonly<Record<string, unknown>>,
+  storybook: string,
+  projectDir: string
+): { readonly options: Readonly<Record<string, string>> | undefined; readonly notes: string[] } => {
+  const notes: string[] = [];
+  if (storybook === "@storybook/nextjs")
+    notes.push(
+      "Storybook's Next.js framework on webpack: Forgebook runs on Vite, so webpackFinal and a Babel configuration are not read"
+    );
+  const features = main["features"];
+  if (isRecord(features) && features["experimentalRSC"] === true)
+    notes.push("experimentalRSC is not needed: Forgebook draws async server components without a flag");
+  const { nextConfigPath } = frameworkOf(main).options;
+  // the Next.js app's folder is where its next.config is: its tsconfig, .env files and PostCSS are there too
+  const file =
+    typeof nextConfigPath === "string" ? VITE_PATHS.resolve(projectDir, nextConfigPath) : undefined;
+  const appDir = file === undefined ? "" : VITE_PATHS.relative(projectDir, VITE_PATHS.dirname(file));
+  const options =
+    file === undefined
+      ? undefined
+      : { ...(appDir === "" ? {} : { dir: appDir }), nextConfig: basename(file) };
+  return { options, notes };
+};
+
+/**
+ * The Forgebook framework of a Storybook package, with what it takes from the project besides its stories: its
+ * adapter's options, and what was not read.
+ *
+ * @param storybook - the Storybook package (`storybookPackage`).
+ * @param main - `main`'s configuration.
+ * @param projectDir - the project's folder, absolute.
+ * @param storybookDir - the Storybook folder, absolute.
+ */
+export const frameworkSettings = (
+  storybook: string,
+  main: Readonly<Record<string, unknown>>,
+  projectDir: string,
+  storybookDir: string
+): FrameworkSettings => {
+  const framework = STORYBOOK_FRAMEWORKS[storybook] ?? "react";
+  if (framework === "nextjs") return { framework, ...nextjsSettings(main, storybook, projectDir) };
+  if (framework === "angular")
+    return { framework, ...importAngular(projectDir, storybookDir, frameworkOf(main).options) };
+  if (framework === "react-native-web") {
+    const options = addonOf(main, storybook)?.options ?? frameworkOf(main).options;
+    return { framework, ...importReactNative(storybook, options, main) };
+  }
+  return { framework, options: undefined, notes: framework === "nuxt" ? NUXT_NOTES : [] };
+};
+
+/**
+ * The packages a framework's adapter needs beside its own that a project may not have yet: none for most.
+ *
+ * @param framework - the Forgebook framework.
+ * @param options - its adapter's options.
+ */
+export const frameworkPeers = (
+  framework: ImportedFramework,
+  options: Readonly<Record<string, unknown>> | undefined
+): readonly string[] => (framework === "react-native-web" ? reactNativePeers(options) : []);

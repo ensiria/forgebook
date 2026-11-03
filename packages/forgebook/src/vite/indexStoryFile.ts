@@ -4,181 +4,52 @@
  *
  * @remarks
  * The sidebar lists every story before any is loaded, so the index comes from the code itself, parsed with Vite's
- * parser (the same files Vite compiles). It reads a meta written inline or as a constant (`export default meta`), a
- * story as an object (CSF 3) or as a function with its properties assigned after it (CSF 2: `A.storyName`,
- * `A.parameters`), named exports and re-exports (`export { A as B }`), `includeStories`, `excludeStories`,
- * `__namedExportsOrder`, the meta's and the stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
+ * parser (the same files Vite compiles). It reads a meta written inline or as a constant (`export default meta`,
+ * `export { meta as default }`), `includeStories`, `excludeStories`, `__namedExportsOrder`, the meta's and the
+ * stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
+ *
+ * Every named export the meta lets in is a story, as Storybook's indexer has it, whatever writes its value: an object
+ * (CSF 3), a function with its properties assigned after it (CSF 2: `A.storyName`, `A.parameters`), a template bound
+ * into a story, a helper's result (`makeStory(…)`), another constant (`export const B = A`), a re-export
+ * (`export { A as B }`, from this file or another). The fields come from the object a value is or names, and from what
+ * is assigned to the export; anything else is the frame's to read when the story loads. Only what does not exist when
+ * the file runs is left out: `export type`, and `export *`, whose names Storybook does not list either.
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
- * the story loads. `touch` and `logic` are read by the index only, so written by code they are a problem. A title written by code, or none, is the file's path (`autoTitle`, as Storybook's auto-title); one
- * written by code is also noted, since the author meant another. A value written plainly but wrongly
+ * the story loads. `touch`, `logic` and `design.figma` are read by the index only, so written by code they are a problem.
+ * A `design.figma` is checked here too, so the pages never carry the checker: one that is not a link to a Figma file is
+ * noted and left out, and the file keeps its stories. A title written by code, or none, is the file's path
+ * (`autoTitle`, as Storybook's auto-title); one written by code is also noted, since the author meant another. A value written plainly but wrongly
  * (`controls: true`) is a problem. Pure: text in, index or problem out.
  *
  * @module
  */
 
-import type { StoryGroup } from "@forgebook/story-format/csf";
-import type { StoryControlsSetting, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
+import type { FigmaLink, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
 import { type ESTree, parseSync } from "vite";
+
+import {
+  controlsOf,
+  designOf,
+  docsDescription,
+  type Fields,
+  flagsOf,
+  groupOf,
+  heightOf,
+  objectFields,
+  parameter,
+  propertyValue,
+  stringField,
+  stringListOf,
+  unwrapped
+} from "./indexFields.ts";
+import { moduleName, type NamedExport, namedExports } from "./storyExports.ts";
 
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
   /** The title from the file's path (`Inputs/Select`); none when the file's place gives none. */
   readonly autoTitle?: string;
-};
-
-/** A story's or a meta's fields by name: an object's properties, or a function story's assigned properties. */
-type Fields = (name: string) => ESTree.Expression | undefined;
-
-/**
- * An expression without the TypeScript wrappers a meta is often written with (`satisfies Meta<…>`, `as Meta`).
- *
- * @param expression - the expression.
- */
-export const unwrapped = (expression: ESTree.Expression): ESTree.Expression => {
-  if (
-    expression.type === "TSSatisfiesExpression" ||
-    expression.type === "TSAsExpression" ||
-    expression.type === "ParenthesizedExpression"
-  ) {
-    return unwrapped(expression.expression);
-  }
-  return expression;
-};
-
-/** A property key's name: an identifier's or a literal's; `undefined` for any other key. */
-const keyName = (key: ESTree.PropertyKey): string | undefined => {
-  if (key.type === "Identifier") return key.name;
-  return key.type === "Literal" ? String(key.value) : undefined;
-};
-
-/**
- * The value of an object's property written plainly (a name or a string as its key), its TypeScript wrappers removed.
- *
- * @param object - the object.
- * @param name - the property's name.
- */
-export const propertyValue = (
-  object: ESTree.ObjectExpression,
-  name: string
-): ESTree.Expression | undefined => {
-  for (const property of object.properties) {
-    if (property.type !== "Property" || property.computed) continue;
-    if (keyName(property.key) === name) return unwrapped(property.value);
-  }
-  return undefined;
-};
-
-/** An object's fields. */
-const objectFields =
-  (object: ESTree.ObjectExpression): Fields =>
-  (name: string): ESTree.Expression | undefined =>
-    propertyValue(object, name);
-
-/** Whether an expression is written plainly: a literal, or a list of literals; anything else is written by code. */
-const isPlain = (expression: ESTree.Expression): boolean =>
-  expression.type === "Literal" ||
-  (expression.type === "ArrayExpression" &&
-    expression.elements.every((element) => element !== null && element.type === "Literal"));
-
-/** A field's value when it is a plain string; `undefined` when it is missing or written by code. */
-const stringField = (fields: Fields, name: string): string | undefined => {
-  const value = fields(name);
-  return value?.type === "Literal" && typeof value.value === "string" ? value.value : undefined;
-};
-
-/** A field of the `parameters` object, when the fields write one as an object. */
-const parameter = (fields: Fields, name: string): ESTree.Expression | undefined => {
-  const parameters = fields("parameters");
-  return parameters?.type === "ObjectExpression" ? propertyValue(parameters, name) : undefined;
-};
-
-/** Why `parameters.controls` cannot be read. */
-const CONTROLS_PROBLEM = "`parameters.controls` must be written as `false` or a list of plain strings";
-
-/**
- * `parameters.controls`: `undefined` when none or written by code, `[]` for `false`, the names of a list, or a
- * problem when written plainly but wrongly.
- */
-const controlsOf = (fields: Fields): StoryControlsSetting | undefined | Error => {
-  const controls = parameter(fields, "controls");
-  if (controls === undefined || !isPlain(controls)) return undefined;
-  if (controls.type === "Literal" && controls.value === false) return [];
-  if (controls.type !== "ArrayExpression") return new Error(CONTROLS_PROBLEM);
-  const names = controls.elements.flatMap((element) =>
-    element?.type === "Literal" && typeof element.value === "string" ? [element.value] : []
-  );
-  return names.length === controls.elements.length ? names : new Error(CONTROLS_PROBLEM);
-};
-
-/** A list of plain strings: `undefined` when none or written by code, the strings, or a problem when it is wrong. */
-const stringListOf = (fields: Fields, name: string): readonly string[] | undefined | Error => {
-  const list = fields(name);
-  if (list === undefined || !isPlain(list)) return undefined;
-  if (list.type !== "ArrayExpression")
-    return new Error(`\`${name}\` must be written as a list of plain strings`);
-  const strings = list.elements.flatMap((element) =>
-    element?.type === "Literal" && typeof element.value === "string" ? [element.value] : []
-  );
-  return strings.length === list.elements.length
-    ? strings
-    : new Error(`\`${name}\` must be written as a list of plain strings`);
-};
-
-/** `parameters.group`: `undefined` when none or written by code, the group, or a problem when it is wrong. */
-const groupOf = (fields: Fields): StoryGroup | undefined | Error => {
-  const group = parameter(fields, "group");
-  if (group === undefined || !isPlain(group)) return undefined;
-  if (group.type === "Literal" && typeof group.value === "string" && group.value !== "") return group.value;
-  return new Error("`parameters.group` must be written as a plain string");
-};
-
-/**
- * A boolean parameter only the index reads (`touch`, `logic`): `true` or `false` written plainly, `undefined` when
- * none, or a problem otherwise. Written by code it would be lost, since the frame does not read it.
- *
- * @param fields - the story's or the meta's fields.
- * @param name - the parameter's name.
- */
-const booleanParameter = (fields: Fields, name: string): boolean | undefined | Error => {
-  const value = parameter(fields, name);
-  if (value === undefined) return undefined;
-  if (value.type === "Literal" && typeof value.value === "boolean") return value.value;
-  return new Error(`\`parameters.${name}\` must be written as a plain \`true\` or \`false\``);
-};
-
-/**
- * The flags a meta or a story sets (`touch`, `logic`), as the index keeps them: each only when written, or a problem.
- *
- * @param fields - the story's or the meta's fields.
- */
-const flagsOf = (fields: Fields): Pick<StoryIndexEntry, "isTouch" | "isLogic"> | Error => {
-  const touch = booleanParameter(fields, "touch");
-  if (touch instanceof Error) return touch;
-  const logic = booleanParameter(fields, "logic");
-  if (logic instanceof Error) return logic;
-  return {
-    ...(touch === undefined ? {} : { isTouch: touch }),
-    ...(logic === undefined ? {} : { isLogic: logic })
-  };
-};
-
-/** `parameters.height`: `undefined` when none or written by code, the height in CSS px, or a problem when wrong. */
-const heightOf = (fields: Fields): number | undefined | Error => {
-  const height = parameter(fields, "height");
-  if (height === undefined || !isPlain(height)) return undefined;
-  if (height.type === "Literal" && typeof height.value === "number" && height.value > 0) return height.value;
-  return new Error("`parameters.height` must be written as a plain positive number of CSS px");
-};
-
-/** `parameters.docs.description.<kind>`, when written as a plain string. */
-const docsDescription = (fields: Fields, kind: "story" | "component"): string | undefined => {
-  const docs = parameter(fields, "docs");
-  const description = docs?.type === "ObjectExpression" ? propertyValue(docs, "description") : undefined;
-  if (description?.type !== "ObjectExpression") return undefined;
-  const text = propertyValue(description, kind);
-  return text?.type === "Literal" && typeof text.value === "string" ? text.value : undefined;
 };
 
 /** A comment as the parser gives it. */
@@ -242,24 +113,57 @@ const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readon
 /** What the index reads of one story besides its export. */
 type StoryFields = Pick<
   StoryIndexEntry,
-  "name" | "controls" | "group" | "height" | "isMain" | "isTouch" | "isLogic" | "tags"
+  "id" | "name" | "controls" | "group" | "height" | "design" | "isMain" | "isTouch" | "isLogic" | "tags"
 >;
 
 /**
- * What the index reads of one story: its name (`name`, or CSF 2's `storyName`), controls, group, height, whether it is
- * the demo, and its tags under the meta's.
+ * A story's own design as the index keeps it: a refused link stays as `null`, since the story meant to replace the
+ * meta's design, not to take it.
  *
- * @param fields - the story's fields.
- * @param metaTags - the meta's tags.
+ * @param design - the design, as `designOf` read it.
  */
-const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): StoryFields | Error => {
-  const name = stringField(fields, "name") ?? stringField(fields, "storyName");
+const storyDesign = (design: FigmaLink | undefined | string): Pick<StoryIndexEntry, "design"> => {
+  if (design === undefined) return {};
+  return { design: typeof design === "string" ? null : design };
+};
+
+/**
+ * What a story's own object and assignments say of who it is: its id (`parameters.__id`, read by Storybook only when
+ * written plainly) and its name (`name`, or CSF 2's `storyName`).
+ *
+ * @param own - the story's own fields.
+ */
+const identityOf = (own: Fields): Pick<StoryIndexEntry, "id" | "name"> => {
+  const name = stringField(own, "name") ?? stringField(own, "storyName");
+  const id = parameter(own, "__id");
+  return {
+    ...(id?.type === "Literal" && typeof id.value === "string" ? { id: id.value } : {}),
+    ...(name === undefined ? {} : { name })
+  };
+};
+
+/**
+ * What the index reads of one story: its own id (`parameters.__id`), its name (`name`, or CSF 2's `storyName`),
+ * controls, group, height, design, whether it is the demo, and its tags under the meta's.
+ *
+ * @param fields - the story's fields: its own, for its name and id, and all it has, for the rest.
+ * @param metaTags - the meta's tags.
+ * @param notes - the file's notes, which a design left out adds to.
+ */
+const storyFields = (
+  { own, fields }: StoryFieldSources,
+  metaTags: readonly string[] | undefined,
+  notes: string[]
+): StoryFields | Error => {
   const controls = controlsOf(fields);
   if (controls instanceof Error) return controls;
   const group = groupOf(fields);
   if (group instanceof Error) return group;
   const height = heightOf(fields);
   if (height instanceof Error) return height;
+  const design = designOf(fields);
+  if (design instanceof Error) return design;
+  if (typeof design === "string") notes.push(design);
   const ownTags = stringListOf(fields, "tags");
   if (ownTags instanceof Error) return ownTags;
   const tags = combinedTags([metaTags, ownTags]);
@@ -267,40 +171,21 @@ const storyFields = (fields: Fields, metaTags: readonly string[] | undefined): S
   const flags = flagsOf(fields);
   if (flags instanceof Error) return flags;
   return {
-    ...(name === undefined ? {} : { name }),
+    ...identityOf(own),
     ...(controls === undefined ? {} : { controls }),
     ...(group === undefined ? {} : { group }),
     ...(height === undefined ? {} : { height }),
+    ...storyDesign(design),
     ...(main?.type === "Literal" && main.value === true ? { isMain: true } : {}),
     ...flags,
     ...(tags.length > 0 ? { tags } : {})
   };
 };
 
-/**
- * A story's source: an object (CSF 3), a function (CSF 2), or a template bound to a new story (CSF 2's
- * `Template.bind({})`), as written.
- */
-type StorySourceNode =
-  | ESTree.ObjectExpression
-  | ESTree.Function
-  | ESTree.ArrowFunctionExpression
-  | ESTree.CallExpression
-  | undefined;
-
-/** Whether an expression binds a template into a story function (`Template.bind({})`). */
-const isBoundTemplate = (value: ESTree.Expression): value is ESTree.CallExpression =>
-  value.type === "CallExpression" &&
-  value.callee.type === "MemberExpression" &&
-  value.callee.property.type === "Identifier" &&
-  value.callee.property.name === "bind";
-
-/** The file's top level, read once: its constants, its functions, and the properties assigned to them. */
+/** The file's top level, read once: its constants and the properties assigned to names. */
 type TopLevel = {
-  /** Each `const`'s value, by name. */
+  /** Each constant's value, by name. */
   readonly values: ReadonlyMap<string, ESTree.Expression>;
-  /** Each function declared at the top, by name. */
-  readonly functions: ReadonlyMap<string, ESTree.Function>;
   /** The properties assigned to a name after it (`A.storyName = "…"`), by name then property. */
   readonly assigned: ReadonlyMap<string, ReadonlyMap<string, ESTree.Expression>>;
 };
@@ -327,105 +212,91 @@ const assignedProperty = (statement: ESTree.Program["body"][number]): AssignedPr
   return { name: object.name, property: property.name, value: unwrapped(expression.right) };
 };
 
-/** A name declared at the top of the file: a constant's value or a function. */
-type Declared =
-  | { readonly kind: "value"; readonly name: string; readonly value: ESTree.Expression }
-  | { readonly kind: "function"; readonly name: string; readonly value: ESTree.Function };
+/** A constant declared at the top of the file, with its value. */
+type Declared = { readonly name: string; readonly value: ESTree.Expression };
 
 /**
- * The names a top-level statement declares, exported or not: its constants with a value, its function.
+ * The constants a top-level statement declares with a value, exported or not.
  *
  * @param statement - the statement.
  */
 const declaredBy = (statement: ESTree.Program["body"][number]): Declared[] => {
   const declaration = statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-  if (declaration?.type === "FunctionDeclaration" && declaration.id !== null)
-    return [{ kind: "function", name: declaration.id.name, value: declaration }];
   if (declaration?.type !== "VariableDeclaration") return [];
   return declaration.declarations.flatMap(({ id, init }): Declared[] =>
-    id.type === "Identifier" && init !== null
-      ? [{ kind: "value", name: id.name, value: unwrapped(init) }]
-      : []
+    id.type === "Identifier" && init !== null ? [{ name: id.name, value: unwrapped(init) }] : []
   );
 };
 
 /**
- * The file's top level: its constants and functions, exported or not, and the properties assigned to them.
+ * The file's top level: its constants, exported or not, and the properties assigned to names.
  *
  * @param program - the parsed file.
  */
 const topLevelOf = (program: ESTree.Program): TopLevel => {
   const values = new Map<string, ESTree.Expression>();
-  const functions = new Map<string, ESTree.Function>();
   const assigned = new Map<string, Map<string, ESTree.Expression>>();
   for (const statement of program.body) {
-    for (const declared of declaredBy(statement)) {
-      if (declared.kind === "value") values.set(declared.name, declared.value);
-      else functions.set(declared.name, declared.value);
-    }
+    for (const declared of declaredBy(statement)) values.set(declared.name, declared.value);
     const property = assignedProperty(statement);
     if (property === undefined) continue;
     const properties = assigned.get(property.name) ?? new Map<string, ESTree.Expression>();
     properties.set(property.property, property.value);
     assigned.set(property.name, properties);
   }
-  return { values, functions, assigned };
+  return { values, assigned };
 };
 
 /**
- * A story's source and fields, by the local name its export points at.
+ * The object a value is, or the one the constants it names lead to (`export const B = A`); `undefined` for any other
+ * value, or for names that lead back to themselves.
  *
  * @param top - the file's top level.
- * @param local - the local name.
+ * @param value - the value.
+ * @param seen - the names followed so far.
  */
-const storyOf = (
+const objectOf = (
   top: TopLevel,
-  local: string
-): { readonly node: StorySourceNode; readonly fields: Fields } => {
-  const value = top.values.get(local);
-  const isStory =
-    value !== undefined &&
-    (value.type === "ObjectExpression" ||
-      value.type === "ArrowFunctionExpression" ||
-      value.type === "FunctionExpression" ||
-      isBoundTemplate(value));
-  const node: StorySourceNode = isStory ? value : top.functions.get(local);
-  const properties = top.assigned.get(local);
-  const fields: Fields =
-    node?.type === "ObjectExpression"
-      ? objectFields(node)
-      : (name: string): ESTree.Expression | undefined => properties?.get(name);
-  return { node, fields };
+  value: ESTree.Expression | undefined,
+  seen: ReadonlySet<string> = new Set()
+): ESTree.ObjectExpression | undefined => {
+  if (value?.type === "ObjectExpression") return value;
+  if (value?.type !== "Identifier" || seen.has(value.name)) return undefined;
+  return objectOf(top, top.values.get(value.name), new Set([...seen, value.name]));
 };
 
-/** One named export of the file: its exported name, the local name it points at, and where its statement starts. */
-type NamedExport = { readonly exportName: string; readonly local: string; readonly start: number };
+/**
+ * Where a story's fields are read: its own (what is assigned to it, and the object its export declares in place), which
+ * give its name and id, as Storybook's indexer reads them; and all it has, the object another constant holds too,
+ * which give the rest, since the story is that object when the file runs.
+ */
+type StoryFieldSources = {
+  /** Its own fields. */
+  readonly own: Fields;
+  /** All its fields. */
+  readonly fields: Fields;
+};
 
 /**
- * The file's named exports, in their order: declared ones and re-exports of local names (`export { A as B }`), never
- * an export from another file.
+ * A story's fields, by the export that names it: what is assigned to it after its declaration (`A.storyName = "…"`),
+ * else the object its value is or names. A story from another file has none.
  *
- * @param program - the parsed file.
+ * @param top - the file's top level.
+ * @param named - the export.
  */
-const namedExports = (program: ESTree.Program): NamedExport[] =>
-  program.body.flatMap((statement): NamedExport[] => {
-    if (statement.type !== "ExportNamedDeclaration" || statement.source !== null) return [];
-    const { declaration } = statement;
-    if (declaration?.type === "VariableDeclaration") {
-      return declaration.declarations.flatMap((declarator) =>
-        declarator.id.type === "Identifier"
-          ? [{ exportName: declarator.id.name, local: declarator.id.name, start: statement.start }]
-          : []
-      );
-    }
-    if (declaration?.type === "FunctionDeclaration" && declaration.id !== null)
-      return [{ exportName: declaration.id.name, local: declaration.id.name, start: statement.start }];
-    return statement.specifiers.flatMap((specifier) =>
-      specifier.local.type === "Identifier" && specifier.exported.type === "Identifier"
-        ? [{ exportName: specifier.exported.name, local: specifier.local.name, start: statement.start }]
-        : []
-    );
-  });
+const storyFieldsOf = (top: TopLevel, named: NamedExport): StoryFieldSources => {
+  const { local } = named;
+  if (local === undefined) return { own: () => undefined, fields: () => undefined };
+  const assigned = top.assigned.get(local);
+  const value = top.values.get(local);
+  const declared = named.isDeclared && value?.type === "ObjectExpression" ? value : undefined;
+  const object = objectOf(top, value);
+  const read =
+    (from: ESTree.ObjectExpression | undefined) =>
+    (name: string): ESTree.Expression | undefined =>
+      assigned?.get(name) ?? (from === undefined ? undefined : propertyValue(from, name));
+  return { own: read(declared), fields: read(object) };
+};
 
 /**
  * Whether an export is a story, as the meta's `includeStories` and `excludeStories` say (a list of names or a regular
@@ -460,14 +331,32 @@ const exportsOrder = (top: TopLevel): readonly string[] | undefined => {
 };
 
 /**
- * The meta's object: the default export, inline or a constant of the file (`export default meta`).
+ * The meta exported by name (`export { meta as default }`), when it is a constant of the file written as an object.
+ *
+ * @param program - the parsed file.
+ * @param top - the file's top level.
+ */
+const namedMeta = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
+  for (const statement of program.body) {
+    if (statement.type !== "ExportNamedDeclaration" || statement.source !== null) continue;
+    const specifier = statement.specifiers.find((each) => moduleName(each.exported) === "default");
+    if (specifier === undefined) continue;
+    const value = top.values.get(moduleName(specifier.local));
+    return value?.type === "ObjectExpression" ? value : undefined;
+  }
+  return undefined;
+};
+
+/**
+ * The meta's object: the default export, inline or a constant of the file (`export default meta`,
+ * `export { meta as default }`).
  *
  * @param program - the parsed file.
  * @param top - the file's top level.
  */
 const metaObject = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
   const meta = program.body.find((statement) => statement.type === "ExportDefaultDeclaration");
-  if (meta === undefined) return undefined;
+  if (meta === undefined) return namedMeta(program, top);
   const { declaration } = meta;
   if (
     declaration.type === "FunctionDeclaration" ||
@@ -520,27 +409,53 @@ const titleOf = (
 /** The meta's fields besides its title and stories, each only when set. */
 type MetaFields = Pick<
   StoryFileIndex,
-  "controls" | "height" | "alsoIn" | "related" | "keywords" | "description"
+  "id" | "controls" | "height" | "design" | "alsoIn" | "related" | "keywords" | "description"
 >;
 
 /**
- * The meta's fields besides its title and stories, or the first problem.
+ * The meta's design as the index keeps it: a link that is not a Figma file's is noted and left out.
  *
  * @param meta - the meta's fields.
+ * @param notes - the file's notes, which a design left out adds to.
  */
-const metaFieldsOf = (meta: Fields): MetaFields | Error => {
+const metaDesign = (meta: Fields, notes: string[]): Pick<StoryFileIndex, "design"> | Error => {
+  const design = designOf(meta);
+  if (design instanceof Error) return design;
+  if (typeof design === "string") {
+    notes.push(design);
+    return {};
+  }
+  return design === undefined ? {} : { design };
+};
+
+/**
+ * The meta's fields besides its title and stories (its `id` among them), or the first problem.
+ *
+ * @param meta - the meta's fields.
+ * @param notes - the file's notes, which a design left out adds to.
+ */
+const metaFieldsOf = (meta: Fields, notes: string[]): MetaFields | Error => {
+  const id = meta("id");
+  // Storybook refuses a component id written by code: it would give ids no link can know
+  if (id !== undefined && (id.type !== "Literal" || typeof id.value !== "string"))
+    return new Error("`id` must be a plain string");
   const controls = controlsOf(meta);
   if (controls instanceof Error) return controls;
   const height = heightOf(meta);
   if (height instanceof Error) return height;
+  const design = metaDesign(meta, notes);
+  if (design instanceof Error) return design;
   const lists = metaListsOf(meta);
   if (lists instanceof Error) return lists;
   const description = docsDescription(meta, "component");
   const flags = flagsOf(meta);
   if (flags instanceof Error) return flags;
   return {
+    // an empty id is none, as Storybook's `meta.id || meta.title` has it
+    ...(id === undefined || id.value === "" ? {} : { id: String(id.value) }),
     ...(controls === undefined ? {} : { controls }),
     ...(height === undefined ? {} : { height }),
+    ...design,
     ...flags,
     ...lists,
     ...(description === undefined ? {} : { description })
@@ -589,20 +504,25 @@ export const indexStoryFile = (
   const metaTags = stringListOf(meta, "tags");
   if (metaTags instanceof Error) return `${file}: the meta's ${metaTags.message}`;
   const stories: StoryIndexEntry[] = [];
-  for (const { exportName, local, start } of storyExports(program, top, meta)) {
-    const story = storyOf(top, local);
-    if (story.node === undefined) continue;
-    const fields = storyFields(story.fields, metaTags);
+  const storyNotes: string[] = [];
+  for (const named of storyExports(program, top, meta)) {
+    const { exportName, start } = named;
+    const sources = storyFieldsOf(top, named);
+    const ownNotes: string[] = [];
+    const fields = storyFields(sources, metaTags, ownNotes);
     if (fields instanceof Error) return `${file}: story ${exportName}: ${fields.message}`;
-    const description = leadingSentence(text, comments, start) ?? docsDescription(story.fields, "story");
+    storyNotes.push(...ownNotes.map((note) => `story ${exportName}: ${note}`));
+    const description = leadingSentence(text, comments, start) ?? docsDescription(sources.fields, "story");
     stories.push({ exportName, ...fields, ...(description === undefined ? {} : { description }) });
   }
-  const metaFields = metaFieldsOf(meta);
+  const metaNotes: string[] = [];
+  const metaFields = metaFieldsOf(meta, metaNotes);
   if (metaFields instanceof Error) return `${file}: the meta's ${metaFields.message}`;
+  const notes = [...title.notes, ...metaNotes, ...storyNotes];
   return {
     title: title.title,
     stories,
     ...metaFields,
-    ...(title.notes.length > 0 ? { notes: title.notes } : {})
+    ...(notes.length > 0 ? { notes } : {})
   };
 };

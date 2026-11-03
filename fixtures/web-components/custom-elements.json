@@ -1,0 +1,394 @@
+{
+  "schemaVersion": "1.0.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "src/FixtureBadge.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "A badge.",
+          "name": "FixtureBadge",
+          "cssParts": [
+            {
+              "description": "The label's box.",
+              "name": "label"
+            }
+          ],
+          "slots": [
+            {
+              "description": "More than a text, after the label.",
+              "name": ""
+            },
+            {
+              "description": "An icon before the label.",
+              "name": "icon"
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "label",
+              "privacy": "public",
+              "type": {
+                "text": "string"
+              },
+              "description": "The text it shows.",
+              "default": "\"\"",
+              "attribute": "label"
+            },
+            {
+              "kind": "field",
+              "name": "tone",
+              "privacy": "public",
+              "type": {
+                "text": "Tone"
+              },
+              "description": "How loud it is.",
+              "default": "\"neutral\"",
+              "attribute": "tone",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "count",
+              "privacy": "public",
+              "type": {
+                "text": "number"
+              },
+              "description": "How many there are.",
+              "default": "0",
+              "attribute": "item-count"
+            },
+            {
+              "kind": "field",
+              "name": "quiet",
+              "privacy": "public",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "Whether it is quieter.",
+              "default": "false",
+              "attribute": "quiet"
+            },
+            {
+              "kind": "field",
+              "name": "keywords",
+              "privacy": "public",
+              "type": {
+                "text": "readonly string[]"
+              },
+              "description": "The words it is searched by.",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "remove_",
+              "privacy": "private",
+              "readonly": true,
+              "description": "Tells the page the person took it away."
+            }
+          ],
+          "events": [
+            {
+              "description": "The person took it away.",
+              "name": "remove"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "description": "The text it shows.",
+              "default": "\"\"",
+              "fieldName": "label"
+            },
+            {
+              "name": "tone",
+              "type": {
+                "text": "Tone"
+              },
+              "description": "How loud it is.",
+              "default": "\"neutral\"",
+              "fieldName": "tone"
+            },
+            {
+              "name": "item-count",
+              "type": {
+                "text": "number"
+              },
+              "description": "How many there are.",
+              "default": "0",
+              "fieldName": "count"
+            },
+            {
+              "name": "quiet",
+              "type": {
+                "text": "boolean"
+              },
+              "description": "Whether it is quieter.",
+              "default": "false",
+              "fieldName": "quiet"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "fixture-badge",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "FixtureBadge",
+          "declaration": {
+            "name": "FixtureBadge",
+            "module": "src/FixtureBadge.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "fixture-badge",
+          "declaration": {
+            "name": "FixtureBadge",
+            "module": "src/FixtureBadge.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/FixtureCounter.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "A counter.",
+          "name": "FixtureCounter",
+          "members": [
+            {
+              "kind": "field",
+              "name": "label",
+              "privacy": "public",
+              "type": {
+                "text": "string"
+              },
+              "description": "What it counts.",
+              "default": "\"Clicks\"",
+              "attribute": "label"
+            },
+            {
+              "kind": "field",
+              "name": "#clicks",
+              "privacy": "private",
+              "type": {
+                "text": "number"
+              },
+              "default": "0",
+              "description": "The presses so far: its own state, which no arg sets."
+            },
+            {
+              "kind": "field",
+              "name": "#press",
+              "privacy": "private",
+              "readonly": true,
+              "description": "Counts a press."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "label",
+              "type": {
+                "text": "string"
+              },
+              "description": "What it counts.",
+              "default": "\"Clicks\"",
+              "fieldName": "label"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "fixture-counter",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "FixtureCounter",
+          "declaration": {
+            "name": "FixtureCounter",
+            "module": "src/FixtureCounter.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "fixture-counter",
+          "declaration": {
+            "name": "FixtureCounter",
+            "module": "src/FixtureCounter.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/FixtureFragile.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "A fragile text.",
+          "name": "FixtureFragile",
+          "members": [
+            {
+              "kind": "field",
+              "name": "text",
+              "privacy": "public",
+              "type": {
+                "text": "string"
+              },
+              "description": "What it shows; `boom` breaks it.",
+              "default": "\"Fine\"",
+              "attribute": "text"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "text",
+              "type": {
+                "text": "string"
+              },
+              "description": "What it shows; `boom` breaks it.",
+              "default": "\"Fine\"",
+              "fieldName": "text"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "fixture-fragile",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "FixtureFragile",
+          "declaration": {
+            "name": "FixtureFragile",
+            "module": "src/FixtureFragile.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "fixture-fragile",
+          "declaration": {
+            "name": "FixtureFragile",
+            "module": "src/FixtureFragile.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/FixturePanel.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "A panel with a heading.",
+          "name": "FixturePanel",
+          "slots": [
+            {
+              "description": "The panel's content.",
+              "name": ""
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "#heading",
+              "privacy": "private",
+              "readonly": true
+            }
+          ],
+          "attributes": [
+            {
+              "name": "heading"
+            }
+          ],
+          "superclass": {
+            "name": "HTMLElement"
+          },
+          "tagName": "fixture-panel",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "FixturePanel",
+          "declaration": {
+            "name": "FixturePanel",
+            "module": "src/FixturePanel.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "fixture-panel",
+          "declaration": {
+            "name": "FixturePanel",
+            "module": "src/FixturePanel.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/formatCount.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "formatCount",
+          "return": {
+            "type": {
+              "text": ""
+            }
+          },
+          "parameters": [
+            {
+              "name": "count",
+              "type": {
+                "text": "number"
+              },
+              "description": "how many."
+            }
+          ],
+          "description": "Writes a count for a person."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "formatCount",
+          "declaration": {
+            "name": "formatCount",
+            "module": "src/formatCount.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/tones.ts",
+      "declarations": [],
+      "exports": []
+    }
+  ]
+}

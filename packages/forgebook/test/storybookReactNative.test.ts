@@ -12,7 +12,12 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { expandedGlobs, importStorybook } from "../bin/forgebook/importers/storybook.ts";
-import { storybookFramework } from "../bin/forgebook/importers/storybookFrameworks.ts";
+import {
+  type FrameworkSettings,
+  frameworkPeers,
+  frameworkSettings,
+  storybookPackage
+} from "../bin/forgebook/importers/storybookFrameworks.ts";
 import { initConfigText } from "../bin/forgebook/initConfig.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "forgebook-import-native-"));
@@ -37,6 +42,23 @@ const project = (name: string, folder: string, main: string): string => {
   return dir;
 };
 
+/**
+ * The framework a `main` moves to, as `importStorybook` chooses it, with its options and notes.
+ *
+ * @param main - `main`'s configuration.
+ * @param isOnDevice - whether the project is on-device Storybook's.
+ * @returns the settings, or none for a framework Forgebook does not read.
+ */
+const storybookFramework = (
+  main: Readonly<Record<string, unknown>>,
+  isOnDevice: boolean
+): FrameworkSettings | undefined => {
+  const storybook = storybookPackage(main, isOnDevice);
+  return storybook === undefined
+    ? undefined
+    : frameworkSettings(storybook, main, scratch, join(scratch, ".storybook"));
+};
+
 describe("Storybook's React Native frameworks", () => {
   it("moves @storybook/react-native-web-vite to react-native-web, with its packages, JSX source, Babel and files", () => {
     const reading = storybookFramework(
@@ -59,19 +81,20 @@ describe("Storybook's React Native frameworks", () => {
       },
       false
     );
-    expect(reading?.framework).toEqual({
-      packageName: "@forgebook/react-native-web",
-      adapter: "reactNativeWeb",
-      peers: ["react-native-web", "@rolldown/plugin-babel", "@babel/core"],
-      options: {
-        nativePackages: ["react-native-reanimated", "@shopify/flash-list"],
-        jsxImportSource: "nativewind",
-        babel: {
-          plugins: ["@babel/plugin-proposal-export-namespace-from", "react-native-reanimated/plugin"],
-          presets: [["nativewind/babel", { mode: "web" }]]
-        },
-        include: ["src/**"]
-      }
+    expect(reading?.framework).toBe("react-native-web");
+    expect(frameworkPeers("react-native-web", reading?.options)).toEqual([
+      "react-native-web",
+      "@rolldown/plugin-babel",
+      "@babel/core"
+    ]);
+    expect(reading?.options).toEqual({
+      nativePackages: ["react-native-reanimated", "@shopify/flash-list"],
+      jsxImportSource: "nativewind",
+      babel: {
+        plugins: ["@babel/plugin-proposal-export-namespace-from", "react-native-reanimated/plugin"],
+        presets: [["nativewind/babel", { mode: "web" }]]
+      },
+      include: ["src/**"]
     });
     // a regular expression is not a plain value: named, to copy by hand
     expect(reading?.notes).toEqual([
@@ -95,8 +118,8 @@ describe("Storybook's React Native frameworks", () => {
       },
       false
     );
-    expect(reading?.framework.adapter).toBe("reactNativeWeb");
-    expect(reading?.framework.options).toEqual({
+    expect(reading?.framework).toBe("react-native-web");
+    expect(reading?.options).toEqual({
       nativePackages: ["legacy-chart"],
       babel: { plugins: ["react-native-reanimated/plugin"] }
     });
@@ -121,7 +144,7 @@ describe("Storybook's React Native frameworks", () => {
       },
       false
     );
-    expect(regex?.framework.options).toEqual({ babel: { plugins: [["y-plugin", { on: true }]] } });
+    expect(regex?.options).toEqual({ babel: { plugins: [["y-plugin", { on: true }]] } });
     expect(regex?.notes[0]).toMatch(/a regular expression/);
   });
 
@@ -130,18 +153,18 @@ describe("Storybook's React Native frameworks", () => {
       { stories: [], deviceAddons: ["@storybook/addon-ondevice-controls"] },
       true
     );
-    expect(reading?.framework.packageName).toBe("@forgebook/react-native-web");
+    expect(reading?.framework).toBe("react-native-web");
+    expect(reading?.options).toBeUndefined();
     expect(reading?.notes.join("\n")).toMatch(/native module does not draw/);
     // a .storybook folder that names no framework is not on-device Storybook's
     expect(storybookFramework({ stories: [] }, false)).toBeUndefined();
   });
 
   it("keeps React on Vite as React's", () => {
-    expect(
-      storybookFramework({ framework: "/repo/node_modules/@storybook/react-vite" }, false)?.framework
-    ).toEqual({
-      packageName: "@forgebook/react",
-      adapter: "react"
+    expect(storybookFramework({ framework: "/repo/node_modules/@storybook/react-vite" }, false)).toEqual({
+      framework: "react",
+      options: undefined,
+      notes: []
     });
   });
 });
@@ -178,9 +201,9 @@ describe("an on-device Storybook's folder", () => {
     );
     const imported = await importStorybook(dir);
     if (typeof imported === "string") throw new Error(imported);
-    expect(imported.framework.adapter).toBe("reactNativeWeb");
-    expect(storybookFramework({ framework: "@storybook/react-native" }, false)?.framework.adapter).toBe(
-      "reactNativeWeb"
+    expect(imported.framework).toBe("react-native-web");
+    expect(storybookFramework({ framework: "@storybook/react-native" }, false)?.framework).toBe(
+      "react-native-web"
     );
   });
 

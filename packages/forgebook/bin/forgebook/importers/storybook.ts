@@ -6,10 +6,10 @@
  * `main` is loaded, as Storybook loads it (Node strips a `main.ts`'s types), so a `stories` list it computes is read
  * too. The preview is read from its source, never run: it imports style sheets and components Node cannot load, so its
  * `globalTypes` and `initialGlobals` are read only when written as plain values; anything else is named in the notes
- * instead. Forgebook reads React stories on Vite and React Native's (Storybook's React Native Web framework, its older
- * addon, and on-device Storybook's `.rnstorybook`), the framework chosen by `storybookFrameworks.ts`; another framework
- * is refused with what Forgebook supports. Each tool is an importer of its own: another tool is another module beside
- * this one.
+ * instead. Which Forgebook framework the stories move to, and what it takes besides them, is `storybookFrameworks.ts`'s
+ * choice; a framework it does not know is refused with what Forgebook supports. On-device React Native Storybook keeps
+ * its `main` in `.rnstorybook`, looked for after `.storybook`.
+ * Each tool is an importer of its own: another tool is another module beside this one.
  *
  * @module
  */
@@ -22,12 +22,20 @@ import ts from "typescript-6";
 import { switchesFromGlobalTypes, type ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 import { VITE_PATHS, type VitePaths } from "../../../src/vite/vitePaths.ts";
-import { type ImportedFramework, STORYBOOK_FRAMEWORKS, storybookFramework } from "./storybookFrameworks.ts";
+import {
+  frameworkOf,
+  frameworkSettings,
+  type ImportedFramework,
+  STORYBOOK_PACKAGES,
+  storybookPackage
+} from "./storybookFrameworks.ts";
 
 /** What a configuration takes from another tool's files. */
 export type ImportedConfig = {
-  /** The Forgebook framework the stories are drawn with. */
+  /** The Forgebook framework the stories are written for. */
   readonly framework: ImportedFramework;
+  /** The framework's options, plain values (`{ dir: "web", nextConfig: "next.config.js" }`); none when there are none. */
+  readonly frameworkOptions: Readonly<Record<string, unknown>> | undefined;
   /** The catalogue's name: the package's, or the folder's. */
   readonly title: string;
   /** The story files, as globs from the project's folder. */
@@ -374,17 +382,6 @@ const loadedMain = async (
 };
 
 /**
- * The name `main` gives its framework, for a refusal: a text, or an object's `name`.
- *
- * @param main - `main`'s configuration.
- */
-const frameworkName = (main: Readonly<Record<string, unknown>>): string => {
-  const { framework } = main;
-  if (typeof framework === "string") return framework;
-  return isRecord(framework) && typeof framework["name"] === "string" ? framework["name"] : "no framework";
-};
-
-/**
  * Reads a project's Storybook configuration.
  *
  * @param projectDir - the project's folder, absolute.
@@ -399,22 +396,26 @@ export const importStorybook = async (projectDir: string): Promise<ImportedConfi
   if (mainFile === undefined) return `No .storybook/main (or .rnstorybook/main) file in ${projectDir}`;
   const main = await loadedMain(mainFile, projectDir);
   if (typeof main === "string") return main;
-  const reading = storybookFramework(main, isOnDeviceStorybook(projectDir, storybookDir));
-  if (reading === undefined)
-    return `Forgebook reads Storybook's ${STORYBOOK_FRAMEWORKS.join(", ")}; this project uses ${frameworkName(main)}`;
+  const storybook = storybookPackage(main, isOnDeviceStorybook(projectDir, storybookDir));
+  if (storybook === undefined) {
+    const supported = STORYBOOK_PACKAGES.join(", ");
+    return `Forgebook reads the stories of Storybook's ${supported}; this project uses ${frameworkOf(main).name ?? "no framework"}`;
+  }
+  const settings = frameworkSettings(storybook, main, projectDir, storybookDir);
   const entries = Array.isArray(main["stories"]) ? main["stories"] : [];
   const { globs, notes } = storyGlobs(entries, storybookDir, projectDir);
   if (globs.length === 0) return `${relative(projectDir, mainFile)} names no story file Forgebook reads`;
   if (Array.isArray(main["addons"]) && main["addons"].length > 0)
     notes.push("The addons are left out: Forgebook has its own panel, toolbar and checks");
-  notes.push(...reading.notes);
+  notes.push(...settings.notes);
   const previewFile = scriptFile(storybookDir, "preview");
   const read =
     previewFile === undefined
       ? { switches: undefined, notes: [] }
       : previewSwitches(readFileSync(previewFile, "utf8"), previewFile);
   return {
-    framework: reading.framework,
+    framework: settings.framework,
+    frameworkOptions: settings.options,
     title: projectTitle(projectDir),
     stories: globs,
     // with forward slashes: it is written into the configuration, which may be shared across systems

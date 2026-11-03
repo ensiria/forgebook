@@ -1,0 +1,7 @@
+{
+  "name": "@fixture/white-label",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A second catalogue on the fixture kit, with a whole theme and no branding. A package of its own so that Vite keeps its cache apart from the fixture app's when both start at once."
+}

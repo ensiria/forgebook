@@ -36,6 +36,7 @@
     ".": "./src/vite/config.ts",
     "./agent": "./src/vite/agent.types.ts",
     "./story-tree": "./src/storyTree.ts",
+    "./page-tree": "./src/pageTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
@@ -43,10 +44,15 @@
     "./story-hooks": "./src/frame/storyHooks.ts",
     "./story-module": "./src/frame/storyModule.ts",
     "./messages": "./src/messages.ts",
+    "./jsx-code": "./src/jsxCode.ts",
     "./component-docs": "./src/componentDocs.ts",
     "./vite/adapter": "./src/vite/adapter.ts",
     "./vite/docs-program": "./src/vite/docsProgram.ts",
     "./vite/story-meta": "./src/vite/storyMeta.ts",
+    "./vite/prop-docs": "./src/vite/propDocs.ts",
+    "./vite/signature-docs": "./src/vite/signatureDocs.ts",
+    "./vite/usage-guidance": "./src/vite/usageGuidance.ts",
+    "./vite/function-component-docs": "./src/vite/functionComponentDocs.ts",
     "./catalogue-docs": "./bin/forgebook-docs/collectDocs.ts",
     "./catalogue-markdown": "./bin/forgebook-docs/catalogueMarkdown.ts",
     "./catalogue-options": "./bin/forgebook-docs/catalogueOptions.ts",
@@ -137,6 +143,10 @@
         "types": "./dist/src/storyTree.d.ts",
         "default": "./dist/src/storyTree.js"
       },
+      "./page-tree": {
+        "types": "./dist/src/pageTree.d.ts",
+        "default": "./dist/src/pageTree.js"
+      },
       "./shell": {
         "types": "./dist/src/shell/mountShell.d.ts",
         "default": "./dist/src/shell/mountShell.js"
@@ -165,6 +175,10 @@
         "types": "./dist/src/messages.d.ts",
         "default": "./dist/src/messages.js"
       },
+      "./jsx-code": {
+        "types": "./dist/src/jsxCode.d.ts",
+        "default": "./dist/src/jsxCode.js"
+      },
       "./component-docs": {
         "types": "./dist/src/componentDocs.d.ts",
         "default": "./dist/src/componentDocs.js"
@@ -180,6 +194,22 @@
       "./vite/story-meta": {
         "types": "./dist/src/vite/storyMeta.d.ts",
         "default": "./dist/src/vite/storyMeta.js"
+      },
+      "./vite/prop-docs": {
+        "types": "./dist/src/vite/propDocs.d.ts",
+        "default": "./dist/src/vite/propDocs.js"
+      },
+      "./vite/signature-docs": {
+        "types": "./dist/src/vite/signatureDocs.d.ts",
+        "default": "./dist/src/vite/signatureDocs.js"
+      },
+      "./vite/usage-guidance": {
+        "types": "./dist/src/vite/usageGuidance.d.ts",
+        "default": "./dist/src/vite/usageGuidance.js"
+      },
+      "./vite/function-component-docs": {
+        "types": "./dist/src/vite/functionComponentDocs.d.ts",
+        "default": "./dist/src/vite/functionComponentDocs.js"
       },
       "./catalogue-docs": {
         "types": "./dist/bin/forgebook-docs/collectDocs.d.ts",
