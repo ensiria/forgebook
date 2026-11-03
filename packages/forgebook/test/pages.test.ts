@@ -8,6 +8,7 @@ import { win32 } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { SAME_ORIGIN } from "../src/frameOrigins.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import {
@@ -48,9 +49,11 @@ const CONFIG: ResolvedConfig = {
 describe("the generated pages", () => {
   it("writes what a frame needs of the theme into the frame only, and nothing without it", () => {
     const themed = { ...CONFIG, shell: { ...CONFIG.shell, frameCss: ".forgebook-frame-error{--x:1}" } };
-    expect(pageHtml("frame.html", themed)).toContain("<style>.forgebook-frame-error{--x:1}</style>");
-    expect(pageHtml("index.html", themed)).not.toContain("forgebook-frame-error");
-    expect(pageHtml("frame.html", CONFIG)).not.toContain("<style>");
+    expect(pageHtml("frame.html", themed, SAME_ORIGIN)).toContain(
+      "<style>.forgebook-frame-error{--x:1}</style>"
+    );
+    expect(pageHtml("index.html", themed, SAME_ORIGIN)).not.toContain("forgebook-frame-error");
+    expect(pageHtml("frame.html", CONFIG, SAME_ORIGIN)).not.toContain("<style>");
   });
 
   it("tells the shell to leave Forgebook's mark out only when the branding is off", () => {
@@ -60,10 +63,21 @@ describe("the generated pages", () => {
   });
 
   it("titles the shell after the catalogue, escaped, and gives only the frame the head's tags", () => {
-    expect(pageHtml("index.html", CONFIG)).toContain("<title>Acme &#60;UI&#62;</title>");
-    expect(pageHtml("index.html", CONFIG)).toContain('<script type="module" src="/.forgebook-shell.ts">');
-    expect(pageHtml("index.html", CONFIG)).not.toContain("fonts.css");
-    expect(pageHtml("frame.html", CONFIG)).toContain('<link rel="stylesheet" href="/fonts.css" />');
+    expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).toContain("<title>Acme &#60;UI&#62;</title>");
+    expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).toContain(
+      '<script type="module" src="/.forgebook-shell.ts">'
+    );
+    expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).not.toContain("fonts.css");
+    expect(pageHtml("frame.html", CONFIG, SAME_ORIGIN)).toContain(
+      '<link rel="stylesheet" href="/fonts.css" />'
+    );
+  });
+
+  it("gives the frame a guard that shows code failing before the frame starts, which the shell page has no need of", () => {
+    const frame = pageHtml("frame.html", CONFIG, SAME_ORIGIN);
+    expect(frame).toContain('addEventListener("error"');
+    expect(frame.indexOf("<script>")).toBeLessThan(frame.indexOf('<script type="module"'));
+    expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).not.toContain('addEventListener("error"');
   });
 
   it("mounts the shell with the data, the logo, the own stories before the packages' and the code writer", () => {
@@ -139,15 +153,17 @@ describe("a catalogue's theme", () => {
   };
 
   it("goes in the shell's page, with no script", () => {
-    expect(pageHtml("index.html", themed)).toContain("<style>:root{--forgebook-font-sans:Inter}</style>");
+    expect(pageHtml("index.html", themed, SAME_ORIGIN)).toContain(
+      "<style>:root{--forgebook-font-sans:Inter}</style>"
+    );
   });
 
   it("stays out of the frames, which belong to the stories", () => {
-    expect(pageHtml("frame.html", themed)).not.toContain("--forgebook-font-sans");
+    expect(pageHtml("frame.html", themed, SAME_ORIGIN)).not.toContain("--forgebook-font-sans");
   });
 
   it("writes nothing for a catalogue with no theme", () => {
-    expect(pageHtml("index.html", CONFIG)).not.toContain("<style>");
+    expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).not.toContain("<style>");
   });
 
   it("imports the catalogue's style sheet into the shell only", () => {

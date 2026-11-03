@@ -369,7 +369,13 @@ export const serveFrames = (
   place: (placement: () => Promise<FramesPlacement>) => void,
   framedPages: ReadonlySet<string>
 ): void => {
-  const frames = framesServing(server, config.frames, pageHtml("frame.html", config), framedPages);
+  // the placement only changes the guard's inline script, never the entries this page is read for
+  const frames = framesServing(
+    server,
+    config.frames,
+    pageHtml("frame.html", config, SAME_ORIGIN),
+    framedPages
+  );
   place(frames.placement);
   server.middlewares.use(frames.catalogueGuard);
   // in middleware mode nothing listens here: the frames stay on the catalogue's origin, known at once

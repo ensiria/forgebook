@@ -33,7 +33,7 @@ import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
 import { codeGlobalsOf, frameAddress, type LiveView, languageOf, parseView } from "../viewState.ts";
 import { checkStory } from "./checkStory.ts";
 import { storyFrameClock } from "./frameClock.ts";
-import { STATUS_ATTRIBUTE } from "./frameStatus.ts";
+import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import { applyTools } from "./measureTools.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
@@ -139,6 +139,8 @@ const optionalTools = ({
  * @param config - the sources.
  */
 export const mountFrame = async (container: HTMLElement, config: FrameConfig): Promise<void> => {
+  // from here the frame shows its own errors: the page's guard against code that fails before it stands down
+  document.documentElement.setAttribute(FRAME_STARTED_ATTRIBUTE, "");
   const params = new URLSearchParams(window.location.search);
   const storyId = params.get("story") ?? "";
   const languages = config.languages ?? [];

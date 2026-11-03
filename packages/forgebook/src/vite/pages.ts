@@ -11,6 +11,8 @@
  *
  * @module
  */
+import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
+import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
 import type { FramesPlacement } from "../frameOrigins.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { MOCKS_MODULES, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
@@ -97,12 +99,99 @@ const escaped = (text: string): string =>
   text.replace(/[&<>"]/g, (character) => `&#${character.charCodeAt(0)};`);
 
 /**
+ * What a frame shows when its code fails before the frame starts: a preview or a source that throws while it loads, or
+ * a module that cannot be loaded at all. The frame's own code never runs then, so without this the frame stays blank
+ * and its shell waits. Plain script in the page, since a module that failed cannot report anything; it stands down
+ * once the frame has started (`FRAME_STARTED_ATTRIBUTE`), when the frame shows its own errors. It reads only errors
+ * thrown by code and module scripts that failed to load: an image, a style sheet or a classic script of the `head`
+ * (an analytics tag a blocker refuses) is not the catalogue's code.
+ *
+ * A module that could not be loaded is loaded again first, up to three times, one, two then four seconds later, once per
+ * page load, counted in the session's storage by the frame's page and story until the frame draws its story
+ * (`staleModule.ts` clears the count) or the guard gives up: in development a library served as source asks for
+ * thousands of modules, and the browser refuses some while the other frames load (`ERR_INSUFFICIENT_RESOURCES`).
+ *
+ * It tells the shell only on the catalogue's origin, worked out as `pageOrigins` does for a frame from the placement
+ * and the frame's own address, never from the address's query: a page that framed the story must not read its errors.
+ *
+ * @param placement - where the frames run.
+ */
+const frameLoadGuard = (placement: FramesPlacement): string => `(function () {
+  var RELOAD_DELAY = 1000;
+  var RELOADS = 3;
+  var PLACEMENT = ${JSON.stringify(placement).replace(/</g, "\\u003c")};
+  var root = document.documentElement;
+  var key = "${LOAD_RELOADS_KEY}" + location.pathname + "?story=" + (new URLSearchParams(location.search).get("story") || "");
+  var isReloading = false;
+  function hasStarted() {
+    return root.hasAttribute("${FRAME_STARTED_ATTRIBUTE}") || root.hasAttribute("${STATUS_ATTRIBUTE}");
+  }
+  function catalogueOrigin() {
+    if (PLACEMENT.kind === "origins") return PLACEMENT.catalogue;
+    var own = new URL(location.href);
+    if (PLACEMENT.kind === "ports") own.port = String(PLACEMENT.catalogue);
+    return own.origin;
+  }
+  function forget() {
+    try {
+      sessionStorage.removeItem(key);
+    } catch (error) {
+      // nothing to forget where the storage refuses access
+    }
+  }
+  function show(message) {
+    if (hasStarted()) return;
+    forget();
+    var box = document.createElement("div");
+    box.className = "forgebook-frame-error";
+    box.setAttribute("role", "alert");
+    var text = document.createElement("p");
+    text.className = "forgebook-frame-error__message";
+    text.textContent = message;
+    box.appendChild(text);
+    document.getElementById("root").replaceChildren(box);
+    root.setAttribute("${STATUS_ATTRIBUTE}", "error");
+    var storyId = new URLSearchParams(location.search).get("story") || "";
+    if (parent !== window) parent.postMessage({ type: "forgebook:error", storyId: storyId, message: message }, catalogueOrigin());
+  }
+  function reloadAgain() {
+    if (isReloading) return true;
+    var done;
+    try {
+      done = Number(sessionStorage.getItem(key) || "0");
+      if (done >= RELOADS) return false;
+      sessionStorage.setItem(key, String(done + 1));
+    } catch (error) {
+      return false;
+    }
+    isReloading = true;
+    setTimeout(function () {
+      if (!hasStarted()) location.reload();
+    }, RELOAD_DELAY * Math.pow(2, done));
+    return true;
+  }
+  addEventListener("error", function (event) {
+    if (hasStarted()) return;
+    var target = event.target;
+    if (target && target.tagName === "SCRIPT" && target.type === "module") {
+      if (reloadAgain()) return;
+      show("The catalogue's code could not be loaded (" + target.src + "): see the console");
+      return;
+    }
+    if (event instanceof ErrorEvent) {
+      show("The catalogue's code failed while it loaded: " + (event.error && event.error.message ? event.error.message : event.message));
+    }
+  }, true);
+})();`;
+
+/**
  * A page's HTML: its title, the frame's head tags, the root the entry mounts in.
  *
  * @param page - the page.
  * @param config - the configuration.
+ * @param placement - where the frames run, which the frame's load guard tells its errors by.
  */
-export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
+export const pageHtml = (page: PageFile, config: ResolvedConfig, placement: FramesPlacement): string =>
   [
     "<!doctype html>",
     '<html lang="en">',
@@ -120,6 +209,7 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
     "  </head>",
     "  <body>",
     '    <div id="root"></div>',
+    ...(page === "frame.html" ? [`    <script>${frameLoadGuard(placement)}</script>`] : []),
     `    <script type="module" src="/${PAGE_ENTRIES[page]}"></script>`,
     "  </body>",
     "</html>",

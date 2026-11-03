@@ -339,7 +339,7 @@ const generatedModule = (
   }
   if (named.kind === "stories-source") return { code: storiesSourceModule(config), moduleType: "js" };
   if (named.kind === "agent-sources") return { code: agentSourcesModule(config), moduleType: "js" };
-  return existsSync(id) ? undefined : pageHtml(named.page, config);
+  return existsSync(id) ? undefined : pageHtml(named.page, config, builtPlacement(config.frames));
 };
 
 /**
@@ -563,12 +563,15 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       // the catalogue's pages, made here: no HTML file is written
       server.middlewares.use((request, response, next): void => {
         const page = requestedPage(request.url ?? "/");
-        if (config === undefined || page === undefined) {
+        const served = config;
+        if (served === undefined || page === undefined) {
           next();
           return;
         }
-        server
-          .transformIndexHtml(request.url ?? "/", pageHtml(page, config))
+        framesPlacement()
+          .then((placement) =>
+            server.transformIndexHtml(request.url ?? "/", pageHtml(page, served, placement))
+          )
           .then((html: string): void => {
             response.setHeader("Content-Type", "text/html");
             response.end(html);
