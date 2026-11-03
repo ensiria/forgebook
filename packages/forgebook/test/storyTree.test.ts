@@ -444,6 +444,36 @@ describe("designs", () => {
       'Kit: A.stories.tsx: story Own: `parameters.design.figma`: "javascript:alert(1)" is not a link to figma.com'
     ]);
   });
+
+  it("gives each story of files with one title its own link, else its own file's meta's, and the component the first file's", () => {
+    const otherLink: FigmaLink = {
+      url: "https://www.figma.com/design/File2",
+      kind: "design",
+      fileKey: "File2"
+    };
+    const tree = storyTree([
+      source({
+        "./a.stories.tsx": {
+          title: "Inputs/A",
+          design: fileLink,
+          stories: [{ exportName: "First" }, { exportName: "Refused", design: null }]
+        },
+        "./a2.stories.tsx": {
+          title: "Inputs/A",
+          design: otherLink,
+          stories: [{ exportName: "More" }, { exportName: "Own", design: nodeLink }]
+        }
+      })
+    ]);
+    const component = tree.sources[0]?.families[0]?.groups[0]?.components[0];
+    expect(component?.design?.url).toBe(fileLink.url);
+    expect(component?.stories.map((story) => story.design?.url)).toEqual([
+      fileLink.url,
+      undefined,
+      otherLink.url,
+      nodeLink.url
+    ]);
+  });
 });
 
 describe("aliases and related components", () => {
