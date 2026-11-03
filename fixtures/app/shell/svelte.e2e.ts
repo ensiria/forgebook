@@ -6,9 +6,9 @@
  */
 import { expect, type FrameLocator, type Page, test } from "@playwright/test";
 
-import { SVELTE_PORT } from "./ports";
+import { catalogueUrl } from "./ports";
 
-test.use({ baseURL: `http://127.0.0.1:${SVELTE_PORT}/` });
+test.use({ baseURL: catalogueUrl("svelte") });
 
 /** Every story of the fixture, by its id without the source. */
 const STORY_IDS = [

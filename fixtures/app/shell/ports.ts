@@ -1,35 +1,47 @@
 /**
- * The ports the shell's browser tests listen on: the fixture app's from `FORGEBOOK_SHELL_PORT`, the other fixture
- * catalogues' after it, and each catalogue's frames' port after all of them.
+ * The ports the shell's browser tests listen on, every one derived from `FORGEBOOK_SHELL_PORT`: each fixture catalogue
+ * takes two in a row, its own and its frames'.
+ *
+ * @remarks
+ * A catalogue's place in `CATALOGUES` gives its pair: the fixture app's is `SHELL_PORT` and `SHELL_PORT + 1`, the next
+ * one's `SHELL_PORT + 2` and `SHELL_PORT + 3`, and so on. Pairs cannot overlap however many catalogues there are, so a
+ * new catalogue is a name added at the end, with no offset to choose and none of the others moved. The frames take the
+ * port after their catalogue's, the one `forgebook dev` gives them when none is set, so a catalogue started by hand
+ * with the same `--port` serves its frames where the tests expect them. Two worktrees run the tests at once with
+ * `FORGEBOOK_SHELL_PORT`s at least twice the number of catalogues apart.
  *
  * @module
  */
 
-/** The port the fixture app listens on. */
+/** The port the fixture app listens on: the first of the suite's ports. */
 export const SHELL_PORT = Number(process.env["FORGEBOOK_SHELL_PORT"] ?? "41721");
 
-/** The port the Vue fixture catalogue listens on. */
-export const VUE_PORT = SHELL_PORT + 1;
-
-/** The port the Svelte fixture catalogue listens on. */
-export const SVELTE_PORT = SHELL_PORT + 2;
-
-/** The port the Next.js fixture catalogue listens on: a gap after the fixture app's, for the other frameworks'. */
-export const NEXTJS_PORT = SHELL_PORT + 7;
-
-/** The port the white-label catalogue listens on: after the frameworks' catalogues. */
-export const WHITE_LABEL_PORT = NEXTJS_PORT + 1;
-
 /**
- * How far after its catalogue's port a catalogue's frames listen: past every catalogue's port (the last one, the
- * white-label's, is + 8), so the frames' default port (the catalogue's + 1) never takes the next catalogue's, and the
- * frames' ports (+ 10, + 11, + 17, + 18) never take one.
+ * The catalogues the suite runs, in the order their ports are handed out: a new one goes at the end, so the others keep
+ * theirs.
  */
-const FRAMES_PORT_OFFSET = 10;
+const CATALOGUES = ["app", "vue", "nextjs", "white-label", "svelte"] as const;
+
+/** A catalogue the suite runs. */
+export type Catalogue = (typeof CATALOGUES)[number];
 
 /**
- * The port a catalogue's frames listen on (`--frame-port`).
+ * The port a catalogue listens on (`--port`).
  *
- * @param port - the catalogue's port.
+ * @param catalogue - the catalogue.
  */
-export const framesPortOf = (port: number): number => port + FRAMES_PORT_OFFSET;
+export const portOf = (catalogue: Catalogue): number => SHELL_PORT + 2 * CATALOGUES.indexOf(catalogue);
+
+/**
+ * The port a catalogue's frames listen on (`--frame-port`): the one after the catalogue's.
+ *
+ * @param catalogue - the catalogue.
+ */
+export const framesPortOf = (catalogue: Catalogue): number => portOf(catalogue) + 1;
+
+/**
+ * The address of a catalogue's page.
+ *
+ * @param catalogue - the catalogue.
+ */
+export const catalogueUrl = (catalogue: Catalogue): string => `http://127.0.0.1:${portOf(catalogue)}/`;
