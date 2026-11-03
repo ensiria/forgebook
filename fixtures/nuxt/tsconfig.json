@@ -1,0 +1,17 @@
+// The Nuxt fixture: components and stories checked by `vue-tsc`. What Nuxt imports for a file is declared in
+// `nuxtImports.d.ts`, as Nuxt's own `.nuxt` folder declares it for a project.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    "jsx": "preserve",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "~/*": ["./app/*"],
+      "#money": ["./shared/utils/money.ts"],
+      "#components": ["./nuxtComponents.d.ts"]
+    }
+  },
+  "include": ["app", "shared", "stories.ts", "nuxt.config.ts", "nuxtImports.d.ts"]
+}

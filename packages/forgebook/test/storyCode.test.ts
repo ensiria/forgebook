@@ -33,6 +33,14 @@ describe("storyCode", () => {
     });
   });
 
+  it("reads a `.js` story file that holds JSX", () => {
+    const file = `export default { title: "Inputs/Button" };
+export const Row = { render: (args) => <div><Button {...args} /></div> };`;
+    expect(storyCode("Button.stories.js", file)).toEqual({
+      Row: "(args) => <div><Button {...args} /></div>"
+    });
+  });
+
   it("says why a file cannot be read", () => {
     expect(storyCode("Broken.stories.tsx", "export const = ;")).toMatch(/does not parse/);
   });

@@ -1,0 +1,12 @@
+// The React Native fixture: the app's components and stories as React Native's types read them, and the catalogue's
+// configuration read by Node.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "allowImportingTsExtensions": true,
+    "customConditions": ["react-native"]
+  },
+  "include": ["src", "forgebook.config.ts", "forgebook.preview.tsx"]
+}

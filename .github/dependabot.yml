@@ -16,7 +16,8 @@ updates:
       production:
         dependency-type: production
   - package-ecosystem: github-actions
-    directory: /
+    # the workflows, and the Actions the repository's own actions use
+    directories: ["/", "/.github/actions/*"]
     target-branch: develop
     schedule:
       interval: weekly

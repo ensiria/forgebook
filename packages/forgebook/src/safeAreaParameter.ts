@@ -45,3 +45,13 @@ export const safeAreaProperties = (search: string): readonly (readonly [string, 
     return [];
   return SIDES.map((side, index) => [`--forgebook-safe-area-${side}`, `${values[index] ?? 0}px`]);
 };
+
+/**
+ * Tells a page the safe areas its address carries, as CSS properties on its root.
+ *
+ * @param root - the page's root element.
+ * @param search - the page's address's query.
+ */
+export const applySafeArea = (root: HTMLElement, search: string): void => {
+  for (const [name, value] of safeAreaProperties(search)) root.style.setProperty(name, value);
+};

@@ -6,8 +6,7 @@
 /// <reference types="@forgebook/story-format/client" />
 import type { StorySource } from "@forgebook/story-format/source";
 
-import en from "./locales/en.json";
-import it from "./locales/it.json";
+import docs from "./docs/**/*.md?forgebook-docs-pages";
 import logoUrl from "./logo.svg?url";
 import files from "./src/*.stories.tsx?forgebook-files";
 
@@ -19,7 +18,11 @@ export const source: StorySource = {
   // invented colours, so the tests can see a story's box wait on its page colour
   background: { light: "#fafafa", dark: "#111111" },
   files: [files],
-  texts: { en, it },
+  docs: [docs],
+  // loaded as a frame shows them: the catalogue's page never carries them
+  texts: { en: () => import("./locales/en.json"), it: () => import("./locales/it.json") },
   sheets: { required: [], theme: [], restyled: [] },
+  // invented tokens, so the tools and CATALOG.md see a library's tokens reach them
+  tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }],
   home: () => import("./home.md?forgebook-markdown")
 };

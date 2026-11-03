@@ -1,0 +1,12 @@
+// The docs reader's fixture: Angular components, checked by the docs' program as a project's own configuration.
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}

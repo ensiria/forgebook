@@ -11,16 +11,22 @@
  * @module
  */
 
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { type PanelArgTypes, panelProps, settableProps } from "../argTypes.ts";
-import { deviceDefaultOf, shownDevice } from "../deviceView.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import type { ArgValue, PanelArgs, ShellMessage } from "../messages.ts";
+import {
+  type ArgValue,
+  type PanelArgs,
+  panelArgsParam,
+  parsePanelArgsParam,
+  type ShellMessage
+} from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
+import type { ViewSwitch } from "../switches.ts";
 import {
   frameAddress,
   isComparing,
@@ -31,39 +37,51 @@ import {
   type StageWidth,
   schemeOf,
   type ViewState,
+  viewParams,
   type Zoom
 } from "../viewState.ts";
-import type { CheckState } from "./A11yTab.tsx";
-import { ClockControls, useStoryClockControls } from "./ClockControls.tsx";
+import { useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import {
   DeviceSlot,
   deviceAddress,
-  inkScheme,
   isWaitingForDevice,
   roomSizing,
-  useFramedDevice
+  useInkScheme,
+  useStageDevice
 } from "./DeviceSlot.tsx";
 import { Dock } from "./Dock.tsx";
+import { DroppedArgsNote } from "./DroppedArgsNote.tsx";
 import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
-import { Icon } from "./icons.tsx";
-import { MatrixPicker } from "./MatrixPicker.tsx";
+import { framesOrigin } from "./framesOrigin.ts";
+import type { PluginReports, ShellPlugin } from "./pluginTabs.tsx";
 import { StageCompare } from "./StageCompare.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
+import { StoryBar } from "./StoryBar.tsx";
 import { STRINGS } from "./strings.ts";
+import { useAddressArgs } from "./useAddressArgs.ts";
 import { useComponentDocs } from "./useComponentDocs.ts";
-import { useCopy } from "./useCopy.ts";
-import { type CheckResult, type EventCall, type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
+import {
+  type CheckResult,
+  type EventCall,
+  type PluginReportMessage,
+  type ReadyMessage,
+  useFrameMessages
+} from "./useFrameMessages.ts";
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
+import { usePluginStory, usePluginTabs } from "./usePluginTabs.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
+import { useStoryCheck } from "./useStoryCheck.ts";
 import { useStoryCode } from "./useStoryCode.ts";
-import { useSystemDark } from "./useSystemDark.ts";
 import { useWorstCase } from "./useWorstCase.ts";
 
 /** The `argTypes` of a story before its frame reported them. */
 const NO_ARG_TYPES: PanelArgTypes = {};
+
+/** What a story's frame reports for the panel and the stage. */
+type ReportedPanel = Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed" | "parameters">;
 
 /**
  * What the stage's handles set the width with; none, so no handles, when the story fixes the width.
@@ -86,11 +104,14 @@ const widthSetter = (
  * @param panels - what each story's frame reported, by story.
  * @param story - the story.
  */
-const reportedPanel = (
-  panels: ReadonlyMap<string, Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed">>,
-  story: TreeStory
-): Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed"> =>
-  panels.get(story.id) ?? { argTypes: NO_ARG_TYPES, controls: story.controls, actions: [], fixed: NOT_FIXED };
+const reportedPanel = (panels: ReadonlyMap<string, ReportedPanel>, story: TreeStory): ReportedPanel =>
+  panels.get(story.id) ?? {
+    argTypes: NO_ARG_TYPES,
+    controls: story.controls,
+    actions: [],
+    fixed: NOT_FIXED,
+    parameters: []
+  };
 
 /** The height of the first frame before its story reports its own, in CSS px. */
 const INITIAL_FRAME_HEIGHT = 240;
@@ -110,7 +131,10 @@ export type StageProps = {
   readonly onViewChange: (view: ViewState) => void;
   /** Called with what a story fixes of the view, once its frame read it, for the toolbar to show. */
   readonly onFixedChange: (storyId: string, fixed: FixedView) => void;
-  /** The values set in the Props tab, over the story's own args (kept in the address). */
+  /**
+   * The values set in the Props tab, over the story's own args (kept in the address): as the address names them, so
+   * unchecked; the stage hands the frames only those the story declares.
+   */
   readonly panelArgs: PanelArgs;
   /** Called with the panel's changed values. */
   readonly onPanelArgsChange: (args: PanelArgs) => void;
@@ -120,6 +144,8 @@ export type StageProps = {
   readonly onMatrixAxesChange: (axes: readonly string[]) => void;
   /** The frame page's address. */
   readonly frameUrl: string;
+  /** The plugins with tabs. */
+  readonly plugins: readonly ShellPlugin[];
   /** Loads the story file's code for the Code tab; `undefined` when the source has none. */
   readonly loadCode: (() => Promise<unknown>) | undefined;
   /** Loads the component's docs for the panel; `undefined` when the source has none for the file. */
@@ -142,60 +168,6 @@ export type StageProps = {
 };
 
 /**
- * The accessibility check of the shown story: its state, cleared when the story or the view changes, and how to run
- * it in the frame.
- *
- * @param frameRef - the story's frame.
- * @param checkKey - the story and the view, as one text: a check belongs to them.
- */
-const useStoryCheck = (
-  frameRef: RefObject<HTMLIFrameElement | null>,
-  checkKey: string
-): { check: CheckState; run: () => void; receive: (result: CheckResult) => void } => {
-  const [check, setCheck] = useState<CheckState>({ status: "idle" });
-  const [checkedKey, setCheckedKey] = useState(checkKey);
-  if (checkedKey !== checkKey) {
-    setCheckedKey(checkKey);
-    setCheck({ status: "idle" });
-  }
-  return {
-    check,
-    run: (): void => {
-      setCheck({ status: "running" });
-      const message: ShellMessage = { type: "forgebook:check" };
-      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
-    },
-    receive: (result: CheckResult): void =>
-      setCheck(
-        "error" in result
-          ? { status: "error", message: result.error }
-          : { status: "done", violations: result.violations }
-      )
-  };
-};
-
-/**
- * Copies the story's id (`kit:inputs-selection-select--overview`), the name tests and tools address it by; the id
- * shows as the button's tooltip.
- *
- * @param props - the story's id.
- */
-const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
-  const { isCopied, copy } = useCopy();
-  return (
-    <button
-      type="button"
-      className="forgebook-button forgebook-button--icon"
-      title={`${STRINGS.copyStoryId}: ${storyId}`}
-      aria-label={isCopied ? STRINGS.copied : STRINGS.copyStoryId}
-      onClick={(): void => copy(storyId)}
-    >
-      <Icon name={isCopied ? "check" : "hash"} size={14} />
-    </button>
-  );
-};
-
-/**
  * Whether a story's args change what it draws: not for a story of fixed examples, nor for one about logic, whose scene
  * takes none.
  *
@@ -203,6 +175,30 @@ const CopyIdButton = ({ storyId }: { readonly storyId: string }): ReactNode => {
  */
 const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
   !story.isLogic && (story.controls === "all" || story.controls.length > 0);
+
+/**
+ * What an embed of the story keeps of the page: its view and the values set in the panel.
+ *
+ * @param view - the reader's view, without what the story fixes, which the story fixes again.
+ * @param panelArgs - the values set in the panel.
+ * @param switches - the catalogue's switches.
+ */
+const embedQuery = (view: ViewState, panelArgs: PanelArgs, switches: readonly ViewSwitch[]): string => {
+  const params = viewParams(view, switches);
+  const args = panelArgsParam(panelArgs);
+  if (args !== "") params.set("args", args);
+  return params.toString();
+};
+
+/**
+ * The height an embed's iframe starts at: as tall as the frame is on the stage.
+ *
+ * @param view - the view, with the height set on the stage.
+ * @param contentHeight - the story's content, in CSS px.
+ * @param story - the story, with the height its scene declares.
+ */
+const embedHeight = (view: ViewState, contentHeight: number, story: Pick<TreeStory, "height">): number =>
+  view.height === "auto" ? Math.max(contentHeight, story.height ?? 0) : view.height;
 
 /**
  * The stage.
@@ -220,6 +216,7 @@ export const Stage = ({
   matrixAxes,
   onMatrixAxesChange,
   frameUrl,
+  plugins,
   loadCode,
   loadDocs,
   namedValues,
@@ -240,9 +237,7 @@ export const Stage = ({
     new Map()
   );
   // each story's `argTypes` and controls, as its frame read them once it ran
-  const [storyPanels, setStoryPanels] = useState<
-    ReadonlyMap<string, Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed">>
-  >(new Map());
+  const [storyPanels, setStoryPanels] = useState<ReadonlyMap<string, ReportedPanel>>(new Map());
   // the story is drawn with what it fixes of the view; a change from here keeps the user's own in the address
   const panel = reportedPanel(storyPanels, story);
   const view = withFixed(ownView, panel.fixed);
@@ -251,6 +246,8 @@ export const Stage = ({
   const [calls, setCalls] = useState<readonly EventCall[]>([]);
   // each story's play trace, by story: a trace belongs to the story that played
   const [traces, setTraces] = useState<ReadonlyMap<string, PlayTrace>>(new Map());
+  // what each plugin's frame module last told its tab, by story: a plugin's report belongs to the story that sent it
+  const [pluginReports, setPluginReports] = useState<PluginReports>(new Map());
   const catalogue = useCatalogue();
   const { switches } = catalogue;
   const storyCheck = useStoryCheck(frameRef, frameAddress(frameUrl, story.id, view, switches));
@@ -272,7 +269,17 @@ export const Stage = ({
     [docs, matrixAxes, story.isLogic]
   );
 
-  const values = { ...storyArgs.get(story.id), ...panelArgs };
+  // the address's values reach the frames only once checked against what the story declares
+  const addressArgs = useAddressArgs({
+    panelArgs,
+    docs,
+    storyArgs: storyArgs.get(story.id),
+    argTypes: panel.argTypes,
+    controls: panel.controls,
+    namedValues
+  });
+  const acceptedArgs = addressArgs.accepted;
+  const values = { ...storyArgs.get(story.id), ...acceptedArgs };
   const settable = useMemo(
     () =>
       docs.status === "ready"
@@ -285,7 +292,7 @@ export const Stage = ({
     storyId: story.id,
     settable,
     values,
-    panelArgs,
+    panelArgs: acceptedArgs,
     onPanelArgsChange
   });
 
@@ -299,14 +306,16 @@ export const Stage = ({
           argTypes: message.argTypes,
           controls: message.controls,
           actions: message.actions,
-          fixed: message.fixed
+          fixed: message.fixed,
+          parameters: message.parameters
         })
       );
       onFixedChange(message.storyId, message.fixed);
-      const send = (shellMessage: ShellMessage): void =>
-        frame.postMessage(shellMessage, window.location.origin);
+      const send = (shellMessage: ShellMessage): void => frame.postMessage(shellMessage, framesOrigin());
       send({ type: "forgebook:events", names: eventNames });
-      send({ type: "forgebook:args", args: panelArgs });
+      // checked against the shown story's declaration only: a late message of the story shown before sends nothing
+      const accepted = message.storyId === story.id ? addressArgs.acceptedFor(message) : undefined;
+      if (accepted !== undefined) send({ type: "forgebook:args", args: accepted });
       send({ type: "forgebook:matrix", matrix });
       // the view may have changed while the frame loaded
       if (!isComparing(view)) send({ type: "forgebook:view", view: liveView(view) });
@@ -320,7 +329,9 @@ export const Stage = ({
     onChecked: (result: CheckResult): void => {
       if (result.storyId === story.id) storyCheck.receive(result);
     },
-    onSpills: worstCase.receive
+    onSpills: worstCase.receive,
+    onPluginReport: (message: PluginReportMessage): void =>
+      setPluginReports((current) => new Map(current).set(`${message.storyId}|${message.plugin}`, message))
   });
 
   // the docs may arrive after the frames: they learn the events then
@@ -329,16 +340,22 @@ export const Stage = ({
     [eventNames]
   );
   useEffect(() => tellFrames(storyRef.current, { type: "forgebook:matrix", matrix }), [matrix]);
-  // the values reach the frames from the address, so going back in the history sets them too
-  useEffect(() => tellFrames(storyRef.current, { type: "forgebook:args", args: panelArgs }), [panelArgs]);
+  // the values reach the frames from the address, so going back in the history sets them too; compared as text, so
+  // a frame is told again only when they change
+  const { acceptedParam } = addressArgs;
+  useEffect(() => {
+    if (acceptedParam === undefined) return;
+    tellFrames(storyRef.current, { type: "forgebook:args", args: parsePanelArgsParam(acceptedParam) });
+  }, [acceptedParam]);
+  // a change starts from the values the story takes: one the address named and the story does not is let go
   const changeValue = (name: string, value: ArgValue | undefined): void => {
-    const { [name]: _removed, ...rest } = panelArgs;
+    const { [name]: _removed, ...rest } = acceptedArgs;
     onPanelArgsChange(value === undefined ? rest : { ...rest, [name]: value });
   };
 
   const replay = (): void => {
     const message: ShellMessage = { type: "forgebook:replay" };
-    frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+    frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
   };
   const title = STRINGS.frameTitle(component.name, story.name);
   const canReplay = replayable === story.id && !isComparing(view);
@@ -347,19 +364,14 @@ export const Stage = ({
   // the frame loads again only for another story or style sheets; the rest of the view (the switches, the language
   // among them) is sent live
   // a device sets the story's width and height in place of the stage's own, and its story area is the toolbar's width
-  const shown = shownDevice(view, deviceDefaultOf(catalogue.device, story.device));
-  const framed = useFramedDevice(shown);
+  const { shown, framed } = useStageDevice(view, story.device, onShownWidthChange);
   const address = deviceAddress(
     frameAddress(frameUrl, story.id, useLoadedView(`${story.id}|${view.sheets}`, view), switches),
     framed
   );
   useLiveView(storyRef, view, !isComparing(view));
   useScrollMemory(storyRef, scroll);
-  const isSystemDark = useSystemDark();
-  const screenWidth = framed?.area.width;
-  useEffect(() => {
-    if (screenWidth !== undefined) onShownWidthChange(screenWidth);
-  }, [screenWidth, onShownWidthChange]);
+  const ink = useInkScheme(schemeOf(view, switches));
   // a story not shown yet waits at its measured height, or keeps the last story's, until it reports its own, so the
   // page does not jump twice
   const reportedHeight = heights.get(address);
@@ -367,6 +379,22 @@ export const Stage = ({
   useEffect(() => {
     if (reportedHeight !== undefined) setLastHeight(reportedHeight);
   }, [reportedHeight]);
+
+  const pluginTabs = usePluginTabs({
+    plugins,
+    strings: catalogue.strings,
+    story: usePluginStory(component, story),
+    parameters: panel.parameters,
+    reports: pluginReports,
+    isComparing: isComparing(view),
+    aside: {
+      address: frameAddress(frameUrl, story.id, view, switches),
+      width: view.width,
+      background: backgroundOf(view),
+      args: panelArgs,
+      view: liveView(view)
+    }
+  });
 
   // a tab the catalogue turns off is never shown
   const tabs = dockTabs({
@@ -386,7 +414,7 @@ export const Stage = ({
     textArgs: Object.fromEntries(
       Object.entries(storyTextKeys.get(story.id) ?? {}).map(([name, key]) => [
         name,
-        { key, isChanged: panelArgs[name] !== undefined }
+        { key, isChanged: acceptedArgs[name] !== undefined }
       ])
     ),
     calls: calls.filter((call) => call.storyId === story.id),
@@ -394,10 +422,11 @@ export const Stage = ({
     trace: isComparing(view) ? undefined : traces.get(story.id),
     onPlayAgain: (): void => {
       const message: ShellMessage = { type: "forgebook:play-again" };
-      frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+      frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
     },
     check: storyCheck.check,
-    onCheck: isComparing(view) ? undefined : storyCheck.run
+    onCheck: isComparing(view) ? undefined : storyCheck.run,
+    pluginTabs
   }).filter((tab) => catalogue.tabs.includes(tab.id));
 
   return (
@@ -406,37 +435,24 @@ export const Stage = ({
       <div className="forgebook-story-pane">
         <div ref={storyRef} className="forgebook-scroll">
           <section className="forgebook-story" aria-label={STRINGS.storyLabel}>
-            <div className="forgebook-story__bar">
-              <div className="forgebook-stage__heading">
-                <h2 className="forgebook-stage__title">{story.name}</h2>
-                {story.description === undefined ? null : (
-                  <p className="forgebook-stage__description" title={story.description}>
-                    {story.description}
-                  </p>
-                )}
-              </div>
-              {axisProps.length === 0 ? null : (
-                <MatrixPicker props={axisProps} axes={matrixAxes} onAxesChange={onMatrixAxesChange} />
-              )}
-              {canReplay ? (
-                <button type="button" className="forgebook-button" onClick={replay}>
-                  <Icon name="replay" size={14} />
-                  {STRINGS.replay}
-                </button>
-              ) : null}
-              {hasClock ? <ClockControls controls={clockControls} /> : null}
-              <CopyIdButton storyId={story.id} />
-              <a
-                className="forgebook-button forgebook-button--icon"
-                href={frameAddress(frameUrl, story.id, view, switches)}
-                target="_blank"
-                rel="noopener"
-                title={STRINGS.openFrame}
-                aria-label={STRINGS.openFrame}
-              >
-                <Icon name="external" size={14} />
-              </a>
-            </div>
+            <StoryBar
+              story={story}
+              axisProps={axisProps}
+              matrixAxes={matrixAxes}
+              onMatrixAxesChange={onMatrixAxesChange}
+              onReplay={canReplay ? replay : undefined}
+              clockControls={hasClock ? clockControls : undefined}
+              frameAddress={frameAddress(frameUrl, story.id, view, switches)}
+              embed={{
+                title,
+                query: embedQuery(ownView, panelArgs, switches),
+                height: embedHeight(view, reportedHeight ?? lastHeight, story)
+              }}
+            />
+            <DroppedArgsNote
+              dropped={addressArgs.dropped}
+              onRemove={(): void => onPanelArgsChange(acceptedArgs)}
+            />
             {isComparing(view) ? (
               <StageCompare
                 story={story}
@@ -462,11 +478,7 @@ export const Stage = ({
                 })}
               >
                 {(fixedHeight: number | undefined): ReactNode => (
-                  <DeviceSlot
-                    framed={framed}
-                    scheme={inkScheme(schemeOf(view, switches), isSystemDark)}
-                    background={backgroundOf(view)}
-                  >
+                  <DeviceSlot framed={framed} scheme={ink} background={backgroundOf(view)}>
                     {isWaitingForDevice(shown, framed) ? null : (
                       <FrameView
                         ref={frameRef}

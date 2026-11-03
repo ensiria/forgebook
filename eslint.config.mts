@@ -27,7 +27,19 @@ const NO_BARRELS = [
 
 /** The configuration. */
 const config: Linter.Config[] = [
-  { ignores: ["**/node_modules/**", "**/dist/**", "**/.heights-build/**", "**/public/**"] },
+  {
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.heights-build/**",
+      "**/.svelte-check/**",
+      "**/.svelte-kit/**",
+      "**/public/**",
+      // React Native's JavaScript as Metro reads it (JSX in `.js`, Flow): the React Native plugin's fixtures
+      "fixtures/react-native/src/legacy/**",
+      "packages/react-native-web/test/project/**/*.js"
+    ]
+  },
   {
     files: TYPESCRIPT,
     languageOptions: {

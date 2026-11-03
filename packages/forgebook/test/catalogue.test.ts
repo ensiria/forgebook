@@ -52,6 +52,13 @@ describe("catalogueSettings", () => {
   });
 });
 
+describe("the Embed button", () => {
+  it("is offered unless a catalogue turns it off", () => {
+    expect(catalogueSettings("A", DEFAULT_SWITCHES).hasEmbed).toBe(true);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { controls: { embed: false } }).hasEmbed).toBe(false);
+  });
+});
+
 describe("mergedLists", () => {
   it("takes the catalogue's single values over its presets', and merges the entries by id", () => {
     const merged = mergedLists([
@@ -109,10 +116,12 @@ describe("story groups", () => {
     const sections = groupedStories(
       [story("zeta"), story("behaviour"), story(undefined), story("alpha"), story("states")].map((each) => ({
         ...each,
+        file: "x.stories.tsx",
         controls: "all" as const,
         description: undefined,
         height: undefined,
         device: undefined,
+        design: undefined,
         tags: [],
         isMain: false,
         isTouch: false,

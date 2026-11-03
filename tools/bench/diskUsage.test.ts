@@ -26,7 +26,10 @@ describe("contentSize", () => {
 });
 
 describe("diskUsage", () => {
-  it("counts whole blocks, so a small file takes more than its bytes", async () => {
-    expect(await diskUsage(folder())).toBeGreaterThan(150);
+  it("counts whole blocks, so a file takes more than its bytes", async () => {
+    // a few kilobytes and not a few bytes: NTFS keeps a file of a few hundred bytes in its file table, with no block
+    const root = mkdtempSync(join(tmpdir(), "bench-blocks-"));
+    writeFileSync(join(root, "a.txt"), "x".repeat(5000));
+    expect(await diskUsage(root)).toBeGreaterThan(5000);
   });
 });

@@ -1,0 +1,13 @@
+// The docs fixtures: functions that draw HTML and types of args, read by the extractor as a project's would be.
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}

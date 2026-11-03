@@ -1,0 +1,5 @@
+{
+  "name": "react-native-plain-css-test",
+  "private": true,
+  "description": "A small project without a PostCSS configuration."
+}

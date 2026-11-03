@@ -11,8 +11,11 @@
  * @module
  */
 
+import { join } from "node:path";
+
 import type { PluginOption } from "vite";
 
+import type { AddressTexts } from "../addressTexts.ts";
 import type { ComponentDocs, NoComponentDocs } from "../componentDocs.ts";
 
 /** A story file's component: its docs and the file that declares it. */
@@ -62,6 +65,44 @@ export type FrameworkAdapter = {
   readonly browserDependencies?: readonly string[];
   /** The Vite plugins the framework needs in a catalogue (React's Fast Refresh); none by default. */
   readonly vitePlugins?: () => Promise<readonly PluginOption[]>;
+  /** The framework's own kind of component file, for a framework whose components are not all TypeScript; none by default. */
+  readonly componentFiles?: ComponentFiles;
+  /**
+   * How its stories take the texts a catalogue's address carries (`addressTexts.ts`): `plain` for a framework whose
+   * stories may write a text into markup (an HTML string), so a shared link's texts reach a story only when they are
+   * plain words. `any` by default, where a text stays text.
+   */
+  readonly addressTexts?: AddressTexts;
+  /**
+   * Whether an edited story file is drawn anew in its open frames, which keep what the reader did in the story
+   * (`hotModules.ts`); `true` by default. `false` for a framework whose compiler makes a story file anew from its own
+   * program and leaves out the code Vite's plugins add to it (Angular's): an edit of its story files reloads the pages.
+   */
+  readonly redrawsEditedStories?: boolean;
+};
+
+/**
+ * A framework's own kind of component file (Vue's `.vue`): what the plugin must know of a file that is not TypeScript,
+ * so an edit to one renews the docs and a page finds the comment that opens its script.
+ */
+export type ComponentFiles = {
+  /** The files' extension, with its dot (`.vue`). */
+  readonly extension: string;
+  /**
+   * The script a file holds, as TypeScript reads it.
+   *
+   * @param text - the file's text.
+   * @returns the script's text; empty when it has none.
+   */
+  readonly scriptOf: (text: string) => string;
+};
+
+/** Where `forgebook new` writes a component's stories, and how they import it. */
+export type StoryFileShape = {
+  /** The stories file's extension (`.stories.ts`). */
+  readonly extension: string;
+  /** The statement that imports the component (`import Badge from "./Badge.vue";`). */
+  readonly importStatement: string;
 };
 
 /** Reads the component a file exports (`forgebook new`): the export named, or the file's only component. */
@@ -75,6 +116,18 @@ export type DocsModule = {
   readonly extractFileComponent?: ExtractFileComponent;
   /** The module a story file imports its types from (`@forgebook/react`); none when not given. */
   readonly storyTypesModule?: string;
+  /**
+   * How a component's stories file is written: a `.stories.tsx` importing the named export, without one.
+   *
+   * @param name - the component's name.
+   * @param file - the component's file, absolute.
+   */
+  readonly storyFileShape?: (name: string, file: string) => StoryFileShape;
+  /**
+   * Called in the docs' worker when a source file changed, for a framework that keeps a program of its own: the core's
+   * programs (`docsProgram.ts`) renew themselves. None by default.
+   */
+  readonly sourcesChanged?: () => void;
 };
 
 /**
@@ -88,4 +141,24 @@ export const isDocsModule = (module: unknown): module is DocsModule =>
   "extractStoryComponent" in module &&
   typeof module.extractStoryComponent === "function" &&
   (!("extractFileComponent" in module) || typeof module.extractFileComponent === "function") &&
-  (!("storyTypesModule" in module) || typeof module.storyTypesModule === "string");
+  (!("storyTypesModule" in module) || typeof module.storyTypesModule === "string") &&
+  (!("storyFileShape" in module) || typeof module.storyFileShape === "function") &&
+  (!("sourcesChanged" in module) || typeof module.sourcesChanged === "function");
+
+/**
+ * The files under a folder, as a pattern a Vite plugin's `include` or `exclude` takes: Vite names a module by its path
+ * with forward slashes.
+ *
+ * @param folder - the folder's absolute path.
+ */
+export const filesUnder = (folder: string): RegExp => {
+  const path = folder.split("\\").join("/").replace(/\/$/, "");
+  return new RegExp(`^${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`);
+};
+
+/**
+ * The core's own files: its shell is React, so a framework's plugin that compiles JSX its own way (Solid's compiler,
+ * Preact's refresh) leaves them to Vite. They matter when the core is linked as sources (a workspace); installed, they
+ * are JavaScript already, which such plugins do not read.
+ */
+export const FORGEBOOK_FILES: RegExp = filesUnder(join(import.meta.dirname, "..", ".."));

@@ -7,7 +7,7 @@
  *
  * @module
  */
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { cpSync, existsSync, globSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
@@ -103,7 +103,8 @@ const publishConfigFor = (manifest: Manifest): PublishConfig =>
 const build = (packageDir: string, manifest: Manifest): number => {
   rmSync(join(packageDir, DIST), { recursive: true, force: true });
   try {
-    execFileSync("pnpm", ["exec", "tsc", "-p", "tsconfig.build.json"], { cwd: packageDir, stdio: "inherit" });
+    // through the system's shell: on Windows pnpm is a .cmd, which Node does not start without one
+    execSync("pnpm exec tsc -p tsconfig.build.json", { cwd: packageDir, stdio: "inherit" });
   } catch {
     throw new ScriptError("tsc failed", {
       hint: `Run pnpm exec tsc -p tsconfig.build.json in ${packageDir}`

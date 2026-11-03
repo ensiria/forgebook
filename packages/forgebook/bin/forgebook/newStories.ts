@@ -12,8 +12,8 @@ import { WORST_NUMBER, WORST_TEXT } from "../../src/worstCase.ts";
 export type NewStoriesInput = {
   /** The component's docs (its props). */
   readonly docs: ComponentDocs;
-  /** How the story file imports the component (`./Badge`). */
-  readonly importPath: string;
+  /** The statement that imports the component (`import { Badge } from "./Badge";`). */
+  readonly importStatement: string;
   /** The meta's title (`Actions/Badge`). */
   readonly title: string;
   /** The module the story types come from (`@forgebook/react`). */
@@ -59,7 +59,9 @@ const LINE_WIDTH = 100;
 /** One story's args as code: on one line when it fits, one arg per line otherwise. */
 const argsCode = (args: readonly (readonly [string, string])[]): string => {
   if (args.length === 0) return "{}";
-  const pairs = args.map(([name, value]) => `${name}: ${value}`);
+  // a name that is no identifier (Vue's `#default`) is a quoted key
+  const key = (name: string): string => (/^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name));
+  const pairs = args.map(([name, value]) => `${key(name)}: ${value}`);
   const line = `{ ${pairs.join(", ")} }`;
   return line.length <= LINE_WIDTH ? line : `{\n${pairs.map((pair) => `    ${pair}`).join(",\n")}\n  }`;
 };
@@ -124,7 +126,7 @@ export const newStories = (input: NewStoriesInput): string => {
     " */",
     `import type { Meta, Story } from ${JSON.stringify(input.typesModule)};`,
     "",
-    `import { ${name} } from ${JSON.stringify(input.importPath)};`,
+    input.importStatement,
     "",
     `export default { title: ${JSON.stringify(input.title)}, component: ${name} } satisfies Meta<typeof ${name}>;`,
     "",

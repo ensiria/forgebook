@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { HttpResponse, http } from "msw";
+import { delay, HttpResponse, http } from "msw";
 import { type ReactNode, useEffect, useState } from "react";
 
 /** Shows what an invented API answers. */
@@ -33,6 +33,11 @@ export const AnsweredByName = {
       handlers: { greeting: [http.get("/api/greeting", () => HttpResponse.json({ text: "Named mock" }))] }
     }
   }
+};
+
+/** Its request never answered: the story stays usable, and can be mounted again. */
+export const Held = {
+  parameters: { msw: { handlers: [http.get("/api/greeting", () => delay("infinite"))] } }
 };
 
 /** With no mock: the request goes to the network, and nothing of MSW loads. */

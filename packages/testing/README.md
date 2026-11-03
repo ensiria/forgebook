@@ -107,6 +107,9 @@ import { storyTestViteConfig } from "@forgebook/testing/vite";
 export default storyTestViteConfig(import.meta.dirname, react());
 ```
 
+The config holds the framework's own Vite plugins (React's, or Solid's that compiles the stories' JSX), as the catalogue
+does: don't add them again.
+
 Then `npx playwright install chromium` once, and `playwright test -c test/stories/playwright.config.ts` starts the
 frame page and runs one test per story and variant (light, dark, both with more contrast, a narrow width, and the
 structure view), starting Vite through the package manager that runs them (`vite` in `testServer.ts` names
@@ -175,8 +178,14 @@ every adapter passes, in its own Vitest with a simulated page, so a framework is
 ```ts
 import { describeAdapter } from "@forgebook/testing/conformance";
 
-describeAdapter({ name: "Vue", renderer, drawing, codeOf });
+describeAdapter({ name: "Solid", renderer, drawing, decorator, codeOf, docsOf });
 ```
 
 `drawing(name)` gives a story with a button showing `Hello <name> <clicks>`, its clicks in its own state, which throws for
-`THROWING_NAME`. `@forgebook/react`'s `test/conformance.test.tsx` is a complete example.
+`THROWING_NAME`. `decorator(label)` draws a story inside a `section` with that `data-decorator`. A renderer's
+`renderToString` may return a promise. A framework whose page and server builds differ runs the suite twice, with
+`half: "page"` in a simulated page and `half: "server"` in Node: Svelte compiles a component apart for each, and Solid's
+`solid-js/web` is its browser build or its server build, never both. `test/conformance.test.tsx` in `@forgebook/react`
+and `@forgebook/preact`, `test/conformance.test.ts` in `@forgebook/vue`, `@forgebook/web-components`,
+`@forgebook/html` and `@forgebook/angular`, and the two `conformance` tests of `@forgebook/svelte` and of
+`@forgebook/solid` are complete examples.

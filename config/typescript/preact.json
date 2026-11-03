@@ -1,0 +1,13 @@
+// Code that runs in a page and is written for Preact: its JSX made by Preact's own runtime (`preact/jsx-runtime`).
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": [],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "module": "preserve",
+    "moduleResolution": "bundler"
+  }
+}

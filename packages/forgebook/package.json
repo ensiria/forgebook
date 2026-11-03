@@ -36,6 +36,7 @@
     ".": "./src/vite/config.ts",
     "./agent": "./src/vite/agent.types.ts",
     "./story-tree": "./src/storyTree.ts",
+    "./page-tree": "./src/pageTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
@@ -43,10 +44,16 @@
     "./story-hooks": "./src/frame/storyHooks.ts",
     "./story-module": "./src/frame/storyModule.ts",
     "./messages": "./src/messages.ts",
+    "./jsx-code": "./src/jsxCode.ts",
     "./component-docs": "./src/componentDocs.ts",
     "./vite/adapter": "./src/vite/adapter.ts",
     "./vite/docs-program": "./src/vite/docsProgram.ts",
+    "./vite/module-summary": "./src/vite/moduleSummary.ts",
     "./vite/story-meta": "./src/vite/storyMeta.ts",
+    "./vite/prop-docs": "./src/vite/propDocs.ts",
+    "./vite/signature-docs": "./src/vite/signatureDocs.ts",
+    "./vite/usage-guidance": "./src/vite/usageGuidance.ts",
+    "./vite/function-component-docs": "./src/vite/functionComponentDocs.ts",
     "./catalogue-docs": "./bin/forgebook-docs/collectDocs.ts",
     "./catalogue-markdown": "./bin/forgebook-docs/catalogueMarkdown.ts",
     "./catalogue-options": "./bin/forgebook-docs/catalogueOptions.ts",
@@ -63,12 +70,16 @@
     "./vite/auto-title": "./src/vite/autoTitle.ts",
     "./vite/index-story-file": "./src/vite/indexStoryFile.ts",
     "./vite/story-files-module": "./src/vite/storyFilesModule.ts",
+    "./vite/paths": "./src/vite/vitePaths.ts",
     "./switches": "./src/switches.ts",
     "./catalogue": "./src/catalogue.ts",
     "./story-check": "./src/storyCheck.ts",
     "./spills": "./src/spills.ts",
     "./real-touch": "./src/realTouch.ts",
-    "./shell-theme": "./src/shellTheme.types.ts"
+    "./shell-theme": "./src/shellTheme.types.ts",
+    "./plugin": "./src/plugin.ts",
+    "./plugin-react": "./src/pluginReact.tsx",
+    "./figma-link": "./src/vite/figmaLink.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -81,7 +92,6 @@
     "@ensiria/cli-kit": "^0.1.1",
     "@forgebook/story-format": "workspace:*",
     "axe-core": "4.14.0",
-    "highlight.js": "11.12.0",
     "lightningcss": "1.33.0",
     "marked": "18.1.0",
     "typescript-6": "npm:typescript@6.0.3"
@@ -89,7 +99,6 @@
   "peerDependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/user-event": "^14.6.0",
-    "msw": "^2.0.0 || ^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sass-embedded": "^1.80.0",
@@ -117,9 +126,6 @@
     "@testing-library/user-event": {
       "optional": true
     },
-    "msw": {
-      "optional": true
-    },
     "sass-embedded": {
       "optional": true
     }
@@ -138,6 +144,10 @@
       "./story-tree": {
         "types": "./dist/src/storyTree.d.ts",
         "default": "./dist/src/storyTree.js"
+      },
+      "./page-tree": {
+        "types": "./dist/src/pageTree.d.ts",
+        "default": "./dist/src/pageTree.js"
       },
       "./shell": {
         "types": "./dist/src/shell/mountShell.d.ts",
@@ -167,6 +177,10 @@
         "types": "./dist/src/messages.d.ts",
         "default": "./dist/src/messages.js"
       },
+      "./jsx-code": {
+        "types": "./dist/src/jsxCode.d.ts",
+        "default": "./dist/src/jsxCode.js"
+      },
       "./component-docs": {
         "types": "./dist/src/componentDocs.d.ts",
         "default": "./dist/src/componentDocs.js"
@@ -179,9 +193,29 @@
         "types": "./dist/src/vite/docsProgram.d.ts",
         "default": "./dist/src/vite/docsProgram.js"
       },
+      "./vite/module-summary": {
+        "types": "./dist/src/vite/moduleSummary.d.ts",
+        "default": "./dist/src/vite/moduleSummary.js"
+      },
       "./vite/story-meta": {
         "types": "./dist/src/vite/storyMeta.d.ts",
         "default": "./dist/src/vite/storyMeta.js"
+      },
+      "./vite/prop-docs": {
+        "types": "./dist/src/vite/propDocs.d.ts",
+        "default": "./dist/src/vite/propDocs.js"
+      },
+      "./vite/signature-docs": {
+        "types": "./dist/src/vite/signatureDocs.d.ts",
+        "default": "./dist/src/vite/signatureDocs.js"
+      },
+      "./vite/usage-guidance": {
+        "types": "./dist/src/vite/usageGuidance.d.ts",
+        "default": "./dist/src/vite/usageGuidance.js"
+      },
+      "./vite/function-component-docs": {
+        "types": "./dist/src/vite/functionComponentDocs.d.ts",
+        "default": "./dist/src/vite/functionComponentDocs.js"
       },
       "./catalogue-docs": {
         "types": "./dist/bin/forgebook-docs/collectDocs.d.ts",
@@ -247,6 +281,10 @@
         "types": "./dist/src/vite/storyFilesModule.d.ts",
         "default": "./dist/src/vite/storyFilesModule.js"
       },
+      "./vite/paths": {
+        "types": "./dist/src/vite/vitePaths.d.ts",
+        "default": "./dist/src/vite/vitePaths.js"
+      },
       "./switches": {
         "types": "./dist/src/switches.d.ts",
         "default": "./dist/src/switches.js"
@@ -270,6 +308,18 @@
       "./shell-theme": {
         "types": "./dist/src/shellTheme.types.d.ts",
         "default": "./dist/src/shellTheme.types.js"
+      },
+      "./plugin": {
+        "types": "./dist/src/plugin.d.ts",
+        "default": "./dist/src/plugin.js"
+      },
+      "./plugin-react": {
+        "types": "./dist/src/pluginReact.d.ts",
+        "default": "./dist/src/pluginReact.js"
+      },
+      "./figma-link": {
+        "types": "./dist/src/vite/figmaLink.d.ts",
+        "default": "./dist/src/vite/figmaLink.js"
       }
     },
     "bin": {

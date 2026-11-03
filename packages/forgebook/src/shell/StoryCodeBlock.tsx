@@ -18,7 +18,7 @@ export type StoryCodeSource = {
   readonly code: StoryFileCode;
   /** The story's export name. */
   readonly exportName: string;
-  /** The component's name, for the code of a story drawn from its args. */
+  /** The component's name as code writes it (`codeNameOf`), for the code of a story drawn from its args. */
   readonly componentName: string;
   /** The values of the moment: the story's args, with the panel's over them on the story page. */
   readonly args: PanelArgs;
@@ -48,7 +48,7 @@ export const StoryCodeBlock = (source: StoryCodeSource): ReactNode => {
     const markup = { __html: render.html };
     return (
       <pre className="forgebook-code-block">
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: the plugin's HTML of the story file's own text, as trusted as the story's code */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: the plugin's HTML of the story file's own text, or the same kept in the project's own node_modules/.vite, as trusted as the story's code */}
         <code className="forgebook-code" dangerouslySetInnerHTML={markup} />
       </pre>
     );

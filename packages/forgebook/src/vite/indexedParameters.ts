@@ -14,10 +14,7 @@ import type { StoryIndexEntry } from "@forgebook/story-format/source";
 import type { ESTree } from "vite";
 
 import { deviceSettingProblem, isDeviceOrientation } from "../deviceView.ts";
-import { keyName, unwrapped } from "./estreeValues.ts";
-
-/** A parameter's value by its name, as the meta or the story writes it under `parameters`. */
-type ParameterOf = (name: string) => ESTree.Expression | undefined;
+import { type Fields, keyName, parameter, unwrapped } from "./indexFields.ts";
 
 /** What the index keeps of these parameters: each only when written. */
 export type IndexedParameters = Pick<StoryIndexEntry, "isTouch" | "isLogic" | "device">;
@@ -109,14 +106,14 @@ const deviceOf = (value: ESTree.Expression | undefined): StoryDeviceSetting | un
 /**
  * The parameters only the index reads, each only when written, or the first problem.
  *
- * @param parameterOf - a parameter's value by name.
+ * @param fields - the story's or the meta's fields.
  */
-export const indexedParameters = (parameterOf: ParameterOf): IndexedParameters | Error => {
-  const touch = booleanOf(parameterOf("touch"), "parameters.touch");
+export const indexedParameters = (fields: Fields): IndexedParameters | Error => {
+  const touch = booleanOf(parameter(fields, "touch"), "parameters.touch");
   if (touch instanceof Error) return touch;
-  const logic = booleanOf(parameterOf("logic"), "parameters.logic");
+  const logic = booleanOf(parameter(fields, "logic"), "parameters.logic");
   if (logic instanceof Error) return logic;
-  const device = deviceOf(parameterOf("device"));
+  const device = deviceOf(parameter(fields, "device"));
   if (device instanceof Error) return device;
   return {
     ...(touch === undefined ? {} : { isTouch: touch }),

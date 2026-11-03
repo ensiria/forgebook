@@ -28,16 +28,6 @@ export type A11yTabProps = {
   readonly onCheck: (() => void) | undefined;
 };
 
-/**
- * The tab's hint: how many rules are broken once checked.
- *
- * @param check - the check's state.
- */
-export const a11yHint = (check: CheckState): string | undefined => {
-  if (check.status !== "done") return undefined;
-  return check.violations.length === 0 ? STRINGS.a11yPasses : STRINGS.a11yCount(check.violations.length);
-};
-
 /** What the check found. */
 const CheckResult = ({ check }: { readonly check: CheckState }): ReactNode => {
   if (check.status === "error") {

@@ -11,12 +11,15 @@ import type { TreeComponent, TreeFamily } from "../src/storyTree.ts";
 
 /** A component with a few stories. */
 const BUTTON: TreeComponent = {
+  id: "kit:actions-buttons-button",
   name: "Button",
   title: "Actions/Buttons/Button",
   file: "Button.stories.tsx",
+  files: ["Button.stories.tsx"],
   stories: [
     {
       id: "kit:b--overview",
+      file: "Button.stories.tsx",
       name: "Overview",
       exportName: "Overview",
       controls: "all",
@@ -27,10 +30,12 @@ const BUTTON: TreeComponent = {
       isLogic: false,
       height: undefined,
       device: undefined,
+      design: undefined,
       tags: []
     },
     {
       id: "kit:b--danger",
+      file: "Button.stories.tsx",
       name: "Danger",
       exportName: "Danger",
       controls: "all",
@@ -41,10 +46,12 @@ const BUTTON: TreeComponent = {
       isLogic: false,
       height: undefined,
       device: undefined,
+      design: undefined,
       tags: []
     },
     {
       id: "kit:b--long",
+      file: "Button.stories.tsx",
       name: "Long label",
       exportName: "Long",
       controls: "all",
@@ -55,13 +62,15 @@ const BUTTON: TreeComponent = {
       isLogic: false,
       height: undefined,
       device: undefined,
+      design: undefined,
       tags: []
     }
   ],
   unlisted: [],
   alsoIn: [],
   related: [],
-  keywords: ["Pressable", "CTA"]
+  keywords: ["Pressable", "CTA"],
+  design: undefined
 };
 
 /** A family holding it, and an alias of a component that lives elsewhere. */

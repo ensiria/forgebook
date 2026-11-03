@@ -11,17 +11,19 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
-import { join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 
 import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
-import type { CorpusComponent } from "./corpus.ts";
 import { contentSize } from "./diskUsage.ts";
-import { stampScript, waitForStamps } from "./stamps.ts";
+import { emptyOutput, type KeptOutput, keepOutput, outputText } from "./serverOutput.ts";
+import { type StampedPage, stampedPage, stampScript, waitForStamps } from "./stamps.ts";
 import { serveStatic } from "./staticServer.ts";
+import type { EditKind, MeasureSubject } from "./subject.ts";
 import { HOST, type Target, type TargetCommand } from "./targets.ts";
+import { toolEnvironment } from "./toolEnvironment.ts";
 
 /** How long a page or a server may take before a sample fails, in milliseconds. */
 const SAMPLE_TIMEOUT = 180_000;
@@ -32,8 +34,19 @@ const POLL_INTERVAL = 25;
 /** The pause between two edits, so one update does not land on the last, in milliseconds. */
 const EDIT_PAUSE = 150;
 
+/**
+ * Up to how much longer the pause after an edit lasts, at random, in milliseconds. A file watcher reports a change
+ * either within a few ms or about 90 ms later (on macOS), never in between: with a fixed pause the edits fall into step
+ * with it, and a tool whose page settles a few ms sooner or later lands on one side nearly every time, which reads as a
+ * difference in HMR the tool does not have. A random pause samples both sides alike, for every tool.
+ */
+const EDIT_JITTER = 100;
+
 /** How long a page has to stay unchanged after a story shows, or a reload could replace it, in milliseconds. */
 const SETTLE = 1500;
+
+/** How long a page may take to go quiet, in milliseconds: some never do, and that must not cost the metric. */
+const QUIET_TIMEOUT = 30_000;
 
 /** How often the server's memory is read, in milliseconds. */
 const MEMORY_INTERVAL = 250;
@@ -44,9 +57,6 @@ const TALL_VIEWPORT = { width: 1280, height: 2600 };
 /** The size of an ordinary window. */
 const VIEWPORT = { width: 1280, height: 900 };
 
-/** A group of the sidebar, taken from the generated titles: seen when the index arrived. */
-const LAST_GROUP = "Overlays";
-
 /** The servers alive now, so an interrupted run leaves none behind to answer for the next. */
 const liveServers = new Set<ChildProcess>();
 
@@ -56,27 +66,30 @@ export type MeasureContext = {
   readonly target: Target;
   /** The project's folder. */
   readonly directory: string;
+  /**
+   * Where its build is written: outside the project, which for a real library is inside its clone, where a library's
+   * own tools read every folder (Fluent UI's Storybook read another tool's build as a package of the monorepo).
+   */
+  readonly buildFolder: string;
   /** The browser. */
   readonly browser: Browser;
-  /** The port its servers listen on. */
+  /** The first of the ports its servers listen on, as many as the target takes. */
   readonly port: number;
   /** The story and component measured. */
-  readonly component: CorpusComponent;
+  readonly subject: MeasureSubject;
   /** The CPU throttle of the browser, 1 for none. */
   readonly throttle: number;
   /** The script's streams. */
   readonly io: ScriptIo;
 };
 
-/** The environment a target's command runs in: the script's, with the target's additions. */
-const environment = (io: ScriptIo, command: TargetCommand): NodeJS.ProcessEnv => ({
-  ...io.env,
-  BROWSER: "none",
-  ...command.env
-});
+/** The environment a target's command runs in: what a program needs of the script's, with the target's additions. */
+const environment = (io: ScriptIo, command: TargetCommand): NodeJS.ProcessEnv =>
+  toolEnvironment(io.env, { BROWSER: "none", ...command.env });
 
-/** The story's text, what a measurement waits for. */
-const storyLabel = (component: CorpusComponent): string => component.stories[0]?.label ?? "";
+/** A command's program: in the project's `node_modules/.bin`, unless the target names it in full. */
+const programOf = (context: Pick<MeasureContext, "directory">, command: TargetCommand): string =>
+  isAbsolute(command.bin) ? command.bin : join(context.directory, "node_modules", ".bin", command.bin);
 
 /** Whether something already listens on a port. */
 const isPortTaken = (port: number): Promise<boolean> =>
@@ -92,26 +105,37 @@ const isPortTaken = (port: number): Promise<boolean> =>
 /**
  * A dev server, in a process group of its own, so stopping it stops whatever it started.
  *
- * @throws when the port is taken: what answered there would pass for this server, with a time near zero.
+ * @throws when one of its ports is taken: what answered there would pass for this server, with a time near zero.
  */
-const startServer = async (context: MeasureContext): Promise<ChildProcess> => {
-  if (await isPortTaken(context.port)) throw new Error(`port ${context.port} is already taken`);
+export const startServer = async (context: MeasureContext): Promise<ChildProcess> => {
+  const ports = Array.from({ length: context.target.ports }, (_, offset) => context.port + offset);
+  for (const port of ports) {
+    if (await isPortTaken(port)) throw new Error(`port ${port} is already taken`);
+  }
   const command = context.target.dev(context.port);
-  const server = spawn(join(context.directory, "node_modules", ".bin", command.bin), [...command.args], {
+  const server = spawn(programOf(context, command), [...command.args], {
     cwd: context.directory,
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
     env: environment(context.io, command)
   });
   liveServers.add(server);
+  const output = emptyOutput();
+  const keep = (chunk: Buffer): void => keepOutput(output, chunk.toString());
+  server.stdout?.on("data", keep);
+  server.stderr?.on("data", keep);
+  serverOutput.set(server, output);
   return server;
 };
+
+/** Each server's output as kept (`serverOutput.ts`), read when it stops before answering. */
+const serverOutput = new WeakMap<ChildProcess, KeptOutput>();
 
 /** Whether a server's process has ended, by its own exit or a signal. */
 const hasEnded = (server: ChildProcess): boolean => server.exitCode !== null || server.signalCode !== null;
 
 /** Stops a server and waits for it to be gone, so the next one finds the port free. */
-const stopServer = (server: ChildProcess): Promise<void> =>
+export const stopServer = (server: ChildProcess): Promise<void> =>
   new Promise((resolve) => {
     liveServers.delete(server);
     if (hasEnded(server) || server.pid === undefined) {
@@ -130,13 +154,33 @@ export const stopAllServers = async (): Promise<void> => {
 /** The address of a server of this context. */
 export const baseOf = (context: Pick<MeasureContext, "port">): string => `http://${HOST}:${context.port}/`;
 
-/** Waits until a server answers, however it answers; one that dies fails at once, with no timeout to sit through. */
-const waitForServer = async (server: ChildProcess, address: string): Promise<void> => {
+/**
+ * Waits until a server answers, however it answers, or, given a page, until that page answers with success; one that
+ * dies fails at once, with no timeout to sit through.
+ *
+ * @param server - the server's process.
+ * @param address - its address.
+ * @param readyPath - a page that answers only once the server can draw (`Target.readyPath`).
+ */
+export const waitForServer = async (
+  server: ChildProcess,
+  address: string,
+  readyPath?: string
+): Promise<void> => {
   const deadline = Date.now() + SAMPLE_TIMEOUT;
   while (Date.now() < deadline) {
-    if (hasEnded(server)) throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})`);
-    const hasAnswered = await fetch(address).then(
-      () => true,
+    if (hasEnded(server)) {
+      const kept = serverOutput.get(server);
+      const text = kept === undefined ? "" : outputText(kept);
+      const last = text === "" ? "" : `: ${text}`;
+      throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})${last}`);
+    }
+    const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`).then(
+      async (response) => {
+        // the body is never read: left open, a long first build would pile up a connection per poll
+        await response.body?.cancel();
+        return readyPath === undefined || response.ok;
+      },
       () => false
     );
     if (hasAnswered) return;
@@ -149,12 +193,17 @@ const waitForServer = async (server: ChildProcess, address: string): Promise<voi
 const openPage = async (
   context: MeasureContext,
   viewport: { readonly width: number; readonly height: number }
-): Promise<{ readonly browserContext: BrowserContext; readonly page: Page }> => {
+): Promise<{
+  readonly browserContext: BrowserContext;
+  readonly page: Page;
+  readonly stamped: StampedPage;
+}> => {
   const browserContext = await context.browser.newContext({ viewport });
   await browserContext.addInitScript({
     content: stampScript({
-      texts: [LAST_GROUP],
-      selectors: context.target.propsTable === undefined ? [] : [context.target.propsTable]
+      texts: [context.subject.sidebar],
+      selectors: context.target.propsTable === undefined ? [] : [context.target.propsTable],
+      ...context.subject.watch
     })
   });
   const page = await browserContext.newPage();
@@ -163,14 +212,18 @@ const openPage = async (
     const session = await browserContext.newCDPSession(page);
     await session.send("Emulation.setCPUThrottlingRate", { rate: context.throttle });
   }
-  return { browserContext, page };
+  return { browserContext, page, stamped: stampedPage(page) };
 };
 
 /**
  * The stamps of keys once the page stopped replacing itself: a document that reloads later starts them over, and the
  * draw a person keeps is the last one.
  */
-const settledStamps = async (page: Page, keys: readonly string[], deadline: number): Promise<number[]> => {
+const settledStamps = async (
+  page: StampedPage,
+  keys: readonly string[],
+  deadline: number
+): Promise<number[]> => {
   let times = await waitForStamps(page, keys, deadline);
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, SETTLE));
@@ -178,6 +231,11 @@ const settledStamps = async (page: Page, keys: readonly string[], deadline: numb
     if (again.join() === times.join()) return times;
     times = again;
   }
+};
+
+/** Waits for the network to go quiet, for as long as it is worth waiting: a page that keeps asking is measured as it is. */
+const quiet = async (page: Page): Promise<void> => {
+  await page.waitForLoadState("networkidle", { timeout: QUIET_TIMEOUT }).catch(() => undefined);
 };
 
 /** Removes the tool's caches, as a first start finds them. */
@@ -203,23 +261,20 @@ export type StartSample = {
  */
 export const measureStart = async (context: MeasureContext, isCold: boolean): Promise<StartSample> => {
   if (isCold) await removeCaches(context);
-  const { browserContext, page } = await openPage(context, VIEWPORT);
+  const { browserContext, page, stamped } = await openPage(context, VIEWPORT);
   const start = Date.now();
   const server = await startServer(context);
   try {
-    await waitForServer(server, baseOf(context));
-    await page.goto(context.target.storyUrl(baseOf(context), context.component));
-    const keys = [storyLabel(context.component), LAST_GROUP];
-    const [story = 0, sidebar = 0] = await settledStamps(page, keys, start + SAMPLE_TIMEOUT);
+    await waitForServer(server, baseOf(context), context.target.readyPath);
+    await page.goto(context.subject.storyAddress(baseOf(context)));
+    const keys = [context.subject.storyKey, context.subject.sidebar];
+    const [story = 0, sidebar = 0] = await settledStamps(stamped, keys, start + SAMPLE_TIMEOUT);
     return { story: story - start, sidebar: sidebar - start };
   } finally {
     await browserContext.close();
     await stopServer(server);
   }
 };
-
-/** The kind of file an edit touches. */
-export type EditKind = "story" | "component";
 
 /**
  * Edits a file again and again and times the new text reaching the page.
@@ -234,29 +289,22 @@ export const measureEdits = async (
   kind: EditKind,
   edits: number
 ): Promise<number[]> => {
-  const { name } = context.component;
-  const file = join(
-    context.directory,
-    "src/components",
-    kind === "story" ? `${name}.stories.tsx` : `${name}.tsx`
-  );
+  const { file, text, mark } = context.subject.edit(kind);
   const original = await readFile(file, "utf8");
-  const before = kind === "story" ? /label: "[^"]*"/ : /const BUILD = "[^"]*"/;
-  const { browserContext, page } = await openPage(context, VIEWPORT);
+  const { browserContext, page, stamped } = await openPage(context, VIEWPORT);
   const server = await startServer(context);
   try {
-    await waitForServer(server, baseOf(context));
-    await page.goto(context.target.storyUrl(baseOf(context), context.component));
-    await settledStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
+    await waitForServer(server, baseOf(context), context.target.readyPath);
+    await page.goto(context.subject.storyAddress(baseOf(context)));
+    await settledStamps(stamped, [context.subject.storyKey], Date.now() + SAMPLE_TIMEOUT);
     const samples: number[] = [];
     for (let edit = 0; edit < edits; edit += 1) {
-      const text = `edit ${edit}`;
-      const replacement = kind === "story" ? `label: "${text}"` : `const BUILD = "${text}"`;
+      const shown = mark(edit);
       const start = Date.now();
-      await writeFile(file, original.replace(before, replacement));
-      const [drawn = 0] = await waitForStamps(page, [text], start + SAMPLE_TIMEOUT);
+      await writeFile(file, text(original, shown));
+      const [drawn = 0] = await waitForStamps(stamped, [shown], start + SAMPLE_TIMEOUT);
       samples.push(drawn - start);
-      await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE));
+      await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE + Math.random() * EDIT_JITTER));
     }
     return samples;
   } finally {
@@ -281,17 +329,17 @@ export type PageSample = {
  * @param address - the page's address.
  */
 export const measureComponentPage = async (context: MeasureContext, address: string): Promise<PageSample> => {
-  const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
+  const { browserContext, page, stamped } = await openPage(context, TALL_VIEWPORT);
   const server = await startServer(context);
   try {
-    await waitForServer(server, baseOf(context));
+    await waitForServer(server, baseOf(context), context.target.readyPath);
     const start = Date.now();
     await page.goto(address);
     // by text and not by count: a tool may draw a story twice, which must not stand in for one still missing
-    const labels = context.component.stories.map((story) => story.label);
+    const labels = context.subject.pageKeys;
     const table = context.target.propsTable;
     const keys = table === undefined ? labels : [...labels, table];
-    const times = await settledStamps(page, keys, start + SAMPLE_TIMEOUT);
+    const times = await settledStamps(stamped, keys, start + SAMPLE_TIMEOUT);
     const props = table === undefined ? undefined : times.at(-1);
     return {
       stories: Math.max(...times.slice(0, labels.length)) - start,
@@ -338,9 +386,15 @@ const treeMemory = async (rootPid: number, io: ScriptIo): Promise<number> => {
  *
  * @param context - the measurement's context.
  * @param address - the page visited.
+ * @param isCold - whether the tool's caches are removed first, as a first start finds them.
  * @returns the peak, in bytes.
  */
-export const measureMemory = async (context: MeasureContext, address: string): Promise<number> => {
+export const measureMemory = async (
+  context: MeasureContext,
+  address: string,
+  isCold = false
+): Promise<number> => {
+  if (isCold) await removeCaches(context);
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
   const server = await startServer(context);
   let peak = 0;
@@ -354,9 +408,9 @@ export const measureMemory = async (context: MeasureContext, address: string): P
     }
   })();
   try {
-    await waitForServer(server, baseOf(context));
+    await waitForServer(server, baseOf(context), context.target.readyPath);
     await page.goto(address);
-    await page.waitForLoadState("networkidle");
+    await quiet(page);
     await new Promise((resolve) => setTimeout(resolve, SETTLE * 2));
     return peak;
   } finally {
@@ -375,21 +429,19 @@ export type BuildSample = {
   readonly size: number;
 };
 
-/** The folder a build writes to, from the project's root. */
-const BUILD_FOLDER = "bench-build";
-
 /**
  * Builds the catalogue from nothing: no output and no cache.
  *
  * @param context - the measurement's context.
  */
 export const measureBuild = async (context: MeasureContext): Promise<BuildSample> => {
-  const out = join(context.directory, BUILD_FOLDER);
+  const out = context.buildFolder;
   await rm(out, { recursive: true, force: true });
   await removeCaches(context);
-  const command = context.target.build(BUILD_FOLDER);
+  // relative to the project, as every tool reads it: Ladle joins its folder to the one it runs in, an absolute one too
+  const command = context.target.build(relative(context.directory, out));
   const start = Date.now();
-  await exec(join(context.directory, "node_modules", ".bin", command.bin), [...command.args], {
+  await exec(programOf(context, command), [...command.args], {
     cwd: context.directory,
     env: environment(context.io, command),
     io: context.io,
@@ -415,19 +467,24 @@ export type LoadSample = {
  * @param context - the measurement's context.
  */
 export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSample> => {
-  const server = await serveStatic(join(context.directory, BUILD_FOLDER), HOST, context.port);
-  const { browserContext, page } = await openPage(context, VIEWPORT);
+  const server = await serveStatic(context.buildFolder, HOST, context.port);
+  const { browserContext, page, stamped } = await openPage(context, VIEWPORT);
   const main = new Set<string>();
   const frames = new Set<string>();
-  page.on("request", (request) => {
-    if (request.resourceType() !== "script") return;
-    const path = new URL(request.url()).pathname;
+  // what this build served: a library's page may ask for a script its build does not hold, which fetched nothing, or
+  // one from another site (Carbon's footer, from IBM's), which is not the build's weight and has no file here to measure
+  page.on("response", (response) => {
+    const request = response.request();
+    if (request.resourceType() !== "script" || !response.ok()) return;
+    const url = new URL(request.url());
+    if (url.origin !== new URL(server.base).origin) return;
+    const path = url.pathname;
     (request.frame() === page.mainFrame() ? main : frames).add(path);
   });
   try {
-    await page.goto(context.target.storyUrl(server.base, context.component));
-    await waitForStamps(page, [storyLabel(context.component)], Date.now() + SAMPLE_TIMEOUT);
-    await page.waitForLoadState("networkidle");
+    await page.goto(context.subject.storyAddress(server.base));
+    await waitForStamps(stamped, [context.subject.storyKey], Date.now() + SAMPLE_TIMEOUT);
+    await quiet(page);
     const total = (paths: ReadonlySet<string>): number =>
       [...paths].reduce((sum, path) => sum + server.gzippedSize(path), 0);
     return {

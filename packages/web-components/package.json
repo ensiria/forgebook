@@ -1,0 +1,94 @@
+{
+  "name": "@forgebook/web-components",
+  "version": "0.1.8",
+  "description": "Forgebook for Web Components, Lit first: the story types, the renderer the frame mounts a custom element story with, and the adapter that reads attributes, properties, events, slots and parts from the Custom Elements Manifest.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/web-components"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./renderer": "./src/webComponentsRenderer.ts",
+    "./server": "./src/serverRender.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./code": "./src/storyHtml.ts",
+    "./vite": "./src/vite/webComponents.ts",
+    "./docs": "./src/vite/extractDocs.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "typescript-6": "npm:typescript@6.0.3"
+  },
+  "peerDependencies": {
+    "@lit-labs/ssr": "^4.0.0",
+    "forgebook": "workspace:^",
+    "lit": "^3.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@lit-labs/ssr": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@lit-labs/ssr": "4.1.0",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "lit": "3.3.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/webComponentsRenderer.d.ts",
+        "default": "./dist/src/webComponentsRenderer.js"
+      },
+      "./server": {
+        "types": "./dist/src/serverRender.d.ts",
+        "default": "./dist/src/serverRender.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyHtml.d.ts",
+        "default": "./dist/src/storyHtml.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/webComponents.d.ts",
+        "default": "./dist/src/vite/webComponents.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
+  }
+}

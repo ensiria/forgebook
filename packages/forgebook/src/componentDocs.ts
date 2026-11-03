@@ -139,7 +139,21 @@ export type ComponentDocs = {
    * meta's `component` is then the hook or the function).
    */
   readonly signature?: FunctionSignatureDocs;
+  /**
+   * The CSS selector a template writes the component with, for a framework whose components are matched by one rather
+   * than named (an Angular component's `fb-badge`, a directive's `button[fbButton]`): the code writer writes the story's
+   * markup from it. Left out when the component is written by its name.
+   */
+  readonly selector?: string;
 };
+
+/**
+ * The name a story's code writes the component with: its selector when its framework matches components by one, its
+ * name otherwise.
+ *
+ * @param docs - the component's docs.
+ */
+export const codeNameOf = (docs: ComponentDocs): string => docs.selector ?? docs.name;
 
 /** What the plugin answers for a story file whose meta names no component (a foundations page). */
 export type NoComponentDocs = {
@@ -208,4 +222,5 @@ export const isComponentDocs = (value: unknown): value is ComponentDocs =>
   isStringList(value["parts"]) &&
   Array.isArray(value["subcomponents"]) &&
   value["subcomponents"].every(isSubcomponentDocs) &&
-  (value["signature"] === undefined || isFunctionSignatureDocs(value["signature"]));
+  (value["signature"] === undefined || isFunctionSignatureDocs(value["signature"])) &&
+  (value["selector"] === undefined || typeof value["selector"] === "string");

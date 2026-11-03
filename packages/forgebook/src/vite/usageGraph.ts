@@ -16,7 +16,8 @@
  */
 import ts from "typescript-6";
 
-import { programFor } from "./docsProgram.ts";
+import { configurationOf, programFor } from "./docsProgram.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** A component, by the file that declares it and its name there. */
 export type ComponentRef = {
@@ -332,16 +333,17 @@ const reachedImports = (
 };
 
 /**
- * The facts of a group of story files: what each story renders, and the import graph the rendered components reach.
+ * The facts of the story files one configuration holds, read with that configuration's whole program.
  *
- * @param requests - the story files and their stories' exports.
+ * @param group - the story files, in Vite's form, each held by the same configuration.
  * @returns the facts, or why a story file's program could not be read.
  */
-export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | string => {
+const groupGraph = (group: readonly UsageRequestFile[]): UsageGraph | string => {
   const files: StoryFileUsage[] = [];
   const programs = new Set<ts.Program>();
-  for (const request of requests) {
-    const docsProgram = programFor(request.storyFile);
+  for (const request of group) {
+    // what every story of the configuration reaches: its whole program, built once
+    const docsProgram = programFor(request.storyFile, { reach: "whole" });
     if (typeof docsProgram === "string") return docsProgram;
     programs.add(docsProgram.program);
     const usage = fileUsage(request, docsProgram.program);
@@ -352,4 +354,37 @@ export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | 
     ...file.stories.flatMap((story) => story.renders.map((ref) => ref.file))
   ]);
   return { files, imports: reachedImports([...new Set(starts)], [...programs]) };
+};
+
+/**
+ * The facts of a group of story files: what each story renders, and the import graph the rendered components reach.
+ *
+ * @remarks
+ * A monorepo has a configuration per package, and holding every package's whole program at once is what stops a
+ * worker: the story files a configuration holds are read together, so a configuration's program is let go with the
+ * others the docs no longer keep (`KEPT_PROGRAMS`) once its group is read. An import graph is followed inside the
+ * program that holds its start, which holds what that start imports.
+ *
+ * @param requests - the story files and their stories' exports.
+ * @returns the facts, or why a story file's program could not be read.
+ */
+export const usageGraph = (requests: readonly UsageRequestFile[]): UsageGraph | string => {
+  const byConfiguration = new Map<string, UsageRequestFile[]>();
+  for (const asked of requests) {
+    // in Vite's form, as TypeScript names the files the graph is made of, so a story file meets its components
+    const request = { ...asked, storyFile: VITE_PATHS.normalize(asked.storyFile) };
+    const key = configurationOf(request.storyFile);
+    byConfiguration.set(key, [...(byConfiguration.get(key) ?? []), request]);
+  }
+  const files: StoryFileUsage[] = [];
+  const imports: Record<string, readonly string[]> = {};
+  for (const group of byConfiguration.values()) {
+    const graph = groupGraph(group);
+    if (typeof graph === "string") return graph;
+    files.push(...graph.files);
+    // a file two configurations hold imports, for each, what its options resolve: both are followed
+    for (const [file, targets] of Object.entries(graph.imports))
+      imports[file] = [...new Set([...(imports[file] ?? []), ...targets])];
+  }
+  return { files, imports };
 };

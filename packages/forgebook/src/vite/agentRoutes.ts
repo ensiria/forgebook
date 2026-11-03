@@ -1,27 +1,32 @@
 /**
  * The dev server's answers to tools and agents, under `/__forgebook/api/`: `stories` (every story) and `story?id=…`
- * (one in detail), each with an optional `view` (the view's query, `theme=dark&lang=it`) the links open in.
+ * (one in detail), `pages` and `page?id=…` (the docs pages), each with an optional `view` (the view's query,
+ * `theme=dark&lang=it`) the links open in; and `preview?id=…`, the page that shows a story inside a client that renders
+ * apps, the one answer that is not JSON.
  *
  * @remarks
  * The server loads the sources and the previews with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool
  * sees what the shell shows. A story module that fails on Node (it reads `window` while it loads) gives its story a
- * problem in the answer instead of an error. Served by the dev server only, where Vite listens (localhost by default);
- * a build has none of it.
+ * problem in the answer instead of an error, and a preview that does is left out of the answers and named among their
+ * problems: it is written for a browser, and only its args and parameters are read here, so it must not cost a tool the
+ * catalogue, nor change the answers without a word. Served by the dev server only, where
+ * Vite listens (localhost by default); a build has none of it.
  *
  * @module
  */
 import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join, relative } from "node:path";
 
 import type { StorySource } from "@forgebook/story-format/source";
-import type { ViteDevServer } from "vite";
+import { createIdResolver, type ViteDevServer } from "vite";
 
-import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
+import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
+import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { componentId, findStory, kebab, type StoryTree, storyTree } from "../storyTree.ts";
+import { findComponentByTitle, findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
+import { frameAddressOf } from "../viewState.ts";
 import type { AgentChangedStory, ChangedStoriesDocument, ErrorsDocument } from "./agent.types.ts";
 import {
   type CataloguePages,
@@ -30,15 +35,26 @@ import {
   storyDocument,
   storyLinks
 } from "./agentApi.ts";
+import { agentIndexAnswer } from "./agentIndexRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
+import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
 import { findAnswer } from "./findRoute.ts";
-import { changeBase, changedFiles } from "./gitChange.ts";
-import { AGENT_SOURCES_FILE } from "./pages.ts";
-import { STORYLESS_ROUTES } from "./storylessRoutes.ts";
+import { framesOriginOf } from "./framesConfig.ts";
+import { hostOf } from "./framesServer.ts";
+import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts";
+import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
+import { PREVIEW_ROUTE } from "./previewRoute.ts";
+import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
 /** The path the answers live under. */
 export const AGENT_API = "/__forgebook/api/";
+
+/**
+ * The pages under `AGENT_API` another origin's page may frame: a client's inline preview. They show a story and act on
+ * nothing, so the catalogue's guard lets another origin open them, as it does the catalogue's page.
+ */
+export const FRAMED_AGENT_PAGES: ReadonlySet<string> = new Set([`${AGENT_API}${PREVIEW_ROUTE}`]);
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -57,14 +73,38 @@ type AgentModule = {
   readonly sources: readonly StorySource[];
   /** Its previews merged. */
   readonly preview: LoadedPreview;
+  /** Why a preview was left out: it could not load on the server. */
+  readonly problems: readonly string[];
 };
 
-/** The agent module read, or why it is not what the plugin generates. */
-const agentModuleOf = (module: unknown): AgentModule => {
+/** Whether a value loads a module. */
+const isLoader = (value: unknown): value is () => Promise<unknown> => typeof value === "function";
+
+/** A preview, read from what loads it, or why it cannot load on the server. */
+const loadedPreview = async (load: () => Promise<unknown>): Promise<LoadedPreview | string> => {
+  try {
+    return readPreview(await load());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `a preview did not load on the server, so its args and parameters are left out of these answers: ${message}`;
+  }
+};
+
+/**
+ * The agent module read, or why it is not what the plugin generates.
+ *
+ * @param module - the module of `AGENT_SOURCES_FILE`, as the server loaded it.
+ */
+export const agentModuleOf = async (module: unknown): Promise<AgentModule> => {
   if (!isRecord(module) || !Array.isArray(module["sources"]) || !Array.isArray(module["previews"]))
     throw new Error("The catalogue's sources did not load");
   const sources = module["sources"].filter(isStorySource);
-  return { sources, preview: mergedPreviews(module["previews"].map(readPreview)) };
+  const previews = await Promise.all(module["previews"].filter(isLoader).map(loadedPreview));
+  return {
+    sources,
+    preview: mergedPreviews(previews.map((each) => (typeof each === "string" ? NO_PREVIEW : each))),
+    problems: previews.filter((each) => typeof each === "string")
+  };
 };
 
 /** A loader's value, or why it failed. */
@@ -93,6 +133,31 @@ const usageBySource = async (sources: readonly StorySource[]): Promise<Map<strin
   return new Map(
     answers.flatMap(([id, index]): [string, UsageIndex][] => (typeof index === "string" ? [] : [[id, index]]))
   );
+};
+
+/** What an answer asks of the dev server. */
+export type AgentServer = {
+  /** Loads a module on the server. */
+  readonly load: (id: string) => Promise<unknown>;
+  /** The file a source's module specifier leads to, as the pages' imports find it; none when nothing does. */
+  readonly resolveSource: (specifier: string) => Promise<string | undefined>;
+};
+
+/**
+ * What the answers ask of a dev server.
+ *
+ * @param server - the dev server.
+ * @param config - the catalogue's configuration, whose generated module the sources are imported from.
+ */
+export const agentServer = (server: ViteDevServer, config: ResolvedConfig): AgentServer => {
+  // Vite's resolver, not Node's: a catalogue's aliases and a package's export conditions lead to the same file; `scan`
+  // keeps it on the package's own file and away from the optimizer, which would answer with a prebundle
+  const resolveId = createIdResolver(server.config, { scan: true });
+  return {
+    load: (id: string): Promise<unknown> => server.ssrLoadModule(id),
+    resolveSource: (specifier: string): Promise<string | undefined> =>
+      resolveId(server.environments.client, specifier, pageModulePath(config.dir, AGENT_SOURCES_FILE))
+  };
 };
 
 /** An answer: its HTTP status and its JSON body. */
@@ -152,7 +217,7 @@ const errorsAnswer = (context: RouteContext, live: LiveErrors | undefined): Agen
  *
  * @param context - what the routes read.
  */
-const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
+export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   const { config, params, tree, pages, view, loaded } = context;
   const usage =
     config.lists.usedIn !== false && params.get("usedIn") === "true"
@@ -189,15 +254,16 @@ const changedAnswer = async ({
       })
     )
   );
-  // git names real paths and the graph the catalogue's own, which differ in a folder reached through a link
-  const realDir = await realpath(config.dir);
-  const changed = files.map((file) => join(config.dir, relative(realDir, join(root, file))));
+  const changed = catalogueChangedFiles(config.dir, await realpath(config.dir), root, files);
   const stories = reaches.flatMap(({ source, reach }) =>
     affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
-      const id = `${componentId(source, story.title)}--${kebab(story.exportName)}`;
-      return findStory(tree, id) === undefined
+      const component = findComponentByTitle(tree, source, story.title)?.component;
+      const found = [...(component?.stories ?? []), ...(component?.unlisted ?? [])].find(
+        (each) => each.exportName === story.exportName
+      );
+      return found === undefined
         ? []
-        : [{ id, title: story.title, links: storyLinks(pages, id, view) }];
+        : [{ id: found.id, title: story.title, links: storyLinks(pages, found.id, view) }];
     })
   );
   const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems: [] };
@@ -209,7 +275,7 @@ const changedAnswer = async ({
  *
  * @param context - what the routes read.
  */
-const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
+export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   const { config, params, tree, pages, view, loaded } = context;
   const id = params.get("id") ?? "";
   const location = findStory(tree, id);
@@ -217,7 +283,8 @@ const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   if (location === undefined || source === undefined)
     return { status: 404, body: { error: `No story "${id}"` } };
   const files = sourceFiles(source);
-  const file = location.component.file;
+  // the story's own file: its module, and the docs of the component its meta names, which its args are for
+  const file = location.story.file;
   const parts: LoadedStoryParts = {
     module: await settled(files.stories[file]),
     docs: await settled(files.docs[file]),
@@ -232,45 +299,67 @@ const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
 /**
  * Answers one of the API's paths.
  *
- * @param load - loads a module on the server (the dev server's `ssrLoadModule`).
+ * @param server - what the answers ask of the dev server.
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
  * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
  *   tokens, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
- * @param origin - where the catalogue is served (`http://localhost:5173`), for the links.
+ * @param origins - where the catalogue is served (`http://localhost:5173`) and where its frames are, for the links.
  * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
  *   command's own, which no frame reports to.
  */
 export const agentAnswer = async (
-  load: (id: string) => Promise<unknown>,
+  server: AgentServer,
   config: ResolvedConfig,
   route: string,
   params: URLSearchParams,
-  origin: string,
+  origins: PageOrigins,
   live?: LiveErrors
 ): Promise<AgentAnswer> => {
   try {
     const answerAlone = STORYLESS_ROUTES[route];
-    if (answerAlone !== undefined) return await answerAlone(config, params);
-    const loaded = agentModuleOf(await load(join(config.dir, AGENT_SOURCES_FILE)));
+    if (answerAlone !== undefined) return await answerAlone(config, params, server.resolveSource);
+    const loaded = await agentModuleOf(await server.load(pageModulePath(config.dir, AGENT_SOURCES_FILE)));
+    const tree = storyTree(loaded.sources);
     const context: RouteContext = {
       loaded,
-      tree: storyTree(loaded.sources),
+      tree: { ...tree, problems: [...loaded.problems, ...tree.problems] },
       config,
       params,
-      pages: { page: `${origin}/`, frame: `${origin}/frame.html` },
+      pages: { page: `${origins.catalogue}/`, frame: `${origins.frames}/frame.html` },
       view: params.get("view") ?? ""
     };
     if (route === "errors") return errorsAnswer(context, live);
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
+    if (route === "pages") return pagesAnswer(context);
+    if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context);
+    if (route === "agent-index")
+      return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
   }
+};
+
+/**
+ * Answers a story's preview page. Its code is read here, on the first request for one: a dev server no client asks for a
+ * preview never loads it.
+ *
+ * @param url - the request's address: `id` and `view` in its query.
+ * @param framesOrigin - the frames' origin, where the page loads the story's frame.
+ * @param response - the answer.
+ */
+const answerPreview = async (url: URL, framesOrigin: string, response: ServerResponse): Promise<void> => {
+  const { previewRelayPage } = await import("./previewPages.ts");
+  const id = url.searchParams.get("id") ?? "";
+  const frame = frameAddressOf(`${framesOrigin}/frame.html`, id, url.searchParams.get("view") ?? "");
+  response.setHeader("Content-Type", "text/html");
+  response.setHeader("Cache-Control", "no-store");
+  response.end(previewRelayPage(frame, id));
 };
 
 /**
@@ -279,18 +368,36 @@ export const agentAnswer = async (
  * @param server - the dev server, which loads the modules.
  * @param config - the catalogue's configuration.
  * @param live - the errors the open frames report.
+ * @param placement - where the frames run, for the links to them.
  * @returns a Connect middleware: it answers its own paths and passes every other request on.
  */
 export const agentMiddleware =
-  (server: ViteDevServer, config: ResolvedConfig, live: LiveErrors) =>
+  (
+    server: ViteDevServer,
+    config: ResolvedConfig,
+    live: LiveErrors,
+    placement: () => Promise<FramesPlacement>
+  ) =>
   (request: IncomingMessage, response: ServerResponse, next: (error?: unknown) => void): void => {
-    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+    const scheme = server.config.server.https === undefined ? "http:" : "https:";
+    const url = new URL(request.url ?? "/", `${scheme}//${hostOf(request) ?? "localhost"}`);
     if (!url.pathname.startsWith(AGENT_API)) {
       next();
       return;
     }
     const route = url.pathname.slice(AGENT_API.length);
-    void agentAnswer((id) => server.ssrLoadModule(id), config, route, url.searchParams, url.origin, live)
+    const origins = placement().then(
+      (frames: FramesPlacement): PageOrigins => ({
+        catalogue: url.origin,
+        frames: framesOriginOf(frames, url.href) ?? url.origin
+      })
+    );
+    if (route === PREVIEW_ROUTE) {
+      void origins.then((each) => answerPreview(url, each.frames, response)).catch(next);
+      return;
+    }
+    void origins
+      .then((each) => agentAnswer(agentServer(server, config), config, route, url.searchParams, each, live))
       .then(({ status, body }) => {
         response.statusCode = status;
         response.setHeader("Content-Type", "application/json");

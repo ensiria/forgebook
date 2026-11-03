@@ -11,13 +11,23 @@
  *
  * @module
  */
+
+import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import type { DeviceDrawing } from "../deviceDrawing.ts";
 import type { StoryArea } from "../devices.ts";
-import type { ShownDevice, StoryDevice } from "../deviceView.ts";
+import {
+  type DeviceView,
+  deviceDefaultOf,
+  type ShownDevice,
+  type StoryDevice,
+  shownDevice
+} from "../deviceView.ts";
+import { useCatalogue } from "./catalogueContext.ts";
 import type * as DevicePartsModule from "./device/deviceParts.tsx";
 import type { StageViewportProps } from "./StageViewport.tsx";
+import { useSystemDark } from "./useSystemDark.ts";
 
 /** The device's parts, as their chunk exports them. */
 export type DeviceParts = typeof DevicePartsModule;
@@ -96,6 +106,28 @@ export const useFramedDevice = (shown: StoryDevice | undefined): FramedDevice | 
 };
 
 /**
+ * The device a story on the stage is drawn in: the view's choice over the story's and the catalogue's defaults, and
+ * once its parts are there, its screen's width told as the story's width.
+ *
+ * @param view - the view's device.
+ * @param storyDevice - the story's own setting, over the catalogue's.
+ * @param onShownWidthChange - told the width the story really has.
+ */
+export const useStageDevice = (
+  view: DeviceView,
+  storyDevice: StoryDeviceSetting | undefined,
+  onShownWidthChange: (width: number | undefined) => void
+): { readonly shown: StoryDevice | undefined; readonly framed: FramedDevice | undefined } => {
+  const shown = shownDevice(view, deviceDefaultOf(useCatalogue().device, storyDevice));
+  const framed = useFramedDevice(shown);
+  const screenWidth = framed?.area.width;
+  useEffect(() => {
+    if (screenWidth !== undefined) onShownWidthChange(screenWidth);
+  }, [screenWidth, onShownWidthChange]);
+  return { shown, framed };
+};
+
+/**
  * Whether a story's frame waits for its device's parts before it loads: a story drawn edge to edge is told its safe
  * areas in its address, which only the parts know, and loading it first would load it twice.
  *
@@ -156,6 +188,14 @@ export const inkScheme = (scheme: "light" | "dark" | "system", isSystemDark: boo
   if (scheme !== "system") return scheme;
   return isSystemDark ? "dark" : "light";
 };
+
+/**
+ * The scheme a story is drawn in, for the status bar's ink, following the system's for `system`.
+ *
+ * @param scheme - the view's scheme (`schemeOf`).
+ */
+export const useInkScheme = (scheme: "light" | "dark" | "system"): "light" | "dark" =>
+  inkScheme(scheme, useSystemDark());
 
 /** What sizes a story's room on the stage, and what the stage's handles and its width field are told. */
 export type RoomSizing = Pick<

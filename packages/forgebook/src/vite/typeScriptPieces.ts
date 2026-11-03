@@ -3,8 +3,8 @@
  * the TypeScript compiler's syntactic classifications, for `highlightCode.ts` to colour.
  *
  * @remarks
- * highlight.js has no JSX grammar: it reads JSX as HTML, so an attribute holding a function or a `>` ends the tag
- * early and the rest of the example is left plain. The compiler parses JSX as the language defines it.
+ * The compiler parses JSX as the language defines it: read as HTML, an attribute holding a function or a `>` would end
+ * the tag early and leave the rest of the example plain.
  *
  * One language service in syntactic mode, created on the first block and kept: it parses the block alone (no
  * program, no library, no type checker), so a block costs a parse, not a type check. Its classifications tell

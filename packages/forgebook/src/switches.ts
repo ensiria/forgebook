@@ -73,6 +73,7 @@ export type ViewSwitch = {
 
 /** The address's own parameters: a switch may not take their names. */
 const RESERVED_IDS: readonly string[] = [
+  "embed",
   "story",
   "component",
   "backdrop",
