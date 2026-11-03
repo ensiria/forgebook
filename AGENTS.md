@@ -29,6 +29,7 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
 pnpm checks                                                # types, lint, unit tests, published manifests, build
 pnpm --filter @fixture/app exec playwright install chromium   # once
 pnpm --filter @fixture/app test:shell                      # when the shell, the frame or the plugin changed
+FORGEBOOK_SHELL_GROUP=1/3 pnpm --filter @fixture/app test:shell  # the same, a third of the catalogues at a time, short of memory
 ```
 
 Both must pass. A rule is never silenced to get a green run: an ignore comment only where the rule is wrong for that

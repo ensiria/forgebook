@@ -11,12 +11,16 @@
  * (`sveltekit.e2e.ts`, `nextjs.e2e.ts`, `nuxt.e2e.ts`, `reactNative.e2e.ts`) and a catalogue with no trace of
  * Forgebook's look (`embed.e2e.ts`).
  *
+ * `FORGEBOOK_SHELL_GROUP=<index>/<count>` runs one group of catalogues and their specs instead of all of them at once
+ * (`catalogueGroups.ts`), for a machine whose memory does not hold every dev server together.
+ *
  * @module
  */
 import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
+import { runGroup } from "./catalogueGroups";
 import { type Catalogue, catalogueUrl, framesPortOf, portOf } from "./ports";
 
 /**
@@ -38,27 +42,39 @@ const catalogueServer = (
   reuseExistingServer: false
 });
 
+/** Each catalogue's server: its folder, and its configuration when not the folder's `forgebook.config.ts`. */
+const SERVERS: Readonly<Record<Catalogue, { folder: string; configFile?: string }>> = {
+  app: { folder: join(import.meta.dirname, "..") },
+  vue: { folder: join(import.meta.dirname, "..", "..", "vue") },
+  svelte: { folder: join(import.meta.dirname, "..", "..", "svelte") },
+  solid: { folder: join(import.meta.dirname, "..", "..", "solid") },
+  preact: { folder: join(import.meta.dirname, "..", "..", "preact") },
+  "web-components": { folder: join(import.meta.dirname, "..", "..", "web-components") },
+  html: { folder: join(import.meta.dirname, "..", "..", "html") },
+  // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
+  "white-label": { folder: join(import.meta.dirname, ".."), configFile: "white-label/forgebook.config.ts" },
+  nextjs: { folder: join(import.meta.dirname, "..", "..", "nextjs") },
+  nuxt: { folder: join(import.meta.dirname, "..", "..", "nuxt") },
+  angular: { folder: join(import.meta.dirname, "..", "..", "angular") },
+  sveltekit: { folder: join(import.meta.dirname, "..", "..", "sveltekit") },
+  "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") }
+};
+
+/** The catalogues and specs this run takes: all of them, or one group (`catalogueGroups.ts`). */
+const group = runGroup(import.meta.dirname);
+
 export default defineConfig({
   testDir: import.meta.dirname,
-  testMatch: "*.e2e.ts",
+  testMatch: [...group.specs],
+  // a group keeps its results apart, so the next group's run does not clear a failure before it
+  ...(group.place === undefined
+    ? {}
+    : { outputDir: join(import.meta.dirname, "..", "test-results", `group-${group.place.index}`) }),
   fullyParallel: true,
   reporter: [["list"]],
-  webServer: [
-    catalogueServer(join(import.meta.dirname, ".."), "app"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "vue"), "vue"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "svelte"), "svelte"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "solid"), "solid"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "preact"), "preact"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "web-components"), "web-components"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "html"), "html"),
-    // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
-    catalogueServer(join(import.meta.dirname, ".."), "white-label", "white-label/forgebook.config.ts"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "nextjs"), "nextjs"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "nuxt"), "nuxt"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "angular"), "angular"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "sveltekit"), "sveltekit"),
-    catalogueServer(join(import.meta.dirname, "..", "..", "react-native"), "react-native")
-  ],
+  webServer: group.catalogues.map((catalogue) =>
+    catalogueServer(SERVERS[catalogue].folder, catalogue, SERVERS[catalogue].configFile)
+  ),
   use: {
     browserName: "chromium",
     baseURL: catalogueUrl("app"),

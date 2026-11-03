@@ -286,7 +286,11 @@
       }
     },
     {
-      "includes": ["packages/testing/src/playwrightConfig.ts", "fixtures/app/shell/ports.ts"],
+      "includes": [
+        "packages/testing/src/playwrightConfig.ts",
+        "fixtures/app/shell/ports.ts",
+        "fixtures/app/shell/catalogueGroups.ts"
+      ],
       "linter": {
         "rules": {
           "style": {

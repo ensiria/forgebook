@@ -38,6 +38,10 @@ pnpm --filter @fixture/app exec playwright install chromium
 pnpm --filter @fixture/app test:shell                      # the shell's browser tests on the fixture catalogue
 ```
 
+The browser tests start a dev server for each fixture catalogue, about a gigabyte each. On a machine whose memory does
+not hold them all, run them a group of catalogues at a time, as the Windows CI does:
+`FORGEBOOK_SHELL_GROUP=1/3 pnpm --filter @fixture/app test:shell`, then `2/3` and `3/3`.
+
 The repository is a pnpm workspace: `packages/` holds the fifteen published packages, `fixtures/` the fixture kit,
 the Storybook-style stories, the catalogue the tests run on, a catalogue for each other framework (Vue, Svelte, Solid,
 Preact, Web Components, plain HTML, Angular, React Native), and small SvelteKit, Next.js and Nuxt apps with their catalogues, `tools/`
