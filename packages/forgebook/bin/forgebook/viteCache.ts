@@ -4,7 +4,15 @@
  *
  * @module
  */
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 /** The nearest folder at or above `dir` holding a `package.json`, as Vite looks for the project's package. */
@@ -128,5 +136,8 @@ export const keepUnresolved = (root: string, imports: readonly string[]): void =
   const file = unresolvedFile(root);
   mkdirSync(dirname(file), { recursive: true });
   const record: UnresolvedRecord = { installed: installStamp(root), imports };
-  writeFileSync(file, JSON.stringify(record));
+  // written aside, then moved: a server reading it meanwhile finds the old list or the new one, never half of one
+  const written = `${file}.${process.pid}`;
+  writeFileSync(written, JSON.stringify(record));
+  renameSync(written, file);
 };

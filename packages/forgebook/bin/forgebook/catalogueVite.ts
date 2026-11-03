@@ -17,34 +17,33 @@ import { unresolvedImports } from "./viteCache.ts";
  *
  * @param config - the catalogue's configuration, read.
  * @param overrides - what the command sets (the port, the output folder); its plugins run after the catalogue's.
+ * @param excluded - the imports a first start's pre-bundling could not resolve, left out here too: they are part of the
+ *   pre-bundle's hash, and a server whose hash differed would pre-bundle everything again itself. By default those kept
+ *   in Vite's cache folder (`unresolvedImports`).
  */
 export const catalogueVite = async (
   config: ResolvedConfig,
-  overrides: InlineConfig
-): Promise<InlineConfig> => {
-  // what a first start's pre-bundling left out, left out here too: it is part of the pre-bundle's hash, and a server
-  // whose hash differed would pre-bundle everything again itself
-  const unresolved = unresolvedImports(config.dir);
-  return {
-    ...overrides,
-    ...(unresolved.length === 0
-      ? {}
-      : {
-          optimizeDeps: {
-            ...overrides.optimizeDeps,
-            exclude: [...(overrides.optimizeDeps?.exclude ?? []), ...unresolved]
-          }
-        }),
-    root: config.dir,
-    // the configuration file is Forgebook's: a vite.config beside it is not read
-    configFile: false,
-    plugins: [
-      forgebookPlugin({ config }),
-      ...((await config.framework.vitePlugins?.()) ?? []),
-      ...(overrides.plugins ?? [])
-    ]
-  };
-};
+  overrides: InlineConfig,
+  excluded: readonly string[] = unresolvedImports(config.dir)
+): Promise<InlineConfig> => ({
+  ...overrides,
+  ...(excluded.length === 0
+    ? {}
+    : {
+        optimizeDeps: {
+          ...overrides.optimizeDeps,
+          exclude: [...(overrides.optimizeDeps?.exclude ?? []), ...excluded]
+        }
+      }),
+  root: config.dir,
+  // the configuration file is Forgebook's: a vite.config beside it is not read
+  configFile: false,
+  plugins: [
+    forgebookPlugin({ config }),
+    ...((await config.framework.vitePlugins?.()) ?? []),
+    ...(overrides.plugins ?? [])
+  ]
+});
 
 /**
  * The configuration with the frames' port the command line gives (`--frame-port`), over the file's.
