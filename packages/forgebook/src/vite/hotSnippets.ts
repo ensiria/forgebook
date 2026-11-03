@@ -47,20 +47,32 @@ export const storyFileHot = (file: string): string =>
     "}"
   ].join(" ");
 
-/** A file's directive prologue (`"use client";`), which must stay its first statements. */
-const DIRECTIVES = /^(?:\s*(["'])use [^"']*\1;?)*/;
+/**
+ * A file's head: its leading comments and its directive prologue (`"use client";`), in any order. The directives must
+ * stay its first statements, and the comments hold the pragmas a compiler reads only before the first statement
+ * (`@jsxImportSource`, `@jsxRuntime`): after added code, a file written for another JSX runtime compiles for React's.
+ */
+const HEAD =
+  /^(?:\s*(?:\/\/[^\n\r\u2028\u2029]*(?:\r\n|[\n\r\u2028\u2029]|$)|\/\*[\s\S]*?\*\/|(["'])use [^"']*\1;?))*/;
+
+/** What ends a line, and so a line comment, in JavaScript. */
+const LINE_END = /[\n\r\u2028\u2029]$/;
 
 /**
  * A story file's code with its accepting code first: it runs before the file's own, so an edit that throws while the
- * file loads still leaves the next one accepted. On the first line, after the directives, so no line of the file
+ * file loads still leaves the next one accepted. After the file's head and on its last line, so no line of the file
  * moves and its source map stays true.
  *
  * @param code - the file's code, as the plugins before have made it.
  * @param id - the file's path.
  */
 export const withStoryFileHot = (code: string, id: string): string => {
-  const prologue = DIRECTIVES.exec(code)?.[0] ?? "";
-  return `${prologue}${prologue === "" ? "" : " "}${storyFileHot(id)} ${code.slice(prologue.length)}`;
+  const head = HEAD.exec(code)?.[0] ?? "";
+  // a file that is all head may end in a line comment, which would take the code in: it goes on a line of its own
+  let separator = " ";
+  if (head === "" || LINE_END.test(head)) separator = "";
+  else if (head.length === code.length) separator = "\n";
+  return `${head}${separator}${storyFileHot(id)} ${code.slice(head.length)}`;
 };
 
 /**

@@ -516,9 +516,12 @@ titles from the file's path, `args` and `argTypes` (with their controls), action
 `.jsx` and `.tsx`, so such a library adds the plugin its own Storybook uses for them, through the framework's plugins),
 hooks in a `render` or a decorator (React and
 Preact, with the story's state kept when a decorator draws `<Story />`), a preview's named exports beside its default
-export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. A preview
-that only a browser can load (it reads `document` as it loads) leaves the answers to tools and agents working: it is
-left out of them and named among their problems. A `**` pattern skips `node_modules` unless it names it.
+export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. The answers
+to tools and agents read a preview's args and parameters on the server: a package it imports that only a browser can
+load (Storybook's docs blocks, which read `document` as they load) is left as a placeholder there, which the preview can
+keep in a parameter or call (an addon's factory) but not read. A preview that still cannot load (it reads one, or one of
+its own files reads `document`) leaves the answers working: it is left out of them and named among their problems. A
+`**` pattern skips `node_modules` unless it names it.
 
 It lists what Storybook's indexer lists:
 
@@ -599,6 +602,11 @@ export default defineConfig({
 A story's id starts with its source's (`ui:actions-button--plain`), so two packages can both have a `Button`. Props are read
 through the `tsconfig.json` that holds the story file: the package's own, or the first one up its folders that lists it. This repository's fixture catalogue is built this way, on two packages, and its
 browser tests run in CI.
+
+A monorepo that points its packages at their sources with an export condition (`"source": "./src/index.ts"` in
+`exports`, and `source` in Vite's `resolve.conditions`, set by a framework's plugins) needs nothing more with the
+`forgebook` command: its dev server reads the stories and previews it answers tools with on Node under the same
+conditions, those of other runtimes (`browser`) aside, unless a plugin names the server's own.
 
 ## Commands
 
