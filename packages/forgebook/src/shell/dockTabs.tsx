@@ -243,11 +243,16 @@ const interactionsTab = (trace: PlayTrace, onPlayAgain: () => void): DockTab => 
   content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayAgain }} />
 });
 
-/** The Code tab, when the story file's code is loaded or failed to load. */
+/** The Code tab, when the story file has code: loading, loaded, or failed to load. */
 const codeTabs = (input: DockTabsInput): DockTab[] => {
   const { code, docs } = input;
   // without the file's code, a story with a render would show the JSX of its args, which is not what it draws
-  if (code.status === "loading" || code.status === "none") return [];
+  if (code.status === "none") return [];
+  // the code's place while it loads: a story without props opens on the first tab, and without this one the first
+  // would be the next (Design), opened, its module loaded and Figma asked, before the code arrives and takes its place
+  if (code.status === "loading") {
+    return [{ id: "code", label: STRINGS.tabs.code, content: notice(STRINGS.codeLoading, false) }];
+  }
   if (code.status === "error") {
     return [
       { id: "code", label: STRINGS.tabs.code, content: notice(`${STRINGS.codeError}: ${code.message}`, true) }
