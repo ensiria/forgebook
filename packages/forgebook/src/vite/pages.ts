@@ -11,6 +11,7 @@
  *
  * @module
  */
+import type { FramesPlacement } from "../frameOrigins.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { MOCKS_MODULES, PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
@@ -129,14 +130,16 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig): string =>
  * The configuration's data, as the pages' module exports it.
  *
  * @param config - the configuration.
+ * @param frames - where the frames run: known on the dev server once both of its ports listen.
  */
-export const configModule = (config: ResolvedConfig): string => {
+export const configModule = (config: ResolvedConfig, frames: FramesPlacement): string => {
   const data: PageConfig = {
     title: config.title,
     heights: config.heights,
     switches: config.switches,
     languages: config.languages,
-    lists: config.lists
+    lists: config.lists,
+    frames
   };
   return `export default ${JSON.stringify(data)};`;
 };
@@ -181,6 +184,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
     `    sources: ${sources.list},`,
     '    frameUrl: "frame.html",',
+    "    frames: config.frames,",
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
@@ -237,6 +241,7 @@ export const frameEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    "    frames: config.frames,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
     ...(config.hasMocks ? [mockToolsLoader()] : []),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,

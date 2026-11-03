@@ -9,6 +9,7 @@ import { win32 } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
+import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import {
   configModule,
   frameEntry,
@@ -40,7 +41,8 @@ const CONFIG: ResolvedConfig = {
   watch: [],
   lists: {},
   hasMocks: false,
-  hasPlayTools: false
+  hasPlayTools: false,
+  frames: ISOLATED_FRAMES
 };
 
 describe("the generated pages", () => {
@@ -67,6 +69,8 @@ describe("the generated pages", () => {
   it("mounts the shell with the data, the logo, the own stories before the packages' and the code writer", () => {
     const entry = shellEntry(CONFIG);
     expect(entry).toContain(`import { codeOf } from ${JSON.stringify(STUB_FRAMEWORK.pages.code)};`);
+    expect(entry).toContain("    frames: config.frames,");
+    expect(frameEntry(CONFIG)).toContain("    frames: config.frames,");
     expect(entry).toContain('import logo from "/catalogue/logo.svg?url";');
     expect(entry).toContain('import { source as source0 } from "/catalogue/.forgebook-stories.ts";');
     expect(entry).toContain('import { source as source1 } from "@acme/ui/stories";');
@@ -99,8 +103,8 @@ describe("the generated pages", () => {
   });
 
   it("hands the pages the configuration's data, and the own stories as one source named after the catalogue", () => {
-    expect(configModule(CONFIG)).toBe(
-      'export default {"title":"Acme <UI>","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}],"lists":{}};'
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 })).toBe(
+      'export default {"title":"Acme <UI>","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}],"lists":{},"frames":{"kind":"ports","catalogue":5173,"frames":5174}};'
     );
     const source = storiesSourceModule(CONFIG);
     expect(source).toContain('import files0 from "./src/**/*.stories.tsx?forgebook-files";');

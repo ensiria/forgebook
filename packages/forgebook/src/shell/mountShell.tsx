@@ -10,8 +10,10 @@ import { createRoot, type Root } from "react-dom/client";
 
 import { isEmbedAddress } from "../embed.ts";
 import type { StoryCodeWriter } from "../frame/renderer.ts";
+import { type FramesPlacement, framePageAddress, pageOrigins, SAME_ORIGIN } from "../frameOrigins.ts";
 import { CodeWriterContext } from "./codeWriter.ts";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
+import { setFramesOrigin } from "./framesOrigin.ts";
 import { Shell, type ShellConfig } from "./Shell.tsx";
 import { configureStrings, STRINGS } from "./strings.ts";
 
@@ -19,6 +21,8 @@ import { configureStrings, STRINGS } from "./strings.ts";
 export type MountShellConfig = ShellConfig & {
   /** Writes a story drawn from its args in the framework's code (`storyJsx` of `@forgebook/react`). */
   readonly codeOf: StoryCodeWriter;
+  /** Where the frames run: on the catalogue's own origin by default. */
+  readonly frames?: FramesPlacement;
 };
 
 /**
@@ -60,7 +64,14 @@ const mountEmbed = (root: Root, shell: ShellConfig): void => {
 export const mountShell = (container: HTMLElement, config: MountShellConfig): void => {
   setPageIcon(config.logo, config.hasBranding ?? true);
   configureStrings(config.lists?.strings ?? {});
-  const { codeOf, ...shell } = config;
+  const { codeOf, frames = SAME_ORIGIN, ...page } = config;
+  // set before anything renders, the embed included: its story's frame runs on the frames' origin too
+  const origins = pageOrigins(frames, window.location, "catalogue");
+  setFramesOrigin(origins.frames);
+  const shell: ShellConfig = {
+    ...page,
+    frameUrl: framePageAddress(page.frameUrl, origins.frames, window.location.pathname)
+  };
   const root = createRoot(container);
   if (isEmbedAddress(window.location.search)) {
     mountEmbed(root, shell);

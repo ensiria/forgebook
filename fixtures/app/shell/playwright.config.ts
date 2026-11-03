@@ -14,14 +14,14 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { NEXTJS_PORT, SHELL_PORT, VUE_PORT, WHITE_LABEL_PORT } from "./ports";
+import { framesPortOf, NEXTJS_PORT, SHELL_PORT, VUE_PORT, WHITE_LABEL_PORT } from "./ports";
 
 /**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
  * dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here.
  *
  * @param folder - the catalogue's folder.
- * @param port - the port it listens on.
+ * @param port - the port it listens on; its frames listen on their own (`framesPortOf`).
  * @param configFile - its configuration, relative to the folder; the folder's `forgebook.config.ts` when absent.
  */
 const catalogueServer = (
@@ -29,7 +29,7 @@ const catalogueServer = (
   port: number,
   configFile?: string
 ): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
-  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${port} --force`,
+  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${port} --frame-port ${framesPortOf(port)} --force`,
   cwd: folder,
   url: `http://127.0.0.1:${port}/`,
   reuseExistingServer: false

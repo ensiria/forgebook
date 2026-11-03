@@ -26,7 +26,11 @@ const frameOfStory = (page: Page, id: string): FrameLocator =>
     `iframe[src*="story=${encodeURIComponent(id)}"]:not([src*="story=${encodeURIComponent(id)}-"])`
   );
 
-/** A page of the catalogue's origin with nothing of its own, to hold frames added in a chosen order. */
+/**
+ * A page of the catalogue's origin with nothing of its own, to hold frames added in a chosen order: a file of the public
+ * folder, since a page a test's route makes up has no address on this machine, and the browser then keeps it from the
+ * frames' origin, a local one.
+ */
 const HOST_PAGE = "/forgebook-mocks-host.html";
 
 test("answers each frame of a component page from its own story's handlers, and the others from the network", async ({
@@ -58,10 +62,6 @@ for (const order of ORDERS) {
   test(`answers each frame from its own handlers when they load as ${order.map((each) => each.id.split("--")[1]).join(", ")}`, async ({
     page
   }) => {
-    // the host is the context's first page, before any worker serves the origin, so the route answers it
-    await page.route(`**${HOST_PAGE}`, (route) =>
-      route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Frames</title>" })
-    );
     await page.goto(HOST_PAGE);
     for (const { id, text } of order) {
       await page.evaluate((story) => {

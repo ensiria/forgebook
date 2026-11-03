@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
+import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import { prebundled, type Resolve, scannedEntries } from "../src/vite/prebundled.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
@@ -28,7 +29,8 @@ const CONFIG: ResolvedConfig = {
   watch: [],
   lists: {},
   hasMocks: false,
-  hasPlayTools: false
+  hasPlayTools: false,
+  frames: ISOLATED_FRAMES
 };
 
 /**

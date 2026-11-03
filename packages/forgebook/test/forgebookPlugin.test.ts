@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
+import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
@@ -162,7 +163,8 @@ describe("forgebookPlugin's pages", () => {
     watch: [],
     lists: {},
     hasMocks: false,
-    hasPlayTools: false
+    hasPlayTools: false,
+    frames: ISOLATED_FRAMES
   };
 
   it("resolves the pages' entries by their address to their path in the folder, and answers them", async () => {

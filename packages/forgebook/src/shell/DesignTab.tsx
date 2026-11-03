@@ -20,6 +20,7 @@ import { isFrameMessage, type PanelArgs, type ShellMessage } from "../messages.t
 import type { LiveView, StageWidth } from "../viewState.ts";
 import "./designTab.scss";
 import { figmaEmbedAddress } from "./figmaEmbed.ts";
+import { framesOrigin, isFromFrames, storyFrameAttributes } from "./framesOrigin.ts";
 import { Icon } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
 import { APPEARANCE_ATTRIBUTE } from "./useAppearance.ts";
@@ -109,9 +110,9 @@ const CompareDialog = ({
   useEffect(() => {
     const answer = (event: MessageEvent): void => {
       const story = frameRef.current?.contentWindow;
-      if (event.origin !== window.location.origin || event.source !== story || !story) return;
+      if (!isFromFrames(event) || event.source !== story || !story) return;
       if (!isFrameMessage(event.data) || event.data.type !== "forgebook:ready") return;
-      const send = (message: ShellMessage): void => story.postMessage(message, window.location.origin);
+      const send = (message: ShellMessage): void => story.postMessage(message, framesOrigin());
       send({ type: "forgebook:args", args: frame.args });
       if (frame.view !== undefined) send({ type: "forgebook:view", view: frame.view });
     };
@@ -149,6 +150,7 @@ const CompareDialog = ({
               title={STRINGS.frameTitle(title, STRINGS.designStoryPane)}
               ref={frameRef}
               src={frame.address}
+              {...storyFrameAttributes()}
               {...{ [FRAME_ASIDE_ATTRIBUTE]: "" }}
               style={frame.width === "fill" ? undefined : { width: frame.width }}
             />
