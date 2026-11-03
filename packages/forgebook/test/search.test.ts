@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { propAnchor } from "../src/docPages.ts";
+import { propAnchor } from "../src/docAnchors.ts";
 import type { TreePage } from "../src/pageTree.ts";
 import { type SearchAnswer, type SearchHit, searchables, searchCatalogue } from "../src/search.ts";
 import { isSearchIndex, mergedSearchIndex, type SearchIndex } from "../src/searchIndex.ts";

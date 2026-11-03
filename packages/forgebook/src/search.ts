@@ -13,7 +13,7 @@
  * @module
  */
 
-import { propAnchor } from "./docPages.ts";
+import { propAnchor } from "./docAnchors.ts";
 import type { TreePage } from "./pageTree.ts";
 import type { SearchComponent, SearchIndex, SearchSection } from "./searchIndex.ts";
 import { type MarkedQuery, type MarkedText, markedText, snippetOf } from "./searchMarks.ts";

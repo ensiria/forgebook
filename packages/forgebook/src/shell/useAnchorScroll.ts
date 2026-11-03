@@ -12,7 +12,7 @@
  */
 import { type RefObject, useCallback, useLayoutEffect } from "react";
 
-import { anchorSelector } from "../docPages.ts";
+import { anchorSelector } from "../docAnchors.ts";
 import { OWN_SCROLL_EVENTS, type PageVisit } from "./useScrollMemory.ts";
 
 /** The room left above a heading brought into view, in CSS px. */

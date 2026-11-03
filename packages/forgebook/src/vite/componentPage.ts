@@ -17,7 +17,7 @@ import { basename } from "node:path";
 
 import { Marked, type Token, type Tokens } from "marked";
 
-import { headingElementId } from "../docPages.ts";
+import { headingElementId } from "../docAnchors.ts";
 import { escapeHtml, highlightCode } from "./highlightCode.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
