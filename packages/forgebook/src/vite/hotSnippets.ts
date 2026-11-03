@@ -16,6 +16,7 @@ import { RENEWED_MODULE_EVENT, STORY_FILE_EVENT } from "../hotModules.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { FILES_PREFIX } from "./pluginModules.ts";
 import { type IndexedStoryFile, storyFileIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
+import { VITE_PATHS } from "./vitePaths.ts";
 
 /** The id of a module a plugin makes, which names no file. */
 const VIRTUAL_ID = /^\0/;
@@ -151,7 +152,8 @@ export const servedPatterns = (): ServedPatterns => {
     changedBy: (file: string): readonly string[] =>
       [...served]
         .filter(([id, files]) => {
-          const kept = files.get(file);
+          // in Vite's form, as the served files are kept: a Windows path reaches here either way
+          const kept = files.get(VITE_PATHS.normalize(file));
           if (kept === undefined) return false;
           const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
           const index = readIndex(root, pattern, kept.key);
