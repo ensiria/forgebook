@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { transformWithOxc } from "vite";
 import { describe, expect, it } from "vitest";
 
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
@@ -94,6 +95,34 @@ describe("a story file's edit on a dev server", () => {
     const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
     const code = codeOf(hooks.transform(`"use client";\n${ONE_STORY}`, "/kit/src/Badge.stories.tsx"));
     expect(code.startsWith('"use client"; import * as __forgebookShown')).toBe(true);
+  });
+
+  it("keeps a file's leading comments first, where a compiler reads its JSX pragmas", async () => {
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
+    const pragmas = "/** @jsxRuntime automatic */\n/** @jsxImportSource @kit/jsx */\n";
+    const story = `${pragmas}export default { title: "Kit/Badge" };\nexport const Badge = () => <b />;\n`;
+    const code = codeOf(hooks.transform(story, "/kit/src/Badge.stories.tsx"));
+    expect(code.startsWith(`${pragmas.trimEnd()} import * as __forgebookShown`)).toBe(true);
+    expect(code.split("\n")).toHaveLength(story.split("\n").length);
+    // the compiler after the plugin still reads them: a pragma after a statement is ignored
+    const { code: compiled } = await transformWithOxc(code, "/kit/src/Badge.stories.tsx", {
+      jsx: { runtime: "automatic", importSource: "react" }
+    });
+    expect(compiled).toContain('from "@kit/jsx/jsx-runtime"');
+  });
+
+  it("keeps line comments and directives in any order before it", () => {
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
+    const head = '// @jsxImportSource @kit/jsx\n"use client";\n/* note */';
+    const code = codeOf(hooks.transform(`${head}${ONE_STORY}`, "/kit/src/Badge.stories.tsx"));
+    expect(code.startsWith(`${head} import * as __forgebookShown`)).toBe(true);
+  });
+
+  it("does not take a comment inside the code for a leading one", () => {
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
+    const story = `const text = "/* not a comment */";\n${ONE_STORY}`;
+    const code = codeOf(hooks.transform(story, "/kit/src/Badge.stories.tsx"));
+    expect(code.startsWith("import * as __forgebookShown")).toBe(true);
   });
 
   it("is taken by a pattern's module, so a file no frame draws reloads nothing", async () => {
