@@ -39,6 +39,12 @@ const propOf = (docs: ComponentDocs, name: string): PropDocs => {
   return prop;
 };
 
+/**
+ * How long a case that builds a TypeScript program of its own may take, in milliseconds: a second on its own, many on
+ * a runner where the other packages' tests build theirs at the same time.
+ */
+const PROGRAM_TIMEOUT = 60_000;
+
 /** A component with one prop. */
 const componentWithProp = (name: string): string =>
   `<script lang="ts">\n  const { ${name} }: { ${name}: string } = $props();\n</script>\n<i>{${name}}</i>\n`;
@@ -136,7 +142,7 @@ describe("other components and stories", () => {
     expect(extractComponentDocs(docsFile("Foundations.stories.ts"))).toEqual({ name: null });
   });
 
-  it("sees an edit once the worker hears of it", () => {
+  it("sees an edit once the worker hears of it", { timeout: PROGRAM_TIMEOUT }, () => {
     const folder = mkdtempSync(join(FIXTURES, "edited-"));
     try {
       const config = readFileSync(join(FIXTURES, "docs", "tsconfig.json"), "utf8");
@@ -156,7 +162,9 @@ describe("other components and stories", () => {
     }
   });
 
-  it("reads a component whose script does not parse as one with no props, instead of throwing", () => {
+  it("reads a component whose script does not parse as one with no props, instead of throwing", {
+    timeout: PROGRAM_TIMEOUT
+  }, () => {
     const folder = mkdtempSync(join(FIXTURES, "broken-"));
     try {
       writeFileSync(join(folder, "Broken.svelte"), '<script lang="ts">\n  const = ;\n</script>\n');
