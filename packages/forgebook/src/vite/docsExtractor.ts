@@ -93,15 +93,43 @@ const WORKER_URL = new URL(`./docsWorker${extname(import.meta.url)}`, import.met
 export type DocsWorkerData = {
   /** The URL of the module exporting the framework's `extractStoryComponent`. */
   readonly docsModule: string;
+  /**
+   * Whether every story's docs will be read, as in a build: each program then holds its whole configuration at once,
+   * rather than what was asked for so far, which a dev server showing one component at a time needs.
+   */
+  readonly readsEverything: boolean;
 };
+
+/** How an extractor reads. */
+export type DocsExtractorOptions = {
+  /** Whether every story's docs will be read, as in a build; a dev server's reads by default. */
+  readonly readsEverything?: boolean;
+};
+
+/**
+ * The worker's young generation on a dev server, in MB. V8 sizes it for throughput, but a program's heap survives
+ * its collections, so a large young generation is mostly empty memory the worker keeps; a dev server reads one
+ * component at a time, where collecting more often costs little.
+ */
+const YOUNG_GENERATION_MB = 8;
+
+/**
+ * The worker's young generation in a build, in MB: a build reads every story's docs in one go, and with the dev
+ * server's small one it would spend much of that time collecting garbage.
+ */
+const BUILD_YOUNG_GENERATION_MB = 64;
 
 /**
  * A docs extractor with its worker, started on its first request.
  *
  * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).
+ * @param options - how it reads.
  * @returns the extractor.
  */
-export const createDocsExtractor = (docsModule: string): DocsExtractor => {
+export const createDocsExtractor = (
+  docsModule: string,
+  { readsEverything = false }: DocsExtractorOptions = {}
+): DocsExtractor => {
   let worker: Worker | undefined;
   let nextId = 0;
   // every request sent and not answered yet, a warm-up's answer included (none reads it)
@@ -110,8 +138,13 @@ export const createDocsExtractor = (docsModule: string): DocsExtractor => {
   const warmUps: string[] = [];
   const started = (): Worker => {
     if (worker !== undefined) return worker;
-    const workerData: DocsWorkerData = { docsModule };
-    const created = new Worker(WORKER_URL, { workerData });
+    const workerData: DocsWorkerData = { docsModule, readsEverything };
+    const created = new Worker(WORKER_URL, {
+      workerData,
+      resourceLimits: {
+        maxYoungGenerationSizeMb: readsEverything ? BUILD_YOUNG_GENERATION_MB : YOUNG_GENERATION_MB
+      }
+    });
     created.unref();
     created.on("message", (response: DocsResponse): void => {
       pending.get(response.id)?.(response);
