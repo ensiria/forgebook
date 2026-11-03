@@ -15,6 +15,7 @@ import { globSync, readFileSync } from "node:fs";
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { autoTitle, patternBase } from "./autoTitle.ts";
+import { type DiskCache, isSettledSince, nowNs, stampPaths } from "./diskCache.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -99,22 +100,36 @@ export type IndexedStoryFile = {
   readonly index: StoryFileIndex;
 };
 
+/** A pattern's index as it is kept between starts, by file key. */
+export type KeptIndex = Readonly<Record<string, StoryFileIndex>>;
+
+/** Whether what a cache file holds is a pattern's index. */
+export const isKeptIndex = (value: unknown): value is KeptIndex =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 /**
  * Every story file a pattern matches, indexed.
  *
  * @param root - the declaring module's folder.
  * @param pattern - the pattern.
  * @param watch - adds a file whose edit renews the module that read it.
+ * @param cache - the index kept between starts, which holds while the files it came from do; none reads them all.
  * @throws when a story file cannot be indexed.
  */
 export const indexedStoryFiles = (
   root: string,
   pattern: string,
-  watch: (file: string) => void
-): IndexedStoryFile[] =>
-  storyFileKeys(root, [pattern]).map((key) => {
+  watch: (file: string) => void,
+  cache?: DiskCache<KeptIndex>
+): IndexedStoryFile[] => {
+  const name = storyFilesGroupText(VITE_PATHS.normalize(root), pattern);
+  const since = nowNs();
+  const kept = cache?.read(name);
+  const files = storyFileKeys(root, [pattern]).map((key) => {
     const file = VITE_PATHS.resolve(root, key);
     watch(file);
+    const known = kept?.[key];
+    if (known !== undefined) return { key, file, index: known };
     const title = autoTitle(patternBase(pattern), key);
     const index = indexStoryFile(
       file,
@@ -124,6 +139,14 @@ export const indexedStoryFiles = (
     if (typeof index === "string") throw new Error(index);
     return { key, file, index };
   });
+  // kept again when anything was read anew: a file added, or the kept index out of date
+  if (cache !== undefined && files.some(({ key }) => kept?.[key] === undefined)) {
+    const stamps = stampPaths(files.map((each) => each.file));
+    const index = Object.fromEntries(files.map((each) => [each.key, each.index]));
+    if (isSettledSince(stamps, since)) cache.write(name, index, stamps);
+  }
+  return files;
+};
 
 /** An object literal of a key per file, each value written by `value`. */
 const objectOf = (keys: readonly string[], value: (key: string) => string): string =>
@@ -136,15 +159,17 @@ const objectOf = (keys: readonly string[], value: (key: string) => string): stri
  * @param pattern - the pattern before `?forgebook-files`.
  * @param watch - adds a file whose edit renews the module (each story file: its index is in the module).
  * @param hasUsage - whether the group offers its "Used in" loader (the catalogue did not turn it off).
+ * @param cache - the index kept between starts.
  * @returns the module's code, or a message saying which file cannot be indexed.
  */
 export const storyFilesModule = (
   root: string,
   pattern: string,
   watch: (file: string) => void,
-  hasUsage = true
+  hasUsage = true,
+  cache?: DiskCache<KeptIndex>
 ): string => {
-  const files = indexedStoryFiles(root, pattern, watch);
+  const files = indexedStoryFiles(root, pattern, watch, cache);
   const keys = files.map((file) => file.key);
   // the group's id in Vite's form, as the plugin names the declaring module's folder
   const folder = VITE_PATHS.normalize(root);

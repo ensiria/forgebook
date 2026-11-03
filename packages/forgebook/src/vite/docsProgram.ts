@@ -386,6 +386,65 @@ const holdingConfiguration = (file: string): string | undefined => {
 };
 
 /**
+ * The files a configuration was read from: itself and those it extends.
+ *
+ * @param configPath - the `tsconfig.json`.
+ */
+const configurationSources = (configPath: string): string[] => {
+  const configFile = readConfiguration(configPath)?.parsed.options["configFile"];
+  const extended =
+    typeof configFile === "object" && configFile !== null && "extendedSourceFiles" in configFile
+      ? (configFile.extendedSourceFiles ?? [])
+      : [];
+  return [configPath, ...extended];
+};
+
+/**
+ * The files besides a source's own imports that what is read of it can change with: every configuration looked at to
+ * find the one that holds it (up its folders, with the projects they reference) and those they extend, and the files
+ * that hold for every file of that configuration (its declarations, its augmentations). Kept answers are checked
+ * against them (`diskCache.ts`).
+ *
+ * @param file - an absolute path to a source file.
+ */
+export const configurationFiles = (file: string): string[] => {
+  const name = file.replaceAll("\\", "/");
+  const files: string[] = [];
+  let folder = dirname(file);
+  for (;;) {
+    const configPath = ts.findConfigFile(folder, ts.sys.fileExists, "tsconfig.json");
+    if (configPath === undefined) break;
+    const candidates = withReferences(configPath);
+    for (const candidate of candidates) files.push(...configurationSources(candidate));
+    const holding = candidates.find((candidate) => readConfiguration(candidate)?.fileSet.has(name) === true);
+    const read = holding === undefined ? undefined : readConfiguration(holding);
+    if (read !== undefined) {
+      files.push(...ambientOf(read));
+      break;
+    }
+    const parent = dirname(dirname(configPath));
+    if (parent === dirname(configPath)) break;
+    folder = parent;
+  }
+  return [...new Set(files)];
+};
+
+/**
+ * The compiler options a file is read with, as `programFor` finds its configuration, without making a program: its
+ * imports resolve with them.
+ *
+ * @param file - an absolute path to a source file.
+ */
+export const compilerOptionsFor = (file: string): ts.CompilerOptions => {
+  const holding = holdingConfiguration(file);
+  const nearest = ts.findConfigFile(dirname(file), ts.sys.fileExists, "tsconfig.json");
+  const configPath = holding ?? nearest;
+  return (
+    (configPath === undefined ? undefined : readConfiguration(configPath)?.parsed.options) ?? FALLBACK_OPTIONS
+  );
+};
+
+/**
  * A configuration's program, renewed when it lacks a file the configuration lists: a story file added since the
  * program was made.
  *
