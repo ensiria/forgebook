@@ -50,6 +50,13 @@ describe("ids and names", () => {
     expect(storyId("kit", "Skjema/Knapp på (ny)", "ÆrligTalt")).toBe("kit:skjema-knapp-på-ny--ærlig-talt");
   });
 
+  it("stays quick on a title that is a long run of punctuation", () => {
+    const title = `${"-".repeat(200_000)}A${"/".repeat(200_000)}`;
+    const started = performance.now();
+    expect(componentId("kit", title)).toBe("kit:a");
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   it("keeps the former ids' rule, which split titles at their case changes", () => {
     expect(kebab("Inputs/Selection/Select")).toBe("inputs-selection-select");
     expect(kebab("ReadMore")).toBe("read-more");

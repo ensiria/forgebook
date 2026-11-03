@@ -22,8 +22,14 @@ const ID_PUNCTUATION = /[ ’–—―′¿'`~!@#$%^&*()_|+\-=?;:'",.<>{}[\]\\/]
  * @param text - a title, a meta's `id` or a story's name.
  * @returns the part; empty when the text has no letter or digit.
  */
-export const idPart = (text: string): string =>
-  text.toLowerCase().replace(ID_PUNCTUATION, "-").replace(/-+/g, "-").replace(/^-+/, "").replace(/-+$/, "");
+export const idPart = (text: string): string => {
+  // after the runs are collapsed, each end holds one hyphen at most: sliced off, with no pattern anchored at the end
+  // that would slow on a long run
+  const collapsed = text.toLowerCase().replace(ID_PUNCTUATION, "-").replace(/-+/g, "-");
+  const start = collapsed.startsWith("-") ? 1 : 0;
+  const end = collapsed.endsWith("-") ? collapsed.length - 1 : collapsed.length;
+  return collapsed.slice(start, Math.max(start, end));
+};
 
 /**
  * The words of an export's name, as Storybook splits it to name a story: at `_`, `-`, `.`, at case changes and around
