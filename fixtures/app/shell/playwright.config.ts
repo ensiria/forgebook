@@ -3,9 +3,11 @@
  * the unit tests cannot reach (the address, the panel, the stage, the keys, the errors).
  *
  * @remarks
- * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT`, so two worktrees can run
- * the tests at once. The Vue, Solid and Preact fixture catalogues run beside the fixture app, for what a catalogue of
- * another framework must do (`vue.e2e.ts`, `solid.e2e.ts`, `preact.e2e.ts`).
+ * Run with `pnpm --filter @fixture/app test:shell`. The ports come from `FORGEBOOK_SHELL_PORT` (`ports.ts`), so two
+ * worktrees can run the tests at once. The Vue, Svelte, Solid, Preact, Next.js and white-label catalogues run beside
+ * the fixture app, for what a catalogue of another framework must do (`vue.e2e.ts`, `svelte.e2e.ts`, `solid.e2e.ts`,
+ * `preact.e2e.ts`), what a Next.js project's components need (`nextjs.e2e.ts`) and a catalogue with no trace of
+ * Forgebook's look (`embed.e2e.ts`).
  *
  * @module
  */
@@ -13,19 +15,24 @@ import { join } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { PREACT_PORT, SHELL_PORT, SOLID_PORT, VUE_PORT } from "./ports";
+import { type Catalogue, catalogueUrl, framesPortOf, portOf } from "./ports";
 
 /**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
  * dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here.
  *
  * @param folder - the catalogue's folder.
- * @param port - the port it listens on.
+ * @param catalogue - which catalogue it is, for its ports (`ports.ts`): its frames listen on their own.
+ * @param configFile - its configuration, relative to the folder; the folder's `forgebook.config.ts` when absent.
  */
-const catalogueServer = (folder: string, port: number) => ({
-  command: `pnpm exec forgebook dev --host 127.0.0.1 --port ${port} --force`,
+const catalogueServer = (
+  folder: string,
+  catalogue: Catalogue,
+  configFile?: string
+): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
+  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${portOf(catalogue)} --frame-port ${framesPortOf(catalogue)} --force`,
   cwd: folder,
-  url: `http://127.0.0.1:${port}/`,
+  url: catalogueUrl(catalogue),
   reuseExistingServer: false
 });
 
@@ -35,14 +42,18 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"]],
   webServer: [
-    catalogueServer(join(import.meta.dirname, ".."), SHELL_PORT),
-    catalogueServer(join(import.meta.dirname, "..", "..", "vue"), VUE_PORT),
-    catalogueServer(join(import.meta.dirname, "..", "..", "solid"), SOLID_PORT),
-    catalogueServer(join(import.meta.dirname, "..", "..", "preact"), PREACT_PORT)
+    catalogueServer(join(import.meta.dirname, ".."), "app"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "vue"), "vue"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "svelte"), "svelte"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "solid"), "solid"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "preact"), "preact"),
+    // a second catalogue, for what only shows on one that sets a whole theme and turns the branding off
+    catalogueServer(join(import.meta.dirname, ".."), "white-label", "white-label/forgebook.config.ts"),
+    catalogueServer(join(import.meta.dirname, "..", "..", "nextjs"), "nextjs")
   ],
   use: {
     browserName: "chromium",
-    baseURL: `http://127.0.0.1:${SHELL_PORT}/`,
+    baseURL: catalogueUrl("app"),
     viewport: { width: 1280, height: 900 }
   }
 });

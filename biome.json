@@ -209,6 +209,20 @@
       }
     },
     {
+      "includes": ["**/*.svelte"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
+          },
+          "style": {
+            "useConst": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/*.vue"],
       "linter": {
         "rules": {
@@ -235,6 +249,33 @@
         "rules": {
           "style": {
             "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/nextjs/src/next/**",
+        "fixtures/nextjs/app/**/page.tsx",
+        "fixtures/nextjs/app/**/layout.tsx",
+        "**/forgebook.preview.tsx",
+        "fixtures/nextjs/types.d.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off",
+            "useNamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["fixtures/nextjs/components/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
           }
         }
       }

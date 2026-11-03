@@ -183,9 +183,8 @@ describeAdapter({ name: "Solid", renderer, drawing, decorator, codeOf, docsOf })
 
 `drawing(name)` gives a story with a button showing `Hello <name> <clicks>`, its clicks in its own state, which throws for
 `THROWING_NAME`. `decorator(label)` draws a story inside a `section` with that `data-decorator`. A renderer's
-`renderToString` may return a promise. `test/conformance.test.tsx` in `@forgebook/react` and `@forgebook/preact`, and
-`test/conformance.test.ts` in `@forgebook/vue`, are complete examples.
-
-A framework whose page and server builds are different modules runs the suite twice: `cases: "page"` in a simulated page,
-`cases: "server"` on Node. Solid is one (`solid-js/web` is its browser build or its server build, never both):
-`@forgebook/solid`'s Vitest has a project for each, and its `conformance.server.test.ts` holds the second run.
+`renderToString` may return a promise. A framework whose page and server builds differ runs the suite twice, with
+`half: "page"` in a simulated page and `half: "server"` in Node: Svelte compiles a component apart for each, and Solid's
+`solid-js/web` is its browser build or its server build, never both. `test/conformance.test.tsx` in `@forgebook/react`
+and `@forgebook/preact`, `test/conformance.test.ts` in `@forgebook/vue`, and the two `conformance` tests of
+`@forgebook/svelte` and of `@forgebook/solid` are complete examples.

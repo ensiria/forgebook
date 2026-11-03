@@ -16,5 +16,5 @@ describeAdapter({
   drawing: greetingDrawing,
   decorator: sectionDecorator,
   codeOf,
-  cases: "server"
+  half: "server"
 });

@@ -12,6 +12,7 @@ import { type ReactNode, type RefObject, useEffect, useState } from "react";
 
 import type { ShellMessage } from "../messages.ts";
 import { CLOCK_RATES, type ClockRate, type ClockState, DEFAULT_CLOCK_STATE } from "../storyClock.ts";
+import { framesOrigin } from "./framesOrigin.ts";
 import { Icon } from "./icons.tsx";
 import { Segmented } from "./Segmented.tsx";
 import { STRINGS } from "./strings.ts";
@@ -46,12 +47,12 @@ export const useStoryClockControls = (
     setLocalState(DEFAULT_CLOCK_STATE);
   }
   const send = (message: ShellMessage): void =>
-    frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+    frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
   // the frame hears every state once it is drawn, so a change builds on the latest state, never on a render's copy
   useEffect(() => {
     frameRef.current?.contentWindow?.postMessage(
       { type: "forgebook:clock", state } satisfies ShellMessage,
-      window.location.origin
+      framesOrigin()
     );
   }, [frameRef, state]);
   return {
@@ -60,7 +61,7 @@ export const useStoryClockControls = (
       setLocalState((current: ClockState) => ({ ...current, ...patch })),
     restart: (): void => send({ type: "forgebook:clock-restart" }),
     sendTo: (frame: Window): void =>
-      frame.postMessage({ type: "forgebook:clock", state } satisfies ShellMessage, window.location.origin)
+      frame.postMessage({ type: "forgebook:clock", state } satisfies ShellMessage, framesOrigin())
   };
 };
 

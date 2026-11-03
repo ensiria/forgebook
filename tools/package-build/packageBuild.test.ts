@@ -71,6 +71,14 @@ describe("which sources the build takes", () => {
     expect(isPublished("src/styles/_tokens.scss")).toBe(false);
     expect(isPublished("src/fonts/Inter-latin.woff2")).toBe(true);
   });
+
+  it("reads a path with Windows separators, as Node's glob gives it there", () => {
+    expect(isPublished("src\\vite\\a.test.ts")).toBe(false);
+    expect(isPublished("src\\test\\fixture.ts")).toBe(false);
+    expect(isPublished("src\\vite\\tsconfig.json")).toBe(false);
+    expect(isPublished("src\\styles\\_tokens.scss")).toBe(false);
+    expect(isPublished("src\\fonts\\Inter-latin.woff2")).toBe(true);
+  });
 });
 
 describe("isPackedByPnpm", () => {

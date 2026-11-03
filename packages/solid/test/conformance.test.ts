@@ -21,5 +21,5 @@ describeAdapter({
   codeOf,
   docsOf: () =>
     extractComponentDocs(join(import.meta.dirname, "..", "fixtures", "docs", "src", "Badge.stories.tsx")),
-  cases: "page"
+  half: "page"
 });

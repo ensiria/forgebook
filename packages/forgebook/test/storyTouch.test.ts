@@ -23,6 +23,7 @@ const CHOICE = touchChoiceOf(FIXTURE_SWITCHES);
  */
 const storyOf = (id: string, isTouch: boolean): TreeStory => ({
   id,
+  file: "a.stories.tsx",
   name: id,
   exportName: id,
   controls: "all",
@@ -32,6 +33,7 @@ const storyOf = (id: string, isTouch: boolean): TreeStory => ({
   isTouch,
   isLogic: false,
   height: undefined,
+  design: undefined,
   tags: []
 });
 
