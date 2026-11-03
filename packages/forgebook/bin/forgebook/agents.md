@@ -90,7 +90,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   own over it. The catalogue adds a Design tab, and `forgebook story` returns it as `design` (the link, `fileKey`,
   `nodeId`, and the `address` to hand a person).
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
-  (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`.
+  (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`. A source gives each language's table, or a
+  loader of it (`texts: { en: () => import("./locales/en.json") }`), which keeps the texts out of the catalogue's page.
 - Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic` and `design.figma` as plain values: the catalogue reads them without running
   the file.
 - In a Next.js project (`framework: nextjs()`), stories take their types from `@forgebook/nextjs`. A story says where

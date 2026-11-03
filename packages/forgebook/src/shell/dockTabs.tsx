@@ -5,8 +5,8 @@
  *
  * @remarks
  * The dock draws only the chosen tab's content, and most stories open on Props: the other tabs' modules (Events,
- * Interactions, Parts and styling, Code, Accessibility, Design) load the first time each is chosen (`lazyTab`), so a
- * first load fetches none of them. What the row of tabs shows of them (a hint, whether there is one) is in `tabSummaries`.
+ * Interactions, Parts and styling, Code, Accessibility, Design) load the first time each is chosen
+ * (`lazyModule.tsx`), so a first load fetches none of them. What the row of tabs shows of them (a hint, whether there is one) is in `tabSummaries`.
  *
  * @module
  */
@@ -23,7 +23,8 @@ import type { CheckState } from "./A11yTab.tsx";
 import type { DesignTabProps } from "./DesignTab.tsx";
 import { DesignTabLoader } from "./DesignTabLoader.tsx";
 import type { DockTab } from "./Dock.tsx";
-import { LazyTab, tabModule } from "./lazyTab.tsx";
+import { lazyModule } from "./lazyModule.tsx";
+import { LazyTab } from "./lazyTab.tsx";
 import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
 import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
@@ -33,21 +34,21 @@ import type { Loaded } from "./useLoaded.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
 
 /** The Events tab, its module, loaded when the tab is first chosen. */
-const EVENTS_TAB = tabModule(() => import("./EventsTab.tsx").then((module) => module.EventsTab));
+const EVENTS_TAB = lazyModule(() => import("./EventsTab.tsx").then((module) => module.EventsTab));
 
 /** The Interactions tab, its module, loaded when the tab is first chosen. */
-const INTERACTIONS_TAB = tabModule(() =>
+const INTERACTIONS_TAB = lazyModule(() =>
   import("./InteractionsTab.tsx").then((module) => module.InteractionsTab)
 );
 
 /** The Parts and styling tab, its module, loaded when the tab is first chosen. */
-const PARTS_TAB = tabModule(() => import("./PartsTab.tsx").then((module) => module.PartsTab));
+const PARTS_TAB = lazyModule(() => import("./PartsTab.tsx").then((module) => module.PartsTab));
 
 /** The Code tab, its module, loaded when the tab is first chosen. */
-const CODE_TAB = tabModule(() => import("./CodeTab.tsx").then((module) => module.CodeTab));
+const CODE_TAB = lazyModule(() => import("./CodeTab.tsx").then((module) => module.CodeTab));
 
 /** The Accessibility tab, its module, loaded when the tab is first chosen. */
-const A11Y_TAB = tabModule(() => import("./A11yTab.tsx").then((module) => module.A11yTab));
+const A11Y_TAB = lazyModule(() => import("./A11yTab.tsx").then((module) => module.A11yTab));
 
 /** What the tabs are built from. */
 export type DockTabsInput = {

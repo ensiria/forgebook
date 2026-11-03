@@ -78,8 +78,8 @@ const Forwarded = forwardRef<HTMLElement, { readonly name?: unknown }>(({ name }
 ));
 
 describe("reactRenderer", () => {
-  it("renders a story on the server inside the catalogue's decorators, which read its globals, with its texts", () => {
-    const html = reactRenderer.renderToString(
+  it("renders a story on the server inside the catalogue's decorators, which read its globals, with its texts", async () => {
+    const html = await reactRenderer.renderToString(
       // the decorator comes as a catalogue's preview gives it, read without its types
       drawing({ name: "Ada" }, readPreview({ decorators: [inLanguage] }).decorators)
     );
@@ -160,11 +160,11 @@ describe("reactRenderer", () => {
     await vi.waitFor(() => expect(canvas.textContent).toContain("Ciao Ada"));
   });
 
-  it("draws a meta's component made by memo or forwardRef, with the story's args", () => {
+  it("draws a meta's component made by memo or forwardRef, with the story's args", async () => {
     for (const component of [Memoized, Forwarded]) {
       const story = readStory({ default: { title: "Kit/Name", component }, Shown: {} }, "Shown");
       if (typeof story === "string") throw new Error(story);
-      const html = reactRenderer.renderToString({ ...drawing({ name: "Ada" }), story });
+      const html = await reactRenderer.renderToString({ ...drawing({ name: "Ada" }), story });
       expect(html).toContain("Ada");
     }
   });

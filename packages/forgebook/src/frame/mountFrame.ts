@@ -30,12 +30,19 @@ import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGloba
 import { shownTexts, storyTextKeysOf, withStoryTexts } from "../storyTexts.ts";
 import { findStory, storyTree } from "../storyTree.ts";
 import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
-import { codeGlobalsOf, frameAddress, type LiveView, languageOf, parseView } from "../viewState.ts";
+import {
+  codeGlobalsOf,
+  frameAddress,
+  type LiveView,
+  languageOf,
+  type MeasureTool,
+  parseView
+} from "../viewState.ts";
 import { checkStory } from "./checkStory.ts";
+import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
-import { applyTools } from "./measureTools.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import type { StoryDrawing, StoryRenderer } from "./renderer.ts";
 import { type ShellChannel, shellChannel } from "./shellChannel.ts";
@@ -44,7 +51,6 @@ import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./s
 import type { MockToolsLoader } from "./storyMocks.ts";
 import { mergedPreviews, readPreview, readStory, startingGlobals } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
-import { followTouch } from "./touchLayer.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {
@@ -151,9 +157,6 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const shell = shellChannel(config.frames ?? SAME_ORIGIN, window);
   const tellShell = shell.tell;
   applyView(document.documentElement, view, catalogue);
-  // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
-  // sees touch
-  followTouch(document);
   // what the story fixes of the view, once it is read: every view the frame applies has it over the shell's
   let fixed: FixedView = NOT_FIXED;
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount
@@ -163,15 +166,6 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   const showSpills = spillOutline(document, ".forgebook-frame", (count) =>
     tellShell({ type: "forgebook:spills", storyId, count })
   );
-  shell.listen((message: ShellMessage): void => {
-    if (message.type === "forgebook:tools") applyTools(document, message.tools, catalogue.gridStep);
-    if (message.type === "forgebook:spills") showSpills(message.isOn);
-    if (message.type !== "forgebook:view") return;
-    applyView(document.documentElement, withFixed(message.view, fixed), catalogue);
-    changeShown?.(message.view);
-    const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
-    window.history.replaceState(null, "", address);
-  });
   // observed from the start, so the shell sizes the frame to an error as well as to a story
   const reportSize = (): void => {
     // the body's own height: the root's scroll height never drops below the frame's, so a story could not shrink
@@ -196,6 +190,27 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     reportError(message);
   };
 
+  // the measuring tools load when one is first turned on: the shell tells every frame, most often that none is; what
+  // the shell sent last is what shows once they are there
+  let measuring: Promise<typeof import("./measureTools.ts")> | undefined;
+  let latestTools: readonly MeasureTool[] = [];
+  const showTools = (tools: readonly MeasureTool[]): void => {
+    latestTools = tools;
+    if (tools.length === 0 && measuring === undefined) return;
+    measuring ??= import("./measureTools.ts");
+    measuring
+      .then(({ applyTools }) => applyTools(document, latestTools, catalogue.gridStep))
+      .catch((error: unknown) => reportError(error instanceof Error ? error.message : String(error)));
+  };
+  shell.listen((message: ShellMessage): void => {
+    if (message.type === "forgebook:tools") showTools(message.tools);
+    if (message.type === "forgebook:spills") showSpills(message.isOn);
+    if (message.type !== "forgebook:view") return;
+    applyView(document.documentElement, withFixed(message.view, fixed), catalogue);
+    changeShown?.(message.view);
+    const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
+    window.history.replaceState(null, "", address);
+  });
   const location = findStory(storyTree(config.sources), storyId);
   const source = config.sources.find((candidate) => candidate.id === location?.source.id);
   const load =
@@ -207,6 +222,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     return;
   }
   try {
+    // the Touch switch's simulation, on before the story's modules load, so a library that reads the device at once
+    // sees touch
+    await followTouch(document, reportError);
     await source.setup?.();
     await preview.setup?.();
     await loadSheets(document, viewSheets(source.sheets, view));
@@ -222,15 +240,20 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     shell.listen((message: ShellMessage): void => {
       if (controls !== undefined) answerShell(message, controls, storyId, catalogue.a11y, tellShell);
     });
-    // the language's texts, and the switches the story reads (the language's provider reads its id among them)
-    const shownFor = (live: Pick<LiveView, "switches">): Pick<StoryDrawing, "texts" | "globals"> => {
+    // the language's texts, and the switches the story reads (the language's provider reads its id among them); a
+    // language the source gives as a loader is loaded as it is shown
+    const shownFor = async (
+      live: Pick<LiveView, "switches">
+    ): Promise<Pick<StoryDrawing, "texts" | "globals">> => {
       const switchesShown = { switches: { ...live.switches, ...fixed.switches } };
       return {
-        texts: shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
+        texts: await shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
         globals: { ...startingGlobals(preview, story), ...codeGlobalsOf(switchesShown, switches) }
       };
     };
-    const shown = shownFor(view);
+    const shown = await shownFor(view);
+    // the view the reader chose last: a language that loads slower than the next one chosen is never drawn
+    let shownCount = 0;
     const { texts } = shown;
     const running = runStory({
       container,
@@ -265,7 +288,18 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           actions: actionNames(story.args, story.argTypes),
           fixed
         });
-        changeShown = (live: LiveView): void => running.setShown(shownFor(live));
+        changeShown = (live: LiveView): void => {
+          shownCount += 1;
+          const count = shownCount;
+          shownFor(live)
+            .then((next) => {
+              if (count === shownCount) running.setShown(next);
+            })
+            .catch((error: unknown) => {
+              // a language another choice replaced meanwhile is no longer the frame's concern
+              if (count === shownCount) reportError(error instanceof Error ? error.message : String(error));
+            });
+        };
       },
       onError: reportError,
       onTrace: (trace: PlayTrace): void => {
