@@ -24,6 +24,7 @@ import { catalogueVite } from "./catalogueVite.ts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
+import { pagesCommands } from "./pagesCommands.mts";
 import { runTokens } from "./tokensRun.ts";
 import { openTouchWindow } from "./touchWindowRun.ts";
 import { visualCommands } from "./visualCommands.mts";
@@ -315,6 +316,7 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),
     ...mcpCommands(forgebook),

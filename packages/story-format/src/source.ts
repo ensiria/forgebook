@@ -1,5 +1,5 @@
 /**
- * What a package hands a catalogue: its story files, its style sheets, its texts.
+ * What a package hands a catalogue: its story files, its style sheets, its texts, its docs pages.
  *
  * @remarks
  * Every package with stories exports one `StorySource` from a development-only `./stories` subpath, never published;
@@ -170,6 +170,37 @@ export type StoryMarkdown = {
   readonly html: string;
 };
 
+/** A docs page as the index lists it, read from its file before anyone opens it. */
+export type DocPageIndex = {
+  /** Its place and name: `Guides/Theming`, or `Theming` for a page outside any group. */
+  readonly title: string;
+  /** Where it sits among the pages: lower first, then the pages without one, by title. */
+  readonly order?: number;
+  /** What it is about, in a sentence: the page's lead, and what tools list. */
+  readonly description?: string;
+  /** The ids of the stories it shows, in its order. */
+  readonly stories: readonly string[];
+  /** The ids of the components whose API tables it shows, in its order. */
+  readonly components: readonly string[];
+  /** The slugs of the pages it links to, which the catalogue checks across every group of the source. */
+  readonly links: readonly string[];
+  /** What the index noticed without refusing the file: an unknown key, a missing image. */
+  readonly notes?: readonly string[];
+};
+
+/**
+ * The docs pages of a pattern, as the catalogue's plugin answers a `?forgebook-docs-pages` import: each page's index and
+ * the loader of the page, by the file's path relative to the importing module (`./docs/theming.md`).
+ */
+export type DocPages = {
+  /** Each page's index: its title and what it shows, read from its file. */
+  readonly index: Readonly<Record<string, DocPageIndex>>;
+  /** Each page, loaded when it opens. */
+  readonly pages: Readonly<Record<string, () => Promise<unknown>>>;
+  /** Each page's Markdown, for tools on the dev server; none in a static build. */
+  readonly text?: Readonly<Record<string, () => Promise<unknown>>>;
+};
+
 /**
  * A design tokens file of a package: its path from the module that declares the source, with its theme when it is a
  * theme's (the format has no themes of its own, so a theme is a file over the base).
@@ -226,6 +257,11 @@ export type StorySource = {
    * (`home: () => import("./home.md?forgebook-markdown")`). None by default: the home then shows only its families.
    */
   readonly home?: () => Promise<{ readonly default: StoryMarkdown }>;
+  /**
+   * Its docs pages: guides and foundations in Markdown, with live stories, listed in the sidebar's Docs section. One
+   * group per `?forgebook-docs-pages` import, the keys unique across the groups. None by default.
+   */
+  readonly docs?: readonly DocPages[];
   /**
    * The package's design tokens, DTCG 2025.10 files, the base first
    * (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`): every catalogue that shows the source adds them to

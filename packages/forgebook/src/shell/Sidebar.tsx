@@ -5,7 +5,8 @@
  * the pointer. A family or a group stays open once opened; a search opens every one it finds something in, and finds a
  * component by its
  * name, its place, its meta's search words or its stories' names and descriptions. A component listed in other places too (`alsoIn`) has an
- * alias entry in each, beside the components that live there, which says where it lives and opens its page.
+ * alias entry in each, beside the components that live there, which says where it lives and opens its page. Docs pages
+ * come first, in a section of their own (`SidebarDocs.tsx`).
  *
  * @module
  */
@@ -25,13 +26,14 @@ import { AppearanceMenu } from "./AppearanceMenu.tsx";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
 import { isTyping } from "./keyboard.ts";
+import { SidebarDocs, type SidebarPageLinks } from "./SidebarDocs.tsx";
 import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
 import { STRINGS } from "./strings.ts";
-import { foundFamily, searchWords } from "./treeSearch.ts";
+import { foundFamily, foundPages, searchWords } from "./treeSearch.ts";
 import type { AppearanceState } from "./useAppearance.ts";
 
 /** The sidebar's props. */
-export type SidebarProps = {
+export type SidebarProps = SidebarPageLinks & {
   /** The catalogue's name. */
   readonly title: string;
   /** The catalogue's logo, the URL of a square image; none shows the catalogue's own mark. */
@@ -49,6 +51,8 @@ export type SidebarProps = {
    * home.
    */
   readonly current: ShownComponent | undefined;
+  /** The shown docs page's id; none on any other page. */
+  readonly currentPageId: string | undefined;
   /** The address of a component's page, by its title, for its link. */
   readonly componentHref: (sourceId: string, title: string) => string;
   /** Opens a component's page, by its title. */
@@ -116,6 +120,9 @@ export const Sidebar = ({
   homeHref,
   onOpenHome,
   current,
+  currentPageId,
+  pageHref,
+  onOpenPage,
   width,
   isOpen,
   onHide,
@@ -126,13 +133,13 @@ export const Sidebar = ({
   const searchRef = useRef<HTMLInputElement>(null);
   const navRef = useRef<HTMLElement>(null);
   // the shown component stays in sight: a page opened by a key, the picker or the address scrolls the list to it
-  const currentTitle = current?.title;
+  const currentEntry = currentPageId ?? current?.title;
   useEffect(() => {
-    if (currentTitle === undefined) return;
+    if (currentEntry === undefined) return;
     navRef.current
       ?.querySelector(".forgebook-tree__item[aria-current]")
       ?.scrollIntoView({ block: "nearest" });
-  }, [currentTitle]);
+  }, [currentEntry]);
   useEffect(() => {
     // "/" goes to the search from anywhere in the shell, as in most catalogues
     // a hidden sidebar leaves the key to the page
@@ -177,7 +184,10 @@ export const Sidebar = ({
       return shown === undefined ? [] : [shown];
     })
   }));
-  const hasMatches = sources.some(({ families }) => families.length > 0);
+  const pages = tree.sources
+    .map((source) => ({ source, pages: foundPages(source.pages, words) }))
+    .filter((entry) => entry.pages.length > 0);
+  const hasMatches = pages.length > 0 || sources.some(({ families }) => families.length > 0);
 
   return (
     // hidden, it slides out by its own width (a margin, so a drag of its handle never waits for a transition) and
@@ -258,6 +268,15 @@ export const Sidebar = ({
       </label>
       <nav ref={navRef} className="forgebook-tree" aria-label={STRINGS.componentsNav}>
         {hasMatches ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}
+        <SidebarDocs
+          sources={pages}
+          currentPageId={currentPageId}
+          isSearching={isSearching}
+          foldChoices={foldChoices}
+          onFoldChange={setFoldOpen}
+          pageHref={pageHref}
+          onOpenPage={onOpenPage}
+        />
         {sources.map(({ source, families }) =>
           families.length === 0 ? null : (
             <section key={source.id} className="forgebook-tree__source">

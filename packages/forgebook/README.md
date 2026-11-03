@@ -126,8 +126,10 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
   story without a pointer; motion replayed on demand.
 - **Packages as sources**: a library ships its stories (`StorySource`), and an app's catalogue lists them beside its
   own, each with its name, logo, texts and design tokens.
-- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook, helper and
-  design token of a package, from its exports, their TSDoc, its stories and its source.
+- **Docs pages**: guides and foundations in Markdown, with live stories inside, in a section of their own above the
+  components ([below](#docs-pages)).
+- **`CATALOG.md`** for coding agents: `forgebook docs` writes one dense line per component, hook, helper, design token
+  and docs page of a package, from its exports, their TSDoc, its stories and its source.
 - **Tests from the stories**, with [`@forgebook/testing`](https://www.npmjs.com/package/@forgebook/testing): every
   story in the browser with axe, spills and overlays, screenshots, and every story rendered on the server.
 
@@ -214,6 +216,57 @@ panel opens on Signature, with no tab of args (its scene takes none), and the ba
 Compare: the story is drawn once, never compared. A section of its own is a title's
 first segment, as for any component (`Hooks/useUndo` is under Hooks; the source's `families` orders the sections).
 `@forgebook/testing` tests it once, not in every look, and takes no reference image of it.
+
+## Docs pages
+
+Guides, foundations and recipes are Markdown files with a little front matter, not MDX: a page is read at build time, and
+nothing is compiled in the browser. A project lists them in its configuration (`docs: ["docs/**/*.md"]`); a
+library gives them with its source, so every catalogue that shows it gets them:
+
+```ts
+// packages/ui/stories.ts
+import docs from "./docs/**/*.md?forgebook-docs-pages";
+import files from "./src/**/*.stories.tsx?forgebook-files";
+
+export const source: StorySource = { id: "acme", name: "Acme UI", files: [files], docs: [docs], sheets };
+```
+
+A page says where it goes, then writes what it has to say; a fence named `story` draws a story in its frame, one named
+`props` a component's API table from its types:
+
+````md
+---
+title: Guides/Theming
+order: 2
+description: How the library follows the catalogue's theme.
+---
+
+The buttons read their colours from the page's theme.
+
+```story acme:actions-button--primary
+```
+
+## The props
+
+```props acme:actions-button
+```
+
+See [the colours](./colours.md#brand), or [every state](?component=acme:actions-button).
+````
+
+- `title` places the page: `Guides/Theming` is a page of the group Guides. Without one, the file's opening `#` heading
+  or its name; `order` sorts the pages, lower first, then the pages without one by title. The address is
+  `?page=acme:guides-theming`, and a heading's anchor follows it (`#the-props`), made as GitHub makes them.
+- Stories load as they come near, follow the view's switches live, and keep their bar: their code, their box over the
+  page, a link to their own page. A story of another source works too: the id is the whole one `forgebook stories` lists.
+- A link to another page is written to its file (`./colours.md#brand`), so it works in the repository too. Images are
+  relative to the file, and go through the build. A fence must sit at the page's top level, not inside a list or a quote.
+- The page gets its look from the shell's palette, so a `shell.theme` and both appearances reach it; a page with two
+  headings or more lists them beside its text, or above it on a narrow page.
+- `forgebook stories` fails when a page names a story or a component that is not there, a link leads to no page, or an
+  image is not a file of its package, so a rename never breaks a page unseen.
+- A page is trusted as a story's code is: Markdown lets it hold raw HTML, which runs in the catalogue. Review one as you
+  review code, and do not build a catalogue from pages you did not write.
 
 ## Design links
 
@@ -318,6 +371,8 @@ browser tests run in CI.
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height; with `@forgebook/testing` |
+| `forgebook pages` | Lists the docs pages with their ids and addresses; fails when the index has problems |
+| `forgebook page <id>` | One docs page's Markdown; its headings too with `--json` |
 | `forgebook diff <id>` | Compares a story's pictures with the baselines `forgebook shot --update` stored: the region, the percentage and a marked picture; fails when anything differs |
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
@@ -429,7 +484,7 @@ shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.b
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers fifteen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers seventeen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, and `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`). `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
@@ -487,16 +542,17 @@ are read for values: stories, tests, token definitions and generated files are l
 code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
-component, hook, helper, style module (what it is, how to import it, its props, the id of a story that shows it) and
-design token of its source (its value, each theme's, what it aliases, what it is for), and `llms.txt`, which points an agent to it. The file's name, its sections and the subpaths left out are set in the
+component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),
+docs page and design token of its source (its value, each theme's, what it aliases, what it is for), and `llms.txt`,
+which points an agent to it and links the pages. The file's name, its sections and the subpaths left out are set in the
 package's `package.json`:
 
 ```json
-{ "forgebook": { "catalog": { "file": "CATALOG.md", "sections": ["components", "modules"], "exclude": ["./internal/*"] } } }
+{ "forgebook": { "catalog": { "file": "CATALOG.md", "sections": ["components", "pages", "modules"], "exclude": ["./internal/*"] } } }
 ```
 
-`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed),
-and its JSON lists every story for a script.
+`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed) or a
+docs page that names what is not there, and its JSON lists every story for a script.
 
 ## Packages
 
