@@ -16,7 +16,8 @@ import { basename, dirname, extname, join } from "node:path";
 
 import type { ComponentDocs, NoComponentDocs, PropDocs, SubcomponentDocs } from "forgebook/component-docs";
 import type { StoryComponentResult, StoryFileShape } from "forgebook/vite/adapter";
-import { chosenExport, moduleSummaryOf, summaryOf } from "forgebook/vite/docs-program";
+import { chosenExport, summaryOf } from "forgebook/vite/docs-program";
+import { moduleSummaryOf } from "forgebook/vite/module-summary";
 import { declarationOrder, declaredSymbol, isForeign, partsOf, propDocs } from "forgebook/vite/prop-docs";
 import { signatureDocs } from "forgebook/vite/signature-docs";
 import { metaComponent, metaSubcomponents } from "forgebook/vite/story-meta";
@@ -170,7 +171,7 @@ const componentProse = (
     const source = program.getSourceFile(place.file);
     return {
       description: summaryOf(symbol, checker),
-      summary: source === undefined ? "" : moduleSummaryOf(source),
+      summary: source === undefined ? "" : moduleSummaryOf(source.text),
       ...guidanceOf(symbol, checker)
     };
   }

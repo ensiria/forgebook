@@ -18,7 +18,8 @@ import ts from "typescript-6";
 
 import type { ComponentDocs, NoComponentDocs, SubcomponentDocs } from "../componentDocs.ts";
 import type { ExtractFileComponent, ExtractStoryComponent, StoryComponentResult } from "./adapter.ts";
-import { chosenExport, moduleSummaryOf, programFor, summaryOf } from "./docsProgram.ts";
+import { chosenExport, programFor, summaryOf } from "./docsProgram.ts";
+import { moduleSummaryOf } from "./moduleSummary.ts";
 import { declarationOrder, declaredSymbol, isForeign, partsOf, propDocs } from "./propDocs.ts";
 import { signatureDocs } from "./signatureDocs.ts";
 import { metaComponent, metaSubcomponents } from "./storyMeta.ts";
@@ -142,7 +143,7 @@ const componentOf = (
     docs: {
       name: symbol.getName(),
       description: summaryOf(symbol, checker),
-      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile),
+      summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile.text),
       props,
       parts,
       subcomponents: subcomponents.docs,

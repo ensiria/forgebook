@@ -4,7 +4,7 @@
  * (a story's pictures, to look at it).
  *
  * @remarks
- * Defined here, on the scope `forgebook.mts` hands them, so the entry stays a list of commands; their work lives in
+ * Defined here, on the scope `forgebookCommands.mts` hands them, so the commands module stays a list of commands; their work lives in
  * their own modules (`agentsText.ts`, `storyCheckRun.ts`, `errorsRun.ts`).
  *
  * @module

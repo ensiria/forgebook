@@ -321,33 +321,6 @@ export const summaryOf = (symbol: ts.Symbol, checker: ts.TypeChecker): string =>
     .trim();
 
 /**
- * The first paragraph of a file's leading comment, its `@module` TSDoc: what the file holds, in a sentence. A
- * component's own TSDoc is often a bare name ("A button."); its file's comment says what it is and does.
- *
- * @param sourceFile - the file.
- * @returns the paragraph on one line, or an empty text when the file does not open with a `@module` comment.
- */
-export const moduleSummaryOf = (sourceFile: ts.SourceFile): string => {
-  const text = sourceFile.getFullText();
-  const [range] = ts.getLeadingCommentRanges(text, 0) ?? [];
-  if (range === undefined) return "";
-  const comment = text.slice(range.pos, range.end);
-  if (!comment.startsWith("/**") || !comment.includes("@module")) return "";
-  const lines = comment
-    .replace(/^\/\*\*/, "")
-    .replace(/\*\/$/, "")
-    .split("\n")
-    .map((line) => line.replace(/^\s*\* ?/, "").trimEnd());
-  const start = lines.findIndex((line) => line !== "");
-  const paragraph: string[] = [];
-  for (const line of lines.slice(Math.max(start, 0))) {
-    if (line === "" || line.startsWith("@")) break;
-    paragraph.push(line);
-  }
-  return paragraph.join(" ").replace(/\s+/g, " ").trim();
-};
-
-/**
  * Each of a TSDoc tag's texts, for a tag that can be written more than once.
  *
  * @param symbol - a declared symbol.
