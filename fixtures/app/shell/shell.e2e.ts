@@ -39,6 +39,29 @@ const frameStatus = async (page: Page): Promise<string | null> => {
   return frameOf(page).locator("html").getAttribute("data-forgebook-status");
 };
 
+/**
+ * The foot handle's box once the handle sits right under the story's room. The box around the room takes the room's
+ * height as measured, a render after the story's height changed, so until then the handle stays where the old height
+ * put it, over the story's last pixels: a press at that place would land on the story.
+ */
+const settledFootBox = async (
+  foot: Locator
+): Promise<{ x: number; y: number; width: number; height: number }> => {
+  await expect
+    .poll(() =>
+      foot.evaluate((element) => {
+        const room = element.parentElement?.querySelector(".forgebook-viewport__room");
+        return room === null || room === undefined
+          ? undefined
+          : element.getBoundingClientRect().top - room.getBoundingClientRect().bottom;
+      })
+    )
+    .toBeCloseTo(0, 0);
+  const box = await foot.boundingBox();
+  if (box === null) throw new Error("The foot handle has no box");
+  return box;
+};
+
 test.describe("pages and the address", () => {
   test("opens the home when the address names none: the library's introduction and its families", async ({
     page
@@ -450,8 +473,7 @@ test.describe("the stage", () => {
     await expect(page).toHaveURL(/height=290/);
     await expect(frame).toHaveCSS("height", "290px");
     // a drag follows the pointer one for one, and the frame's window is that height
-    const box = await foot.boundingBox();
-    if (box === null) throw new Error("The foot handle has no box");
+    const box = await settledFootBox(foot);
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 150, { steps: 5 });
