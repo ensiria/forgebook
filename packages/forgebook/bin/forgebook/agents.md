@@ -92,3 +92,7 @@ Never write a raw colour or size when a token exists: ask `tokens --nearest` fir
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.
 
 Run `npx forgebook <command> --help` for the options. With an MCP client, `npx forgebook mcp` offers the same as tools.
+
+A client that renders MCP Apps also gets `story_preview`, which shows a story to the person, live, inside the conversation.
+You do not see what it shows: to look at a story yourself, use `shot` (`story_shot`). Where the tool is not listed, the
+client cannot show one: give the person the story's link, or its picture.
