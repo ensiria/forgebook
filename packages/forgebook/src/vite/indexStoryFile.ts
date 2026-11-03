@@ -27,7 +27,7 @@
  */
 
 import type { FigmaLink, StoryFileIndex, StoryIndexEntry } from "@forgebook/story-format/source";
-import { type ESTree, parseSync } from "vite";
+import type { ESTree } from "vite";
 
 import {
   controlsOf,
@@ -45,6 +45,7 @@ import {
   unwrapped
 } from "./indexFields.ts";
 import { moduleName, type NamedExport, namedExports } from "./storyExports.ts";
+import { parseStoryFile } from "./storyParse.ts";
 
 /** What the index is given besides the file: the title its path makes, for a meta that writes none. */
 export type IndexOptions = {
@@ -492,7 +493,7 @@ export const indexStoryFile = (
   text: string,
   options: IndexOptions = {}
 ): StoryFileIndex | string => {
-  const { program, comments, errors } = parseSync(file, text);
+  const { program, comments, errors } = parseStoryFile(file, text);
   const [error] = errors;
   if (error !== undefined) return `${file} does not parse: ${error.message}`;
   const top = topLevelOf(program);

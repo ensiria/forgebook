@@ -324,7 +324,13 @@ blocks it uses Open in Figma. A catalogue published with a Content Security Poli
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and
 titles from the file's path, `args` and `argTypes` (with their controls), actions from `fn()` or an `argTypes` action,
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
-`tags` (`!dev`, `!test`) and a story's `globals`.
+`tags` (`!dev`, `!test`), a story's `globals`, JSX in `.js` story files (listed and shown as code; Vite compiles JSX only in
+`.jsx` and `.tsx`, so such a library adds the plugin its own Storybook uses for them, through the framework's plugins),
+hooks in a `render` or a decorator (React and
+Preact, with the story's state kept when a decorator draws `<Story />`), a preview's named exports beside its default
+export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. A preview
+that only a browser can load (it reads `document` as it loads) leaves the answers to tools and agents working: it is
+left out of them and named among their problems. A `**` pattern skips `node_modules` unless it names it.
 
 It lists what Storybook's indexer lists:
 

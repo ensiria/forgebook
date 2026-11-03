@@ -24,6 +24,15 @@ describe("indexStoryFile", () => {
     });
   });
 
+  it("reads a `.js` story file that holds JSX, as libraries written in JavaScript do", () => {
+    const text = `export default { title: "Inputs/Button" };
+      export const Default = { render: () => <button>Go</button> };`;
+    expect(indexStoryFile("Button.stories.js", text)).toEqual({
+      title: "Inputs/Button",
+      stories: [{ exportName: "Default" }]
+    });
+  });
+
   it("reads a meta held in a constant of the file (`export default meta`)", () => {
     const text = "const meta = { title: 'A/B' } satisfies Meta; export default meta; export const X = {};";
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({ title: "A/B", stories: [{ exportName: "X" }] });

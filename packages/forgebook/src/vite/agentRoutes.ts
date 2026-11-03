@@ -7,8 +7,10 @@
  * @remarks
  * The server loads the sources and the previews with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool
  * sees what the shell shows. A story module that fails on Node (it reads `window` while it loads) gives its story a
- * problem in the answer instead of an error. Served by the dev server only, where Vite listens (localhost by default);
- * a build has none of it.
+ * problem in the answer instead of an error, and a preview that does is left out of the answers and named among their
+ * problems: it is written for a browser, and only its args and parameters are read here, so it must not cost a tool the
+ * catalogue, nor change the answers without a word. Served by the dev server only, where
+ * Vite listens (localhost by default); a build has none of it.
  *
  * @module
  */
@@ -18,7 +20,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { StorySource } from "@forgebook/story-format/source";
 import { createIdResolver, type ViteDevServer } from "vite";
 
-import { type LoadedPreview, mergedPreviews, readPreview } from "../frame/storyModule.ts";
+import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
@@ -71,14 +73,38 @@ type AgentModule = {
   readonly sources: readonly StorySource[];
   /** Its previews merged. */
   readonly preview: LoadedPreview;
+  /** Why a preview was left out: it could not load on the server. */
+  readonly problems: readonly string[];
 };
 
-/** The agent module read, or why it is not what the plugin generates. */
-const agentModuleOf = (module: unknown): AgentModule => {
+/** Whether a value loads a module. */
+const isLoader = (value: unknown): value is () => Promise<unknown> => typeof value === "function";
+
+/** A preview, read from what loads it, or why it cannot load on the server. */
+const loadedPreview = async (load: () => Promise<unknown>): Promise<LoadedPreview | string> => {
+  try {
+    return readPreview(await load());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `a preview did not load on the server, so its args and parameters are left out of these answers: ${message}`;
+  }
+};
+
+/**
+ * The agent module read, or why it is not what the plugin generates.
+ *
+ * @param module - the module of `AGENT_SOURCES_FILE`, as the server loaded it.
+ */
+export const agentModuleOf = async (module: unknown): Promise<AgentModule> => {
   if (!isRecord(module) || !Array.isArray(module["sources"]) || !Array.isArray(module["previews"]))
     throw new Error("The catalogue's sources did not load");
   const sources = module["sources"].filter(isStorySource);
-  return { sources, preview: mergedPreviews(module["previews"].map(readPreview)) };
+  const previews = await Promise.all(module["previews"].filter(isLoader).map(loadedPreview));
+  return {
+    sources,
+    preview: mergedPreviews(previews.map((each) => (typeof each === "string" ? NO_PREVIEW : each))),
+    problems: previews.filter((each) => typeof each === "string")
+  };
 };
 
 /** A loader's value, or why it failed. */
@@ -294,10 +320,11 @@ export const agentAnswer = async (
   try {
     const answerAlone = STORYLESS_ROUTES[route];
     if (answerAlone !== undefined) return await answerAlone(config, params, server.resolveSource);
-    const loaded = agentModuleOf(await server.load(pageModulePath(config.dir, AGENT_SOURCES_FILE)));
+    const loaded = await agentModuleOf(await server.load(pageModulePath(config.dir, AGENT_SOURCES_FILE)));
+    const tree = storyTree(loaded.sources);
     const context: RouteContext = {
       loaded,
-      tree: storyTree(loaded.sources),
+      tree: { ...tree, problems: [...loaded.problems, ...tree.problems] },
       config,
       params,
       pages: { page: `${origins.catalogue}/`, frame: `${origins.frames}/frame.html` },

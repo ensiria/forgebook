@@ -35,6 +35,9 @@ import { type CatalogueOptions, isExcluded } from "./catalogueOptions.ts";
 import { moduleDocs } from "./moduleDocs.ts";
 import { sassMembers, styleSheetSummary } from "./sassDocs.ts";
 
+/** Whether a folder's name is one whose story files are not the package's own: its dependencies, its build. */
+const isLeftOutFolder = (name: string): boolean => name === "node_modules" || name === "dist";
+
 /** What was read, and what could not be. */
 export type CollectedDocs = {
   /** The catalogue's data. */
@@ -110,10 +113,11 @@ const collectComponents = (
   const components: CatalogueComponent[] = [];
   const componentFiles = new Set<string>();
   // with forward slashes: the glob gives backslashes on Windows, and the folders and the title are read by `/`
-  const storyFiles = globSync("**/*.stories.*", { cwd: packageDir })
+  // the dependencies and the build are never walked: a package's node_modules alone can hold thousands of folders
+  const storyFiles = globSync("**/*.stories.*", { cwd: packageDir, exclude: isLeftOutFolder })
     .map((file) => VITE_PATHS.normalize(file))
     .filter((file) => STORY_FILE.test(file))
-    .filter((file) => !file.split("/").some((segment) => segment === "node_modules" || segment === "dist"))
+    .filter((file) => !file.split("/").some(isLeftOutFolder))
     .sort();
   for (const relative of storyFiles) {
     const file = VITE_PATHS.join(packageDir, relative);
