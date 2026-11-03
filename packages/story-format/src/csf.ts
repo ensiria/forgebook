@@ -225,8 +225,9 @@ export type StoryContext<TArgs> = {
    */
   readonly clock: StoryClock;
   /**
-   * The values of the catalogue's switches applied by code, by the switch's id (CSF's name): what a decorator reads
-   * to pick a provider's theme, a density, a locale. Empty outside a catalogue.
+   * The globals a decorator reads to pick a provider's theme, a density, a locale, by id (CSF's name): the preview's
+   * starting values (its `globalTypes` defaults, under `initialGlobals`), under the meta's and the story's own, under
+   * the catalogue's switches applied by code. Text values only. Empty outside a catalogue.
    */
   readonly globals: Readonly<Record<string, string>>;
   /** What the story's loaders returned, merged: the preview's, then the meta's, then the story's (CSF's `loaded`). */

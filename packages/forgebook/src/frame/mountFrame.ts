@@ -42,7 +42,7 @@ import { type ShellChannel, shellChannel } from "./shellChannel.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import type { MockToolsLoader } from "./storyMocks.ts";
-import { mergedPreviews, readPreview, readStory } from "./storyModule.ts";
+import { mergedPreviews, readPreview, readStory, startingGlobals } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
 import { followTouch } from "./touchLayer.ts";
 
@@ -225,7 +225,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       const switchesShown = { switches: { ...live.switches, ...fixed.switches } };
       return {
         texts: shownTexts(source.texts, shownLanguage(languages, languageOf(switchesShown, switches))),
-        globals: codeGlobalsOf(switchesShown, switches)
+        globals: { ...startingGlobals(preview, story), ...codeGlobalsOf(switchesShown, switches) }
       };
     };
     const shown = shownFor(view);

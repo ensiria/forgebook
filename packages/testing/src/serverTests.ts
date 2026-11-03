@@ -23,7 +23,8 @@ import {
   type LoadedStory,
   mergedPreviews,
   readPreview,
-  readStory
+  readStory,
+  startingGlobals
 } from "forgebook/story-module";
 import { BASE_LANGUAGE, withStoryTexts } from "forgebook/story-texts";
 import { storyTree, testedStoryLocations } from "forgebook/story-tree";
@@ -124,12 +125,14 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
           const clock = heldFrameClock(loaded.clockStart ?? 0);
           // the loaders and set-ups run as in the frame, so a story drawn from what they load renders here too
           const identity = { id: story.id, name: story.name, title: component.title };
+          // the globals the frame starts the story with, so a decorator reading its preview's default reads it here too
+          const globals = startingGlobals(preview, loaded);
           const prepared = await prepareStory(loaded, {
             ...identity,
             args,
             text: storyTextOf(texts),
             clock,
-            globals: {},
+            globals,
             parameters: loaded.parameters
           });
           const html = await renderedHtml(options.renderer, prepared, {
@@ -139,7 +142,7 @@ export const storyServerTests = (source: StorySource, options: StoryServerTestsO
             texts,
             clock,
             decorators: [...preview.decorators, ...(pass.decorator === undefined ? [] : [pass.decorator])],
-            globals: {},
+            globals,
             loaded: prepared.loaded
           });
           pass.check?.(html);
