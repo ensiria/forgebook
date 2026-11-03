@@ -194,7 +194,12 @@
       }
     },
     {
-      "includes": ["**/*.stories.tsx", "**/*.stories.ts", "**/forgebook.preview.ts"],
+      "includes": [
+        "**/*.stories.tsx",
+        "**/*.stories.ts",
+        "**/forgebook.preview.ts",
+        "**/forgebook.preview.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {

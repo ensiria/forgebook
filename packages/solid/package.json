@@ -1,0 +1,93 @@
+{
+  "name": "@forgebook/solid",
+  "version": "0.1.8",
+  "description": "Forgebook for Solid: the story types and primitives, the renderer the frame mounts a story with, args updating in place as signals do, and the adapter that reads a Solid component's props.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/solid"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./clock": "./src/clock.ts",
+    "./texts": "./src/texts.ts",
+    "./renderer": "./src/solidRenderer.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./code": "./src/code.ts",
+    "./vite": "./src/vite/solid.ts",
+    "./docs": "./src/vite/extractDocs.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "vite-plugin-solid": "2.11.15"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "solid-js": "^1.9.0"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@testing-library/jest-dom": "6.9.1",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "solid-js": "1.9.18",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./clock": {
+        "types": "./dist/src/clock.d.ts",
+        "default": "./dist/src/clock.js"
+      },
+      "./texts": {
+        "types": "./dist/src/texts.d.ts",
+        "default": "./dist/src/texts.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/solidRenderer.d.ts",
+        "default": "./dist/src/solidRenderer.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/code.d.ts",
+        "default": "./dist/src/code.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/solid.d.ts",
+        "default": "./dist/src/vite/solid.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
+  }
+}

@@ -10,11 +10,12 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   frame), `src/vite` (the plugin, the props extractor, the answers to tools and agents), `bin/` (`forgebook`,
   `forgebook-docs`, `forgebook-texts`).
 - `packages/react` (`@forgebook/react`), `packages/vue` (`@forgebook/vue`), `packages/nextjs` (`@forgebook/nextjs`, on
-  React's), `packages/svelte` (`@forgebook/svelte`), `packages/story-format` (`@forgebook/story-format`, no
-  dependencies), `packages/testing` (`@forgebook/testing`).
+  React's), `packages/svelte` (`@forgebook/svelte`), `packages/solid` (`@forgebook/solid`), `packages/preact`
+  (`@forgebook/preact`), `packages/story-format` (`@forgebook/story-format`, no dependencies), `packages/testing`
+  (`@forgebook/testing`).
 - `fixtures/`: the kit, the stories written the Storybook way, the catalogue the shell's browser tests run on, and the
-  Vue and Svelte catalogues (`fixtures/vue`, `fixtures/svelte`) and small Next.js app (`fixtures/nextjs`) whose
-  catalogues they open beside it.
+  Vue, Svelte, Solid and Preact catalogues (`fixtures/vue`, `fixtures/svelte`, `fixtures/solid`, `fixtures/preact`) and
+  small Next.js app (`fixtures/nextjs`) whose catalogues they open beside it.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
 
 ## Before you say a change is done
