@@ -35,6 +35,7 @@ const shellStrings = {
   view: "View",
   viewChanged: "A view setting is changed",
   viewMenuError: "The View menu could not be loaded",
+  compareError: "The comparison could not be loaded",
   controlChanged: (control: string): string => `${control}: changed`,
   controlKey: (control: string, key: string | undefined): string =>
     key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,

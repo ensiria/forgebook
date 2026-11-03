@@ -175,10 +175,8 @@ test.describe("device frames", () => {
   }) => {
     await page.goto(screen("phone"));
     await page.getByRole("button", { name: /^View/ }).click();
-    const rows = await page
-      .locator(".forgebook-arrange")
-      .evaluateAll((each) => each.map((row) => (row as HTMLElement).dataset["control"] ?? ""));
-    expect(rows.indexOf("forgebook.device")).toBeGreaterThanOrEqual(0);
+    // the menu's rows come with its panel, which loads the first time it opens
+    await expect(page.locator('.forgebook-arrange[data-control="forgebook.device"]')).toHaveCount(1);
   });
 
   test("a story sits below the status bar by default, and one drawn edge to edge is told the safe areas", async ({
