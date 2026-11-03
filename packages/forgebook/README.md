@@ -448,6 +448,15 @@ browser tests run in CI.
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
 
+`forgebook build` names each script it writes by its hash alone (`assets/3f9a1c2b.js`): a catalogue names every story
+file's scripts once per loader, so shorter names make a smaller build. To read what a build holds, name each script after
+its module too (`assets/Button-3f9a1c2b.js`), for one build with `forgebook build --readable-names`, or for every build in
+the configuration:
+
+```ts
+export default defineConfig({ /* … */ build: { readableNames: true } });
+```
+
 ## Mocking an API
 A story that fetches gets its answers from [MSW](https://mswjs.io), an optional peer. Install it and write its worker into
 the catalogue's public folder:

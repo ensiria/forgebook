@@ -44,6 +44,7 @@ import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
+import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   agentSourcesModule,
   CONFIG_MODULE,
@@ -285,6 +286,50 @@ const generatedId = (source: string, dir: string): string | undefined => {
 };
 
 /**
+ * Whether an app's configuration names its build's output itself, which the plugin then leaves as it is.
+ *
+ * @param userConfig - the configuration so far.
+ */
+const hasOwnOutput = (userConfig: UserConfig): boolean =>
+  userConfig.build?.rolldownOptions?.output !== undefined ||
+  userConfig.build?.rollupOptions?.output !== undefined;
+
+/**
+ * What the plugin sets in Vite's configuration for a catalogue: its folder as the root, what to pre-bundle, the pages
+ * as the build's inputs, and the dev server's reads kept to each origin.
+ *
+ * @param config - the catalogue's configuration.
+ * @param userConfig - the configuration so far, whose own `server.cors` and build output the plugin leaves alone.
+ */
+const catalogueConfig = (config: ResolvedConfig, userConfig: UserConfig): UserConfig => ({
+  root: config.dir,
+  // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
+  // story files (the project's and the sources') are scanned for what their components import
+  optimizeDeps: {
+    include: prebundled(config, packageResolver(config.dir)),
+    entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
+  },
+  build: {
+    rolldownOptions: {
+      input: {
+        index: pageModulePath(config.dir, "index.html"),
+        frame: pageModulePath(config.dir, "frame.html")
+      },
+      // a catalogue names each story file's scripts once per loader: a name of its hash alone is a tenth of
+      // what the index weighs, and a catalogue whose builds are read by name keeps Vite's (`readableNames`)
+      ...(config.build.readableNames || hasOwnOutput(userConfig)
+        ? {}
+        : { output: { chunkFileNames: "assets/[hash].js", hashCharacters: "base36" } })
+    }
+  },
+  // Vite lets any localhost page read the server: neither origin needs another's reads, and the guards
+  // would be the only wall left between the frames and the catalogue (unless the app chose its own)
+  ...(config.frames.kind === "isolated" && userConfig.server?.cors === undefined
+    ? { server: { cors: false } }
+    : {})
+});
+
+/**
  * The catalogue's Vite plugin: the story index, the docs, the code and the Markdown of the stories, the forced-states
  * rewrite of every style sheet and, with a configuration, the catalogue's two pages.
  *
@@ -380,15 +425,17 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    *
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
+   * @param pack - writes a module's JSON as its value: as it is, or kept out of a build's JavaScript.
    * @throws when a story file cannot be indexed.
    */
   const storiesModule = async (
     id: string,
-    watch: (file: string) => void
+    watch: (file: string) => void,
+    pack: PackJson
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
-      return usageModule(id, watch, extractor().usage, indexCache());
+      return usageModule(id, watch, extractor().usage, indexCache(), pack);
     }
     // what each story reaches is for the dev server's tools only: a build ships none of it
     if (id.startsWith(REACH_ID_PREFIX)) {
@@ -465,31 +512,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
       }
-      const pages =
-        config === undefined
-          ? {}
-          : {
-              root: config.dir,
-              // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
-              // story files (the project's and the sources') are scanned for what their components import
-              optimizeDeps: {
-                include: prebundled(config, packageResolver(config.dir)),
-                entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
-              },
-              build: {
-                rolldownOptions: {
-                  input: {
-                    index: pageModulePath(config.dir, "index.html"),
-                    frame: pageModulePath(config.dir, "frame.html")
-                  }
-                }
-              },
-              // Vite lets any localhost page read the server: neither origin needs another's reads, and the guards
-              // would be the only wall left between the frames and the catalogue (unless the app chose its own)
-              ...(config.frames.kind === "isolated" && userConfig.server?.cors === undefined
-                ? { server: { cors: false } }
-                : {})
-            };
+      const pages = config === undefined ? {} : catalogueConfig(config, userConfig);
       return {
         ...pages,
         css: {
@@ -590,7 +613,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       });
       if (answered !== undefined) return answered;
       try {
-        return (await storiesModule(id, watch)) ?? null;
+        // a build's browser files only: a server environment's output is no page's to fetch
+        const pack =
+          isServing() || this.environment.name !== "client"
+            ? inlineJson
+            : packedJsonOf((asset): unknown => this.emitFile(asset));
+        return (await storiesModule(id, watch, pack)) ?? null;
       } catch (error) {
         this.error(error instanceof Error ? error.message : String(error));
       }

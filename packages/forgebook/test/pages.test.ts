@@ -43,7 +43,8 @@ const CONFIG: ResolvedConfig = {
   lists: {},
   hasMocks: false,
   hasPlayTools: false,
-  frames: ISOLATED_FRAMES
+  frames: ISOLATED_FRAMES,
+  build: { readableNames: false }
 };
 
 describe("the generated pages", () => {

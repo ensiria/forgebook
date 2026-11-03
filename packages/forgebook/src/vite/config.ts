@@ -89,6 +89,19 @@ export type ForgebookConfig = CatalogueLists & {
    * catalogue's origin unless `origins` names a second host. `"same-origin"` runs them on the catalogue's origin.
    */
   readonly frames?: FramesOption;
+  /** How `forgebook build` writes the catalogue. */
+  readonly build?: BuildOptions;
+};
+
+/** How `forgebook build` writes the catalogue. */
+export type BuildOptions = {
+  /**
+   * Whether each script a build writes is named after its module as well as its hash (`assets/Button-3f9a1c2b.js`), for
+   * whoever reads a build's files; `false` by default: its hash alone (`assets/3f9a1c2b.js`), since a catalogue names
+   * each story file's scripts once per loader, and the names are a tenth of what its index weighs.
+   * `forgebook build --readable-names` turns it on for one build.
+   */
+  readonly readableNames?: boolean;
 };
 
 /**
