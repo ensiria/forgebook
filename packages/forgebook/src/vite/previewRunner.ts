@@ -8,10 +8,13 @@
  * those, but one such import would leave the whole preview out of every answer. So the previews load in a module
  * runner of their own whose evaluator takes a package (a module Vite leaves to Node) that stops on a browser global
  * (`document is not defined`) for a namespace of placeholders. A placeholder can be kept in a parameter (a docs
- * container, a decorator) or called (an addon's factory in `definePreview`), but reading one of its properties, or the
- * names of the namespace, throws, naming the package: a preview that uses such a package while it loads still fails to load, and is named among the
- * answers' problems, rather than giving values a browser would not. A file of the catalogue's own that reads a browser
- * global is not replaced: half run, it would leave values a browser does not have.
+ * container, a decorator) or called (an addon's factory in `definePreview`), and what a call made can be looked into
+ * as the framework composing the preview does; but reading a property of an export, using any placeholder as a
+ * string, a number or a list, or listing the names of the namespace throws, naming the package: a preview that uses
+ * such a package while it loads still fails to load, and is named among the answers' problems, rather than giving
+ * values a browser would not. A placeholder kept in the preview's args or parameters is left out of the answers, as a
+ * function is. A file of the catalogue's own that reads a browser global is not replaced: half run, it would leave
+ * values a browser does not have.
  *
  * The runner is Vite's (`createServerModuleRunner`, experimental in Vite 8), on the server environment, with its hot
  * updates: an edit of a preview or of a file it imports is read on the next answer. One runner serves a dev server
@@ -75,6 +78,16 @@ const ABSENT_KEYS: ReadonlySet<string> = new Set(["toJSON", "then"]);
 const FUNCTION_KEYS: ReadonlySet<string> = new Set(["name", "length", "prototype", "constructor"]);
 
 /**
+ * What a script reads of a value to use it as data: to turn it into a string or a number (`${value}`, `value + 1`), and
+ * to iterate it (`[...value]`, `for of`, `for await`). A placeholder has no such value, so reading these throws.
+ */
+const VALUE_SYMBOLS: ReadonlySet<symbol> = new Set([
+  Symbol.toPrimitive,
+  Symbol.iterator,
+  Symbol.asyncIterator
+]);
+
+/**
  * Why a placeholder cannot be used.
  *
  * @param name - the export, or what was done with it.
@@ -85,26 +98,61 @@ const unavailable = (name: string, file: string, reason: string): Error =>
   new Error(`${name} of ${file} cannot be used on the server: it needs a browser (${reason})`);
 
 /**
- * An export of a package that did not load on Node: a function that can be kept and called (what it returns is
- * another), and throws when a property of it is read or it is constructed.
+ * How many calls and reads a chain may take from an export: far more than a framework's composition needs (Storybook's
+ * takes three, `docs().default.parameters`), and a bound on a loop that walks a placeholder (`while (node.parent)`),
+ * which would otherwise never end and hold the dev server with it.
+ */
+const MAX_STEPS = 16;
+
+/**
+ * An export of a package that did not load on Node, or what a call of one made: a function that can be kept and called
+ * (what it returns is another), and throws when it is constructed or used as data (made a string or a number, or
+ * iterated).
  *
- * @param name - the export.
+ * @remarks
+ * A property read differs by origin. Of an export, it throws: the preview's own code reads a value of the package
+ * (`themes.light`), which a browser would give and a placeholder cannot. Of what a call made, it is a placeholder too,
+ * the same one each time it is read: what a factory returns is handed whole to the framework that composes the
+ * preview, which looks into it for what it contributes (Storybook's `definePreview` reads
+ * `addon.default?.parameters ?? addon.parameters` of every addon in `addons: [docs()]`), keeps what it finds, or merges
+ * it with `Object.assign`, which finds no names on a placeholder. So the composition runs to its end, its values from
+ * the package being placeholders, while a string, a number or a list taken from them still throws.
+ *
+ * @param name - the export, and what was done with it (`docs().default`).
  * @param file - the package's module.
  * @param reason - why the module did not load.
+ * @param steps - the calls and reads from the export to this placeholder: none for the export itself.
  */
-const placeholder = (name: string, file: string, reason: string): unknown =>
-  new Proxy(() => undefined, {
-    // what a call makes is a placeholder too: Storybook's `addons: [docs()]` is kept, a value read from it throws
-    apply: (): unknown => placeholder(`${name}()`, file, reason),
+const placeholder = (name: string, file: string, reason: string, steps: number): unknown => {
+  const read = new Map<string, unknown>();
+  // the next placeholder of the chain, or why it goes no further
+  const next = (step: string): unknown => {
+    if (steps >= MAX_STEPS) throw unavailable(step, file, reason);
+    return placeholder(step, file, reason, steps + 1);
+  };
+  // a class, not an arrow function: `new` reaches the trap of a constructor only, and its message names the package
+  const target = class {};
+  const proxy = new Proxy<typeof target>(target, {
+    apply: (): unknown => next(`${name}()`),
     construct: (): object => {
       throw unavailable(`new ${name}`, file, reason);
     },
-    get: (target: () => undefined, key: string | symbol, receiver: unknown): unknown => {
-      if (typeof key === "symbol" || FUNCTION_KEYS.has(key)) return Reflect.get(target, key, receiver);
+    get: (self: typeof target, key: string | symbol, receiver: unknown): unknown => {
+      if (typeof key === "symbol") {
+        if (VALUE_SYMBOLS.has(key)) throw unavailable(name, file, reason);
+        return Reflect.get(self, key, receiver);
+      }
+      if (FUNCTION_KEYS.has(key)) return Reflect.get(self, key, receiver);
       if (ABSENT_KEYS.has(key)) return undefined;
-      throw unavailable(`${name}.${key}`, file, reason);
+      if (steps === 0) throw unavailable(`${name}.${key}`, file, reason);
+      if (!read.has(key)) read.set(key, next(`${name}.${key}`));
+      return read.get(key);
     }
   });
+  // the class's prototype leads back to the placeholder, not to a constructor that would make a plain object
+  target.prototype.constructor = proxy;
+  return proxy;
+};
 
 /**
  * The namespace of a package that did not load on Node: every name it is asked for is a placeholder, so an import of
@@ -117,7 +165,7 @@ export const browserOnlyNamespace = (file: string, reason: string): object =>
   new Proxy(Object.create(null), {
     has: (_target: object, key: string | symbol): boolean => typeof key === "string" && !ABSENT_KEYS.has(key),
     get: (_target: object, key: string | symbol): unknown =>
-      typeof key === "string" && !ABSENT_KEYS.has(key) ? placeholder(key, file, reason) : undefined,
+      typeof key === "string" && !ABSENT_KEYS.has(key) ? placeholder(key, file, reason, 0) : undefined,
     ownKeys: (): never => {
       throw unavailable("The names", file, reason);
     }
