@@ -23,6 +23,16 @@ import { CODE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 /** A module the plugin answers. */
 type AnsweredModule = { code: string; moduleType: "js" };
 
+/**
+ * The module whose default export is a value.
+ *
+ * @param value - the value, as JSON.
+ */
+const valueModule = (value: unknown): AnsweredModule => ({
+  code: `export default ${JSON.stringify(value)};`,
+  moduleType: "js"
+});
+
 /** A story file's code as the Code tab reads it: each story's `render` text and its coloured HTML, or why it cannot. */
 export type KeptCode =
   | { readonly error: string }
@@ -53,25 +63,25 @@ const colouredCode = async (code: Readonly<Record<string, string>>): Promise<Kep
 };
 
 /**
- * The module that answers a `?forgebook-code` import: each story's `render` text and its coloured HTML, or `{ error }`
- * for the card.
+ * A story file's code as the Code tab reads it, what a `?forgebook-code` import answers: each story's `render` text and
+ * its coloured HTML, or `{ error }` for the card.
  *
  * @param storyFile - the story file's absolute path; Vite renews the module when it changes, as the id names it.
  * @param cache - the code kept between starts; none reads the file every time.
  */
-const codeModule = async (
+export const storyFileCode = async (
   storyFile: string,
   cache: DiskCache<KeptCode> | undefined
-): Promise<AnsweredModule> => {
+): Promise<KeptCode> => {
   const kept = cache?.read(storyFile);
-  if (kept !== undefined) return { code: `export default ${JSON.stringify(kept)};`, moduleType: "js" };
+  if (kept !== undefined) return kept;
   const since = nowNs();
   const code = storyCode(storyFile, readFileSync(storyFile, "utf8"));
   const value: KeptCode = typeof code === "string" ? { error: code } : await colouredCode(code);
   // colouring loads the compiler's scanner: kept, a story's page reads its code without it on a later start
   const stamps = stampPaths([storyFile]);
   if (typeof code !== "string" && isSettledSince(stamps, since)) cache?.write(storyFile, value, stamps);
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
+  return value;
 };
 
 /**
@@ -87,33 +97,40 @@ const scriptOfFile = (file: string, componentFiles: ComponentFiles | undefined):
     : text;
 };
 
+/** A component's page as a story file's query answers it. */
+export type ComponentPageText = {
+  /** Its documentation file as HTML; empty without one. */
+  readonly html: string;
+  /** The first paragraph of its file's `@module` comment, for the page's lead; empty without one. */
+  readonly summary: string;
+};
+
 /**
- * The module that answers a `?forgebook-page` import: the component's documentation file as HTML (empty without
- * one), and its file's summary, the first paragraph of its `@module` comment, for the page's lead.
+ * A story file's component page, what a `?forgebook-page` import answers: the component's documentation file as HTML
+ * (empty without one), and its file's summary, the first paragraph of its `@module` comment, for the page's lead.
  *
  * @remarks
  * The summary is read here, from the component's file alone, rather than with the docs: the docs wait for the
  * package's TypeScript program, and the lead would come seconds after the rest of the page.
  *
  * @param storyFile - the story file's absolute path.
- * @param componentFile - the component's file, as the story file's import resolves; none when it names none.
- * @param watch - adds a file whose edit renews the module (the documentation file, the component's file).
- * @param componentFiles - the framework's own kind of component file; none when it has none.
+ * @param context - what the plugin gives: the watch (the documentation file, the component's file), how an import of
+ * the component resolves, and the framework's own kind of component file.
  */
-const pageModule = async (
+export const storyFilePage = async (
   storyFile: string,
-  componentFile: string | undefined,
-  watch: (file: string) => void,
-  componentFiles: ComponentFiles | undefined
-): Promise<AnsweredModule> => {
+  context: Pick<TextModuleContext, "watch" | "resolveImport" | "componentFiles">
+): Promise<ComponentPageText> => {
+  const specifier = componentImport(storyFile, readFileSync(storyFile, "utf8"));
+  const componentFile =
+    specifier === undefined ? undefined : await context.resolveImport(specifier, storyFile);
   const { componentPage } = await import("./componentPage.ts");
   const page = componentPage(storyFile);
-  if (page !== undefined) watch(page.file);
-  if (componentFile !== undefined) watch(componentFile);
+  if (page !== undefined) context.watch(page.file);
+  if (componentFile !== undefined) context.watch(componentFile);
   const summary =
-    componentFile === undefined ? "" : moduleSummaryOf(scriptOfFile(componentFile, componentFiles));
-  const value = { html: page?.html ?? "", summary };
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
+    componentFile === undefined ? "" : moduleSummaryOf(scriptOfFile(componentFile, context.componentFiles));
+  return { html: page?.html ?? "", summary };
 };
 
 /**
@@ -152,13 +169,11 @@ export const textModule = async (
   context: TextModuleContext
 ): Promise<AnsweredModule | undefined> => {
   if (id.endsWith(PAGE_QUERY)) {
-    const storyFile = id.slice(0, -PAGE_QUERY.length);
-    const specifier = componentImport(storyFile, readFileSync(storyFile, "utf8"));
-    const componentFile =
-      specifier === undefined ? undefined : await context.resolveImport(specifier, storyFile);
-    return pageModule(storyFile, componentFile, context.watch, context.componentFiles);
+    return valueModule(await storyFilePage(id.slice(0, -PAGE_QUERY.length), context));
   }
-  if (id.endsWith(CODE_QUERY)) return codeModule(id.slice(0, -CODE_QUERY.length), context.cache);
+  if (id.endsWith(CODE_QUERY)) {
+    return valueModule(await storyFileCode(id.slice(0, -CODE_QUERY.length), context.cache));
+  }
   if (id.endsWith(MARKDOWN_QUERY)) return markdownModule(id.slice(0, -MARKDOWN_QUERY.length), context.watch);
   return undefined;
 };

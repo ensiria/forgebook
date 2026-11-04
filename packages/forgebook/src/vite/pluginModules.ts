@@ -10,6 +10,7 @@
  */
 
 import { packedUsage } from "../usedIn.ts";
+import type { BuiltTexts } from "./builtTexts.ts";
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult, UsageResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
@@ -44,6 +45,21 @@ export const SEARCH_ID_PREFIX = `\0${SEARCH_PREFIX}`;
 export const PAGES_SEARCH_ID_PREFIX = `\0${PAGES_SEARCH_PREFIX}`;
 
 /**
+ * A story file's component docs as the panel reads them, or `{ error }`.
+ *
+ * @param component - what the extractor read for the story file.
+ * @param watch - adds a file whose edit renews what holds them.
+ */
+export const docsValue = (component: DocsResult, watch: (file: string) => void): unknown => {
+  // the docs come from the component's files, not the story file the id names: Vite renews them on an edit only if
+  // it watches those files too
+  if (typeof component !== "string" && "sources" in component) {
+    for (const file of component.sources) watch(file);
+  }
+  return typeof component === "string" ? { error: component } : component.docs;
+};
+
+/**
  * The module that answers a `?forgebook-docs` import: the story file's component docs, or `{ error }` for the panel.
  *
  * @param component - what the extractor read for the story file.
@@ -52,15 +68,10 @@ export const PAGES_SEARCH_ID_PREFIX = `\0${PAGES_SEARCH_PREFIX}`;
 export const docsModule = (
   component: DocsResult,
   watch: (file: string) => void
-): { code: string; moduleType: "js" } => {
-  // the docs come from the component's files, not the story file the id names: Vite renews them on an edit only if
-  // it watches those files too
-  if (typeof component !== "string" && "sources" in component) {
-    for (const file of component.sources) watch(file);
-  }
-  const value = typeof component === "string" ? { error: component } : component.docs;
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
-};
+): { code: string; moduleType: "js" } => ({
+  code: `export default ${JSON.stringify(docsValue(component, watch))};`,
+  moduleType: "js"
+});
 
 /**
  * The module of a `?forgebook-files` pattern: every matched story file's index and loaders; with the files, indexed,
@@ -71,20 +82,23 @@ export const docsModule = (
  * @param loaders - the group's loaders besides its story files'.
  * @param cache - the pattern's index kept between starts; none reads every file.
  * @param warm - starts reading the docs of a story file ahead of its request; none in a test run.
+ * @param writeTexts - a build's: writes the files' docs, code and pages as data (`builtTexts.ts`); none imports them.
  * @throws when a story file cannot be indexed.
  */
-export const patternModule = (
+export const patternModule = async (
   id: string,
   watch: (file: string) => void,
   loaders: GroupLoaders,
   cache: DiskCache<KeptIndex> | undefined,
-  warm: ((storyFile: string) => void) | undefined
-): { code: string; moduleType: "js"; files: readonly IndexedStoryFile[] } => {
+  warm: ((storyFile: string) => void) | undefined,
+  writeTexts?: (files: readonly IndexedStoryFile[]) => Promise<BuiltTexts>
+): Promise<{ code: string; moduleType: "js"; files: readonly IndexedStoryFile[] }> => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
   const files = indexedStoryFiles(root, pattern, watch, cache);
   const [first] = files;
   if (first !== undefined) warm?.(first.file);
-  return { code: storyFilesCode(root, pattern, files, loaders), moduleType: "js", files };
+  const texts = await writeTexts?.(files);
+  return { code: storyFilesCode(root, pattern, files, loaders, texts), moduleType: "js", files };
 };
 
 /** A group's story files indexed, and what their stories render, read in the docs worker. */

@@ -5,6 +5,7 @@
  * @module
  */
 import { join } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 import type { UserConfig } from "vite";
 import { describe, expect, it } from "vitest";
@@ -255,5 +256,71 @@ describe("forgebookPlugin in the dev server", () => {
     expect(fake.added).toEqual([]);
     expect(fake.invalidated).toEqual([id, id]);
     expect(fake.reloads).toBe(2);
+  });
+});
+
+/**
+ * A build's load of the fixture kit's pattern, in one of the build's environments, with the files it wrote.
+ *
+ * @param environment - the environment's name: `client` for the pages' files.
+ */
+const builtPattern = async (
+  environment: string
+): Promise<{ readonly code: string; readonly emitted: ReadonlyMap<string, Uint8Array> }> => {
+  const plugin = forgebookPlugin({ framework: STUB_FRAMEWORK });
+  const { config: configHook, resolveId, load, closeBundle } = plugin;
+  if (
+    typeof configHook !== "function" ||
+    typeof resolveId !== "function" ||
+    typeof load !== "function" ||
+    typeof closeBundle !== "function"
+  )
+    throw new Error("missing hooks");
+  await Reflect.apply(configHook, undefined, [{}, { command: "build", mode: "production" }]);
+  const emitted = new Map<string, Uint8Array>();
+  const context = {
+    environment: { name: environment },
+    addWatchFile: (): undefined => undefined,
+    emitFile: (asset: { fileName: string; source: Uint8Array }): string => {
+      emitted.set(asset.fileName, asset.source);
+      return asset.fileName;
+    },
+    resolve: async (): Promise<null> => null,
+    error: (message: string): never => {
+      throw new Error(message);
+    }
+  };
+  const id: unknown = Reflect.apply(resolveId, context, [
+    "./src/*.stories.tsx?forgebook-files",
+    join(KIT, "stories.ts"),
+    { isEntry: false }
+  ]);
+  const loaded: unknown = await Reflect.apply(load, context, [String(id)]);
+  await Reflect.apply(closeBundle, undefined, []);
+  const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
+  return { code, emitted };
+};
+
+describe("forgebookPlugin in a build", () => {
+  it("writes a pattern's docs, code and pages as data, never a module each: a file a page asks for, or the text", async () => {
+    const { code, emitted } = await builtPattern("client");
+    expect(code).not.toMatch(/\?forgebook-(docs|code|page)/);
+    const select = code.split("\n").find((row) => row.startsWith('["./src/Select.stories.tsx"'));
+    // its stories have a render and its component a page: both worth a file
+    const files = [...(select ?? "").matchAll(/packedText\("(assets\/[0-9a-f]{12}\.bin)"\)/g)].map(
+      (match) => match[1] ?? ""
+    );
+    expect(files).toHaveLength(2);
+    const texts = files.map((file) => gunzipSync(emitted.get(file) ?? new Uint8Array()).toString());
+    expect(texts.some((text) => text.includes("select.inRow.caption"))).toBe(true);
+    expect(texts.some((text) => text.includes("Lets the user pick one value"))).toBe(true);
+  });
+
+  it("keeps the queries in a server environment's build, whose output no page fetches", async () => {
+    const { code, emitted } = await builtPattern("ssr");
+    expect(code).toContain("?forgebook-docs");
+    expect(code).toContain("?forgebook-code");
+    expect(code).toContain("?forgebook-page");
+    expect(emitted.size).toBe(0);
   });
 });
