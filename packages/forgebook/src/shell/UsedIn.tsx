@@ -10,10 +10,11 @@
  *
  * @module
  */
+import type { StorySource } from "@forgebook/story-format/source";
 import { type MouseEvent, type ReactNode, useId, useState } from "react";
 
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
-import { isUsageIndex, USED_IN_SHOWN, type UsageIndex, type UsingComponent } from "../usedIn.ts";
+import { isUsageIndex, USED_IN_SHOWN, type UsageIndex, type UsingComponent, usageLoader } from "../usedIn.ts";
 import { Icon } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
 import { useFold } from "./useFold.ts";
@@ -24,8 +25,8 @@ import { useStored } from "./useStored.ts";
 export type UsedInProps = {
   /** The page's component's title. */
   readonly title: string;
-  /** Loads the source's usage. */
-  readonly load: () => Promise<UsageIndex | string>;
+  /** The page's source, whose usage the block reads (`usageLoader`). */
+  readonly source: StorySource;
   /** A component of the source, by its title; none when the tree no longer has it. */
   readonly componentOf: (title: string) => TreeComponent | undefined;
   /** The address of a component's page. */
@@ -104,7 +105,7 @@ const PageLink = ({
 const UserList = ({
   users,
   ...links
-}: Omit<UsedInProps, "title" | "load" | "componentOf"> & {
+}: Omit<UsedInProps, "title" | "source" | "componentOf"> & {
   readonly users: readonly ShownUser[];
 }): ReactNode => {
   const [isAll, setIsAll] = useState(false);
@@ -159,9 +160,9 @@ const usageState = (value: unknown): Loaded<UsageIndex> => {
 /**
  * The block.
  *
- * @param props - the page's component, the usage's loader and how pages open.
+ * @param props - the page's component, its source and how pages open.
  */
-export const UsedIn = ({ title, load, componentOf, ...links }: UsedInProps): ReactNode => {
+export const UsedIn = ({ title, source, componentOf, ...links }: UsedInProps): ReactNode => {
   const [isOpen, setIsOpen] = useStored(
     "used-in",
     (stored: string | null): boolean => stored !== "closed",
@@ -169,7 +170,7 @@ export const UsedIn = ({ title, load, componentOf, ...links }: UsedInProps): Rea
   );
   // read even while folded: a component no other story uses gets no block at all, and the block waits until that is
   // known, so it never shows to go away again
-  const usage = useLoaded(load, usageState);
+  const usage = useLoaded(usageLoader(source), usageState);
   const fold = useFold(isOpen, false);
   const headingId = useId();
   const bodyId = useId();

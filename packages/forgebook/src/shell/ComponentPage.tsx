@@ -25,6 +25,7 @@ import {
   type TreeComponent,
   type TreeStory
 } from "../storyTree.ts";
+import { usageLoader } from "../usedIn.ts";
 import { type ViewState, viewParams } from "../viewState.ts";
 import { ApiReference } from "./ApiReference.tsx";
 import type { AudienceSectionsProps } from "./AudienceSections.tsx";
@@ -269,7 +270,7 @@ export const ComponentPage = ({
     touchOverrides
   });
   useScrollMemory(pageRef, scroll);
-  useAudienceLoads(view.audience, loadTokens, usedIn?.load);
+  useAudienceLoads(view.audience, loadTokens, usedIn === undefined ? undefined : usageLoader(usedIn.source));
   const componentDocs = docs.status === "ready" ? docs.value : undefined;
   const isLogic = isLogicComponent(component);
   const reading: ExampleReading = {
