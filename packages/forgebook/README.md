@@ -193,6 +193,15 @@ shows nowhere, not even on the toolbar, and keeps its default (the width can sti
 may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
 that is no control at all stops the catalogue with an error saying which.
 
+The Background control offers Forgebook's five pictures and the catalogue's own:
+`backgrounds: { builtIn: ["checkerboard"], custom: [{ id: "paper", label: "Paper", light: { color: "#fffdf5" } }] }`
+keeps one picture and adds a plain paper colour (`layers` puts CSS backgrounds over it, `dark` sets another look for the
+dark scheme). Code that reads the resolved settings (`catalogueSettings` from `forgebook/catalogue`) finds each in
+`backdrops`, in one of two shapes. Forgebook's own is `{ kind: "builtIn", id, label, colors }`: only the frame draws its
+picture, so the settings carry its colours, not its picture. A catalogue's is `{ kind: "own", id, label, colors, layers }`,
+its picture being `layers`. `colors` and `layers` are both `{ light, dark }`. The colour under a backdrop in the dark
+scheme is `backdrop.colors.dark`; a custom backdrop's CSS for the light one is `backdrop.layers.light`.
+
 ## Touch
 
 The Touch switch (in View, `m` by default) lets a story be tried as on a phone, from the computer:

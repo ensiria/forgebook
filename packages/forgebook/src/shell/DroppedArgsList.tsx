@@ -12,7 +12,7 @@
 import type { ReactNode } from "react";
 
 import type { DroppedArg } from "../addressArgs.ts";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 
 /** The note's props. */
 export type DroppedArgsListProps = {
@@ -29,16 +29,16 @@ export type DroppedArgsListProps = {
  */
 export const DroppedArgsList = ({ dropped, onRemove }: DroppedArgsListProps): ReactNode => (
   <div className="forgebook-dropped-args" role="status">
-    <p className="forgebook-dropped-args__text">{STRINGS.droppedArgs}</p>
+    <p className="forgebook-dropped-args__text">{LATER_STRINGS.droppedArgs}</p>
     <ul className="forgebook-dropped-args__list">
       {dropped.map(({ name, reason }) => (
         <li key={name}>
-          <code>{name}</code> {STRINGS.droppedArgReasons[reason]}
+          <code>{name}</code> {LATER_STRINGS.droppedArgReasons[reason]}
         </li>
       ))}
     </ul>
     <button type="button" className="forgebook-text-button" onClick={onRemove}>
-      {STRINGS.removeDroppedArgs}
+      {LATER_STRINGS.removeDroppedArgs}
     </button>
   </div>
 );

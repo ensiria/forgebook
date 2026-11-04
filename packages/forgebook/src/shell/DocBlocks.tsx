@@ -35,6 +35,7 @@ import { Example, type ExampleContext } from "./Example.tsx";
 import { componentCount, libraryCount } from "./HomePage.tsx";
 import { type HomePiecesContext, HomePieceView } from "./HomePieces.tsx";
 import { LazyHost } from "./LazyHost.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import { STRINGS } from "./strings.ts";
@@ -185,7 +186,7 @@ const CodeBlock = ({
         onClick={(): void => copy(text)}
         aria-live="polite"
       >
-        {isCopied ? STRINGS.copied : STRINGS.copy}
+        {isCopied ? STRINGS.copied : LATER_STRINGS.copy}
       </button>
       <PackageHtml className="forgebook-prose" html={`<pre><code>${html}</code></pre>`} />
     </div>
@@ -270,7 +271,8 @@ const PropsBlock = ({
     if (isOver) queue.markReady(key);
   }, [isOver, key, queue]);
   if (location === undefined) return <MissingBlock message={STRINGS.unknownComponent(id)} />;
-  if (docs.status === "error") return <MissingBlock message={`${STRINGS.pageError}: ${docs.message}`} />;
+  if (docs.status === "error")
+    return <MissingBlock message={`${LATER_STRINGS.pageError}: ${docs.message}`} />;
   return (
     <div ref={queue.observerOf(key)}>
       {docs.status === "ready" && isComponentDocs(docs.value) ? (

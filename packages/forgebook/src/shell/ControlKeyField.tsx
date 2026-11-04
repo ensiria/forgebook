@@ -7,7 +7,7 @@
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 
 import { keyOf } from "../controlKeys.ts";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 
 /** The keys that take a control's key away while one is recorded. */
 const REMOVE_KEYS = ["Backspace", "Delete"];
@@ -52,9 +52,9 @@ export const ControlKeyField = ({
       <button
         type="button"
         className="forgebook-key-field__button"
-        aria-label={STRINGS.controlKey(label, shortcut)}
+        aria-label={LATER_STRINGS.controlKey(label, shortcut)}
         aria-pressed={isRecording}
-        title={isRecording ? STRINGS.pressAKey : STRINGS.changeKey}
+        title={isRecording ? LATER_STRINGS.pressAKey : LATER_STRINGS.changeKey}
         onClick={(): void => {
           setProblem(undefined);
           setIsRecording(!isRecording);
@@ -62,7 +62,7 @@ export const ControlKeyField = ({
         onBlur={(): void => setIsRecording(false)}
         onKeyDown={record}
       >
-        {isRecording ? STRINGS.pressAKey : <kbd>{shortcut?.toUpperCase() ?? "–"}</kbd>}
+        {isRecording ? LATER_STRINGS.pressAKey : <kbd>{shortcut?.toUpperCase() ?? "–"}</kbd>}
       </button>
       <span className="forgebook-key-field__problem" role="status">
         {problem ?? ""}

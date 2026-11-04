@@ -19,6 +19,7 @@ import { Code } from "./Code.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 
@@ -36,9 +37,9 @@ const typeText = (row: RowDocs): string =>
 
 /** A table's first column's heading. */
 const NAME_HEADINGS: Readonly<Record<TableKind, () => string>> = {
-  props: () => STRINGS.apiProp,
-  events: () => STRINGS.apiEvent,
-  members: () => STRINGS.apiMember
+  props: () => LATER_STRINGS.apiProp,
+  events: () => LATER_STRINGS.apiEvent,
+  members: () => LATER_STRINGS.apiMember
 };
 
 /**
@@ -81,11 +82,11 @@ const Row = ({
               type="button"
               className="forgebook-api__members-toggle"
               aria-expanded={isOpen}
-              aria-label={`${STRINGS.membersOf(row.type)}: ${STRINGS.memberCount(members.length)}`}
+              aria-label={`${LATER_STRINGS.membersOf(row.type)}: ${LATER_STRINGS.memberCount(members.length)}`}
               onClick={(): void => setOpen(!isOpen)}
             >
               <Icon name="chevronRight" size={12} />
-              {STRINGS.memberCount(members.length)}
+              {LATER_STRINGS.memberCount(members.length)}
             </button>
           )}
         </td>
@@ -106,7 +107,7 @@ const Row = ({
             <PropTable
               rows={members}
               kind="members"
-              label={STRINGS.membersOf(row.type)}
+              label={LATER_STRINGS.membersOf(row.type)}
               part={part === undefined ? row.name : `${part}.${row.name}`}
             />
           </td>
@@ -140,8 +141,8 @@ const PropTable = ({
         <thead>
           <tr>
             <th scope="col">{NAME_HEADINGS[kind]()}</th>
-            <th scope="col">{kind === "events" ? STRINGS.apiSignature : STRINGS.apiType}</th>
-            {hasDefaults ? <th scope="col">{STRINGS.apiDefault}</th> : null}
+            <th scope="col">{kind === "events" ? LATER_STRINGS.apiSignature : STRINGS.apiType}</th>
+            {hasDefaults ? <th scope="col">{LATER_STRINGS.apiDefault}</th> : null}
             <th scope="col">{STRINGS.apiWhat}</th>
           </tr>
         </thead>
@@ -220,7 +221,7 @@ const PropsAndEvents = ({
       ))}
       {events.length === 0 ? null : (
         <>
-          <EventsHeading>{STRINGS.events}</EventsHeading>
+          <EventsHeading>{LATER_STRINGS.events}</EventsHeading>
           <PropTable rows={events} kind="events" part={part} />
         </>
       )}
@@ -274,7 +275,7 @@ export const ApiReference = ({
   const groupOrder = propGroupOrder(componentGroups, useCatalogue().propGroups);
   return (
     <section className="forgebook-doc__section" aria-labelledby="forgebook-api">
-      <h2 id="forgebook-api">{STRINGS.apiReference}</h2>
+      <h2 id="forgebook-api">{LATER_STRINGS.apiReference}</h2>
       {/* a hook's or a function's page documents its call, not the props of a component */}
       {isLogic && docs.signature !== undefined ? (
         <SignatureReference name={docs.name} signature={docs.signature} />

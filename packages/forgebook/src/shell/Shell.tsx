@@ -45,7 +45,6 @@ import {
   type TreeStory
 } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
-import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
 import type { WrittenHomeProps } from "./AuthoredHome.tsx";
 import type { ComponentPageProps } from "./ComponentPage.tsx";
@@ -492,7 +491,7 @@ const usedInLinks = (
   source === undefined || !isOffered
     ? undefined
     : {
-        load: usageLoader(source),
+        source,
         componentOf: (title: string): TreeComponent | undefined =>
           findComponentByTitle(tree, source.id, title)?.component,
         componentHrefOf: (component: TreeComponent): string => pages.hrefOf(componentPage(component)),

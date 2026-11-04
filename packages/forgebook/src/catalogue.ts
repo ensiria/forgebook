@@ -97,7 +97,7 @@ export type CatalogueLists = {
   readonly a11y?: Partial<A11ySettings>;
   /** The measuring grid's step, in CSS px. */
   readonly gridStep?: number;
-  /** Texts of the shell replaced, by their name in `STRINGS` (a translation, another word). */
+  /** Texts of the shell replaced, by their name in `STRINGS` or `LATER_STRINGS` (a translation, another word). */
   readonly strings?: Readonly<Record<string, string>>;
   /**
    * Forgebook's own controls turned off (`{ sheets: false }`): shown nowhere, and the background, the style sheets

@@ -11,7 +11,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { PluginTabContext, PluginView, PluginViewContext, PluginViewHandle } from "../plugin.ts";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { APPEARANCE_ATTRIBUTE } from "./useAppearance.ts";
 
 /** The shell's appearance, as its root says it now. */
@@ -102,7 +102,7 @@ export const PluginViewHost = <TContext extends PluginViewContext>({
   if (problem !== undefined) {
     return (
       <p className="forgebook-problems" role="alert">
-        {STRINGS.pluginError}: {problem}
+        {LATER_STRINGS.pluginError}: {problem}
       </p>
     );
   }

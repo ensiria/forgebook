@@ -34,6 +34,7 @@ import { frameAddress, parseView, STAGE_HEIGHT_RANGE, type ViewState } from "../
 import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
 import { FrameView } from "./FrameView.tsx";
 import { framesOrigin } from "./framesOrigin.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import type { ShellConfig } from "./Shell.tsx";
 import { shellIsDark } from "./shellScheme.ts";
 import { STRINGS } from "./strings.ts";
@@ -234,7 +235,9 @@ const EmbedContent = ({
   if (location === undefined) {
     return (
       <main className="forgebook-embed">
-        <EmbedNotice message={storyId === null ? STRINGS.embedNoStory : STRINGS.embedUnknownStory(storyId)} />
+        <EmbedNotice
+          message={storyId === null ? LATER_STRINGS.embedNoStory : LATER_STRINGS.embedUnknownStory(storyId)}
+        />
       </main>
     );
   }

@@ -9,6 +9,7 @@ import "./embed.scss";
 import { type ChangeEvent, type FocusEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { embedAddressOf, embedCode, isLocalAddress } from "../embedCode.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { STRINGS } from "./strings.ts";
 import { useCopy } from "./useCopy.ts";
 
@@ -49,7 +50,7 @@ const EmbedField = ({
   useEffect(() => {
     if (hasFailed) field.current?.select();
   }, [hasFailed]);
-  const buttonText = isCopied ? STRINGS.copied : STRINGS.copy;
+  const buttonText = isCopied ? STRINGS.copied : LATER_STRINGS.copy;
   return (
     <div className="forgebook-embed-field">
       <label className="forgebook-embed-field__label" htmlFor={id}>
@@ -66,11 +67,11 @@ const EmbedField = ({
       <button
         type="button"
         className="forgebook-button"
-        aria-label={`${STRINGS.copy}: ${label}`}
+        aria-label={`${LATER_STRINGS.copy}: ${label}`}
         aria-live="polite"
         onClick={(): void => copy(value)}
       >
-        {hasFailed ? STRINGS.embedCopyFailed : buttonText}
+        {hasFailed ? LATER_STRINGS.embedCopyFailed : buttonText}
       </button>
     </div>
   );
@@ -87,9 +88,9 @@ export const EmbedPanel = ({ storyId, title, query, height }: EmbedPanelProps): 
   const link = embedAddressOf(page, storyId, query);
   return (
     <>
-      <p className="forgebook-embed-panel__hint">{STRINGS.embedHint}</p>
-      <EmbedField label={STRINGS.embedLink} value={link} isFirst={true} />
-      <EmbedField label={STRINGS.embedCode} value={embedCode({ link, title, height, isFollowing })} />
+      <p className="forgebook-embed-panel__hint">{LATER_STRINGS.embedHint}</p>
+      <EmbedField label={LATER_STRINGS.embedLink} value={link} isFirst={true} />
+      <EmbedField label={LATER_STRINGS.embedCode} value={embedCode({ link, title, height, isFollowing })} />
       <label className="forgebook-embed-panel__follow">
         <input
           type="checkbox"
@@ -101,12 +102,12 @@ export const EmbedPanel = ({ storyId, title, query, height }: EmbedPanelProps): 
             setIsFollowing(event.currentTarget.checked)
           }
         />
-        {STRINGS.embedFollow}
+        {LATER_STRINGS.embedFollow}
       </label>
-      {isFollowing ? <p className="forgebook-embed-panel__hint">{STRINGS.embedFollowHint}</p> : null}
+      {isFollowing ? <p className="forgebook-embed-panel__hint">{LATER_STRINGS.embedFollowHint}</p> : null}
       {isLocalAddress(link) ? (
         <p className="forgebook-embed-panel__hint" data-warning="">
-          {STRINGS.embedLocal}
+          {LATER_STRINGS.embedLocal}
         </p>
       ) : null}
     </>
