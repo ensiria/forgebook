@@ -6,11 +6,12 @@
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { createServer, type ViteDevServer } from "vite";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { readPreview } from "../src/frame/storyModule.ts";
 import { browserOnlyNamespace, isBrowserGlobalError, loadPreview } from "../src/vite/previewRunner.ts";
 
 /** The folders and servers a test made, removed after it. */
@@ -27,6 +28,38 @@ const BROWSER_PACKAGE = [
   "const isOld = !!document.documentElement.currentStyle;",
   "export const DocsContainer = () => isOld;",
   "export const themes = { light: {} };",
+  "export default () => ({ parameters: { docs: { container: DocsContainer } } });",
+  ""
+].join("\n");
+
+/**
+ * What Storybook 10's `definePreview` does while a preview loads, as `storybook/internal/csf` writes it: it composes
+ * its addons and the rest at once, each field read as `default?.[field] ?? [field]`, lists flattened, objects merged,
+ * the last of a single field kept, and enhancers split by `secondPass`.
+ */
+const STORYBOOK_DEFINE_PREVIEW = [
+  "const getField = (list, field) => list.map((xs) => xs.default?.[field] ?? xs[field]).filter(Boolean);",
+  "const getArrayField = (list, field) =>",
+  "  getField(list, field).reduce((all, each) => [...all, ...(Array.isArray(each) ? each : [each])], []);",
+  "const getObjectField = (list, field) => Object.assign({}, ...getField(list, field));",
+  "const getSingletonField = (list, field) => getField(list, field).pop();",
+  "const composeConfigs = (list) => {",
+  '  const enhancers = getArrayField(list, "argTypesEnhancers");',
+  "  return {",
+  '    parameters: Object.assign({}, ...getField(list, "parameters")),',
+  '    decorators: getArrayField(list, "decorators"),',
+  '    args: getObjectField(list, "args"),',
+  '    initialGlobals: getObjectField(list, "initialGlobals"),',
+  '    globalTypes: getObjectField(list, "globalTypes"),',
+  "    argTypesEnhancers: [...enhancers.filter((e) => !e.secondPass), ...enhancers.filter((e) => e.secondPass)],",
+  '    render: getSingletonField(list, "render"),',
+  '    tags: getArrayField(list, "tags")',
+  "  };",
+  "};",
+  "export const definePreview = (input) => {",
+  "  const { addons, ...rest } = input;",
+  '  return { _tag: "Preview", input, composed: composeConfigs([...(addons ?? []), rest]) };',
+  "};",
   ""
 ].join("\n");
 
@@ -102,13 +135,62 @@ describe("browserOnlyNamespace", () => {
     expect(() => Reflect.get(Object(themes), "light")).toThrow(
       "themes.light of /kit/index.js cannot be used"
     );
-    const container: unknown = Reflect.get(namespace, "DocsContainer");
-    // a call is kept, as an addon's factory is in a preview's list; what it made cannot be read either
-    const made: unknown = typeof container === "function" ? container() : undefined;
-    expect(typeof made).toBe("function");
-    expect(() => Reflect.get(Object(made), "title")).toThrow("DocsContainer().title of /kit/index.js");
+    expect(() => new (Object(themes))()).toThrow("new themes of /kit/index.js cannot be used");
     // its names cannot be listed: an empty list would be a value a browser does not give
     expect(() => Object.keys(namespace)).toThrow("The names of /kit/index.js cannot be used");
+  });
+
+  it("lets what a call made be looked into, called and merged, as deep as a framework goes", () => {
+    const namespace = browserOnlyNamespace("/kit/index.js", "document is not defined");
+    const factory: unknown = Reflect.get(namespace, "default");
+    const addon: unknown = typeof factory === "function" ? factory() : undefined;
+    // Storybook's composition of `definePreview({ addons: [docs()] })`: `addon.default?.[field] ?? addon[field]`
+    const field: unknown = Reflect.get(Object(Reflect.get(Object(addon), "default")), "parameters");
+    expect(typeof field).toBe("function");
+    expect([field].filter(Boolean)).toEqual([field]);
+    expect(Object.assign({}, field)).toEqual({});
+    expect(Array.isArray(field)).toBe(false);
+    expect(JSON.stringify({ parameters: field, layout: "centered" })).toBe('{"layout":"centered"}');
+    // deeper still: a member of the result called, and a member of what that made
+    const deeper: unknown =
+      typeof field === "function" ? Reflect.get(Object(field()), "decorators") : undefined;
+    expect(typeof deeper).toBe("function");
+    // the same placeholder each time, as a framework that reads a field twice expects
+    expect(Reflect.get(Object(addon), "default")).toBe(Reflect.get(Object(addon), "default"));
+  });
+
+  it("ends a chain that never ends, as a loop walking a placeholder makes, with the same message", () => {
+    const namespace = browserOnlyNamespace("/kit/index.js", "document is not defined");
+    const factory: unknown = Reflect.get(namespace, "default");
+    let node: unknown = typeof factory === "function" ? factory() : undefined;
+    const walk = (): void => {
+      while (node) node = Reflect.get(Object(node), "parent");
+    };
+    expect(walk).toThrow(/^default\(\)(\.parent)+ of \/kit\/index\.js cannot be used on the server/);
+  });
+
+  it("cannot be constructed through its prototype either", () => {
+    const namespace = browserOnlyNamespace("/kit/index.js", "document is not defined");
+    const factory: unknown = Reflect.get(namespace, "default");
+    const made: unknown = typeof factory === "function" ? factory() : undefined;
+    const prototype: unknown = Reflect.get(Object(made), "prototype");
+    const maker: unknown = Reflect.get(Object(prototype), "constructor");
+    expect(maker).toBe(made);
+    expect(() => new (Object(maker))()).toThrow("new default() of /kit/index.js cannot be used");
+  });
+
+  it("throws, naming the whole chain, when what a call made is used as a string, a number or a list", () => {
+    const namespace = browserOnlyNamespace("/kit/index.js", "document is not defined");
+    const factory: unknown = Reflect.get(namespace, "default");
+    const addon: unknown = typeof factory === "function" ? factory() : undefined;
+    const title: unknown = Reflect.get(Object(Reflect.get(Object(addon), "default")), "title");
+    const chain = "default().default.title of /kit/index.js cannot be used on the server";
+    expect(() => `${String(title)}`).toThrow(chain);
+    expect(() => Number(title)).toThrow(chain);
+    expect(() => [...Object(title)]).toThrow(chain);
+    expect(() => new (Object(title))()).toThrow(`new ${chain}`);
+    // an export used as a value fails the same way, before any of its members is read
+    expect(() => String(factory)).toThrow("default of /kit/index.js cannot be used");
   });
 });
 
@@ -138,6 +220,57 @@ describe("loadPreview", () => {
       'import { themes } from "browser-kit";\nexport const parameters = { theme: themes.light };\n'
     );
     await expect(load("/preview.ts")).rejects.toThrow("themes.light of");
+  });
+
+  it("loads Aksel's preview: definePreview with addons from packages that need a browser, read by its input", async () => {
+    const { load, file } = await catalogue(
+      [
+        'import addonDocs from "browser-kit";',
+        'import { definePreview } from "./csf";',
+        "const addons = [addonDocs(), addonDocs()];",
+        "export default definePreview({",
+        "  addons,",
+        '  parameters: { layout: "centered", docs: { codePanel: true } },',
+        '  globalTypes: { font: { toolbar: { items: [{ value: "Source Sans 3" }] } } },',
+        '  initialGlobals: { font: "Source Sans 3" },',
+        "  decorators: [(story) => story()]",
+        "});",
+        ""
+      ].join("\n")
+    );
+    writeFileSync(join(dirname(file), "csf.ts"), STORYBOOK_DEFINE_PREVIEW);
+    writeFileSync(
+      join(dirname(file), "forgebook.preview.ts"),
+      [
+        'import preview from "./preview";',
+        "export const decorators = preview.input.decorators;",
+        "export const { parameters, globalTypes, initialGlobals } = preview.input;",
+        ""
+      ].join("\n")
+    );
+    const read = readPreview(await load("/forgebook.preview.ts"));
+    expect(read.parameters).toMatchObject({ layout: "centered", docs: { codePanel: true } });
+    expect(read.globals).toEqual({ font: "Source Sans 3" });
+    expect(read.decorators).toHaveLength(1);
+  });
+
+  it("leaves out of the answers a placeholder kept in a parameter, as it leaves out a function", async () => {
+    const { load } = await catalogue(
+      [
+        'import addonDocs from "browser-kit";',
+        'export const parameters = { layout: "centered", docs: { theme: addonDocs().default.theme } };',
+        ""
+      ].join("\n")
+    );
+    const read = readPreview(await load("/preview.ts"));
+    expect(JSON.parse(JSON.stringify(read.parameters))).toEqual({ layout: "centered", docs: {} });
+  });
+
+  it("still fails a preview that takes a text from what a browser-only factory made", async () => {
+    const { load } = await catalogue(
+      'import addonDocs from "browser-kit";\nexport const parameters = { title: "Docs: " + addonDocs().default.title };\n'
+    );
+    await expect(load("/preview.ts")).rejects.toThrow("default().default.title of");
   });
 
   it("still fails a preview that reads a browser global itself", async () => {
