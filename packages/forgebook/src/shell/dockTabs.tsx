@@ -190,9 +190,13 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   const docsTab: Pick<DockTab, "id" | "label"> = input.isLogic
     ? { id: "signature", label: STRINGS.tabs.signature }
     : { id: "props", label: STRINGS.tabs.props };
-  if (docs.status === "loading") return [{ ...docsTab, content: notice(STRINGS.docsLoading, false) }];
+  // the play's trace comes from the frame, not from the docs: a first read of a project's docs can take seconds, and a
+  // play that finished meanwhile is shown without waiting for them, or when they fail
+  const played = input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)];
+  if (docs.status === "loading")
+    return [{ ...docsTab, content: notice(STRINGS.docsLoading, false) }, ...played];
   if (docs.status === "error") {
-    return [{ ...docsTab, content: notice(`${STRINGS.docsError}: ${docs.message}`, true) }];
+    return [{ ...docsTab, content: notice(`${STRINGS.docsError}: ${docs.message}`, true) }, ...played];
   }
   const component = docs.value;
   const events = eventsOf(component.props, input.actions);

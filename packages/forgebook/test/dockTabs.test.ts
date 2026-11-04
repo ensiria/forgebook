@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentDocs } from "../src/componentDocs.ts";
+import type { PlayTrace } from "../src/playTrace.ts";
 import { type DockTabsInput, dockTabs } from "../src/shell/dockTabs.tsx";
 
 /** A hook whose options carry a value and a callback, so a component would get Props and Events. */
@@ -76,6 +77,21 @@ describe("the tabs of a story's panel", () => {
     ]);
     const failed = dockTabs({ ...inputOf(true), docs: { status: "error", message: "no program" } });
     expect(failed[0]?.id).toBe("signature");
+  });
+
+  it("shows a play's trace while the component's docs load or fail, beside the docs' place", () => {
+    const trace: PlayTrace = { status: "passed", steps: [] };
+    for (const isLogic of [false, true]) {
+      const docsPlace = isLogic ? "signature" : "props";
+      const loading = dockTabs({ ...inputOf(isLogic), docs: { status: "loading" }, trace });
+      expect(loading.map((tab) => tab.id)).toEqual([docsPlace, "play", "a11y"]);
+      const failed = dockTabs({
+        ...inputOf(isLogic),
+        docs: { status: "error", message: "no program" },
+        trace
+      });
+      expect(failed.map((tab) => tab.id)).toEqual([docsPlace, "play", "a11y"]);
+    }
   });
 
   it("gives a story about its looks its props and events, and no signature", () => {
