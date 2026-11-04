@@ -132,12 +132,12 @@ const placeholder = (name: string, file: string, reason: string, steps: number):
   };
   // a class, not an arrow function: `new` reaches the trap of a constructor only, and its message names the package
   const target = class {};
-  const proxy = new Proxy(target, {
+  const proxy = new Proxy<typeof target>(target, {
     apply: (): unknown => next(`${name}()`),
     construct: (): object => {
       throw unavailable(`new ${name}`, file, reason);
     },
-    get: (self: object, key: string | symbol, receiver: unknown): unknown => {
+    get: (self: typeof target, key: string | symbol, receiver: unknown): unknown => {
       if (typeof key === "symbol") {
         if (VALUE_SYMBOLS.has(key)) throw unavailable(name, file, reason);
         return Reflect.get(self, key, receiver);
