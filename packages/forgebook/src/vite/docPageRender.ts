@@ -13,7 +13,7 @@
  */
 import { Marked, type Token, type Tokens } from "marked";
 
-import type { DocBlock, DocHeading } from "../docPages.ts";
+import { type DocBlock, type DocHeading, PAGE_LINK_SCHEME } from "../docPages.ts";
 import { fencedCode } from "./codeFence.ts";
 import { codeHtml, headingAnchors } from "./componentPage.ts";
 import { isValueToken, VALUES_EXTENSION } from "./docMarkdown.ts";
@@ -38,6 +38,12 @@ const plainText = (tokens: readonly Token[]): string =>
     .join("");
 
 /**
+ * The addresses a page's link may hold: another site, mail, another page of the catalogue as the reader wrote it
+ * (`PAGE_LINK_SCHEME`), or an address with no scheme of its own (an anchor, a file); never one whose scheme runs code.
+ */
+const SAFE_LINK = new RegExp(`^(https?:|mailto:|${PAGE_LINK_SCHEME}|[^:]*$|[^:]*[/?#])`, "i");
+
+/**
  * The Markdown renderer of one page: it keeps the page's headings, so it is made for each page.
  *
  * @param headings - receives the page's second- and third-level headings.
@@ -59,6 +65,8 @@ const pageRenderer = (headings: DocHeading[]): Marked => {
         return `<h${depth} id="doc-${escapeHtml(anchor)}"><a class="forgebook-anchor" href="#${escapeHtml(anchor)}">${words}</a></h${depth}>\n`;
       },
       link({ href, title, tokens }: Tokens.Link): string {
+        // a link that would run code (`javascript:`, `data:`) keeps its words and loses its address
+        if (!SAFE_LINK.test(href)) return this.parser.parseInline(tokens);
         const titled = title === null || title === undefined ? "" : ` title="${escapeHtml(title)}"`;
         // a page of the catalogue opens in place; another site must not replace the catalogue being read
         const opens = /^https?:/i.test(href) ? ' target="_blank" rel="noreferrer"' : "";

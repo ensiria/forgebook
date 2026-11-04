@@ -131,6 +131,8 @@ describe("the blocks of a page", () => {
     ).toEqual(['line 4, column 19: the card links to "./gone.md", which is not there']);
     expect(notesOf('::link-card[Odd]{href="odd.txt"}')[0]).toContain("is no page or address");
     expect(notesOf('::link-card[Away]{href="//evil.example"}')[0]).toContain("is no page or address");
+    // the attribute's `\\` is one backslash: `/\\host` is another site to a browser too
+    expect(notesOf('::link-card[Away]{href="/\\\\evil.example"}')[0]).toContain("is no page or address");
     expect(notesOf('::link-card[A]{href="?page=kit:a" description="{{nope}}"}')).toEqual([
       "line 4, column 48: `{{nope}}` is not a value a page can show"
     ]);
@@ -161,6 +163,23 @@ describe("the blocks of a page", () => {
     expect(notesOf(":::warning\nCareful.\n:::")[0]).toContain("(for this aside, write `:::caution`)");
     expect(blocksOf("::families")).toEqual([
       { kind: "problem", message: "line 4, column 1: `::families` is drawn only on the catalogue's home" }
+    ]);
+  });
+
+  it("keeps a link's words and drops an address whose scheme runs code", () => {
+    const html = (body: string): string =>
+      compiledDocPage(FILE, withFront(body))
+        .blocks.map((block) => (block.kind === "text" ? block.html : ""))
+        .join("");
+    expect(html("[Run](javascript:alert(1)) and [data](data:text/html,x)")).not.toContain("href");
+    expect(html("[Site](https://example.com)")).toContain('href="https://example.com"');
+  });
+
+  it("reads a plugin's fence as its block, not as code with words it does not read", () => {
+    const fence = "```probe sb:testing-pluginprobe--probe\nbody\n```";
+    expect(docPageIndex(FILE, withFront(fence), () => undefined, ["probe"]).notes).toBeUndefined();
+    expect(compiledDocPage(FILE, withFront(fence), () => undefined, ["probe"]).blocks).toEqual([
+      { kind: "plugin", fence: "probe", argument: "sb:testing-pluginprobe--probe", body: "body" }
     ]);
   });
 

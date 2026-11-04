@@ -326,8 +326,6 @@ export const textsOfGroup = <TTexts extends Record<string, unknown>>(
   group: string,
   texts: TTexts
 ): TTexts => {
-  for (const [path, text] of Object.entries(catalogueReplacements)) {
-    replaceText({ [group]: texts }, path.split("."), text);
-  }
+  lateStrings({ [group]: texts });
   return texts;
 };

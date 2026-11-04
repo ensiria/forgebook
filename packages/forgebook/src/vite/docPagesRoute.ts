@@ -16,6 +16,7 @@ import type { AgentPage, PageDocument, PagesDocument } from "./agent.types.ts";
 import type { CataloguePages } from "./agentApi.ts";
 import { type AgentAnswer, type RouteContext, settled } from "./agentRoutes.ts";
 import type { HomeIndex } from "./docPageMarkdown.ts";
+import { pluginFences } from "./pluginConfig.ts";
 
 /** The id `forgebook page` takes for the catalogue's written home. */
 export const HOME_PAGE_ID = "home";
@@ -29,8 +30,13 @@ type ReadHome = { readonly file: string; readonly index: HomeIndex; readonly tex
  *
  * @param home - its absolute path.
  * @param dir - the configuration's folder.
+ * @param fences - the fences the catalogue's plugins draw, which are not code.
  */
-const readHome = async (home: string | undefined, dir: string): Promise<ReadHome | undefined> => {
+const readHome = async (
+  home: string | undefined,
+  dir: string,
+  fences: readonly string[]
+): Promise<ReadHome | undefined> => {
   if (home === undefined) return undefined;
   let text: string;
   try {
@@ -38,11 +44,16 @@ const readHome = async (home: string | undefined, dir: string): Promise<ReadHome
   } catch {
     return undefined;
   }
-  const [{ homeIndex }, { frontMatterOf }] = await Promise.all([
+  const [{ homeIndex }, { frontMatterOf }, { readLinkedFile }] = await Promise.all([
     import("./docPageMarkdown.ts"),
-    import("./docMarkdown.ts")
+    import("./docMarkdown.ts"),
+    import("./docPageLinks.ts")
   ]);
-  return { file: relative(dir, home), index: homeIndex(home, text), text: frontMatterOf(text).body.trim() };
+  return {
+    file: relative(dir, home),
+    index: homeIndex(home, text, readLinkedFile, fences),
+    text: frontMatterOf(text).body.trim()
+  };
 };
 
 /** The written home as the documents give it. */
@@ -116,7 +127,13 @@ export const pagesDocument = (
  */
 export const pagesAnswer = async ({ config, tree, pages, view }: RouteContext): Promise<AgentAnswer> => ({
   status: 200,
-  body: pagesDocument(config.title, tree, pages, view, await readHome(config.home, config.dir))
+  body: pagesDocument(
+    config.title,
+    tree,
+    pages,
+    view,
+    await readHome(config.home, config.dir, pluginFences(config.plugins))
+  )
 });
 
 /**
@@ -128,12 +145,12 @@ export const pagesAnswer = async ({ config, tree, pages, view }: RouteContext): 
  * @param view - the view the links open in.
  */
 const homeAnswer = async (
-  config: Pick<RouteContext["config"], "title" | "home" | "dir">,
+  config: Pick<RouteContext["config"], "title" | "home" | "dir" | "plugins">,
   tree: StoryTree,
   pages: CataloguePages,
   view: string
 ): Promise<AgentAnswer> => {
-  const home = await readHome(config.home, config.dir);
+  const home = await readHome(config.home, config.dir, pluginFences(config.plugins));
   if (home === undefined)
     return { status: 404, body: { error: "This catalogue has no written home: its home is generated" } };
   const body: PageDocument = {
@@ -159,7 +176,7 @@ export const pageAnswer = async ({
   view,
   config
 }: Omit<RouteContext, "config"> & {
-  readonly config?: Pick<RouteContext["config"], "title" | "home" | "dir">;
+  readonly config?: Pick<RouteContext["config"], "title" | "home" | "dir" | "plugins">;
 }): Promise<AgentAnswer> => {
   const id = params.get("id") ?? "";
   if (id === HOME_PAGE_ID && config !== undefined) return await homeAnswer(config, tree, pages, view);

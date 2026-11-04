@@ -119,7 +119,7 @@ describe("for agents", () => {
     sheets: { required: [], theme: [], restyled: [] }
   };
   const tree = storyTree([source]);
-  const config = { title: "Fixture", home: HOME, dir: APP_DIR };
+  const config = { title: "Fixture", home: HOME, dir: APP_DIR, plugins: [] };
   const home = {
     file: "forgebook.home.md",
     index: {

@@ -469,8 +469,10 @@ See [the colours](./colours.md#brand), or [every state](?component=acme:actions-
 - `forgebook stories` and `forgebook pages` fail when a page names a story or a component that is not there, a link leads
   to no page, an image is not a file of its package, or a block cannot be read; each problem gives its line and column
   (`./docs/theming.md: line 12, column 1: …`), and the page still draws everything else.
-- A page is trusted as a story's code is: Markdown lets it hold raw HTML, which runs in the catalogue. Review one as you
-  review code, and do not build a catalogue from pages you did not write.
+- A page is trusted more than a story's code: a story runs in a frame on an origin of its own, while a page's raw HTML,
+  which Markdown lets it hold, runs in the catalogue itself (its links keep only web, mail and the catalogue's own
+  addresses). Review a page as you review code, and do not build a catalogue from pages, a library's included, you did
+  not write.
 
 ### Blocks
 

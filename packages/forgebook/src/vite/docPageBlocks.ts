@@ -69,8 +69,8 @@ const KNOWN_LEAVES = ["link-card", ...HOME_PIECES].map((name) => `::${name}`);
 /** The pieces of the home that take a heading of their own. */
 const LABELLED_PIECES: readonly HomePiece[] = ["recent", "families", "pages"];
 
-/** The addresses a link card may open: another site, or an address of the catalogue; never `//host`, another site in disguise. */
-const CARD_ADDRESS = /^(https?:|mailto:|\?|#|\/(?!\/))/i;
+/** The addresses a link card may open: another site, or an address of the catalogue; never `//host` or `/\host`, another site in disguise. */
+const CARD_ADDRESS = /^(https?:|mailto:|\?|#|\/(?![/\\]))/i;
 
 /** The asides other tools name otherwise, by those names. */
 const OTHER_NAMES: Readonly<Record<string, AsideTone>> = {

@@ -165,7 +165,8 @@ export const homeModule = (
     ...(description === undefined ? {} : { description }),
     blocks,
     stories,
-    notes
+    // what the author got wrong is the dev server's to show: a published home keeps its readers out of it
+    notes: isServing ? notes : []
   };
   return [
     ...imageImports(images),
