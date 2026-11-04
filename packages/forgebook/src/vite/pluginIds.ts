@@ -1,6 +1,6 @@
 /**
  * The ids of the modules the plugin makes: a pattern's story files or docs pages, the configuration's data, the design
- * tokens, a group's "Used in" and reach. Pure: a specifier in, an id out.
+ * tokens, a group's "Used in", reach and texts. Pure: a specifier in, an id out.
  *
  * @module
  */
@@ -11,6 +11,7 @@ import {
   REACH_PREFIX,
   SEARCH_PREFIX,
   storyFilesGroupText,
+  TEXTS_PREFIX,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 
@@ -45,12 +46,18 @@ export const patternId = (source: string, folder: string): string | null => {
   return `${DOCS_PAGES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
 };
 
-/** The specifiers' prefixes of a group's virtual modules: its "Used in", its reach, its search indexes. */
-const VIRTUAL_PREFIXES: readonly string[] = [USAGE_PREFIX, REACH_PREFIX, SEARCH_PREFIX, PAGES_SEARCH_PREFIX];
+/** The specifiers' prefixes of a group's virtual modules: its "Used in", its reach, its search indexes, its texts. */
+const VIRTUAL_PREFIXES: readonly string[] = [
+  USAGE_PREFIX,
+  REACH_PREFIX,
+  SEARCH_PREFIX,
+  PAGES_SEARCH_PREFIX,
+  TEXTS_PREFIX
+];
 
 /**
- * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in"), when the import names
- * one.
+ * The id of a virtual module the plugin makes (the configuration's data, the tokens, a group's "Used in", reach,
+ * search indexes or texts), when the import names one.
  *
  * @param source - the import's specifier.
  */

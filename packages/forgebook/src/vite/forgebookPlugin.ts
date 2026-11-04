@@ -37,8 +37,9 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { axeAddress, axeBuildAsset } from "./axeScript.ts";
-import { type BuiltTexts, textsWriter } from "./builtTexts.ts";
+import { groupTexts, type TextSources } from "./builtTexts.ts";
 import { catalogueConfig } from "./catalogueConfig.ts";
+import { currentCloseWatch } from "./closeWatch.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
@@ -281,6 +282,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   };
   /** The dev server; none in a build. */
   let devServer: ViteDevServer | undefined;
+  /** The files followed one by one, so an edit reaches the dev server at once. */
+  const watching = currentCloseWatch();
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
@@ -290,6 +293,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     isServing,
     track: (id: string, isPages: boolean) => (isPages ? docsModules : searchModules).add(id)
   });
+  // a build's docs, code and pages of each group's story files, read while the build loads the stories
+  const texts = groupTexts();
   // whether an edited story file is drawn anew in its open frames: a dev server's, unless the framework cannot
   const isRedrawing = (): boolean =>
     isServing() && (config?.framework ?? options.framework)?.redrawsEditedStories !== false;
@@ -351,14 +356,15 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
    * @param pack - writes a module's JSON as its value: as it is, or kept out of a build's JavaScript.
-   * @param writeTexts - a build's: writes a pattern's docs, code and pages as data; none imports each.
+   * @param startTexts - a build's browser files': starts reading a pattern's docs, code and pages, which its module
+   * imports from the group's texts module; none imports each from its query.
    * @throws when a story file cannot be indexed.
    */
   const storiesModule = async (
     id: string,
     watch: (file: string) => void,
     pack: PackJson,
-    writeTexts: ((files: readonly IndexedStoryFile[]) => Promise<BuiltTexts>) | undefined
+    startTexts: ((files: readonly IndexedStoryFile[]) => void) | undefined
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
@@ -375,13 +381,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     filesModules.add(id);
     const hasUsage = config?.lists.usedIn !== false;
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
-    const { files, code } = await patternModule(
+    const { files, code } = patternModule(
       id,
       watch,
       { hasUsage, hasReach: hasUsage && isServing() },
       indexCache(),
       isTestRun ? undefined : extractor().warm,
-      writeTexts
+      startTexts
     );
     if (!isRedrawing()) return { code, moduleType: "js" };
     served.keep(id, files);
@@ -439,7 +445,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     return textModule(id, { watch, resolveImport, componentFiles, cache: keptCache("code", isKeptCode) });
   };
   /**
-   * A group's module (a pattern's, its search index, its "Used in"), when the id names one.
+   * A group's module (a pattern's, its search index, its "Used in", a build's texts), when the id names one.
    *
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
@@ -457,10 +463,14 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
     const docsOf = async (storyFile: string): Promise<unknown> =>
       docsValue(await search.docsOf(storyFile), watch);
-    const writeTexts =
-      emit === undefined ? undefined : textsWriter({ docsOf, watch, resolveImport, componentFiles }, emit);
+    const sources: TextSources = { docsOf, watch, resolveImport, componentFiles };
+    // a build's browser files only: a dev server answers each text from its query, and no texts module
+    const startTexts = emit === undefined ? undefined : texts.starter(id, sources);
     return (
-      (await search.moduleOf(id, watch, pack)) ?? (await storiesModule(id, watch, pack, writeTexts)) ?? null
+      (emit === undefined ? undefined : await texts.moduleOf(id, sources, emit)) ??
+      (await search.moduleOf(id, watch, pack)) ??
+      (await storiesModule(id, watch, pack, startTexts)) ??
+      null
     );
   };
   return {
@@ -500,6 +510,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     },
     configureServer: (server: ViteDevServer): void => {
       devServer = server;
+      // no person waits for a page in a test run
+      watching.serve(isTestRun ? undefined : server);
       server.httpServer?.on("close", (): void => void docs?.close());
       // first: the frames' own origin, and the guard that keeps every other origin's page from reading this one
       if (config !== undefined)
@@ -558,10 +570,14 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const axe = config === undefined ? undefined : axeBuildAsset(PACKAGE_DIR);
       if (axe !== undefined) this.emitFile({ type: "asset", fileName: axe.fileName, source: axe.source });
     },
+    // a dev server without an HTTP server of its own (middleware mode) ends its close watch here only
+    closeServer: (context: { readonly reason: "restart" | "close" }): void => {
+      if (context.reason === "close") watching.close();
+    },
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
-    ...storyFileHotHooks(isRedrawing, served.changedBy),
+    ...storyFileHotHooks(isRedrawing, served.changedBy, watching),
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = await pagesModule(id);
       if (generated !== undefined) return generated;
