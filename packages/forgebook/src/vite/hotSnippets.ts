@@ -14,6 +14,7 @@ import type { EnvironmentModuleNode, HotUpdateOptions, Plugin } from "vite";
 
 import { RENEWED_MODULE_EVENT, STORY_FILE_EVENT } from "../hotModules.ts";
 import { STORY_FILE } from "./autoTitle.ts";
+import type { CloseWatch } from "./closeWatch.ts";
 import { FILES_PREFIX } from "./pluginModules.ts";
 import { type IndexedStoryFile, storyFileIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
@@ -177,26 +178,33 @@ export const servedPatterns = (): ServedPatterns => {
 
 /**
  * The plugin's hooks for a story file's edit: the file accepts it on a dev server, and an edit that changes a pattern's
- * list (a story added, renamed, a title) reloads the pages, which read the list once.
+ * list (a story added, renamed, a title) reloads the pages, which read the list once. A story file a frame loads is
+ * followed closely (`closeWatch.ts`), and the late report of an edit of any file the close watch handed on already is
+ * dropped, so an edit is drawn once.
  *
  * @param isServing - whether a dev server runs whose framework draws an edited story file in place.
  * @param changedFilesModules - the patterns' modules the edit changed.
+ * @param watching - the dev server's close watch.
  */
 export const storyFileHotHooks = (
   isServing: () => boolean,
-  changedFilesModules: (file: string) => readonly string[]
+  changedFilesModules: (file: string) => readonly string[],
+  watching: Pick<CloseWatch, "follow" | "isLateReport">
 ): Pick<Plugin, "transform" | "hotUpdate"> => ({
   transform: {
     // a pattern's module is named after its pattern, which may end like a story file
     filter: { id: { include: STORY_FILE, exclude: VIRTUAL_ID } },
     handler(code: string, id: string): { code: string; map: null } | undefined {
       if (!isServing() || this.environment.name !== "client") return undefined;
+      watching.follow(id);
       return { code: withStoryFileHot(code, id), map: null };
     }
   },
   hotUpdate(options: HotUpdateOptions): EnvironmentModuleNode[] | undefined {
     // a file removed or added changes the lists another way (`modulesListing`)
     if (options.type !== "update") return undefined;
+    // the system's late report of an edit the close watch handed on already
+    if (watching.isLateReport(this.environment.name, options.file)) return [];
     if (this.environment.name !== "client" || !STORY_FILE.test(options.file)) return undefined;
     const changed = changedFilesModules(options.file);
     if (changed.length === 0) return undefined;
