@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
+import { codeLiteral } from "../codeLiteral.ts";
 import { packageResolver } from "./configFile.ts";
 import type { AxeAddress } from "./pages.ts";
 
@@ -46,9 +47,9 @@ export const axeAddress = (command: "serve" | "build", packageDir: string): AxeA
   const file = axeScript(packageDir);
   if (file === undefined) return undefined;
   if (command === "serve")
-    return { imports: [`import axeUrl from ${JSON.stringify(`${file}?url`)};`], value: "axeUrl" };
+    return { imports: [`import axeUrl from ${codeLiteral(`${file}?url`)};`], value: "axeUrl" };
   const name = axeBuildFile(readFileSync(file));
-  return { imports: [], value: `import.meta.env.BASE_URL + ${JSON.stringify(name)}` };
+  return { imports: [], value: `import.meta.env.BASE_URL + ${codeLiteral(name)}` };
 };
 
 /**

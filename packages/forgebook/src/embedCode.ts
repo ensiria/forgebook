@@ -9,6 +9,7 @@
  *
  * @module
  */
+import { codeLiteral } from "./codeLiteral.ts";
 import { EMBED_PARAMETER, EMBED_SIZE_TYPE } from "./embed.ts";
 
 /** The parameters an embed does not read: they belong to the stage, so a link keeps none of them. */
@@ -60,14 +61,14 @@ const attribute = (text: string): string =>
  */
 const followScript = (link: string): string => {
   // a link holds no `<` once read as a URL, but a script's text must never be able to close its element
-  const origin = JSON.stringify(new URL(link).origin).replace(/</g, "\\u003c");
+  const origin = codeLiteral(new URL(link).origin);
   return [
     "<script>",
     "(() => {",
     "  const frame = document.currentScript.previousElementSibling;",
     '  addEventListener("message", ({ source, origin, data }) => {',
     `    if (source !== frame.contentWindow || origin !== ${origin}) return;`,
-    `    if (data?.type === ${JSON.stringify(EMBED_SIZE_TYPE)} && Number.isFinite(data.height)) frame.height = data.height;`,
+    `    if (data?.type === ${codeLiteral(EMBED_SIZE_TYPE)} && Number.isFinite(data.height)) frame.height = data.height;`,
     "  });",
     "})();",
     "</script>"

@@ -11,6 +11,7 @@
  *
  * @module
  */
+import { codeLiteral } from "../codeLiteral.ts";
 import { OWN_SOURCE_ID } from "../docPages.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
 import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
@@ -123,12 +124,12 @@ const escaped = (text: string): string =>
 const frameLoadGuard = (placement: FramesPlacement): string => `(function () {
   var RELOAD_DELAY = 1000;
   var RELOADS = 3;
-  var PLACEMENT = ${JSON.stringify(placement).replace(/</g, "\\u003c")};
+  var PLACEMENT = ${codeLiteral(placement)};
   var root = document.documentElement;
-  var key = "${LOAD_RELOADS_KEY}" + location.pathname + "?story=" + (new URLSearchParams(location.search).get("story") || "");
+  var key = ${codeLiteral(LOAD_RELOADS_KEY)} + location.pathname + "?story=" + (new URLSearchParams(location.search).get("story") || "");
   var isReloading = false;
   function hasStarted() {
-    return root.hasAttribute("${FRAME_STARTED_ATTRIBUTE}") || root.hasAttribute("${STATUS_ATTRIBUTE}");
+    return root.hasAttribute(${codeLiteral(FRAME_STARTED_ATTRIBUTE)}) || root.hasAttribute(${codeLiteral(STATUS_ATTRIBUTE)});
   }
   function catalogueOrigin() {
     if (PLACEMENT.kind === "origins") return PLACEMENT.catalogue;
@@ -154,7 +155,7 @@ const frameLoadGuard = (placement: FramesPlacement): string => `(function () {
     text.textContent = message;
     box.appendChild(text);
     document.getElementById("root").replaceChildren(box);
-    root.setAttribute("${STATUS_ATTRIBUTE}", "error");
+    root.setAttribute(${codeLiteral(STATUS_ATTRIBUTE)}, "error");
     var storyId = new URLSearchParams(location.search).get("story") || "";
     if (parent !== window) parent.postMessage({ type: "forgebook:error", storyId: storyId, message: message }, catalogueOrigin());
   }
@@ -235,7 +236,7 @@ export const configModule = (config: ResolvedConfig, frames: FramesPlacement): s
     lists: config.lists,
     frames
   };
-  return `export default ${JSON.stringify(data)};`;
+  return `export default ${codeLiteral(data)};`;
 };
 
 /**
@@ -249,7 +250,7 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
   const specifiers = [...own, ...config.sources];
   return {
     imports: specifiers.map(
-      (specifier, index) => `import { source as source${index} } from ${JSON.stringify(specifier)};`
+      (specifier, index) => `import { source as source${index} } from ${codeLiteral(specifier)};`
     ),
     list: `[${specifiers.map((_specifier, index) => `source${index}`).join(", ")}]`
   };
@@ -267,8 +268,8 @@ export const WRITTEN_HOME_MODULE = "forgebook/shell/home";
 const writtenHomeCode = (home: string): string =>
   [
     "() =>",
-    `      import(${JSON.stringify(WRITTEN_HOME_MODULE)}).then((module) =>`,
-    `        module.writtenHome(() => import(${JSON.stringify(`${home}${HOME_QUERY}`)}).then((page) => page.default))`,
+    `      import(${codeLiteral(WRITTEN_HOME_MODULE)}).then((module) =>`,
+    `        module.writtenHome(() => import(${codeLiteral(`${home}${HOME_QUERY}`)}).then((page) => page.default))`,
     "      )"
   ].join("\n");
 
@@ -294,17 +295,18 @@ const pluginViewLines = (config: ResolvedConfig): string[] => {
   const lines = config.plugins.flatMap((plugin) => {
     const tabs = (plugin.tabs ?? []).map(
       (tab) =>
-        `{ id: ${JSON.stringify(tab.id)}, label: ${JSON.stringify(tab.label)}, ` +
-        `when: ${JSON.stringify(tab.when)}, load: () => import(${JSON.stringify(tab.view)}) }`
+        `{ id: ${codeLiteral(tab.id)}, label: ${codeLiteral(tab.label)}, ` +
+        // a tab with no condition shows on every story: it has no `when` to write
+        (tab.when === undefined ? "" : `when: ${codeLiteral(tab.when)}, `) +
+        `load: () => import(${codeLiteral(tab.view)}) }`
     );
     const blocks = (plugin.docBlocks ?? []).map(
-      (block) =>
-        `{ fence: ${JSON.stringify(block.fence)}, load: () => import(${JSON.stringify(block.view)}) }`
+      (block) => `{ fence: ${codeLiteral(block.fence)}, load: () => import(${codeLiteral(block.view)}) }`
     );
     return tabs.length === 0 && blocks.length === 0
       ? []
       : [
-          `      { id: ${JSON.stringify(plugin.id)}, tabs: [${tabs.join(", ")}], docBlocks: [${blocks.join(", ")}] },`
+          `      { id: ${codeLiteral(plugin.id)}, tabs: [${tabs.join(", ")}], docBlocks: [${blocks.join(", ")}] },`
         ];
   });
   return lines.length === 0
@@ -313,7 +315,7 @@ const pluginViewLines = (config: ResolvedConfig): string[] => {
         "    plugins: [",
         ...lines,
         "    ],",
-        `    pluginHosts: () => import(${JSON.stringify(PLUGIN_HOSTS_MODULE)}).then((module) => module.pluginHosts),`
+        `    pluginHosts: () => import(${codeLiteral(PLUGIN_HOSTS_MODULE)}).then((module) => module.pluginHosts),`
       ];
 };
 
@@ -326,11 +328,11 @@ export const shellEntry = (config: ResolvedConfig): string => {
   const sources = sourcesCode(config);
   return [
     'import { mountShell } from "forgebook/shell";',
-    `import { codeOf } from ${JSON.stringify(config.framework.pages.code)};`,
-    `import config from ${JSON.stringify(CONFIG_MODULE)};`,
-    ...(config.logo === undefined ? [] : [`import logo from ${JSON.stringify(`${config.logo}?url`)};`]),
+    `import { codeOf } from ${codeLiteral(config.framework.pages.code)};`,
+    `import config from ${codeLiteral(CONFIG_MODULE)};`,
+    ...(config.logo === undefined ? [] : [`import logo from ${codeLiteral(`${config.logo}?url`)};`]),
     ...sources.imports,
-    ...config.shell.styleSheets.map((file) => `import ${JSON.stringify(file)};`),
+    ...config.shell.styleSheets.map((file) => `import ${codeLiteral(file)};`),
     'const root = document.getElementById("root");',
     "if (root !== null)",
     "  mountShell(root, {",
@@ -348,11 +350,11 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...pluginViewLines(config),
     ...(config.framework.addressTexts === undefined
       ? []
-      : [`    addressTexts: ${JSON.stringify(config.framework.addressTexts)},`]),
+      : [`    addressTexts: ${codeLiteral(config.framework.addressTexts)},`]),
     // a source may declare tokens of its own, read with the catalogue's
     ...(config.tokens.length === 0 && config.sources.length === 0
       ? []
-      : [`    loadTokens: () => import(${JSON.stringify(TOKENS_MODULE)}).then((module) => module.default),`]),
+      : [`    loadTokens: () => import(${codeLiteral(TOKENS_MODULE)}).then((module) => module.default),`]),
     "    codeOf",
     "  });",
     ""
@@ -364,7 +366,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
  * catalogue whose stories have no play never loads them.
  */
 const playToolsLoader = (): string => {
-  const imports = PLAY_TOOLS_PACKAGES.map((name) => `import(${JSON.stringify(name)})`).join(", ");
+  const imports = PLAY_TOOLS_PACKAGES.map((name) => `import(${codeLiteral(name)})`).join(", ");
   return [
     "    playTools: async () => {",
     `      const [dom, events] = await Promise.all([${imports}]);`,
@@ -393,8 +395,10 @@ const previewsHot = (previews: readonly string[]): readonly string[] =>
     ? []
     : [
         "if (import.meta.hot)",
+        // plain JSON, unlike every other value here: Vite reads the accepted files as the text between the quotes,
+        // escapes undecoded, and resolves an escaped path as no file; this module is never set inline in a page
         `  import.meta.hot.accept(${JSON.stringify(previews)}, (next) =>`,
-        `    window.dispatchEvent(new CustomEvent(${JSON.stringify(PREVIEWS_EVENT)}, { detail: { next } }))`,
+        `    window.dispatchEvent(new CustomEvent(${codeLiteral(PREVIEWS_EVENT)}, { detail: { next } }))`,
         "  );"
       ];
 
@@ -412,13 +416,13 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     return frame === undefined ? [] : [{ id: plugin.id, frame }];
   });
   return [
-    `import { mountFrame } from ${JSON.stringify(config.framework.pages.frame)};`,
-    `import config from ${JSON.stringify(CONFIG_MODULE)};`,
+    `import { mountFrame } from ${codeLiteral(config.framework.pages.frame)};`,
+    `import config from ${codeLiteral(CONFIG_MODULE)};`,
     ...(axe?.imports ?? []),
     ...sources.imports,
-    ...config.previews.map((file, index) => `import * as preview${index} from ${JSON.stringify(file)};`),
+    ...config.previews.map((file, index) => `import * as preview${index} from ${codeLiteral(file)};`),
     ...frames.map(
-      (plugin, index) => `import { frame as pluginFrame${index} } from ${JSON.stringify(plugin.frame)};`
+      (plugin, index) => `import { frame as pluginFrame${index} } from ${codeLiteral(plugin.frame)};`
     ),
     'const root = document.getElementById("root");',
     "if (root !== null)",
@@ -434,7 +438,7 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
       ? []
       : [
           `    plugins: [${frames
-            .map((plugin, index) => `{ id: ${JSON.stringify(plugin.id)}, create: pluginFrame${index} }`)
+            .map((plugin, index) => `{ id: ${codeLiteral(plugin.id)}, create: pluginFrame${index} }`)
             .join(", ")}],`
         ]),
     `    previews: [${config.previews.map((_file, index) => `preview${index}`).join(", ")}]`,
@@ -466,15 +470,15 @@ export const storiesSourceModule = (config: ResolvedConfig): string =>
   [
     ...config.stories.map(
       (pattern, index) =>
-        `import files${index} from ${JSON.stringify(`./${pattern.replace(/^\.\//, "")}?forgebook-files`)};`
+        `import files${index} from ${codeLiteral(`./${pattern.replace(/^\.\//, "")}?forgebook-files`)};`
     ),
     ...config.docs.map(
       (pattern, index) =>
-        `import docs${index} from ${JSON.stringify(`./${pattern.replace(/^\.\//, "")}?forgebook-docs-pages`)};`
+        `import docs${index} from ${codeLiteral(`./${pattern.replace(/^\.\//, "")}?forgebook-docs-pages`)};`
     ),
     "export const source = {",
-    `  id: ${JSON.stringify(OWN_SOURCE_ID)},`,
-    `  name: ${JSON.stringify(config.title)},`,
+    `  id: ${codeLiteral(OWN_SOURCE_ID)},`,
+    `  name: ${codeLiteral(config.title)},`,
     `  files: [${config.stories.map((_pattern, index) => `files${index}`).join(", ")}],`,
     ...(config.docs.length === 0
       ? []

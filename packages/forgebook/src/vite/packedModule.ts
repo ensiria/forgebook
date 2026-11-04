@@ -14,6 +14,7 @@ import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
+import { codeLiteral, codeOfJson } from "../codeLiteral.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /**
@@ -34,8 +35,8 @@ export type EmitAsset = (asset: {
   readonly source: Uint8Array;
 }) => unknown;
 
-/** The JSON as it is, on a dev server. */
-export const inlineJson: PackJson = (json: string): string => json;
+/** The JSON as code of the same value, on a dev server. */
+export const inlineJson: PackJson = (json: string): string => codeOfJson(json);
 
 /**
  * The name a build gives a JSON document's gzipped file: its content's hash, so a host may keep it for ever. Twelve
@@ -68,7 +69,7 @@ export const packedLoaderMaker = (name: string): string =>
     `const ${name} = (file) => {`,
     "  let loading;",
     "  return () => {",
-    `    loading ??= import(${JSON.stringify(PACKED_TEXT)})`,
+    `    loading ??= import(${codeLiteral(PACKED_TEXT)})`,
     "      .then((module) => module.packedJson(import.meta.env.BASE_URL + file))",
     "      .catch((error) => {",
     "        loading = undefined;",
@@ -91,6 +92,6 @@ export const packedJsonOf =
   (json: string): string => {
     const fileName = packedFileName(json);
     emit({ type: "asset", fileName, source: gzippedJson(json) });
-    const address = `import.meta.env.BASE_URL + ${JSON.stringify(fileName)}`;
-    return `import(${JSON.stringify(PACKED_TEXT)}).then((module) => module.packedJson(${address}))`;
+    const address = `import.meta.env.BASE_URL + ${codeLiteral(fileName)}`;
+    return `import(${codeLiteral(PACKED_TEXT)}).then((module) => module.packedJson(${address}))`;
   };

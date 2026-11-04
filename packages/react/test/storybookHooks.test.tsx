@@ -7,6 +7,7 @@
  */
 
 import { heldStoryClock } from "@forgebook/story-format/clock";
+import { codeLiteral } from "forgebook/code-literal";
 import type { ArgsChange, StoryDrawing } from "forgebook/renderer";
 import { type LoadedStory, readPreview, readStory } from "forgebook/story-module";
 import { type ReactNode, useState } from "react";
@@ -113,7 +114,7 @@ const MODULE_ID =
 describe("storybookPreviewApi", () => {
   it("answers an import of Storybook's preview API with Forgebook's hooks beside the rest of Storybook's", () => {
     const withPackage = previewApiModule(MODULE_ID);
-    expect(withPackage).toContain('export * from "storybook/preview-api";');
+    expect(withPackage).toContain(`export * from ${codeLiteral("storybook/preview-api")};`);
     expect(withPackage).toContain(
       'export { useArgs, useGlobals, useParameter, useStoryContext, useChannel } from "@forgebook/react/storybook-hooks";'
     );

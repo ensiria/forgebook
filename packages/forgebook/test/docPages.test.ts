@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { catalogueTools } from "../bin/forgebook/mcpTools.ts";
 import { catalogueMarkdown } from "../bin/forgebook-docs/catalogueMarkdown.ts";
 import { llmsText } from "../bin/forgebook-docs/llmsText.ts";
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { type DocBlock, isDocPage, linkedHtml } from "../src/docPages.ts";
 import { NO_PREVIEW } from "../src/frame/storyModule.ts";
 import { findPage, pageGroups } from "../src/pageTree.ts";
@@ -308,7 +309,7 @@ describe("the modules", () => {
     const watched: string[] = [];
     const code = docPagesModule(KIT_DIR, "docs/**/*.md", (file) => watched.push(file), true);
     expect(code).toContain(
-      `"./docs/getting-started.md": () => import(${JSON.stringify(`${VITE_PATHS.join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
+      `${codeLiteral("./docs/getting-started.md")}: () => import(${codeLiteral(`${VITE_PATHS.join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
     );
     expect(code).toContain("module.text");
     expect(new Set(watched).size).toBe(5);
@@ -325,7 +326,7 @@ describe("the modules", () => {
     const file = join(KIT_DIR, "docs/guides/theming.md");
     const code = docPageModule(file, () => undefined, false);
     expect(code).toContain(
-      `import asset0 from ${JSON.stringify(`${VITE_PATHS.join(KIT_DIR, "logo.svg")}?url`)};`
+      `import asset0 from ${codeLiteral(`${VITE_PATHS.join(KIT_DIR, "logo.svg")}?url`)};`
     );
     expect(code).toContain("assets: [asset0]");
     expect(code).not.toContain("export const text");

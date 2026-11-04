@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 
 import type { StoryMarkdown } from "@forgebook/story-format/source";
 
+import { codeLiteral } from "../codeLiteral.ts";
 import type { ComponentFiles } from "./adapter.ts";
 import { componentImport } from "./componentImport.ts";
 import { type DiskCache, isSettledSince, nowNs, stampPaths } from "./diskCache.ts";
@@ -29,7 +30,7 @@ type AnsweredModule = { code: string; moduleType: "js" };
  * @param value - the value, as JSON.
  */
 const valueModule = (value: unknown): AnsweredModule => ({
-  code: `export default ${JSON.stringify(value)};`,
+  code: `export default ${codeLiteral(value)};`,
   moduleType: "js"
 });
 
@@ -143,7 +144,7 @@ const markdownModule = async (file: string, watch: (file: string) => void): Prom
   watch(file);
   const { markdownHtml } = await import("./componentPage.ts");
   const value: StoryMarkdown = { html: markdownHtml(readFileSync(file, "utf8")) };
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
+  return { code: `export default ${codeLiteral(value)};`, moduleType: "js" };
 };
 
 /** What the text modules need of the plugin. */

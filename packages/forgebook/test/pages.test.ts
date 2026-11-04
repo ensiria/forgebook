@@ -4,10 +4,14 @@
  *
  * @module
  */
-import { win32 } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, win32 } from "node:path";
 
+import { createServer } from "vite";
 import { describe, expect, it } from "vitest";
 
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { SAME_ORIGIN } from "../src/frameOrigins.ts";
 import type { ForgebookPlugin } from "../src/plugin.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
@@ -85,22 +89,24 @@ describe("the generated pages", () => {
 
   it("mounts the shell with the data, the logo, the own stories before the packages' and the code writer", () => {
     const entry = shellEntry(CONFIG);
-    expect(entry).toContain(`import { codeOf } from ${JSON.stringify(STUB_FRAMEWORK.pages.code)};`);
+    expect(entry).toContain(`import { codeOf } from ${codeLiteral(STUB_FRAMEWORK.pages.code)};`);
     expect(entry).toContain("    frames: config.frames,");
     expect(frameEntry(CONFIG)).toContain("    frames: config.frames,");
-    expect(entry).toContain('import logo from "/catalogue/logo.svg?url";');
-    expect(entry).toContain('import { source as source0 } from "/catalogue/.forgebook-stories.ts";');
-    expect(entry).toContain('import { source as source1 } from "@acme/ui/stories";');
+    expect(entry).toContain(`import logo from ${codeLiteral("/catalogue/logo.svg?url")};`);
+    expect(entry).toContain(
+      `import { source as source0 } from ${codeLiteral("/catalogue/.forgebook-stories.ts")};`
+    );
+    expect(entry).toContain(`import { source as source1 } from ${codeLiteral("@acme/ui/stories")};`);
     expect(entry).toContain("sources: [source0, source1],");
   });
 
   it("makes the project's own source from its docs pages alone, and lists them", () => {
     const docsOnly = { ...CONFIG, stories: [], docs: ["./docs/**/*.md"] };
     expect(shellEntry(docsOnly)).toContain(
-      'import { source as source0 } from "/catalogue/.forgebook-stories.ts";'
+      `import { source as source0 } from ${codeLiteral("/catalogue/.forgebook-stories.ts")};`
     );
     const source = storiesSourceModule(docsOnly);
-    expect(source).toContain('import docs0 from "./docs/**/*.md?forgebook-docs-pages";');
+    expect(source).toContain(`import docs0 from ${codeLiteral("./docs/**/*.md?forgebook-docs-pages")};`);
     expect(source).toContain("  docs: [docs0],");
     expect(storiesSourceModule(CONFIG)).not.toContain("docs:");
   });
@@ -113,16 +119,53 @@ describe("the generated pages", () => {
 
   it("mounts the framework's frame with the previews, the catalogue's last", () => {
     const entry = frameEntry(CONFIG);
-    expect(entry).toContain(`import { mountFrame } from ${JSON.stringify(STUB_FRAMEWORK.pages.frame)};`);
-    expect(entry).toContain('import * as preview0 from "/catalogue/forgebook.preview.tsx";');
+    expect(entry).toContain(`import { mountFrame } from ${codeLiteral(STUB_FRAMEWORK.pages.frame)};`);
+    expect(entry).toContain(`import * as preview0 from ${codeLiteral("/catalogue/forgebook.preview.tsx")};`);
     expect(entry).toContain("previews: [preview0]");
   });
 
   it("takes its previews' edits on a dev server, and none without previews", () => {
     const entry = frameEntry(CONFIG);
+    // as plain JSON: Vite reads the accepted files' text without decoding its escapes
     expect(entry).toContain('import.meta.hot.accept(["/catalogue/forgebook.preview.tsx"], (next) =>');
     expect(entry).toContain('"forgebook:previews"');
     expect(frameEntry({ ...CONFIG, previews: [] })).not.toContain("import.meta.hot");
+  });
+
+  it("names its previews' files so that Vite's dev server finds them", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-previews-hot-"));
+    const preview = join(dir, "forgebook.preview.ts");
+    writeFileSync(preview, "export const parameters = {};\n");
+    // the entry's preview imports and its hot block alone: the rest imports modules only a catalogue serves; served as
+    // JavaScript, so Vite reads the text as written, with no transform that would decode its escapes first
+    const entry = frameEntry({ ...CONFIG, previews: [preview] })
+      .split("\n")
+      .filter(
+        (line, at, lines) =>
+          line.startsWith("import * as preview") || at >= lines.indexOf("if (import.meta.hot)")
+      )
+      .join("\n");
+    const server = await createServer({
+      root: dir,
+      configFile: false,
+      logLevel: "silent",
+      server: { middlewareMode: true, hmr: { port: 0 } },
+      plugins: [
+        {
+          name: "entry",
+          resolveId: (id: string): string | undefined => (id === "/entry.js" ? id : undefined),
+          load: (id: string): string | undefined => (id === "/entry.js" ? entry : undefined)
+        }
+      ]
+    });
+    try {
+      // Vite reads the accepted files as written, and fails on one it cannot resolve
+      const transformed = await server.transformRequest("/entry.js");
+      expect(transformed?.code).toContain("import.meta.hot.accept(");
+    } finally {
+      await server.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("hands the frame axe's address when there is one, with what it imports", () => {
@@ -135,17 +178,19 @@ describe("the generated pages", () => {
   it("loads Testing Library for the plays only when the project installs it, and only on the first play", () => {
     expect(frameEntry(CONFIG)).not.toContain("@testing-library");
     const entry = frameEntry({ ...CONFIG, hasPlayTools: true });
-    expect(entry).toContain('import("@testing-library/dom"), import("@testing-library/user-event")');
+    expect(entry).toContain(
+      `import(${codeLiteral("@testing-library/dom")}), import(${codeLiteral("@testing-library/user-event")})`
+    );
     expect(entry).not.toMatch(/^import .*@testing-library/m);
   });
 
   it("hands the pages the configuration's data, and the own stories as one source named after the catalogue", () => {
     expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 })).toBe(
-      'export default {"title":"Acme <UI>","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}],"lists":{},"frames":{"kind":"ports","catalogue":5173,"frames":5174}};'
+      'export default {"title":"Acme \\u003cUI\\u003e","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}],"lists":{},"frames":{"kind":"ports","catalogue":5173,"frames":5174}};'
     );
     const source = storiesSourceModule(CONFIG);
-    expect(source).toContain('import files0 from "./src/**/*.stories.tsx?forgebook-files";');
-    expect(source).toContain('name: "Acme <UI>",');
+    expect(source).toContain(`import files0 from ${codeLiteral("./src/**/*.stories.tsx?forgebook-files")};`);
+    expect(source).toContain(`name: ${codeLiteral("Acme <UI>")},`);
   });
 });
 
@@ -175,23 +220,24 @@ describe("a catalogue's plugins", () => {
 
   it("loads a tab's view only when it opens: a dynamic import of the module it names", () => {
     const entry = shellEntry(listed);
-    expect(entry).toContain('load: () => import("@acme/plugin/tab")');
+    expect(entry).toContain(`load: () => import(${codeLiteral("@acme/plugin/tab")})`);
     expect(entry).toContain('when: {"parameter":"acme"}');
-    expect(entry).not.toMatch(/^import .*@acme\/plugin/m);
+    const staticImports = entry.split("\n").filter((line) => line.startsWith("import "));
+    expect(staticImports.join("\n")).not.toContain("plugin");
   });
 
   it("gives the shell the code that draws the plugins' views only with plugins that have views, loaded on first use", () => {
-    expect(shellEntry(CONFIG)).not.toContain("forgebook/shell/plugin-hosts");
+    expect(shellEntry(CONFIG)).not.toContain(codeLiteral("forgebook/shell/plugin-hosts"));
     const entry = shellEntry(listed);
     expect(entry).toContain(
-      'pluginHosts: () => import("forgebook/shell/plugin-hosts").then((module) => module.pluginHosts),'
+      `pluginHosts: () => import(${codeLiteral("forgebook/shell/plugin-hosts")}).then((module) => module.pluginHosts),`
     );
     expect(entry).not.toMatch(/^import .*plugin-hosts/m);
   });
 
   it("loads a docs block's view only when a page draws it", () => {
     const entry = shellEntry(listed);
-    expect(entry).toContain('{ fence: "acme", load: () => import("@acme/plugin/block") }');
+    expect(entry).toContain(`{ fence: "acme", load: () => import(${codeLiteral("@acme/plugin/block")}) }`);
   });
 
   it("picks the frame module of the catalogue's framework", () => {
@@ -200,18 +246,18 @@ describe("a catalogue's plugins", () => {
       plugins: [{ ...plugin, frame: { [STUB_FRAMEWORK.name]: "@acme/plugin/stub-frame" } }]
     };
     expect(frameEntry(byFramework)).toContain(
-      'import { frame as pluginFrame0 } from "@acme/plugin/stub-frame";'
+      `import { frame as pluginFrame0 } from ${codeLiteral("@acme/plugin/stub-frame")};`
     );
   });
 
   it("keeps a plugin's frame module out of the shell, and its tabs out of the frame", () => {
-    expect(shellEntry(listed)).not.toContain("@acme/plugin/frame");
-    expect(frameEntry(listed)).not.toContain("@acme/plugin/tab");
+    expect(shellEntry(listed)).not.toContain(codeLiteral("@acme/plugin/frame"));
+    expect(frameEntry(listed)).not.toContain(codeLiteral("@acme/plugin/tab"));
   });
 
   it("hands the frame each plugin's frame module, by its id", () => {
     const entry = frameEntry(listed);
-    expect(entry).toContain('import { frame as pluginFrame0 } from "@acme/plugin/frame";');
+    expect(entry).toContain(`import { frame as pluginFrame0 } from ${codeLiteral("@acme/plugin/frame")};`);
     expect(entry).toContain('plugins: [{ id: "acme", create: pluginFrame0 }],');
   });
 
@@ -228,8 +274,10 @@ describe("a catalogue's plugins", () => {
     expect(shellEntry(CONFIG)).not.toContain('from "react"');
     const entry = shellEntry({ ...CONFIG, home: "/catalogue/forgebook.home.md" });
     expect(entry).not.toContain('from "react"');
-    expect(entry).toContain('import("forgebook/shell/home")');
-    expect(entry).toContain('module.writtenHome(() => import("/catalogue/forgebook.home.md?forgebook-home")');
+    expect(entry).toContain(`import(${codeLiteral("forgebook/shell/home")})`);
+    expect(entry).toContain(
+      `module.writtenHome(() => import(${codeLiteral("/catalogue/forgebook.home.md?forgebook-home")})`
+    );
   });
 });
 
@@ -261,8 +309,8 @@ describe("a catalogue's theme", () => {
       sources: [],
       tokens: [{ path: "/catalogue/tokens.json", mode: undefined }]
     });
-    expect(entry).toContain('loadTokens: () => import("virtual:forgebook/tokens")');
-    expect(entry).not.toContain('from "virtual:forgebook/tokens"');
+    expect(entry).toContain(`loadTokens: () => import(${codeLiteral("virtual:forgebook/tokens")})`);
+    expect(entry).not.toContain(`from ${codeLiteral("virtual:forgebook/tokens")}`);
   });
 
   it("imports the catalogue's style sheet into the shell only", () => {
@@ -270,7 +318,7 @@ describe("a catalogue's theme", () => {
       ...CONFIG,
       shell: { ...CONFIG.shell, styleSheets: ["/catalogue/shell.css"] }
     };
-    expect(shellEntry(styled)).toContain('import "/catalogue/shell.css";');
+    expect(shellEntry(styled)).toContain(`import ${codeLiteral("/catalogue/shell.css")};`);
     expect(frameEntry(styled)).not.toContain("shell.css");
   });
 });
@@ -320,6 +368,6 @@ describe("the generated modules' paths on Windows", () => {
 
   it("imports the project's own stories by their module's path in Vite's form", () => {
     const own = { ...CONFIG, dir: "C:/Users/ada/app" };
-    expect(shellEntry(own)).toContain('from "C:/Users/ada/app/.forgebook-stories.ts";');
+    expect(shellEntry(own)).toContain(`from ${codeLiteral("C:/Users/ada/app/.forgebook-stories.ts")};`);
   });
 });

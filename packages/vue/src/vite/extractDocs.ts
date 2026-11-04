@@ -14,6 +14,7 @@
  */
 import { basename, dirname, extname, join } from "node:path";
 
+import { codeLiteral } from "forgebook/code-literal";
 import type { ComponentDocs, NoComponentDocs, PropDocs, SubcomponentDocs } from "forgebook/component-docs";
 import type { StoryComponentResult, StoryFileShape } from "forgebook/vite/adapter";
 import { chosenExport, summaryOf } from "forgebook/vite/docs-program";
@@ -95,7 +96,7 @@ const readablePlace = (checker: ComponentChecker, place: ComponentPlace): Compon
   const specifier = `./${basename(place.file).replace(/(\.d)?\.[cm]?[jt]sx?$/, "")}`;
   checker.updateFile(
     file,
-    `import { ${place.exportName} as Component } from ${JSON.stringify(specifier)};\nexport const component = Component;\n`
+    `import { ${place.exportName} as Component } from ${codeLiteral(specifier)};\nexport const component = Component;\n`
   );
   return { file, exportName: "component" };
 };

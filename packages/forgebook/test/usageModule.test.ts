@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { catalogueSettings } from "../src/catalogue.ts";
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { mergedUsage } from "../src/usedIn.ts";
 import { mergedLists } from "../src/vite/configFile.ts";
@@ -92,7 +93,9 @@ describe("a catalogue that turns Used in off", () => {
       hasUsage: false,
       hasReach: false
     });
-    expect(offered).toContain(`usage: () => import("virtual:forgebook-usage:${dir}::0::*.stories.tsx")`);
+    expect(offered).toContain(
+      `usage: () => import(${codeLiteral(`virtual:forgebook-usage:${dir}::0::*.stories.tsx`)})`
+    );
     expect(off).not.toContain("usage: ()");
     expect(off).not.toContain("reach: ()");
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES).hasUsedIn).toBe(true);
@@ -137,7 +140,7 @@ describe("a files module's loaders", () => {
       expect(Object.values(column ?? {}).every((loader) => typeof loader === "function")).toBe(true);
     }
     const first = keys[0] ?? "none";
-    expect(code.split(JSON.stringify(first))).toHaveLength(2);
+    expect(code.split(codeLiteral(first))).toHaveLength(2);
     expect(Reflect.get(Reflect.get(loaders, "index"), first)).toHaveProperty("stories");
   });
 });

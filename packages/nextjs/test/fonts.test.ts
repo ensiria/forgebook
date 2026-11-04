@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { codeLiteral } from "forgebook/code-literal";
 import { describe, expect, it } from "vitest";
 
 import { findFontCalls, replaceFontCalls } from "../src/vite/fonts/fontCalls.ts";
@@ -55,7 +56,7 @@ describe("findFontCalls and replaceFontCalls", () => {
     ]);
     const replaced = replaceFontCalls(MODULE, found, ["virtual:f/a", "virtual:f/b", "virtual:f/c"]);
     expect(replaced.split("\n")).toHaveLength(MODULE.split("\n").length);
-    expect(replaced).toContain('import __forgebookFont0 from "virtual:f/a";');
+    expect(replaced).toContain(`import __forgebookFont0 from ${codeLiteral("virtual:f/a")};`);
     expect(replaced).toContain("export const mono = __forgebookFont1\n\n\n;");
     expect(replaced).not.toContain("next/font");
     expect(findFontCalls("export const x = 1;", "/a.ts")).toEqual({ calls: [], imports: [], problems: [] });
@@ -107,6 +108,13 @@ const context = (
   };
 };
 
+/**
+ * The style sheet a font's module imports: the path its import's literal names.
+ *
+ * @param code - the module's code.
+ */
+const sheetOf = (code: string): string => String(JSON.parse(/import ("[^"]+")/.exec(code)?.[1] ?? '""'));
+
 describe("buildFontModule", () => {
   it("writes a local font's faces, with its file from the style sheet's folder, and its classes", async () => {
     const project = mkdtempSync(join(tmpdir(), "forgebook-next-app-"));
@@ -123,7 +131,7 @@ describe("buildFontModule", () => {
       join(project, "fonts.ts"),
       context()
     );
-    const sheet = /import "([^"]+)"/.exec(built.code)?.[1] ?? "";
+    const sheet = sheetOf(built.code);
     const css = readFileSync(sheet, "utf8");
     expect(css).toMatch(
       /font-family: '__brand_\w+';\n {2}src: url\("[^"]*brand\.woff2"\) format\("woff2"\);/
@@ -154,7 +162,7 @@ describe("buildFontModule", () => {
       end: 0
     };
     const built = await buildFontModule(call, "/app/fonts.ts", fetched);
-    const css = readFileSync(/import "([^"]+)"/.exec(built.code)?.[1] ?? "", "utf8");
+    const css = readFileSync(sheetOf(built.code), "utf8");
     expect(css).toMatch(/src: url\("\.\/google-\w+\.woff2"\)/);
     expect(built.code).toContain(`"fontFamily":"'Inter', system-ui"`);
     // the second time, the style sheet comes from the cache: nothing is fetched
@@ -177,9 +185,7 @@ describe("buildFontModule", () => {
       checked
     );
     expect(built.code).not.toContain("variable");
-    expect(readFileSync(/import "([^"]+)"/.exec(built.code)?.[1] ?? "", "utf8")).not.toContain(
-      "display:none"
-    );
+    expect(readFileSync(sheetOf(built.code), "utf8")).not.toContain("display:none");
     expect(checked.warnings[0]).toContain("is not a value Next.js accepts");
     const local = context();
     const first = mkdtempSync(join(tmpdir(), "forgebook-next-a-"));

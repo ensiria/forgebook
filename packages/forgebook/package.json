@@ -81,7 +81,8 @@
     "./shell-theme": "./src/shellTheme.types.ts",
     "./plugin": "./src/plugin.ts",
     "./plugin-react": "./src/pluginReact.tsx",
-    "./figma-link": "./src/vite/figmaLink.ts"
+    "./figma-link": "./src/vite/figmaLink.ts",
+    "./code-literal": "./src/codeLiteral.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -330,6 +331,10 @@
       "./figma-link": {
         "types": "./dist/src/vite/figmaLink.d.ts",
         "default": "./dist/src/vite/figmaLink.js"
+      },
+      "./code-literal": {
+        "types": "./dist/src/codeLiteral.d.ts",
+        "default": "./dist/src/codeLiteral.js"
       }
     },
     "bin": {

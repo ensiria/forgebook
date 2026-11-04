@@ -11,6 +11,7 @@ import { gunzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
+import { codeLiteral } from "../src/codeLiteral.ts";
 import {
   type FileTexts,
   type GroupTexts,
@@ -56,7 +57,7 @@ describe("textsModuleCode", () => {
     expect(written[0]?.fileName).toMatch(/^assets\/[0-9a-f]{12}\.bin$/);
     expect(JSON.parse(gunzipSync(written[0]?.source ?? new Uint8Array()).toString())).toEqual(LONG_DOCS);
     expect(rowsOf(code)).toEqual([
-      [`packedText(${JSON.stringify(written[0]?.fileName)})`, "writtenText0", "writtenText1"]
+      [`packedText(${codeLiteral(written[0]?.fileName)})`, "writtenText0", "writtenText1"]
     ]);
   });
 

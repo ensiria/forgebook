@@ -141,7 +141,7 @@ describe("the frame's page and the plugins' settings", () => {
       { basePath: "", publicRuntimeConfig: {} }
     );
     expect(script).not.toContain("</script>");
-    expect(script).toContain("\\u003c/script>");
+    expect(script).toContain("\\u003c\\u002fscript\\u003e");
     expect(script).toContain('globalThis[Symbol.for("forgebook.nextjs.app")]');
   });
 

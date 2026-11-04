@@ -9,11 +9,9 @@
  *
  * @module
  */
+import { codeLiteral } from "../codeLiteral.ts";
 import { previewRelay } from "../previewRelay.ts";
 import { PREVIEW_ELEMENTS, type PreviewViewOptions, previewView } from "../previewView.ts";
-
-/** A value as text a script element can hold: nothing in it can close the element. */
-const scriptValue = (value: unknown): string => JSON.stringify(value).replaceAll("<", "\\u003c");
 
 /** The class of a frame still loading. */
 const LOADING_CLASS = "loading";
@@ -62,7 +60,7 @@ export const previewViewPage = (options: Omit<PreviewViewOptions, "loadingClass"
 <p id="${PREVIEW_ELEMENTS.status}" role="status"></p>
 <iframe id="${PREVIEW_ELEMENTS.frame}" hidden></iframe>
 <img id="${PREVIEW_ELEMENTS.picture}" alt="" hidden>
-<script>(${previewView.toString()})(${scriptValue({ ...options, loadingClass: LOADING_CLASS })}, ${scriptValue(PREVIEW_ELEMENTS)});</script>
+<script>(${previewView.toString()})(${codeLiteral({ ...options, loadingClass: LOADING_CLASS })}, ${codeLiteral(PREVIEW_ELEMENTS)});</script>
 </body>
 </html>
 `;
@@ -81,7 +79,7 @@ export const previewRelayPage = (frameAddress: string, title: string): string =>
 <style>html, body { margin: 0; background: transparent; }</style>
 </head>
 <body>
-<script>(${previewRelay.toString()})(${scriptValue(frameAddress)}, ${scriptValue(title)});</script>
+<script>(${previewRelay.toString()})(${codeLiteral(frameAddress)}, ${codeLiteral(title)});</script>
 </body>
 </html>
 `;

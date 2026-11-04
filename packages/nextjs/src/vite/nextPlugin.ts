@@ -17,6 +17,7 @@ import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { codeLiteral } from "forgebook/code-literal";
 import {
   type ConfigEnv,
   type HtmlTagDescriptor,
@@ -149,21 +150,18 @@ export const imageSettings = (
 
 /**
  * The script the frame's page runs before any module: the `process.env` Next.js gives the browser, and the settings
- * the stand-ins read.
+ * the stand-ins read. Set inline in the page, so every value is a `codeLiteral`: no text in it can close the script.
  *
  * @param env - the variables, by name.
  * @param settings - the settings.
  */
-export const pageScript = (env: Readonly<Record<string, unknown>>, settings: NextAppSettings): string => {
-  // a value holding `</script>` must not close the script: `<` is written as an escape, which JavaScript reads the same
-  const json = (value: unknown): string => JSON.stringify(value).replaceAll("<", "\\u003c");
-  return [
+export const pageScript = (env: Readonly<Record<string, unknown>>, settings: NextAppSettings): string =>
+  [
     "globalThis.process ??= { env: {} };",
     "globalThis.process.env ??= {};",
-    `Object.assign(globalThis.process.env, ${json(env)});`,
-    `globalThis[Symbol.for(${json(APP_SETTINGS_KEY)})] = ${json(settings)};`
+    `Object.assign(globalThis.process.env, ${codeLiteral(env)});`,
+    `globalThis[Symbol.for(${codeLiteral(APP_SETTINGS_KEY)})] = ${codeLiteral(settings)};`
   ].join("\n");
-};
 
 /**
  * The plugins of a Next.js catalogue.
@@ -195,7 +193,7 @@ export const nextPlugins = (options: NextjsOptions = {}): PluginOption[] => {
         // `next.config`'s `env` is written into the code that reads it, as Next.js does: a value no browser code reads
         // never reaches a page
         define: Object.fromEntries(
-          Object.entries(next.env).map(([name, value]) => [`process.env.${name}`, JSON.stringify(value)])
+          Object.entries(next.env).map(([name, value]) => [`process.env.${name}`, codeLiteral(value)])
         ),
         resolve: {
           // `@/components/…`: the paths of the project's tsconfig.json, as Next.js reads them
