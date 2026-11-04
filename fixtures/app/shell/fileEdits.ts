@@ -12,10 +12,11 @@
  * them once the file is back. A run killed outright leaves them there; the next test that edits the file puts them
  * back before reading it, so an edit is never taken for the file's text.
  *
- * Vite's watcher passes a file's change on at most once in 50 ms and drops the ones in between, and macOS hands it
- * changes in batches: a write that follows another of the same file closely is never seen, and the page keeps drawing
- * the one before. So each write, the put-back included, returns only once the dev server serves the file as written
- * and that window has passed: the next write, in this test or the next one, is always seen.
+ * Vite's watcher passes a file's change on at most once in 50 ms and drops the ones in between: a write that follows
+ * another of the same file closely is never seen, and the page keeps drawing the one before. So each write, the
+ * put-back included, returns only once the dev server serves the file as written and that window has passed: the next
+ * write, in this test or the next one, is always seen. The fixture app's server polls the files (`--poll`,
+ * `playwright.config.ts`), since the system's change events can come seconds late on a busy machine.
  *
  * Only one test may edit a given file at a time, whatever spec or repetition it is: the specs that use this fixture
  * run in the configuration's `story file edits` project, on one worker (`playwright.config.ts`).

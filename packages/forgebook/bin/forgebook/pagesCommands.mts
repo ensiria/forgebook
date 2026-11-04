@@ -1,14 +1,24 @@
 /**
- * The commands that read a catalogue's docs pages: `pages` (the list) and `page` (one, to read).
+ * The commands that read a catalogue's docs: `pages` (the list), `page` (one, to read) and `search` (everything, by
+ * its text).
  *
  * @module
  */
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
+import { EXIT } from "@ensiria/cli-kit/constants";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import { isPageDocument, isPagesDocument } from "../../src/vite/agentApi.ts";
-import { pagesText, pageText } from "./agentText.ts";
-import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
+import { MAX_QUERY } from "../../src/search.ts";
+import { isPageDocument, isPagesDocument, isSearchDocument } from "../../src/vite/agentApi.ts";
+import { pagesText, pageText, searchText } from "./agentText.ts";
+import {
+  askCatalogue,
+  COMMAND,
+  configOf,
+  type ForgebookOptions,
+  printAnswer,
+  printTokenAnswer
+} from "./catalogueCommands.ts";
 
 /** What both commands take. */
 const PAGE_OPTIONS = {
@@ -60,7 +70,13 @@ export const pagesCommands = (
     summary: "Print one docs page: its Markdown, its headings with --json, the address that opens it.",
     json: true,
     options: PAGE_OPTIONS,
-    positionals: [{ name: "id", description: "The page's id, as forgebook pages lists it.", required: true }],
+    positionals: [
+      {
+        name: "id",
+        description: "The page's id, as forgebook pages lists it; home for the catalogue's written home.",
+        required: true
+      }
+    ],
     examples: [
       { command: `${COMMAND} page kit:guides-theming`, description: "Read a page." },
       { command: `${COMMAND} page kit:guides-theming --json`, description: "With its headings, as JSON." }
@@ -71,6 +87,40 @@ export const pagesCommands = (
       const body = await askCatalogue(config, options.url, "page", params, log);
       if (!isPageDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
       printAnswer(pageText(body), body, body.problems, { io, log, isJson });
+    }
+  }),
+  search: forgebook.command({
+    summary: "Search the whole catalogue by its text: docs pages, props, descriptions, stories and names.",
+    json: true,
+    options: {
+      ...PAGE_OPTIONS,
+      limit: {
+        type: "number",
+        valueName: "count",
+        description: "How many results to give: 8 by default, 50 at most."
+      }
+    },
+    positionals: [{ name: "query", description: "The words to look for.", required: true }],
+    examples: [
+      { command: `${COMMAND} search onValueChange`, description: "The components with that prop." },
+      {
+        command: `${COMMAND} search "how the theme reaches a story" --json`,
+        description: "A sentence of the docs, with the address of its heading."
+      }
+    ],
+    run: async ({ args, options, io, log, isJson }): Promise<void> => {
+      const config = await configOf(options.config);
+      const { limit } = options;
+      if (limit !== undefined && (!Number.isInteger(limit) || limit < 1))
+        throw new ScriptError("--limit takes a whole number above 0", { exitCode: EXIT.usage });
+      const params = new URLSearchParams({
+        query: args.query.slice(0, MAX_QUERY),
+        view: options.view ?? "",
+        limit: String(limit ?? "")
+      });
+      const body = await askCatalogue(config, options.url, "search", params, log);
+      if (!isSearchDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
+      printTokenAnswer(searchText(body), body, { io, log, isJson });
     }
   })
 });

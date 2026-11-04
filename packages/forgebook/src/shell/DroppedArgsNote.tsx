@@ -1,45 +1,25 @@
 /**
- * The note above a story whose address names values it does not take: which ones were left out and why, and a button
- * that removes them from the address.
- *
- * @remarks
- * A link may carry values the story never declared (a prop renamed since, or a link crafted to reach an element's
- * attributes): they never reach the frame (`addressArgs.ts`), and the person who opened the link sees that they did
- * not, instead of a story that silently differs from the shared view.
+ * The note above a story whose address names values it does not take. Such a link is rare, so the note's module
+ * (`DroppedArgsList.tsx`) loads only when one is opened: the first screen carries this check alone.
  *
  * @module
  */
 import type { ReactNode } from "react";
 
-import type { DroppedArg } from "../addressArgs.ts";
-import { STRINGS } from "./strings.ts";
+import type { DroppedArgsListProps } from "./DroppedArgsList.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
 
-/** The note's props. */
-export type DroppedArgsNoteProps = {
-  /** The values left out. */
-  readonly dropped: readonly DroppedArg[];
-  /** Removes them from the address. */
-  readonly onRemove: () => void;
-};
+/** The note's module, loaded for the first link that names values its story does not take. */
+const DROPPED_ARGS_LIST = lazyModule(() =>
+  import("./DroppedArgsList.tsx").then((module) => module.DroppedArgsList)
+);
 
 /**
- * The note; nothing when no value was left out.
+ * The note; nothing when no value was left out, nor when its module cannot load.
  *
  * @param props - the values left out and the remover.
  */
-export const DroppedArgsNote = ({ dropped, onRemove }: DroppedArgsNoteProps): ReactNode =>
-  dropped.length === 0 ? null : (
-    <div className="forgebook-dropped-args" role="status">
-      <p className="forgebook-dropped-args__text">{STRINGS.droppedArgs}</p>
-      <ul className="forgebook-dropped-args__list">
-        {dropped.map(({ name, reason }) => (
-          <li key={name}>
-            <code>{name}</code> {STRINGS.droppedArgReasons[reason]}
-          </li>
-        ))}
-      </ul>
-      <button type="button" className="forgebook-text-button" onClick={onRemove}>
-        {STRINGS.removeDroppedArgs}
-      </button>
-    </div>
+export const DroppedArgsNote = (props: DroppedArgsListProps): ReactNode =>
+  props.dropped.length === 0 ? null : (
+    <LazyView module={DROPPED_ARGS_LIST} props={props} loading={null} failed={(): null => null} />
   );

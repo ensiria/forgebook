@@ -740,6 +740,16 @@
     gap: $space-3;
   }
 
+  // the device list, its icon before it as the width's, and the turn button after it while a device is shown
+  .forgebook-toolbar__control.forgebook-device-control {
+    gap: $space-1-5;
+
+    // as wide as the longest name, so every model reads whole and the bar keeps its width from one to another
+    .forgebook-select {
+      min-width: 10.5rem;
+    }
+  }
+
   // the width's field closes the presets' group: a custom width lights it as a chosen preset is lit
   .forgebook-width-field {
     display: inline-flex;
@@ -2043,6 +2053,18 @@
     padding: 0;
     list-style: none;
     font: $text-body;
+  }
+
+  // a page drawn for one audience says so, quietly, above what it shows
+  .forgebook-audience-note {
+    margin: 0;
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  // a designer's page gives the demo the room a wider column has; the frames' width follows it live
+  .forgebook-doc[data-audience="designer"] {
+    max-width: 72rem;
   }
 
   .forgebook-doc__lead {

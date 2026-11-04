@@ -26,6 +26,7 @@ import type {
   PageDocument,
   PagesDocument,
   PluginsDocument,
+  SearchDocument,
   StoriesDocument,
   StoryDocument,
   TokensDocument
@@ -319,16 +320,19 @@ export const pluginsText = (document: PluginsDocument): string => {
  * @param document - the pages document.
  * @param style - colours, glyphs and width.
  */
-export const pagesText = (document: PagesDocument, style: OutputStyle): string =>
-  document.pages.length === 0
+export const pagesText = (document: PagesDocument, style: OutputStyle): string => {
+  // the written home comes first, as the page a reader meets first
+  const pages = document.home === undefined ? document.pages : [document.home, ...document.pages];
+  return pages.length === 0
     ? "No docs pages here."
     : table(
-        document.pages.map((page) => [page.id, page.title, String(page.stories.length)]),
+        pages.map((page) => [page.id, page.title, String(page.stories.length)]),
         {
           columns: [{ header: "Id" }, { header: "Page", tone: "muted" }, { header: "Stories", tone: "muted" }]
         },
         uncut(style)
       );
+};
 
 /**
  * One docs page as a person reads it: where it opens, then its Markdown.
@@ -337,3 +341,22 @@ export const pagesText = (document: PagesDocument, style: OutputStyle): string =
  */
 export const pageText = (document: PageDocument): string =>
   [document.page.links.address, "", document.text].join("\n");
+
+/**
+ * What a search found as a person reads it: each result with its address, then what matched inside it.
+ *
+ * @param document - the search's document.
+ */
+export const searchText = (document: SearchDocument): string =>
+  document.results.length === 0
+    ? `Nothing in the catalogue holds "${document.query}".`
+    : document.results
+        .flatMap((result) => [
+          `${result.name} (${result.place})${result.missed.length === 0 ? "" : `, missing: ${result.missed.join(", ")}`}`,
+          `  ${result.address}`,
+          ...result.hits.flatMap((hit) => [
+            `  ${hit.kind}${hit.name === undefined ? "" : ` ${hit.name}`}: ${hit.text}`,
+            `    ${hit.address}`
+          ])
+        ])
+        .join("\n");

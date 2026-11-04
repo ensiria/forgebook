@@ -44,22 +44,25 @@ const NAME_HEADINGS: Readonly<Record<TableKind, () => string>> = {
 /**
  * One row, and under it, once unfolded, the members of its object type across the whole table.
  *
- * @param props - the row, whether the table has a Default column, and its number of columns.
+ * @param props - the row, whether the table has a Default column, its number of columns, and the part it belongs to:
+ * the row says its name (`data-prop`), for an address to open it.
  */
 const Row = ({
   row,
   hasDefaults,
-  columns
+  columns,
+  part
 }: {
   readonly row: RowDocs;
   readonly hasDefaults: boolean;
   readonly columns: number;
+  readonly part: string | undefined;
 }): ReactNode => {
   const [isOpen, setOpen] = useState(false);
   const { members } = row;
   return (
     <>
-      <tr>
+      <tr data-prop={part === undefined ? row.name : `${part}.${row.name}`}>
         <th scope="row">
           <code className="forgebook-api__name">{row.name}</code>
           {row.isRequired ? (
@@ -100,7 +103,12 @@ const Row = ({
       {members !== undefined && isOpen ? (
         <tr className="forgebook-api__members">
           <td colSpan={columns}>
-            <PropTable rows={members} kind="members" label={STRINGS.membersOf(row.type)} />
+            <PropTable
+              rows={members}
+              kind="members"
+              label={STRINGS.membersOf(row.type)}
+              part={part === undefined ? row.name : `${part}.${row.name}`}
+            />
           </td>
         </tr>
       ) : null}
@@ -111,16 +119,19 @@ const Row = ({
 /**
  * A table of props, events or members: the Default column only when one of them has a default.
  *
- * @param props - the rows, what they are, and the table's name when it needs one (a members table).
+ * @param props - the rows, what they are, the table's name when it needs one (a members table), and the part they
+ * belong to.
  */
 const PropTable = ({
   rows,
   kind,
-  label
+  label,
+  part
 }: {
   readonly rows: readonly RowDocs[];
   readonly kind: TableKind;
   readonly label?: string;
+  readonly part: string | undefined;
 }): ReactNode => {
   const hasDefaults = kind !== "events" && rows.some((row) => row.defaultValue !== undefined);
   return (
@@ -136,7 +147,13 @@ const PropTable = ({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <Row key={row.name} row={row} hasDefaults={hasDefaults} columns={hasDefaults ? 4 : 3} />
+            <Row
+              key={row.name}
+              row={row}
+              hasDefaults={hasDefaults}
+              columns={hasDefaults ? 4 : 3}
+              part={part}
+            />
           ))}
         </tbody>
       </table>
@@ -148,16 +165,18 @@ const PropTable = ({
  * A group of props: the props that name none as a table alone, a named group under its heading, open until a reader
  * folds it.
  *
- * @param props - the group, and the level of its heading.
+ * @param props - the group, the level of its heading, and the part it belongs to.
  */
 const GroupTable = ({
   group,
-  level
+  level,
+  part
 }: {
   readonly group: PropGroup<PropDocs>;
   readonly level: 3 | 4;
+  readonly part: string | undefined;
 }): ReactNode => {
-  if (group.name === undefined) return <PropTable rows={group.props} kind="props" />;
+  if (group.name === undefined) return <PropTable rows={group.props} kind="props" part={part} />;
   const Heading = level === 3 ? "h3" : "h4";
   return (
     <details className="forgebook-fold forgebook-api__group" open>
@@ -166,7 +185,7 @@ const GroupTable = ({
         <Heading className="forgebook-fold__name">{group.name}</Heading>
         <span className="forgebook-fold__count">{STRINGS.propCount(group.props.length)}</span>
       </summary>
-      <PropTable rows={group.props} kind="props" />
+      <PropTable rows={group.props} kind="props" part={part} />
     </details>
   );
 };
@@ -174,17 +193,19 @@ const GroupTable = ({
 /**
  * A component's or a part's props in their groups, then its events under their own heading.
  *
- * @param props - the props, the groups to list first, and the level of the headings: under the section's, or under a
- * part's.
+ * @param props - the props, the groups to list first, the level of the headings (under the section's, or under a
+ * part's) and the part they belong to.
  */
 const PropsAndEvents = ({
   props,
   groupOrder,
-  level
+  level,
+  part
 }: {
   readonly props: readonly PropDocs[];
   readonly groupOrder: readonly string[];
   readonly level: 3 | 4;
+  readonly part?: string;
 }): ReactNode => {
   const EventsHeading = level === 3 ? "h3" : "h4";
   const groups = groupedProps(
@@ -195,12 +216,12 @@ const PropsAndEvents = ({
   return (
     <>
       {groups.map((group) => (
-        <GroupTable key={group.name ?? ""} group={group} level={level} />
+        <GroupTable key={group.name ?? ""} group={group} level={level} part={part} />
       ))}
       {events.length === 0 ? null : (
         <>
           <EventsHeading>{STRINGS.events}</EventsHeading>
-          <PropTable rows={events} kind="events" />
+          <PropTable rows={events} kind="events" part={part} />
         </>
       )}
     </>
@@ -219,7 +240,7 @@ const SubcomponentReference = ({
   readonly docs: SubcomponentDocs;
   readonly groupOrder: readonly string[];
 }): ReactNode => (
-  <section className="forgebook-api__subcomponent" aria-label={docs.name}>
+  <section className="forgebook-api__subcomponent" aria-label={docs.name} data-prop={docs.name}>
     <h3>
       <code className="forgebook-inline-code">{docs.name}</code>
     </h3>
@@ -228,7 +249,7 @@ const SubcomponentReference = ({
         <CodeText text={docs.description} />
       </p>
     )}
-    <PropsAndEvents props={docs.props} groupOrder={groupOrder} level={4} />
+    <PropsAndEvents props={docs.props} groupOrder={groupOrder} level={4} part={docs.name} />
   </section>
 );
 

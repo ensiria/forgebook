@@ -62,6 +62,7 @@ test.describe("docs pages", () => {
       "Theming",
       "Choosing a select",
       "Writing for the kit",
+      "Blocks",
       "Plugin blocks",
       "About these stories"
     ]);

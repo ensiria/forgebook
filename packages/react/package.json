@@ -19,6 +19,7 @@
   "exports": {
     ".": "./src/stories.ts",
     "./clock": "./src/clock.ts",
+    "./storybook-hooks": "./src/storybookHooks.ts",
     "./texts": "./src/texts.ts",
     "./renderer": "./src/reactRenderer.tsx",
     "./frame-renderer": "./src/reactFrameRenderer.tsx",
@@ -67,6 +68,10 @@
       "./clock": {
         "types": "./dist/src/clock.d.ts",
         "default": "./dist/src/clock.js"
+      },
+      "./storybook-hooks": {
+        "types": "./dist/src/storybookHooks.d.ts",
+        "default": "./dist/src/storybookHooks.js"
       },
       "./texts": {
         "types": "./dist/src/texts.d.ts",

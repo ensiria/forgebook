@@ -33,6 +33,7 @@ const CONFIG: ResolvedConfig = {
   heights: "story-heights.json",
   stories: ["src/**/*.stories.tsx"],
   docs: [],
+  home: undefined,
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [{ id: "it", label: "Italiano" }],
@@ -212,6 +213,15 @@ describe("a catalogue's plugins", () => {
     });
     expect(entry).toContain('label: "A \\"quoted\\" name"');
   });
+
+  it("gives the shell a written home only when there is one, loaded on first use", () => {
+    expect(shellEntry(CONFIG)).not.toContain("home");
+    expect(shellEntry(CONFIG)).not.toContain('from "react"');
+    const entry = shellEntry({ ...CONFIG, home: "/catalogue/forgebook.home.md" });
+    expect(entry).not.toContain('from "react"');
+    expect(entry).toContain('import("forgebook/shell/home")');
+    expect(entry).toContain('module.writtenHome(() => import("/catalogue/forgebook.home.md?forgebook-home")');
+  });
 });
 
 describe("a catalogue's theme", () => {
@@ -232,6 +242,18 @@ describe("a catalogue's theme", () => {
 
   it("writes nothing for a catalogue with no theme", () => {
     expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).not.toContain("<style>");
+  });
+
+  it("gives the shell the tokens' module to load on first use, only when the catalogue or a source may have tokens", () => {
+    expect(shellEntry({ ...CONFIG, sources: [] })).not.toContain("loadTokens");
+    expect(shellEntry(CONFIG)).toContain("loadTokens");
+    const entry = shellEntry({
+      ...CONFIG,
+      sources: [],
+      tokens: [{ path: "/catalogue/tokens.json", mode: undefined }]
+    });
+    expect(entry).toContain('loadTokens: () => import("virtual:forgebook/tokens")');
+    expect(entry).not.toContain('from "virtual:forgebook/tokens"');
   });
 
   it("imports the catalogue's style sheet into the shell only", () => {

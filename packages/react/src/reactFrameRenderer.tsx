@@ -60,7 +60,8 @@ export const reactFrameRenderer: FrameRenderer = {
               {storyElement(
                 drawing.story,
                 storyContextOf(drawing, drawing.args, () => canvas),
-                drawing.decorators
+                drawing.decorators,
+                drawing.changeArgs
               )}
             </Drawn>
           </StoryErrorBoundary>

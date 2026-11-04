@@ -1,6 +1,6 @@
 /**
- * The tools that read a catalogue's docs pages: `list_pages` and `get_page`, each answered as the command of the same
- * name answers.
+ * The tools that read a catalogue's docs: `list_pages`, `get_page` and `search_catalogue`, each answered as the command
+ * of the same name answers.
  *
  * @module
  */
@@ -41,7 +41,10 @@ export const pageTools = (ask: Ask): readonly McpTool[] => [
     inputSchema: {
       type: "object",
       properties: {
-        id: { type: "string", description: "The page's id, as list_pages gives it." },
+        id: {
+          type: "string",
+          description: "The page's id, as list_pages gives it; `home` for the catalogue's written home."
+        },
         view: VIEW
       },
       required: ["id"],
@@ -52,6 +55,32 @@ export const pageTools = (ask: Ask): readonly McpTool[] => [
         await ask(
           "page",
           new URLSearchParams({ id: textOf(args, "id") ?? "", view: textOf(args, "view") ?? "" })
+        )
+      )
+  },
+  {
+    name: "search_catalogue",
+    description:
+      "Search the whole catalogue by its text: docs pages, props, events, descriptions, stories and names, as a person's search in the catalogue does. Use it to find which component has a prop, or where the docs say something; to find a component by what it is for, find_component. Each result lists what matched, the words it missed and the address that opens the exact heading or prop.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "The words to look for: a prop's name, a sentence." },
+        limit: { type: "number", description: "How many results to give; 8 by default, 50 at most." },
+        view: VIEW
+      },
+      required: ["query"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(
+        await ask(
+          "search",
+          new URLSearchParams({
+            query: textOf(args, "query") ?? "",
+            limit: String(args["limit"] ?? ""),
+            view: textOf(args, "view") ?? ""
+          })
         )
       )
   }

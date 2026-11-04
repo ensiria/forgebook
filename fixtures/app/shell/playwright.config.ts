@@ -27,6 +27,13 @@ import { runGroup } from "./catalogueGroups";
 import { type Catalogue, catalogueUrl, framesPortOf, portOf } from "./ports";
 
 /**
+ * The catalogues whose dev server notices edits by polling (`--poll`): the fixture app's, whose files the
+ * `story file edits` specs write. On a busy machine the system's change events come seconds late, past an assertion's
+ * wait; polling checks the files itself, every 100 ms, without the system's event service.
+ */
+const POLLING_CATALOGUES: readonly Catalogue[] = ["app"];
+
+/**
  * A catalogue as an app runs it: the forgebook command over its configuration, no page of its own; with a cold
  * dependency cache every run, as a first start, so a page that reloads while Vite discovers a package fails here.
  *
@@ -39,7 +46,7 @@ const catalogueServer = (
   catalogue: Catalogue,
   configFile?: string
 ): { command: string; cwd: string; url: string; reuseExistingServer: boolean } => ({
-  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${portOf(catalogue)} --frame-port ${framesPortOf(catalogue)} --force`,
+  command: `pnpm exec forgebook dev${configFile === undefined ? "" : ` --config ${configFile}`} --host 127.0.0.1 --port ${portOf(catalogue)} --frame-port ${framesPortOf(catalogue)} --force${POLLING_CATALOGUES.includes(catalogue) ? " --poll" : ""}`,
   cwd: folder,
   url: catalogueUrl(catalogue),
   reuseExistingServer: false
@@ -60,7 +67,9 @@ const SERVERS: Readonly<Record<Catalogue, { folder: string; configFile?: string 
   nuxt: { folder: join(import.meta.dirname, "..", "..", "nuxt") },
   angular: { folder: join(import.meta.dirname, "..", "..", "angular") },
   sveltekit: { folder: join(import.meta.dirname, "..", "..", "sveltekit") },
-  "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") }
+  "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") },
+  // the fixture app without its written home, for the home every catalogue without one keeps (`home.e2e.ts`)
+  "generated-home": { folder: join(import.meta.dirname, ".."), configFile: "forgebook.generated.config.ts" }
 };
 
 /** The catalogues and specs this run takes: all of them, or one group (`catalogueGroups.ts`). */

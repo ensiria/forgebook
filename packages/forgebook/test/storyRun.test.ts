@@ -88,6 +88,8 @@ const run = async (
       reports.controls = controls;
     },
     onEvent,
+    panelArgsOf: (): PanelArgs => ({}),
+    onArgsChange: (): undefined => undefined,
     onError: (message: string): void => {
       reports.errors.push(message);
     },
@@ -497,6 +499,8 @@ describe("runStory with a second framework", () => {
       onEvent: (name: string, values: readonly unknown[]): void => {
         calls.push(`${name}(${values.join(", ")})`);
       },
+      panelArgsOf: (): PanelArgs => ({}),
+      onArgsChange: (): undefined => undefined,
       onError: (): undefined => undefined,
       onTrace: () => undefined
     });

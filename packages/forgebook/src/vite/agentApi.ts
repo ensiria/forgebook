@@ -14,7 +14,7 @@ import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.
 import { isLiveErrorReport } from "../liveErrors.ts";
 import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
 import type { UsageIndex } from "../usedIn.ts";
-import { frameAddressOf, storyAddressOf } from "../viewState.ts";
+import { componentAddressOf, frameAddressOf, storyAddressOf } from "../viewState.ts";
 import type {
   AgentComponent,
   AgentDesign,
@@ -28,6 +28,7 @@ import type {
   NearestTokensDocument,
   PageDocument,
   PagesDocument,
+  SearchDocument,
   StoriesDocument,
   StoryDocument,
   StoryLinks,
@@ -52,6 +53,8 @@ export type CataloguePages = {
  */
 export const storyLinks = (pages: CataloguePages, id: string, view: string): StoryLinks => ({
   address: storyAddressOf(pages.page, id, view),
+  // the last `--` ends the component's id: a source's own id may hold one
+  component: componentAddressOf(pages.page, id.slice(0, id.lastIndexOf("--")), view),
   frame: frameAddressOf(pages.frame, id, view),
   embed: embedAddressOf(pages.page, id, view)
 });
@@ -72,6 +75,8 @@ const agentStory = (
   isUnlisted,
   ...(story.height === undefined ? {} : { height: story.height }),
   isLogic: story.isLogic,
+  hasPlay: story.hasPlay,
+  ...(story.device === undefined ? {} : { device: story.device }),
   links: storyLinks(pages, story.id, view)
 });
 
@@ -403,6 +408,19 @@ export const isFoundComponentsDocument = (value: unknown): value is FoundCompone
   value["schema"] === 1 &&
   typeof value["query"] === "string" &&
   Array.isArray(value["components"]);
+
+/**
+ * Whether a value is a search's document, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isSearchDocument = (value: unknown): value is SearchDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  typeof value["query"] === "string" &&
+  typeof value["total"] === "number" &&
+  Array.isArray(value["results"]) &&
+  Array.isArray(value["problems"]);
 
 /**
  * Whether a value is the changed stories' document, as a client receives it over HTTP.

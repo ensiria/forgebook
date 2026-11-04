@@ -11,6 +11,7 @@
  *
  * @module
  */
+import { OWN_SOURCE_ID } from "../docPages.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
 import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
 import type { FramesPlacement } from "../frameOrigins.ts";
@@ -18,6 +19,7 @@ import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { pluginFrameModule } from "./pluginConfig.ts";
+import { HOME_QUERY } from "./textQueries.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The pages, by their file name. */
@@ -28,6 +30,9 @@ export type PageFile = (typeof PAGE_FILES)[number];
 
 /** The module the pages read the configuration's data from. */
 export const CONFIG_MODULE = "virtual:forgebook/config";
+
+/** The module the shell reads the design tokens from, imported on first use: a page that shows none never loads it. */
+export const TOKENS_MODULE = "virtual:forgebook/tokens";
 
 /**
  * The entries the pages load, by page: file names in the configuration's folder, never written to disk. Named as
@@ -44,12 +49,9 @@ export const STORIES_SOURCE_FILE = ".forgebook-stories.ts";
 
 /**
  * The file name, in the configuration's folder, of the module the dev server loads to answer tools and agents: the
- * sources and the previews, as the frame gets them (never written to disk).
+ * sources, as the frame gets them (never written to disk).
  */
 export const AGENT_SOURCES_FILE = ".forgebook-agent.ts";
-
-/** The project's own stories' source id. */
-export const OWN_SOURCE_ID = "stories";
 
 /** A module the plugin generates in the configuration's folder: a page, a page's entry, or one of the two sources. */
 export type PageModule =
@@ -253,6 +255,23 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
   };
 };
 
+/** The module the entry loads the written home's view from, on first use. */
+export const WRITTEN_HOME_MODULE = "forgebook/shell/home";
+
+/**
+ * The shell's written home, as the entry writes it: loaded as the home opens, with its text, so a catalogue without
+ * one pays nothing for it, and the shell's own code holds nothing of it.
+ *
+ * @param home - the home's absolute path.
+ */
+const writtenHomeCode = (home: string): string =>
+  [
+    "() =>",
+    `      import(${JSON.stringify(WRITTEN_HOME_MODULE)}).then((module) =>`,
+    `        module.writtenHome(() => import(${JSON.stringify(`${home}${HOME_QUERY}`)}).then((page) => page.default))`,
+    "      )"
+  ].join("\n");
+
 /**
  * The shell's list of the plugins' tabs and docs blocks, each with the import that loads its view when it is first
  * needed; nothing for a catalogue without any, whose entry is then what it would be with no plugin.
@@ -300,6 +319,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.logo === undefined ? [] : ["    logo,"]),
     ...(config.shell.hasBranding ? [] : ["    hasBranding: false,"]),
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
+    ...(config.home === undefined ? [] : [`    home: ${writtenHomeCode(config.home)},`]),
     `    sources: ${sources.list},`,
     '    frameUrl: "frame.html",',
     "    frames: config.frames,",
@@ -310,6 +330,10 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.framework.addressTexts === undefined
       ? []
       : [`    addressTexts: ${JSON.stringify(config.framework.addressTexts)},`]),
+    // a source may declare tokens of its own, read with the catalogue's
+    ...(config.tokens.length === 0 && config.sources.length === 0
+      ? []
+      : [`    loadTokens: () => import(${JSON.stringify(TOKENS_MODULE)}).then((module) => module.default),`]),
     "    codeOf",
     "  });",
     ""
@@ -402,20 +426,15 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
 };
 
 /**
- * The module the dev server loads to answer tools and agents: the sources the frame mounts, and a loader for each of
- * its previews, which a browser's code may keep from loading on the server (`sources`, `previews`), with the same
- * imports the pages use.
+ * The module the dev server loads to answer tools and agents: the sources the frame mounts (`sources`), with the same
+ * imports the pages use. The previews are loaded beside it, each on its own (`previewRunner.ts`): a browser's code may
+ * keep one from loading on the server.
  *
  * @param config - the configuration.
  */
 export const agentSourcesModule = (config: ResolvedConfig): string => {
   const sources = sourcesCode(config);
-  return [
-    ...sources.imports,
-    `export const sources = ${sources.list};`,
-    `export const previews = [${config.previews.map((file) => `() => import(${JSON.stringify(file)})`).join(", ")}];`,
-    ""
-  ].join("\n");
+  return [...sources.imports, `export const sources = ${sources.list};`, ""].join("\n");
 };
 
 /**

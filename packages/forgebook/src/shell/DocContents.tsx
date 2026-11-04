@@ -6,8 +6,9 @@
  */
 import { type MouseEvent, type ReactNode, type RefObject, useEffect, useState } from "react";
 
-import { type DocHeading, headingElementId } from "../docPages.ts";
-import { STRINGS } from "./strings.ts";
+import { headingElementId } from "../docAnchors.ts";
+import { type DocHeading, filledText, type PageValues } from "../docPages.ts";
+import { PAGE_STRINGS } from "./pageStrings.ts";
 
 /** How far below the page's top a heading counts as being read, in CSS px. */
 const READING_LINE = 96;
@@ -70,6 +71,8 @@ const useReadHeading = (
 export type DocContentsProps = {
   /** The page's headings. */
   readonly headings: readonly DocHeading[];
+  /** The values a heading's text names (`{{title}}`). */
+  readonly values: PageValues;
   /** The page's scrolling element. */
   readonly scrollRef: RefObject<HTMLElement | null>;
   /** Whether there is room for a column beside the text. */
@@ -87,10 +90,11 @@ export type DocContentsProps = {
  */
 const ContentsList = ({
   headings,
+  values,
   current,
   hrefOf,
   onOpen
-}: Pick<DocContentsProps, "headings" | "hrefOf" | "onOpen"> & {
+}: Pick<DocContentsProps, "headings" | "values" | "hrefOf" | "onOpen"> & {
   readonly current: string | undefined;
 }): ReactNode => (
   <ul className="forgebook-contents__list">
@@ -106,7 +110,7 @@ const ContentsList = ({
             onOpen(heading.anchor);
           }}
         >
-          {heading.text}
+          {filledText(heading.text, values)}
         </a>
       </li>
     ))}
@@ -120,6 +124,7 @@ const ContentsList = ({
  */
 export const DocContents = ({
   headings,
+  values,
   scrollRef,
   isColumn,
   hrefOf,
@@ -127,16 +132,18 @@ export const DocContents = ({
 }: DocContentsProps): ReactNode => {
   const current = useReadHeading(scrollRef, headings);
   if (headings.length < 2) return null;
-  const list = <ContentsList headings={headings} current={current} hrefOf={hrefOf} onOpen={onOpen} />;
+  const list = (
+    <ContentsList headings={headings} values={values} current={current} hrefOf={hrefOf} onOpen={onOpen} />
+  );
   return isColumn ? (
-    <nav className="forgebook-contents forgebook-contents--column" aria-label={STRINGS.pageContents}>
-      <p className="forgebook-contents__title">{STRINGS.pageContents}</p>
+    <nav className="forgebook-contents forgebook-contents--column" aria-label={PAGE_STRINGS.pageContents}>
+      <p className="forgebook-contents__title">{PAGE_STRINGS.pageContents}</p>
       {list}
     </nav>
   ) : (
     <details className="forgebook-contents forgebook-contents--fold">
-      <summary className="forgebook-contents__title">{STRINGS.pageContents}</summary>
-      <nav aria-label={STRINGS.pageContents}>{list}</nav>
+      <summary className="forgebook-contents__title">{PAGE_STRINGS.pageContents}</summary>
+      <nav aria-label={PAGE_STRINGS.pageContents}>{list}</nav>
     </details>
   );
 };

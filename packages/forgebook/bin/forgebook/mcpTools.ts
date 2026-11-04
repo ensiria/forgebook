@@ -1,8 +1,8 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page` and `list_plugins`; and `story_preview` (`mcpPreview.ts`), for a client that
- * renders apps.
+ * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
+ * for a client that renders apps.
  *
  * @module
  */
@@ -264,7 +264,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -395,7 +395,7 @@ export const catalogueTools = ({
   {
     name: "story_shot",
     description:
-      "Take a story's pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files' paths. Views are written as the catalogue's address writes them (theme=dark&width=360) or as words (\"dark it 360\"). Needs @forgebook/testing and Playwright in the project.",
+      'Take a story\'s pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files\' paths. Views are written as the catalogue\'s address writes them (theme=dark&width=360) or as words ("dark it 360"); a device model\'s id in a view ("iphone-16", "pixel-9 landscape") frames the picture in that device. Needs @forgebook/testing and Playwright in the project.',
     inputSchema: {
       type: "object",
       properties: {

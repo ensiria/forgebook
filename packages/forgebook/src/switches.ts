@@ -13,6 +13,8 @@
  * @module
  */
 
+import { DEVICE_PARAMETER, ORIENTATION_PARAMETER } from "./deviceView.ts";
+
 /** One value a switch offers. */
 export type SwitchValue = {
   /** The value, as the address and the root's attribute write it (`dark`). */
@@ -70,7 +72,7 @@ export type ViewSwitch = {
 };
 
 /** The address's own parameters: a switch may not take their names. */
-const RESERVED_IDS = [
+const RESERVED_IDS: readonly string[] = [
   "embed",
   "story",
   "component",
@@ -84,9 +86,12 @@ const RESERVED_IDS = [
   "tab",
   "zoom",
   "tools",
+  DEVICE_PARAMETER,
+  ORIENTATION_PARAMETER,
   "args",
   "matrix",
-  "clock"
+  "clock",
+  "audience"
 ];
 
 /**

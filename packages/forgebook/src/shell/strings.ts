@@ -3,7 +3,7 @@
  * its words together keeps them consistent and ready for a translation.
  *
  * @remarks
- * A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
+ * Only the audiences' texts (`audiencePage.ts`) live elsewhere, to stay out of the first load. A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
  * its configuration): the shell applies the replacements once, before it draws (`configureStrings`), as a translation
  * is set up, so every module keeps reading `STRINGS`. A text that takes values (`allStories(count)`) stays the shell's.
  *
@@ -15,19 +15,15 @@ import type { SheetsChoice, TextScale } from "../viewState.ts";
 // biome-ignore lint/nursery/useExplicitType: the texts' type is their own shape (`ShellStrings`); a written one would repeat every key
 const shellStrings = {
   searchPlaceholder: "Search",
-  searchLabel: "Search components, stories and docs",
+  searchLabel: "Search components, stories, props and docs",
   componentsNav: "Components",
   docsNav: "Docs",
-  pageContents: "On this page",
-  previousPage: "Previous",
-  nextPage: "Next",
-  docPageError: "The page could not be read",
   sidebarWidth: "Sidebar width",
   hideSidebar: "Hide the sidebar",
   showSidebar: "Show the sidebar",
   storiesNav: "Stories",
   allStories: (count: number): string => `All ${count} stories`,
-  noMatch: "No component matches",
+  noMatch: "No name matches",
   aliasPlace: (family: string): string => `in ${family}`,
   aliasHint: (place: string): string => `Lives in ${place}: listed here too`,
   alsoIn: (places: string): string => `also listed in ${places}`,
@@ -35,6 +31,8 @@ const shellStrings = {
   view: "View",
   viewChanged: "A view setting is changed",
   viewMenuError: "The View menu could not be loaded",
+  audienceError: "This part of the page could not be loaded",
+  compareError: "The comparison could not be loaded",
   controlChanged: (control: string): string => `${control}: changed`,
   controlKey: (control: string, key: string | undefined): string =>
     key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
@@ -117,6 +115,13 @@ const shellStrings = {
   heightHandle: "Story height",
   heightHandleHint: "Drag to change the story's height; double-click for its own",
   widthFillNote: "Fill: the story takes the whole stage",
+  device: "Device",
+  deviceNone: "No frame",
+  devicePhones: "Phones",
+  deviceGeneric: "Generic phone",
+  deviceTablets: "Tablets",
+  deviceTurn: "Turn the device",
+  setByDevice: "Set by the device frame",
   panel: "Panel",
   panelHeight: "Panel height",
   closePanel: "Close the panel",
@@ -197,18 +202,13 @@ const shellStrings = {
   backToPlace: "Back to its place",
   backToPlaceNamed: (name: string): string => `Put ${name} back in its place`,
   examples: "Examples",
+  audience: "Reading for",
+  audiences: { everyone: "Everyone", designer: "Designers", coder: "Coders", tester: "Testers" },
+  audienceElsewhere: "Changes a component's page",
   pageError: "The component's page could not be read",
   storyLabel: "Story",
   frameTitle: (component: string, story: string): string => `${component}: ${story}`,
   home: "Home",
-  homeEmpty: "No stories yet: a source with story files shows its families here.",
-  homeSummary: (components: number, sources: number): string =>
-    `${components} ${components === 1 ? "component" : "components"} in ${sources} ${sources === 1 ? "library" : "libraries"}.`,
-  homeIntroError: "The library's introduction could not be read",
-  recentlyOpened: "Recently opened",
-  componentsCount: (count: number): string => `${count} ${count === 1 ? "component" : "components"}`,
-  showAll: (count: number): string => `Show all ${count}`,
-  showFewer: "Show fewer",
   unknownStory: (id: string): string =>
     `No story "${id}": it may have been renamed. Pick one in the sidebar.`,
   unknownPage: (id: string): string => `No page "${id}": it may have been renamed. Pick one in the sidebar.`,
@@ -262,6 +262,9 @@ export type ShellStrings = typeof shellStrings;
 /** The shell's texts, as shown. */
 export const STRINGS: ShellStrings = shellStrings;
 
+/** The catalogue's replacements, for the texts that load after it set them. */
+let catalogueReplacements: Readonly<Record<string, string>> = {};
+
 /**
  * Whether a value is a group of texts (`tabs`), whose members a path can name.
  *
@@ -295,5 +298,34 @@ const replaceText = (texts: Record<string, unknown>, path: readonly string[], te
  * @param replacements - the new texts, by their path (`tabs.props`).
  */
 export const configureStrings = (replacements: Readonly<Record<string, string>>): void => {
+  catalogueReplacements = replacements;
   for (const [path, text] of Object.entries(replacements)) replaceText(STRINGS, path.split("."), text);
+};
+
+/**
+ * The texts of a part of the shell loaded on first use (the docs pages), with the catalogue's replacements applied as
+ * they load: they live with their part, so the first load does not carry them, and keep their names among the shell's
+ * texts, so a catalogue replaces them as any other.
+ *
+ * @param texts - the part's texts, as Forgebook writes them.
+ * @returns the same texts, replaced where the catalogue asks.
+ */
+export const lateStrings = <TTexts extends Record<string, unknown>>(texts: TTexts): TTexts => {
+  for (const [path, text] of Object.entries(catalogueReplacements)) replaceText(texts, path.split("."), text);
+  return texts;
+};
+
+/**
+ * Texts kept out of the first load, with the catalogue's replacements applied as those of `STRINGS` are.
+ *
+ * @param group - their name among the texts (`audienceTexts`): a replacement's path starts with it.
+ * @param texts - the texts.
+ * @returns the same texts, changed in place.
+ */
+export const textsOfGroup = <TTexts extends Record<string, unknown>>(
+  group: string,
+  texts: TTexts
+): TTexts => {
+  lateStrings({ [group]: texts });
+  return texts;
 };

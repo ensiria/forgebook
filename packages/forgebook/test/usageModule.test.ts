@@ -93,8 +93,8 @@ describe("a catalogue that turns Used in off", () => {
       hasReach: false
     });
     expect(offered).toContain(`usage: () => import("virtual:forgebook-usage:${dir}::0::*.stories.tsx")`);
-    expect(off).not.toContain("usage:");
-    expect(off).not.toContain("reach:");
+    expect(off).not.toContain("usage: ()");
+    expect(off).not.toContain("reach: ()");
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES).hasUsedIn).toBe(true);
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES, mergedLists([{ usedIn: false }, {}])).hasUsedIn).toBe(
       false

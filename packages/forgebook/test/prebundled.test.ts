@@ -20,6 +20,7 @@ const CONFIG: ResolvedConfig = {
   heights: undefined,
   stories: [],
   docs: [],
+  home: undefined,
   sources: ["@acme/ui/stories"],
   switches: undefined,
   languages: [],
@@ -74,6 +75,14 @@ describe("prebundled", () => {
     expect(names).toContain("forgebook/shell");
     expect(names).toContain(STUB_FRAMEWORK.pages.frame);
     expect(prebundled(CONFIG, LINKED)).not.toContain("forgebook/shell");
+  });
+
+  it("adds the written home's module only for a catalogue with a written home", () => {
+    const installed: Resolve = (name: string): string => `/app/node_modules/${name}/index.js`;
+    expect(prebundled(CONFIG, installed)).not.toContain("forgebook/shell/home");
+    expect(prebundled({ ...CONFIG, home: "/app/forgebook.home.md" }, installed)).toContain(
+      "forgebook/shell/home"
+    );
   });
 });
 

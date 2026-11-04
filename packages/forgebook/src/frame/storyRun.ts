@@ -23,7 +23,7 @@ import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
-import type { FrameRenderer, MountedStory, StoryDrawing, StoryIdentity } from "./renderer.ts";
+import type { ArgsChange, FrameRenderer, MountedStory, StoryDrawing, StoryIdentity } from "./renderer.ts";
 import { animationsSettled } from "./settle.ts";
 import { storyCanvas } from "./storyCanvas.ts";
 import { type PreparedStory, prepareStory } from "./storyHooks.ts";
@@ -81,6 +81,13 @@ export type StoryRunOptions = {
   readonly onControlsReady: (controls: StoryControls) => void;
   /** Called on every call of a recorded event, with its arguments. */
   readonly onEvent: (name: string, values: readonly unknown[]) => void;
+  /** What the panel can show of values: those it cannot (a function, an object) stay the frame's alone. */
+  readonly panelArgsOf: (values: Readonly<Record<string, unknown>>) => PanelArgs;
+  /**
+   * Called when the story changed its own args, after it was drawn again with them, with the panel's values the change
+   * makes, so the panel shows them.
+   */
+  readonly onArgsChange: (args: PanelArgs) => void;
   /** Called with the message when the story throws while it is drawn; the frame shows the error instead. */
   readonly onError: (message: string) => void;
   /** Called with the play function's trace after every change. */
@@ -193,6 +200,10 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let args: LoadedArgs = story.args;
   // the panel's values, kept over the story's own when an edit of its file brings new ones
   let panelValues: LoadedArgs = {};
+  // the values the story set itself that the panel cannot show, kept over the panel's until the story resets them
+  let ownValues: LoadedArgs = {};
+  // the args of the latest drawing: a change that hands back what the story was given changes nothing of it
+  let lastShown: LoadedArgs = {};
   let eventNames: readonly string[] = [];
   let matrix: Matrix | undefined;
   let mounted: { readonly story: MountedStory; readonly values: LoadedArgs }[] = [];
@@ -237,17 +248,42 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     ...withStoryTexts(mappedArgs(args, story.argTypes), text),
     ...recorded()
   });
-  const drawing = (values: LoadedArgs): StoryDrawing => ({
-    identity: options.identity,
-    story,
-    args: { ...shownArgs(), ...values },
-    texts,
-    clock,
-    decorators,
-    globals,
-    loaded: prepared.loaded,
-    onEvent: options.onEvent
-  });
+  const drawing = (values: LoadedArgs): StoryDrawing => {
+    lastShown = { ...shownArgs(), ...values };
+    return {
+      identity: options.identity,
+      story,
+      args: lastShown,
+      texts,
+      clock,
+      decorators,
+      globals,
+      loaded: prepared.loaded,
+      onEvent: options.onEvent,
+      changeArgs
+    };
+  };
+
+  // the story's own change of its args, kept as the panel's values are (Replay and an edit of its file keep it too); a
+  // value handed back as it was given (`updateArgs({ ...args, count })`) is left out: a recorded event's wrapper or a
+  // text in the shown language would otherwise stand for the story's own
+  const changeArgs = (change: ArgsChange): void => {
+    const isKept = (name: string): boolean => change.reset !== "all" && !change.reset.includes(name);
+    const keptOf = (values: LoadedArgs): LoadedArgs =>
+      Object.fromEntries(Object.entries(values).filter(([name]) => isKept(name)));
+    const changed = Object.fromEntries(
+      Object.entries(change.set).filter(([name, value]) => value !== lastShown[name])
+    );
+    const shown = options.panelArgsOf(changed);
+    panelValues = { ...keptOf(panelValues), ...changed };
+    ownValues = {
+      ...keptOf(ownValues),
+      ...Object.fromEntries(Object.entries(changed).filter(([name]) => !(name in shown)))
+    };
+    args = { ...story.args, ...ownValues, ...panelValues };
+    redraw();
+    options.onArgsChange(options.panelArgsOf(panelValues));
+  };
 
   const clearError = (): void => {
     shownError?.remove();
@@ -287,7 +323,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     },
     setPanelArgs: (panelArgs: PanelArgs): void => {
       panelValues = options.resolveArgs(panelArgs);
-      args = { ...story.args, ...panelValues };
+      args = { ...story.args, ...ownValues, ...panelValues };
       redraw();
     },
     setEvents: (names: readonly string[]): void => {
@@ -460,7 +496,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       story = next;
       decorators = nextDecorators;
       actions = actionNames(story.args, story.argTypes);
-      args = { ...story.args, ...panelValues };
+      args = { ...story.args, ...ownValues, ...panelValues };
       // a play drives the story from its start, and loaders and set-ups make what it draws: drawn in place, it would
       // show what the edit no longer writes
       const isPrepared = story.play !== undefined || story.loaders.length > 0 || story.beforeEach.length > 0;

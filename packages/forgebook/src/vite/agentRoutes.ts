@@ -1,15 +1,16 @@
 /**
  * The dev server's answers to tools and agents, under `/__forgebook/api/`: `stories` (every story) and `story?id=…`
- * (one in detail), `pages` and `page?id=…` (the docs pages), each with an optional `view` (the view's query,
- * `theme=dark&lang=it`) the links open in; and `preview?id=…`, the page that shows a story inside a client that renders
- * apps, the one answer that is not JSON.
+ * (one in detail), `pages` and `page?id=…` (the docs pages), `search?query=…` (everything, by its text), each with an
+ * optional `view` (the view's query, `theme=dark&lang=it`) the links open in; and `preview?id=…`, the page that shows a
+ * story inside a client that renders apps, the one answer that is not JSON.
  *
  * @remarks
- * The server loads the sources and the previews with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool
- * sees what the shell shows. A story module that fails on Node (it reads `window` while it loads) gives its story a
- * problem in the answer instead of an error, and a preview that does is left out of the answers and named among their
- * problems: it is written for a browser, and only its args and parameters are read here, so it must not cost a tool the
- * catalogue, nor change the answers without a word. Served by the dev server only, where
+ * The server loads the sources with the same imports the pages use (`AGENT_SOURCES_FILE`), so a tool sees what the
+ * shell shows. A story module that fails on Node (it reads `window` while it loads) gives its story a problem in the
+ * answer instead of an error. A preview is written for a browser, and only its args and parameters are read here: it
+ * loads with what it imports that needs a browser left as placeholders (`previewRunner.ts`), and one that still fails is
+ * left out of the answers and named among their problems, so it costs a tool neither the catalogue nor answers changed
+ * without a word. Served by the dev server only, where
  * Vite listens (localhost by default); a build has none of it.
  *
  * @module
@@ -44,6 +45,8 @@ import { hostOf } from "./framesServer.ts";
 import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { PREVIEW_ROUTE } from "./previewRoute.ts";
+import { loadPreview } from "./previewRunner.ts";
+import { searchAnswer } from "./searchRoute.ts";
 import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
 import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
@@ -77,9 +80,6 @@ type AgentModule = {
   readonly problems: readonly string[];
 };
 
-/** Whether a value loads a module. */
-const isLoader = (value: unknown): value is () => Promise<unknown> => typeof value === "function";
-
 /** A preview, read from what loads it, or why it cannot load on the server. */
 const loadedPreview = async (load: () => Promise<unknown>): Promise<LoadedPreview | string> => {
   try {
@@ -91,19 +91,23 @@ const loadedPreview = async (load: () => Promise<unknown>): Promise<LoadedPrevie
 };
 
 /**
- * The agent module read, or why it is not what the plugin generates.
+ * The agent module read with the catalogue's previews, or why it is not what the plugin generates.
  *
  * @param module - the module of `AGENT_SOURCES_FILE`, as the server loaded it.
+ * @param previews - what loads each preview, in the configuration's order.
  */
-export const agentModuleOf = async (module: unknown): Promise<AgentModule> => {
-  if (!isRecord(module) || !Array.isArray(module["sources"]) || !Array.isArray(module["previews"]))
+export const agentModuleOf = async (
+  module: unknown,
+  previews: readonly (() => Promise<unknown>)[]
+): Promise<AgentModule> => {
+  if (!isRecord(module) || !Array.isArray(module["sources"]))
     throw new Error("The catalogue's sources did not load");
   const sources = module["sources"].filter(isStorySource);
-  const previews = await Promise.all(module["previews"].filter(isLoader).map(loadedPreview));
+  const loaded = await Promise.all(previews.map(loadedPreview));
   return {
     sources,
-    preview: mergedPreviews(previews.map((each) => (typeof each === "string" ? NO_PREVIEW : each))),
-    problems: previews.filter((each) => typeof each === "string")
+    preview: mergedPreviews(loaded.map((each) => (typeof each === "string" ? NO_PREVIEW : each))),
+    problems: loaded.filter((each) => typeof each === "string")
   };
 };
 
@@ -139,6 +143,8 @@ const usageBySource = async (sources: readonly StorySource[]): Promise<Map<strin
 export type AgentServer = {
   /** Loads a module on the server. */
   readonly load: (id: string) => Promise<unknown>;
+  /** Loads a preview on the server, with what only a browser can load left as placeholders (`previewRunner.ts`). */
+  readonly loadPreview: (file: string) => Promise<unknown>;
   /** The file a source's module specifier leads to, as the pages' imports find it; none when nothing does. */
   readonly resolveSource: (specifier: string) => Promise<string | undefined>;
 };
@@ -155,6 +161,7 @@ export const agentServer = (server: ViteDevServer, config: ResolvedConfig): Agen
   const resolveId = createIdResolver(server.config, { scan: true });
   return {
     load: (id: string): Promise<unknown> => server.ssrLoadModule(id),
+    loadPreview: (file: string): Promise<unknown> => loadPreview(server.environments.ssr, file),
     resolveSource: (specifier: string): Promise<string | undefined> =>
       resolveId(server.environments.client, specifier, pageModulePath(config.dir, AGENT_SOURCES_FILE))
   };
@@ -303,7 +310,7 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
  * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
- *   tokens, `usedIn=true` for the list's "Used in" (a
+ *   tokens, `query` and `limit` for a search, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
  * @param origins - where the catalogue is served (`http://localhost:5173`) and where its frames are, for the links.
  * @param live - the errors the open frames reported, on a dev server a browser uses; none for a server of the
@@ -320,7 +327,10 @@ export const agentAnswer = async (
   try {
     const answerAlone = STORYLESS_ROUTES[route];
     if (answerAlone !== undefined) return await answerAlone(config, params, server.resolveSource);
-    const loaded = await agentModuleOf(await server.load(pageModulePath(config.dir, AGENT_SOURCES_FILE)));
+    const loaded = await agentModuleOf(
+      await server.load(pageModulePath(config.dir, AGENT_SOURCES_FILE)),
+      config.previews.map((file) => (): Promise<unknown> => server.loadPreview(file))
+    );
     const tree = storyTree(loaded.sources);
     const context: RouteContext = {
       loaded,
@@ -334,7 +344,8 @@ export const agentAnswer = async (
     if (route === "stories") return await storiesAnswer(context);
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
-    if (route === "pages") return pagesAnswer(context);
+    if (route === "search") return await searchAnswer(context);
+    if (route === "pages") return await pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context);
     if (route === "agent-index")

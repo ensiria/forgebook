@@ -7,14 +7,24 @@
 import type { StoryFileCode } from "@forgebook/story-format/source";
 import { type ChangeEvent, type MouseEvent, type ReactNode, useId, useState } from "react";
 
+import { deviceDefaultOf, type StoryDevice, shownDevice } from "../deviceView.ts";
 import type { PanelArgs } from "../messages.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
-import { frameAddress, type ViewState } from "../viewState.ts";
+import { frameAddress, schemeOf, type ViewState } from "../viewState.ts";
 import { type BoxWidth, BoxWidthControl, useBoxWidth } from "./BoxWidth.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { useCodeWriter } from "./codeWriter.ts";
+import {
+  DeviceSlot,
+  deviceAddress,
+  type FramedDevice,
+  inkScheme,
+  isWaitingForDevice,
+  roomSizing,
+  useFramedDevice
+} from "./DeviceSlot.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { StageViewport } from "./StageViewport.tsx";
@@ -25,12 +35,26 @@ import { useCopy } from "./useCopy.ts";
 import { type FullPage, useFullPage } from "./useFullPage.ts";
 import { useLoadedView } from "./useLiveView.ts";
 import type { Loaded } from "./useLoaded.ts";
+import { useSystemDark } from "./useSystemDark.ts";
 
 /** The height of a frame before its story reports its own, in CSS px. */
 const FALLBACK_HEIGHT = 160;
 
 /** The demo's height before its story reports its own, in CSS px: the demo is the page's first, larger frame. */
 const DEMO_FALLBACK_HEIGHT = 280;
+
+/** The least height of a demo an audience draws larger, in CSS px: its room, never a scale, so its sizes stay true. */
+const LARGE_DEMO_HEIGHT = 360;
+
+/** How a page's audience draws its examples. */
+export type ExampleReading = {
+  /** Whether the examples offer their code. */
+  readonly hasCode: boolean;
+  /** Whether their code starts open. */
+  readonly isCodeOpen: boolean;
+  /** Whether the demo is drawn larger, with more room around it. */
+  readonly isDemoLarge: boolean;
+};
 
 /** What every example of the page shares: the frames' address, view and reports, the code, how to open a story. */
 export type ExampleContext = {
@@ -66,10 +90,12 @@ export type ExampleContext = {
   readonly heightOf: (storyId: string) => number | undefined;
   /** The colour the stories' page has, which each box waits on. */
   readonly background: string | undefined;
+  /** How the page's audience draws its examples. */
+  readonly reading: ExampleReading;
 };
 
 /** A link to a story's own page, opened in place unless the user asks for another tab. */
-const StoryLink = ({
+export const StoryLink = ({
   story,
   hrefOf,
   onOpen,
@@ -231,7 +257,8 @@ const ExampleBar = ({
   onCodeShownChange,
   codeId,
   full,
-  boxWidth
+  boxWidth,
+  isFramed
 }: {
   readonly story: TreeStory;
   readonly context: Pick<ExampleContext, "hrefOf" | "onOpen" | "touches" | "onTouchChange">;
@@ -241,6 +268,8 @@ const ExampleBar = ({
   readonly codeId: string;
   readonly full: FullPage;
   readonly boxWidth: BoxWidth;
+  /** Whether the story is in a device, which sets its width in place of the box's. */
+  readonly isFramed: boolean;
 }): ReactNode => {
   const isTouch = context.touches.get(story.id);
   return (
@@ -260,7 +289,7 @@ const ExampleBar = ({
       {isTouch === undefined ? null : (
         <TouchToggle story={story} isTouch={isTouch} onTouchChange={context.onTouchChange} />
       )}
-      <BoxWidthControl boxWidth={boxWidth} />
+      {isFramed ? null : <BoxWidthControl boxWidth={boxWidth} />}
       <button
         type="button"
         className="forgebook-example__full"
@@ -285,6 +314,81 @@ const ExampleBar = ({
 };
 
 /**
+ * An example's code: what it shows, whether its audience offers it, and whether it is open: the audience's default until
+ * the person says otherwise, so changing audience opens or closes what they left alone.
+ *
+ * @param story - the story.
+ * @param context - what every example shares.
+ */
+const useExampleCode = (
+  story: TreeStory,
+  context: Pick<ExampleContext, "code" | "componentName" | "argsOf" | "reading">
+): {
+  readonly source: StoryCodeSource | undefined;
+  readonly hasCode: boolean;
+  readonly isCodeShown: boolean;
+  readonly setIsCodeShown: (isShown: boolean) => void;
+} => {
+  const [ownCodeShown, setIsCodeShown] = useState<boolean | undefined>(undefined);
+  const source: StoryCodeSource | undefined =
+    context.code.status === "ready"
+      ? {
+          code: context.code.value,
+          exportName: story.exportName,
+          componentName: context.componentName,
+          args: context.argsOf(story.id)
+        }
+      : undefined;
+  return {
+    source,
+    hasCode: source !== undefined && context.reading.hasCode,
+    isCodeShown: ownCodeShown ?? context.reading.isCodeOpen,
+    setIsCodeShown
+  };
+};
+
+/**
+ * The device an example is drawn in, over the page as in the list: the view's choice over the story's and the
+ * catalogue's defaults, and the ink of its status bar.
+ *
+ * @param story - the story.
+ * @param context - the page's view and switches.
+ */
+const useExampleDevice = (
+  story: TreeStory,
+  context: Pick<ExampleContext, "view" | "switches">
+): {
+  readonly shown: StoryDevice | undefined;
+  readonly framed: FramedDevice | undefined;
+  readonly scheme: "light" | "dark";
+} => {
+  const shown = shownDevice(context.view, deviceDefaultOf(useCatalogue().device, story.device));
+  return {
+    shown,
+    framed: useFramedDevice(shown),
+    scheme: inkScheme(schemeOf(context.view, context.switches), useSystemDark())
+  };
+};
+
+/**
+ * The heights an example's frame waits at: the story's measured one when there is one, a guess otherwise (larger for
+ * the demo), never below the height its scene needs; and the least a large demo is given.
+ *
+ * @param story - the story.
+ * @param context - the page's measured heights and how it reads.
+ * @param isDemo - whether it is the page's demo.
+ */
+const exampleHeights = (
+  story: TreeStory,
+  context: Pick<ExampleContext, "heightOf" | "reading">,
+  isDemo: boolean
+): { readonly fallback: number; readonly least: number } => {
+  const least = isDemo && context.reading.isDemoLarge ? LARGE_DEMO_HEIGHT : 0;
+  const guess = isDemo ? DEMO_FALLBACK_HEIGHT : FALLBACK_HEIGHT;
+  return { fallback: Math.max(story.height ?? 0, context.heightOf(story.id) ?? guess, least), least };
+};
+
+/**
  * One example: its title and description (the demo has none: it opens the page), its story in a frame, and a bar
  * that shows its code and opens the story on its own page.
  *
@@ -303,31 +407,18 @@ export const Example = ({
   readonly isMounted: boolean;
   readonly observe?: (element: HTMLElement | null) => void;
 }): ReactNode => {
-  const [isCodeShown, setIsCodeShown] = useState(false);
+  const { source, hasCode, isCodeShown, setIsCodeShown } = useExampleCode(story, context);
   const codeId = useId();
   const full = useFullPage();
   const { touch } = useCatalogue();
+  const { shown, framed, scheme } = useExampleDevice(story, context);
   // the frame loads with the story's finger as it is then; a change after reaches it live, keeping the story's state
   const loadedView = useLoadedView(
     context.frameView.sheets,
     touchedView(context.frameView, story.id, context.touches, touch)
   );
   const boxWidth = useBoxWidth(full.isOver, context.view.width);
-  // the story's measured height when there is one; a guess otherwise, larger for the demo; never below the height its
-  // scene needs, which its frame has from the start
-  const fallbackHeight = Math.max(
-    story.height ?? 0,
-    context.heightOf(story.id) ?? (isDemo ? DEMO_FALLBACK_HEIGHT : FALLBACK_HEIGHT)
-  );
-  const source: StoryCodeSource | undefined =
-    context.code.status === "ready"
-      ? {
-          code: context.code.value,
-          exportName: story.exportName,
-          componentName: context.componentName,
-          args: context.argsOf(story.id)
-        }
-      : undefined;
+  const { fallback: fallbackHeight, least: leastHeight } = exampleHeights(story, context, isDemo);
   return (
     <article
       ref={observe}
@@ -346,38 +437,52 @@ export const Example = ({
       >
         <div ref={full.stageRef} className="forgebook-example__stage">
           <StageViewport
-            width={boxWidth.width}
-            onWidthChange={boxWidth.onWidthChange}
-            onShownWidthChange={boxWidth.onShownWidthChange}
-            background={context.background}
+            {...roomSizing(framed, {
+              width: boxWidth.width,
+              onWidthChange: boxWidth.onWidthChange,
+              onShownWidthChange: boxWidth.onShownWidthChange,
+              background: context.background
+            })}
           >
-            {isMounted ? (
-              <FrameView
-                title={STRINGS.frameTitle(context.component.name, story.name)}
-                address={frameAddress(context.frameUrl, story.id, loadedView, context.switches)}
-                heights={context.heights}
-                settled={context.settled}
-                fallbackHeight={fallbackHeight}
-                // over the page, the story fills the room it has
-                sceneHeight={sceneHeightOf(story, full.stageHeight)}
-              />
-            ) : (
-              // the frame's room until its turn comes, so the page does not jump when it loads
-              <div className="forgebook-frame-placeholder" style={{ height: fallbackHeight }} />
-            )}
+            <DeviceSlot framed={framed} scheme={scheme} background={context.background}>
+              {isMounted && !isWaitingForDevice(shown, framed) ? (
+                <FrameView
+                  title={STRINGS.frameTitle(context.component.name, story.name)}
+                  address={deviceAddress(
+                    frameAddress(context.frameUrl, story.id, loadedView, context.switches),
+                    framed
+                  )}
+                  heights={context.heights}
+                  settled={context.settled}
+                  fallbackHeight={fallbackHeight}
+                  // over the page, the story fills the room it has
+                  sceneHeight={Math.max(sceneHeightOf(story, full.stageHeight) ?? 0, leastHeight)}
+                  fixedHeight={framed?.area.height}
+                />
+              ) : (
+                // the frame's room until its turn comes, so the page does not jump when it loads
+                <div
+                  className="forgebook-frame-placeholder"
+                  style={{ height: framed?.area.height ?? fallbackHeight }}
+                />
+              )}
+            </DeviceSlot>
           </StageViewport>
         </div>
         <ExampleBar
           story={story}
           context={context}
-          hasCode={source !== undefined}
+          hasCode={hasCode}
           isCodeShown={isCodeShown}
           onCodeShownChange={setIsCodeShown}
           codeId={codeId}
           full={full}
           boxWidth={boxWidth}
+          isFramed={framed !== undefined}
         />
-        {source === undefined ? null : <ExampleCode id={codeId} source={source} isShown={isCodeShown} />}
+        {source === undefined || !hasCode ? null : (
+          <ExampleCode id={codeId} source={source} isShown={isCodeShown} />
+        )}
       </div>
     </article>
   );

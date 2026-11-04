@@ -15,9 +15,10 @@ import { resolve } from "node:path";
 import type { DocPageIndex } from "@forgebook/story-format/source";
 
 import type { ForgebookPlugin } from "../plugin.ts";
-import { compiledDocPage, docPageIndex, readLinkedFile } from "./docPageMarkdown.ts";
+import { readLinkedFile } from "./docPageLinks.ts";
+import { compiledDocPage, compiledHome, docPageIndex } from "./docPageMarkdown.ts";
 import { pluginFences } from "./pluginConfig.ts";
-import { storyFileKeys } from "./storyFilesModule.ts";
+import { PAGES_SEARCH_PREFIX, storyFileKeys, storyFilesGroupText } from "./storyFilesModule.ts";
 import { DOCS_PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -46,16 +47,18 @@ const watchedRead =
  * @param root - the declaring module's folder.
  * @param pattern - the pattern.
  * @param watch - adds a file whose edit renews the module that read it.
+ * @param fences - the fences the catalogue's plugins draw, which are not code; none by default.
  */
 export const indexedDocPages = (
   root: string,
   pattern: string,
-  watch: (file: string) => void
+  watch: (file: string) => void,
+  fences: readonly string[] = []
 ): IndexedDocPage[] => {
   return storyFileKeys(root, [pattern]).map((key) => {
     const file = resolve(root, key);
     watch(file);
-    return { key, file, index: docPageIndex(file, readFileSync(file, "utf8"), watchedRead(watch)) };
+    return { key, file, index: docPageIndex(file, readFileSync(file, "utf8"), watchedRead(watch), fences) };
   });
 };
 
@@ -70,21 +73,25 @@ const objectOf = (keys: readonly string[], value: (key: string) => string): stri
  * @param pattern - the pattern before `?forgebook-docs-pages`.
  * @param watch - adds a file whose edit renews the module (each page: its index is in the module).
  * @param isServing - whether a dev server runs, whose tools read a page's Markdown.
+ * @param plugins - the catalogue's plugins, whose fences a page may draw; none by default.
  */
 export const docPagesModule = (
   root: string,
   pattern: string,
   watch: (file: string) => void,
-  isServing: boolean
+  isServing: boolean,
+  plugins: readonly ForgebookPlugin[] = []
 ): string => {
-  const pages = indexedDocPages(root, pattern, watch);
+  const pages = indexedDocPages(root, pattern, watch, pluginFences(plugins));
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
   const page = (key: string): string => JSON.stringify(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);
+  const search = JSON.stringify(`${PAGES_SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
   return [
     "export default {",
     `index: ${JSON.stringify(index)},`,
     `pages: ${objectOf(keys, (key) => `() => import(${page(key)}).then((module) => module.default)`)},`,
+    `search: () => import(${search}).then((module) => module.default),`,
     ...(isServing
       ? [`text: ${objectOf(keys, (key) => `() => import(${page(key)}).then((module) => module.text)`)}`]
       : []),
@@ -115,12 +122,55 @@ export const docPageModule = (
     pluginFences(plugins)
   );
   return [
-    ...images.map(
-      (image, place) => `import asset${place} from ${JSON.stringify(`${VITE_PATHS.normalize(image)}?url`)};`
-    ),
-    `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: [${images
-      .map((_image, place) => `asset${place}`)
-      .join(", ")}] };`,
+    ...imageImports(images),
+    `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: ${assetList(images)} };`,
+    ...(isServing ? [`export const text = ${JSON.stringify(text)};`] : [])
+  ].join("\n");
+};
+
+/** The imports of a page's images, each answered with its address. */
+const imageImports = (images: readonly string[]): string[] =>
+  images.map(
+    (image, place) => `import asset${place} from ${JSON.stringify(`${VITE_PATHS.normalize(image)}?url`)};`
+  );
+
+/** The list of a page's images' addresses, as the module's code writes it. */
+const assetList = (images: readonly string[]): string =>
+  `[${images.map((_image, place) => `asset${place}`).join(", ")}]`;
+
+/**
+ * The code of the written home's module: what the shell draws in place of the generated home, with its problems, and,
+ * on the dev server, its Markdown for tools.
+ *
+ * @param file - the home's file, absolute.
+ * @param watch - adds a file whose edit renews the module.
+ * @param isServing - whether a dev server runs.
+ * @param plugins - the catalogue's plugins, whose fences the home may draw; none by default.
+ */
+export const homeModule = (
+  file: string,
+  watch: (file: string) => void,
+  isServing: boolean,
+  plugins: readonly ForgebookPlugin[] = []
+): string => {
+  watch(file);
+  const { title, description, blocks, stories, notes, images, text } = compiledHome(
+    file,
+    readFileSync(file, "utf8"),
+    watchedRead(watch),
+    pluginFences(plugins)
+  );
+  const document = {
+    ...(title === undefined ? {} : { title }),
+    ...(description === undefined ? {} : { description }),
+    blocks,
+    stories,
+    // what the author got wrong is the dev server's to show: a published home keeps its readers out of it
+    notes: isServing ? notes : []
+  };
+  return [
+    ...imageImports(images),
+    `export default { ...${JSON.stringify(document)}, assets: ${assetList(images)} };`,
     ...(isServing ? [`export const text = ${JSON.stringify(text)};`] : [])
   ].join("\n");
 };

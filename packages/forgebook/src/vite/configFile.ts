@@ -9,14 +9,18 @@
  *
  * @module
  */
-import { existsSync } from "node:fs";
+
+import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
+import { AUDIENCE_IDS } from "../audiences.ts";
 import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
+import { deviceSettingProblem } from "../deviceView.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import {
   frameThemeCss,
@@ -35,6 +39,12 @@ import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
+
+/**
+ * The name the written home has beside the configuration. Prefixed as the preview is, so a `home.md` a project
+ * keeps for another reason never replaces the generated home of a catalogue that did not ask for it.
+ */
+export const HOME_FILE = "forgebook.home.md";
 
 /** The names a preview may have beside the configuration, in the order they are looked for. */
 const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebook.preview.js"];
@@ -80,6 +90,8 @@ export type ResolvedConfig = {
   readonly stories: readonly string[];
   /** The project's own docs pages' globs, from the configuration's folder. */
   readonly docs: readonly string[];
+  /** The written home's absolute path; none for the generated home. */
+  readonly home: string | undefined;
   /** The sources' module specifiers. */
   readonly sources: readonly string[];
   /** The switches, the presets' and the catalogue's merged; none when neither declares any. */
@@ -173,6 +185,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
   ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar }),
   ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn }),
+  ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
   ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups })
 });
@@ -181,7 +194,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
  * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
  * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
  * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar and the
- * prop groups' order the last that names one.
+ * prop groups' order the last that names one; the device field by field.
  *
  * @param all - the presets' lists, then the catalogue's.
  */
@@ -191,7 +204,10 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   const strings: Record<string, string> = {};
   const keys: Record<string, string | false> = {};
   let merged: CatalogueLists = {};
+  // the device field by field, as a story's lies over its meta's: a preset's model stays under a catalogue's frame
+  let device: StoryDeviceSetting | undefined;
   for (const lists of all) {
+    if (lists.device !== undefined) device = { ...device, ...lists.device };
     Object.assign(tabs, lists.tabs);
     Object.assign(controls, lists.controls);
     Object.assign(strings, lists.strings);
@@ -202,6 +218,7 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   const tags = all.findLast((lists) => lists.a11y?.tags !== undefined)?.a11y?.tags;
   return {
     ...merged,
+    ...(device === undefined ? {} : { device }),
     backgrounds: {
       ...(builtIn === undefined ? {} : { builtIn }),
       custom: mergedById(all.map((lists) => lists.backgrounds?.custom))
@@ -237,6 +254,13 @@ const configProblem = (config: unknown): string | undefined => {
   if (!("framework" in config) || typeof config.framework !== "object" || config.framework === null)
     return "it names no framework (`framework: react()`)";
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
+  if (
+    "home" in config &&
+    config.home !== undefined &&
+    config.home !== false &&
+    typeof config.home !== "string"
+  )
+    return 'its home is neither a path (`home: "docs/home.md"`) nor false';
   if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
   return framesProblem("frames" in config ? config.frames : undefined);
@@ -249,12 +273,83 @@ const configProblem = (config: unknown): string | undefined => {
  */
 const isConfig = (config: unknown): config is ForgebookConfig => configProblem(config) === undefined;
 
+/** The fields of a device setting, by name, and the type each is written in. */
+const DEVICE_FIELDS: Readonly<Record<string, "boolean" | "string">> = {
+  frame: "boolean",
+  model: "string",
+  orientation: "string",
+  touch: "boolean",
+  edgeToEdge: "boolean"
+};
+
+/**
+ * Why a device setting cannot be used, or none: not an object of `frame`, `model`, `orientation` and `touch`, a field
+ * of another type, or a model or an orientation that is none. A configuration is code, so its types are not a
+ * promise.
+ *
+ * @param device - the setting as a configuration or a preset gives it.
+ */
+const deviceProblem = (device: unknown): string | undefined => {
+  if (typeof device !== "object" || device === null || Array.isArray(device))
+    return 'write it as an object: { frame: true, model: "iphone-16" }';
+  for (const [name, value] of Object.entries(device)) {
+    const type = DEVICE_FIELDS[name];
+    if (type === undefined)
+      return `it has no field "${name}": it takes ${Object.keys(DEVICE_FIELDS).join(", ")}`;
+    if (value !== undefined && typeof value !== type)
+      return `its ${name} must be ${type === "boolean" ? "true or false" : "a text"}`;
+  }
+  const model: unknown = Reflect.get(device, "model");
+  const orientation: unknown = Reflect.get(device, "orientation");
+  return deviceSettingProblem({
+    ...(typeof model === "string" ? { model } : {}),
+    ...(typeof orientation === "string" ? { orientation } : {})
+  });
+};
+
+/**
+ * The configuration's and the presets' lists, once checked where the shell would leave a mistake out: a device that
+ * cannot be used.
+ *
+ * @param all - the presets' lists, then the configuration's.
+ * @param dir - the configuration's folder, for the message.
+ * @throws when a device cannot be used.
+ */
+const checkedLists = (all: readonly CatalogueLists[], dir: string): readonly CatalogueLists[] => {
+  for (const lists of all) {
+    const problem = lists.device === undefined ? undefined : deviceProblem(lists.device);
+    if (problem !== undefined)
+      throw new Error(`${resolve(dir, "forgebook.config")}: Forgebook's device: ${problem}`);
+  }
+  return all;
+};
+
 /** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
 const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "docs" | "sources"> => ({
   stories: config.stories ?? [],
   docs: config.docs ?? [],
   sources: config.sources ?? []
 });
+
+/**
+ * The written home's absolute path: the configuration's `home`, else `forgebook.home.md` beside it when there; none
+ * with `home: false`.
+ *
+ * @param config - the configuration.
+ * @param dir - the folder of its file.
+ * @throws when the configuration names a home that is not there.
+ */
+const homeOf = (config: ForgebookConfig, dir: string): string | undefined => {
+  if (config.home === false) return undefined;
+  if (config.home === undefined) {
+    const beside = VITE_PATHS.join(dir, HOME_FILE);
+    return existsSync(beside) ? beside : undefined;
+  }
+  const home = VITE_PATHS.resolve(dir, config.home);
+  if (!existsSync(home) || !statSync(home).isFile())
+    throw new Error(`${resolve(dir, "forgebook.config")}: its home "${config.home}" is not a file there`);
+  return home;
+};
 
 /**
  * A configuration's plugins, once they can be used.
@@ -313,6 +408,13 @@ export const resolveConfig = (
   const fromTokens = Object.assign({}, ...declaredThemes.map((each) => each.fromTokens));
   const tokenThemed = tokenThemeOf(fromTokens, tokens, dir);
   const theme = mergedThemes([tokenThemed.theme, ...declaredThemes]);
+  const lists = mergedLists(checkedLists([...presets, config], dir));
+  // the page reads it as one of the ids, and a configuration is written by JavaScript too, which no type stops
+  if (lists.audience !== undefined && !AUDIENCE_IDS.includes(lists.audience)) {
+    throw new Error(
+      `${resolve(dir, "forgebook.config")}: the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`
+    );
+  }
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
   const ownPreview =
@@ -323,6 +425,7 @@ export const resolveConfig = (
     dir,
     framework: config.framework,
     title: config.title,
+    home: homeOf(config, dir),
     logo: config.logo === undefined ? undefined : absolute(config.logo),
     heights: config.heights,
     ...shownFiles(config),
@@ -347,7 +450,7 @@ export const resolveConfig = (
     },
     tokens,
     watch: (config.watch ?? []).map(absolute),
-    lists: mergedLists([...presets, config]),
+    lists,
     hasPlayTools: hasPlayToolsIn(dir),
     plugins,
     frames: resolvedFrames(config.frames),

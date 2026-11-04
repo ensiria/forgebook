@@ -32,19 +32,22 @@ export const sourceFiles = (source: StorySource): StoryFiles => {
   return merged;
 };
 
+/** A source's docs pages, every group merged: the search index stays per group (`sourceSearchLoaders`). */
+export type MergedPages = Required<Omit<DocPages, "search">>;
+
 /** The merged docs pages of each source seen, by the source object itself. */
-const MERGED_PAGES = new WeakMap<StorySource, Required<DocPages>>();
+const MERGED_PAGES = new WeakMap<StorySource, MergedPages>();
 
 /**
  * A source's docs pages, every group merged; empty for a source without any.
  *
  * @param source - the source.
  */
-export const sourcePages = (source: StorySource): Required<DocPages> => {
+export const sourcePages = (source: StorySource): MergedPages => {
   const known = MERGED_PAGES.get(source);
   if (known !== undefined) return known;
   const groups = source.docs ?? [];
-  const merged: Required<DocPages> = {
+  const merged: MergedPages = {
     index: Object.assign({}, ...groups.map((group) => group.index)),
     pages: Object.assign({}, ...groups.map((group) => group.pages)),
     text: Object.assign({}, ...groups.map((group) => group.text ?? {}))
@@ -52,3 +55,12 @@ export const sourcePages = (source: StorySource): Required<DocPages> => {
   MERGED_PAGES.set(source, merged);
   return merged;
 };
+
+/**
+ * The loaders of a source's search indexes, one per group: a group's index is read as it comes, so the docs pages' text
+ * is found while a package's props are still being read.
+ *
+ * @param source - the source.
+ */
+export const sourceSearchLoaders = (source: StorySource): readonly (() => Promise<unknown>)[] =>
+  [...source.files, ...(source.docs ?? [])].flatMap((group) => group.search ?? []);

@@ -3,7 +3,8 @@
  *
  * @remarks
  * The frame tells the shell what the loaded story can do (Replay, a story clock, its args), how tall it is (the shell sizes the frame
- * to it, so a story never scrolls inside a box), every call of an event, or why it failed. The shell asks the frame to
+ * to it, so a story never scrolls inside a box), every call of an event, the args the story changed itself, or why it
+ * failed. The shell asks the frame to
  * replay, sends the props panel's values, names the events to record, and runs, holds, speeds up or restarts the
  * story clock. Every message is checked on arrival
  * (`isFrameMessage`, `isShellMessage`): a page may receive messages from anything it embeds or is embedded in.
@@ -67,6 +68,17 @@ export type FrameMessage =
       readonly fixed: FixedView;
       /** The names of the story's parameters, which decide the plugins' tabs. */
       readonly parameters: readonly string[];
+    }
+  | {
+      /**
+       * The story changed its own args (Storybook's `useArgs`): the panel takes these values, as if the reader had set
+       * them. All of them, the story's change applied, so the last of two changes in a row holds both.
+       */
+      readonly type: "forgebook:story-args";
+      /** The story's id. */
+      readonly storyId: string;
+      /** The panel's values after the change, those the panel can show: another value is the frame's alone. */
+      readonly args: PanelArgs;
     }
   | {
       /** The story's height changed. */
@@ -294,6 +306,8 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
         isFixedView(value["fixed"]) &&
         isStringList(value["parameters"])
       );
+    case "forgebook:story-args":
+      return isPanelArgs(value["args"]);
     case "forgebook:size":
       return typeof value["height"] === "number";
     case "forgebook:spills":

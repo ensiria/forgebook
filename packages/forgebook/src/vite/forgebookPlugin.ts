@@ -10,7 +10,7 @@
  * `{ error }` for the panel, `?forgebook-code`, answered with each story's `render` as written (`storyCode.ts`),
  * `?forgebook-page`, answered with the component's documentation file as HTML (`componentPage.ts`), and
  * `?forgebook-markdown`, a source's own Markdown file (its introduction on the home) as HTML. A source's docs pages
- * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`). It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
+ * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`), and the written home with `?forgebook-home`. It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
  * `pkg:` URLs, which the library's style sheets use.
  *
  * A pattern's module watches its story files, so an edit renews it. Vite watches only its root for new files, and the
@@ -47,8 +47,8 @@ import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { FILES_MODULE_HOT, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
 import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
+  AGENT_SOURCES_FILE,
   agentSourcesModule,
-  CONFIG_MODULE,
   configModule,
   frameEntry,
   PAGE_ENTRIES,
@@ -60,25 +60,21 @@ import {
   shellEntry,
   storiesSourceModule
 } from "./pages.ts";
+import { CONFIG_ID, DOCS_PAGES_PREFIX, patternId, TOKENS_ID, virtualId } from "./pluginIds.ts";
 import {
   docsModule,
   FILES_PREFIX,
   patternModule,
   REACH_ID_PREFIX,
   reachModule,
+  searchIndexes,
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
 import { prebundled, scannedEntries } from "./prebundled.ts";
-import {
-  isKeptIndex,
-  type KeptIndex,
-  REACH_PREFIX,
-  storyFilesGroupOf,
-  storyFilesGroupText,
-  USAGE_PREFIX
-} from "./storyFilesModule.ts";
-import { CODE_QUERY, DOCS_PAGE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
+import { isKeptIndex, type KeptIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
+import { tokensModule } from "./storylessRoutes.ts";
+import { CODE_QUERY, DOCS_PAGE_QUERY, HOME_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /**
@@ -107,15 +103,6 @@ const sassOptions = async (): Promise<NonNullable<UserConfig["css"]>> => {
   return { preprocessorOptions: { scss: { importers: [new NodePackageImporter()] } } };
 };
 
-/** The query that asks for the story files a pattern matches (`../src/**\/*.stories.tsx?forgebook-files`). */
-const FILES_QUERY = "?forgebook-files";
-
-/** The query that asks for the docs pages a pattern matches (`./docs/*.md?forgebook-docs-pages`). */
-const DOCS_PAGES_QUERY = "?forgebook-docs-pages";
-
-/** The id of a pattern's docs pages: virtual, with the declaring module's folder and the pattern after it. */
-const DOCS_PAGES_PREFIX = "\0forgebook-docs-pages:";
-
 /** A docs page, whose file added or removed changes what the sidebar lists. */
 const DOCS_PAGE_FILE = /\.md$/;
 
@@ -132,7 +119,14 @@ const TEXT_QUERIES: readonly string[] = [CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY]
 const RENEWED_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY];
 
 /** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
-const FILE_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY, DOCS_PAGE_QUERY];
+const FILE_QUERIES: readonly string[] = [
+  DOCS_QUERY,
+  CODE_QUERY,
+  PAGE_QUERY,
+  MARKDOWN_QUERY,
+  DOCS_PAGE_QUERY,
+  HOME_QUERY
+];
 
 /**
  * Whether a dev server may read the file a query names: a plugin's answer never passes Vite's own check of
@@ -178,42 +172,6 @@ const invalidateEverywhere = (server: ViteDevServer, ids: Iterable<string>): voi
 };
 
 /**
- * The id of a `?forgebook-files` module: its prefix, then its group (`storyFilesGroupText`), which holds no `..`.
- *
- * @param folder - the importing module's folder.
- * @param pattern - the pattern as the import writes it.
- */
-const filesId = (folder: string, pattern: string): string =>
-  `${FILES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
-
-/**
- * The id of a pattern's module, when an import asks for one: its story files, or its docs pages.
- *
- * @param source - the import's specifier.
- * @param folder - the importing module's folder.
- */
-const patternId = (source: string, folder: string): string | null => {
-  if (source.endsWith(FILES_QUERY)) return filesId(folder, source.slice(0, -FILES_QUERY.length));
-  if (!source.endsWith(DOCS_PAGES_QUERY)) return null;
-  const pattern = source.slice(0, -DOCS_PAGES_QUERY.length);
-  return `${DOCS_PAGES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
-};
-
-/**
- * The id of a virtual module the plugin makes (the configuration's data, a group's "Used in"), when the import names
- * one.
- *
- * @param source - the import's specifier.
- */
-const virtualId = (source: string): string | undefined => {
-  if (source === CONFIG_MODULE) return CONFIG_ID;
-  return source.startsWith(USAGE_PREFIX) || source.startsWith(REACH_PREFIX) ? `\0${source}` : undefined;
-};
-
-/** The resolved id of the configuration's data module. */
-const CONFIG_ID = `\0${CONFIG_MODULE}`;
-
-/**
  * The page a request names, when it names one: `/` is the shell's.
  *
  * @param url - the request's address.
@@ -225,8 +183,8 @@ const requestedPage = (url: string): PageFile | undefined => {
 };
 
 /**
- * A docs pages' module, when the id is a pattern's or a page's. The Markdown reader loads with the first: a catalogue
- * may have no docs pages, and a story's page reads none.
+ * A docs pages' module, when the id is a pattern's, a page's or the written home's. The Markdown reader loads with the
+ * first: a catalogue may have no docs pages, and a story's page reads none.
  *
  * @param id - the module's id.
  * @param watch - adds a file whose edit renews the module.
@@ -239,15 +197,18 @@ const docsModuleOf = async (
   isServing: boolean,
   plugins: ResolvedConfig["plugins"]
 ): Promise<{ code: string; moduleType: "js" } | undefined> => {
+  const isHome = id.endsWith(HOME_QUERY);
   const isPage = id.endsWith(DOCS_PAGE_QUERY);
-  if (!isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
-  const { docPageModule, docPagesModule } = await import("./docPagesModule.ts");
+  if (!isHome && !isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
+  const { docPageModule, docPagesModule, homeModule } = await import("./docPagesModule.ts");
+  if (isHome)
+    return { code: homeModule(id.slice(0, -HOME_QUERY.length), watch, isServing, plugins), moduleType: "js" };
   if (isPage) {
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
     return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
   }
   const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
-  return { code: docPagesModule(root, pattern, watch, isServing), moduleType: "js" };
+  return { code: docPagesModule(root, pattern, watch, isServing, plugins), moduleType: "js" };
 };
 
 /**
@@ -352,6 +313,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const usageModules = new Set<string>();
   /** The docs pages' modules, renewed when a Markdown file is added or removed. */
   const docsModules = new Set<string>();
+  /** The groups' search indexes: any edit may change what a component's docs say. */
+  const searchModules = new Set<string>();
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
   /** Where the frames run: the dev server's second port once it listens, the configuration's choice in a build. */
@@ -376,6 +339,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
+  // the search's indexes, a build reading each component's docs once for its page and its index
+  const search = searchIndexes({
+    extract: (storyFile: string) => extractor().extract(storyFile),
+    isServing,
+    track: (id: string, isPages: boolean) => (isPages ? docsModules : searchModules).add(id)
+  });
   // whether an edited story file is drawn anew in its open frames: a dev server's, unless the framework cannot
   const isRedrawing = (): boolean =>
     isServing() && (config?.framework ?? options.framework)?.redrawsEditedStories !== false;
@@ -420,7 +389,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     return docs;
   };
   /**
-   * Renews what an edited source file may change: the docs' programs, and every group's "Used in".
+   * Renews what an edited source file may change: the docs' programs, and every group's "Used in" and search index.
    *
    * @param server - the dev server.
    * @param file - the edited file.
@@ -429,7 +398,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
     if (!SOURCE_FILE.test(file) && componentFiles?.extension !== extname(file)) return;
     docs?.changed();
-    invalidateEverywhere(server, usageModules);
+    invalidateEverywhere(server, [...usageModules, ...searchModules]);
   };
   /**
    * A pattern's module, or a group's "Used in" or reach module, when the id is one.
@@ -488,7 +457,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    */
   const modulesListing = (file: string): readonly string[] | undefined => {
     // the patterns' modules list the story files; the groups' "Used in" read them
-    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules];
+    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules, ...searchModules];
     return DOCS_PAGE_FILE.test(file) && docsModules.size > 0 ? [...docsModules] : undefined;
   };
   /**
@@ -503,8 +472,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     watch: (file: string) => void,
     resolveImport: (specifier: string, importer: string) => Promise<string | undefined>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
+    if (id === TOKENS_ID && config !== undefined) {
+      // a source's tokens are found from its module, imported as the generated pages import it
+      const importer = pageModulePath(config.dir, AGENT_SOURCES_FILE);
+      return tokensModule(config, watch, (specifier: string) => resolveImport(specifier, importer));
+    }
     if (id.endsWith(DOCS_QUERY)) {
-      return docsModule(await extractor().extract(id.slice(0, -DOCS_QUERY.length)), watch);
+      return docsModule(await search.docsOf(id.slice(0, -DOCS_QUERY.length)), watch);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
     const docsPages = await docsModuleOf(id, watch, isServing(), config?.plugins ?? []);
@@ -633,7 +607,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
           isServing() || this.environment.name !== "client"
             ? inlineJson
             : packedJsonOf((asset): unknown => this.emitFile(asset));
-        return (await storiesModule(id, watch, pack)) ?? null;
+        return (await search.moduleOf(id, watch, pack)) ?? (await storiesModule(id, watch, pack)) ?? null;
       } catch (error) {
         this.error(error instanceof Error ? error.message : String(error));
       }

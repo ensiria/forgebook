@@ -17,6 +17,7 @@ import type {
   NearestTokensDocument,
   PageDocument,
   PagesDocument,
+  SearchDocument,
   StoriesDocument,
   StoryDocument,
   TokenDocument,
@@ -157,7 +158,7 @@ export const printAnswer = (
  */
 export const printTokenAnswer = (
   text: string,
-  document: TokenDocument | NearestTokensDocument,
+  document: TokenDocument | NearestTokensDocument | SearchDocument,
   context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
 ): void => {
   context.io.stdout.write(context.isJson ? formatJson(document) : `${text}\n`);

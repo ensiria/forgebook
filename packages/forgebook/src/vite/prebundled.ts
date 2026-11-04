@@ -14,6 +14,7 @@
  * @module
  */
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { WRITTEN_HOME_MODULE } from "./pages.ts";
 import { pluginModules } from "./pluginConfig.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -47,6 +48,8 @@ const isInstalled = (file: string): boolean => file.split(/[\\/]/).includes("nod
 export const prebundled = (config: ResolvedConfig, resolve: Resolve): string[] => {
   const pageModules = [
     ...PAGE_MODULES,
+    // imported on first use, so the scanner never sees it: named, or the first home would wait for the optimizer
+    ...(config.home === undefined ? [] : [WRITTEN_HOME_MODULE]),
     config.framework.pages.frame,
     config.framework.pages.code,
     ...pluginModules(config.plugins, config.framework.name)
