@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { transformWithOxc } from "vite";
 import { describe, expect, it } from "vitest";
 
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { storyFileHotHooks } from "../src/vite/hotSnippets.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
@@ -85,7 +86,9 @@ describe("a story file's edit on a dev server", () => {
     const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
     const code = codeOf(hooks.transform(ONE_STORY, "/kit/src/Badge.stories.tsx"));
     // first, so a file that throws while it loads still accepts its fix; on its first line, so no line moves
-    expect(code.startsWith('import * as __forgebookShown from "/kit/src/Badge.stories.tsx";')).toBe(true);
+    expect(
+      code.startsWith(`import * as __forgebookShown from ${codeLiteral("/kit/src/Badge.stories.tsx")};`)
+    ).toBe(true);
     expect(code.endsWith(ONE_STORY)).toBe(true);
     expect(code.split("\n")).toHaveLength(ONE_STORY.split("\n").length);
     expect(code).toContain("import.meta.hot.accept(");

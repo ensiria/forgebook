@@ -18,6 +18,7 @@
 import { readdirSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
 
+import { codeLiteral } from "forgebook/code-literal";
 import MagicString, { type SourceMap } from "magic-string";
 import { createUnimport, type Import, scanDirExports, toExports, type Unimport } from "unimport";
 import {
@@ -195,10 +196,10 @@ const shapeOf = (state: ProjectState): string =>
 const componentsModule = (state: ProjectState): string =>
   [
     'import { defineAsyncComponent } from "vue";',
-    `export { ${BUILT_IN_COMPONENT_NAMES.join(", ")} } from ${JSON.stringify(COMPONENTS_MODULE)};`,
+    `export { ${BUILT_IN_COMPONENT_NAMES.join(", ")} } from ${codeLiteral(COMPONENTS_MODULE)};`,
     ...[...state.components.values()].flatMap(({ name, file }) => [
-      `export { default as ${name} } from ${JSON.stringify(file)};`,
-      `export const Lazy${name} = defineAsyncComponent(() => import(${JSON.stringify(file)}));`
+      `export { default as ${name} } from ${codeLiteral(file)};`,
+      `export const Lazy${name} = defineAsyncComponent(() => import(${codeLiteral(file)}));`
     ])
   ].join("\n");
 
@@ -215,16 +216,16 @@ const projectModule = (state: ProjectState): string => {
     app: { baseURL: config.baseURL, buildAssetsDir: config.buildAssetsDir, cdnURL: "" }
   };
   const loaders = [...state.components.values()].map(
-    ({ name, file }) => `    ${JSON.stringify(name)}: () => import(${JSON.stringify(file)})`
+    ({ name, file }) => `    ${codeLiteral(name)}: () => import(${codeLiteral(file)})`
   );
   return [
     ...(config.appConfigFile === undefined
       ? []
-      : [`import appConfig from ${JSON.stringify(config.appConfigFile)};`]),
+      : [`import appConfig from ${codeLiteral(config.appConfigFile)};`]),
     "export const project = {",
-    `  routes: ${JSON.stringify(state.routes)},`,
-    `  runtimeConfig: ${JSON.stringify(runtimeConfig)},`,
-    `  appConfigs: [${JSON.stringify(config.appConfig)}${config.appConfigFile === undefined ? "" : ", appConfig"}],`,
+    `  routes: ${codeLiteral(state.routes)},`,
+    `  runtimeConfig: ${codeLiteral(runtimeConfig)},`,
+    `  appConfigs: [${codeLiteral(config.appConfig)}${config.appConfigFile === undefined ? "" : ", appConfig"}],`,
     `  components: {\n${loaders.join(",\n")}\n  }`,
     "};"
   ].join("\n");
@@ -242,7 +243,7 @@ const virtualModule = async (name: string, state: ProjectState): Promise<string>
   if (name === "#components") return componentsModule(state);
   if (name === PROJECT_MODULE) return projectModule(state);
   if (name === "virtual:forgebook-nuxt/styles")
-    return state.config.css.map((sheet) => `import ${JSON.stringify(sheet)};`).join("\n");
+    return state.config.css.map((sheet) => `import ${codeLiteral(sheet)};`).join("\n");
   return [
     'import "virtual:forgebook-nuxt/styles";',
     'import { mountFrame as mountForgebookFrame } from "forgebook/frame";',
@@ -289,10 +290,9 @@ const namedComponent = (
  */
 const componentImport = ({ name, component, isLazy }: NamedComponent, local: string): string => {
   if (component === undefined)
-    return `import { ${name} as ${local} } from ${JSON.stringify(COMPONENTS_MODULE)};`;
-  if (isLazy)
-    return `const ${local} = __forgebookDefineAsync(() => import(${JSON.stringify(component.file)}));`;
-  return `import ${local} from ${JSON.stringify(component.file)};`;
+    return `import { ${name} as ${local} } from ${codeLiteral(COMPONENTS_MODULE)};`;
+  if (isLazy) return `const ${local} = __forgebookDefineAsync(() => import(${codeLiteral(component.file)}));`;
+  return `import ${local} from ${codeLiteral(component.file)};`;
 };
 
 /**
@@ -345,7 +345,7 @@ export const withProcessFlags = (code: MagicString, isDev: boolean): boolean => 
     client: "true",
     browser: "true",
     server: "false",
-    dev: JSON.stringify(isDev)
+    dev: codeLiteral(isDev)
   };
   let isWritten = false;
   for (const match of code.original.matchAll(PROCESS_FLAG)) {
@@ -459,7 +459,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
           "import.meta.server": "false",
           "import.meta.nitro": "false",
           "import.meta.prerender": "false",
-          "import.meta.dev": JSON.stringify(isDev),
+          "import.meta.dev": codeLiteral(isDev),
           "import.meta.test": "false"
         },
         // the stand-ins and the renderer are one module graph, served from their sources: see the module's remarks
@@ -482,7 +482,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
       if (!id.startsWith(RESOLVED)) return undefined;
       const name = nameOfId(id);
       if (name.startsWith("build:"))
-        return `throw new Error(${JSON.stringify(`#${name.slice(6)} is written by Nuxt's build, which a catalogue does not run`)});`;
+        return `throw new Error(${codeLiteral(`#${name.slice(6)} is written by Nuxt's build, which a catalogue does not run`)});`;
       return virtualModule(name, project());
     },
     configureServer: (server: ViteDevServer): void => {

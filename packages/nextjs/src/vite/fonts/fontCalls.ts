@@ -11,6 +11,7 @@
  *
  * @module
  */
+import { codeLiteral } from "forgebook/code-literal";
 import { parseSync } from "vite";
 
 /** Which of Next.js's font loaders a call uses. */
@@ -278,7 +279,7 @@ export const replaceFontCalls = (
 ): string => {
   const names = moduleIds.map((_, index) => `__forgebookFont${index}`);
   const imports = names
-    .map((name, index) => `import ${name} from ${JSON.stringify(moduleIds[index])};`)
+    .map((name, index) => `import ${name} from ${codeLiteral(moduleIds[index])};`)
     .join(" ");
   const edits = [
     ...found.imports.map((range, index) => ({ ...range, text: index === 0 ? imports : "" })),

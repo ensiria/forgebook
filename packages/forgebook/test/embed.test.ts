@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { isEmbedAddress } from "../src/embed.ts";
 import { embedAddressOf, embedCode, isLocalAddress } from "../src/embedCode.ts";
 import { switchesProblem, themeSwitch } from "../src/switches.ts";
@@ -67,7 +68,7 @@ describe("the embed's code", () => {
 
   it("answers only its own frame and origin when it follows the story", () => {
     const code = embedCode({ link: LINK, title: "A", height: 100, isFollowing: true });
-    expect(code).toContain('origin !== "https://ui.example.com"');
+    expect(code).toContain(`origin !== ${codeLiteral("https://ui.example.com")}`);
     expect(code).toContain("source !== frame.contentWindow");
     expect(code).toContain('"forgebook:embed-size"');
     expect(code).toContain("Number.isFinite(data.height)");

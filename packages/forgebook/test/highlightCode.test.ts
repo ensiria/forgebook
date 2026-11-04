@@ -8,6 +8,22 @@ import { describe, expect, it } from "vitest";
 
 import { escapeHtml, highlightCode } from "../src/vite/highlightCode.ts";
 
+/**
+ * The text of coloured HTML: its tags taken out until none is left, so a tag that taking one out would join is taken
+ * out too.
+ *
+ * @param html - the HTML.
+ */
+const textOf = (html: string): string => {
+  let text = html;
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== previous);
+  return text;
+};
+
 describe("highlightCode", () => {
   it("colours TSX with the catalogue's classes, JSX included", () => {
     const html = highlightCode('const label = <Button tone="danger">Delete</Button>;', "tsx");
@@ -60,6 +76,6 @@ describe("highlightCode", () => {
     const started = performance.now();
     const html = highlightCode(code, "scss");
     expect(performance.now() - started).toBeLessThan(1000);
-    expect(html.replace(/<[^>]*>/g, "")).toBe(escapeHtml(code));
+    expect(textOf(html)).toBe(escapeHtml(code));
   });
 });

@@ -12,6 +12,7 @@
  */
 import { createHash } from "node:crypto";
 
+import { codeLiteral } from "forgebook/code-literal";
 import type MagicString from "magic-string";
 
 /** The functions keyed by their place, with the number of arguments a call has once keyed. */
@@ -121,7 +122,7 @@ export const withPlaceKeys = (code: MagicString, program: unknown, file: string)
   keyedCalls(program, foreignNames(program), found);
   for (const call of found) {
     const key = `$${createHash("sha256").update(`${file}:${call.at}`).digest("base64url").slice(0, 10)}`;
-    code.appendLeft(call.at, `${call.isAfterArgument ? ", " : ""}${JSON.stringify(key)}`);
+    code.appendLeft(call.at, `${call.isAfterArgument ? ", " : ""}${codeLiteral(key)}`);
   }
   return found.length > 0;
 };

@@ -16,6 +16,7 @@ import { globSync, readFileSync } from "node:fs";
 
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
+import { codeLiteral } from "../codeLiteral.ts";
 import { autoTitle, patternBase } from "./autoTitle.ts";
 import { type DiskCache, isSettledSince, nowNs, stampPaths } from "./diskCache.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
@@ -228,16 +229,16 @@ export const storyFilesCode = (
   const { hasUsage, hasReach } = loaders;
   // the group's id in Vite's form, as the plugin names the declaring module's folder
   const folder = VITE_PATHS.normalize(root);
-  const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
-  const search = JSON.stringify(`${SEARCH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
-  const reach = JSON.stringify(`${REACH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
-  const texts = JSON.stringify(`${TEXTS_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const usage = codeLiteral(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const search = codeLiteral(`${SEARCH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const reach = codeLiteral(`${REACH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const texts = codeLiteral(`${TEXTS_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   // absolute paths in Vite's form: the module has no folder of its own, Vite serves them under /@fs/ in development,
   // and the queries' ids come back to the plugin as written here
   const absolute = (key: string): string => VITE_PATHS.resolve(folder, key);
-  const path = (key: string): string => JSON.stringify(absolute(key));
+  const path = (key: string): string => codeLiteral(absolute(key));
   const query = (key: string, name: string): string =>
-    `() => import(${JSON.stringify(`${absolute(key)}?${name}`)}).then((module) => module.default)`;
+    `() => import(${codeLiteral(`${absolute(key)}?${name}`)}).then((module) => module.default)`;
   const textLoaders = (key: string): readonly string[] =>
     hasTexts
       ? []
@@ -245,7 +246,7 @@ export const storyFilesCode = (
   // a row per file, its name written once and not once per column (its index, each loader): a large catalogue's
   // names are a tenth of its index
   const rows = files.map(({ key, index }) =>
-    [JSON.stringify(key), JSON.stringify(index), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")
+    [codeLiteral(key), codeLiteral(index), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")
   );
   const written = `[${rows.map((row) => `[${row}]`).join(",\n")}]`;
   return [

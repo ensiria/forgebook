@@ -11,6 +11,7 @@
  */
 import { readFile } from "node:fs/promises";
 
+import { codeLiteral } from "forgebook/code-literal";
 import type { Plugin } from "vite";
 
 import { imageSize } from "./imageSize.ts";
@@ -57,7 +58,7 @@ export const staticImages = (): Plugin => ({
         // Next.js gives no placeholder for an SVG or an animated GIF either
         ...(/\.(svg|gif)$/i.test(file) ? [] : ["blurDataURL: src"])
       ];
-      return `import src from ${JSON.stringify(`${file}?url`)};\nexport default { ${fields.join(", ")} };\n`;
+      return `import src from ${codeLiteral(`${file}?url`)};\nexport default { ${fields.join(", ")} };\n`;
     }
   }
 });

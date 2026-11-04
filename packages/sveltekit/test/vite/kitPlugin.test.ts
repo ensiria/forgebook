@@ -6,6 +6,7 @@
  */
 import { join, win32 } from "node:path";
 
+import { codeLiteral } from "forgebook/code-literal";
 import { vitePathsOf } from "forgebook/vite/paths";
 import { normalizePath, type Plugin, type ResolvedConfig } from "vite";
 import { describe, expect, it } from "vitest";
@@ -141,7 +142,7 @@ describe("the aliases", () => {
   it("writes the settings in the frame's page with no way to close its script", () => {
     const script = pageScript({ base: "", assets: "", version: "</script>", routes: [], staticFiles: [] });
     expect(script).not.toContain("</script>");
-    expect(script).toContain("\\u003c/script>");
+    expect(script).toContain("\\u003c\\/script\\u003e");
   });
 });
 
@@ -157,7 +158,9 @@ describe("the environment", () => {
     const staticPublic = await loaded(plugin, "$env/static/public");
     expect(staticPublic).toContain('export const PUBLIC_RETRIES = "3";');
     expect(staticPublic).not.toContain("hidden");
-    expect(await loaded(plugin, "$env/dynamic/public")).toContain('"PUBLIC_TITLE":"Kit </script> three"');
+    expect(await loaded(plugin, "$env/dynamic/public")).toContain(
+      `"PUBLIC_TITLE":${codeLiteral("Kit </script> three")}`
+    );
   });
 
   it("writes SvelteKit 3's $app/env/public from the variables src/env.ts declares public, checked by their schema", async () => {

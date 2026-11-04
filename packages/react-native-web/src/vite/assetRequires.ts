@@ -13,6 +13,8 @@
  * @module
  */
 
+import { codeLiteral } from "forgebook/code-literal";
+
 /** The files a `require` names as an asset rather than a module: images, fonts, sounds and videos. */
 export const ASSET_FILE = /\.(?:png|jpe?g|gif|webp|bmp|svg|ttf|otf|woff2?|mp3|wav|m4a|aac|mp4|webm|mov)$/i;
 
@@ -164,6 +166,6 @@ export const importedAssets = (code: string, program: unknown): string | undefin
     rewritten += code.slice(at, call.start) + inPlaceOf(code.slice(call.start, call.end), name);
     at = call.end;
   }
-  const imports = [...names].map(([specifier, name]) => `import ${name} from ${JSON.stringify(specifier)};`);
+  const imports = [...names].map(([specifier, name]) => `import ${name} from ${codeLiteral(specifier)};`);
   return `${rewritten}${code.slice(at)}\n${imports.join("\n")}\n`;
 };

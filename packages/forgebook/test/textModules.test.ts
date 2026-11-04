@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it, vi } from "vitest";
 
+import { codeLiteral } from "../src/codeLiteral.ts";
 import type { TextModuleContext } from "../src/vite/textModules.ts";
 
 /** What the plugin gives: nothing watched, nothing resolved, nothing kept. */
@@ -72,7 +73,7 @@ describe("a story file's code", () => {
       'export default { title: "Actions/Button" };\nexport const Row = { render: () => <div /> };\n'
     );
     expect(await codeOf(file)).toEqual({
-      code: 'export default {"Row":{"text":"() => <div />","html":"<b>() => <div /></b>"}};',
+      code: `export default ${codeLiteral({ Row: { text: "() => <div />", html: "<b>() => <div /></b>" } })};`,
       loads: 1
     });
   });

@@ -14,6 +14,7 @@ import { resolve } from "node:path";
 
 import type { DocPageIndex } from "@forgebook/story-format/source";
 
+import { codeLiteral } from "../codeLiteral.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import { readLinkedFile } from "./docPageLinks.ts";
 import { compiledDocPage, compiledHome, docPageIndex } from "./docPageMarkdown.ts";
@@ -64,7 +65,7 @@ export const indexedDocPages = (
 
 /** An object literal of a key per page, each value written by `value`. */
 const objectOf = (keys: readonly string[], value: (key: string) => string): string =>
-  `{${keys.map((key) => `${JSON.stringify(key)}: ${value(key)}`).join(",\n")}}`;
+  `{${keys.map((key) => `${codeLiteral(key)}: ${value(key)}`).join(",\n")}}`;
 
 /**
  * The code of the module for one pattern.
@@ -85,11 +86,11 @@ export const docPagesModule = (
   const pages = indexedDocPages(root, pattern, watch, pluginFences(plugins));
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
-  const page = (key: string): string => JSON.stringify(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);
-  const search = JSON.stringify(`${PAGES_SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
+  const page = (key: string): string => codeLiteral(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);
+  const search = codeLiteral(`${PAGES_SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
   return [
     "export default {",
-    `index: ${JSON.stringify(index)},`,
+    `index: ${codeLiteral(index)},`,
     `pages: ${objectOf(keys, (key) => `() => import(${page(key)}).then((module) => module.default)`)},`,
     `search: () => import(${search}).then((module) => module.default),`,
     ...(isServing
@@ -123,15 +124,15 @@ export const docPageModule = (
   );
   return [
     ...imageImports(images),
-    `export default { blocks: ${JSON.stringify(blocks)}, headings: ${JSON.stringify(headings)}, assets: ${assetList(images)} };`,
-    ...(isServing ? [`export const text = ${JSON.stringify(text)};`] : [])
+    `export default { blocks: ${codeLiteral(blocks)}, headings: ${codeLiteral(headings)}, assets: ${assetList(images)} };`,
+    ...(isServing ? [`export const text = ${codeLiteral(text)};`] : [])
   ].join("\n");
 };
 
 /** The imports of a page's images, each answered with its address. */
 const imageImports = (images: readonly string[]): string[] =>
   images.map(
-    (image, place) => `import asset${place} from ${JSON.stringify(`${VITE_PATHS.normalize(image)}?url`)};`
+    (image, place) => `import asset${place} from ${codeLiteral(`${VITE_PATHS.normalize(image)}?url`)};`
   );
 
 /** The list of a page's images' addresses, as the module's code writes it. */
@@ -170,7 +171,7 @@ export const homeModule = (
   };
   return [
     ...imageImports(images),
-    `export default { ...${JSON.stringify(document)}, assets: ${assetList(images)} };`,
-    ...(isServing ? [`export const text = ${JSON.stringify(text)};`] : [])
+    `export default { ...${codeLiteral(document)}, assets: ${assetList(images)} };`,
+    ...(isServing ? [`export const text = ${codeLiteral(text)};`] : [])
   ].join("\n");
 };

@@ -19,6 +19,7 @@
  * @module
  */
 
+import { codeLiteral, codeOfJson } from "../codeLiteral.ts";
 import { type EmitAsset, gzippedJson, packedFileName, packedLoaderMaker } from "./packedModule.ts";
 import { FILES_PREFIX, TEXTS_ID_PREFIX } from "./pluginModules.ts";
 import {
@@ -70,14 +71,14 @@ const textWriter = (
     loaderOf: (value: unknown): string => {
       const json = JSON.stringify(value);
       const fileName = packedFileName(json);
-      const address = JSON.stringify(fileName);
+      const address = codeLiteral(fileName);
       const packed = gzippedJson(json);
       if (json.length <= address.length + packed.length) return written(json);
       emit({ type: "asset", fileName, source: packed });
       return `${PACKED}(${address})`;
     },
     written: (): readonly string[] =>
-      [...names].map(([json, name]) => `const ${name} = () => Promise.resolve(${json});`)
+      [...names].map(([json, name]) => `const ${name} = () => Promise.resolve(${codeOfJson(json)});`)
   };
 };
 

@@ -11,6 +11,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
+import { codeLiteral } from "../codeLiteral.ts";
 import type { CheckedCodeDocument } from "./agent.types.ts";
 import type { AgentAnswer } from "./agentRoutes.ts";
 import { addedLines, checkedCode, deletedTests, fileLines } from "./checkCode.ts";
@@ -96,7 +97,7 @@ export const tokensModule = async (
   const shown = (problem: string): string =>
     problem.replaceAll(config.dir, ".").replaceAll(resolve(config.dir), ".");
   const value = { tokens: tokens.map(tokenSummary), problems: [...unread, ...problems].map(shown) };
-  return { code: `export default ${JSON.stringify(value)};`, moduleType: "js" };
+  return { code: `export default ${codeLiteral(value)};`, moduleType: "js" };
 };
 
 /**

@@ -14,6 +14,7 @@
  *
  * @module
  */
+import { codeLiteral } from "forgebook/code-literal";
 import type { Plugin } from "vite";
 
 /** Vite's `resolveId` hook, as a function. */
@@ -80,7 +81,7 @@ export const previewApiModule = (id: string): string | undefined => {
     `export { ${STORY_HOOKS.join(", ")} } from "@forgebook/react/storybook-hooks";`,
     `export { ${REACT_HOOKS.join(", ")} } from "react";`
   ].join("\n");
-  return named.hasPackage ? `export * from ${JSON.stringify(named.source)};\n${hooks}\n` : `${hooks}\n`;
+  return named.hasPackage ? `export * from ${codeLiteral(named.source)};\n${hooks}\n` : `${hooks}\n`;
 };
 
 /**

@@ -3,6 +3,7 @@
  *
  * @module
  */
+import { codeLiteral } from "forgebook/code-literal";
 import { parseAst } from "vite";
 import { describe, expect, it } from "vitest";
 
@@ -30,8 +31,8 @@ describe("a require of an asset", () => {
     expect(lines[1]).toMatch(/^const logo = __fbAsset0 +;$/);
     expect(lines[2]).toMatch(/Mono: __fbAsset1 +, Again: __fbAsset0 +\}/);
     expect(lines.slice(4).filter((line) => line !== "")).toEqual([
-      'import __fbAsset0 from "./logo.png";',
-      'import __fbAsset1 from "./fonts/Mono.ttf";'
+      `import __fbAsset0 from ${codeLiteral("./logo.png")};`,
+      `import __fbAsset1 from ${codeLiteral("./fonts/Mono.ttf")};`
     ]);
   });
 
@@ -49,7 +50,7 @@ describe("a require of an asset", () => {
     const lines = rewritten.split("\n");
     expect(lines[5]).toBe(code.split("\n")[5]);
     expect(lines[2]).toMatch(/^const logo = ___fbAsset0/);
-    expect(rewritten).toContain('import ___fbAsset0 from "./logo.png";');
+    expect(rewritten).toContain(`import ___fbAsset0 from ${codeLiteral("./logo.png")};`);
     // the rewritten module still parses: no name declared twice
     expect(() => parseAst(rewritten)).not.toThrow();
   });

@@ -9,6 +9,7 @@
  * @module
  */
 
+import { codeLiteral } from "../codeLiteral.ts";
 import { packedUsage } from "../usedIn.ts";
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult, UsageResult } from "./docsExtractor.ts";
@@ -72,7 +73,7 @@ export const docsModule = (
   component: DocsResult,
   watch: (file: string) => void
 ): { code: string; moduleType: "js" } => ({
-  code: `export default ${JSON.stringify(docsValue(component, watch))};`,
+  code: `export default ${codeLiteral(docsValue(component, watch))};`,
   moduleType: "js"
 });
 
@@ -197,7 +198,7 @@ export const reachModule = async (
           graph,
           files.map((file) => ({ storyFile: file.file, title: file.index.title }))
         );
-  return { code: `export default ${JSON.stringify(reach)};`, moduleType: "js" };
+  return { code: `export default ${codeLiteral(reach)};`, moduleType: "js" };
 };
 
 /** A search index, made: its module, and whether it is a group of docs pages' (renewed as pages come and go). */

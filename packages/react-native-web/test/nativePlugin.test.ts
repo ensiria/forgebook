@@ -7,6 +7,7 @@
  */
 import { join } from "node:path";
 
+import { codeLiteral } from "forgebook/code-literal";
 import { build, type Rolldown, type UserConfig } from "vite";
 import { describe, expect, it } from "vitest";
 
@@ -94,7 +95,7 @@ describe("the dev server's pre-bundling of a package written for React Native", 
     expect(result).toMatchObject({ moduleType: "jsx" });
     expect(result.code).not.toContain(": string");
     expect(result.code).not.toContain('require("./a.png")');
-    expect(result.code).toContain('import __fbAsset0 from "./a.png";');
+    expect(result.code).toContain(`import __fbAsset0 from ${codeLiteral("./a.png")};`);
     expect(result.code).toContain("<b />");
   });
 

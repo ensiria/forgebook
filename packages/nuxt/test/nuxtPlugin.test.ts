@@ -4,6 +4,7 @@
  *
  * @module
  */
+import { codeLiteral } from "forgebook/code-literal";
 import MagicString from "magic-string";
 import { describe, expect, it } from "vitest";
 
@@ -34,11 +35,13 @@ describe("a template's components", () => {
     ].join("\n");
     const written = withComponentImports(new MagicString(code), COMPONENTS)?.toString() ?? "";
     expect(written).toContain(
-      'import { NuxtLink as __nuxt_component_0 } from "@forgebook/nuxt/app/components";'
+      `import { NuxtLink as __nuxt_component_0 } from ${codeLiteral("@forgebook/nuxt/app/components")};`
     );
-    expect(written).toContain('import __nuxt_component_1 from "/p/app/components/base/Badge.vue";');
     expect(written).toContain(
-      'const __nuxt_component_2 = __forgebookDefineAsync(() => import("/p/app/components/base/Badge.vue"));'
+      `import __nuxt_component_1 from ${codeLiteral("/p/app/components/base/Badge.vue")};`
+    );
+    expect(written).toContain(
+      `const __nuxt_component_2 = __forgebookDefineAsync(() => import(${codeLiteral("/p/app/components/base/Badge.vue")}));`
     );
     expect(written).toContain("const b = __nuxt_component_1;\nconst c = __nuxt_component_1;");
     expect(written).toContain('const e = _resolveComponent("RouterView");');

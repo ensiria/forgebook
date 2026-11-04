@@ -10,6 +10,7 @@ import { gunzipSync } from "node:zlib";
 import type { UserConfig } from "vite";
 import { describe, expect, it } from "vitest";
 
+import { codeLiteral } from "../src/codeLiteral.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
@@ -115,11 +116,11 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
     const loaded = await hooks.load(String(id));
     await hooks.closeBundle();
     const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
-    expect(code).toContain('["./src/Select.stories.tsx", {"title":"Inputs/Selection/Select"');
-    // in Vite's form, which the queries' ids come back to the plugin in: forward slashes on Windows too
     expect(code).toContain(
-      `() => import(${JSON.stringify(VITE_PATHS.join(KIT, "src", "Select.stories.tsx"))})`
+      `[${codeLiteral("./src/Select.stories.tsx")}, {"title":${codeLiteral("Inputs/Selection/Select")}`
     );
+    // in Vite's form, which the queries' ids come back to the plugin in: forward slashes on Windows too
+    expect(code).toContain(`() => import(${codeLiteral(VITE_PATHS.join(KIT, "src", "Select.stories.tsx"))})`);
     expect(code).toContain("?forgebook-docs");
     expect(code).toContain("?forgebook-code");
     expect(hooks.watched).toContain(VITE_PATHS.join(KIT, "src", "Select.stories.tsx"));
@@ -138,7 +139,9 @@ describe("forgebookPlugin's ?forgebook-files modules", () => {
     await hooks.closeBundle();
     const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
     // keys stay relative to the declaring module, so two patterns of one source never share one
-    expect(code).toContain('["../kit/src/Select.stories.tsx", {"title":"Inputs/Selection/Select"');
+    expect(code).toContain(
+      `[${codeLiteral("../kit/src/Select.stories.tsx")}, {"title":${codeLiteral("Inputs/Selection/Select")}`
+    );
   });
 
   it("leaves every other import to Vite", () => {
@@ -182,7 +185,7 @@ describe("forgebookPlugin's pages", () => {
     const shell = await hooks.load("C:/Users/ada/app/.forgebook-shell.ts");
     const code = typeof shell === "object" && shell !== null && "code" in shell ? String(shell.code) : "";
     expect(code).toContain("mountShell(root");
-    expect(code).toContain('from "C:/Users/ada/app/.forgebook-stories.ts";');
+    expect(code).toContain(`from ${codeLiteral("C:/Users/ada/app/.forgebook-stories.ts")};`);
   });
 
   it("names a build's scripts by their hash alone, and after their modules when the configuration asks", async () => {
@@ -219,7 +222,7 @@ describe("forgebookPlugin's pages", () => {
     expect(id).toBe("C:/Users/ada/app/.forgebook-stories.ts");
     const source = await hooks.load(String(id));
     const code = typeof source === "object" && source !== null && "code" in source ? String(source.code) : "";
-    expect(code).toContain('"./src/**/*.stories.tsx?forgebook-files"');
+    expect(code).toContain(`${codeLiteral("./src/**/*.stories.tsx?forgebook-files")}`);
   });
 });
 
@@ -315,7 +318,7 @@ const builtPattern = async (
  * @param code - the module's code.
  */
 const rowKeys = (code: string): string[] =>
-  [...code.matchAll(/^(?:const rows = \[)?\[("\.\/src\/[^"]+")/gm)].map((match) =>
+  [...code.matchAll(/^(?:const rows = \[)?\[("\.\\\/src\\\/[^"]+")/gm)].map((match) =>
     JSON.parse(match[1] ?? "")
   );
 
@@ -329,8 +332,8 @@ describe("forgebookPlugin in a build", () => {
     const rows = (texts ?? "").split("export default [")[1]?.split(",\n") ?? [];
     expect(rows).toHaveLength(rowKeys(code).length);
     // its stories have a render and its component a page: both worth a file
-    const files = [...(rows[at] ?? "").matchAll(/packedText\("(assets\/[0-9a-f]{12}\.bin)"\)/g)].map(
-      (match) => match[1] ?? ""
+    const files = [...(rows[at] ?? "").matchAll(/packedText\(("assets\\\/[0-9a-f]{12}\.bin")\)/g)].map(
+      (match) => String(JSON.parse(match[1] ?? ""))
     );
     expect(files).toHaveLength(2);
     const written = files.map((file) => gunzipSync(emitted.get(file) ?? new Uint8Array()).toString());

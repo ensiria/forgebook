@@ -12,6 +12,7 @@
  */
 import type { EnvironmentModuleNode, HotUpdateOptions, Plugin } from "vite";
 
+import { codeLiteral } from "../codeLiteral.ts";
 import { RENEWED_MODULE_EVENT, STORY_FILE_EVENT } from "../hotModules.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import type { CloseWatch } from "./closeWatch.ts";
@@ -32,13 +33,13 @@ const VIRTUAL_ID = /^\0/;
  */
 export const storyFileHot = (file: string): string =>
   [
-    `import * as __forgebookShown from ${JSON.stringify(file)};`,
+    `import * as __forgebookShown from ${codeLiteral(file)};`,
     "if (import.meta.hot) {",
     // what the page drew, kept across versions: one that threw while it loaded drew nothing
     "  import.meta.hot.data.forgebookShown ??= __forgebookShown;",
     "  import.meta.hot.accept((next) => {",
     "    if (next === undefined) return;",
-    `    const event = new CustomEvent(${JSON.stringify(STORY_FILE_EVENT)}, {`,
+    `    const event = new CustomEvent(${codeLiteral(STORY_FILE_EVENT)}, {`,
     "      cancelable: true,",
     "      detail: { previous: import.meta.hot.data.forgebookShown, next }",
     "    });",
@@ -83,11 +84,11 @@ export const withStoryFileHot = (code: string, id: string): string => {
  */
 export const renewedModuleHot = (id: string): string =>
   [
-    `import * as __forgebookRenewed from ${JSON.stringify(id)};`,
+    `import * as __forgebookRenewed from ${codeLiteral(id)};`,
     "if (import.meta.hot) {",
     "  import.meta.hot.accept((next) => {",
     "    if (next === undefined) return;",
-    `    window.dispatchEvent(new CustomEvent(${JSON.stringify(RENEWED_MODULE_EVENT)}, {`,
+    `    window.dispatchEvent(new CustomEvent(${codeLiteral(RENEWED_MODULE_EVENT)}, {`,
     "      detail: { previous: __forgebookRenewed.default, next: next.default }",
     "    }));",
     "  });",

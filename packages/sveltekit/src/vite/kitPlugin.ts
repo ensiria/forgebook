@@ -15,6 +15,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { codeLiteral } from "forgebook/code-literal";
 import { VITE_PATHS, type VitePaths } from "forgebook/vite/paths";
 import {
   type Alias,
@@ -162,15 +163,13 @@ const envFiles = (envDir: string, mode: string): string[] =>
     .filter((file) => existsSync(file));
 
 /**
- * The script the frame's page runs before any module: the settings the stand-ins read.
+ * The script the frame's page runs before any module: the settings the stand-ins read. Set inline in the page, so
+ * every value is a `codeLiteral`: no text in it can close the script.
  *
  * @param settings - the settings.
  */
-export const pageScript = (settings: KitAppSettings): string => {
-  // a value holding `</script>` must not close the script: `<` is written as an escape, which JavaScript reads the same
-  const json = (value: unknown): string => JSON.stringify(value).replaceAll("<", "\\u003c");
-  return `globalThis[Symbol.for(${json(APP_SETTINGS_KEY)})] = ${json(settings)};`;
-};
+export const pageScript = (settings: KitAppSettings): string =>
+  `globalThis[Symbol.for(${codeLiteral(APP_SETTINGS_KEY)})] = ${codeLiteral(settings)};`;
 
 /**
  * The plugin of a SvelteKit catalogue.
@@ -234,14 +233,14 @@ export const kitPlugin = (project: KitProject): Plugin => {
     );
     return module === "$env/static/public"
       ? namedExports(values)
-      : `export const env = ${JSON.stringify(values)};\n`;
+      : `export const env = ${codeLiteral(values)};\n`;
   };
   return {
     name: "forgebook:sveltekit",
     enforce: "pre",
     config: (): UserConfig => ({
       // a server render has no page to write the settings in: the code this package compiles has them instead
-      define: { [SETTINGS_CONSTANT]: JSON.stringify(settingsNow()) },
+      define: { [SETTINGS_CONSTANT]: codeLiteral(settingsNow()) },
       // compiled by Vite, so the settings are in it, rather than loaded by Node as it is published
       ssr: { noExternal: ["@forgebook/sveltekit"] },
       resolve: {

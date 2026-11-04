@@ -12,6 +12,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
 import type { Violation } from "forgebook/a11y";
 import { DEFAULT_A11Y_TAGS } from "forgebook/catalogue";
+import { codeLiteral } from "forgebook/code-literal";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import { frameAddressOf } from "forgebook/view-state";
 
@@ -67,13 +68,9 @@ export const takeShot = async (request: ShotRequest): Promise<StoryShot> => {
     await page.goto(address);
     // a text expression: the command runs on Node, where the page's own globals are not typed
     const status = await page
-      .waitForFunction(
-        `document.documentElement.getAttribute(${JSON.stringify(STATUS_ATTRIBUTE)})`,
-        undefined,
-        {
-          timeout: request.timeout
-        }
-      )
+      .waitForFunction(`document.documentElement.getAttribute(${codeLiteral(STATUS_ATTRIBUTE)})`, undefined, {
+        timeout: request.timeout
+      })
       .then(
         async (handle): Promise<ShotStatus> => ((await handle.jsonValue()) === "ready" ? "ready" : "error")
       )

@@ -13,6 +13,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { codeOfJson } from "forgebook/code-literal";
 import { type Alias, runnerImport } from "vite";
 
 /** The modules only a server may load, with what each is. */
@@ -48,12 +49,15 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * A value written in a module: a text can hold `</script>` with no harm, since the module is not in the page's HTML.
+ * A value written in a module: a big integer as its literal, a value JSON writes nothing for as `undefined`.
  *
  * @param value - the value.
  */
-const written = (value: unknown): string =>
-  typeof value === "bigint" ? `${value}n` : (JSON.stringify(value) ?? "undefined");
+const written = (value: unknown): string => {
+  if (typeof value === "bigint") return `${value}n`;
+  const json: unknown = JSON.stringify(value);
+  return typeof json === "string" ? codeOfJson(json) : "undefined";
+};
 
 /** The query a server-only import is rewritten with, naming what it imports (`?names=SECRET,TOKEN`). */
 const NAMES_QUERY = "?names=";

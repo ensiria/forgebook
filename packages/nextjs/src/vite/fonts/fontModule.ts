@@ -14,6 +14,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 
+import { codeLiteral } from "forgebook/code-literal";
+
 import type { GoogleFontsMode } from "../nextjs.ts";
 import type { FontCall } from "./fontCalls.ts";
 import {
@@ -423,7 +425,7 @@ export const buildFontModule = async (
   const sheet = join(context.cacheDir, `${hash}.css`);
   writeFileSync(sheet, `${parts.faces}\n${built.css}\n`);
   return {
-    code: `import ${JSON.stringify(sheet.split("\\").join("/"))};\nexport default ${JSON.stringify(built.value)};\n`,
+    code: `import ${codeLiteral(sheet.split("\\").join("/"))};\nexport default ${codeLiteral(built.value)};\n`,
     watch: parts.watch
   };
 };

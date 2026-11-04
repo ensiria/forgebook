@@ -13,6 +13,8 @@
  * @module
  */
 
+import { codeLiteral } from "forgebook/code-literal";
+
 /**
  * The extensions a module is looked for with, the web's first: `Button.web.tsx` wins over `Button.tsx` and over
  * `Button.native.tsx`, which is never read, as Metro does for the web platform.
@@ -106,8 +108,8 @@ export const isNativeSource = (file: string, nativePackages: readonly string[]):
  */
 export const nativeDefines = (isDevelopment: boolean): Readonly<Record<string, string>> => ({
   // biome-ignore lint/style/useNamingConvention: the global's name, as React Native's code reads it
-  __DEV__: JSON.stringify(isDevelopment),
-  "process.env.EXPO_OS": JSON.stringify("web"),
+  __DEV__: codeLiteral(isDevelopment),
+  "process.env.EXPO_OS": codeLiteral("web"),
   global: "globalThis"
 });
 

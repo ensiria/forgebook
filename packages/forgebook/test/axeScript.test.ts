@@ -9,6 +9,7 @@ import { gunzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { axeAddress, axeBuildAsset } from "../src/vite/axeScript.ts";
 import { packageResolver } from "../src/vite/configFile.ts";
 
@@ -27,7 +28,7 @@ describe("axeAddress", () => {
     const asset = axeBuildAsset(PACKAGE_DIR);
     expect(address?.imports).toEqual([]);
     expect(asset?.fileName).toMatch(/^assets\/axe-[0-9a-f]{8}\.bin$/);
-    expect(address?.value).toBe(`import.meta.env.BASE_URL + ${JSON.stringify(asset?.fileName)}`);
+    expect(address?.value).toBe(`import.meta.env.BASE_URL + ${codeLiteral(asset?.fileName)}`);
   });
 
   it("writes the script gzipped, whole", () => {
