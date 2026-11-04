@@ -1,3 +1,73 @@
+## 0.2.0 (2026-11-04)
+
+### 🚀 Features
+
+- ⚠️  **story-format:** let a source load each language's texts when shown ([22fcb19](https://github.com/ensiria/forgebook/commit/22fcb19))
+- **angular:** add the Angular and Analog adapter ([87c9db7](https://github.com/ensiria/forgebook/commit/87c9db7))
+- **html:** add the plain HTML adapter ([ebedf7a](https://github.com/ensiria/forgebook/commit/ebedf7a))
+- ⚠️  show a story in a drawn device frame ([fdb94e4](https://github.com/ensiria/forgebook/commit/fdb94e4))
+- read a framework's own component files as TypeScript ([44e5de3](https://github.com/ensiria/forgebook/commit/44e5de3))
+- **web-components:** add the Web Components adapter ([3707036](https://github.com/ensiria/forgebook/commit/3707036))
+- share JSX code and function components' docs between adapters ([343d10a](https://github.com/ensiria/forgebook/commit/343d10a))
+- ⚠️  **forgebook:** draw a component's page for its audience ([c58b72a](https://github.com/ensiria/forgebook/commit/c58b72a))
+- open the framework contract beyond React ([350056c](https://github.com/ensiria/forgebook/commit/350056c))
+- link components to Figma, with a Design tab and a comparison ([91d3f63](https://github.com/ensiria/forgebook/commit/91d3f63))
+- **forgebook:** let a model judge what axe cannot see ([fb8c28c](https://github.com/ensiria/forgebook/commit/fb8c28c))
+- **forgebook:** compare a story's pictures with stored baselines ([883e41d](https://github.com/ensiria/forgebook/commit/883e41d))
+- **testing:** give every framework adapter one suite to pass ([e43e4b8](https://github.com/ensiria/forgebook/commit/e43e4b8))
+- **testing:** name a modal that loses the keyboard ([36cdbbb](https://github.com/ensiria/forgebook/commit/36cdbbb))
+- **testing:** check a real page of the application ([3d32884](https://github.com/ensiria/forgebook/commit/3d32884))
+
+### 🩹 Fixes
+
+- **forgebook:** write values into generated code as escaped literals ([535ca0e](https://github.com/ensiria/forgebook/commit/535ca0e))
+- **forgebook:** read a preview's named exports and the globals it starts from ([99ad9c6](https://github.com/ensiria/forgebook/commit/99ad9c6))
+- **testing:** give the conformance suite's docs test a program's time ([6cffa3e](https://github.com/ensiria/forgebook/commit/6cffa3e))
+- ⚠️  **forgebook:** give stories Storybook's ids, and merge files with one title ([05e19ad](https://github.com/ensiria/forgebook/commit/05e19ad))
+- draw a story in a device inside its safe areas ([bc83792](https://github.com/ensiria/forgebook/commit/bc83792))
+- keep device and orientation free for a catalogue's own switches ([1e0cffd](https://github.com/ensiria/forgebook/commit/1e0cffd))
+- **solid:** report an error once, and never call a story that threw drawn ([f09cdae](https://github.com/ensiria/forgebook/commit/f09cdae))
+- **testing:** quote the config's path in the frame server's command ([44992e4](https://github.com/ensiria/forgebook/commit/44992e4))
+- **testing:** keep a picture's name quick on a long run of hyphens ([84ea199](https://github.com/ensiria/forgebook/commit/84ea199))
+
+### 🔥 Performance
+
+- **react:** leave React's server renderer out of the frame page ([db0c81b](https://github.com/ensiria/forgebook/commit/db0c81b))
+
+### ⚠️  Breaking Changes
+
+- **story-format:** let a source load each language's texts when shown  ([22fcb19](https://github.com/ensiria/forgebook/commit/22fcb19))
+  StorySource.texts values may be loaders, so code that
+  reads a source's texts must handle both forms; shownTexts in
+  forgebook/story-texts returns a promise.
+- **forgebook:** give stories Storybook's ids, and merge files with one title  ([05e19ad](https://github.com/ensiria/forgebook/commit/05e19ad))
+  ids change for titles with a case change inside a word and for
+  exports with digits or capitals in a row. The old ids keep working: the shell
+  rewrites an address written with one, and a frame, `forgebook story`, `check`,
+  `shot`, `diff` and the MCP tools take one and answer with the current id. A
+  `forgebook diff` baseline or a Playwright screenshot stored under an old id is
+  still the story's baseline until `forgebook shot --update` or
+  `--update-snapshots` stores one under its id. Names derived from exports change
+  where capitals or digits run together (`Size2X` is "Size 2 X").
+- show a story in a drawn device frame  ([fdb94e4](https://github.com/ensiria/forgebook/commit/fdb94e4))
+  device and orientation are now parameters of the
+  address, so a catalogue's switch may no longer use either id. A
+  catalogue with such a switch renames it, and the values its stories
+  write in globals, to load.
+- **forgebook:** draw a component's page for its audience  ([c58b72a](https://github.com/ensiria/forgebook/commit/c58b72a))
+  `audience` is now a parameter of the address, so a switch
+  may no longer take that id and a Storybook global of that name is dropped;
+  `ViewState`, `ViewCatalogue` and `TreeStory` gain required fields.
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.0
+- Updated forgebook to 0.2.0
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.9 (2026-11-01)
 
 ### 🚀 Features

@@ -1,3 +1,52 @@
+## 0.2.0 (2026-11-04)
+
+### 🚀 Features
+
+- **forgebook:** list props by their TSDoc group, and an object prop's members ([f3d0003](https://github.com/ensiria/forgebook/commit/f3d0003))
+- ⚠️  **story-format:** let a source load each language's texts when shown ([22fcb19](https://github.com/ensiria/forgebook/commit/22fcb19))
+- **story-format:** type a story's MSW handlers ([1670092](https://github.com/ensiria/forgebook/commit/1670092))
+- give the device frame its own control, and touch in a device ([133c00f](https://github.com/ensiria/forgebook/commit/133c00f))
+- ⚠️  show a story in a drawn device frame ([fdb94e4](https://github.com/ensiria/forgebook/commit/fdb94e4))
+- ⚠️  **forgebook:** draw a component's page for its audience ([c58b72a](https://github.com/ensiria/forgebook/commit/c58b72a))
+- **forgebook:** search docs pages, props and descriptions ([b39a045](https://github.com/ensiria/forgebook/commit/b39a045))
+- open the framework contract beyond React ([350056c](https://github.com/ensiria/forgebook/commit/350056c))
+- **forgebook:** add docs pages with live stories ([bac3b59](https://github.com/ensiria/forgebook/commit/bac3b59))
+- link components to Figma, with a Design tab and a comparison ([91d3f63](https://github.com/ensiria/forgebook/commit/91d3f63))
+- **story-format:** let a source name its design tokens ([aef8648](https://github.com/ensiria/forgebook/commit/aef8648))
+- **forgebook:** check the stories a change touches ([1e2ee90](https://github.com/ensiria/forgebook/commit/1e2ee90))
+
+### 🩹 Fixes
+
+- renew a story's mocks in place, and log each frame's own requests ([ea08850](https://github.com/ensiria/forgebook/commit/ea08850))
+- **forgebook:** read a preview's named exports and the globals it starts from ([99ad9c6](https://github.com/ensiria/forgebook/commit/99ad9c6))
+- **forgebook:** list every export of a story file, as Storybook's indexer does ([350c260](https://github.com/ensiria/forgebook/commit/350c260))
+- draw a story in a device inside its safe areas ([bc83792](https://github.com/ensiria/forgebook/commit/bc83792))
+- **forgebook:** harden docs pages after review ([0feface](https://github.com/ensiria/forgebook/commit/0feface))
+
+### 🔥 Performance
+
+- **forgebook:** check Figma links in the index, not in the pages ([4f96a20](https://github.com/ensiria/forgebook/commit/4f96a20))
+
+### ⚠️  Breaking Changes
+
+- **story-format:** let a source load each language's texts when shown  ([22fcb19](https://github.com/ensiria/forgebook/commit/22fcb19))
+  StorySource.texts values may be loaders, so code that
+  reads a source's texts must handle both forms; shownTexts in
+  forgebook/story-texts returns a promise.
+- show a story in a drawn device frame  ([fdb94e4](https://github.com/ensiria/forgebook/commit/fdb94e4))
+  device and orientation are now parameters of the
+  address, so a catalogue's switch may no longer use either id. A
+  catalogue with such a switch renames it, and the values its stories
+  write in globals, to load.
+- **forgebook:** draw a component's page for its audience  ([c58b72a](https://github.com/ensiria/forgebook/commit/c58b72a))
+  `audience` is now a parameter of the address, so a switch
+  may no longer take that id and a Storybook global of that name is dropped;
+  `ViewState`, `ViewCatalogue` and `TreeStory` gain required fields.
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.5 (2026-11-01)
 
 ### 🚀 Features

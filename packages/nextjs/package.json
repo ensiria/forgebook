@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/nextjs",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "Forgebook for Next.js: a Next.js project's components drawn outside Next, with next/image, next/font, next/link, both routers, next/headers and server components, on Vite.",
   "keywords": [
     "nextjs",

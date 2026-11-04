@@ -1,3 +1,52 @@
+## 0.2.0 (2026-11-04)
+
+### 🚀 Features
+
+- **react:** run Storybook's preview hooks in a React story file ([b051e42](https://github.com/ensiria/forgebook/commit/b051e42))
+- **forgebook:** list props by their TSDoc group, and an object prop's members ([f3d0003](https://github.com/ensiria/forgebook/commit/f3d0003))
+- **react-native-web:** take Storybook's Babel, JSX source and file options ([a27a96d](https://github.com/ensiria/forgebook/commit/a27a96d))
+- **react-native-web:** draw React Native components through react-native-web ([a4e758f](https://github.com/ensiria/forgebook/commit/a4e758f))
+- share JSX code and function components' docs between adapters ([343d10a](https://github.com/ensiria/forgebook/commit/343d10a))
+- open the framework contract beyond React ([350056c](https://github.com/ensiria/forgebook/commit/350056c))
+- **forgebook:** read tokens from sources, and list them in CATALOG.md ([47e6740](https://github.com/ensiria/forgebook/commit/47e6740))
+- **testing:** give every framework adapter one suite to pass ([e43e4b8](https://github.com/ensiria/forgebook/commit/e43e4b8))
+- **forgebook:** read when to use a component from its TSDoc ([59e7bfa](https://github.com/ensiria/forgebook/commit/59e7bfa))
+
+### 🩹 Fixes
+
+- **forgebook:** write values into generated code as escaped literals ([535ca0e](https://github.com/ensiria/forgebook/commit/535ca0e))
+- **react:** run a story's render and decorators as components ([0723312](https://github.com/ensiria/forgebook/commit/0723312))
+- **forgebook:** read a .js story file that holds JSX ([73a07ec](https://github.com/ensiria/forgebook/commit/73a07ec))
+- ⚠️  **forgebook:** give stories Storybook's ids, and merge files with one title ([05e19ad](https://github.com/ensiria/forgebook/commit/05e19ad))
+
+### 🔥 Performance
+
+- **react:** leave React's server renderer out of the frame page ([db0c81b](https://github.com/ensiria/forgebook/commit/db0c81b))
+- **react:** redraw an edited component as soon as its update ran ([71ed135](https://github.com/ensiria/forgebook/commit/71ed135))
+- **react:** load React's server renderer only for a server render ([317ebaa](https://github.com/ensiria/forgebook/commit/317ebaa))
+
+### ⚠️  Breaking Changes
+
+- **forgebook:** give stories Storybook's ids, and merge files with one title  ([05e19ad](https://github.com/ensiria/forgebook/commit/05e19ad))
+  ids change for titles with a case change inside a word and for
+  exports with digits or capitals in a row. The old ids keep working: the shell
+  rewrites an address written with one, and a frame, `forgebook story`, `check`,
+  `shot`, `diff` and the MCP tools take one and answer with the current id. A
+  `forgebook diff` baseline or a Playwright screenshot stored under an old id is
+  still the story's baseline until `forgebook shot --update` or
+  `--update-snapshots` stores one under its id. Names derived from exports change
+  where capitals or digits run together (`Size2X` is "Size 2 X").
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.0
+- Updated forgebook to 0.2.0
+- Updated @forgebook/testing to 0.2.0
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.1.8 (2026-11-01)
 
 ### 🚀 Features

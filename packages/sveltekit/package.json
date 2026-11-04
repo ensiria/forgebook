@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/sveltekit",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "Forgebook for SvelteKit: a SvelteKit project's components drawn outside the app, with $app/state, $app/navigation, $app/forms, $app/paths, the environment and a page's load, on Vite.",
   "keywords": [
     "sveltekit",
