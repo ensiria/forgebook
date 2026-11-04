@@ -20,3 +20,6 @@ export const MARKDOWN_QUERY = "?forgebook-markdown";
 
 /** The query that asks for one docs page, compiled. */
 export const DOCS_PAGE_QUERY = "?forgebook-docs-page";
+
+/** The query that asks for the written home (`forgebook.home.md`), rendered: its file, then this. */
+export const HOME_QUERY = "?forgebook-home";

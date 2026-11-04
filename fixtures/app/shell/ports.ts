@@ -33,7 +33,8 @@ export const CATALOGUES = [
   "nuxt",
   "angular",
   "sveltekit",
-  "react-native"
+  "react-native",
+  "generated-home"
 ] as const;
 
 /** A catalogue the suite runs. */

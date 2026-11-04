@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 
 import { catalogueSettings, groupLabel } from "../src/catalogue.ts";
 import { LATER_STRINGS } from "../src/shell/laterStrings.ts";
-import { configureStrings, STRINGS, textsByName, textsOfGroup } from "../src/shell/strings.ts";
+import { PAGE_STRINGS } from "../src/shell/pageStrings.ts";
+import { configureStrings, lateStrings, STRINGS, textsOfGroup } from "../src/shell/strings.ts";
 import { groupedStories } from "../src/storyTree.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { mergedLists } from "../src/vite/configFile.ts";
@@ -193,7 +194,7 @@ describe("configureStrings", () => {
       usedInMore: "Many"
     });
     const usedInMore = (count: number): string => String(count);
-    const texts = textsByName({
+    const texts = lateStrings({
       copy: "Copy",
       droppedArgReasons: { undeclared: "Not a prop", type: "Not its type" },
       usedInMore
@@ -206,9 +207,10 @@ describe("configureStrings", () => {
     configureStrings({});
   });
 
-  it("keeps each text in one place: no later part's text has a name of the first screen's", () => {
-    const shared = Object.keys(LATER_STRINGS).filter((name) => Object.hasOwn(STRINGS, name));
-    expect(shared).toEqual([]);
+  it("keeps each text in one place: no two sets of texts share a name", () => {
+    const sets = [Object.keys(STRINGS), Object.keys(LATER_STRINGS), Object.keys(PAGE_STRINGS)];
+    const names = sets.flat();
+    expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
   });
 
   it("replaces plain texts by their path, and leaves a text that takes values and an unknown path alone", () => {
@@ -244,5 +246,21 @@ describe("configureStrings", () => {
     expect(
       catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { model: "nokia-3310" } }).device.model
     ).toBe("phone");
+  });
+});
+
+describe("lateStrings", () => {
+  it("gives a part loaded later the catalogue's replacements by the same names, leaving the rest", () => {
+    configureStrings({ "asides.tip": "Hint", previousPage: "Back" });
+    const texts = lateStrings({
+      previousPage: "Previous",
+      nextPage: "Next",
+      asides: { tip: "Tip", note: "Note" },
+      count: (value: number): string => `${value}`
+    });
+    expect(texts.previousPage).toBe("Back");
+    expect(texts.nextPage).toBe("Next");
+    expect(texts.asides).toEqual({ tip: "Hint", note: "Note" });
+    configureStrings({});
   });
 });

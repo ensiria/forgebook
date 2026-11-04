@@ -345,7 +345,7 @@ export const agentAnswer = async (
     if (route === "story") return await storyAnswer(context);
     if (route === "find") return await findAnswer(context);
     if (route === "search") return await searchAnswer(context);
-    if (route === "pages") return pagesAnswer(context);
+    if (route === "pages") return await pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context);
     if (route === "agent-index")

@@ -311,7 +311,7 @@ describe("the modules", () => {
       `"./docs/getting-started.md": () => import(${JSON.stringify(`${VITE_PATHS.join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
     );
     expect(code).toContain("module.text");
-    expect(new Set(watched).size).toBe(4);
+    expect(new Set(watched).size).toBe(5);
     expect(docPagesModule(KIT_DIR, "docs/**/*.md", () => undefined, false)).not.toContain("module.text");
   });
 

@@ -4,12 +4,13 @@
  *
  * @remarks
  * `STRINGS` holds the texts of what a first load draws; the texts of the parts that load later live beside it and
- * load with those parts, so a first load carries none of them: the pages and panels opened on demand
- * (`laterStrings.ts`), the search's results (`searchStrings.ts`), the audiences' sections (`audiencePage.ts`). A
+ * load with those parts, so a first load carries none of them: the home and the docs pages (`pageStrings.ts`),
+ * the other pages, tabs and panels opened on demand (`laterStrings.ts`), the search's results (`searchStrings.ts`),
+ * the audiences' sections (`audiencePage.ts`). A
  * catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
  * its configuration), wherever the text lives: the shell applies the replacements once, before it draws
  * (`configureStrings`), as a translation is set up, and the later texts take them when they load
- * (`textsByName`, `textsOfGroup`). A text that takes values (`allStories(count)`) stays the shell's.
+ * (`lateStrings`, `textsOfGroup`). A text that takes values (`allStories(count)`) stays the shell's.
  *
  * @module
  */
@@ -219,29 +220,20 @@ export const configureStrings = (replacements: Readonly<Record<string, string>>)
 };
 
 /**
- * Applies the catalogue's replacements to texts that loaded after it set them.
+ * The texts of a part of the shell loaded on first use (the docs pages), with the catalogue's replacements applied as
+ * they load: they live with their part, so the first load does not carry them, and keep their names among the shell's
+ * texts, so a catalogue replaces them as any other.
  *
- * @param texts - the texts, under the names a replacement's path starts with.
+ * @param texts - the part's texts, as Forgebook writes them.
+ * @returns the same texts, replaced where the catalogue asks.
  */
-const applyReplacements = (texts: Record<string, unknown>): void => {
+export const lateStrings = <TTexts extends Record<string, unknown>>(texts: TTexts): TTexts => {
   for (const [path, text] of Object.entries(catalogueReplacements)) replaceText(texts, path.split("."), text);
-};
-
-/**
- * Texts kept out of the first load under the plain names they share with `STRINGS` (`copy`,
- * `droppedArgReasons.type`), with the catalogue's replacements applied as those of `STRINGS` are.
- *
- * @param texts - the texts.
- * @returns the same texts, changed in place.
- */
-export const textsByName = <TTexts extends Record<string, unknown>>(texts: TTexts): TTexts => {
-  applyReplacements(texts);
   return texts;
 };
 
 /**
- * Texts kept out of the first load under a group's name, with the catalogue's replacements applied as those of
- * `STRINGS` are.
+ * Texts kept out of the first load, with the catalogue's replacements applied as those of `STRINGS` are.
  *
  * @param group - their name among the texts (`audienceTexts`): a replacement's path starts with it.
  * @param texts - the texts.
@@ -251,6 +243,6 @@ export const textsOfGroup = <TTexts extends Record<string, unknown>>(
   group: string,
   texts: TTexts
 ): TTexts => {
-  applyReplacements({ [group]: texts });
+  lateStrings({ [group]: texts });
   return texts;
 };

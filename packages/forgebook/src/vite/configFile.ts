@@ -10,7 +10,7 @@
  * @module
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -39,6 +39,12 @@ import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The names a configuration file may have, in the order they are looked for. */
 export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"];
+
+/**
+ * The name the written home has beside the configuration. Prefixed as the preview is, so a `home.md` a project
+ * keeps for another reason never replaces the generated home of a catalogue that did not ask for it.
+ */
+export const HOME_FILE = "forgebook.home.md";
 
 /** The names a preview may have beside the configuration, in the order they are looked for. */
 const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebook.preview.js"];
@@ -84,6 +90,8 @@ export type ResolvedConfig = {
   readonly stories: readonly string[];
   /** The project's own docs pages' globs, from the configuration's folder. */
   readonly docs: readonly string[];
+  /** The written home's absolute path; none for the generated home. */
+  readonly home: string | undefined;
   /** The sources' module specifiers. */
   readonly sources: readonly string[];
   /** The switches, the presets' and the catalogue's merged; none when neither declares any. */
@@ -246,6 +254,13 @@ const configProblem = (config: unknown): string | undefined => {
   if (!("framework" in config) || typeof config.framework !== "object" || config.framework === null)
     return "it names no framework (`framework: react()`)";
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
+  if (
+    "home" in config &&
+    config.home !== undefined &&
+    config.home !== false &&
+    typeof config.home !== "string"
+  )
+    return 'its home is neither a path (`home: "docs/home.md"`) nor false';
   if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
   return framesProblem("frames" in config ? config.frames : undefined);
@@ -315,6 +330,26 @@ const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "
   docs: config.docs ?? [],
   sources: config.sources ?? []
 });
+
+/**
+ * The written home's absolute path: the configuration's `home`, else `forgebook.home.md` beside it when there; none
+ * with `home: false`.
+ *
+ * @param config - the configuration.
+ * @param dir - the folder of its file.
+ * @throws when the configuration names a home that is not there.
+ */
+const homeOf = (config: ForgebookConfig, dir: string): string | undefined => {
+  if (config.home === false) return undefined;
+  if (config.home === undefined) {
+    const beside = VITE_PATHS.join(dir, HOME_FILE);
+    return existsSync(beside) ? beside : undefined;
+  }
+  const home = VITE_PATHS.resolve(dir, config.home);
+  if (!existsSync(home) || !statSync(home).isFile())
+    throw new Error(`${resolve(dir, "forgebook.config")}: its home "${config.home}" is not a file there`);
+  return home;
+};
 
 /**
  * A configuration's plugins, once they can be used.
@@ -390,6 +425,7 @@ export const resolveConfig = (
     dir,
     framework: config.framework,
     title: config.title,
+    home: homeOf(config, dir),
     logo: config.logo === undefined ? undefined : absolute(config.logo),
     heights: config.heights,
     ...shownFiles(config),

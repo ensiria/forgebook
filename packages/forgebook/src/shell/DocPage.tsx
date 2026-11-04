@@ -16,7 +16,6 @@ import {
   type MouseEvent,
   type ReactNode,
   useCallback,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -31,16 +30,23 @@ import { findStory, type StoryTree, type TreeSource, type TreeStory } from "../s
 import type { ViewState } from "../viewState.ts";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
-import { DocBlocks, type DocBlocksContext, queuedBlocks } from "./DocBlocks.tsx";
+import {
+  blockPlaces,
+  catalogueValues,
+  DocBlocks,
+  type DocBlocksContext,
+  queuedBlocks
+} from "./DocBlocks.tsx";
 import { DocContents } from "./DocContents.tsx";
 import { Icon } from "./icons.tsx";
-import { LATER_STRINGS } from "./laterStrings.ts";
+import { PAGE_STRINGS } from "./pageStrings.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { useAnchorScroll } from "./useAnchorScroll.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import { usePageFrames } from "./usePageFrames.ts";
+import { useProseLinks } from "./useProseLinks.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 
 /** The narrowest page that takes the contents as a column beside its text, in CSS px. */
@@ -57,6 +63,8 @@ const pageState = (value: unknown): Loaded<LoadedDocPage> =>
 
 /** The docs page's props. */
 export type DocPageProps = {
+  /** The catalogue's name, for the values a page's text names. */
+  readonly title: string;
   /** The plugins, whose blocks the page may hold. */
   readonly plugins: readonly ShellPlugin[];
   /** The page and its source. */
@@ -150,8 +158,8 @@ const PageFoot = ({
     );
   return previous === undefined && next === undefined ? null : (
     <nav className="forgebook-docs__foot" aria-label={STRINGS.docsNav}>
-      {link(previous, LATER_STRINGS.previousPage, "previous")}
-      {link(next, LATER_STRINGS.nextPage, "next")}
+      {link(previous, PAGE_STRINGS.previousPage, "previous")}
+      {link(next, PAGE_STRINGS.nextPage, "next")}
     </nav>
   );
 };
@@ -184,6 +192,7 @@ const loadedPage = (loaded: Loaded<LoadedDocPage>): LoadedDocPage =>
  * @param props - the page, its anchor, the view, and how it opens what it links to.
  */
 export const DocPage = ({
+  title,
   plugins,
   location,
   anchor,
@@ -217,6 +226,8 @@ export const DocPage = ({
     [page.stories, tree]
   );
   const queued = useMemo(() => queuedBlocks(content.blocks, tree), [content.blocks, tree]);
+  const places = useMemo(() => blockPlaces(content.blocks), [content.blocks]);
+  const values = useMemo(() => catalogueValues(title, tree), [title, tree]);
   const frames = usePageFrames({ stories, queued, pageRef, view, touchOverrides });
   useScrollMemory(pageRef, scroll);
   const placeAgain = useAnchorScroll(pageRef, anchor, scroll.visit, loaded.status === "ready");
@@ -238,19 +249,7 @@ export const DocPage = ({
     },
     [goToAnchor, onOpenAddress]
   );
-  // a link of the package's text is plain HTML: it opens in place through here, or the whole catalogue would reload
-  useEffect(() => {
-    const body = bodyRef.current;
-    if (body === null) return;
-    const follow = (event: globalThis.MouseEvent): void => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-      const link = event.target instanceof Element ? event.target.closest(".forgebook-prose a") : null;
-      const href = link?.getAttribute("href");
-      if (href !== null && href !== undefined && openLink(href)) event.preventDefault();
-    };
-    body.addEventListener("click", follow);
-    return (): void => body.removeEventListener("click", follow);
-  }, [openLink]);
+  useProseLinks(bodyRef, openLink);
   const context: DocBlocksContext = {
     tree,
     sources,
@@ -266,12 +265,16 @@ export const DocPage = ({
     stories: { hrefOf: storyHrefOf, onOpen: onOpenStory },
     onTouchChange,
     heightOf,
-    backgroundOf
+    backgroundOf,
+    values,
+    onOpenAddress: openLink,
+    places
   };
   const isColumn = width !== undefined && width >= COLUMN_WIDTH;
   const contents = (
     <DocContents
       headings={content.headings}
+      values={values}
       scrollRef={pageRef}
       isColumn={isColumn}
       hrefOf={(target: string): string => pageHrefOf(page.id, target)}
@@ -292,7 +295,7 @@ export const DocPage = ({
             {isColumn ? null : contents}
             {loaded.status === "error" ? (
               <p className="forgebook-problems" role="alert">
-                {LATER_STRINGS.docPageError}: {loaded.message}
+                {PAGE_STRINGS.docPageError}: {loaded.message}
               </p>
             ) : null}
             <DocBlocks blocks={content.blocks} context={context} />

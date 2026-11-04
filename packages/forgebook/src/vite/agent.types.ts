@@ -185,11 +185,11 @@ export type PageLinks = {
 
 /** A docs page, as the list of pages gives it. */
 export type AgentPage = {
-  /** `<source>:<title>` in kebab case: what `forgebook page` takes. */
+  /** `<source>:<title>` in kebab case, or `home` for the catalogue's written home: what `forgebook page` takes. */
   readonly id: string;
   /** Its whole title (`Guides/Theming`). */
   readonly title: string;
-  /** The id of the source it belongs to. */
+  /** The id of the source it belongs to; empty for the written home, which belongs to the catalogue. */
   readonly source: string;
   /** Its file, relative to the module that declares the source. */
   readonly file: string;
@@ -211,6 +211,8 @@ export type PagesDocument = {
   readonly title: string;
   /** Every page. */
   readonly pages: readonly AgentPage[];
+  /** The catalogue's written home (`forgebook.home.md`), which `forgebook page home` reads; none for the generated one. */
+  readonly home?: AgentPage;
   /** One message per problem the index found: a page naming a story that is not there, a title taken twice. */
   readonly problems: readonly string[];
 };

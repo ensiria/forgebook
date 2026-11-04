@@ -18,7 +18,7 @@ import { csfStoryId } from "../../src/storyIds.ts";
 import type { ExtractStoryComponent } from "../../src/vite/adapter.ts";
 import { autoTitle, STORY_FILE } from "../../src/vite/autoTitle.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
-import { readLinkedFile } from "../../src/vite/docPageMarkdown.ts";
+import { readLinkedFile } from "../../src/vite/docPageLinks.ts";
 import { indexedDocPages } from "../../src/vite/docPagesModule.ts";
 import { indexStoryFile } from "../../src/vite/indexStoryFile.ts";
 import { readTokenFiles, type SourceTokens, sourceTokensIn } from "../../src/vite/sourceTokens.ts";

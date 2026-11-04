@@ -21,8 +21,8 @@ import {
   type TreeFamily,
   type TreeSource
 } from "../storyTree.ts";
-import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
+import { PAGE_STRINGS } from "./pageStrings.ts";
 import { STRINGS } from "./strings.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import type { RecentPage } from "./useRecentPages.ts";
@@ -49,7 +49,7 @@ export type HomePageProps = {
 };
 
 /** A link to a page, opened in place unless the user asks for another tab. */
-const PageLink = ({
+export const PageLink = ({
   page,
   hrefOf,
   onOpen,
@@ -89,7 +89,7 @@ type RecentEntry = {
  * @param tree - the tree.
  * @param recent - the pages opened last.
  */
-const recentEntries = (tree: StoryTree, recent: readonly RecentPage[]): RecentEntry[] =>
+export const recentEntries = (tree: StoryTree, recent: readonly RecentPage[]): RecentEntry[] =>
   recent.flatMap((page): RecentEntry[] => {
     if (page.kind === "story") {
       const location = findStory(tree, page.id);
@@ -131,12 +131,12 @@ const introState = (value: unknown): Loaded<{ readonly html: string }> => {
  *
  * @param props - the loader.
  */
-const SourceIntro = ({ load }: { readonly load: StorySource["home"] }): ReactNode => {
+export const SourceIntro = ({ load }: { readonly load: StorySource["home"] }): ReactNode => {
   const intro = useLoaded(load, introState);
   if (intro.status === "error") {
     return (
       <p className="forgebook-problems" role="alert">
-        {LATER_STRINGS.homeIntroError}: {intro.message}
+        {PAGE_STRINGS.homeIntroError}: {intro.message}
       </p>
     );
   }
@@ -150,7 +150,7 @@ const SourceIntro = ({ load }: { readonly load: StorySource["home"] }): ReactNod
  *
  * @param props - the family, and how to open a component.
  */
-const FamilyCard = ({
+export const FamilyCard = ({
   family,
   hrefOf,
   onOpen
@@ -164,7 +164,7 @@ const FamilyCard = ({
     <article className="forgebook-home__card" aria-label={family.name}>
       <h3 className="forgebook-home__card-title">
         {family.name}
-        <span className="forgebook-home__count">{LATER_STRINGS.componentsCount(components.length)}</span>
+        <span className="forgebook-home__count">{PAGE_STRINGS.componentsCount(components.length)}</span>
       </h3>
       <ul className="forgebook-home__components">
         {shown.map((component) => (
@@ -187,7 +187,7 @@ const FamilyCard = ({
           aria-expanded={isOpen}
           onClick={(): void => setIsOpen(!isOpen)}
         >
-          {isOpen ? LATER_STRINGS.showFewer : LATER_STRINGS.showAll(components.length)}
+          {isOpen ? PAGE_STRINGS.showFewer : PAGE_STRINGS.showAll(components.length)}
         </button>
       ) : null}
     </article>
@@ -199,7 +199,7 @@ const FamilyCard = ({
  *
  * @param props - the source, and how to open a page.
  */
-const DocsCard = ({
+export const DocsCard = ({
   source,
   hrefOf,
   onOpen
@@ -224,6 +224,96 @@ const DocsCard = ({
 );
 
 /**
+ * How many components a tree has, in every library.
+ *
+ * @param tree - the tree.
+ */
+export const componentCount = (tree: StoryTree): number =>
+  tree.sources.reduce(
+    (total, source) =>
+      total +
+      source.families.reduce(
+        (sum, family) => sum + family.groups.reduce((count, group) => count + group.components.length, 0),
+        0
+      ),
+    0
+  );
+
+/**
+ * How many libraries of a tree have components.
+ *
+ * @param tree - the tree.
+ */
+export const libraryCount = (tree: StoryTree): number =>
+  tree.sources.filter((source) => source.families.length > 0).length;
+
+/**
+ * The pages opened last, under their heading; nothing when there are none.
+ *
+ * @param props - the tree, the recent pages, how to open one, and the heading; "Recently opened" by default.
+ */
+export const RecentSection = ({
+  tree,
+  recent,
+  hrefOf,
+  onOpen,
+  label = PAGE_STRINGS.recentlyOpened
+}: Pick<HomePageProps, "tree" | "recent" | "hrefOf" | "onOpen"> & {
+  readonly label?: string | undefined;
+}): ReactNode => {
+  const entries = recentEntries(tree, recent);
+  return entries.length === 0 ? null : (
+    <section className="forgebook-doc__section" aria-labelledby="forgebook-recent">
+      <h2 id="forgebook-recent">{label}</h2>
+      <ul className="forgebook-home__recent">
+        {entries.map((entry) => (
+          <li key={`${entry.page.kind}:${entry.page.id}`}>
+            <PageLink
+              page={entry.page}
+              hrefOf={hrefOf}
+              onOpen={onOpen}
+              className="forgebook-home__recent-link"
+            >
+              <span className="forgebook-home__recent-name">{entry.name}</span>
+              <span className="forgebook-home__recent-place">{entry.place}</span>
+            </PageLink>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
+
+/**
+ * A library on the home: its name and logo, its introduction, its docs pages and its families.
+ *
+ * @param props - the library, the sources for its introduction, and how to open a page.
+ */
+export const LibrarySection = ({
+  source,
+  sources,
+  hrefOf,
+  onOpen
+}: Pick<HomePageProps, "sources" | "hrefOf" | "onOpen"> & { readonly source: TreeSource }): ReactNode => (
+  <section className="forgebook-doc__section" aria-labelledby={`forgebook-source-${source.id}`}>
+    <h2 id={`forgebook-source-${source.id}`} className="forgebook-home__source">
+      {/* decorative: the name beside it says which library it is */}
+      {source.logo === undefined ? null : (
+        <img className="forgebook-source-logo" src={source.logo} alt="" width={28} height={28} />
+      )}
+      {source.name}
+    </h2>
+    <SourceIntro load={sources.find((candidate) => candidate.id === source.id)?.home} />
+    <div className="forgebook-home__families">
+      {source.pages.length === 0 ? null : <DocsCard source={source} hrefOf={hrefOf} onOpen={onOpen} />}
+      {source.families.map((family) => (
+        <FamilyCard key={family.name} family={family} hrefOf={hrefOf} onOpen={onOpen} />
+      ))}
+    </div>
+  </section>
+);
+
+/**
  * The home.
  *
  * @param props - the title, the tree, the sources, the recent pages, and how to open a page.
@@ -237,16 +327,6 @@ export const HomePage = ({
   onOpen,
   header
 }: HomePageProps): ReactNode => {
-  const entries = recentEntries(tree, recent);
-  const componentCount = tree.sources.reduce(
-    (total, source) =>
-      total +
-      source.families.reduce(
-        (sum, family) => sum + family.groups.reduce((count, group) => count + group.components.length, 0),
-        0
-      ),
-    0
-  );
   return (
     <div className="forgebook-workspace">
       {header}
@@ -256,56 +336,19 @@ export const HomePage = ({
             <h1 className="forgebook-home__title">{title}</h1>
             <p className="forgebook-doc__lead">
               {tree.sources.length === 0
-                ? LATER_STRINGS.homeEmpty
-                : LATER_STRINGS.homeSummary(
-                    componentCount,
-                    tree.sources.filter((source) => source.families.length > 0).length
-                  )}
+                ? PAGE_STRINGS.homeEmpty
+                : PAGE_STRINGS.homeSummary(componentCount(tree), libraryCount(tree))}
             </p>
           </header>
-          {entries.length === 0 ? null : (
-            <section className="forgebook-doc__section" aria-labelledby="forgebook-recent">
-              <h2 id="forgebook-recent">{LATER_STRINGS.recentlyOpened}</h2>
-              <ul className="forgebook-home__recent">
-                {entries.map((entry) => (
-                  <li key={`${entry.page.kind}:${entry.page.id}`}>
-                    <PageLink
-                      page={entry.page}
-                      hrefOf={hrefOf}
-                      onOpen={onOpen}
-                      className="forgebook-home__recent-link"
-                    >
-                      <span className="forgebook-home__recent-name">{entry.name}</span>
-                      <span className="forgebook-home__recent-place">{entry.place}</span>
-                    </PageLink>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <RecentSection tree={tree} recent={recent} hrefOf={hrefOf} onOpen={onOpen} />
           {tree.sources.map((source) => (
-            <section
+            <LibrarySection
               key={source.id}
-              className="forgebook-doc__section"
-              aria-labelledby={`forgebook-source-${source.id}`}
-            >
-              <h2 id={`forgebook-source-${source.id}`} className="forgebook-home__source">
-                {/* decorative: the name beside it says which library it is */}
-                {source.logo === undefined ? null : (
-                  <img className="forgebook-source-logo" src={source.logo} alt="" width={28} height={28} />
-                )}
-                {source.name}
-              </h2>
-              <SourceIntro load={sources.find((candidate) => candidate.id === source.id)?.home} />
-              <div className="forgebook-home__families">
-                {source.pages.length === 0 ? null : (
-                  <DocsCard source={source} hrefOf={hrefOf} onOpen={onOpen} />
-                )}
-                {source.families.map((family) => (
-                  <FamilyCard key={family.name} family={family} hrefOf={hrefOf} onOpen={onOpen} />
-                ))}
-              </div>
-            </section>
+              source={source}
+              sources={sources}
+              hrefOf={hrefOf}
+              onOpen={onOpen}
+            />
           ))}
         </div>
       </div>

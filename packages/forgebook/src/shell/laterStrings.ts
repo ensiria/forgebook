@@ -1,24 +1,20 @@
 /**
- * The texts of the shell's parts that load after the first screen: the pages other than a story's (the home, a
- * component's page, a docs page), the panel's tabs but Props, the View menu's panel, the embed panel and page, the
- * comparison, the story clock's bar, the plugins' hosts and the note on args a link dropped. They load with the
+ * The texts of the shell's parts that load after the first screen, but for the home and the docs pages
+ * (`pageStrings.ts`): a component's page, the panel's tabs but Props, the View menu's panel, the embed panel and page,
+ * the comparison, the story clock's bar, the plugins' hosts and the note on args a link dropped. They load with the
  * first of those parts, so a first load carries none of them.
  *
  * @remarks
  * Each keeps the plain name it would have in `STRINGS`, so a catalogue replaces it the same way
  * (`strings: { copy: "Copia" }`): the replacements set before the shell drew apply when this module loads
- * (`textsByName`).
+ * (`lateStrings`).
  *
  * @module
  */
-import { textsByName } from "./strings.ts";
+import { lateStrings } from "./strings.ts";
 
 /** The later parts' texts, as shown: Forgebook's, with the catalogue's replacements. */
-export const LATER_STRINGS = textsByName({
-  pageContents: "On this page",
-  previousPage: "Previous",
-  nextPage: "Next",
-  docPageError: "The page could not be read",
+export const LATER_STRINGS = lateStrings({
   audienceError: "This part of the page could not be loaded",
   controlKey: (control: string, key: string | undefined): string =>
     key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
@@ -97,14 +93,6 @@ export const LATER_STRINGS = textsByName({
   backToPlaceNamed: (name: string): string => `Put ${name} back in its place`,
   examples: "Examples",
   pageError: "The component's page could not be read",
-  homeEmpty: "No stories yet: a source with story files shows its families here.",
-  homeSummary: (components: number, sources: number): string =>
-    `${components} ${components === 1 ? "component" : "components"} in ${sources} ${sources === 1 ? "library" : "libraries"}.`,
-  homeIntroError: "The library's introduction could not be read",
-  recentlyOpened: "Recently opened",
-  componentsCount: (count: number): string => `${count} ${count === 1 ? "component" : "components"}`,
-  showAll: (count: number): string => `Show all ${count}`,
-  showFewer: "Show fewer",
   droppedArgs: "The link sets values this story does not take; they were left out:",
   droppedArgReasons: { undeclared: "not one of its props", type: "not of the prop's type" },
   removeDroppedArgs: "Remove them from the address",
