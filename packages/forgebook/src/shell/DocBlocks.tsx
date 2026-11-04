@@ -14,7 +14,7 @@
  * @module
  */
 import type { StorySource } from "@forgebook/story-format/source";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useCallback, useEffect } from "react";
 
 import { isComponentDocs } from "../componentDocs.ts";
 import {
@@ -37,6 +37,7 @@ import { type HomePiecesContext, HomePieceView } from "./HomePieces.tsx";
 import { LazyHost } from "./LazyHost.tsx";
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
+import { MISSING_PLUGIN_HOSTS, usePluginHosts } from "./pluginHostsContext.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import { STRINGS } from "./strings.ts";
 import { useComponentDocs } from "./useComponentDocs.ts";
@@ -286,10 +287,6 @@ const PropsBlock = ({
   );
 };
 
-/** Loads the host of a plugin's block. */
-const loadBlockHost = async (): Promise<typeof import("./PluginBlockHost.tsx").PluginBlockHost> =>
-  (await import("./PluginBlockHost.tsx")).PluginBlockHost;
-
 /**
  * A plugin's block; a fence no plugin of this catalogue draws is said, as a block that names what is not there.
  *
@@ -306,6 +303,12 @@ const PluginBlock = ({
     each.docBlocks.some((candidate) => candidate.fence === block.fence)
   );
   const load = plugin?.docBlocks.find((candidate) => candidate.fence === block.fence)?.load;
+  const loadHosts = usePluginHosts();
+  // a stable loader: the host loads again whenever it changes
+  const loadBlockHost = useCallback(async () => {
+    if (loadHosts === undefined) throw new Error(MISSING_PLUGIN_HOSTS);
+    return (await loadHosts()).loadBlockHost();
+  }, [loadHosts]);
   if (plugin === undefined || load === undefined) return <MissingBlock message={block.fence} />;
   return (
     <LazyHost

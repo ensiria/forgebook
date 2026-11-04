@@ -56,6 +56,7 @@ import { Icon } from "./icons.tsx";
 import { LazyPage } from "./LazyPage.tsx";
 import { LogicMark } from "./LogicMark.tsx";
 import { type LazyModule, lazyModule } from "./lazyModule.tsx";
+import { type LoadPluginHosts, PluginHostsContext } from "./pluginHostsContext.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
@@ -120,6 +121,11 @@ export type ShellConfig = {
   readonly loadTokens?: () => Promise<unknown>;
   /** The plugins with views (the generated page passes them); none by default. */
   readonly plugins?: readonly ShellPlugin[];
+  /**
+   * Loads the code that draws the plugins' views (`forgebook/shell/plugin-hosts`): the generated page gives it only
+   * with plugins that have views, so a catalogue without one ships none of it. None draws no plugin's view.
+   */
+  readonly pluginHosts?: LoadPluginHosts;
   /**
    * How the framework's stories take the texts the address carries (`addressTexts.ts`): `plain` keeps a shared link's
    * texts that are not plain words from a story that may write them into markup. `any` by default.
@@ -1040,6 +1046,8 @@ const ShellPage = ({
  */
 export const Shell = (props: ShellConfig): ReactNode => (
   <CatalogueContext.Provider value={useConfiguredCatalogue(props)}>
-    <ShellPage {...props} />
+    <PluginHostsContext.Provider value={props.pluginHosts}>
+      <ShellPage {...props} />
+    </PluginHostsContext.Provider>
   </CatalogueContext.Provider>
 );

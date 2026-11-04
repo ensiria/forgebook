@@ -17,7 +17,7 @@ import { setFramesOrigin } from "./framesOrigin.ts";
 import { Shell, type ShellConfig } from "./Shell.tsx";
 import { configureStrings, STRINGS } from "./strings.ts";
 
-/** What an app passes to the shell: the catalogue's configuration and the framework's code writer. */
+/** What the generated page passes to the shell: the catalogue's configuration and the framework's code writer. */
 export type MountShellConfig = ShellConfig & {
   /** Writes a story drawn from its args in the framework's code (`storyJsx` of `@forgebook/react`). */
   readonly codeOf: StoryCodeWriter;

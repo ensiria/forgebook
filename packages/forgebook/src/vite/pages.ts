@@ -272,9 +272,21 @@ const writtenHomeCode = (home: string): string =>
     "      )"
   ].join("\n");
 
+/** The module the entry loads the code that draws the plugins' views from, on first use. */
+export const PLUGIN_HOSTS_MODULE = "forgebook/shell/plugin-hosts";
+
+/**
+ * Whether a catalogue lists a plugin with a view in the shell: a tab or a docs block.
+ *
+ * @param config - the configuration.
+ */
+export const hasPluginViews = (config: ResolvedConfig): boolean =>
+  config.plugins.some((plugin) => (plugin.tabs ?? []).length > 0 || (plugin.docBlocks ?? []).length > 0);
+
 /**
  * The shell's list of the plugins' tabs and docs blocks, each with the import that loads its view when it is first
- * needed; nothing for a catalogue without any, whose entry is then what it would be with no plugin.
+ * needed, and the loader of the code that draws them; nothing for a catalogue without any, whose entry is then what it
+ * would be with no plugin and whose build holds none of that code.
  *
  * @param config - the configuration.
  */
@@ -295,7 +307,14 @@ const pluginViewLines = (config: ResolvedConfig): string[] => {
           `      { id: ${JSON.stringify(plugin.id)}, tabs: [${tabs.join(", ")}], docBlocks: [${blocks.join(", ")}] },`
         ];
   });
-  return lines.length === 0 ? [] : ["    plugins: [", ...lines, "    ],"];
+  return lines.length === 0
+    ? []
+    : [
+        "    plugins: [",
+        ...lines,
+        "    ],",
+        `    pluginHosts: () => import(${JSON.stringify(PLUGIN_HOSTS_MODULE)}).then((module) => module.pluginHosts),`
+      ];
 };
 
 /**
