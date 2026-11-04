@@ -7,7 +7,9 @@
 import { describe, expect, it } from "vitest";
 
 import { catalogueSettings, groupLabel } from "../src/catalogue.ts";
-import { configureStrings, STRINGS } from "../src/shell/strings.ts";
+import { LATER_STRINGS } from "../src/shell/laterStrings.ts";
+import { PAGE_STRINGS } from "../src/shell/pageStrings.ts";
+import { configureStrings, lateStrings, STRINGS, textsOfGroup } from "../src/shell/strings.ts";
 import { groupedStories } from "../src/storyTree.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { mergedLists } from "../src/vite/configFile.ts";
@@ -29,6 +31,7 @@ describe("catalogueSettings", () => {
     expect(settings.tabs).toEqual(["props", "events", "play", "parts", "code", "a11y", "signature"]);
     expect(settings.gridStep).toBe(8);
     expect(settings.appearance).toBe("system");
+    expect(settings.propGroups).toEqual([]);
   });
 
   it("keeps the built-in backgrounds it names, adds its own, turns tabs off, and keeps 100 % among the steps", () => {
@@ -49,6 +52,35 @@ describe("catalogueSettings", () => {
     expect(catalogueSettings("A", DEFAULT_SWITCHES, { backgrounds: { builtIn: false } }).backdrops).toEqual(
       []
     );
+  });
+});
+
+describe("the audience", () => {
+  it("is everyone unless the catalogue says otherwise, with its control in the View menu only", () => {
+    const settings = catalogueSettings("Acme", DEFAULT_SWITCHES);
+    expect(settings.audience).toBe("everyone");
+    expect(settings.ownControls).toContain("audience");
+    expect(settings.toolbar).not.toContain("audience");
+  });
+
+  it("takes the catalogue's audience, and pins it when asked", () => {
+    const settings = catalogueSettings("Acme", DEFAULT_SWITCHES, {
+      audience: "tester",
+      toolbar: ["audience"]
+    });
+    expect(settings.audience).toBe("tester");
+    expect(settings.toolbar).toEqual(["audience"]);
+  });
+
+  it("keeps a configuration's audience through the merge of its lists", () => {
+    expect(mergedLists([{ audience: "coder" }, { audience: "tester" }]).audience).toBe("tester");
+  });
+});
+
+describe("the Embed button", () => {
+  it("is offered unless a catalogue turns it off", () => {
+    expect(catalogueSettings("A", DEFAULT_SWITCHES).hasEmbed).toBe(true);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { controls: { embed: false } }).hasEmbed).toBe(false);
   });
 });
 
@@ -94,6 +126,16 @@ describe("mergedLists", () => {
     expect(merged.toolbar).toEqual(["contrast", "theme"]);
     expect(mergedLists([{ toolbar: ["theme"] }, {}]).toolbar).toEqual(["theme"]);
   });
+
+  it("takes the prop groups' order the last names, as a whole list", () => {
+    expect(mergedLists([{ propGroups: ["Texts"] }, {}]).propGroups).toEqual(["Texts"]);
+    expect(
+      mergedLists([{ propGroups: ["Texts"] }, { propGroups: ["Selection", "Paging"] }]).propGroups
+    ).toEqual(["Selection", "Paging"]);
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { propGroups: ["Paging"] }).propGroups).toEqual([
+      "Paging"
+    ]);
+  });
 });
 
 describe("story groups", () => {
@@ -109,10 +151,14 @@ describe("story groups", () => {
     const sections = groupedStories(
       [story("zeta"), story("behaviour"), story(undefined), story("alpha"), story("states")].map((each) => ({
         ...each,
+        file: "x.stories.tsx",
         controls: "all" as const,
         description: undefined,
         height: undefined,
+        device: undefined,
+        design: undefined,
         tags: [],
+        hasPlay: false,
         isMain: false,
         isTouch: false,
         isLogic: false
@@ -131,6 +177,42 @@ describe("story groups", () => {
 });
 
 describe("configureStrings", () => {
+  it("reaches the texts that load after it", () => {
+    configureStrings({ "lateTexts.title": "Replaced" });
+    expect(textsOfGroup("lateTexts", { title: "Written", other: "Kept" })).toEqual({
+      title: "Replaced",
+      other: "Kept"
+    });
+    configureStrings({});
+  });
+
+  it("reaches the later parts' texts by the plain names they share with the first screen's", () => {
+    configureStrings({
+      copy: "Copia",
+      "droppedArgReasons.type": "Tipo",
+      "copied.x": "No",
+      usedInMore: "Many"
+    });
+    const usedInMore = (count: number): string => String(count);
+    const texts = lateStrings({
+      copy: "Copy",
+      droppedArgReasons: { undeclared: "Not a prop", type: "Not its type" },
+      usedInMore
+    });
+    expect(texts).toEqual({
+      copy: "Copia",
+      droppedArgReasons: { undeclared: "Not a prop", type: "Tipo" },
+      usedInMore
+    });
+    configureStrings({});
+  });
+
+  it("keeps each text in one place: no two sets of texts share a name", () => {
+    const sets = [Object.keys(STRINGS), Object.keys(LATER_STRINGS), Object.keys(PAGE_STRINGS)];
+    const names = sets.flat();
+    expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
+  });
+
   it("replaces plain texts by their path, and leaves a text that takes values and an unknown path alone", () => {
     const allStories = STRINGS.allStories;
     configureStrings({
@@ -142,5 +224,43 @@ describe("configureStrings", () => {
     expect(STRINGS.tabs.parts).toBe("Parts and hooks");
     expect(STRINGS.allStories).toBe(allStories);
     expect(Object.keys(STRINGS)).not.toContain("nothing");
+  });
+
+  it("frames no story by default, takes the catalogue's device, and leaves out a model that is none", () => {
+    expect(catalogueSettings("Acme UI", DEFAULT_SWITCHES).device).toEqual({
+      isFramed: false,
+      model: "phone",
+      orientation: "portrait",
+      isTouch: true,
+      isEdgeToEdge: false
+    });
+    expect(
+      catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { frame: true, model: "pixel-9" } }).device
+    ).toEqual({
+      isFramed: true,
+      model: "pixel-9",
+      orientation: "portrait",
+      isTouch: true,
+      isEdgeToEdge: false
+    });
+    expect(
+      catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { model: "nokia-3310" } }).device.model
+    ).toBe("phone");
+  });
+});
+
+describe("lateStrings", () => {
+  it("gives a part loaded later the catalogue's replacements by the same names, leaving the rest", () => {
+    configureStrings({ "asides.tip": "Hint", previousPage: "Back" });
+    const texts = lateStrings({
+      previousPage: "Previous",
+      nextPage: "Next",
+      asides: { tip: "Tip", note: "Note" },
+      count: (value: number): string => `${value}`
+    });
+    expect(texts.previousPage).toBe("Back");
+    expect(texts.nextPage).toBe("Next");
+    expect(texts.asides).toEqual({ tip: "Hint", note: "Note" });
+    configureStrings({});
   });
 });

@@ -1,0 +1,37 @@
+# Once a week, and by hand: the benchmark on Forgebook alone, on a modest real machine. It watches the trend: no number
+# fails it, and it blocks no pull request; only a metric that could not be measured does. By hand it can compare the
+# three tools. The report stays as
+# an artefact and in the job's summary, since the branches take no direct push to keep a history in.
+name: bench
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      compare:
+        description: Also measure Storybook and Ladle
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @forgebook/tools exec playwright install --with-deps chromium
+      - run: node tools/bench/bench.mts --markdown --work "$RUNNER_TEMP/bench" ${{ inputs.compare && '--compare' || '' }} >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: bench-report
+          path: ${{ runner.temp }}/bench/report.json

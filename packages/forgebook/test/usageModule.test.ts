@@ -5,20 +5,21 @@
  *
  * @module
  */
-import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { catalogueSettings } from "../src/catalogue.ts";
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { mergedUsage } from "../src/usedIn.ts";
 import { mergedLists } from "../src/vite/configFile.ts";
 import { storyFilesModule } from "../src/vite/storyFilesModule.ts";
 import { type UsageGraph, usageGraph } from "../src/vite/usageGraph.ts";
 import { joinedUsage, type UsageFile } from "../src/vite/usageModule.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 
 /** A file of the usage fixture. */
-const at = (name: string): string => join(import.meta.dirname, "fixtures", "usage", name);
+const at = (name: string): string => VITE_PATHS.join(import.meta.dirname, "fixtures", "usage", name);
 
 const GRAPH = ((): UsageGraph => {
   const result = usageGraph([
@@ -86,14 +87,60 @@ describe("mergedUsage", () => {
 
 describe("a catalogue that turns Used in off", () => {
   it("offers no usage loader in its files' modules, and says so in its settings", () => {
-    const dir = join(import.meta.dirname, "fixtures", "usage");
+    const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
     const offered = storyFilesModule(dir, "./*.stories.tsx", () => undefined);
-    const off = storyFilesModule(dir, "./*.stories.tsx", () => undefined, false);
-    expect(offered).toContain(`usage: () => import("virtual:forgebook-usage:${dir}::0::*.stories.tsx")`);
-    expect(off).not.toContain("usage:");
+    const off = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+      hasUsage: false,
+      hasReach: false
+    });
+    expect(offered).toContain(
+      `usage: () => import(${codeLiteral(`virtual:forgebook-usage:${dir}::0::*.stories.tsx`)})`
+    );
+    expect(off).not.toContain("usage: ()");
+    expect(off).not.toContain("reach: ()");
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES).hasUsedIn).toBe(true);
     expect(catalogueSettings("Acme", DEFAULT_SWITCHES, mergedLists([{ usedIn: false }, {}])).hasUsedIn).toBe(
       false
     );
+  });
+});
+
+describe("a static build's files module", () => {
+  it('offers "Used in" without what each story reaches, which only the dev server\'s tools read', () => {
+    const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
+    const built = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+      hasUsage: true,
+      hasReach: false
+    });
+    expect(built).toContain("usage: () => import(");
+    expect(built).not.toContain("reach:");
+  });
+});
+
+describe("a files module's loaders", () => {
+  it("name each story file once, for its index and every loader of it", async () => {
+    const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
+    const code = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+      hasUsage: false,
+      hasReach: false
+    });
+    const module: unknown = await import(`data:text/javascript,${encodeURIComponent(code)}`);
+    const loaders =
+      typeof module === "object" &&
+      module !== null &&
+      "default" in module &&
+      typeof module.default === "object"
+        ? module.default
+        : null;
+    if (loaders === null) throw new Error("no default export");
+    const keys = Object.keys(Reflect.get(loaders, "index"));
+    for (const name of ["stories", "docs", "code", "pages"]) {
+      const column: unknown = Reflect.get(loaders, name);
+      expect(Object.keys(column ?? {})).toEqual(keys);
+      expect(Object.values(column ?? {}).every((loader) => typeof loader === "function")).toBe(true);
+    }
+    const first = keys[0] ?? "none";
+    expect(code.split(codeLiteral(first))).toHaveLength(2);
+    expect(Reflect.get(Reflect.get(loaders, "index"), first)).toHaveProperty("stories");
   });
 });

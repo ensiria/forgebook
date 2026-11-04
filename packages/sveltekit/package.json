@@ -1,0 +1,133 @@
+{
+  "name": "@forgebook/sveltekit",
+  "version": "0.1.8",
+  "description": "Forgebook for SvelteKit: a SvelteKit project's components drawn outside the app, with $app/state, $app/navigation, $app/forms, $app/paths, the environment and a page's load, on Vite.",
+  "keywords": [
+    "sveltekit",
+    "svelte",
+    "catalogue",
+    "stories"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/sveltekit"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./code": "./src/storyCode.ts",
+    "./docs": "./src/vite/extractDocs.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./renderer": "./src/kitRenderer.ts",
+    "./page": "./src/storyPage.ts",
+    "./vite": "./src/vite/sveltekit.ts",
+    "./app/env": "./src/app/env.ts",
+    "./app/forms": "./src/app/forms.ts",
+    "./app/manifest": "./src/app/manifest.ts",
+    "./app/navigation": "./src/app/navigation.ts",
+    "./app/paths": "./src/app/paths.ts",
+    "./app/state": "./src/app/state.ts",
+    "./app/stores": "./src/app/stores.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && svelte-check --tsconfig test/tsconfig.json --fail-on-warnings"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/svelte": "workspace:*"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^",
+    "svelte": "^5.46.4",
+    "vite": "^8.0.0"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@sveltejs/kit": "3.1.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyCode.d.ts",
+        "default": "./dist/src/storyCode.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/kitRenderer.d.ts",
+        "default": "./dist/src/kitRenderer.js"
+      },
+      "./page": {
+        "types": "./dist/src/storyPage.d.ts",
+        "default": "./dist/src/storyPage.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/sveltekit.d.ts",
+        "default": "./dist/src/vite/sveltekit.js"
+      },
+      "./app/env": {
+        "types": "./dist/src/app/env.d.ts",
+        "default": "./dist/src/app/env.js"
+      },
+      "./app/forms": {
+        "types": "./dist/src/app/forms.d.ts",
+        "default": "./dist/src/app/forms.js"
+      },
+      "./app/manifest": {
+        "types": "./dist/src/app/manifest.d.ts",
+        "default": "./dist/src/app/manifest.js"
+      },
+      "./app/navigation": {
+        "types": "./dist/src/app/navigation.d.ts",
+        "default": "./dist/src/app/navigation.js"
+      },
+      "./app/paths": {
+        "types": "./dist/src/app/paths.d.ts",
+        "default": "./dist/src/app/paths.js"
+      },
+      "./app/state": {
+        "types": "./dist/src/app/state.d.ts",
+        "default": "./dist/src/app/state.js"
+      },
+      "./app/stores": {
+        "types": "./dist/src/app/stores.d.ts",
+        "default": "./dist/src/app/stores.js"
+      }
+    }
+  }
+}

@@ -1,6 +1,8 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors` and `story_shot`.
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
+ * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
+ * for a client that renders apps.
  *
  * @module
  */
@@ -10,11 +12,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { PluginsDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
+import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { previewTool } from "./mcpPreview.ts";
+import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
+import { pageTools } from "./pageTools.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
 /** The session's folder for pictures; made on the first call. */
@@ -31,28 +38,6 @@ const shotsFolder = (): string => {
   return shotsDir;
 };
 
-/** Asks the catalogue one of its answers. */
-type Ask = (route: string, params: URLSearchParams) => Promise<AgentAnswer>;
-
-/** The schema of the view argument, shared by the tools. */
-const VIEW = {
-  type: "string",
-  description:
-    "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it); none for the default."
-} as const;
-
-/** A text argument, or none. */
-const textOf = (args: Readonly<Record<string, unknown>>, name: string): string | undefined => {
-  const value = args[name];
-  return typeof value === "string" && value !== "" ? value : undefined;
-};
-
-/** An answer as a tool's result: a failure when the catalogue did not answer 200. */
-const resultOf = (answer: AgentAnswer): McpToolResult => ({
-  structured: answer.body,
-  isError: answer.status !== 200
-});
-
 /** Writes a component's first stories, as `forgebook new --print` does. */
 type NewStories = (file: string, exportName: string | undefined) => Promise<NewStoriesFile>;
 
@@ -62,8 +47,23 @@ type Check = (input: StoryCheckInput) => Promise<StoryCheckReport | string>;
 /** Takes a story's pictures into a folder: the report, or why they could not be taken. */
 type Shot = (input: StoryCheckInput, outDir: string) => Promise<StoryShotReport | string>;
 
+/** An answer as a tool's result that fails on what it found, as the command of the same name does. */
+const problemsResult = (answer: AgentAnswer): McpToolResult => {
+  const result = resultOf(answer);
+  const body = answer.body;
+  const hasProblems =
+    typeof body === "object" &&
+    body !== null &&
+    "problems" in body &&
+    Array.isArray(body.problems) &&
+    body.problems.length > 0;
+  return { ...result, isError: result.isError || hasProblems };
+};
+
 /** What the tools reach the catalogue through. */
 export type CatalogueReach = {
+  /** The plugins the configuration lists. */
+  readonly plugins: PluginsDocument;
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
   readonly ask: Ask;
   /** Writes a component's first stories, the file relative to the catalogue's folder. */
@@ -72,6 +72,10 @@ export type CatalogueReach = {
   readonly check: Check;
   /** Takes a story's pictures. */
   readonly shot: Shot;
+  /** Runs the checks on a page of the application. */
+  readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
+  /** Serves the catalogue where a browser can open a preview, and answers where. */
+  readonly servePreview: () => Promise<string>;
 };
 
 /**
@@ -79,7 +83,156 @@ export type CatalogueReach = {
  *
  * @param reach - what they reach the catalogue through.
  */
-export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): readonly McpTool[] => [
+export const catalogueTools = ({
+  ask,
+  writeNew,
+  check,
+  shot,
+  checkPage,
+  servePreview,
+  plugins
+}: CatalogueReach): readonly McpTool[] => [
+  ...pageTools(ask),
+  {
+    name: "list_plugins",
+    description:
+      "The plugins this catalogue lists and what each adds: panel tabs (open one with tab=<id> in a view), switches, docs blocks. A tab needs its plugin: a story's parameter does nothing without it.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    call: async (): Promise<McpToolResult> => ({ structured: plugins, isError: false })
+  },
+  {
+    name: "check_page",
+    description:
+      "Run the catalogue's checks on a real page of the application in a browser: accessibility, what spills, console and page errors. Use it on the screen you built; for a story, check_story.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "The page's address, as http://localhost:3000/checkout." }
+      },
+      required: ["address"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
+      const report = await checkPage(textOf(args, "address") ?? "");
+      return typeof report === "string"
+        ? { structured: { error: report }, isError: true }
+        : { structured: report, isError: false };
+    }
+  },
+  {
+    name: "changed_stories",
+    description:
+      "The stories a change touches: every story that reaches a file git says changed, through the imports. Call it after editing, then run check_story on what it lists.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "The commit to compare with; HEAD by default, so what is not committed."
+        }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("changed", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
+  },
+  {
+    name: "find_component",
+    description:
+      'The components a description fits, best first, in your own words ("modal", "radio tile group"): call it before writing a component that may already exist. Each with the words it matched and missed, when to use it, and its first story.',
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", description: "What you are looking for, in any words." } },
+      required: ["query"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("find", new URLSearchParams({ query: textOf(args, "query") ?? "" })))
+  },
+  {
+    name: "check_code",
+    description:
+      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "The commit to compare with; HEAD by default, so what is not committed."
+        }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
+  },
+  {
+    name: "list_tokens",
+    description:
+      "The design tokens of this catalogue and of the libraries it shows, to use instead of a colour, size or duration written by hand: how many of each type, the first of them, and `clashes` where two authors disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          description: "A token type (color) or a first group (space); none for all."
+        },
+        limit: { type: "number", description: "The most tokens to give; 100 by default." }
+      },
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(
+        await ask(
+          "tokens",
+          new URLSearchParams({
+            category: textOf(args, "category") ?? "",
+            limit: String(args["limit"] ?? "")
+          })
+        )
+      )
+  },
+  {
+    name: "get_token",
+    description:
+      "One design token: its value in each theme, what it is for, the token it aliases, and why not to use it if deprecated.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "The token's name, as list_tokens gives it." } },
+      required: ["name"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(await ask("token", new URLSearchParams({ name: textOf(args, "name") ?? "" })))
+  },
+  {
+    name: "nearest_token",
+    description:
+      "The tokens nearest a value written by hand, nearest first: call it before writing a raw colour or size. Use a match only when `isClose` or `isExact` is true; otherwise no token fits, so say so rather than force one. Deprecated tokens are left out.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: {
+          type: "string",
+          description: "The value, as code writes it: #1c1b1b, rgb(1 2 3), 16px, 200ms."
+        },
+        type: {
+          type: "string",
+          description:
+            "What to compare with: color, dimension, duration, number, fontWeight, or a CSS property (background, padding, font-size). Read from the value when left out."
+        }
+      },
+      required: ["value"],
+      additionalProperties: false
+    },
+    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
+      resultOf(
+        await ask(
+          "nearest-token",
+          new URLSearchParams({ value: textOf(args, "value") ?? "", type: textOf(args, "type") ?? "" })
+        )
+      )
+  },
   {
     name: "list_stories",
     description:
@@ -111,7 +264,7 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
   {
     name: "get_story",
     description:
-      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: its args as the catalogue renders it, its component's props (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -132,7 +285,7 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
   {
     name: "story_address",
     description:
-      "The links that open a story in the catalogue and in its frame alone, in the view asked for: give them to a person to look at what you describe.",
+      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe.",
     inputSchema: {
       type: "object",
       properties: {
@@ -146,12 +299,10 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
       const id = textOf(args, "id") ?? "";
       const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const story = answer.body.components
-        .flatMap((component) => component.stories)
-        .find((each) => each.id === id);
-      return story === undefined
+      const named = namedStory(answer.body, id);
+      return named === undefined
         ? { structured: { error: `No story "${id}"` }, isError: true }
-        : { structured: { id, links: story.links }, isError: false };
+        : { structured: { id: named.story.id, links: named.story.links }, isError: false };
     }
   },
   {
@@ -199,6 +350,11 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
         allVariants: {
           type: "boolean",
           description: "Check every variant the catalogue's browser tests check."
+        },
+        semantic: {
+          type: "boolean",
+          description:
+            "Also ask the model the user configured whether headings, labels and alternatives say the right thing. Its judgements are opinions, in `judgements`."
         }
       },
       required: ["id"],
@@ -211,7 +367,8 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
       const report = await check({
         id: textOf(args, "id") ?? "",
         views,
-        isAllVariants: args["allVariants"] === true
+        isAllVariants: args["allVariants"] === true,
+        isSemantic: args["semantic"] === true
       });
       if (typeof report === "string") return { structured: { error: report }, isError: true };
       return { structured: report, isError: report.results.some((result) => result.problems.length > 0) };
@@ -238,7 +395,7 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
   {
     name: "story_shot",
     description:
-      "Take a story's pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files' paths. Views are written as the catalogue's address writes them (theme=dark&width=360) or as words (\"dark it 360\"). Needs @forgebook/testing and Playwright in the project.",
+      'Take a story\'s pictures in a browser, one per view, and look at them: the answer holds the pictures themselves, and the PNG files\' paths. Views are written as the catalogue\'s address writes them (theme=dark&width=360) or as words ("dark it 360"); a device model\'s id in a view ("iphone-16", "pixel-9 landscape") frames the picture in that device. Needs @forgebook/testing and Playwright in the project.',
     inputSchema: {
       type: "object",
       properties: {
@@ -272,5 +429,6 @@ export const catalogueTools = ({ ask, writeNew, check, shot }: CatalogueReach): 
       }));
       return { structured: report, isError: false, images };
     }
-  }
+  },
+  previewTool({ ask, serve: servePreview })
 ];

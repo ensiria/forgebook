@@ -1,0 +1,10 @@
+// The HTML package's tests, run by Vitest in a simulated page (happy-dom).
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "allowImportingTsExtensions": true
+  },
+  "include": [".", "../src"]
+}

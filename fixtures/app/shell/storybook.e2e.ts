@@ -1,7 +1,8 @@
 /**
  * Stories written the Storybook way, in the browser, on the fixture's Storybook source: a title from the path, tags,
  * CSF 2, the meta's render and play, loaders, plays with `storybook/test` and the context's tools, arg types in the
- * panel, actions in Events, a story's globals over the toolbar, a file's exports and a `.jsx` file.
+ * panel, actions in Events, a story's globals over the toolbar, a file's exports, a `.jsx` file, a title written in
+ * two files, Storybook's ids and the former ones.
  *
  * @module
  */
@@ -31,7 +32,10 @@ const shownArgs = async (page: Page): Promise<Record<string, unknown>> => {
   return JSON.parse(text ?? "{}") as Record<string, unknown>;
 };
 
-/** Every story of the Storybook fixture, by its id without the source. */
+/**
+ * Every story of the Storybook fixture, by its id without the source, but the hot-edit file's: `hotEdit.e2e.ts` edits
+ * that file while this spec may run, and checks its stories itself.
+ */
 const STORY_IDS = [
   "components-button--primary",
   "components-button--secondary",
@@ -52,7 +56,13 @@ const STORY_IDS = [
   "storybook-formats-exports-button--first",
   "storybook-formats-exports-button--second",
   "storybook-formats-exports-button--renamed",
-  "storybook-plain-java-script--untyped"
+  "storybook-merged--overview",
+  "storybook-merged--made",
+  "storybook-merged--aliased",
+  "storybook-merged--wrapping",
+  "storybook-merged--reexported",
+  "storybook-plain-javascript--untyped",
+  "storybook-preview-hooks--synced"
 ];
 
 test("every story written the Storybook way is ready in its frame, without a page error", async ({
@@ -131,9 +141,63 @@ test.describe("files written the Storybook way", () => {
   });
 
   test("a story file in plain JavaScript is drawn", async ({ page }) => {
+    await page.goto(story("storybook-plain-javascript--untyped"));
+    await isReady(page);
+    await expect(frameOf(page).getByRole("button")).toHaveText("From a .jsx file");
+  });
+});
+
+test.describe("a title written in several files, and ids", () => {
+  test("files with one title make one component, each story from its own file with its own meta", async ({
+    page
+  }) => {
+    await page.goto(story("storybook-merged--wrapping"));
+    await isReady(page);
+    await expect(pickerOptions(page)).toHaveText([
+      "All 5 stories",
+      "Overview",
+      "Made",
+      "Aliased",
+      "Wrapping",
+      "Reexported"
+    ]);
+    // the second file's meta gives its stories their variant
+    await expect(frameOf(page).getByRole("button")).toHaveAttribute("data-variant", "secondary");
+    await page.goto("/?component=sb:storybook-merged");
+    const examples = page.locator(".forgebook-example:not([data-demo])");
+    await expect(examples).toHaveCount(4);
+    // the code of a story of the second file, on the page the first file's docs lead
+    const wrapping = examples.filter({ hasText: "Wrapping" });
+    await wrapping.getByRole("button", { name: "Show code" }).click();
+    await expect(wrapping.locator(".forgebook-example__code")).toContainText("A label long enough to wrap");
+    await expect(page.locator(".forgebook-api__table").first().locator("tbody th")).toContainText(["label"]);
+  });
+
+  test("a story a helper makes, another constant and a re-export are drawn", async ({ page }) => {
+    await page.goto(story("storybook-merged--made"));
+    await isReady(page);
+    await expect(frameOf(page).getByRole("button")).toHaveText("Made by a helper");
+    await page.goto(story("storybook-merged--aliased"));
+    await isReady(page);
+    await expect(frameOf(page).getByRole("button")).toHaveText("From another constant");
+    await page.goto(story("storybook-merged--reexported"));
+    await isReady(page);
+    await expect(frameOf(page).getByRole("button")).toHaveText("From another module");
+  });
+
+  test("an address with the id the former rule gave a story or a component opens it under its own", async ({
+    page
+  }) => {
     await page.goto(story("storybook-plain-java-script--untyped"));
     await isReady(page);
     await expect(frameOf(page).getByRole("button")).toHaveText("From a .jsx file");
+    await expect(page).toHaveURL(/story=sb%3Astorybook-plain-javascript--untyped/);
+    await page.goto("/?component=sb:storybook-plain-java-script");
+    await expect(page).toHaveURL(/component=sb%3Astorybook-plain-javascript/);
+    await expect(page.locator(".forgebook-example").first()).toBeVisible();
+    // a frame opened by the former id draws its story too
+    await page.goto("/frame.html?story=sb:storybook-plain-java-script--untyped");
+    await expect.poll(async () => page.locator("html").getAttribute("data-forgebook-status")).toBe("ready");
   });
 });
 
@@ -155,6 +219,22 @@ test.describe("arg types and actions", () => {
     // a mapping's key chosen in the panel reaches the story as its value
     await page.getByRole("combobox", { name: "icon" }).selectOption("heart");
     await expect.poll(async () => (await shownArgs(page))["icon"]).toBe("♥");
+  });
+
+  test("a story changes its own args with Storybook's useArgs, and the panel and the address follow", async ({
+    page
+  }) => {
+    await page.goto(story("storybook-preview-hooks--synced"));
+    await isReady(page);
+    // the render's update, from a click in the story
+    await frameOf(page).getByRole("button", { name: "Add" }).click();
+    await expect.poll(async () => (await shownArgs(page))["count"]).toBe(1);
+    await expect(page.getByRole("spinbutton", { name: "count" })).toHaveValue("1");
+    await expect(page).toHaveURL(/args=[^&]*count/);
+    // the decorator's update, in an effect, after the panel changed the arg it follows
+    await page.getByRole("combobox", { name: "kind" }).selectOption("bot");
+    await expect.poll(async () => (await shownArgs(page))["name"]).toBe("dependabot");
+    await expect(page.getByRole("textbox", { name: "name" })).toHaveValue("dependabot");
   });
 
   test("a spy's calls are recorded in Events, and the play still checks the spy", async ({ page }) => {
@@ -207,5 +287,28 @@ test.describe("a story's globals", () => {
     await isReady(page);
     const box = await page.locator("iframe.forgebook-frame-view").boundingBox();
     expect(Math.round(box?.width ?? 0)).toBe(560);
+  });
+});
+
+test.describe("a story's mocked API", () => {
+  /** A service worker's first install, on a cold runner, takes longer than a story's first draw, in milliseconds. */
+  const workerStart = 20_000;
+
+  test("answers a story's fetch from its handlers, as a list or a record of lists", async ({ page }) => {
+    await page.goto(story("fetching-mocked--answered"));
+    await expect(frameOf(page).getByTestId("greeting")).toHaveText("Hello from a mock", {
+      timeout: workerStart
+    });
+    await page.goto(story("fetching-mocked--answered-by-name"));
+    await expect(frameOf(page).getByTestId("greeting")).toHaveText("Named mock", { timeout: workerStart });
+  });
+
+  test("loads nothing of MSW for a story with no handlers, and lets its request go", async ({ page }) => {
+    const requests: string[] = [];
+    page.on("request", (request) => requests.push(request.url()));
+    await page.goto(story("fetching-mocked--unmocked"));
+    await expect(frameOf(page).getByTestId("greeting")).toHaveText("No answer");
+    expect(requests.filter((url) => url.includes("mockServiceWorker"))).toEqual([]);
+    expect(requests.filter((url) => url.includes("msw_browser"))).toEqual([]);
   });
 });

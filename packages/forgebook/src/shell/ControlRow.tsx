@@ -7,12 +7,13 @@
  */
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
-import type { PlacedControl } from "../toolbarLayout.ts";
+import type { ToolbarControl as Control, PlacedControl } from "../toolbarLayout.ts";
 import { ControlKeyField } from "./ControlKeyField.tsx";
+import { controlLabel } from "./controlLabel.ts";
 import { InfoTip } from "./InfoTip.tsx";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { STRINGS } from "./strings.ts";
-import { type ControlContext, controlLabel, ToolbarControl } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
 
 /** The arrow keys that move a row, and by how much. */
@@ -34,8 +35,8 @@ export const ControlRow = ({
   hintId,
   onGrab,
   onAnnounce,
-  ...context
-}: ControlContext & {
+  drawControl
+}: {
   readonly each: PlacedControl;
   readonly index: number;
   readonly count: number;
@@ -48,6 +49,8 @@ export const ControlRow = ({
   readonly hintId: string;
   readonly onGrab: (event: PointerEvent<HTMLButtonElement>, id: string) => void;
   readonly onAnnounce: (text: string) => void;
+  /** Draws a control in a row's form, as the toolbar draws it, with the view it reads and sets. */
+  readonly drawControl: (control: Control) => ReactNode;
 }): ReactNode => {
   const { control, isPinned } = each;
   const label = controlLabel(control);
@@ -57,7 +60,7 @@ export const ControlRow = ({
     if (offset === 0 || target < 0 || target >= count) return;
     event.preventDefault();
     layout.move(control.id, target);
-    onAnnounce(STRINGS.controlMoved(label, target + 1, count));
+    onAnnounce(LATER_STRINGS.controlMoved(label, target + 1, count));
   };
   // a switch's note (the touch simulation's limits): an info button beside its value
   const description = control.kind === "switch" ? control.switch.description : undefined;
@@ -72,7 +75,7 @@ export const ControlRow = ({
       <button
         type="button"
         className="forgebook-arrange__handle"
-        aria-label={STRINGS.moveControl(label)}
+        aria-label={LATER_STRINGS.moveControl(label)}
         aria-describedby={hintId}
         onPointerDown={(event: PointerEvent<HTMLButtonElement>): void => onGrab(event, control.id)}
         onKeyDown={step}
@@ -86,7 +89,7 @@ export const ControlRow = ({
         ) : null}
       </span>
       <div className="forgebook-arrange__control">
-        <ToolbarControl control={control} form="row" {...context} />
+        {drawControl(control)}
         {description === undefined ? null : <InfoTip note={description} about={label} />}
       </div>
       <ControlKeyField
@@ -97,8 +100,8 @@ export const ControlRow = ({
       <button
         type="button"
         className="forgebook-icon-button"
-        aria-label={STRINGS.pinControl(label)}
-        title={isMoved ? STRINGS.pinnedNoRoom : STRINGS.pinControl(label)}
+        aria-label={LATER_STRINGS.pinControl(label)}
+        title={isMoved ? LATER_STRINGS.pinnedNoRoom : LATER_STRINGS.pinControl(label)}
         aria-pressed={isPinned}
         onClick={(): void => layout.pin(control.id, !isPinned)}
       >
@@ -107,8 +110,8 @@ export const ControlRow = ({
       <button
         type="button"
         className="forgebook-icon-button"
-        aria-label={STRINGS.hideControl(label)}
-        title={STRINGS.hideControl(label)}
+        aria-label={LATER_STRINGS.hideControl(label)}
+        title={LATER_STRINGS.hideControl(label)}
         onClick={(): void => layout.hide(control.id, true)}
       >
         <Icon name="eyeOff" size={14} />

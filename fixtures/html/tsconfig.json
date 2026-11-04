@@ -1,0 +1,12 @@
+// The HTML fixture: functions and stories checked by `tsc`, so a story's args are checked against its function.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@forgebook/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["src", "stories.ts", "forgebook.preview.ts", "forgebook.config.ts", "vitest.config.ts"]
+}

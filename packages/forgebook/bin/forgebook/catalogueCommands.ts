@@ -12,7 +12,17 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import type { StoriesDocument, StoryDocument } from "../../src/vite/agent.types.ts";
+import type {
+  FoundComponentsDocument,
+  NearestTokensDocument,
+  PageDocument,
+  PagesDocument,
+  SearchDocument,
+  StoriesDocument,
+  StoryDocument,
+  TokenDocument,
+  TokensDocument
+} from "../../src/vite/agent.types.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import {
   CONFIG_FILES,
@@ -41,13 +51,22 @@ export const FORGEBOOK_OPTIONS: ForgebookOptions = {
 export const COMMAND = "forgebook";
 
 /**
+ * The configuration file a command reads: the one given, or the one in the folder it runs in.
+ *
+ * @param file - the configuration file given; none to look in the current folder.
+ * @returns its absolute path, or none when there is none here.
+ */
+export const configPathOf = (file: string | undefined): string | undefined =>
+  file === undefined ? findConfigFile(process.cwd()) : resolve(file);
+
+/**
  * The catalogue's configuration: the file given, or the one in the folder the command runs in.
  *
  * @param file - the configuration file given; none to look in the current folder.
  * @throws a `ScriptError` when there is none, or it cannot be used.
  */
 export const configOf = async (file: string | undefined): Promise<ResolvedConfig> => {
-  const found = file === undefined ? findConfigFile(process.cwd()) : resolve(file);
+  const found = configPathOf(file);
   if (found === undefined)
     throw new ScriptError(`No ${CONFIG_FILES[0]} here`, {
       hint: `Run ${COMMAND} in the catalogue's folder, or give --config`
@@ -111,7 +130,15 @@ export const askCatalogue = async (
  */
 export const printAnswer = (
   text: string,
-  document: StoriesDocument | StoryDocument,
+  document:
+    | StoriesDocument
+    | StoryDocument
+    | TokensDocument
+    | TokenDocument
+    | NearestTokensDocument
+    | FoundComponentsDocument
+    | PagesDocument
+    | PageDocument,
   problems: readonly string[],
   context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
 ): void => {
@@ -119,4 +146,21 @@ export const printAnswer = (
   for (const problem of problems) context.log.warn(problem);
   if (problems.length > 0)
     throw new ScriptError(`${problems.length} problems`, { exitCode: EXIT.failure, isReported: true });
+};
+
+/**
+ * Prints an answer about tokens that holds whatever else is wrong in the files: the problems are warned about, and the
+ * command succeeds, since a good answer must not read as a failure because of an unrelated token.
+ *
+ * @param text - the answer as a person reads it.
+ * @param document - the answer.
+ * @param context - where it goes.
+ */
+export const printTokenAnswer = (
+  text: string,
+  document: TokenDocument | NearestTokensDocument | SearchDocument,
+  context: { readonly io: ScriptIo; readonly log: Logger; readonly isJson: boolean }
+): void => {
+  context.io.stdout.write(context.isJson ? formatJson(document) : `${text}\n`);
+  for (const problem of document.problems) context.log.warn(problem);
 };

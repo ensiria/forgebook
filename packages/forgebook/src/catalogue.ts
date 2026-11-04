@@ -12,8 +12,12 @@
  * @module
  */
 
+import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
+
+import { type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
+import { DEVICE_PARAMETER, type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "./deviceView.ts";
 import type { CatalogueView } from "./namedViews.ts";
 import { switchWithRole, type TouchChoice, touchChoiceOf, type ViewSwitch } from "./switches.ts";
 import { viewQuery } from "./viewWords.ts";
@@ -34,24 +38,29 @@ export type StoryGroupSetting = {
   readonly label: string;
 };
 
-/** The tabs of the panel under a story. */
+/** Forgebook's own tabs of the panel under a story. */
 export const PANEL_TAB_IDS = ["props", "events", "play", "parts", "code", "a11y", "signature"] as const;
 
-/** A tab of the panel under a story. */
+/** One of Forgebook's own tabs of the panel under a story. */
 export type PanelTabId = (typeof PANEL_TAB_IDS)[number];
 
 /**
- * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the background, the
- * style sheets, the text size and the stage's width. Their ids are the address's own parameters, so no switch takes
- * one.
+ * Forgebook's own controls of the toolbar and the View menu, beside the catalogue's switches: the device frame (first,
+ * so it sits beside the Touch switch, the last of the ready-made ones), the background, the style sheets, the text
+ * size, the stage's width and who a component's page is read by. Their ids are their parameters in the address, so no
+ * switch takes one; the device's is under Forgebook's name (`forgebook.device`), so a catalogue's own `device` switch
+ * keeps its id.
  */
-export const OWN_CONTROL_IDS = ["backdrop", "sheets", "text", "width"] as const;
+export const OWN_CONTROL_IDS = [DEVICE_PARAMETER, "backdrop", "sheets", "text", "width", "audience"] as const;
 
 /** One of Forgebook's own controls. */
 export type OwnControlId = (typeof OWN_CONTROL_IDS)[number];
 
-/** What `controls` turns off: one of Forgebook's own controls, or its ready-made direction or touch switch. */
-export type TurnedOffControl = OwnControlId | "direction" | "touch";
+/**
+ * What `controls` turns off: one of Forgebook's own controls, its ready-made direction or touch switch, or the story
+ * bar's Embed button.
+ */
+export type TurnedOffControl = OwnControlId | "direction" | "touch" | "embed";
 
 /** The accessibility rules the Accessibility tab and the generated tests check. */
 export type A11ySettings = {
@@ -82,23 +91,24 @@ export type CatalogueLists = {
   };
   /** The story groups, in the sidebar's order, with their headings. */
   readonly storyGroups?: readonly StoryGroupSetting[];
-  /** The panel's tabs turned off (`{ a11y: false }`). */
-  readonly tabs?: Readonly<Partial<Record<PanelTabId, false>>>;
+  /** The panel's tabs turned off, Forgebook's or a plugin's (`{ a11y: false }`). */
+  readonly tabs?: Readonly<Partial<Record<PanelTabId, false>> & Record<string, false>>;
   /** The accessibility rules. */
   readonly a11y?: Partial<A11ySettings>;
   /** The measuring grid's step, in CSS px. */
   readonly gridStep?: number;
-  /** Texts of the shell replaced, by their name in `STRINGS` (a translation, another word). */
+  /** Texts of the shell replaced, by their name in `STRINGS` or `LATER_STRINGS` (a translation, another word). */
   readonly strings?: Readonly<Record<string, string>>;
   /**
    * Forgebook's own controls turned off (`{ sheets: false }`): shown nowhere, and the background, the style sheets
    * and the text size keep their default; the stage's width is still set by the stage's handle. `direction: false`
-   * and `touch: false` drop the ready-made direction and touch switches.
+   * and `touch: false` drop the ready-made direction and touch switches. `embed: false` takes the Embed button off
+   * the story bar; a `?embed` address still works, since any page can frame what it can open.
    */
   readonly controls?: Readonly<Partial<Record<TurnedOffControl, false>>>;
   /**
    * The controls that start on the toolbar, in their order, by id (a switch's id or one of `OWN_CONTROL_IDS`); the
-   * colour scheme, the contrast and the width by default. A control turned off in `controls` (here or by a preset) is
+   * colour scheme, the contrast, the width and the device by default. A control turned off in `controls` (here or by a preset) is
    * left out. A person's own arrangement replaces it.
    */
   readonly toolbar?: readonly string[];
@@ -108,7 +118,14 @@ export type CatalogueLists = {
    */
   readonly usedIn?: boolean;
   /**
-   * The shell's appearance before a reader picks one: `system` (the default) follows the system's light or dark. A
+   * Who a component's page is read by before a person picks: `designer`, `coder` or `tester` reorder and filter the
+   * page for them, and `everyone` (the default) draws all of it. The address's `audience` wins, so a link keeps its view;
+   * with `controls: { audience: false }` the catalogue's choice is the only one.
+   */
+  readonly audience?: AudienceId;
+  /**
+   * The shell's appearance before a reader picks one; `story` follows the colour scheme of the story shown, for a
+   * library that wants one page with its stories: `system` (the default) follows the system's light or dark. A
    * reader's choice, kept in their browser, wins over it; the frames follow the view's switches, never this.
    */
   readonly appearance?: Appearance;
@@ -123,13 +140,25 @@ export type CatalogueLists = {
    * (`theme=dark&width=360`) or as words (`"dark it 360"`); a reader saves their own beside them.
    */
   readonly views?: readonly CatalogueView[];
+  /**
+   * The device every story is shown in by default, under each story's own `parameters.device`: `{ frame: true }`
+   * frames them all in a generic phone, `{ model: "pixel-9" }` only sets the model the toolbar's toggle turns on. No
+   * frame by default.
+   */
+  readonly device?: StoryDeviceSetting;
+  /**
+   * The prop groups listed first in every component's API reference and Props tab, in this order, by the name their
+   * props' TSDoc gives (`@group Selection`). A component's meta may name its own first (`parameters.propGroups`); the
+   * groups named nowhere follow in the order they first appear. The props that name no group always come first.
+   */
+  readonly propGroups?: readonly string[];
 };
 
-/** The shell's own appearance: light, dark, or the system's. */
-export type Appearance = "light" | "dark" | "system";
+/** The shell's own appearance: light, dark, the system's, or the colour scheme of the story shown. */
+export type Appearance = "light" | "dark" | "system" | "story";
 
 /** The appearances, in the order the reader is offered them. */
-export const APPEARANCES: readonly Appearance[] = ["light", "dark", "system"];
+export const APPEARANCES: readonly Appearance[] = ["light", "dark", "system", "story"];
 
 /** A catalogue's lists with the defaults filled in, and its switches: what the shell and the frame read. */
 export type CatalogueSettings = {
@@ -151,8 +180,8 @@ export type CatalogueSettings = {
   readonly backdrops: readonly Backdrop[];
   /** The named story groups, in their order. */
   readonly storyGroups: readonly StoryGroupSetting[];
-  /** The panel's tabs shown, in their order. */
-  readonly tabs: readonly PanelTabId[];
+  /** The panel's tabs shown, Forgebook's then the plugins', by id. */
+  readonly tabs: readonly string[];
   /** The accessibility rules. */
   readonly a11y: A11ySettings;
   /** The measuring grid's step, in CSS px. */
@@ -165,12 +194,20 @@ export type CatalogueSettings = {
   readonly toolbar: readonly string[];
   /** Whether a component's page offers "Used in". */
   readonly hasUsedIn: boolean;
+  /** Who a component's page is read by when the address does not say. */
+  readonly audience: AudienceId;
+  /** Whether the story bar offers the Embed button. */
+  readonly hasEmbed: boolean;
   /** The shell's appearance before a reader picks one. */
   readonly appearance: Appearance;
   /** The keys that cycle the controls, by control id. */
   readonly keys: ControlKeys;
   /** The catalogue's named views, their values in the address's form. */
   readonly views: readonly { readonly name: string; readonly query: string }[];
+  /** The device every story is shown in by default, under its own. */
+  readonly device: DeviceDefault;
+  /** The prop groups listed first, in their order; none by default. */
+  readonly propGroups: readonly string[];
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -206,8 +243,8 @@ const withHundred = (list: readonly number[] | undefined, fallback: readonly num
   list?.includes(100) ? [...list].sort((first, second) => first - second) : fallback;
 
 /**
- * The controls that start on the toolbar when the configuration names none: the colour scheme, the contrast and the
- * width, those the catalogue has.
+ * The controls that start on the toolbar when the configuration names none: the colour scheme, the contrast, the
+ * width and the device, those the catalogue has.
  *
  * @param switches - the catalogue's switches.
  * @param ownControls - Forgebook's own controls shown.
@@ -216,7 +253,8 @@ const defaultToolbar = (switches: readonly ViewSwitch[], ownControls: readonly O
   ...[switchWithRole(switches, "colorScheme"), switchWithRole(switches, "contrast")].flatMap((each) =>
     each === undefined ? [] : [each.id]
   ),
-  ...(ownControls.includes("width") ? ["width"] : [])
+  ...(ownControls.includes("width") ? ["width"] : []),
+  ...(ownControls.includes(DEVICE_PARAMETER) ? [DEVICE_PARAMETER] : [])
 ];
 
 /**
@@ -267,19 +305,32 @@ const catalogueViews = (
   });
 
 /**
+ * The groups a catalogue names, of stories and of props, none by default.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+const namedGroups = (lists: CatalogueLists): Pick<CatalogueSettings, "storyGroups" | "propGroups"> => ({
+  storyGroups: lists.storyGroups ?? [],
+  propGroups: lists.propGroups ?? []
+});
+
+/**
  * A catalogue's settings, its lists' defaults filled in.
  *
  * @param title - the catalogue's title, for its storage's id.
  * @param switches - its switches.
  * @param lists - the lists its configuration sets.
+ * @param pluginTabs - the ids of the tabs its plugins add.
  * @throws when the toolbar it names holds an id that is no control at all, or one twice; or a key it sets cannot be
  *   used; or a view it names cannot be read.
  */
 export const catalogueSettings = (
   title: string,
   switches: readonly ViewSwitch[],
-  lists: CatalogueLists = {}
+  lists: CatalogueLists = {},
+  pluginTabs: readonly string[] = []
 ): CatalogueSettings => {
+  const { audience = DEFAULT_AUDIENCE } = lists;
   const builtIn = lists.backgrounds?.builtIn;
   const offered =
     builtIn === false
@@ -303,8 +354,8 @@ export const catalogueSettings = (
     zooms: withHundred(lists.zooms, [50, 75, 100, 125, 150, 200]),
     textSizes: withHundred(lists.textSizes, [100, 125, 150]),
     backdrops: [...offered, ...(lists.backgrounds?.custom ?? []).map(customBackdrop)],
-    storyGroups: lists.storyGroups ?? [],
-    tabs: PANEL_TAB_IDS.filter((tab) => tabsOff[tab] !== false),
+    ...namedGroups(lists),
+    tabs: [...PANEL_TAB_IDS, ...pluginTabs].filter((tab) => tabsOff[tab] !== false),
     a11y: {
       tags: lists.a11y?.tags ?? DEFAULT_A11Y_TAGS,
       disabledRules: lists.a11y?.disabledRules ?? []
@@ -314,9 +365,13 @@ export const catalogueSettings = (
     ownControls,
     toolbar,
     hasUsedIn: lists.usedIn !== false,
+    audience,
+    hasEmbed: controlsOff.embed !== false,
     appearance: lists.appearance ?? "system",
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
-    views: catalogueViews(switches, lists.views)
+    views: catalogueViews(switches, lists.views),
+    // checked when the configuration loads (`configFile.ts`): a model that is none is left out here
+    device: deviceDefaultOf(NO_DEVICE, lists.device)
   };
 };
 

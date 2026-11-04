@@ -41,7 +41,7 @@ const BADGE: ComponentDocs = {
 
 const TEXT = newStories({
   docs: BADGE,
-  importPath: "./Badge",
+  importStatement: 'import { Badge } from "./Badge";',
   title: "Actions/Badge",
   typesModule: "@forgebook/react"
 });
@@ -70,5 +70,28 @@ describe("newStories", () => {
     expect(TEXT).toContain(`label: ${JSON.stringify(WORST_TEXT)}`);
     expect(TEXT).toContain(`count: ${WORST_NUMBER}`);
     expect(TEXT).toContain('parameters: { group: "worst-case" }');
+  });
+
+  it("quotes an arg whose name is no identifier", () => {
+    const text = newStories({
+      docs: {
+        ...BADGE,
+        props: [
+          {
+            name: "#default",
+            kind: "other",
+            type: "Slot",
+            description: "",
+            isRequired: false,
+            canTakeText: true
+          }
+        ]
+      },
+      importStatement: 'import Badge from "./Badge.vue";',
+      title: "Actions/Badge",
+      typesModule: "@forgebook/vue"
+    });
+    expect(text).toContain('"#default": ');
+    expect(text).toContain('import Badge from "./Badge.vue";');
   });
 });

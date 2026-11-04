@@ -1,0 +1,14 @@
+{
+  "name": "bench-target-bare",
+  "private": true,
+  "description": "A TypeScript project with Vite and React and no catalogue: what each tool's install is added to.",
+  "dependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "vite": "8.3.5"
+  }
+}

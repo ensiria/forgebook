@@ -23,11 +23,11 @@ import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
-import type { MountedStory, StoryDrawing, StoryIdentity, StoryRenderer } from "./renderer.ts";
+import type { ArgsChange, FrameRenderer, MountedStory, StoryDrawing, StoryIdentity } from "./renderer.ts";
 import { animationsSettled } from "./settle.ts";
 import { storyCanvas } from "./storyCanvas.ts";
 import { type PreparedStory, prepareStory } from "./storyHooks.ts";
-import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
+import type { LoadedArgs, LoadedBeforeEach, LoadedStory } from "./storyModule.ts";
 
 /** What the shell can do to a running story. */
 export type StoryControls = {
@@ -60,8 +60,10 @@ export type StoryRunOptions = {
   readonly identity: StoryIdentity;
   /** Loads the play tools the project installed, for the first play; none without them. */
   readonly playTools?: PlayToolsLoader;
+  /** What the plugins prepare before every mount, ahead of the story's loaders. */
+  readonly pluginSetups: readonly LoadedBeforeEach[];
   /** The framework that draws it. */
-  readonly renderer: StoryRenderer;
+  readonly renderer: FrameRenderer;
   /** The story clock the story reads: running from its start for a Live story, held otherwise. */
   readonly clock: FrameClock;
   /** The texts inside the stories in the shown language. */
@@ -79,6 +81,13 @@ export type StoryRunOptions = {
   readonly onControlsReady: (controls: StoryControls) => void;
   /** Called on every call of a recorded event, with its arguments. */
   readonly onEvent: (name: string, values: readonly unknown[]) => void;
+  /** What the panel can show of values: those it cannot (a function, an object) stay the frame's alone. */
+  readonly panelArgsOf: (values: Readonly<Record<string, unknown>>) => PanelArgs;
+  /**
+   * Called when the story changed its own args, after it was drawn again with them, with the panel's values the change
+   * makes, so the panel shows them.
+   */
+  readonly onArgsChange: (args: PanelArgs) => void;
   /** Called with the message when the story throws while it is drawn; the frame shows the error instead. */
   readonly onError: (message: string) => void;
   /** Called with the play function's trace after every change. */
@@ -119,6 +128,15 @@ export type RunningStory = {
    * @param shown - the texts of the language now shown, and the switches' values.
    */
   readonly setShown: (shown: Pick<StoryDrawing, "texts" | "globals">) => void;
+  /**
+   * Draws the story as its edited file now writes it, in place: what the reader did in it stays (a typed field, an
+   * open menu), and so do the values set in the panel. A story with a play, loaders or set-ups is mounted anew, and
+   * they run again, as do the plugins' preparations.
+   *
+   * @param next - the story, read from the edited file.
+   * @param decorators - the decorators around it, when an edit of a preview changed them; the same ones by default.
+   */
+  readonly setStory: (next: LoadedStory, decorators?: StoryDrawing["decorators"]) => void;
 };
 
 /** A story's handler of an event, as the frame calls it. */
@@ -144,6 +162,25 @@ const clearSpies = (args: LoadedArgs): void => {
   }
 };
 
+/** How long a mount waits for the mount before it to be undone, in milliseconds. */
+const CLEANUP_WAIT = 2000;
+
+/**
+ * Waits for a cleanup, for so long: one that never ends (a mocked request held open) must not keep the story blank for
+ * good, with every later mount behind it.
+ *
+ * @param cleanup - the cleanup, running.
+ * @param wait - the most to wait, in milliseconds.
+ * @throws What the cleanup throws, in time.
+ */
+const settledWithin = async (cleanup: Promise<void>, wait: number): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, wait);
+  });
+  await Promise.race([cleanup, late]).finally(() => clearTimeout(timer));
+};
+
 /** A story before its loaders ran, or after its set-ups were undone: nothing loaded, nothing to undo. */
 const NOT_PREPARED: PreparedStory = { loaded: {}, cleanup: async (): Promise<void> => undefined };
 
@@ -154,12 +191,19 @@ const NOT_PREPARED: PreparedStory = { loaded: {}, cleanup: async (): Promise<voi
  * @returns what the frame can change while it runs.
  */
 export const runStory = (options: StoryRunOptions): RunningStory => {
-  const { container, story, renderer, clock } = options;
+  const { container, renderer, clock } = options;
+  let { story } = options;
   const document = container.ownerDocument;
-  const { decorators } = options;
+  let { decorators } = options;
   let { texts, globals } = options;
   let text = storyTextOf(texts);
   let args: LoadedArgs = story.args;
+  // the panel's values, kept over the story's own when an edit of its file brings new ones
+  let panelValues: LoadedArgs = {};
+  // the values the story set itself that the panel cannot show, kept over the panel's until the story resets them
+  let ownValues: LoadedArgs = {};
+  // the args of the latest drawing: a change that hands back what the story was given changes nothing of it
+  let lastShown: LoadedArgs = {};
   let eventNames: readonly string[] = [];
   let matrix: Matrix | undefined;
   let mounted: { readonly story: MountedStory; readonly values: LoadedArgs }[] = [];
@@ -167,9 +211,10 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let mountCount = 0;
   let hasPlayed = false;
   let prepared: PreparedStory = NOT_PREPARED;
+  let preparing: Promise<void> = Promise.resolve();
 
   // the story's actions are recorded whatever the shell names: a spy, an `argTypes` action
-  const actions = actionNames(story.args, story.argTypes);
+  let actions = actionNames(story.args, story.argTypes);
   // every recorded event reports its calls, then runs the story's own handler when it has one; the handler is
   // wrapped, not replaced, so a spy stays one (`expect(args.onPress).toHaveBeenCalled()` reads its calls)
   const recorded = (): LoadedArgs =>
@@ -203,16 +248,42 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     ...withStoryTexts(mappedArgs(args, story.argTypes), text),
     ...recorded()
   });
-  const drawing = (values: LoadedArgs): StoryDrawing => ({
-    identity: options.identity,
-    story,
-    args: { ...shownArgs(), ...values },
-    texts,
-    clock,
-    decorators,
-    globals,
-    loaded: prepared.loaded
-  });
+  const drawing = (values: LoadedArgs): StoryDrawing => {
+    lastShown = { ...shownArgs(), ...values };
+    return {
+      identity: options.identity,
+      story,
+      args: lastShown,
+      texts,
+      clock,
+      decorators,
+      globals,
+      loaded: prepared.loaded,
+      onEvent: options.onEvent,
+      changeArgs
+    };
+  };
+
+  // the story's own change of its args, kept as the panel's values are (Replay and an edit of its file keep it too); a
+  // value handed back as it was given (`updateArgs({ ...args, count })`) is left out: a recorded event's wrapper or a
+  // text in the shown language would otherwise stand for the story's own
+  const changeArgs = (change: ArgsChange): void => {
+    const isKept = (name: string): boolean => change.reset !== "all" && !change.reset.includes(name);
+    const keptOf = (values: LoadedArgs): LoadedArgs =>
+      Object.fromEntries(Object.entries(values).filter(([name]) => isKept(name)));
+    const changed = Object.fromEntries(
+      Object.entries(change.set).filter(([name, value]) => value !== lastShown[name])
+    );
+    const shown = options.panelArgsOf(changed);
+    panelValues = { ...keptOf(panelValues), ...changed };
+    ownValues = {
+      ...keptOf(ownValues),
+      ...Object.fromEntries(Object.entries(changed).filter(([name]) => !(name in shown)))
+    };
+    args = { ...story.args, ...ownValues, ...panelValues };
+    redraw();
+    options.onArgsChange(options.panelArgsOf(panelValues));
+  };
 
   const clearError = (): void => {
     shownError?.remove();
@@ -251,7 +322,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       redraw();
     },
     setPanelArgs: (panelArgs: PanelArgs): void => {
-      args = { ...story.args, ...options.resolveArgs(panelArgs) };
+      panelValues = options.resolveArgs(panelArgs);
+      args = { ...story.args, ...ownValues, ...panelValues };
       redraw();
     },
     setEvents: (names: readonly string[]): void => {
@@ -344,15 +416,31 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     const previous = prepared;
     prepared = NOT_PREPARED;
     try {
-      await previous.cleanup();
-      const next = await prepareStory(story, {
+      await settledWithin(previous.cleanup(), CLEANUP_WAIT);
+      const context = {
         ...options.identity,
         args: shownArgs(),
         text,
         clock,
         globals,
         parameters: story.parameters
+      };
+      // ahead of the story's loaders, which may depend on them: a mocked API answers a loader's fetch
+      const plugins = await prepareStory({ loaders: [], beforeEach: options.pluginSetups }, context);
+      const hooks = await prepareStory(story, context).catch(async (error: unknown) => {
+        await plugins.cleanup();
+        throw error;
       });
+      const next: PreparedStory = {
+        ...hooks,
+        cleanup: async (): Promise<void> => {
+          try {
+            await hooks.cleanup();
+          } finally {
+            await plugins.cleanup();
+          }
+        }
+      };
       // a later mount started while this one loaded: its set-ups are undone, the later one draws
       if (count !== mountCount) {
         await next.cleanup();
@@ -367,11 +455,18 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   };
 
   // a new mount draws the story from scratch: its loaders and set-ups run again, its own state starts over and its
-  // play function runs again
+  // play function runs again; it waits for the mount before it, whose set-ups it must undo, and one overtaken meanwhile
+  // never starts: two at once would hold what only one can (a mocked API's worker)
   const mountStory = (): void => {
     unmountAll();
     mountCount += 1;
-    void prepareMount(mountCount).then((isLast) => {
+    const count = mountCount;
+    const turn = preparing.then(() => (count === mountCount ? prepareMount(count) : false));
+    preparing = turn.then(
+      () => undefined,
+      () => undefined
+    );
+    void turn.then((isLast) => {
       if (!isLast) return;
       // a framework may throw while it starts drawing, before its own error capture is in place: shown as any error
       try {
@@ -396,6 +491,17 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       ({ texts, globals } = shown);
       text = storyTextOf(texts);
       redraw();
+    },
+    setStory: (next: LoadedStory, nextDecorators = decorators): void => {
+      story = next;
+      decorators = nextDecorators;
+      actions = actionNames(story.args, story.argTypes);
+      args = { ...story.args, ...ownValues, ...panelValues };
+      // a play drives the story from its start, and loaders and set-ups make what it draws: drawn in place, it would
+      // show what the edit no longer writes
+      const isPrepared = story.play !== undefined || story.loaders.length > 0 || story.beforeEach.length > 0;
+      if (isPrepared) mountStory();
+      else redraw();
     }
   };
 };

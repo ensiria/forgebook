@@ -29,6 +29,33 @@ const settled = async (parts: Locator): Promise<void> => {
 /** Waits until the open popovers have finished growing in. */
 const popoversSettled = (page: Page): Promise<void> => settled(page.locator(".forgebook-popover"));
 
+/**
+ * Opens the View menu, and waits until its panel is drawn and has finished growing in.
+ *
+ * @remarks
+ * The button's name takes its dot's when a value it holds is changed. The panel's module loads the first time the menu
+ * opens, after the popover is drawn: its rows are read, and pressed, once its foot is there.
+ */
+const openView = async (page: Page): Promise<void> => {
+  await page.getByRole("button", { name: /^View/ }).click();
+  await expect(
+    page.getByRole("dialog", { name: "View" }).getByRole("button", { name: "Reset to defaults" })
+  ).toBeVisible();
+  await popoversSettled(page);
+};
+
+/**
+ * Picks an appearance in the open Appearance menu, and waits until the menu's button shows it.
+ *
+ * @remarks
+ * The menu closes on a choice. `check()` reads the radio again after its click, so on a busy page, where the menu is
+ * gone by then, it waits for a radio that never comes back: a click, and the button's name, say the choice was made.
+ */
+const chooseAppearance = async (page: Page, name: string): Promise<void> => {
+  await page.getByRole("dialog", { name: "Appearance" }).getByRole("radio", { name, exact: true }).click();
+  await expect(page.getByRole("button", { name: `Appearance: ${name}` })).toBeVisible();
+};
+
 /** Waits until the shown story's frame says it is ready (or failed). */
 const frameStatus = async (page: Page): Promise<string | null> => {
   const html = page.locator("iframe.forgebook-frame-view");
@@ -37,6 +64,29 @@ const frameStatus = async (page: Page): Promise<string | null> => {
     .poll(async () => frameOf(page).locator("html").getAttribute("data-forgebook-status"))
     .not.toBeNull();
   return frameOf(page).locator("html").getAttribute("data-forgebook-status");
+};
+
+/**
+ * The foot handle's box once the handle sits right under the story's room. The box around the room takes the room's
+ * height as measured, a render after the story's height changed, so until then the handle stays where the old height
+ * put it, over the story's last pixels: a press at that place would land on the story.
+ */
+const settledFootBox = async (
+  foot: Locator
+): Promise<{ x: number; y: number; width: number; height: number }> => {
+  await expect
+    .poll(() =>
+      foot.evaluate((element) => {
+        const room = element.parentElement?.querySelector(".forgebook-viewport__room");
+        return room === null || room === undefined
+          ? undefined
+          : element.getBoundingClientRect().top - room.getBoundingClientRect().bottom;
+      })
+    )
+    .toBeCloseTo(0, 0);
+  const box = await foot.boundingBox();
+  if (box === null) throw new Error("The foot handle has no box");
+  return box;
 };
 
 test.describe("pages and the address", () => {
@@ -59,7 +109,7 @@ test.describe("pages and the address", () => {
         .poll(() => logo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
         .toBeGreaterThan(0);
     }
-    await library.getByRole("link", { name: "Select" }).click();
+    await library.getByRole("link", { name: "Select", exact: true }).click();
     await expect(page).toHaveURL(/component=kit%3Ainputs-selection-select/);
   });
 
@@ -105,6 +155,65 @@ test.describe("pages and the address", () => {
     await expect(page).toHaveURL(/select--hinted/);
     await page.locator("body").press("]");
     await expect(page).toHaveURL(/select--in-row/);
+  });
+});
+
+test.describe("a catalogue's theme of the shell", () => {
+  test("reaches what the shell draws, each palette in its appearance, and stays out of the frames", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit%3Ainputs-selection-select");
+    await expect(page.locator("iframe.forgebook-frame-view").first()).toBeVisible();
+    const custom = (name: string): Promise<string> =>
+      page.evaluate(
+        (property) => getComputedStyle(document.documentElement).getPropertyValue(property).trim(),
+        name
+      );
+    const appearance = (value: string): Promise<void> =>
+      page.evaluate(
+        (next) => document.documentElement.setAttribute("data-forgebook-appearance", next),
+        value
+      );
+    await appearance("light");
+    await expect.poll(() => custom("--forgebook-accent-text")).toBe("#5a2aa0");
+    await expect(page.locator(".forgebook-example__box").first()).toHaveCSS("border-radius", "10px");
+
+    await appearance("dark");
+    await expect.poll(() => custom("--forgebook-accent")).toBe("#b28bff");
+    // a role only the light palette sets keeps the shell's own colour in dark
+    await expect.poll(() => custom("--forgebook-accent-text")).toBe("#7ab3ff");
+
+    const inFrame = await page
+      .frameLocator("iframe.forgebook-frame-view")
+      .first()
+      .locator(".forgebook-frame")
+      .evaluate((root) => getComputedStyle(root).getPropertyValue("--forgebook-radius-card"));
+    expect(inFrame.trim()).toBe("12px");
+  });
+});
+
+test.describe("the shell following the story", () => {
+  test("turns dark with the story, stays while comparing, and yields to the reader's own choice", async ({
+    page
+  }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(story("overview", "theme=dark"));
+    const appearance = (): Promise<string | null> =>
+      page.evaluate(() => document.documentElement.getAttribute("data-forgebook-appearance"));
+    await expect.poll(appearance).toBe("light");
+
+    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await chooseAppearance(page, "Follow the story");
+    await expect.poll(appearance).toBe("dark");
+
+    await page.goto(story("overview", "theme=dark&compare=theme"));
+    await expect.poll(appearance).toBe("light");
+
+    await page.goto(story("overview", "theme=dark"));
+    await expect.poll(appearance).toBe("dark");
+    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await chooseAppearance(page, "Light");
+    await expect.poll(appearance).toBe("light");
   });
 });
 
@@ -253,7 +362,7 @@ test.describe("the sidebar", () => {
   });
 });
 
-test.describe("aliases and related pages (D-492)", () => {
+test.describe("aliases and related pages", () => {
   test("an alias entry in another place opens the same page, which says where the component lives", async ({
     page
   }) => {
@@ -291,7 +400,7 @@ test.describe("aliases and related pages (D-492)", () => {
   });
 });
 
-test.describe("a story's declared height (D-469)", () => {
+test.describe("a story's declared height", () => {
   test("the frame has the declared height from the start, before the story reports its own", async ({
     page
   }) => {
@@ -375,7 +484,7 @@ test.describe("the stage", () => {
     await expect(page).not.toHaveURL(/width=/);
   });
 
-  test("the handle at the story's foot sets its height from the declared one, and a double click gives it back (note 142)", async ({
+  test("the handle at the story's foot sets its height from the declared one, and a double click gives it back", async ({
     page
   }) => {
     await page.goto(story("overlay-in-room"));
@@ -388,8 +497,7 @@ test.describe("the stage", () => {
     await expect(page).toHaveURL(/height=290/);
     await expect(frame).toHaveCSS("height", "290px");
     // a drag follows the pointer one for one, and the frame's window is that height
-    const box = await foot.boundingBox();
-    if (box === null) throw new Error("The foot handle has no box");
+    const box = await settledFootBox(foot);
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 150, { steps: 5 });
@@ -473,9 +581,7 @@ test.describe("the stage", () => {
     await expect(frame).toHaveCSS("height", "777px");
     await expect(page.locator(".forgebook-frame-loading")).toBeVisible();
     // the frame's document is up and has told its height by now; the box keeps waiting at the measured one
-    await expect
-      .poll(() => frame.evaluate((element) => (element as HTMLIFrameElement).contentDocument?.body !== null))
-      .toBe(true);
+    await expect(frameOf(page).locator("body")).toBeAttached();
     await page.waitForTimeout(300);
     await expect(frame).toHaveCSS("height", "777px");
     release();
@@ -583,9 +689,9 @@ test.describe("the stage", () => {
   test("the sidebar never lists stories: they are picked in the header", async ({ page }) => {
     await page.goto(story("overview"));
     // Inputs is open (the shown component's family), Foundations closed: one link, the component's, none for a story
-    await expect(page.getByRole("navigation", { name: "Components" }).getByRole("link")).toHaveText([
-      /^Select\d+$/
-    ]);
+    // the section after the Docs one: the library's families
+    const families = page.getByRole("navigation", { name: "Components" }).locator("section").nth(1);
+    await expect(families.getByRole("link")).toHaveText([/^Select\d+$/]);
   });
 
   test("a story that throws shows its error in the frame", async ({ page }) => {
@@ -648,6 +754,43 @@ test.describe("the component's page", () => {
     await expect(page.getByRole("article", { name: "In row", exact: true })).toHaveCount(0);
   });
 
+  test("the API reference lists the props naming no group first, then each group, and unfolds an object's members", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const reference = page.getByRole("region", { name: "API reference" });
+    await expect(reference.locator(".forgebook-api__table").first().locator("tbody th")).toHaveText([
+      "value",
+      "size",
+      "options*",
+      "hint",
+      "classNames"
+    ]);
+    // the meta names Texts first, though Behaviour comes first in the props; every group starts open
+    const groups = reference.locator(":scope > .forgebook-api__group");
+    await expect(groups.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    await expect(groups.locator(".forgebook-fold__count")).toHaveText(["1 prop", "2 props"]);
+    await expect(groups.nth(1).locator("tbody th")).toHaveText(["rows", "isDisabled"]);
+    await expect(groups.nth(0)).toHaveAttribute("open");
+    await expect(groups.nth(1)).toHaveAttribute("open");
+    // a group folds from its summary
+    await groups.nth(1).locator("summary").click();
+    await expect(groups.nth(1)).not.toHaveAttribute("open");
+    await expect(groups.nth(1).getByRole("rowheader", { name: "rows" })).toBeHidden();
+    // the texts' type unfolds under its row, its members with their TSDoc and default
+    const members = reference.getByRole("button", { name: "Members of SelectTexts: 2 members" });
+    await expect(members).toHaveAttribute("aria-expanded", "false");
+    await expect(reference.getByRole("table", { name: "Members of SelectTexts" })).toHaveCount(0);
+    await members.click();
+    await expect(members).toHaveAttribute("aria-expanded", "true");
+    const table = reference.getByRole("table", { name: "Members of SelectTexts" });
+    await expect(table.locator("tbody th")).toHaveText(["empty", "listLabel"]);
+    await expect(table).toContainText("Shown in place of the list when there is no option.");
+    await expect(table).toContainText('"Nothing to pick"');
+    // the events keep their heading, after the groups
+    await expect(reference.getByRole("heading", { level: 3, name: "Events" })).toBeVisible();
+  });
+
   test("an example's box fills the page and goes back to its place, its story never loaded again", async ({
     page
   }) => {
@@ -655,6 +798,8 @@ test.describe("the component's page", () => {
     const overview = page.getByRole("article", { name: "Overview", exact: true });
     const frame = overview.locator("iframe");
     const root = overview.frameLocator("iframe").locator("html");
+    // a frame loads only near the visible part: the API table may push the example past it, so it is brought in view
+    await overview.scrollIntoViewIfNeeded();
     // a frame further down the page may load slowly while the other tests run: its readiness gets more time
     await expect(root).toHaveAttribute("data-forgebook-status", /.+/, { timeout: 15_000 });
     await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
@@ -691,6 +836,8 @@ test.describe("the component's page", () => {
     await page.goto("/?component=kit:inputs-selection-select");
     const overview = page.getByRole("article", { name: "Overview", exact: true });
     const frame = overview.locator("iframe");
+    // a frame loads only near the visible part: the API table may push the example past it, so it is brought in view
+    await overview.scrollIntoViewIfNeeded();
     const pageWidth = (await frame.boundingBox())?.width;
     const address = page.url();
     // in the list the stage has no handles: the width is the page's
@@ -750,7 +897,7 @@ test.describe("the component's page", () => {
 
 test.describe("the toolbar each person arranges", () => {
   // wide enough for the default bar and two more controls
-  test.use({ viewport: { width: 1600, height: 900 } });
+  test.use({ viewport: { width: 1760, height: 900 } });
 
   /** The controls on the bar, by id, in their order. */
   const barControls = (page: Page): Promise<string[]> =>
@@ -764,20 +911,14 @@ test.describe("the toolbar each person arranges", () => {
       .locator(".forgebook-arrange")
       .evaluateAll((rows) => rows.map((each) => (each as HTMLElement).dataset["control"] ?? ""));
 
-  // the button's name takes its dot's when a value it holds is changed
-  const openView = async (page: Page): Promise<void> => {
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
-  };
-
-  test("starts with View first, then the colour scheme, the contrast and the width, the panel and Compare last", async ({
+  test("starts with View first, then the colour scheme, the contrast, the width and the device, the panel and Compare last", async ({
     page
   }) => {
     await page.goto(story("overview"));
     await frameStatus(page);
     const toolbar = page.locator(".forgebook-toolbar");
     await expect(toolbar.locator("> *").first()).toHaveClass(/forgebook-view-menu/);
-    expect(await barControls(page)).toEqual(["theme", "contrast", "width"]);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "forgebook.device"]);
     await expect(toolbar.locator("> *").last()).toHaveClass(/forgebook-view-menu/);
     await expect(toolbar.locator("> *").last().getByRole("button")).toHaveAccessibleName("Compare");
     await openView(page);
@@ -785,15 +926,18 @@ test.describe("the toolbar each person arranges", () => {
       "theme",
       "contrast",
       "width",
+      "forgebook.device",
       "motion",
       "speed",
       "press",
+      "probe",
       "lang",
       "dir",
       "touch",
       "backdrop",
       "sheets",
-      "text"
+      "text",
+      "audience"
     ]);
     await expect(page.getByRole("button", { name: "Reset toolbar" })).toBeDisabled();
   });
@@ -810,7 +954,7 @@ test.describe("the toolbar each person arranges", () => {
       "true"
     );
     await page.keyboard.press("Escape");
-    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "speed"]);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "forgebook.device", "speed"]);
     const onBar = page.locator('.forgebook-toolbar__pinned[data-control="speed"]');
     await onBar.getByRole("radio", { name: "Fast" }).check({ force: true });
     await expect(page).toHaveURL(/speed=fast/);
@@ -818,10 +962,10 @@ test.describe("the toolbar each person arranges", () => {
     await expect(page.getByRole("img", { name: "A view setting is changed" })).toHaveCount(0);
     await page.reload();
     await frameStatus(page);
-    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "speed"]);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "forgebook.device", "speed"]);
     await openView(page);
     await page.getByRole("button", { name: "Reset toolbar" }).click();
-    expect(await barControls(page)).toEqual(["theme", "contrast", "width"]);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "forgebook.device"]);
   });
 
   test("a hidden control leaves View and the bar, still applies, and comes back where it was", async ({
@@ -841,7 +985,7 @@ test.describe("the toolbar each person arranges", () => {
     await hiddenRow.getByRole("radio", { name: "Darken", exact: true }).check({ force: true });
     await expect(page).toHaveURL(/press=darken/);
     await page.getByRole("button", { name: "Show Press" }).click();
-    expect((await menuRows(page)).slice(4, 7)).toEqual(["speed", "press", "lang"]);
+    expect((await menuRows(page)).slice(5, 8)).toEqual(["speed", "press", "probe"]);
   });
 
   test("the rows move by keyboard and by pointer, and the bar follows their order", async ({ page }) => {
@@ -849,14 +993,21 @@ test.describe("the toolbar each person arranges", () => {
     await frameStatus(page);
     await openView(page);
     await page.getByRole("button", { name: "Pin Motion to the toolbar" }).click();
-    // by keyboard: Motion above the width, announced
+    // by keyboard: Motion above the device and the width, announced
     const handle = page.getByRole("button", { name: "Move Motion" });
     await handle.focus();
     await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowUp");
     await expect(handle).toBeFocused();
-    expect((await menuRows(page)).slice(0, 4)).toEqual(["theme", "contrast", "motion", "width"]);
-    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 12");
-    expect(await barControls(page)).toEqual(["theme", "contrast", "motion", "width"]);
+    expect((await menuRows(page)).slice(0, 5)).toEqual([
+      "theme",
+      "contrast",
+      "motion",
+      "width",
+      "forgebook.device"
+    ]);
+    await expect(page.locator("[aria-live]")).toHaveText("Motion, 3 of 15");
+    expect(await barControls(page)).toEqual(["theme", "contrast", "motion", "width", "forgebook.device"]);
     // by pointer: the theme dragged below the contrast
     const grip = page.getByRole("button", { name: "Move Theme" });
     const from = await grip.boundingBox();
@@ -867,7 +1018,7 @@ test.describe("the toolbar each person arranges", () => {
     await page.mouse.move(from.x + from.width / 2, to.y + to.height, { steps: 8 });
     await page.mouse.up();
     expect((await menuRows(page)).slice(0, 2)).toEqual(["contrast", "theme"]);
-    expect(await barControls(page)).toEqual(["contrast", "theme", "motion", "width"]);
+    expect(await barControls(page)).toEqual(["contrast", "theme", "motion", "width", "forgebook.device"]);
     // drags one after another leave every row in its place: none still shifted, none on another
     for (const [name, rows] of [
       ["Text", -6],
@@ -906,11 +1057,11 @@ test.describe("the toolbar each person arranges", () => {
     const menu = page.getByRole("menu", { name: "More contrast on the toolbar" });
     await expect(menu.getByRole("menuitem").first()).toBeFocused();
     await menu.getByRole("menuitem", { name: "Remove from the toolbar" }).click();
-    expect(await barControls(page)).toEqual(["theme", "width"]);
+    expect(await barControls(page)).toEqual(["theme", "width", "forgebook.device"]);
     // hidden in View, the theme stays on the bar and takes no row in the menu
     await page.locator('.forgebook-toolbar__pinned[data-control="theme"]').click({ button: "right" });
     await page.getByRole("menuitem", { name: "Hide in View" }).click();
-    expect(await barControls(page)).toEqual(["theme", "width"]);
+    expect(await barControls(page)).toEqual(["theme", "width", "forgebook.device"]);
     await openView(page);
     expect(await menuRows(page)).not.toContain("theme");
     // the count says how many of the hidden still sit on the bar
@@ -937,7 +1088,7 @@ test.describe("the toolbar each person arranges", () => {
     await openView(page);
     await expect(page.locator('.forgebook-arrange[data-control="motion"]')).toHaveAttribute("data-moved", "");
     await page.keyboard.press("Escape");
-    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.setViewportSize({ width: 1760, height: 900 });
     await expect.poll(() => barControls(page)).toContain("motion");
   });
 
@@ -967,7 +1118,9 @@ test.describe("the toolbar each person arranges", () => {
     await page.getByRole("switch", { name: "Wrap the toolbar onto more lines when it is full" }).check();
     await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 1100, height: 900 });
-    await expect.poll(() => barControls(page)).toEqual(["theme", "contrast", "width", "motion"]);
+    await expect
+      .poll(() => barControls(page))
+      .toEqual(["theme", "contrast", "width", "forgebook.device", "motion"]);
     const height = await page
       .locator(".forgebook-toolbar")
       .evaluate((bar) => bar.getBoundingClientRect().height);
@@ -975,7 +1128,7 @@ test.describe("the toolbar each person arranges", () => {
     // kept for the next visit
     await page.reload();
     await frameStatus(page);
-    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "motion"]);
+    expect(await barControls(page)).toEqual(["theme", "contrast", "width", "forgebook.device", "motion"]);
   });
 });
 
@@ -1003,8 +1156,7 @@ test.describe("the stories' texts", () => {
     const root = frameOf(page).locator("html");
     await expect(root).toHaveAttribute("dir", "rtl");
     await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page.getByRole("group", { name: "Direction" }).getByRole("radio", { name: "Left to right" }).check({
       force: true
     });
@@ -1065,17 +1217,23 @@ test.describe("touch", () => {
   test("a tap sends a finger's events and a touch click, a long press the menu, and the CSS answers as a phone's", async ({
     page
   }) => {
+    await page.clock.install();
     await page.goto(touchPad());
     await frameStatus(page);
     const button = await centreOf(frameOf(page).getByRole("button", { name: "Press me" }));
     await page.mouse.move(button.x, button.y);
+    // the frame's clock, not the machine's, says how long a press lasts: paused, a tap stays a tap however long the
+    // runner takes between the press and the lift, and a long press is exactly as long as the frame waits for one
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page.mouse.down();
     await page.mouse.up();
+    // the touch click follows the real one on a timer of its own
+    await page.clock.runFor(1);
     await expect
       .poll(() => eventLog(page))
       .toEqual(["pointerdown touch", "touchstart 1", "pointerup touch", "touchend 0", "click touch"]);
     await page.mouse.down();
-    await page.waitForTimeout(650);
+    await page.clock.runFor(650);
     await page.mouse.up();
     await expect.poll(async () => (await eventLog(page)).includes("contextmenu")).toBe(true);
     await expect(frameOf(page).getByText("A phone's media")).toBeVisible();
@@ -1228,8 +1386,7 @@ test.describe("touch", () => {
     await page.goto("/?story=kit:interaction-touch-pad--by-pointer");
     await frameStatus(page);
     await expect(frameOf(page).getByText("Open the row's menu for its actions")).toBeVisible();
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page
       .getByRole("dialog", { name: "View" })
       .getByRole("group", { name: "Touch" })
@@ -1257,8 +1414,7 @@ test.describe("touch", () => {
     await page.getByRole("link", { name: "Open the story Inbox", exact: true }).click();
     await frameStatus(page);
     await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-touch");
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page
       .getByRole("dialog", { name: "View" })
       .getByRole("group", { name: "Touch" })
@@ -1277,8 +1433,7 @@ test.describe("touch", () => {
   }) => {
     await page.goto(touchPad());
     await frameStatus(page);
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     // the limits are a note on an info button, not a paragraph: shown on hover, in the menu and on the bar
     await page.getByRole("dialog", { name: "View" }).getByRole("button", { name: "About Touch" }).hover();
     await expect(
@@ -1357,16 +1512,62 @@ test.describe("the panel", () => {
     await expect(frameOf(page).locator("select")).toHaveAttribute("data-size", "lg");
   });
 
+  test("Props lists the props naming no group by control, then each group under its name", async ({
+    page
+  }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const tab = page.locator(".forgebook-tab-props");
+    await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    // a group's number field and toggle sit in it, and set the story as anywhere else
+    const behaviour = tab.locator(".forgebook-fold").filter({ hasText: "Behaviour" });
+    await expect(tab.locator(".forgebook-fold[open]")).toHaveCount(2);
+    await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
+    await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
+    await expect(frameOf(page).locator("select")).toBeDisabled();
+    // the toggles that name no group stay under Toggles; Select has none left there
+    await expect(tab.locator(".forgebook-prop-group__title", { hasText: "Toggles" })).toHaveCount(0);
+  });
+
+  test("a shared link's values reach the frame only for the story's props, with their types; the rest are reported", async ({
+    page
+  }) => {
+    const dialogs: string[] = [];
+    page.on("dialog", (dialog) => {
+      dialogs.push(dialog.message());
+      void dialog.dismiss();
+    });
+    const crafted = {
+      size: "lg",
+      onclick: "alert(1)",
+      innerHTML: "<img src=x onerror=alert(2)>",
+      hint: 5,
+      icon: { of: "constructor", named: "constructor" }
+    };
+    await page.goto(story("overview", `args=${encodeURIComponent(JSON.stringify(crafted))}`));
+    await frameStatus(page);
+    const select = frameOf(page).locator("select");
+    await expect(select).toHaveAttribute("data-size", "lg");
+    await select.click();
+    await expect(select).not.toHaveAttribute("onclick");
+    const note = page.locator(".forgebook-dropped-args");
+    await expect(note).toContainText("onclick not one of its props");
+    await expect(note).toContainText("innerHTML not one of its props");
+    await expect(note).toContainText("hint not of the prop's type");
+    await expect(note).toContainText("icon not one of its props");
+    expect(dialogs).toEqual([]);
+    await note.getByRole("button", { name: "Remove them from the address" }).click();
+    await expect(note).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`args=${encodeURIComponent(JSON.stringify({ size: "lg" }))}$`));
+    await expect(select).toHaveAttribute("data-size", "lg");
+  });
+
   test("named views: the catalogue's picked, a reader's saved, kept after a reload, and removed", async ({
     page
   }) => {
     await page.goto(story("overview"));
     await frameStatus(page);
-    const openView = async (): Promise<void> => {
-      await page.getByRole("button", { name: /^View/ }).click();
-      await popoversSettled(page);
-    };
-    await openView();
+    await openView(page);
     const views = page.getByRole("region", { name: "Views" });
     await views.getByRole("button", { name: "Dark phone" }).click();
     await expect(page).toHaveURL(/theme=dark/);
@@ -1378,7 +1579,7 @@ test.describe("the panel", () => {
     await expect(views.getByRole("button", { name: "Mine", exact: true })).toBeVisible();
     await page.goto(story("overview"));
     await frameStatus(page);
-    await openView();
+    await openView(page);
     await views.getByRole("button", { name: "Mine", exact: true }).click();
     await expect(page).toHaveURL(/width=360/);
     await views.getByRole("button", { name: "Remove the view Mine" }).click();
@@ -1395,8 +1596,7 @@ test.describe("the panel", () => {
     const afterT = new URL(page.url()).searchParams.get("theme");
     await page.keyboard.press("Shift+T");
     await expect(page).not.toHaveURL(new RegExp(`theme=${afterT}`));
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page.getByRole("button", { name: "Theme: key T" }).click();
     await page.keyboard.press("c");
     // contrast has c: refused, said in place
@@ -1415,8 +1615,7 @@ test.describe("the panel", () => {
     await page.goto(story("overview", "theme=dark"));
     await frameStatus(page);
     await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(1);
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(2);
     await page.goto(story("overview"));
     await frameStatus(page);
@@ -1433,10 +1632,7 @@ test.describe("the panel", () => {
     await expect(root).toHaveAttribute("data-forgebook-appearance", "dark");
     await page.getByRole("button", { name: "Appearance: System" }).click();
     await popoversSettled(page);
-    await page
-      .getByRole("dialog", { name: "Appearance" })
-      .getByRole("radio", { name: "Light" })
-      .check({ force: true });
+    await chooseAppearance(page, "Light");
     await expect(root).toHaveAttribute("data-forgebook-appearance", "light");
     await expect(page.getByRole("button", { name: "Appearance: Light" })).toBeVisible();
     await page.reload();

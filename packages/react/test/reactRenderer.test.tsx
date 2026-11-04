@@ -78,8 +78,8 @@ const Forwarded = forwardRef<HTMLElement, { readonly name?: unknown }>(({ name }
 ));
 
 describe("reactRenderer", () => {
-  it("renders a story on the server inside the catalogue's decorators, which read its globals, with its texts", () => {
-    const html = reactRenderer.renderToString(
+  it("renders a story on the server inside the catalogue's decorators, which read its globals, with its texts", async () => {
+    const html = await reactRenderer.renderToString(
       // the decorator comes as a catalogue's preview gives it, read without its types
       drawing({ name: "Ada" }, readPreview({ decorators: [inLanguage] }).decorators)
     );
@@ -101,6 +101,50 @@ describe("reactRenderer", () => {
     expect(canvas.textContent).toBe("");
   });
 
+  it("keeps a story's state when a decorator draws it as <Story />, and the args change", async () => {
+    const canvas = document.createElement("div");
+    document.body.append(canvas);
+    const asElement = (Story: () => ReactNode): ReactNode => (
+      <section>
+        <Story />
+      </section>
+    );
+    const decorated = (name: string): StoryDrawing => ({
+      ...drawing({ name }, readPreview({ decorators: [asElement] }).decorators)
+    });
+    const mounted = reactRenderer.mount(canvas, decorated("Ada"), () => undefined);
+    await mounted.drawn;
+    canvas.querySelector("button")?.click();
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Ada 1"));
+    mounted.update(decorated("Grace"));
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Grace 1"));
+    mounted.unmount();
+  });
+
+  it("calls hooks in a story's render and in a decorator, which Storybook's stories do", async () => {
+    const canvas = document.createElement("div");
+    document.body.append(canvas);
+    const inSection = (story: () => ReactNode): ReactNode => {
+      const [label] = useState("wrapped");
+      return <section aria-label={label}>{story()}</section>;
+    };
+    const errors: string[] = [];
+    const hooked = {
+      ...drawing({ name: "Ada" }, readPreview({ decorators: [inSection] }).decorators),
+      story: loaded({
+        render: () => {
+          const [text] = useState("from a hook");
+          return <p>{text}</p>;
+        }
+      })
+    };
+    const mounted = reactRenderer.mount(canvas, hooked, (error) => errors.push(error.message));
+    await vi.waitFor(() => expect(canvas.textContent).toBe("from a hook"));
+    expect(canvas.querySelector("section")?.getAttribute("aria-label")).toBe("wrapped");
+    expect(errors).toEqual([]);
+    mounted.unmount();
+  });
+
   it("hands an error to the frame and draws the story again with other args", async () => {
     const canvas = document.createElement("div");
     document.body.append(canvas);
@@ -116,11 +160,11 @@ describe("reactRenderer", () => {
     await vi.waitFor(() => expect(canvas.textContent).toContain("Ciao Ada"));
   });
 
-  it("draws a meta's component made by memo or forwardRef, with the story's args", () => {
+  it("draws a meta's component made by memo or forwardRef, with the story's args", async () => {
     for (const component of [Memoized, Forwarded]) {
       const story = readStory({ default: { title: "Kit/Name", component }, Shown: {} }, "Shown");
       if (typeof story === "string") throw new Error(story);
-      const html = reactRenderer.renderToString({ ...drawing({ name: "Ada" }), story });
+      const html = await reactRenderer.renderToString({ ...drawing({ name: "Ada" }), story });
       expect(html).toContain("Ada");
     }
   });

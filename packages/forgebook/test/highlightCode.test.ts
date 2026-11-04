@@ -8,6 +8,22 @@ import { describe, expect, it } from "vitest";
 
 import { escapeHtml, highlightCode } from "../src/vite/highlightCode.ts";
 
+/**
+ * The text of coloured HTML: its tags taken out until none is left, so a tag that taking one out would join is taken
+ * out too.
+ *
+ * @param html - the HTML.
+ */
+const textOf = (html: string): string => {
+  let text = html;
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== previous);
+  return text;
+};
+
 describe("highlightCode", () => {
   it("colours TSX with the catalogue's classes, JSX included", () => {
     const html = highlightCode('const label = <Button tone="danger">Delete</Button>;', "tsx");
@@ -25,5 +41,41 @@ describe("highlightCode", () => {
     expect(escapeHtml(`<a href="x" title='y'>&</a>`)).toBe(
       "&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;"
     );
+  });
+
+  it("colours the languages a component's documentation writes", () => {
+    expect(highlightCode(".card { color: #fff; margin: 4px; } /* note */", "css")).toBe(
+      '<span class="forgebook-hl-type">.card</span> { <span class="forgebook-hl-property">color</span>: ' +
+        '<span class="forgebook-hl-number">#fff</span>; <span class="forgebook-hl-property">margin</span>: ' +
+        '<span class="forgebook-hl-number">4px</span>; } <span class="forgebook-hl-comment">/* note */</span>'
+    );
+    expect(highlightCode("$size: 2px; // small", "scss")).toContain(
+      '<span class="forgebook-hl-comment">// small</span>'
+    );
+    expect(highlightCode('{ "name": "x", "on": true }', "json")).toBe(
+      '{ <span class="forgebook-hl-property">&quot;name&quot;</span>: ' +
+        '<span class="forgebook-hl-string">&quot;x&quot;</span>, ' +
+        '<span class="forgebook-hl-property">&quot;on&quot;</span>: <span class="forgebook-hl-keyword">true</span> }'
+    );
+    expect(highlightCode('cd "$HOME" # go', "sh")).toBe(
+      '<span class="forgebook-hl-keyword">cd</span> <span class="forgebook-hl-string">&quot;$HOME&quot;</span> ' +
+        '<span class="forgebook-hl-comment"># go</span>'
+    );
+  });
+
+  it("colours HTML's tags and leaves its text alone, quotes included", () => {
+    expect(highlightCode('<a href="x">it\'s</a>', "html")).toBe(
+      '&lt;<span class="forgebook-hl-name">a</span> <span class="forgebook-hl-attr">href</span>=' +
+        '<span class="forgebook-hl-string">&quot;x&quot;</span>&gt;it&#39;s&lt;/' +
+        '<span class="forgebook-hl-name">a</span>&gt;'
+    );
+  });
+
+  it("gives back every character, and stays quick on a long run of what almost matches", () => {
+    const code = `/*${"*".repeat(50_000)}"${"\\".repeat(50_000)}`;
+    const started = performance.now();
+    const html = highlightCode(code, "scss");
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(textOf(html)).toBe(escapeHtml(code));
   });
 });

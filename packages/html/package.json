@@ -1,0 +1,80 @@
+{
+  "name": "@forgebook/html",
+  "version": "0.1.8",
+  "description": "Forgebook for plain HTML: stories that return an HTML string or a DOM node, written in JavaScript or TypeScript with no framework; the story types, the renderer the frame draws them with, and the adapter that reads a story function's args from its types and TSDoc.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ensiria/forgebook.git",
+    "directory": "packages/html"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/stories.ts",
+    "./renderer": "./src/htmlRenderer.ts",
+    "./frame": "./src/mountFrame.ts",
+    "./code": "./src/storyCall.ts",
+    "./vite": "./src/vite/html.ts",
+    "./docs": "./src/vite/extractDocs.ts"
+  },
+  "scripts": {
+    "build": "package-build build",
+    "manifest": "package-build manifest",
+    "prepack": "package-build prepack",
+    "test": "vitest run",
+    "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
+  },
+  "dependencies": {
+    "@forgebook/story-format": "workspace:*",
+    "typescript-6": "npm:typescript@6.0.3"
+  },
+  "peerDependencies": {
+    "forgebook": "workspace:^"
+  },
+  "devDependencies": {
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/tools": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "happy-dom": "21.0.4",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/stories.d.ts",
+        "default": "./dist/src/stories.js"
+      },
+      "./renderer": {
+        "types": "./dist/src/htmlRenderer.d.ts",
+        "default": "./dist/src/htmlRenderer.js"
+      },
+      "./frame": {
+        "types": "./dist/src/mountFrame.d.ts",
+        "default": "./dist/src/mountFrame.js"
+      },
+      "./code": {
+        "types": "./dist/src/storyCall.d.ts",
+        "default": "./dist/src/storyCall.js"
+      },
+      "./vite": {
+        "types": "./dist/src/vite/html.d.ts",
+        "default": "./dist/src/vite/html.js"
+      },
+      "./docs": {
+        "types": "./dist/src/vite/extractDocs.d.ts",
+        "default": "./dist/src/vite/extractDocs.js"
+      }
+    }
+  }
+}

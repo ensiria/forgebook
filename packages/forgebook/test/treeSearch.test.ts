@@ -6,17 +6,20 @@
 import { describe, expect, it } from "vitest";
 
 import { steppedStory, storyStep } from "../src/shell/keyboard.ts";
-import { foundComponent, foundFamily, searchWords } from "../src/shell/treeSearch.ts";
+import { foundComponent, foundFamily, searchWords, shownTree } from "../src/shell/treeSearch.ts";
 import type { TreeComponent, TreeFamily } from "../src/storyTree.ts";
 
 /** A component with a few stories. */
 const BUTTON: TreeComponent = {
+  id: "kit:actions-buttons-button",
   name: "Button",
   title: "Actions/Buttons/Button",
   file: "Button.stories.tsx",
+  files: ["Button.stories.tsx"],
   stories: [
     {
       id: "kit:b--overview",
+      file: "Button.stories.tsx",
       name: "Overview",
       exportName: "Overview",
       controls: "all",
@@ -26,10 +29,14 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      device: undefined,
+      design: undefined,
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--danger",
+      file: "Button.stories.tsx",
       name: "Danger",
       exportName: "Danger",
       controls: "all",
@@ -39,10 +46,14 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      device: undefined,
+      design: undefined,
+      tags: [],
+      hasPlay: false
     },
     {
       id: "kit:b--long",
+      file: "Button.stories.tsx",
       name: "Long label",
       exportName: "Long",
       controls: "all",
@@ -52,13 +63,18 @@ const BUTTON: TreeComponent = {
       isTouch: false,
       isLogic: false,
       height: undefined,
-      tags: []
+      device: undefined,
+      design: undefined,
+      tags: [],
+      hasPlay: false
     }
   ],
   unlisted: [],
   alsoIn: [],
   related: [],
-  keywords: ["Pressable", "CTA"]
+  keywords: ["Pressable", "CTA"],
+  design: undefined,
+  propGroups: []
 };
 
 /** A family holding it, and an alias of a component that lives elsewhere. */
@@ -141,5 +157,22 @@ describe("the shell's keys", () => {
     expect(steppedStory(ids, "b", -1, undefined)).toBe("a");
     expect(steppedStory(ids, "c", 1, undefined)).toBeUndefined();
     expect(steppedStory(ids, undefined, 1, "b")).toBe("b");
+  });
+});
+
+describe("shownTree", () => {
+  it("keeps every source, with only what the words find, and leaves out sources without pages", () => {
+    const source = {
+      id: "kit",
+      name: "Kit",
+      logo: undefined,
+      background: undefined,
+      families: [{ name: "Actions", groups: [{ name: undefined, components: [BUTTON], aliases: [] }] }],
+      pages: []
+    };
+    const tree = { sources: [source], problems: [] };
+    expect(shownTree(tree, "button").sources[0]?.families).toHaveLength(1);
+    expect(shownTree(tree, "zebra").sources[0]?.families).toEqual([]);
+    expect(shownTree(tree, "button").pages).toEqual([]);
   });
 });

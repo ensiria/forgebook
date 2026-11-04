@@ -56,6 +56,23 @@ export type FunctionSignatureDocs = {
   readonly returnsDescription: string;
 };
 
+/**
+ * One member of a prop's object type (a `texts` prop's `FileFinderTexts`), listed under the prop in the API
+ * reference.
+ */
+export type MemberDocs = {
+  /** The member's name. */
+  readonly name: string;
+  /** Its type as the source writes it, without `undefined` and `null`. */
+  readonly type: string;
+  /** The first paragraph of its TSDoc; empty when it has none. */
+  readonly description: string;
+  /** Its `@defaultValue`, when the TSDoc gives one. */
+  readonly defaultValue?: string;
+  /** Whether the member must be given. */
+  readonly isRequired: boolean;
+};
+
 /** One prop of a component. */
 export type PropDocs = {
   /** The prop's name. */
@@ -83,6 +100,16 @@ export type PropDocs = {
    * field for it. Left out when `false`.
    */
   readonly canTakeText?: boolean;
+  /**
+   * The group its TSDoc puts it in (`@group Selection`): the API reference and the Props tab list it under that
+   * heading. Left out when it names none.
+   */
+  readonly group?: string;
+  /**
+   * The members of its type, when that type is an object the package declares and documents (`texts?: FileFinderTexts`),
+   * in the order the source declares them: the API reference lists them under the prop, folded. Left out otherwise.
+   */
+  readonly members?: readonly MemberDocs[];
 };
 
 /** A part the component is used with, named in the meta's `subcomponents`: listed under it on its page. */
@@ -93,6 +120,23 @@ export type SubcomponentDocs = {
   readonly description: string;
   /** Its props declared in the package, in the same order as the component's. */
   readonly props: readonly PropDocs[];
+};
+
+/**
+ * When to use a component and when not, as its TSDoc says: the rule a person knows and an agent has no way to guess.
+ * Tags: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`, `@replacedBy`.
+ */
+export type UsageGuidance = {
+  /** The situations it is for, one per `@useWhen`. */
+  readonly useWhen?: readonly string[];
+  /** The situations it is not for, one per `@avoidWhen`. */
+  readonly avoidWhen?: readonly string[];
+  /** Components to consider instead, from `@alternatives`, comma-separated. */
+  readonly alternatives?: readonly string[];
+  /** Why not to use it any more, from `@deprecated`. */
+  readonly deprecated?: string;
+  /** What to use instead, from `@replacedBy`. */
+  readonly replacedBy?: string;
 };
 
 /** A story file's component. */
@@ -115,12 +159,28 @@ export type ComponentDocs = {
   readonly parts: readonly string[];
   /** The parts the meta names in `subcomponents`, in the order it writes them; empty when it names none. */
   readonly subcomponents: readonly SubcomponentDocs[];
+  /** When to use it and when not, from its TSDoc; left out when it says nothing. */
+  readonly guidance?: UsageGuidance;
   /**
    * Its call signature, when it has one: the parameters and the return value a story about logic shows first (the
    * meta's `component` is then the hook or the function).
    */
   readonly signature?: FunctionSignatureDocs;
+  /**
+   * The CSS selector a template writes the component with, for a framework whose components are matched by one rather
+   * than named (an Angular component's `fb-badge`, a directive's `button[fbButton]`): the code writer writes the story's
+   * markup from it. Left out when the component is written by its name.
+   */
+  readonly selector?: string;
 };
+
+/**
+ * The name a story's code writes the component with: its selector when its framework matches components by one, its
+ * name otherwise.
+ *
+ * @param docs - the component's docs.
+ */
+export const codeNameOf = (docs: ComponentDocs): string => docs.selector ?? docs.name;
 
 /** What the plugin answers for a story file whose meta names no component (a foundations page). */
 export type NoComponentDocs = {
@@ -139,6 +199,15 @@ const isStringList = (value: unknown): value is readonly string[] =>
 /** The prop kinds, for the check. */
 const PROP_KINDS: readonly PropKind[] = ["choice", "text", "number", "toggle", "event", "other"];
 
+/** Whether a value is one member's docs. */
+const isMemberDocs = (value: unknown): value is MemberDocs =>
+  isRecord(value) &&
+  typeof value["name"] === "string" &&
+  typeof value["type"] === "string" &&
+  typeof value["description"] === "string" &&
+  typeof value["isRequired"] === "boolean" &&
+  (value["defaultValue"] === undefined || typeof value["defaultValue"] === "string");
+
 /** Whether a value is one prop's docs. */
 const isPropDocs = (value: unknown): value is PropDocs =>
   isRecord(value) &&
@@ -147,7 +216,10 @@ const isPropDocs = (value: unknown): value is PropDocs =>
   typeof value["type"] === "string" &&
   typeof value["description"] === "string" &&
   typeof value["isRequired"] === "boolean" &&
-  (value["canTakeText"] === undefined || typeof value["canTakeText"] === "boolean");
+  (value["canTakeText"] === undefined || typeof value["canTakeText"] === "boolean") &&
+  (value["group"] === undefined || typeof value["group"] === "string") &&
+  (value["members"] === undefined ||
+    (Array.isArray(value["members"]) && value["members"].every(isMemberDocs)));
 
 /** Whether a value is a subcomponent's docs. */
 const isSubcomponentDocs = (value: unknown): value is SubcomponentDocs =>
@@ -189,4 +261,5 @@ export const isComponentDocs = (value: unknown): value is ComponentDocs =>
   isStringList(value["parts"]) &&
   Array.isArray(value["subcomponents"]) &&
   value["subcomponents"].every(isSubcomponentDocs) &&
-  (value["signature"] === undefined || isFunctionSignatureDocs(value["signature"]));
+  (value["signature"] === undefined || isFunctionSignatureDocs(value["signature"])) &&
+  (value["selector"] === undefined || typeof value["selector"] === "string");

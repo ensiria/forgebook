@@ -31,7 +31,19 @@ describe("storyTestConfig", () => {
     });
     const server = config.webServer;
     expect(server && !Array.isArray(server) ? server.command : undefined).toBe(
-      "node ./vite.mjs --config /stories/vite.config.ts --host 127.0.0.1 --port 4100 --strictPort"
+      'node ./vite.mjs --config "/stories/vite.config.ts" --host 127.0.0.1 --port 4100 --strictPort'
+    );
+  });
+
+  it("quotes the config's path, so a folder with a space stays one argument in sh and in cmd.exe", () => {
+    const config = storyTestConfig({
+      dir: "C:\\Users\\Ada Lovelace\\kit\\stories",
+      port: 4100,
+      browserPort: 4101
+    });
+    const server = config.webServer;
+    expect(server && !Array.isArray(server) ? server.command : undefined).toContain(
+      '--config "C:\\Users\\Ada Lovelace\\kit\\stories/vite.config.ts" '
     );
   });
 });

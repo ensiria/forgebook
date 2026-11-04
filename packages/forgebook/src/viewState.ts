@@ -6,13 +6,23 @@
  * Only values that differ from the defaults are written; an unknown or invalid value reads as the default. The view
  * holds a value for each switch the catalogue declares (`switches.ts`: the theme, the contrast, the language, the
  * library's own), which the frame applies on its root or hands the story; and Forgebook's own settings: the style
- * sheets, the root font size and the backdrop Forgebook draws behind the story. The stage's width, height, zoom and tools and the panel (open, its tab) are the shell's alone: a frame's address leaves them
- * out. Pure.
+ * sheets, the root font size and the backdrop Forgebook draws behind the story. The stage's width, height, zoom, tools and
+ * device frame, the panel (open, its tab) and who a component's page is read by are the shell's alone: a frame's
+ * address leaves them out. Pure.
  *
  * @module
  */
 
-import type { CatalogueSettings, OwnControlId, PanelTabId } from "./catalogue.ts";
+import { AUDIENCE_IDS, type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
+import type { CatalogueSettings, OwnControlId } from "./catalogue.ts";
+import {
+  DEVICE_PARAMETER,
+  type DeviceChoice,
+  isDeviceId,
+  isDeviceOrientation,
+  ORIENTATION_PARAMETER,
+  type OrientationChoice
+} from "./deviceView.ts";
 import { switchValueOf, switchWithRole, type TouchChoice, type ViewSwitch } from "./switches.ts";
 
 /**
@@ -47,14 +57,14 @@ export type MeasureTool = "outline" | "grid" | "measure";
 export type Zoom = number;
 
 /** A tab of the panel under a story. */
-export type PanelTab = PanelTabId;
+export type PanelTab = string;
 
 /** The story's width on the stage: the stage's whole width, or a width in CSS px (a preset, or dragged). */
 export type StageWidth = "fill" | number;
 
 /**
  * The story's height on the stage: its own (`auto`: the story's content, at least the height it declares) or a
- * height in CSS px dragged with the handle at its foot (note 142).
+ * height in CSS px dragged with the handle at its foot.
  */
 export type StageHeight = "auto" | number;
 
@@ -82,6 +92,12 @@ export type ViewState = {
   readonly zoom: Zoom;
   /** The tools drawn over the story, in `MEASURE_TOOLS`' order. */
   readonly tools: readonly MeasureTool[];
+  /** Who a component's page is read by. */
+  readonly audience: AudienceId;
+  /** The device frame around the story: the story's own default (`auto`), none, or a model. */
+  readonly device: DeviceChoice;
+  /** How the device is held: the story's own default (`auto`), or one way. */
+  readonly orientation: OrientationChoice;
 };
 
 /** The part of the view a frame applies on its root without loading again, so the story keeps its state. */
@@ -99,7 +115,10 @@ export const DEFAULT_VIEW: ViewState = {
   isPanelOpen: true,
   panelTab: "props",
   zoom: 100,
-  tools: []
+  tools: [],
+  audience: DEFAULT_AUDIENCE,
+  device: "auto",
+  orientation: "auto"
 };
 
 /** Every style sheet setting, in the menu's order. */
@@ -124,7 +143,7 @@ const toolsOf = (value: string | null): MeasureTool[] => {
 /** What the view reads of a catalogue: its switches and the lists its values are checked against. */
 export type ViewCatalogue = Pick<
   CatalogueSettings,
-  "switches" | "widthRange" | "zooms" | "textSizes" | "backdrops" | "tabs" | "ownControls"
+  "switches" | "widthRange" | "zooms" | "textSizes" | "backdrops" | "tabs" | "ownControls" | "audience"
 >;
 
 /**
@@ -158,6 +177,14 @@ const stageHeight = (value: string | null): StageHeight => {
   const height = Number(value);
   return value !== null && Number.isInteger(height) && clampedHeight(height) === height ? height : "auto";
 };
+
+/** The device a parameter names: `off` or a model's id, otherwise the story's own. */
+const deviceChoice = (value: string | null): DeviceChoice =>
+  value === "off" || isDeviceId(value) ? value : "auto";
+
+/** The orientation a parameter names, otherwise the story's own. */
+const orientationChoice = (value: string | null): OrientationChoice =>
+  isDeviceOrientation(value) ? value : "auto";
 
 /** The value of a parameter when it is one of the choices, otherwise the default. */
 const choice = <TChoice extends string | number>(
@@ -235,7 +262,10 @@ export const parseView = (search: string, catalogue: ViewCatalogue): ViewState =
     isPanelOpen: params.get("panel") !== "closed",
     panelTab: choice(params.get("tab"), catalogue.tabs, catalogue.tabs[0] ?? DEFAULT_VIEW.panelTab),
     zoom: choice(params.get("zoom"), catalogue.zooms, DEFAULT_VIEW.zoom),
-    tools: toolsOf(params.get("tools"))
+    tools: toolsOf(params.get("tools")),
+    audience: choice(shown("audience"), AUDIENCE_IDS, catalogue.audience),
+    device: deviceChoice(params.get(DEVICE_PARAMETER)),
+    orientation: orientationChoice(params.get(ORIENTATION_PARAMETER))
   };
 };
 
@@ -278,9 +308,15 @@ const frameParams = (view: ViewState, switches: readonly ViewSwitch[]): URLSearc
  *
  * @param view - the view.
  * @param switches - the catalogue's switches.
+ * @param defaultAudience - the audience the catalogue starts with: `everyone` must be written in a catalogue that starts
+ * with another, or the link would open that one.
  * @returns the parameters, in a stable order.
  */
-export const viewParams = (view: ViewState, switches: readonly ViewSwitch[]): URLSearchParams => {
+export const viewParams = (
+  view: ViewState,
+  switches: readonly ViewSwitch[],
+  defaultAudience: AudienceId = DEFAULT_AUDIENCE
+): URLSearchParams => {
   const params = frameParams(view, switches);
   if (isComparing(view)) params.set("compare", view.compare.join(","));
   if (view.width !== DEFAULT_VIEW.width) params.set("width", String(view.width));
@@ -289,6 +325,9 @@ export const viewParams = (view: ViewState, switches: readonly ViewSwitch[]): UR
   if (view.panelTab !== DEFAULT_VIEW.panelTab) params.set("tab", view.panelTab);
   if (view.zoom !== DEFAULT_VIEW.zoom) params.set("zoom", String(view.zoom));
   if (view.tools.length > 0) params.set("tools", view.tools.join(","));
+  if (view.audience !== defaultAudience) params.set("audience", view.audience);
+  if (view.device !== DEFAULT_VIEW.device) params.set(DEVICE_PARAMETER, view.device);
+  if (view.orientation !== DEFAULT_VIEW.orientation) params.set(ORIENTATION_PARAMETER, view.orientation);
   return params;
 };
 
@@ -300,16 +339,21 @@ export const viewParams = (view: ViewState, switches: readonly ViewSwitch[]): UR
  * @param view - the view.
  * @param switches - the catalogue's switches.
  * @param ids - the controls' ids.
+ * @param defaultAudience - the audience the catalogue starts with.
  */
 export const hasViewChanges = (
   view: ViewState,
   switches: readonly ViewSwitch[],
-  ids: readonly string[]
+  ids: readonly string[],
+  defaultAudience: AudienceId = DEFAULT_AUDIENCE
 ): boolean =>
   switches.some((each) => ids.includes(each.id) && !isDefault(view, each)) ||
   (ids.includes("backdrop") && view.backdrop !== DEFAULT_VIEW.backdrop) ||
   (ids.includes("sheets") && view.sheets !== DEFAULT_VIEW.sheets) ||
-  (ids.includes("text") && view.text !== DEFAULT_VIEW.text);
+  (ids.includes("text") && view.text !== DEFAULT_VIEW.text) ||
+  (ids.includes("audience") && view.audience !== defaultAudience) ||
+  (ids.includes(DEVICE_PARAMETER) &&
+    (view.device !== DEFAULT_VIEW.device || view.orientation !== DEFAULT_VIEW.orientation));
 
 /**
  * The address of a story's frame.
@@ -444,7 +488,7 @@ export const codeGlobalsOf = (
   );
 
 /** The parameters only the shell reads: a frame's address leaves them out. */
-const SHELL_PARAMETERS = [
+const SHELL_PARAMETERS: readonly string[] = [
   "compare",
   "width",
   "height",
@@ -452,9 +496,13 @@ const SHELL_PARAMETERS = [
   "tab",
   "zoom",
   "tools",
+  DEVICE_PARAMETER,
+  ORIENTATION_PARAMETER,
   "args",
   "matrix",
-  "component"
+  "component",
+  "embed",
+  "audience"
 ];
 
 /**
@@ -484,7 +532,39 @@ export const frameAddressOf = (frameUrl: string, id: string, search: string): st
 export const storyAddressOf = (pageUrl: string, id: string, search: string): string => {
   const params = new URLSearchParams(search);
   params.delete("component");
+  params.delete("page");
   params.delete("story");
   params.set("story", id);
+  return `${pageUrl}?${params.toString()}`;
+};
+
+/**
+ * The address of a component's page in the catalogue from a catalogue's address query: for a tool that does not know
+ * the catalogue's switches, the view kept as written, an audience's among it.
+ *
+ * @param pageUrl - the catalogue's page.
+ * @param id - the component's id.
+ * @param search - the view's query; empty for the default view.
+ */
+export const componentAddressOf = (pageUrl: string, id: string, search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("story");
+  params.delete("page");
+  params.set("component", id);
+  return `${pageUrl}?${params.toString()}`;
+};
+
+/**
+ * A docs page's address in the catalogue, in a view.
+ *
+ * @param pageUrl - the catalogue's page.
+ * @param id - the page's id.
+ * @param search - the view's query; empty for the default view.
+ */
+export const docPageAddressOf = (pageUrl: string, id: string, search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("component");
+  params.delete("story");
+  params.set("page", id);
   return `${pageUrl}?${params.toString()}`;
 };

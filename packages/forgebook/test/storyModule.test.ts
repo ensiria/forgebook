@@ -6,7 +6,13 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type LoadedStory, mergedPreviews, readPreview, readStory } from "../src/frame/storyModule.ts";
+import {
+  type LoadedStory,
+  mergedPreviews,
+  readPreview,
+  readStory,
+  startingGlobals
+} from "../src/frame/storyModule.ts";
 
 /**
  * A story read from a module, failing the test when it cannot be read.
@@ -21,6 +27,47 @@ const read = (module: Record<string, unknown>, exportName: string): LoadedStory 
 };
 
 describe("readStory", () => {
+  it("reads the globals a preview starts from: `initialGlobals` over `globalTypes`, the texts of both", () => {
+    const preview = readPreview({
+      globalTypes: { scheme: { defaultValue: "light" }, flags: { defaultValue: { beta: true } }, none: {} },
+      initialGlobals: { locale: "en", scheme: "dark" }
+    });
+    expect(preview.globals).toEqual({ scheme: "dark", locale: "en" });
+    const merged = mergedPreviews([
+      readPreview({ initialGlobals: { a: "1", b: "1" } }),
+      readPreview({ initialGlobals: { b: "2" } })
+    ]);
+    expect(merged.globals).toEqual({ a: "1", b: "2" });
+  });
+
+  it("starts a story with the preview's globals under the meta's and the story's own text values", () => {
+    const preview = readPreview({ initialGlobals: { theme: "light", locale: "en" } });
+    const story = { globals: { theme: "dark", viewport: { value: "mobile" } } };
+    expect(startingGlobals(preview, story)).toEqual({ theme: "dark", locale: "en" });
+  });
+
+  it("takes a field of the named exports when the default export leaves it undefined", () => {
+    const decorator = (): null => null;
+    const preview = readPreview({
+      decorators: [decorator],
+      default: { decorators: undefined, args: { a: 1 } }
+    });
+    expect(preview.decorators).toEqual([decorator]);
+    expect(preview.args).toEqual({ a: 1 });
+  });
+
+  it("reads a preview's named exports beside a default export, field by field, as Storybook does", () => {
+    const decorator = (): null => null;
+    const preview = readPreview({
+      decorators: [decorator],
+      args: { named: true },
+      default: { args: { fromDefault: true }, parameters: { layout: "centered" } }
+    });
+    expect(preview.decorators).toEqual([decorator]);
+    expect(preview.args).toEqual({ fromDefault: true });
+    expect(preview.parameters).toMatchObject({ layout: "centered" });
+  });
+
   it("reads a CSF 2 function story: the function is its render, its properties its args and parameters", () => {
     const Primary = Object.assign((): string => "drawn", {
       args: { label: "Go" },

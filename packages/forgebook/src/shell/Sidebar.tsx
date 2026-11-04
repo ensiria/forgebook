@@ -5,38 +5,43 @@
  * the pointer. A family or a group stays open once opened; a search opens every one it finds something in, and finds a
  * component by its
  * name, its place, its meta's search words or its stories' names and descriptions. A component listed in other places too (`alsoIn`) has an
- * alias entry in each, beside the components that live there, which says where it lives and opens its page.
+ * alias entry in each, beside the components that live there, which says where it lives and opens its page. Docs pages
+ * come first, in a section of their own (`SidebarDocs.tsx`).
  *
  * @module
  */
 
-import {
-  type ChangeEvent,
-  type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
-  useEffect,
-  useRef,
-  useState
-} from "react";
+import type { StorySource } from "@forgebook/story-format/source";
+import { type MouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
+import type { SearchTarget } from "../search.ts";
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
+import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
-import { isTyping } from "./keyboard.ts";
+import { SidebarDocs, type SidebarPageLinks } from "./SidebarDocs.tsx";
 import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
+import { SidebarSearch } from "./SidebarSearch.tsx";
 import { STRINGS } from "./strings.ts";
-import { foundFamily, searchWords } from "./treeSearch.ts";
+import type { ShownTree, shownTree } from "./treeSearch.ts";
 import type { AppearanceState } from "./useAppearance.ts";
 
 /** The sidebar's props. */
-export type SidebarProps = {
+export type SidebarProps = SidebarPageLinks & {
   /** The catalogue's name. */
   readonly title: string;
-  /** The catalogue's logo, the URL of a square image; none shows the catalogue's own mark. */
+  /** The catalogue's logo, the URL of a square image; none shows Forgebook's mark, or the name alone without branding. */
   readonly logo: string | undefined;
+  /** Whether a catalogue without a logo shows Forgebook's mark. */
+  readonly hasBranding: boolean;
   /** The tree. */
   readonly tree: StoryTree;
+  /** The sources, for the search's index. */
+  readonly sources: readonly StorySource[];
+  /** The address of a search's result. */
+  readonly searchHref: (target: SearchTarget) => string;
+  /** Goes to a search's result. */
+  readonly onOpenResult: (target: SearchTarget) => void;
   /** Whether the home is shown: the logo, its link, is then the current page. */
   readonly isHome: boolean;
   /** The home's address, for the logo's link. */
@@ -48,6 +53,8 @@ export type SidebarProps = {
    * home.
    */
   readonly current: ShownComponent | undefined;
+  /** The shown docs page's id; none on any other page. */
+  readonly currentPageId: string | undefined;
   /** The address of a component's page, by its title, for its link. */
   readonly componentHref: (sourceId: string, title: string) => string;
   /** Opens a component's page, by its title. */
@@ -58,6 +65,8 @@ export type SidebarProps = {
   readonly isOpen: boolean;
   /** Hides the sidebar. */
   readonly onHide: () => void;
+  /** Shows it again. */
+  readonly onShow: () => void;
   /** The shell's appearance and its setter, for the menu at the foot. */
   readonly appearance: AppearanceState;
 };
@@ -98,6 +107,14 @@ const currentGroupOf = (tree: StoryTree, current: SidebarProps["current"]): stri
   return family === undefined || group === undefined ? undefined : groupKey(family, group);
 };
 
+/** The tree as it is, with no search on. */
+const wholeTree = (tree: StoryTree): ShownTree => ({
+  sources: tree.sources.map((source) => ({ source, families: source.families })),
+  pages: tree.sources
+    .filter(({ pages }) => pages.length > 0)
+    .map((source) => ({ source, pages: source.pages }))
+});
+
 /** How many components a family holds. */
 const componentCount = (family: TreeFamily): number =>
   family.groups.reduce((count, group) => count + group.components.length, 0);
@@ -110,41 +127,38 @@ const componentCount = (family: TreeFamily): number =>
 export const Sidebar = ({
   title,
   logo,
+  hasBranding,
   tree,
+  sources: storySources,
+  searchHref,
+  onOpenResult,
   isHome,
   homeHref,
   onOpenHome,
   current,
+  currentPageId,
+  pageHref,
+  onOpenPage,
   width,
   isOpen,
   onHide,
+  onShow,
   appearance,
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [filterTree, setFilterTree] = useState<typeof shownTree>();
+  const showFiltered = useCallback((filter: typeof shownTree): void => setFilterTree(() => filter), []);
+  const mark = logo ?? (hasBranding ? FORGEBOOK_MARK_URL : undefined);
   const navRef = useRef<HTMLElement>(null);
   // the shown component stays in sight: a page opened by a key, the picker or the address scrolls the list to it
-  const currentTitle = current?.title;
+  const currentEntry = currentPageId ?? current?.title;
   useEffect(() => {
-    if (currentTitle === undefined) return;
+    if (currentEntry === undefined) return;
     navRef.current
       ?.querySelector(".forgebook-tree__item[aria-current]")
       ?.scrollIntoView({ block: "nearest" });
-  }, [currentTitle]);
-  useEffect(() => {
-    // "/" goes to the search from anywhere in the shell, as in most catalogues
-    // a hidden sidebar leaves the key to the page
-    if (!isOpen) return;
-    const focusSearch = (event: globalThis.KeyboardEvent): void => {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target))
-        return;
-      event.preventDefault();
-      searchRef.current?.focus();
-    };
-    document.addEventListener("keydown", focusSearch);
-    return (): void => document.removeEventListener("keydown", focusSearch);
-  }, [isOpen]);
+  }, [currentEntry]);
   // the families and groups the user opened or closed, and the ones a shown component opened: once open, one stays
   // open until the user closes it, so opening a component elsewhere never folds the list under the pointer
   const [foldChoices, setFoldChoices] = useState<ReadonlyMap<string, boolean>>(new Map());
@@ -161,22 +175,17 @@ export const Sidebar = ({
           ])
     );
   }, [currentFamilyKey, currentGroupKey]);
-  const words = searchWords(query);
-  const isSearching = words.length > 0;
+  const isSearching = query.trim() !== "";
   const isCurrentFamily = (source: TreeSource, family: TreeFamily): boolean =>
     current?.sourceId === source.id &&
     family.groups.some((group) => group.components.some((component) => component.title === current.title));
   const setFoldOpen = (key: string, isOpen: boolean): void =>
     setFoldChoices((choices) => new Map(choices).set(key, isOpen));
 
-  const sources = tree.sources.map((source) => ({
-    source,
-    families: source.families.flatMap((family) => {
-      const shown = foundFamily(family, words);
-      return shown === undefined ? [] : [shown];
-    })
-  }));
-  const hasMatches = sources.some(({ families }) => families.length > 0);
+  // the filter comes with the search's list; a moment before it, or with no words, the tree shows whole
+  const { sources, pages } =
+    isSearching && filterTree !== undefined ? filterTree(tree, query) : wholeTree(tree);
+  const hasMatches = pages.length > 0 || sources.some(({ families }) => families.length > 0);
 
   return (
     // hidden, it slides out by its own width (a margin, so a drag of its handle never waits for a transition) and
@@ -200,13 +209,9 @@ export const Sidebar = ({
             onOpenHome();
           }}
         >
-          {logo === undefined ? (
-            <span className="forgebook-brand__mark">
-              <Icon name="compare" size={14} />
-            </span>
-          ) : (
-            // decorative: the name beside it says what it is
-            <img className="forgebook-brand__logo" src={logo} alt="" width={28} height={28} />
+          {/* decorative: the name beside it says what it is */}
+          {mark === undefined ? null : (
+            <img className="forgebook-brand__logo" src={mark} alt="" width={28} height={28} />
           )}
           <span className="forgebook-brand__name">{title}</span>
         </a>
@@ -220,43 +225,29 @@ export const Sidebar = ({
           <Icon name="sidebar" size={14} />
         </button>
       </div>
-      <label className="forgebook-search">
-        <Icon name="search" size={14} />
-        <input
-          type="search"
-          ref={searchRef}
-          value={query}
-          onKeyDown={(event: KeyboardEvent<HTMLInputElement>): void => {
-            // Escape empties the search first, then leaves the field
-            if (event.key !== "Escape") return;
-            if (query === "") event.currentTarget.blur();
-            else setQuery("");
-          }}
-          placeholder={STRINGS.searchPlaceholder}
-          aria-label={STRINGS.searchLabel}
-          onChange={(event: ChangeEvent<HTMLInputElement>): void => setQuery(event.target.value)}
-        />
-        {query === "" ? (
-          // the key that comes here; the field's own name (aria-label) says what it is
-          <kbd className="forgebook-search__key">/</kbd>
-        ) : (
-          // the catalogue's own clear button: the platform's draws in its own colours and size
-          <button
-            type="button"
-            className="forgebook-search__clear"
-            aria-label={STRINGS.clearSearch}
-            title={STRINGS.clearSearch}
-            onClick={(): void => {
-              setQuery("");
-              searchRef.current?.focus();
-            }}
-          >
-            <Icon name="close" size={10} />
-          </button>
-        )}
-      </label>
+      <SidebarSearch
+        query={query}
+        onQueryChange={setQuery}
+        onFilterReady={showFiltered}
+        tree={tree}
+        sources={storySources}
+        sidebarWidth={width}
+        isSidebarOpen={isOpen}
+        onShowSidebar={onShow}
+        searchHref={searchHref}
+        onOpenResult={onOpenResult}
+      />
       <nav ref={navRef} className="forgebook-tree" aria-label={STRINGS.componentsNav}>
         {hasMatches ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}
+        <SidebarDocs
+          sources={pages}
+          currentPageId={currentPageId}
+          isSearching={isSearching}
+          foldChoices={foldChoices}
+          onFoldChange={setFoldOpen}
+          pageHref={pageHref}
+          onOpenPage={onOpenPage}
+        />
         {sources.map(({ source, families }) =>
           families.length === 0 ? null : (
             <section key={source.id} className="forgebook-tree__source">

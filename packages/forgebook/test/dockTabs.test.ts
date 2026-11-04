@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentDocs } from "../src/componentDocs.ts";
+import type { PlayTrace } from "../src/playTrace.ts";
 import { type DockTabsInput, dockTabs } from "../src/shell/dockTabs.tsx";
 
 /** A hook whose options carry a value and a callback, so a component would get Props and Events. */
@@ -53,12 +54,14 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   },
   namedValues: undefined,
   textArgs: {},
+  propGroups: [],
   calls: [],
   onClearCalls: (): undefined => undefined,
   trace: undefined,
   onPlayAgain: (): undefined => undefined,
   check: { status: "idle" },
-  onCheck: undefined
+  onCheck: undefined,
+  pluginTabs: []
 });
 
 describe("the tabs of a story's panel", () => {
@@ -76,7 +79,67 @@ describe("the tabs of a story's panel", () => {
     expect(failed[0]?.id).toBe("signature");
   });
 
+  it("shows a play's trace while the component's docs load or fail, beside the docs' place", () => {
+    const trace: PlayTrace = { status: "passed", steps: [] };
+    for (const isLogic of [false, true]) {
+      const docsPlace = isLogic ? "signature" : "props";
+      const loading = dockTabs({ ...inputOf(isLogic), docs: { status: "loading" }, trace });
+      expect(loading.map((tab) => tab.id)).toEqual([docsPlace, "play", "a11y"]);
+      const failed = dockTabs({
+        ...inputOf(isLogic),
+        docs: { status: "error", message: "no program" },
+        trace
+      });
+      expect(failed.map((tab) => tab.id)).toEqual([docsPlace, "play", "a11y"]);
+    }
+  });
+
   it("gives a story about its looks its props and events, and no signature", () => {
     expect(dockTabs(inputOf(false)).map((tab) => tab.id)).toEqual(["props", "events", "a11y"]);
+  });
+
+  it("shows Events for a story with no events of its own once a framework reported a call", () => {
+    const input: DockTabsInput = {
+      ...inputOf(false),
+      docs: { status: "ready", value: { ...HOOK_DOCS, props: [] } }
+    };
+    expect(dockTabs(input).map((tab) => tab.id)).not.toContain("events");
+    const withCall = dockTabs({
+      ...input,
+      calls: [{ storyId: "s", name: "router.push", values: ["/about"], details: [null], time: 0 }]
+    });
+    expect(withCall.map((tab) => tab.id)).toContain("events");
+  });
+
+  it("sets a plugin's tab after Code and before Accessibility, on a story about logic too", () => {
+    const pluginTabs = [{ id: "figma", label: "Design", content: null }];
+    expect(dockTabs({ ...inputOf(false), pluginTabs }).map((tab) => tab.id)).toEqual([
+      "props",
+      "events",
+      "figma",
+      "a11y"
+    ]);
+    expect(dockTabs({ ...inputOf(true), pluginTabs }).map((tab) => tab.id)).toEqual([
+      "signature",
+      "figma",
+      "a11y"
+    ]);
+  });
+
+  it("keeps the Code tab's place while the story file's code loads, so the panel opens on it, not on a plugin's", () => {
+    const withoutComponent: DockTabsInput = {
+      ...inputOf(false),
+      docs: { status: "none" },
+      pluginTabs: [{ id: "figma", label: "Design", content: null }]
+    };
+    const loading = dockTabs({ ...withoutComponent, code: { status: "loading" } });
+    expect(loading.map((tab) => [tab.id, tab.label])).toEqual([
+      ["code", "Code"],
+      ["figma", "Design"],
+      ["a11y", "Accessibility"]
+    ]);
+    const loaded = dockTabs({ ...withoutComponent, code: { status: "ready", value: {} } });
+    expect(loaded[0]?.id).toBe("code");
+    expect(dockTabs(withoutComponent).map((tab) => tab.id)).toEqual(["figma", "a11y"]);
   });
 });

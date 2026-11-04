@@ -12,6 +12,7 @@
 import type { Page } from "@playwright/test";
 import { type A11ySettings, catalogueSettings } from "forgebook/catalogue";
 import type {
+  SemanticModel,
   StoryCheckReport,
   StoryCheckRequest,
   StoryCheckResult,
@@ -19,7 +20,15 @@ import type {
 } from "forgebook/story-check";
 
 import { isOverlayChecked } from "./overlays.ts";
-import { axeProblems, errorProblems, overlayProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
+import { askModel, storySight } from "./semanticJudge.ts";
+import {
+  axeProblems,
+  errorProblems,
+  focusProblems,
+  overlayProblems,
+  spillProblems,
+  watchedErrors
+} from "./storyCheck.ts";
 import { eachStoryPage, openedStory, READY_MS, type StoryPage } from "./storyPages.ts";
 import { hasLookChecks } from "./storyTestPlan.ts";
 
@@ -33,7 +42,8 @@ import { hasLookChecks } from "./storyTestPlan.ts";
 const checkedPage = async (
   page: Page,
   storyPage: StoryPage,
-  a11y: A11ySettings
+  a11y: A11ySettings,
+  semantic: SemanticModel | undefined
 ): Promise<StoryCheckResult> => {
   const errors = watchedErrors(page);
   const status = await openedStory(page, storyPage);
@@ -58,7 +68,11 @@ const checkedPage = async (
         ...(await overlayProblems(page, isOverlayChecked(storyPage.view), storyPage.story.height))
       ]
     : [];
-  return result([...(await axeProblems(page, a11y)), ...lookProblems, ...errorProblems(errors)]);
+  const axe = await axeProblems(page, a11y);
+  const checked = result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(errors)]);
+  return semantic === undefined
+    ? checked
+    : { ...checked, judgements: await askModel(semantic, await storySight(page)) };
 };
 
 /**
@@ -69,6 +83,8 @@ const checkedPage = async (
  */
 export const checkStories = async (request: StoryCheckRequest): Promise<StoryCheckReport> => {
   const { a11y } = catalogueSettings("", request.switches, request.lists);
-  const results = await eachStoryPage(request, (page, storyPage) => checkedPage(page, storyPage, a11y));
+  const results = await eachStoryPage(request, (page, storyPage) =>
+    checkedPage(page, storyPage, a11y, request.semantic)
+  );
   return { schema: 1, results };
 };

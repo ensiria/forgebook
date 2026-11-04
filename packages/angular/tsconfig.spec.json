@@ -1,0 +1,12 @@
+// The program Analog's Angular plugin compiles the tests' components with (its default name for tests): the tests'
+// own configuration, emitting, since Angular's compiler writes the code it runs.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./test/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["test/subjects"]
+}

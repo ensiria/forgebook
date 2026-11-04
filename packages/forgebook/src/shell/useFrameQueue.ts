@@ -21,10 +21,15 @@ const NEAR_MARGIN = "600px 0px";
 export type FrameQueue = {
   /** The stories whose frames may be mounted. */
   readonly mounted: ReadonlySet<string>;
-  /** Registers the element that holds a story's frame, to know when it is near; `null` when it goes away. */
-  readonly observe: (storyId: string, element: HTMLElement | null) => void;
+  /**
+   * The ref of an element that holds a story's frame, to know when it is near; the same function each time, or every
+   * render would observe the element anew. A story shown twice names each place with its own `place`.
+   */
+  readonly observerOf: (storyId: string, place?: number) => (element: HTMLElement | null) => void;
   /** Records a story whose frame finished loading. */
   readonly markReady: (storyId: string) => void;
+  /** Loads every frame of the page, wherever it is, still a few at a time. */
+  readonly loadAll: () => void;
 };
 
 /**
@@ -37,11 +42,15 @@ export const useFrameQueue = (
   storyIds: readonly string[],
   root: RefObject<HTMLElement | null>
 ): FrameQueue => {
-  const [near, setNear] = useState<ReadonlySet<string>>(new Set());
+  const [near, setNear] = useState<ReadonlySet<Element>>(new Set());
   const [ready, setReady] = useState<ReadonlySet<string>>(new Set());
   const [mounted, setMounted] = useState<ReadonlySet<string>>(new Set());
+  // the list asked for in full: another page's stories wait for their own turn again
+  const [wholeList, setWholeList] = useState<readonly string[] | undefined>(undefined);
+  const isEveryStoryNear = wholeList === storyIds;
   const observerRef = useRef<IntersectionObserver | undefined>(undefined);
   const elements = useRef(new Map<Element, string>());
+  const observers = useRef(new Map<string, (element: HTMLElement | null) => void>());
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -49,10 +58,8 @@ export const useFrameQueue = (
         setNear((current) => {
           const next = new Set(current);
           for (const entry of entries) {
-            const id = elements.current.get(entry.target);
-            if (id === undefined) continue;
-            if (entry.isIntersecting) next.add(id);
-            else next.delete(id);
+            if (entry.isIntersecting) next.add(entry.target);
+            else next.delete(entry.target);
           }
           return next;
         }),
@@ -63,25 +70,41 @@ export const useFrameQueue = (
     return (): void => observer.disconnect();
   }, [root]);
 
-  // a few more frames whenever a story comes near or a frame finishes loading
+  // a few more frames whenever a story comes near or a frame finishes loading; a frame the page no longer lists never
+  // finishes, and must not hold a place
   useEffect(() => {
     setMounted((current) => {
-      const loading = [...current].filter((id) => !ready.has(id)).length;
-      const waiting = storyIds.filter((id) => near.has(id) && !current.has(id));
+      const nearIds = new Set([...near].map((element) => elements.current.get(element)));
+      const loading = [...current].filter((id) => storyIds.includes(id) && !ready.has(id)).length;
+      const waiting = storyIds.filter((id) => (isEveryStoryNear || nearIds.has(id)) && !current.has(id));
       const next = waiting.slice(0, Math.max(0, MAX_LOADING - loading));
       return next.length === 0 ? current : new Set([...current, ...next]);
     });
-  }, [storyIds, near, ready]);
+  }, [storyIds, near, ready, isEveryStoryNear]);
 
-  const observe = useCallback((storyId: string, element: HTMLElement | null): void => {
-    for (const [known, id] of elements.current) {
-      if (id !== storyId) continue;
-      observerRef.current?.unobserve(known);
-      elements.current.delete(known);
-    }
-    if (element === null) return;
-    elements.current.set(element, storyId);
-    observerRef.current?.observe(element);
+  const observerOf = useCallback((storyId: string, place = 0) => {
+    const key = `${storyId}\n${place}`;
+    const known = observers.current.get(key);
+    if (known !== undefined) return known;
+    let shown: HTMLElement | null = null;
+    const observe = (element: HTMLElement | null): void => {
+      if (shown !== null) {
+        const gone = shown;
+        observerRef.current?.unobserve(gone);
+        elements.current.delete(gone);
+        setNear((current) => {
+          const next = new Set(current);
+          next.delete(gone);
+          return next;
+        });
+      }
+      shown = element;
+      if (element === null) return;
+      elements.current.set(element, storyId);
+      observerRef.current?.observe(element);
+    };
+    observers.current.set(key, observe);
+    return observe;
   }, []);
 
   const markReady = useCallback(
@@ -90,5 +113,7 @@ export const useFrameQueue = (
     []
   );
 
-  return { mounted, observe, markReady };
+  const loadAll = useCallback((): void => setWholeList(storyIds), [storyIds]);
+
+  return { mounted, observerOf, markReady, loadAll };
 };

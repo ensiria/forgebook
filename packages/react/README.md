@@ -19,6 +19,10 @@ import { defineConfig } from "forgebook";
 export default defineConfig({ framework: react(), title: "My components", stories: ["src/**/*.stories.tsx"] });
 ```
 
+`react()` brings React's Vite plugin, with Fast Refresh; a library whose files need it configured passes its options,
+as `react({ include: /\.[jt]sx?$/ })` for JSX in `.js` files. Leave the plugin to the adapter rather than adding your own:
+the adapter's plugins around it redraw an edited component sooner.
+
 and the stories take their types from it:
 
 ```tsx
@@ -34,7 +38,7 @@ export const Default: Story<typeof Badge> = { args: { label: "New" } };
 | Import | What it is |
 |---|---|
 | `@forgebook/react` | `Meta`, `Story`, `Decorator`, `Preview`: CSF 3 typed for React, the args from the component's props |
-| `@forgebook/react/vite` | `react()`, the framework adapter of `forgebook.config.ts` |
+| `@forgebook/react/vite` | `react()`, the framework adapter of `forgebook.config.ts`; it takes `@vitejs/plugin-react`'s options, as `react({ include: /\.[jt]sx?$/ })` to give Fast Refresh to `.js` files |
 | `@forgebook/react/texts`, `@forgebook/react/clock` | A story's texts in the catalogue's language, and the story clock, as hooks |
 
 The rest of its exports are what the catalogue loads itself. Getting started, the catalogue's features and its

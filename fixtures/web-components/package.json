@@ -1,0 +1,39 @@
+{
+  "name": "@fixture/web-components",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Web Components fixture catalogue: Forgebook's shell and frame over Lit elements and a plain custom element, documented by their Custom Elements Manifest, their stories tested on the server.",
+  "type": "module",
+  "customElements": "custom-elements.json",
+  "exports": {
+    "./badge": "./src/FixtureBadge.ts",
+    "./stories": "./stories.ts"
+  },
+  "scripts": {
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "manifest": "cem analyze --litelement --globs \"src/**/*.ts\" --exclude \"src/**/*.stories.ts\" --exclude \"src/storyTypes.ts\"",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@custom-elements-manifest/analyzer": "0.11.0",
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/testing": "workspace:*",
+    "@forgebook/typescript-config": "workspace:*",
+    "@forgebook/web-components": "workspace:*",
+    "@lit-labs/ssr": "4.1.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "lit": "3.3.3",
+    "msw": "3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sass-embedded": "1.106.1",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

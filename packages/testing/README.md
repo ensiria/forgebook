@@ -107,6 +107,9 @@ import { storyTestViteConfig } from "@forgebook/testing/vite";
 export default storyTestViteConfig(import.meta.dirname, react());
 ```
 
+The config holds the framework's own Vite plugins (React's, or Solid's that compiles the stories' JSX), as the catalogue
+does: don't add them again.
+
 Then `npx playwright install chromium` once, and `playwright test -c test/stories/playwright.config.ts` starts the
 frame page and runs one test per story and variant (light, dark, both with more contrast, a narrow width, and the
 structure view), starting Vite through the package manager that runs them (`vite` in `testServer.ts` names
@@ -166,3 +169,25 @@ translation catalogue), its HTML checked.
 | `forgebook-shot` | Opens one story of a running catalogue and reports it with a picture |
 
 More: [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).
+
+## Writing a framework adapter
+
+A framework is an adapter package: a renderer, a code writer and a docs reader. `@forgebook/testing/conformance` is what
+every adapter passes, in its own Vitest with a simulated page, so a framework is done when this is green:
+
+```ts
+import { describeAdapter } from "@forgebook/testing/conformance";
+
+describeAdapter({ name: "Solid", renderer, drawing, decorator, codeOf, docsOf });
+```
+
+`drawing(name)` gives a story with a button showing `Hello <name> <clicks>`, its clicks in its own state, which throws
+for `THROWING_NAME`. `decorator(label)` draws a story inside a `section` with that `data-decorator`. A renderer's
+`renderToString` may return a promise. The frame takes only the drawing half, a `FrameRenderer` of `forgebook/renderer`:
+a framework's frame page imports a module without the server render, so the server renderer stays out of a static
+catalogue and of a first start's pre-bundle (`reactFrameRenderer` in `@forgebook/react`). A framework whose page and
+server builds differ runs the suite twice, with `half: "page"` in a simulated page and `half: "server"` in Node: Svelte
+compiles a component apart for each, and Solid's `solid-js/web` is its browser build or its server build, never both.
+`test/conformance.test.tsx` in `@forgebook/react` and `@forgebook/preact`, `test/conformance.test.ts` in
+`@forgebook/vue`, `@forgebook/web-components`, `@forgebook/html` and `@forgebook/angular`, and the two `conformance`
+tests of `@forgebook/svelte` and of `@forgebook/solid` are complete examples.

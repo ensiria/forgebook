@@ -1,11 +1,16 @@
 /**
- * Every text the catalogue's shell shows, in one place: the catalogue is a development tool in English, and keeping
- * its words together keeps them consistent and ready for a translation.
+ * The texts of the catalogue's shell: the catalogue is a development tool in English, and keeping its words together
+ * keeps them consistent and ready for a translation.
  *
  * @remarks
- * A catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
- * its configuration): the shell applies the replacements once, before it draws (`configureStrings`), as a translation
- * is set up, so every module keeps reading `STRINGS`. A text that takes values (`allStories(count)`) stays the shell's.
+ * `STRINGS` holds the texts of what a first load draws; the texts of the parts that load later live beside it and
+ * load with those parts, so a first load carries none of them: the home and the docs pages (`pageStrings.ts`),
+ * the other pages, tabs and panels opened on demand (`laterStrings.ts`), the search's results (`searchStrings.ts`),
+ * the audiences' sections (`audiencePage.ts`). A
+ * catalogue may replace any plain text by its name (`strings: { props: "Controls", "tabs.props": "Controls" }` in
+ * its configuration), wherever the text lives: the shell applies the replacements once, before it draws
+ * (`configureStrings`), as a translation is set up, and the later texts take them when they load
+ * (`lateStrings`, `textsOfGroup`). A text that takes values (`allStories(count)`) stays the shell's.
  *
  * @module
  */
@@ -15,32 +20,27 @@ import type { SheetsChoice, TextScale } from "../viewState.ts";
 // biome-ignore lint/nursery/useExplicitType: the texts' type is their own shape (`ShellStrings`); a written one would repeat every key
 const shellStrings = {
   searchPlaceholder: "Search",
-  searchLabel: "Search components and stories",
+  searchLabel: "Search components, stories, props and docs",
   componentsNav: "Components",
+  docsNav: "Docs",
   sidebarWidth: "Sidebar width",
   hideSidebar: "Hide the sidebar",
   showSidebar: "Show the sidebar",
   storiesNav: "Stories",
   allStories: (count: number): string => `All ${count} stories`,
-  noMatch: "No component matches",
+  noMatch: "No name matches",
   aliasPlace: (family: string): string => `in ${family}`,
   aliasHint: (place: string): string => `Lives in ${place}: listed here too`,
   alsoIn: (places: string): string => `also listed in ${places}`,
   related: "Related",
   view: "View",
   viewChanged: "A view setting is changed",
+  viewMenuError: "The View menu could not be loaded",
+  compareError: "The comparison could not be loaded",
   controlChanged: (control: string): string => `${control}: changed`,
-  controlKey: (control: string, key: string | undefined): string =>
-    key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
   cycleKey: (control: string, key: string): string =>
     `${control}: press ${key} for the next value, Shift+${key} for the one before`,
-  changeKey: "Change the key: press it, then the new key; Backspace takes it away",
-  pressAKey: "Press a key",
   aboutControl: (control: string): string => `About ${control}`,
-  namedViews: "Views",
-  saveView: "Save view…",
-  viewName: "View name",
-  removeView: (name: string): string => `Remove the view ${name}`,
   backdrop: "Background",
   backdropPlain: "Plain",
   sheets: "Styles",
@@ -50,35 +50,22 @@ const shellStrings = {
   >,
   text: "Text",
   textScale: (scale: TextScale): string => `${scale}%`,
-  resetView: "Reset to defaults",
-  viewInAddress: "Saved in the address",
-  pinControl: (label: string): string => `Pin ${label} to the toolbar`,
-  hideControl: (label: string): string => `Hide ${label} in View`,
-  showControl: (label: string): string => `Show ${label}`,
-  moveControl: (label: string): string => `Move ${label}`,
-  moveControlHint: "Drag, or press the arrow keys",
-  controlMoved: (label: string, position: number, count: number): string =>
-    `${label}, ${position} of ${count}`,
   controlMenu: (label: string): string => `${label} on the toolbar`,
   unpinControl: "Remove from the toolbar",
   hideInView: "Hide in View",
   showInView: "Show in View",
-  pinnedNoRoom: "Pinned: back on the toolbar when there is room",
-  resetToolbar: "Reset toolbar",
-  wrapToolbar: "Wrap the toolbar onto more lines when it is full",
-  hiddenControls: (count: number, pinned: number): string =>
-    pinned === 0 ? `${count} hidden` : `${count} hidden · ${pinned} on the toolbar`,
-  toolbarInBrowser: "The toolbar is kept in this browser",
   compare: "Compare",
   compareOff: "Off",
   compareText: "Text sizes",
   compareSheets: "Styles",
   compareOf: (labels: readonly string[]): string => labels.join(" × "),
-  compareCell: (labels: readonly string[]): string => labels.join(" · "),
   width: "Width",
   widthFill: "Fill",
   widthPx: (width: number): string => `${width}`,
   copyStoryId: "Copy the story's id",
+  embedStory: "Embed this story",
+  embedFailed: "This story could not be shown.",
+  embedPanelFailed: "This could not load: reload the page to try again.",
   clearSearch: "Clear the search",
   fromTexts: "From the story's texts:",
   backToText: "Back to the text",
@@ -99,6 +86,13 @@ const shellStrings = {
   heightHandle: "Story height",
   heightHandleHint: "Drag to change the story's height; double-click for its own",
   widthFillNote: "Fill: the story takes the whole stage",
+  device: "Device",
+  deviceNone: "No frame",
+  devicePhones: "Phones",
+  deviceGeneric: "Generic phone",
+  deviceTablets: "Tablets",
+  deviceTurn: "Turn the device",
+  setByDevice: "Set by the device frame",
   panel: "Panel",
   panelHeight: "Panel height",
   closePanel: "Close the panel",
@@ -111,80 +105,40 @@ const shellStrings = {
     a11y: "Accessibility",
     signature: "Signature"
   },
+  openInFigma: "Open in Figma",
   logic: "Logic",
   logicHint: "About logic, not looks: a scene that uses the hook or the function",
   signatureParameter: "Parameter",
   signatureReturns: "Returns",
   signatureNone: "It takes no parameters.",
-  playTitle: "Play function",
   playStatus: { running: "running", passed: "passed", failed: "failed" },
-  playTime: (ms: number): string => `${ms} ms`,
-  playAgain: "Run again",
-  playNoSteps: "The play names no steps: wrap its parts in step(label, run) to see them here.",
   fixedExamples: "This story draws fixed examples: its props are not set from here. Every prop, for reading:",
   allProps: "Props",
   openFrame: "Open in a new tab",
   code: "Code",
-  codeFromArgs: "from the args",
-  codeRender: "the story's render",
+  codeLoading: "Reading the story's code…",
   codeError: "The story's code could not be read",
-  copy: "Copy",
   copied: "Copied",
   matrix: "Matrix",
   matrixNone: "—",
   matrixColumns: "Matrix columns",
   a11y: "Accessibility",
-  a11yCheck: "Check the story",
-  a11yRunning: "Checking…",
   a11yPasses: "passes",
   a11yCount: (count: number): string => `${count} ${count === 1 ? "problem" : "problems"}`,
-  a11yNone: "No WCAG 2.2 A or AA rule is broken in the story as it is now.",
-  a11yError: "The check could not run",
-  a11yNotInCompare: "One story at a time: leave Compare to check it",
   replay: "Replay",
-  clockLabel: "Story clock",
-  clockPause: "Pause the clock",
-  clockResume: "Resume the clock",
-  clockRestart: "Restart",
-  clockSpeed: "Clock speed",
-  clockRate: (rate: number): string => `×${rate}`,
   loadingStory: "Loading the story…",
-  apiReference: "API reference",
-  apiProp: "Prop",
-  apiEvent: "Event",
   apiType: "Type",
-  apiSignature: "Signature",
-  apiDefault: "Default",
   apiWhat: "What it does",
-  showCode: "Show code",
-  hideCode: "Hide code",
-  openStory: "Open the story",
-  usedIn: "Used in",
-  usedInThrough: "through another component",
-  usedInMore: (count: number): string => `and ${count} more`,
-  usedInStories: (count: number): string => (count === 1 ? "1 story" : `${count} stories`),
-  openStoryNamed: (name: string): string => `Open the story ${name}`,
-  touch: "Touch",
-  touchNamed: (name: string): string => `Touch ${name} with a finger`,
-  fillPage: "Fill the page",
-  fillPageNamed: (name: string): string => `Fill the page with ${name}`,
-  backToPlace: "Back to its place",
-  backToPlaceNamed: (name: string): string => `Put ${name} back in its place`,
-  examples: "Examples",
-  pageError: "The component's page could not be read",
+  propCount: (count: number): string => `${count} ${count === 1 ? "prop" : "props"}`,
+  audience: "Reading for",
+  audiences: { everyone: "Everyone", designer: "Designers", coder: "Coders", tester: "Testers" },
+  audienceElsewhere: "Changes a component's page",
   storyLabel: "Story",
   frameTitle: (component: string, story: string): string => `${component}: ${story}`,
   home: "Home",
-  homeEmpty: "No stories yet: a source with story files shows its families here.",
-  homeSummary: (components: number, sources: number): string =>
-    `${components} ${components === 1 ? "component" : "components"} in ${sources} ${sources === 1 ? "library" : "libraries"}.`,
-  homeIntroError: "The library's introduction could not be read",
-  recentlyOpened: "Recently opened",
-  componentsCount: (count: number): string => `${count} ${count === 1 ? "component" : "components"}`,
-  showAll: (count: number): string => `Show all ${count}`,
-  showFewer: "Show fewer",
   unknownStory: (id: string): string =>
     `No story "${id}": it may have been renamed. Pick one in the sidebar.`,
+  unknownPage: (id: string): string => `No page "${id}": it may have been renamed. Pick one in the sidebar.`,
   unknownComponent: (id: string): string =>
     `No component "${id}": it may have been renamed. Pick one in the sidebar.`,
   props: "Props",
@@ -200,7 +154,7 @@ const shellStrings = {
   resetArgs: "Reset",
   appearance: "Appearance",
   appearanceOf: (name: string): string => `Appearance: ${name}`,
-  appearances: { light: "Light", dark: "Dark", system: "System" },
+  appearances: { light: "Light", dark: "Dark", system: "System", story: "Follow the story" },
   worstCase: "Worst case",
   worstCaseHint:
     "Long texts with a word too long to break, huge numbers: the elements that spill are outlined",
@@ -208,17 +162,13 @@ const shellStrings = {
     if (count === 0) return "Nothing spills";
     return count === 1 ? "1 element spills" : `${count} elements spill`;
   },
-  events: "Events",
-  calls: "Calls",
-  noCalls: "No call yet",
-  clearCalls: "Clear",
   parts: "Parts and styling",
   partCount: (count: number): string => `${count} ${count === 1 ? "part" : "parts"}`,
-  partsList: "Parts",
-  styleHooks: "Styling attributes",
-  testIds: "Test ids",
   noProps: "This page has no props",
   docsLoading: "Reading the component…",
+  tabLoading: "Loading the tab…",
+  tabError: "The tab could not be loaded",
+  pageLoadError: "The page could not be loaded",
   docsError: "The component could not be read",
   indexProblems: "Some story files could not be placed"
 };
@@ -228,6 +178,9 @@ export type ShellStrings = typeof shellStrings;
 
 /** The shell's texts, as shown. */
 export const STRINGS: ShellStrings = shellStrings;
+
+/** The catalogue's replacements, for the texts that load after it set them. */
+let catalogueReplacements: Readonly<Record<string, string>> = {};
 
 /**
  * Whether a value is a group of texts (`tabs`), whose members a path can name.
@@ -262,5 +215,34 @@ const replaceText = (texts: Record<string, unknown>, path: readonly string[], te
  * @param replacements - the new texts, by their path (`tabs.props`).
  */
 export const configureStrings = (replacements: Readonly<Record<string, string>>): void => {
+  catalogueReplacements = replacements;
   for (const [path, text] of Object.entries(replacements)) replaceText(STRINGS, path.split("."), text);
+};
+
+/**
+ * The texts of a part of the shell loaded on first use (the docs pages), with the catalogue's replacements applied as
+ * they load: they live with their part, so the first load does not carry them, and keep their names among the shell's
+ * texts, so a catalogue replaces them as any other.
+ *
+ * @param texts - the part's texts, as Forgebook writes them.
+ * @returns the same texts, replaced where the catalogue asks.
+ */
+export const lateStrings = <TTexts extends Record<string, unknown>>(texts: TTexts): TTexts => {
+  for (const [path, text] of Object.entries(catalogueReplacements)) replaceText(texts, path.split("."), text);
+  return texts;
+};
+
+/**
+ * Texts kept out of the first load, with the catalogue's replacements applied as those of `STRINGS` are.
+ *
+ * @param group - their name among the texts (`audienceTexts`): a replacement's path starts with it.
+ * @param texts - the texts.
+ * @returns the same texts, changed in place.
+ */
+export const textsOfGroup = <TTexts extends Record<string, unknown>>(
+  group: string,
+  texts: TTexts
+): TTexts => {
+  lateStrings({ [group]: texts });
+  return texts;
 };

@@ -1,0 +1,184 @@
+/**
+ * Tests for the check of the panel's values an address names: only the props the story declares, with values of
+ * their type, reach its frame.
+ *
+ * @module
+ */
+import { describe, expect, it } from "vitest";
+
+import { type ArgDeclaration, checkedAddressArgs, declaredArgProps } from "../src/addressArgs.ts";
+import type { PropDocs } from "../src/componentDocs.ts";
+import type { PanelArgs } from "../src/messages.ts";
+
+/** A component's props as its types give them. */
+const PROPS: readonly PropDocs[] = [
+  {
+    name: "size",
+    kind: "choice",
+    type: '"sm" | "lg"',
+    description: "",
+    isRequired: false,
+    choices: ["sm", "lg"]
+  },
+  { name: "label", kind: "text", type: "string", description: "", isRequired: true },
+  { name: "count", kind: "number", type: "number", description: "", isRequired: false },
+  { name: "isOpen", kind: "toggle", type: "boolean", description: "", isRequired: false },
+  { name: "icon", kind: "other", type: "IconComponent", description: "", isRequired: false },
+  {
+    name: "children",
+    kind: "other",
+    type: "ReactNode",
+    description: "",
+    isRequired: false,
+    canTakeText: true
+  },
+  { name: "render", kind: "other", type: "() => ReactNode", description: "", isRequired: false },
+  { name: "onPress", kind: "event", type: "() => void", description: "", isRequired: false }
+];
+
+/** An icon the source names. */
+const IconBell = (): null => null;
+
+/** A story of that component, with every control set. */
+const DECLARATION: ArgDeclaration = {
+  props: PROPS,
+  argTypes: {
+    tone: { isHidden: false, control: "radio", options: ["calm", 2] },
+    sides: { isHidden: false, control: "check", options: ["top", "bottom"] },
+    accent: { isHidden: false, control: "color" },
+    when: { isHidden: false, control: "date" },
+    level: { isHidden: false, control: "range", min: 0, max: 10 },
+    payload: { isHidden: false, control: "none" },
+    secret: { isHidden: true }
+  },
+  controls: "all",
+  storyArgs: {
+    label: "Save",
+    caption: "own",
+    ratio: 0.5,
+    isDense: false,
+    sideIcon: { of: "IconComponent", named: "IconBell" }
+  },
+  namedValues: { IconComponent: { IconBell } }
+};
+
+/** The names the check left out. */
+const droppedNames = (args: PanelArgs, declaration: ArgDeclaration = DECLARATION): readonly string[] =>
+  checkedAddressArgs(args, declaration).dropped.map((each) => each.name);
+
+describe("the panel's values an address names", () => {
+  it("keeps every value the panel itself could set, as a shared link writes it", () => {
+    const args: PanelArgs = {
+      size: "lg",
+      label: "Delete",
+      count: 3,
+      isOpen: true,
+      icon: { of: "IconComponent", named: "IconBell" },
+      children: "Text",
+      tone: 2,
+      sides: ["top", "bottom"],
+      accent: "#ff0000",
+      when: 1_700_000_000_000,
+      level: 4,
+      caption: "theirs",
+      ratio: 2,
+      isDense: true,
+      sideIcon: { of: "IconComponent", named: "IconBell" }
+    };
+    expect(checkedAddressArgs(args, DECLARATION)).toEqual({ accepted: args, dropped: [] });
+  });
+
+  it("leaves out a name the story does not declare: an element's handlers, its HTML, a prototype's keys", () => {
+    const args: PanelArgs = JSON.parse(
+      JSON.stringify({
+        size: "sm",
+        onclick: "alert(1)",
+        onClick: "alert(1)",
+        innerHTML: "<img src=x onerror=alert(1)>",
+        srcDoc: "<script>alert(1)</script>",
+        href: "javascript:alert(1)",
+        style: "background:url(/leak)",
+        dangerouslySetInnerHTML: { of: "a", named: "b" },
+        constructor: "x",
+        toString: "x"
+      }).replace('"constructor"', '"__proto__":"x","constructor"')
+    );
+    const checked = checkedAddressArgs(args, DECLARATION);
+    expect(checked.accepted).toEqual({ size: "sm" });
+    expect(checked.dropped.every((each) => each.reason === "undeclared")).toBe(true);
+    expect(checked.dropped.map((each) => each.name)).toEqual([
+      "onclick",
+      "onClick",
+      "innerHTML",
+      "srcDoc",
+      "href",
+      "style",
+      "dangerouslySetInnerHTML",
+      "__proto__",
+      "constructor",
+      "toString"
+    ]);
+  });
+
+  it("leaves out a value not of its prop's type", () => {
+    const checked = checkedAddressArgs(
+      {
+        size: "xl",
+        label: 5,
+        count: "3",
+        isOpen: "true",
+        children: ["a"],
+        tone: "loud",
+        sides: ["left"],
+        accent: 1,
+        when: "today",
+        level: null,
+        caption: 1,
+        ratio: false,
+        isDense: "no"
+      },
+      DECLARATION
+    );
+    expect(checked.accepted).toEqual({});
+    expect(checked.dropped.every((each) => each.reason === "type")).toBe(true);
+    expect(checked.dropped).toHaveLength(13);
+  });
+
+  it("takes a named value only among the source's own, for the prop's type: never a function through a prototype", () => {
+    expect(
+      droppedNames({
+        icon: { of: "constructor", named: "constructor" },
+        sideIcon: { of: "IconComponent", named: "constructor" },
+        children: { of: "IconComponent", named: "IconBell" }
+      })
+    ).toEqual(["icon", "sideIcon", "children"]);
+    expect(droppedNames({ icon: { of: "Other", named: "IconBell" } })).toEqual(["icon"]);
+  });
+
+  it("never takes a value for an event, a function prop, a hidden arg or one the panel only lists", () => {
+    expect(droppedNames({ onPress: "x", render: "x", secret: "x", payload: "x" })).toEqual([
+      "onPress",
+      "render",
+      "secret",
+      "payload"
+    ]);
+  });
+
+  it("takes only the props the story's controls let the panel set", () => {
+    const declaration: ArgDeclaration = { ...DECLARATION, controls: ["size"] };
+    expect(droppedNames({ size: "lg", label: "x", caption: "x" }, declaration)).toEqual(["label", "caption"]);
+    expect(droppedNames({ size: "lg" }, { ...DECLARATION, controls: [] })).toEqual(["size"]);
+  });
+
+  it("declares the story's own args by the type of their value when neither the types nor the `argTypes` name them", () => {
+    const declaration: ArgDeclaration = {
+      props: [],
+      argTypes: {},
+      controls: "all",
+      storyArgs: { title: "x", none: null, picks: ["a"] },
+      namedValues: {}
+    };
+    expect(declaredArgProps(declaration).map((prop) => [prop.name, prop.kind])).toEqual([["title", "text"]]);
+    expect(droppedNames({ title: "y", none: null, picks: ["a"] }, declaration)).toEqual(["none", "picks"]);
+  });
+});

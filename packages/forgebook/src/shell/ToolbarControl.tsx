@@ -1,6 +1,6 @@
 /**
  * One control of the toolbar or the View menu, wherever the person placed it: a switch the catalogue declares, or one
- * of Forgebook's own (the background, the style sheets, the text size, the stage's width), drawn for the toolbar or for
+ * of Forgebook's own (the background, the style sheets, the text size, the stage's width, the audience), drawn for the toolbar or for
  * a row of the View menu; off while the compare view sets it or the story fixes it.
  *
  * @remarks
@@ -12,7 +12,9 @@
  */
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
+import { AUDIENCE_IDS, type AudienceId } from "../audiences.ts";
 import type { OwnControlId } from "../catalogue.ts";
+import { DEVICE_PARAMETER, type DeviceDefault, shownDevice } from "../deviceView.ts";
 import type { FixedView } from "../storyGlobals.ts";
 import { switchControl, type ViewSwitch } from "../switches.ts";
 import type { ToolbarControl as Control } from "../toolbarLayout.ts";
@@ -25,6 +27,7 @@ import {
   type ViewState
 } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
+import { DeviceControl } from "./DeviceControl.tsx";
 import { Icon, type IconName } from "./icons.tsx";
 import { Segmented, type SegmentOption } from "./Segmented.tsx";
 import { STRINGS } from "./strings.ts";
@@ -42,10 +45,14 @@ export type ControlContext = {
   readonly onViewChange: (view: ViewState) => void;
   /** Whether a story's page is shown: the compare view sets values there, never on a component's page. */
   readonly isStoryPage: boolean;
+  /** Whether a component's page is shown: the only page the audience changes. */
+  readonly isComponentPage: boolean;
   /** What the shown story fixes of the view. */
   readonly fixed: FixedView;
   /** The width the shown story really has, in CSS px, for the width field; none on a component's page. */
   readonly shownWidth: number | undefined;
+  /** The page's default device: the shown story's, or the catalogue's on a component's page. */
+  readonly deviceDefault: DeviceDefault;
 };
 
 /** The icon of each scheme a colour scheme switch's values draw in. */
@@ -68,22 +75,6 @@ const COMPACT_VALUES = 3;
  */
 const isCompact = (labels: readonly string[]): boolean =>
   labels.length <= COMPACT_VALUES && labels.join("").length <= COMPACT_LETTERS;
-
-/** The name of each of Forgebook's own controls. */
-const OWN_LABELS: Readonly<Record<OwnControlId, () => string>> = {
-  backdrop: () => STRINGS.backdrop,
-  sheets: () => STRINGS.sheets,
-  text: () => STRINGS.text,
-  width: () => STRINGS.width
-};
-
-/**
- * A control's name, as its row, its menu and its buttons' names write it.
- *
- * @param control - the control.
- */
-export const controlLabel = (control: Control): string =>
-  control.kind === "switch" ? control.switch.label : OWN_LABELS[control.id]();
 
 /** A choice drawn as segments or as a list, the same way for every control. */
 type Choice<TValue extends string | number> = {
@@ -233,7 +224,7 @@ const SwitchControl = ({
 };
 
 /**
- * The stage's width: its presets as segments, closed by the field that takes any width.
+ * The stage's width: its presets as segments, closed by the field that takes any width; off while a device sets it.
  *
  * @param props - its form and what every control shares.
  */
@@ -243,15 +234,17 @@ const WidthControl = ({
   onViewChange,
   isStoryPage,
   fixed,
-  shownWidth
+  shownWidth,
+  deviceDefault
 }: ControlContext & { readonly form: ControlForm }): ReactNode => {
   const { widths } = useCatalogue();
   const setWidth = (width: StageWidth): void => onViewChange({ ...view, width });
+  const note = widthNote(shownDevice(view, deviceDefault) !== undefined, fixed);
   const presets = (
     <Segmented
       label={STRINGS.width}
-      isDisabled={(isStoryPage && isComparing(view)) || fixed.width !== undefined}
-      disabledNote={fixed.width === undefined ? undefined : STRINGS.setByStory}
+      isDisabled={(isStoryPage && isComparing(view)) || note !== undefined}
+      disabledNote={note}
       options={[
         { value: "fill", label: STRINGS.widthFill },
         ...widths.map((preset) => ({
@@ -261,7 +254,9 @@ const WidthControl = ({
       ]}
       value={view.width}
       onValueChange={setWidth}
-      after={<WidthField width={view.width} shownWidth={shownWidth} onWidthChange={setWidth} />}
+      after={
+        <WidthField width={view.width} shownWidth={shownWidth} onWidthChange={setWidth} disabledNote={note} />
+      }
     />
   );
   if (form === "row") return presets;
@@ -276,6 +271,17 @@ const WidthControl = ({
 };
 
 /**
+ * Why the width cannot be set, or none: a device shown sets it, then a story that fixes it.
+ *
+ * @param isFramed - whether a device is shown.
+ * @param fixed - what the story fixes.
+ */
+const widthNote = (isFramed: boolean, fixed: FixedView): string | undefined => {
+  if (isFramed) return STRINGS.setByDevice;
+  return fixed.width === undefined ? undefined : STRINGS.setByStory;
+};
+
+/**
  * One of Forgebook's own controls.
  *
  * @param props - the control, its form, and what every control shares.
@@ -286,8 +292,27 @@ const OwnControl = ({
   ...context
 }: ControlContext & { readonly id: OwnControlId; readonly form: ControlForm }): ReactNode => {
   const catalogue = useCatalogue();
-  const { view, onViewChange, isStoryPage, fixed } = context;
+  const { view, onViewChange, isStoryPage, isComponentPage, fixed } = context;
   if (id === "width") return <WidthControl form={form} {...context} />;
+  if (id === "audience") {
+    return (
+      <FormChoice
+        form={form}
+        // its names are too long for segments, and a list stays quiet on the bar
+        isList={true}
+        label={STRINGS.audience}
+        options={AUDIENCE_IDS.map((audience) => ({ value: audience, label: STRINGS.audiences[audience] }))}
+        value={view.audience}
+        onValueChange={(audience: AudienceId): void => onViewChange({ ...view, audience })}
+        isDisabled={!isComponentPage}
+        disabledNote={isComponentPage ? undefined : STRINGS.audienceElsewhere}
+      />
+    );
+  }
+  if (id === DEVICE_PARAMETER)
+    return (
+      <DeviceControl form={form} view={view} onViewChange={onViewChange} defaults={context.deviceDefault} />
+    );
   if (id === "backdrop") {
     return (
       <FormChoice

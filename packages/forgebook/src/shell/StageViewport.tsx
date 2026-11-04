@@ -1,7 +1,7 @@
 /**
  * The room a story's frame gets on the stage, as a browser's device mode: the stage's whole width or a fixed one,
  * centred, with a handle on each side; the width it has is reported to the toolbar's field. On a story's page a
- * handle at its foot sets its height too (note 142): the story's own (its content, at least the height it declares) or a dragged one, which is the window the story's overlays are placed in.
+ * handle at its foot sets its height too: the story's own (its content, at least the height it declares) or a dragged one, which is the window the story's overlays are placed in.
  *
  * @remarks
  * Dragging either handle widens or narrows the story on both sides at once, so it stays centred; a double click on a
@@ -51,6 +51,11 @@ export type StageViewportProps = {
   /** Called with the height the foot handle or its keys set; none shows no foot handle (the component's page). */
   readonly onHeightChange?: ((height: StageHeight) => void) | undefined;
   /**
+   * Whether the room holds a device (`DeviceSlot.tsx`): the device is the story's edge, so the room draws no surface
+   * of its own; `false` by default.
+   */
+  readonly isDevice?: boolean;
+  /**
    * The frame, or a function that draws it at the height set by the foot handle (a drag's while it lasts), in the
    * story's own CSS px; `undefined` lets the frame take the story's own.
    */
@@ -97,7 +102,7 @@ type FootHandleProps = {
 };
 
 /**
- * The handle at the story's foot (note 142): a drag or the up and down keys set the story's height from the one it
+ * The handle at the story's foot: a drag or the up and down keys set the story's height from the one it
  * has, a double click gives it its own back; it shows the height set.
  *
  * @param props - the zoom, the heights and their setters.
@@ -178,6 +183,7 @@ export const StageViewport = ({
   background,
   height = "auto",
   onHeightChange,
+  isDevice = false,
   children
 }: StageViewportProps): ReactNode => {
   const { widthRange } = useCatalogue();
@@ -303,6 +309,7 @@ export const StageViewport = ({
               ref={roomRef}
               className="forgebook-viewport__room"
               data-dragging={isDragging ? "" : undefined}
+              data-device={isDevice ? "" : undefined}
               style={{
                 width: layoutWidth,
                 transform: scale === 1 ? undefined : `scale(${scale})`,

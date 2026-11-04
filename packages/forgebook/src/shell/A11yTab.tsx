@@ -11,7 +11,7 @@
 import type { ReactNode } from "react";
 
 import type { Violation } from "../a11y.ts";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 
 /** The check's state: not run, running, its violations, or why it could not run. */
 export type CheckState =
@@ -28,27 +28,18 @@ export type A11yTabProps = {
   readonly onCheck: (() => void) | undefined;
 };
 
-/**
- * The tab's hint: how many rules are broken once checked.
- *
- * @param check - the check's state.
- */
-export const a11yHint = (check: CheckState): string | undefined => {
-  if (check.status !== "done") return undefined;
-  return check.violations.length === 0 ? STRINGS.a11yPasses : STRINGS.a11yCount(check.violations.length);
-};
-
 /** What the check found. */
 const CheckResult = ({ check }: { readonly check: CheckState }): ReactNode => {
   if (check.status === "error") {
     return (
       <p className="forgebook-problems" role="alert">
-        {STRINGS.a11yError}: {check.message}
+        {LATER_STRINGS.a11yError}: {check.message}
       </p>
     );
   }
   if (check.status !== "done") return null;
-  if (check.violations.length === 0) return <p className="forgebook-prop__description">{STRINGS.a11yNone}</p>;
+  if (check.violations.length === 0)
+    return <p className="forgebook-prop__description">{LATER_STRINGS.a11yNone}</p>;
   return (
     <ul className="forgebook-violations">
       {check.violations.map((violation) => (
@@ -89,10 +80,10 @@ export const A11yTab = ({ check, onCheck }: A11yTabProps): ReactNode => (
         disabled={onCheck === undefined || check.status === "running"}
         onClick={onCheck}
       >
-        {check.status === "running" ? STRINGS.a11yRunning : STRINGS.a11yCheck}
+        {check.status === "running" ? LATER_STRINGS.a11yRunning : LATER_STRINGS.a11yCheck}
       </button>
       {onCheck === undefined ? (
-        <span className="forgebook-popover__note">{STRINGS.a11yNotInCompare}</span>
+        <span className="forgebook-popover__note">{LATER_STRINGS.a11yNotInCompare}</span>
       ) : null}
     </div>
     <div aria-live="polite">

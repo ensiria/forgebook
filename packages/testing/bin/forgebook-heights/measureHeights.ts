@@ -12,6 +12,7 @@
  * @module
  */
 import { type Browser, chromium, type Page } from "@playwright/test";
+import { codeLiteral } from "forgebook/code-literal";
 import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryHeights } from "forgebook/story-heights";
 import { STORY_IDS_ELEMENT } from "forgebook/story-ids-element";
@@ -148,13 +149,9 @@ const measureStory = async (
   await page.setViewportSize({ width: first, height: VIEWPORT_HEIGHT });
   await page.goto(new URL(frameAddressOf("frame.html", storyId, ""), address).href);
   const status = await page
-    .waitForFunction(
-      `document.documentElement.getAttribute(${JSON.stringify(STATUS_ATTRIBUTE)})`,
-      undefined,
-      {
-        timeout
-      }
-    )
+    .waitForFunction(`document.documentElement.getAttribute(${codeLiteral(STATUS_ATTRIBUTE)})`, undefined, {
+      timeout
+    })
     .then(async (handle) => String(await handle.jsonValue()))
     .catch(() => "timeout");
   if (status === "timeout") return { story: storyId, reason: `no answer in ${timeout} ms` };

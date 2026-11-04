@@ -16,7 +16,7 @@ import type { CatalogueLists } from "./catalogue.ts";
 import type { ViewSwitch } from "./switches.ts";
 
 /** What kind of check found a problem. */
-export type StoryProblemKind = "frame" | "axe" | "spill" | "overlay" | "error";
+export type StoryProblemKind = "frame" | "axe" | "spill" | "overlay" | "focus" | "error";
 
 /** One problem a check found. */
 export type StoryProblem = {
@@ -34,10 +34,17 @@ export type StoryProblem = {
 export type StoryCheckStory = {
   /** The story's id. */
   readonly id: string;
+  /**
+   * The id an earlier rule gave it, when it differs from `id`: a baseline stored under that id is still its baseline
+   * until `forgebook shot --update` stores one under its id.
+   */
+  readonly formerId?: string;
   /** Its `parameters.height`, in CSS px, when it declares one: an overlay inside it is not a problem. */
   readonly height?: number;
   /** Whether it is about logic, not looks (`parameters.logic`): every variant then means its default view only. */
   readonly isLogic?: boolean;
+  /** Whether it draws edge to edge in a device (`parameters.device.edgeToEdge`), for a view that names one. */
+  readonly isEdgeToEdge?: boolean;
 };
 
 /** What a check is asked to do. */
@@ -54,6 +61,26 @@ export type StoryCheckRequest = {
   readonly views: readonly string[];
   /** Check every variant the catalogue's browser tests check instead of the views given. */
   readonly isAllVariants: boolean;
+  /** The model that judges what axe cannot see; none leaves the pages on this machine. */
+  readonly semantic?: SemanticModel;
+};
+
+/** A model to judge stories with, as the user configured it. */
+export type SemanticModel = {
+  /** The address of an OpenAI-compatible API (`https://api.example.com/v1`). */
+  readonly url: string;
+  /** The model's name. */
+  readonly name: string;
+  /** Its key, when it needs one; only ever sent to `url`. */
+  readonly key?: string;
+};
+
+/** What a model judged wrong: an opinion to read, never a fact, so it does not fail a check. */
+export type StoryJudgement = {
+  /** The criterion it names (`WCAG 2.4.6`); empty when it named none. */
+  readonly criterion: string;
+  /** What it found. */
+  readonly message: string;
 };
 
 /** One story in one view, and its problems. */
@@ -66,6 +93,8 @@ export type StoryCheckResult = {
   readonly frame: string;
   /** The problems; none when it passes. */
   readonly problems: readonly StoryProblem[];
+  /** What the model judged, when one was asked; a text says why it could not. */
+  readonly judgements?: readonly StoryJudgement[] | string;
 };
 
 /** What a check found. */
@@ -77,7 +106,7 @@ export type StoryCheckReport = {
 };
 
 /** Every kind, for reading a report back. */
-const KINDS: readonly StoryProblemKind[] = ["frame", "axe", "spill", "overlay", "error"];
+const KINDS: readonly StoryProblemKind[] = ["frame", "axe", "spill", "overlay", "focus", "error"];
 
 /**
  * Whether a value is a problem.
@@ -140,6 +169,8 @@ export type StoryShot = {
   readonly frame: string;
   /** The picture, a PNG file's absolute path. */
   readonly file: string;
+  /** Why the story did not draw (`error`, or `silent` when it never said); none when it did. */
+  readonly status?: "error" | "silent";
 };
 
 /** The pictures taken. */
@@ -149,6 +180,68 @@ export type StoryShotReport = {
   /** One picture per story and view. */
   readonly shots: readonly StoryShot[];
 };
+
+/** What a comparison with the baselines is asked. */
+export type StoryDiffRequest = StoryShotRequest & {
+  /** The folder the baselines are in, absolute; never the folder the pictures go in. */
+  readonly baselines: string;
+  /** The component asked for, when one was: its baselines with no story left are reported. */
+  readonly component?: string;
+  /**
+   * The id an earlier rule gave that component, when it differs from `component`: its baselines stored under that id
+   * are its own too.
+   */
+  readonly formerComponent?: string;
+};
+
+/** How a picture compares with its baseline. */
+export type StoryDiffStatus = "same" | "changed" | "resized" | "new" | "broken" | "removed";
+
+/** One story in one view against its baseline. */
+export type StoryDiff = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view's name; empty for the default view. */
+  readonly view: string;
+  /**
+   * How it compares: `new` has no baseline yet, `resized` cannot be compared pixel by pixel, `broken` did not draw so it
+   * proves nothing, and `removed` is a baseline whose story is gone.
+   */
+  readonly status: StoryDiffStatus;
+  /** The pixels that changed. */
+  readonly changedPixels: number;
+  /** Their share of the picture, 0 to 100; 100 when it was resized. */
+  readonly percent: number;
+  /** The smallest box that holds them, in CSS px at the picture's scale. */
+  readonly region?: { x: number; y: number; width: number; height: number };
+  /** The baseline's file. */
+  readonly baseline: string;
+  /** The new picture's file. */
+  readonly current: string;
+  /** The new picture with what changed marked. */
+  readonly diff?: string;
+};
+
+/** The comparison's results. */
+export type StoryDiffReport = {
+  /** The shape's version. */
+  readonly schema: 1;
+  /** One result per story and view. */
+  readonly results: readonly StoryDiff[];
+};
+
+/**
+ * Whether what the testing package answered is a comparison's report.
+ *
+ * @param value - the answer.
+ */
+export const isStoryDiffReport = (value: unknown): value is StoryDiffReport =>
+  typeof value === "object" &&
+  value !== null &&
+  "schema" in value &&
+  value.schema === 1 &&
+  "results" in value &&
+  Array.isArray(value.results);
 
 /**
  * Whether what the testing package answered is a picture run's report.

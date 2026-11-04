@@ -1,10 +1,15 @@
 node_modules/
 dist/
+fixtures/app/preview/
 *.tgz
 .DS_Store
 test-results/
 playwright-report/
 .heights-build/
+# svelte-check's incremental output
+.svelte-check/
+# the types and settings `svelte-kit sync` writes
+.svelte-kit/
 
 # Nx release's cache
 .nx/

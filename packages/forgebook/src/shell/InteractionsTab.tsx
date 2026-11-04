@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 
 import type { PlayStatus, PlayTrace } from "../playTrace.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { STRINGS } from "./strings.ts";
 
 /** The tab's props. */
@@ -16,13 +17,6 @@ export type InteractionsTabProps = {
   /** Runs the play again on a fresh mount. */
   readonly onPlayAgain: () => void;
 };
-
-/**
- * The tab's hint: the play's status.
- *
- * @param trace - the trace.
- */
-export const interactionsHint = (trace: PlayTrace): string => STRINGS.playStatus[trace.status];
 
 /** A status with its time, as a line ends. */
 const StatusNote = ({
@@ -34,7 +28,7 @@ const StatusNote = ({
 }): ReactNode => (
   <span className="forgebook-play__status" data-status={status}>
     {STRINGS.playStatus[status]}
-    {ms === undefined ? null : ` · ${STRINGS.playTime(ms)}`}
+    {ms === undefined ? null : ` · ${LATER_STRINGS.playTime(ms)}`}
   </span>
 );
 
@@ -47,7 +41,7 @@ export const InteractionsTab = ({ trace, onPlayAgain }: InteractionsTabProps): R
   <div className="forgebook-prop-group" aria-live="polite">
     <div className="forgebook-calls__head">
       <h3 className="forgebook-prop-group__title">
-        {STRINGS.playTitle} <StatusNote status={trace.status} ms={trace.ms} />
+        {LATER_STRINGS.playTitle} <StatusNote status={trace.status} ms={trace.ms} />
       </h3>
       <button
         type="button"
@@ -55,7 +49,7 @@ export const InteractionsTab = ({ trace, onPlayAgain }: InteractionsTabProps): R
         disabled={trace.status === "running"}
         onClick={onPlayAgain}
       >
-        {STRINGS.playAgain}
+        {LATER_STRINGS.playAgain}
       </button>
     </div>
     {trace.error === undefined ? null : (
@@ -64,7 +58,7 @@ export const InteractionsTab = ({ trace, onPlayAgain }: InteractionsTabProps): R
       </p>
     )}
     {trace.steps.length === 0 ? (
-      <p className="forgebook-prop__description">{STRINGS.playNoSteps}</p>
+      <p className="forgebook-prop__description">{LATER_STRINGS.playNoSteps}</p>
     ) : (
       <ol className="forgebook-play__steps">
         {trace.steps.map((step, index) => (

@@ -12,8 +12,12 @@ import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import { useCatalogue } from "./catalogueContext.ts";
 
-/** The stored text under a key, or none when there is none or storage is refused. */
-const readStored = (key: string): string | null => {
+/**
+ * The stored text under a key, or none when there is none or storage is refused.
+ *
+ * @param key - the key.
+ */
+export const readStored = (key: string): string | null => {
   try {
     return window.localStorage.getItem(key);
   } catch {
@@ -21,8 +25,13 @@ const readStored = (key: string): string | null => {
   }
 };
 
-/** Keeps a text under a key, when storage allows it. */
-const writeStored = (key: string, value: string): void => {
+/**
+ * Keeps a text under a key, when storage allows it.
+ *
+ * @param key - the key.
+ * @param value - the text.
+ */
+export const writeStored = (key: string, value: string): void => {
   try {
     window.localStorage.setItem(key, value);
   } catch {

@@ -260,7 +260,8 @@ export const mappedArgs = (
       if (!isRecord(mapping) || (typeof value !== "string" && typeof value !== "number"))
         return [name, value];
       const key = String(value);
-      return [name, key in mapping ? mapping[key] : value];
+      // the mapping's own keys only: a value a shared link chose (`constructor`) never reaches its prototype
+      return [name, Object.hasOwn(mapping, key) ? mapping[key] : value];
     })
   );
 

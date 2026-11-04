@@ -1,0 +1,524 @@
+// A docs page and the written home: their text, their blocks and their contents, on the shell's palette, so a
+// catalogue's theme and both appearances reach them. Compiled with the page, loaded on first use: a catalogue that opens
+// neither pays nothing for it. The asides' tones take colours the palette already holds for text, so each keeps its
+// contrast in both appearances and follows a catalogue's theme.
+
+@use "../styles/tokens" as *;
+@use "../styles/mixins";
+
+@layer catalogue {
+  .forgebook-docs {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .forgebook-docs__body {
+    flex: 0 1 56rem;
+    min-width: 0;
+    margin: 0;
+  }
+
+  // the text set for reading at length: a size up from a component page's notes, the line kept to a readable measure
+  .forgebook-docs .forgebook-prose,
+  .forgebook-home--written .forgebook-prose {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: $text;
+
+    > p,
+    > ul,
+    > ol,
+    > blockquote {
+      max-width: 42rem;
+    }
+
+    h2,
+    h3,
+    h4 {
+      scroll-margin-top: $space-4;
+    }
+
+    h2 {
+      margin-top: $space-7;
+    }
+
+    h4 {
+      margin: $space-4 0 $space-1-5;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    blockquote {
+      margin: 0 0 $space-3;
+      padding: $space-1 $space-4;
+      border-inline-start: 3px solid $accent;
+      color: $text-secondary;
+    }
+
+    hr {
+      margin: $space-6 0;
+      border: 0;
+      box-shadow: $line-top;
+      height: 1px;
+    }
+
+    img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: auto;
+      // a drawing with no size of its own would otherwise take the whole column
+      max-height: 20rem;
+      border-radius: $radius-card;
+    }
+
+    // a wide table scrolls on its own rather than widening the page
+    table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
+
+  // a heading links to itself: it keeps its colour, and a mark beside it says so
+  .forgebook-anchor {
+    position: relative;
+    color: inherit !important;
+    text-decoration: none;
+    border-radius: $radius-control-small;
+
+    &::before {
+      content: "#";
+      position: absolute;
+      inset-inline-end: 100%;
+      padding-inline-end: $space-1-5;
+      color: $text-tertiary;
+      font-weight: 400;
+      opacity: 0;
+      transition: opacity $duration-quick ease-out;
+    }
+
+    &:hover::before,
+    &:focus-visible::before {
+      opacity: 1;
+    }
+
+    @include mixins.focus-ring;
+  }
+
+  .forgebook-docs__code {
+    position: relative;
+    min-width: 0;
+
+    pre {
+      margin: 0;
+    }
+
+    // a title sits on the code's own card, the copy button beside it
+    &[data-titled="true"] pre {
+      // the title's line and the code's own space below it
+      padding-top: calc(#{$space-8} + #{$space-3});
+    }
+
+    // a wrapped line never runs under the copy button
+    &[data-wrap="true"] pre {
+      padding-inline-end: 5rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .forgebook-docs__code-title {
+    position: absolute;
+    top: 0;
+    inset-inline: 0;
+    margin: 0;
+    padding: $space-2 $space-4;
+    box-shadow: $line-bottom;
+    font: $text-mono-small;
+    color: $text-secondary;
+    // the copy button sits over the title's end
+    padding-inline-end: 5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // a block whose lines are marked: each line a band as wide as the code, its sign in the gutter for a diff
+  .forgebook-docs__code code:has(.forgebook-code-line) {
+    display: inline-block;
+    min-width: 100%;
+  }
+
+  .forgebook-code-line {
+    display: inline-block;
+    box-sizing: border-box;
+    min-width: calc(100% + 2 * #{$space-4});
+    margin-inline: calc(-1 * #{$space-4});
+    padding-inline: $space-4;
+    text-decoration: none;
+  }
+
+  mark.forgebook-code-line {
+    background: color-mix(in srgb, $accent 14%, transparent);
+    color: inherit;
+    box-shadow: inset 3px 0 0 $accent;
+  }
+
+  ins.forgebook-code-line,
+  del.forgebook-code-line {
+    position: relative;
+
+    &::before {
+      position: absolute;
+      inset-inline-start: $space-1;
+    }
+  }
+
+  ins.forgebook-code-line {
+    background: color-mix(in srgb, $code-string 14%, transparent);
+
+    // the element says it was inserted; the sign is for the eye only
+    &::before {
+      content: "+" / "";
+      color: $code-string;
+    }
+  }
+
+  del.forgebook-code-line {
+    background: color-mix(in srgb, $danger-text 12%, transparent);
+
+    &::before {
+      content: "-" / "";
+      color: $danger-text;
+    }
+  }
+
+  // an aside: its tone's colour on its edge and its title, a tint of it behind
+  .forgebook-aside {
+    --forgebook-tone: #{$accent-text};
+
+    display: grid;
+    gap: $space-2;
+    min-width: 0;
+    margin: 0;
+    padding: $space-3 $space-4;
+    border-radius: $radius-control;
+    background: color-mix(in srgb, var(--forgebook-tone) 7%, transparent);
+    box-shadow: inset 3px 0 0 var(--forgebook-tone);
+
+    &[data-tone="tip"] {
+      --forgebook-tone: #{$code-string};
+    }
+
+    &[data-tone="important"] {
+      --forgebook-tone: #{$code-keyword};
+    }
+
+    &[data-tone="caution"] {
+      --forgebook-tone: #{$code-number};
+    }
+
+    &[data-tone="danger"] {
+      --forgebook-tone: #{$danger-text};
+    }
+
+    > .forgebook-prose > :last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .forgebook-aside__title {
+    margin: 0;
+    font: $text-row-label;
+    font-weight: 600;
+    color: var(--forgebook-tone);
+  }
+
+  // tabs: a row of labels on a line, the chosen one underlined in the accent
+  .forgebook-tabs {
+    display: grid;
+    gap: $space-3;
+    min-width: 0;
+  }
+
+  .forgebook-tabs__list {
+    display: flex;
+    gap: $space-1;
+    overflow-x: auto;
+    box-shadow: $line-bottom;
+  }
+
+  .forgebook-tabs__tab {
+    flex: none;
+    padding: $space-1-5 $space-2-5;
+    border: 0;
+    border-radius: $radius-control-small $radius-control-small 0 0;
+    background: none;
+    box-shadow: inset 0 -2px 0 transparent;
+    font: $text-row-label;
+    color: $text-secondary;
+    cursor: pointer;
+    transition:
+      color $duration-quick ease-out,
+      box-shadow $duration-quick ease-out;
+
+    &:hover {
+      color: $text;
+    }
+
+    &[aria-selected="true"] {
+      color: $accent-text;
+      box-shadow: inset 0 -2px 0 $accent;
+    }
+
+    @include mixins.focus-ring(inside);
+  }
+
+  .forgebook-tabs__panel {
+    display: grid;
+    gap: $space-4;
+    min-width: 0;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  // steps: a numbered line down the left, each step's number in a ring on it
+  .forgebook-steps {
+    display: grid;
+    gap: $space-5;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: forgebook-step;
+  }
+
+  .forgebook-steps__step {
+    position: relative;
+    display: grid;
+    gap: $space-3;
+    min-width: 0;
+    // the number's ring and the room after it
+    padding-inline-start: calc(1.75rem + #{$space-3});
+    counter-increment: forgebook-step;
+
+    &::before {
+      content: counter(forgebook-step);
+      position: absolute;
+      top: 0;
+      inset-inline-start: 0;
+      display: grid;
+      place-items: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      background: $surface;
+      box-shadow: $ring;
+      font: $text-row-label;
+      font-weight: 600;
+      color: $text-secondary;
+    }
+
+    // the line that joins a step to the next
+    &:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: calc(1.75rem + #{$space-1});
+      bottom: calc(-1 * #{$space-5} + #{$space-1});
+      inset-inline-start: calc(0.875rem - 0.5px);
+      width: 1px;
+      background: $separator;
+    }
+  }
+
+  // cards: as many to a row as fit, each on the shell's card surface
+  .forgebook-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    gap: $space-3;
+  }
+
+  .forgebook-card {
+    display: grid;
+    align-content: start;
+    gap: $space-2;
+    min-width: 0;
+    padding: $space-3 $space-4;
+    border-radius: $radius-card;
+    background: $surface;
+    box-shadow: $shadow-card;
+    color: inherit;
+
+    > .forgebook-prose > :last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .forgebook-card__title {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    margin: 0;
+    font: $text-card-title;
+  }
+
+  .forgebook-card--link {
+    text-decoration: none;
+    transition: box-shadow $duration-medium $ease-out;
+
+    .forgebook-card__title {
+      color: $accent-text;
+    }
+
+    &:hover {
+      box-shadow: $shadow-card-hover;
+    }
+
+    @include mixins.focus-ring($shadow: $shadow-card);
+  }
+
+  .forgebook-card__description {
+    font: $text-body;
+    color: $text-secondary;
+  }
+
+  // the pages around this one: each a card, the next one at the end
+  .forgebook-docs__foot {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: $space-3;
+    margin-top: $space-4;
+  }
+
+  .forgebook-docs__around {
+    display: grid;
+    gap: $space-0-5;
+    padding: $space-2-5 $space-3;
+    border-radius: $radius-control;
+    background: $surface;
+    box-shadow: $shadow-card;
+    color: inherit;
+    text-decoration: none;
+    transition: box-shadow $duration-medium $ease-out;
+
+    &[data-side="next"] {
+      justify-items: end;
+      text-align: end;
+    }
+
+    &:hover {
+      box-shadow: $shadow-card-hover;
+    }
+
+    @include mixins.focus-ring($shadow: $shadow-card);
+  }
+
+  .forgebook-docs__around-label {
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  .forgebook-docs__around-name {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    font: $text-row-label;
+    color: $accent-text;
+  }
+
+  .forgebook-contents__title {
+    margin: 0;
+    font: $text-label;
+    color: $text-tertiary;
+  }
+
+  .forgebook-contents__list {
+    display: grid;
+    gap: $space-0-5;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    [data-depth="3"] {
+      padding-inline-start: $space-3;
+    }
+  }
+
+  .forgebook-contents__link {
+    display: block;
+    padding: $space-1 $space-2;
+    border-radius: $radius-control-small;
+    box-shadow: inset 2px 0 0 transparent;
+    font: $text-row-compact;
+    color: $text-secondary;
+    text-decoration: none;
+    transition:
+      color $duration-quick ease-out,
+      background-color $duration-quick ease-out;
+
+    &:hover {
+      background: $hover;
+      color: $text;
+    }
+
+    &[aria-current="location"] {
+      color: $accent-text;
+      font-weight: 500;
+    }
+
+    @include mixins.focus-ring(inside);
+  }
+
+  // beside the text, staying in sight as it scrolls, with a scroll of its own for a long list
+  .forgebook-contents--column {
+    position: sticky;
+    top: $space-6;
+    flex: none;
+    box-sizing: border-box;
+    display: grid;
+    gap: $space-2;
+    width: 13rem;
+    max-height: calc(100dvh - 10rem);
+    margin-top: $space-6;
+    padding-inline-end: $space-4;
+    overflow-y: auto;
+  }
+
+  // above the text, folded: a narrow page starts with what it says, not with its list
+  .forgebook-contents--fold {
+    padding: $space-2 $space-3;
+    border-radius: $radius-control;
+    background: $fill-quiet;
+
+    > summary {
+      cursor: pointer;
+      border-radius: $radius-control-small;
+
+      @include mixins.focus-ring;
+    }
+
+    > nav {
+      margin-top: $space-2;
+    }
+  }
+
+  // a phone's width: the page's own margins give their room to the text
+  @media (max-width: 40rem) {
+    .forgebook-docs__body {
+      padding-inline: $space-4;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .forgebook-anchor::before,
+    .forgebook-contents__link,
+    .forgebook-docs__around,
+    .forgebook-tabs__tab,
+    .forgebook-card--link {
+      transition: none;
+    }
+  }
+}

@@ -7,6 +7,7 @@
 import type { ReactNode, Ref } from "react";
 
 import type { ShellMessage } from "../messages.ts";
+import { framesOrigin, storyFrameAttributes } from "./framesOrigin.ts";
 import { STRINGS } from "./strings.ts";
 
 /** The frame view's props. */
@@ -26,7 +27,7 @@ export type FrameViewProps = {
    */
   readonly sceneHeight?: number | undefined;
   /**
-   * A height set on the stage (the foot handle, note 142), in CSS px: the frame takes it whatever its story's;
+   * A height set on the stage (the foot handle), in CSS px: the frame takes it whatever its story's;
    * none by default.
    */
   readonly fixedHeight?: number | undefined;
@@ -60,7 +61,14 @@ export const FrameView = ({
   const height = fixedHeight ?? Math.max(contentHeight, sceneHeight);
   return (
     <div className="forgebook-frame-box" data-loading={isLoading ? "" : undefined}>
-      <iframe ref={ref} className="forgebook-frame-view" title={title} src={address} style={{ height }} />
+      <iframe
+        ref={ref}
+        className="forgebook-frame-view"
+        title={title}
+        src={address}
+        {...storyFrameAttributes()}
+        style={{ height }}
+      />
       {/* a story's modules may take seconds the first time: an empty frame would look broken */}
       {isLoading ? (
         <div className="forgebook-frame-loading" role="status">
@@ -82,7 +90,7 @@ export const FrameView = ({
  */
 export const tellFrames = (container: HTMLElement | null, message: ShellMessage): void => {
   for (const frame of container?.querySelectorAll("iframe") ?? []) {
-    frame.contentWindow?.postMessage(message, window.location.origin);
+    frame.contentWindow?.postMessage(message, framesOrigin());
   }
 };
 
@@ -98,6 +106,6 @@ export const tellEachFrame = (
 ): void => {
   for (const frame of container?.querySelectorAll("iframe") ?? []) {
     const storyId = new URL(frame.src, window.location.href).searchParams.get("story") ?? undefined;
-    frame.contentWindow?.postMessage(messageOf(storyId), window.location.origin);
+    frame.contentWindow?.postMessage(messageOf(storyId), framesOrigin());
   }
 };
