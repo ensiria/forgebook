@@ -6,7 +6,8 @@
  * @remarks
  * One module per pattern, instead of an import per file: in development the browser fetched every index module one by
  * one, a few hundred requests per frame. The keys are the files' paths relative to the declaring module
- * (`../src/x.stories.tsx`), the same keys `storyFileKeys` gives the tests that read the files from the disk.
+ * (`../src/x.stories.tsx`), the same keys `storyFileKeys` gives the tests that read the files from the disk. A build
+ * writes each file's docs, code and page in the module as data instead of their loaders' imports (`builtTexts.ts`).
  *
  * @module
  */
@@ -15,6 +16,7 @@ import { globSync, readFileSync } from "node:fs";
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { autoTitle, patternBase } from "./autoTitle.ts";
+import type { BuiltTexts } from "./builtTexts.ts";
 import { type DiskCache, isSettledSince, nowNs, stampPaths } from "./diskCache.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
@@ -207,12 +209,14 @@ export const storyFilesModule = (
  * @param pattern - the pattern before `?forgebook-files`.
  * @param files - the story files it matches, indexed.
  * @param loaders - the group's loaders besides its story files'.
+ * @param texts - a build's: each file's docs, code and page written as data; none imports each from its query.
  */
 export const storyFilesCode = (
   root: string,
   pattern: string,
   files: readonly IndexedStoryFile[],
-  loaders: GroupLoaders
+  loaders: GroupLoaders,
+  texts?: BuiltTexts
 ): string => {
   const { hasUsage, hasReach } = loaders;
   const keys = files.map((file) => file.key);
@@ -228,19 +232,19 @@ export const storyFilesCode = (
   // and the queries' ids come back to the plugin as written here
   const absolute = (key: string): string => VITE_PATHS.resolve(folder, key);
   const path = (key: string): string => JSON.stringify(absolute(key));
-  const query = (key: string, name: string): string => JSON.stringify(`${absolute(key)}?${name}`);
+  const query = (key: string, name: string): string =>
+    `() => import(${JSON.stringify(`${absolute(key)}?${name}`)}).then((module) => module.default)`;
+  const textLoaders = (key: string): readonly string[] => {
+    const written = texts?.files.get(key);
+    if (written !== undefined) return [written.docs, written.code, written.page];
+    return [query(key, "forgebook-docs"), query(key, "forgebook-code"), query(key, "forgebook-page")];
+  };
   // a row per file, its name written once and not once per loader: a large catalogue's names are a tenth of its index
   const rows = keys.map(
-    (key) =>
-      `[${[
-        JSON.stringify(key),
-        `() => import(${path(key)})`,
-        `() => import(${query(key, "forgebook-docs")}).then((module) => module.default)`,
-        `() => import(${query(key, "forgebook-code")}).then((module) => module.default)`,
-        `() => import(${query(key, "forgebook-page")}).then((module) => module.default)`
-      ].join(", ")}]`
+    (key) => `[${[JSON.stringify(key), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")}]`
   );
   return [
+    ...(texts === undefined ? [] : texts.helpers),
     `const rows = [${rows.join(",\n")}];`,
     "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
     "export default {",

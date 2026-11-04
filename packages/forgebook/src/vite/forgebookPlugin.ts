@@ -19,7 +19,7 @@
  *
  * @module
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 
 import {
@@ -37,6 +37,8 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
 import { axeAddress, axeBuildAsset } from "./axeScript.ts";
+import { type BuiltTexts, textsWriter } from "./builtTexts.ts";
+import { catalogueConfig } from "./catalogueConfig.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
@@ -45,7 +47,7 @@ import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { FILES_MODULE_HOT, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
-import { inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
+import { type EmitAsset, inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
   agentSourcesModule,
@@ -63,6 +65,7 @@ import {
 import { CONFIG_ID, DOCS_PAGES_PREFIX, patternId, TOKENS_ID, virtualId } from "./pluginIds.ts";
 import {
   docsModule,
+  docsValue,
   FILES_PREFIX,
   patternModule,
   REACH_ID_PREFIX,
@@ -71,24 +74,10 @@ import {
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
-import { prebundled, scannedEntries } from "./prebundled.ts";
-import { isKeptIndex, type KeptIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
+import { type IndexedStoryFile, isKeptIndex, type KeptIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
 import { tokensModule } from "./storylessRoutes.ts";
 import { CODE_QUERY, DOCS_PAGE_QUERY, HOME_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
-
-/**
- * A file's text, or none when it cannot be read.
- *
- * @param file - the file.
- */
-const readTextFile = (file: string): string | undefined => {
-  try {
-    return readFileSync(file, "utf8");
-  } catch {
-    return undefined;
-  }
-};
 
 /** This module's folder, in the core's package: the core's own dependencies resolve from here, not the project's. */
 const PACKAGE_DIR: string = import.meta.dirname;
@@ -253,50 +242,6 @@ const generatedId = (source: string, dir: string): string | undefined => {
 };
 
 /**
- * Whether an app's configuration names its build's output itself, which the plugin then leaves as it is.
- *
- * @param userConfig - the configuration so far.
- */
-const hasOwnOutput = (userConfig: UserConfig): boolean =>
-  userConfig.build?.rolldownOptions?.output !== undefined ||
-  userConfig.build?.rollupOptions?.output !== undefined;
-
-/**
- * What the plugin sets in Vite's configuration for a catalogue: its folder as the root, what to pre-bundle, the pages
- * as the build's inputs, and the dev server's reads kept to each origin.
- *
- * @param config - the catalogue's configuration.
- * @param userConfig - the configuration so far, whose own `server.cors` and build output the plugin leaves alone.
- */
-const catalogueConfig = (config: ResolvedConfig, userConfig: UserConfig): UserConfig => ({
-  root: config.dir,
-  // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
-  // story files (the project's and the sources') are scanned for what their components import
-  optimizeDeps: {
-    include: prebundled(config, packageResolver(config.dir)),
-    entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
-  },
-  build: {
-    rolldownOptions: {
-      input: {
-        index: pageModulePath(config.dir, "index.html"),
-        frame: pageModulePath(config.dir, "frame.html")
-      },
-      // a catalogue names each story file's scripts once per loader: a name of its hash alone is a tenth of
-      // what the index weighs, and a catalogue whose builds are read by name keeps Vite's (`readableNames`)
-      ...(config.build.readableNames || hasOwnOutput(userConfig)
-        ? {}
-        : { output: { chunkFileNames: "assets/[hash].js", hashCharacters: "base36" } })
-    }
-  },
-  // Vite lets any localhost page read the server: neither origin needs another's reads, and the guards
-  // would be the only wall left between the frames and the catalogue (unless the app chose its own)
-  ...(config.frames.kind === "isolated" && userConfig.server?.cors === undefined
-    ? { server: { cors: false } }
-    : {})
-});
-
-/**
  * The catalogue's Vite plugin: the story index, the docs, the code and the Markdown of the stories, the forced-states
  * rewrite of every style sheet and, with a configuration, the catalogue's two pages.
  *
@@ -406,12 +351,14 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param id - the module's id.
    * @param watch - adds a file whose edit renews the module.
    * @param pack - writes a module's JSON as its value: as it is, or kept out of a build's JavaScript.
+   * @param writeTexts - a build's: writes a pattern's docs, code and pages as data; none imports each.
    * @throws when a story file cannot be indexed.
    */
   const storiesModule = async (
     id: string,
     watch: (file: string) => void,
-    pack: PackJson
+    pack: PackJson,
+    writeTexts: ((files: readonly IndexedStoryFile[]) => Promise<BuiltTexts>) | undefined
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
@@ -428,12 +375,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     filesModules.add(id);
     const hasUsage = config?.lists.usedIn !== false;
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
-    const { files, code } = patternModule(
+    const { files, code } = await patternModule(
       id,
       watch,
       { hasUsage, hasReach: hasUsage && isServing() },
       indexCache(),
-      isTestRun ? undefined : extractor().warm
+      isTestRun ? undefined : extractor().warm,
+      writeTexts
     );
     if (!isRedrawing()) return { code, moduleType: "js" };
     served.keep(id, files);
@@ -489,6 +437,31 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const { isKeptCode, textModule } = await import("./textModules.ts");
     const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
     return textModule(id, { watch, resolveImport, componentFiles, cache: keptCache("code", isKeptCode) });
+  };
+  /**
+   * A group's module (a pattern's, its search index, its "Used in"), when the id names one.
+   *
+   * @param id - the module's id.
+   * @param watch - adds a file whose edit renews the module.
+   * @param resolveImport - resolves an import of a file as the app resolves it.
+   * @param emit - a build's browser files': writes a packed file; none keeps the JSON in the modules.
+   * @throws when a story file cannot be indexed.
+   */
+  const groupModule = async (
+    id: string,
+    watch: (file: string) => void,
+    resolveImport: (specifier: string, importer: string) => Promise<string | undefined>,
+    emit: EmitAsset | undefined
+  ): Promise<{ code: string; moduleType: "js" } | null> => {
+    const pack = emit === undefined ? inlineJson : packedJsonOf(emit);
+    const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
+    const docsOf = async (storyFile: string): Promise<unknown> =>
+      docsValue(await search.docsOf(storyFile), watch);
+    const writeTexts =
+      emit === undefined ? undefined : textsWriter({ docsOf, watch, resolveImport, componentFiles }, emit);
+    return (
+      (await search.moduleOf(id, watch, pack)) ?? (await storiesModule(id, watch, pack, writeTexts)) ?? null
+    );
   };
   return {
     name: "forgebook",
@@ -596,18 +569,19 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (!isReadable(id, devServer)) return { code: "export default null;", moduleType: "js" };
       // in Vite's form, the text Vite's module graph knows a file by: a Node path on Windows (`C:\app\x.md`) is another
       const watch = (file: string): void => this.addWatchFile(VITE_PATHS.normalize(file));
-      const answered = await queryModule(id, watch, async (specifier: string, importer: string) => {
+      const resolveImport = async (specifier: string, importer: string): Promise<string | undefined> => {
         const resolved = await this.resolve(specifier, importer);
         return resolved?.id;
-      });
+      };
+      const answered = await queryModule(id, watch, resolveImport);
       if (answered !== undefined) return renewedModule(id, answered, RENEWED_QUERIES, isServing());
+      // a build's browser files only: a server environment's output is no page's to fetch
+      const emit =
+        isServing() || this.environment.name !== "client"
+          ? undefined
+          : (asset: Parameters<EmitAsset>[0]): unknown => this.emitFile(asset);
       try {
-        // a build's browser files only: a server environment's output is no page's to fetch
-        const pack =
-          isServing() || this.environment.name !== "client"
-            ? inlineJson
-            : packedJsonOf((asset): unknown => this.emitFile(asset));
-        return (await search.moduleOf(id, watch, pack)) ?? (await storiesModule(id, watch, pack)) ?? null;
+        return await groupModule(id, watch, resolveImport, emit);
       } catch (error) {
         this.error(error instanceof Error ? error.message : String(error));
       }
