@@ -10,7 +10,6 @@
  */
 
 import { packedUsage } from "../usedIn.ts";
-import type { BuiltTexts } from "./builtTexts.ts";
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult, UsageResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
@@ -24,6 +23,7 @@ import {
   SEARCH_PREFIX,
   storyFilesCode,
   storyFilesGroupOf,
+  TEXTS_PREFIX,
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { storyReach } from "./storyReach.ts";
@@ -37,6 +37,9 @@ export const USAGE_ID_PREFIX = `\0${USAGE_PREFIX}`;
 
 /** The resolved id of a group's reach module, the same way. */
 export const REACH_ID_PREFIX = `\0${REACH_PREFIX}`;
+
+/** The resolved id of a group's texts module, a build's, the same way. */
+export const TEXTS_ID_PREFIX = `\0${TEXTS_PREFIX}`;
 
 /** The resolved id of a group of story files' search index. */
 export const SEARCH_ID_PREFIX = `\0${SEARCH_PREFIX}`;
@@ -82,23 +85,25 @@ export const docsModule = (
  * @param loaders - the group's loaders besides its story files'.
  * @param cache - the pattern's index kept between starts; none reads every file.
  * @param warm - starts reading the docs of a story file ahead of its request; none in a test run.
- * @param writeTexts - a build's: writes the files' docs, code and pages as data (`builtTexts.ts`); none imports them.
+ * @param startTexts - a build's: starts reading the files' docs, code and pages, which the module imports from the
+ * group's texts module (`builtTexts.ts`); none imports each from its query.
  * @throws when a story file cannot be indexed.
  */
-export const patternModule = async (
+export const patternModule = (
   id: string,
   watch: (file: string) => void,
   loaders: GroupLoaders,
   cache: DiskCache<KeptIndex> | undefined,
   warm: ((storyFile: string) => void) | undefined,
-  writeTexts?: (files: readonly IndexedStoryFile[]) => Promise<BuiltTexts>
-): Promise<{ code: string; moduleType: "js"; files: readonly IndexedStoryFile[] }> => {
+  startTexts?: (files: readonly IndexedStoryFile[]) => void
+): { code: string; moduleType: "js"; files: readonly IndexedStoryFile[] } => {
   const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
   const files = indexedStoryFiles(root, pattern, watch, cache);
   const [first] = files;
   if (first !== undefined) warm?.(first.file);
-  const texts = await writeTexts?.(files);
-  return { code: storyFilesCode(root, pattern, files, loaders, texts), moduleType: "js", files };
+  startTexts?.(files);
+  const code = storyFilesCode(root, pattern, files, loaders, startTexts !== undefined);
+  return { code, moduleType: "js", files };
 };
 
 /** A group's story files indexed, and what their stories render, read in the docs worker. */
