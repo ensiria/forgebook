@@ -7,6 +7,8 @@
 import { describe, expect, it } from "vitest";
 
 import { catalogueSettings, groupLabel } from "../src/catalogue.ts";
+import { LATER_STRINGS } from "../src/shell/laterStrings.ts";
+import { PAGE_STRINGS } from "../src/shell/pageStrings.ts";
 import { configureStrings, lateStrings, STRINGS, textsOfGroup } from "../src/shell/strings.ts";
 import { groupedStories } from "../src/storyTree.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
@@ -182,6 +184,33 @@ describe("configureStrings", () => {
       other: "Kept"
     });
     configureStrings({});
+  });
+
+  it("reaches the later parts' texts by the plain names they share with the first screen's", () => {
+    configureStrings({
+      copy: "Copia",
+      "droppedArgReasons.type": "Tipo",
+      "copied.x": "No",
+      usedInMore: "Many"
+    });
+    const usedInMore = (count: number): string => String(count);
+    const texts = lateStrings({
+      copy: "Copy",
+      droppedArgReasons: { undeclared: "Not a prop", type: "Not its type" },
+      usedInMore
+    });
+    expect(texts).toEqual({
+      copy: "Copia",
+      droppedArgReasons: { undeclared: "Not a prop", type: "Tipo" },
+      usedInMore
+    });
+    configureStrings({});
+  });
+
+  it("keeps each text in one place: no two sets of texts share a name", () => {
+    const sets = [Object.keys(STRINGS), Object.keys(LATER_STRINGS), Object.keys(PAGE_STRINGS)];
+    const names = sets.flat();
+    expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
   });
 
   it("replaces plain texts by their path, and leaves a text that takes values and an unknown path alone", () => {

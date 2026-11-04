@@ -6,7 +6,7 @@
  */
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import type { Loaded } from "./useLoaded.ts";
 
 /**
@@ -45,9 +45,9 @@ export const LazyHost = <TProps extends object>({
   if (host.status === "error") {
     return (
       <p className="forgebook-problems" role="alert">
-        {STRINGS.pluginError}: {host.message}
+        {LATER_STRINGS.pluginError}: {host.message}
       </p>
     );
   }
-  return <p className="forgebook-tab-note">{STRINGS.pluginLoading}</p>;
+  return <p className="forgebook-tab-note">{LATER_STRINGS.pluginLoading}</p>;
 };
