@@ -41,8 +41,7 @@ describe("codeLiteral", () => {
 
   it("leaves no character that ends a script or a string in an older parser", () => {
     for (const value of VALUES) {
-      // a slash stays, escaped: `<\/script>` reads as `</script>` in the string and as nothing in the page
-      expect(codeLiteral(value)).not.toMatch(/[<>\u2028\u2029]|(?<!\\)\//);
+      expect(codeLiteral(value)).not.toMatch(/[<>/\u2028\u2029]/);
     }
   });
 
@@ -63,6 +62,6 @@ describe("codeOfJson", () => {
   it("writes JSON text as code of the same value", () => {
     const json = JSON.stringify({ file: "</script>\u2028", at: "a/b" });
     expect(JSON.parse(json)).toEqual(evaluated(codeOfJson(json)));
-    expect(codeOfJson(json)).toBe('{"file":"\\u003c\\/script\\u003e\\u2028","at":"a\\/b"}');
+    expect(codeOfJson(json)).toBe('{"file":"\\u003c\\u002fscript\\u003e\\u2028","at":"a\\u002fb"}');
   });
 });

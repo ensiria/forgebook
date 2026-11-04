@@ -23,7 +23,7 @@ describe("packedJsonOf", () => {
     const value = pack('{"a":1}');
     expect(gunzipSync(written[0]?.source ?? new Uint8Array()).toString()).toBe('{"a":1}');
     expect(written[0]?.fileName).toMatch(/^assets\/[0-9a-f]{12}\.bin$/);
-    expect(value).toMatch(/^import\(".*\/packedText\.ts"\)\.then\(\(module\) => module\.packedJson\(/);
+    expect(value).toMatch(/^import\(".*packedText\.ts"\)\.then\(\(module\) => module\.packedJson\(/);
     expect(value).toContain(`import.meta.env.BASE_URL + ${codeLiteral(written[0]?.fileName)}`);
     expect(value).not.toContain("await");
     pack('{"a":1}');

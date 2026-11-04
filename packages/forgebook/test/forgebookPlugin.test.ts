@@ -318,7 +318,7 @@ const builtPattern = async (
  * @param code - the module's code.
  */
 const rowKeys = (code: string): string[] =>
-  [...code.matchAll(/^(?:const rows = \[)?\[("\.\\\/src\\\/[^"]+")/gm)].map((match) =>
+  [...code.matchAll(/^(?:const rows = \[)?\[("\.\\u002fsrc\\u002f[^"]+")/gm)].map((match) =>
     JSON.parse(match[1] ?? "")
   );
 
@@ -332,7 +332,7 @@ describe("forgebookPlugin in a build", () => {
     const rows = (texts ?? "").split("export default [")[1]?.split(",\n") ?? [];
     expect(rows).toHaveLength(rowKeys(code).length);
     // its stories have a render and its component a page: both worth a file
-    const files = [...(rows[at] ?? "").matchAll(/packedText\(("assets\\\/[0-9a-f]{12}\.bin")\)/g)].map(
+    const files = [...(rows[at] ?? "").matchAll(/packedText\(("assets\\u002f[0-9a-f]{12}\.bin")\)/g)].map(
       (match) => String(JSON.parse(match[1] ?? ""))
     );
     expect(files).toHaveLength(2);

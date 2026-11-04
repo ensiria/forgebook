@@ -8,7 +8,9 @@
  * `<script>`, a string holding `</script>` or `<!--` ends or changes the script, and before ES2019 a raw U+2028 or
  * U+2029 ended a string literal. The literal written here escapes `<`, `>` and `/` and both separators, so it reads
  * back as the same value in a module, in an inline script and in an older parser alike, wherever a generator places
- * it. The escapes only ever fall inside string literals: JSON writes those characters nowhere else. Each is a pass
+ * it. Each is written as a Unicode escape, never as a backslash before the character, so no escape depends on how the
+ * text's backslashes were escaped. The escapes only ever fall inside string literals: JSON writes those characters
+ * nowhere else. Each is a pass
  * of its own, a native replacement as fast on a large document as one pass with a callback, and the form code
  * scanners read as escaping.
  *
@@ -30,7 +32,7 @@ export const codeOfJson = (json: string): string =>
   json
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e")
-    .replace(/\//g, "\\/")
+    .replace(/\//g, "\\u002f")
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
 

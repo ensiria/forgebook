@@ -142,7 +142,7 @@ describe("the aliases", () => {
   it("writes the settings in the frame's page with no way to close its script", () => {
     const script = pageScript({ base: "", assets: "", version: "</script>", routes: [], staticFiles: [] });
     expect(script).not.toContain("</script>");
-    expect(script).toContain("\\u003c\\/script\\u003e");
+    expect(script).toContain("\\u003c\\u002fscript\\u003e");
   });
 });
 
