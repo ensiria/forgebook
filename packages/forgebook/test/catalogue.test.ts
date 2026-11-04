@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { catalogueSettings, groupLabel } from "../src/catalogue.ts";
-import { configureStrings, STRINGS, textsOfGroup } from "../src/shell/strings.ts";
+import { configureStrings, lateStrings, STRINGS, textsOfGroup } from "../src/shell/strings.ts";
 import { groupedStories } from "../src/storyTree.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { mergedLists } from "../src/vite/configFile.ts";
@@ -217,5 +217,21 @@ describe("configureStrings", () => {
     expect(
       catalogueSettings("Acme UI", DEFAULT_SWITCHES, { device: { model: "nokia-3310" } }).device.model
     ).toBe("phone");
+  });
+});
+
+describe("lateStrings", () => {
+  it("gives a part loaded later the catalogue's replacements by the same names, leaving the rest", () => {
+    configureStrings({ "asides.tip": "Hint", previousPage: "Back" });
+    const texts = lateStrings({
+      previousPage: "Previous",
+      nextPage: "Next",
+      asides: { tip: "Tip", note: "Note" },
+      count: (value: number): string => `${value}`
+    });
+    expect(texts.previousPage).toBe("Back");
+    expect(texts.nextPage).toBe("Next");
+    expect(texts.asides).toEqual({ tip: "Hint", note: "Note" });
+    configureStrings({});
   });
 });

@@ -10,7 +10,7 @@
  * `{ error }` for the panel, `?forgebook-code`, answered with each story's `render` as written (`storyCode.ts`),
  * `?forgebook-page`, answered with the component's documentation file as HTML (`componentPage.ts`), and
  * `?forgebook-markdown`, a source's own Markdown file (its introduction on the home) as HTML. A source's docs pages
- * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`). It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
+ * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`), and the written home with `?forgebook-home`. It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
  * `pkg:` URLs, which the library's style sheets use.
  *
  * A pattern's module watches its story files, so an edit renews it. Vite watches only its root for new files, and the
@@ -74,7 +74,7 @@ import {
 import { prebundled, scannedEntries } from "./prebundled.ts";
 import { isKeptIndex, type KeptIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
 import { tokensModule } from "./storylessRoutes.ts";
-import { CODE_QUERY, DOCS_PAGE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
+import { CODE_QUERY, DOCS_PAGE_QUERY, HOME_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /**
@@ -119,7 +119,14 @@ const TEXT_QUERIES: readonly string[] = [CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY]
 const RENEWED_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY];
 
 /** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
-const FILE_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY, DOCS_PAGE_QUERY];
+const FILE_QUERIES: readonly string[] = [
+  DOCS_QUERY,
+  CODE_QUERY,
+  PAGE_QUERY,
+  MARKDOWN_QUERY,
+  DOCS_PAGE_QUERY,
+  HOME_QUERY
+];
 
 /**
  * Whether a dev server may read the file a query names: a plugin's answer never passes Vite's own check of
@@ -176,8 +183,8 @@ const requestedPage = (url: string): PageFile | undefined => {
 };
 
 /**
- * A docs pages' module, when the id is a pattern's or a page's. The Markdown reader loads with the first: a catalogue
- * may have no docs pages, and a story's page reads none.
+ * A docs pages' module, when the id is a pattern's, a page's or the written home's. The Markdown reader loads with the
+ * first: a catalogue may have no docs pages, and a story's page reads none.
  *
  * @param id - the module's id.
  * @param watch - adds a file whose edit renews the module.
@@ -190,15 +197,18 @@ const docsModuleOf = async (
   isServing: boolean,
   plugins: ResolvedConfig["plugins"]
 ): Promise<{ code: string; moduleType: "js" } | undefined> => {
+  const isHome = id.endsWith(HOME_QUERY);
   const isPage = id.endsWith(DOCS_PAGE_QUERY);
-  if (!isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
-  const { docPageModule, docPagesModule } = await import("./docPagesModule.ts");
+  if (!isHome && !isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
+  const { docPageModule, docPagesModule, homeModule } = await import("./docPagesModule.ts");
+  if (isHome)
+    return { code: homeModule(id.slice(0, -HOME_QUERY.length), watch, isServing, plugins), moduleType: "js" };
   if (isPage) {
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
     return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
   }
   const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
-  return { code: docPagesModule(root, pattern, watch, isServing), moduleType: "js" };
+  return { code: docPagesModule(root, pattern, watch, isServing, plugins), moduleType: "js" };
 };
 
 /**

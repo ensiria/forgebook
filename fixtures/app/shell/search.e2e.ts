@@ -161,7 +161,8 @@ test.describe("the search", () => {
     await expect(row(page, "Called with the new value")).toBeVisible();
     const opened = context.waitForEvent("page");
     await row(page, "Called with the new value").click({ modifiers: ["ControlOrMeta"] });
-    await expect((await opened).url()).toContain("prop.onValueChange");
+    // the new tab opens on a blank page first, then goes to the result
+    await (await opened).waitForURL(/prop\.onValueChange/);
     await expect(results(page)).toBeVisible();
   });
 

@@ -41,6 +41,7 @@ const configIn = (dir: string, tokens: readonly string[]): ResolvedConfig => ({
   lists: {},
   hasPlayTools: false,
   plugins: [],
+  home: undefined,
   frames: ISOLATED_FRAMES,
   build: { readableNames: false }
 });

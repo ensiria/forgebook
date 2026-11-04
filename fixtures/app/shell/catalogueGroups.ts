@@ -24,6 +24,7 @@ import { CATALOGUES, type Catalogue } from "./ports";
 const SPEC_CATALOGUES: Readonly<Record<string, readonly Catalogue[]>> = {
   "angular.e2e.ts": ["angular"],
   "embed.e2e.ts": ["white-label", "app"],
+  "home.e2e.ts": ["app", "generated-home"],
   "html.e2e.ts": ["html"],
   "nextjs.e2e.ts": ["nextjs"],
   "nuxt.e2e.ts": ["nuxt"],

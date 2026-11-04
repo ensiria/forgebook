@@ -11,6 +11,7 @@
  *
  * @module
  */
+import { OWN_SOURCE_ID } from "../docPages.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
 import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
 import type { FramesPlacement } from "../frameOrigins.ts";
@@ -18,6 +19,7 @@ import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { pluginFrameModule } from "./pluginConfig.ts";
+import { HOME_QUERY } from "./textQueries.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** The pages, by their file name. */
@@ -50,9 +52,6 @@ export const STORIES_SOURCE_FILE = ".forgebook-stories.ts";
  * sources, as the frame gets them (never written to disk).
  */
 export const AGENT_SOURCES_FILE = ".forgebook-agent.ts";
-
-/** The project's own stories' source id. */
-export const OWN_SOURCE_ID = "stories";
 
 /** A module the plugin generates in the configuration's folder: a page, a page's entry, or one of the two sources. */
 export type PageModule =
@@ -256,6 +255,23 @@ const sourcesCode = (config: ResolvedConfig): { readonly imports: string[]; read
   };
 };
 
+/** The module the entry loads the written home's view from, on first use. */
+export const WRITTEN_HOME_MODULE = "forgebook/shell/home";
+
+/**
+ * The shell's written home, as the entry writes it: loaded as the home opens, with its text, so a catalogue without
+ * one pays nothing for it, and the shell's own code holds nothing of it.
+ *
+ * @param home - the home's absolute path.
+ */
+const writtenHomeCode = (home: string): string =>
+  [
+    "() =>",
+    `      import(${JSON.stringify(WRITTEN_HOME_MODULE)}).then((module) =>`,
+    `        module.writtenHome(() => import(${JSON.stringify(`${home}${HOME_QUERY}`)}).then((page) => page.default))`,
+    "      )"
+  ].join("\n");
+
 /**
  * The shell's list of the plugins' tabs and docs blocks, each with the import that loads its view when it is first
  * needed; nothing for a catalogue without any, whose entry is then what it would be with no plugin.
@@ -303,6 +319,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.logo === undefined ? [] : ["    logo,"]),
     ...(config.shell.hasBranding ? [] : ["    hasBranding: false,"]),
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
+    ...(config.home === undefined ? [] : [`    home: ${writtenHomeCode(config.home)},`]),
     `    sources: ${sources.list},`,
     '    frameUrl: "frame.html",',
     "    frames: config.frames,",

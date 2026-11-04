@@ -41,7 +41,10 @@ export const pageTools = (ask: Ask): readonly McpTool[] => [
     inputSchema: {
       type: "object",
       properties: {
-        id: { type: "string", description: "The page's id, as list_pages gives it." },
+        id: {
+          type: "string",
+          description: "The page's id, as list_pages gives it; `home` for the catalogue's written home."
+        },
         view: VIEW
       },
       required: ["id"],

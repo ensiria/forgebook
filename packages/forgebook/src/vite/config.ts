@@ -62,6 +62,12 @@ export type ForgebookConfig = CatalogueLists & {
    * stories, listed in the sidebar's Docs section, in the source named after the catalogue.
    */
   readonly docs?: readonly string[];
+  /**
+   * The catalogue's home, written by its authors: a Markdown file by path from the configuration's folder, read with
+   * the docs pages' syntax, with values (`{{components}}`) and pieces of the generated home (`::families`).
+   * `forgebook.home.md` beside the configuration when there; without either, or with `false`, the home is generated.
+   */
+  readonly home?: string | false;
   /** The packages' story sources, as module specifiers exporting a `source` (`["@acme/ui/stories"]`). */
   readonly sources?: readonly string[];
   /** The switches of the toolbar and the View menu; the theme and the contrast when neither it nor a preset declares any. */

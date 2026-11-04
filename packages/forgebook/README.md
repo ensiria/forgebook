@@ -462,13 +462,154 @@ See [the colours](./colours.md#brand), or [every state](?component=acme:actions-
 - Stories load as they come near, follow the view's switches live, and keep their bar: their code, their box over the
   page, a link to their own page. A story of another source works too: the id is the whole one `forgebook stories` lists.
 - A link to another page is written to its file (`./colours.md#brand`), so it works in the repository too. Images are
-  relative to the file, and go through the build. A fence must sit at the page's top level, not inside a list or a quote.
+  relative to the file, and go through the build. A `story` or `props` fence sits in the page's own flow, or in a block
+  below (an aside, a tab, a step), not inside a plain list or quote.
 - The page gets its look from the shell's palette, so a `shell.theme` and both appearances reach it; a page with two
   headings or more lists them beside its text, or above it on a narrow page.
-- `forgebook stories` fails when a page names a story or a component that is not there, a link leads to no page, or an
-  image is not a file of its package, so a rename never breaks a page unseen.
-- A page is trusted as a story's code is: Markdown lets it hold raw HTML, which runs in the catalogue. Review one as you
-  review code, and do not build a catalogue from pages you did not write.
+- `forgebook stories` and `forgebook pages` fail when a page names a story or a component that is not there, a link leads
+  to no page, an image is not a file of its package, or a block cannot be read; each problem gives its line and column
+  (`./docs/theming.md: line 12, column 1: …`), and the page still draws everything else.
+- A page is trusted more than a story's code: a story runs in a frame on an origin of its own, while a page's raw HTML,
+  which Markdown lets it hold, runs in the catalogue itself (its links keep only web, mail and the catalogue's own
+  addresses). Review a page as you review code, and do not build a catalogue from pages, a library's included, you did
+  not write.
+
+### Blocks
+
+Blocks are written as Starlight, Docusaurus and VitePress write them, so a page reads well on GitHub too: `:::name`
+opens a block, a line of the same colons closes it, `[label]` gives it a title (plain text, values included) and
+`{key="value"}` its attributes. A block inside another has fewer colons than its parent. Everything is drawn at build time; the tabs alone bring a few lines of
+script, with the docs pages' code, which only a page that opens loads.
+
+````md
+:::tip[Before you start]
+Anything Markdown holds goes in a block, a story too:
+
+```story acme:actions-button--primary
+```
+:::
+
+> [!WARNING]
+> GitHub's alerts are asides too: NOTE, TIP, IMPORTANT, WARNING (a caution) and CAUTION (a danger).
+
+::::tabs{syncKey="package-manager"}
+:::tab[pnpm]
+```sh
+pnpm add @acme/ui
+```
+:::
+:::tab[npm]
+```sh
+npm install @acme/ui
+```
+:::
+::::
+
+:::steps
+1. Install the package.
+2. Wrap the app in its provider.
+
+   ```tsx
+   <AcmeProvider theme="light">{app}</AcmeProvider>
+   ```
+:::
+
+::::cards
+:::card[Light and dark]
+Every component follows the theme.
+:::
+::link-card[Theming]{href="./theming.md" description="How the colours are chosen."}
+::::
+````
+
+| Block | What it draws |
+|---|---|
+| `:::note`, `:::tip`, `:::important`, `:::caution`, `:::danger` | An aside in its tone's colour; `[label]` replaces the tone's name as its title. |
+| `> [!NOTE]` … `> [!CAUTION]` | The same asides, as GitHub writes them. |
+| `::::tabs{syncKey="…"}` around `:::tab[Label]` | One panel at a time, keys ← → Home End. Tabs with the same `syncKey` (as Starlight names it) switch together, on every page, and the browser keeps the choice. |
+| `:::steps` around one numbered list | Numbered steps; a step may hold code and stories. |
+| `::::cards` around `:::card[Title]` and `::link-card` | Cards side by side, as many to a row as fit. |
+| `::link-card[Title]{href="…" description="…"}` | A card that links to a page by its file, to an address of the catalogue (`?component=…`), or to another site. |
+
+A block the page cannot read is reported with its line and column, and what it holds still draws: a name Forgebook does
+not know (a `::` line it does not know stays as text; `:::warning` is pointed to `:::caution`), an attribute a block does
+not take, a closing line with the wrong number of colons, a block never closed. A block starts at
+a line's start; written after spaces, as under a list item, it is not read.
+
+### Code
+
+The line after a fence's backticks is read whole, as Expressive Code writes it:
+
+````md
+```tsx title="Button.tsx" {3} ins={4} del={5}
+import { Button } from "@acme/ui";
+
+export const Save = () => (
+  <Button tone="primary">Save</Button>
+  <Button>Save</Button>
+);
+```
+
+```diff lang="tsx"
+-const tone = "neutral";
++const tone = "primary";
+```
+````
+
+`title="…"` names the code (a file, most often); `{1,4-6}` marks lines, `ins={…}` and `del={…}` mark them inserted or
+deleted; `wrap` wraps long lines instead of scrolling. A `diff` fence marks its `+` and `-` lines: with `lang="tsx"` it is
+code, its signs taken off and the rest coloured in that language; without, it is a patch, shown and copied as written. The
+lines are `<mark>`, `<ins>` and `<del>` elements, so a screen reader says what changed, and Copy copies code as it reads
+after the change: no diff signs, no deleted lines. A word the line does not read is a problem, with its
+column.
+
+### A home of your own
+
+A catalogue's home lists the libraries and their families. To write your own, put `forgebook.home.md` beside the
+configuration (or name another file with `home: "docs/home.md"`); without one, the home stays the generated one. It is a
+docs page, with every block above, a few values and the generated home's pieces among your own words:
+
+````md
+---
+description: "{{components}} components in {{libraries}} libraries, version {{version}}."
+---
+
+Our design system, for every product team.
+
+:::tip[Start here]
+Read [Getting started](./docs/getting-started.md), then pick a component.
+:::
+
+::recent
+
+```story acme:actions-button--primary
+```
+
+::families[Components]{source="acme"}
+
+::libraries
+````
+
+| Value | What it shows |
+|---|---|
+| `{{title}}` | The catalogue's name. |
+| `{{version}}` | The `version` of the `package.json` the file belongs to, read at build time. |
+| `{{components}}`, `{{stories}}` | How many components and listed stories the catalogue has. |
+| `{{libraries}}`, `{{pages}}` | How many libraries have components, and how many docs pages there are. |
+
+| Piece | What it draws |
+|---|---|
+| `::recent[Heading]` | The pages opened last, under "Recently opened" or your heading; nothing when there are none. |
+| `::libraries{source="…"}` | Each library as the generated home shows it: its name and logo, its introduction, its pages and families. |
+| `::families[Heading]{source="…"}` | The family cards alone. |
+| `::pages[Heading]{source="…"}` | The docs pages' card alone. |
+
+The title is the front matter's `title`, else the file's opening `#` heading, else the catalogue's name; `description` is
+the lead under it. Values work in docs pages too, and a value is never read inside code, so a page can show `{{title}}`
+itself in backticks; a name that is not a value (`{{name}}`) stays as written and is reported. The pieces belong to the home: on a docs page they are a problem. A link to a `.md` file opens that
+page of the catalogue's own `docs`; a library's page is linked by its address (`?page=acme:guides-theming`). Problems in
+the file are listed above the home and by `forgebook pages`, and `forgebook page home` reads it as an agent would. Restart
+`forgebook dev` after adding or removing the file.
 
 ## Design links
 

@@ -2,11 +2,14 @@
  * The blocks of a docs page: its text, its code, its stories in their frames and its components' API tables.
  *
  * @remarks
- * Each kind of block is one case of `DocBlockView`, and the plugin's compiler gives each its fence, so a new kind (a
- * table of the catalogue's tokens, a comparison of a story's themes) is one type, one fence and one case, and needs no
- * page of its own. A plugin's block is one of those cases, its view loaded as the page draws it. A story's block is an example of a component's page, without its heading: the page's own text says
+ * Each kind of block is one case of `DocBlockView`, and the plugin's compiler gives each its fence or directive, so a
+ * new kind (a table of the catalogue's tokens, a comparison of a story's themes) is one type, one name and one case,
+ * and needs no page of its own. A plugin's block is one of those cases, its view loaded as the page draws it. A
+ * container draws its blocks through the same view, so a story may sit in an aside, a tab or a step. A story's block is
+ * an example of a component's page, without its heading: the page's own text says
  * what it shows. It loads as it comes near, through the same queue as a component's examples, and its code and a
- * table's docs wait for that too.
+ * table's docs wait for that too; each block keeps its place in the page's reading order, however deep it sits. The
+ * written home's pieces (`::families`) draw today's home, from the same components.
  *
  * @module
  */
@@ -14,13 +17,23 @@ import type { StorySource } from "@forgebook/story-format/source";
 import { type ReactNode, useEffect } from "react";
 
 import { isComponentDocs } from "../componentDocs.ts";
-import { type DocBlock, linkedHtml } from "../docPages.ts";
+import {
+  type DocBlock,
+  filledHtml,
+  filledText,
+  linkedHref,
+  linkedHtml,
+  type PageValues
+} from "../docPages.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { findComponent, findStory, isLogicComponent, type StoryTree, type TreeSource } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { ViewState } from "../viewState.ts";
 import { ApiReference } from "./ApiReference.tsx";
+import { AsideBlock, CardBlock, CardsBlock, LinkCardBlock, StepsBlock, TabsBlock } from "./DocContainers.tsx";
 import { Example, type ExampleContext } from "./Example.tsx";
+import { componentCount, libraryCount } from "./HomePage.tsx";
+import { type HomePiecesContext, HomePieceView } from "./HomePieces.tsx";
 import { LazyHost } from "./LazyHost.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
 import type { ShellPlugin } from "./pluginTabs.tsx";
@@ -60,7 +73,68 @@ export type DocBlocksContext = {
   readonly heightOf: (storyId: string) => number | undefined;
   /** The colour a source's stories' page has in the view, which each box waits on. */
   readonly backgroundOf: (source: TreeSource) => string | undefined;
+  /** The values the text names (`{{components}}`). */
+  readonly values: PageValues;
+  /** Opens an address of the catalogue a link card names; `false` when it names no page of the catalogue. */
+  readonly onOpenAddress: (href: string) => boolean;
+  /** What the written home's pieces read; none on a docs page, where they are not drawn. */
+  readonly home?: HomePiecesContext;
+  /** Each story's and table's place in the page's reading order, for the queue. */
+  readonly places: ReadonlyMap<DocBlock, number>;
 };
+
+/**
+ * The values a page's text can name, as the catalogue has them now.
+ *
+ * @param title - the catalogue's name.
+ * @param tree - its tree.
+ */
+export const catalogueValues = (title: string, tree: StoryTree): PageValues => ({
+  title,
+  components: String(componentCount(tree)),
+  // the stories the sidebar lists: a story a component keeps out of the list is not one a reader can open
+  stories: String(
+    tree.sources
+      .flatMap((source) => source.families)
+      .flatMap((family) => family.groups)
+      .flatMap((group) => group.components)
+      .reduce((total, component) => total + component.stories.length, 0)
+  ),
+  libraries: String(libraryCount(tree)),
+  pages: String(tree.sources.reduce((total, source) => total + source.pages.length, 0))
+});
+
+/** The blocks a block holds, in their order: none for a block that holds none. */
+const childrenOf = (block: DocBlock): readonly DocBlock[] => {
+  switch (block.kind) {
+    case "aside":
+    case "cards":
+    case "card":
+      return block.children;
+    case "tabs":
+      return block.tabs.flatMap((tab) => tab.children);
+    case "steps":
+      return block.steps.flat();
+    default:
+      return [];
+  }
+};
+
+/**
+ * Every block of a page in its reading order, a container before what it holds.
+ *
+ * @param blocks - the page's blocks.
+ */
+export const readingOrder = (blocks: readonly DocBlock[]): DocBlock[] =>
+  blocks.flatMap((block) => [block, ...readingOrder(childrenOf(block))]);
+
+/**
+ * Each block's place in a page's reading order.
+ *
+ * @param blocks - the page's blocks.
+ */
+export const blockPlaces = (blocks: readonly DocBlock[]): ReadonlyMap<DocBlock, number> =>
+  new Map(readingOrder(blocks).map((block, place) => [block, place]));
 
 /** The queue's name for a component's table, apart from the ids of the stories. */
 const propsKey = (id: string): string => `props:${id}`;
@@ -73,7 +147,7 @@ const propsKey = (id: string): string => `props:${id}`;
  * @param tree - the tree, which finds a story by either id.
  */
 export const queuedBlocks = (blocks: readonly DocBlock[], tree: StoryTree): string[] =>
-  blocks.flatMap((block) => {
+  readingOrder(blocks).flatMap((block) => {
     if (block.kind === "story") return [findStory(tree, block.id)?.story.id ?? block.id];
     return block.kind === "props" ? [propsKey(block.id)] : [];
   });
@@ -90,10 +164,21 @@ const MissingBlock = ({ message }: { readonly message: string }): ReactNode => (
  *
  * @param props - the code as copied and as HTML.
  */
-const CodeBlock = ({ text, html }: { readonly text: string; readonly html: string }): ReactNode => {
+const CodeBlock = ({
+  text,
+  html,
+  title,
+  isWrapped
+}: {
+  readonly text: string;
+  readonly html: string;
+  readonly title: string | undefined;
+  readonly isWrapped: boolean;
+}): ReactNode => {
   const { isCopied, copy } = useCopy();
   return (
-    <div className="forgebook-docs__code">
+    <div className="forgebook-docs__code" data-titled={title !== undefined} data-wrap={isWrapped}>
+      {title === undefined ? null : <p className="forgebook-docs__code-title">{title}</p>}
       <button
         type="button"
         className="forgebook-example__copy"
@@ -237,31 +322,78 @@ const PluginBlock = ({
 /**
  * One block of a page.
  *
- * @param props - the block, its place in the page and what the blocks share.
+ * @param props - the block and what the blocks share.
  */
 const DocBlockView = ({
   block,
-  place,
   context
 }: {
   readonly block: DocBlock;
-  readonly place: number;
   readonly context: DocBlocksContext;
 }): ReactNode => {
+  const inner = (blocks: readonly DocBlock[]): ReactNode => <DocBlocks blocks={blocks} context={context} />;
+  const text = (written: string): string => filledText(written, context.values);
   switch (block.kind) {
     case "text":
       return (
         <PackageHtml
           className="forgebook-prose"
-          html={linkedHtml(block.html, context.pageHrefOf, context.assets)}
+          html={filledHtml(linkedHtml(block.html, context.pageHrefOf, context.assets), context.values)}
         />
       );
     case "code":
-      return <CodeBlock text={block.text} html={block.html} />;
+      return (
+        <CodeBlock
+          text={block.text}
+          html={block.html}
+          title={block.title}
+          isWrapped={block.isWrapped === true}
+        />
+      );
     case "story":
-      return <StoryBlock id={block.id} place={place} context={context} />;
+      return <StoryBlock id={block.id} place={context.places.get(block) ?? 0} context={context} />;
     case "props":
       return <PropsBlock id={block.id} context={context} />;
+    case "aside":
+      return (
+        <AsideBlock tone={block.tone} title={block.title === undefined ? undefined : text(block.title)}>
+          {inner(block.children)}
+        </AsideBlock>
+      );
+    case "tabs":
+      return (
+        <TabsBlock
+          labels={block.tabs.map((tab) => text(tab.label))}
+          sync={block.sync}
+          panels={block.tabs.map((tab) => inner(tab.children))}
+        />
+      );
+    case "steps":
+      return <StepsBlock steps={block.steps.map(inner)} />;
+    case "cards":
+      return <CardsBlock>{inner(block.children)}</CardsBlock>;
+    case "card":
+      return <CardBlock title={text(block.title)}>{inner(block.children)}</CardBlock>;
+    case "link-card":
+      return (
+        <LinkCardBlock
+          title={text(block.title)}
+          description={block.description === undefined ? undefined : text(block.description)}
+          href={linkedHref(block.href, context.pageHrefOf)}
+          onOpen={context.onOpenAddress}
+        />
+      );
+    case "home":
+      return context.home === undefined ? null : (
+        <HomePieceView
+          piece={block.piece}
+          label={block.label === undefined ? undefined : text(block.label)}
+          source={block.source}
+          context={context.home}
+        />
+      );
+    case "problem":
+      return <MissingBlock message={block.message} />;
     case "plugin":
       return <PluginBlock block={block} context={context} />;
     default:
@@ -284,5 +416,5 @@ export const DocBlocks = ({
   blocks.map((block, place) => (
     // the blocks of one page never reorder, so their place is a stable key, and a story may be shown twice
     // biome-ignore lint/suspicious/noArrayIndexKey: see above
-    <DocBlockView key={place} block={block} place={place} context={context} />
+    <DocBlockView key={place} block={block} context={context} />
   ));

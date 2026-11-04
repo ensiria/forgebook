@@ -70,7 +70,13 @@ export const pagesCommands = (
     summary: "Print one docs page: its Markdown, its headings with --json, the address that opens it.",
     json: true,
     options: PAGE_OPTIONS,
-    positionals: [{ name: "id", description: "The page's id, as forgebook pages lists it.", required: true }],
+    positionals: [
+      {
+        name: "id",
+        description: "The page's id, as forgebook pages lists it; home for the catalogue's written home.",
+        required: true
+      }
+    ],
     examples: [
       { command: `${COMMAND} page kit:guides-theming`, description: "Read a page." },
       { command: `${COMMAND} page kit:guides-theming --json`, description: "With its headings, as JSON." }

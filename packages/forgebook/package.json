@@ -38,6 +38,7 @@
     "./story-tree": "./src/storyTree.ts",
     "./page-tree": "./src/pageTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
+    "./shell/home": "./src/shell/AuthoredHome.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
     "./renderer": "./src/frame/renderer.ts",
@@ -152,6 +153,10 @@
       "./shell": {
         "types": "./dist/src/shell/mountShell.d.ts",
         "default": "./dist/src/shell/mountShell.js"
+      },
+      "./shell/home": {
+        "types": "./dist/src/shell/AuthoredHome.d.ts",
+        "default": "./dist/src/shell/AuthoredHome.js"
       },
       "./frame": {
         "types": "./dist/src/frame/mountFrame.d.ts",

@@ -67,7 +67,9 @@ const SERVERS: Readonly<Record<Catalogue, { folder: string; configFile?: string 
   nuxt: { folder: join(import.meta.dirname, "..", "..", "nuxt") },
   angular: { folder: join(import.meta.dirname, "..", "..", "angular") },
   sveltekit: { folder: join(import.meta.dirname, "..", "..", "sveltekit") },
-  "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") }
+  "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") },
+  // the fixture app without its written home, for the home every catalogue without one keeps (`home.e2e.ts`)
+  "generated-home": { folder: join(import.meta.dirname, ".."), configFile: "forgebook.generated.config.ts" }
 };
 
 /** The catalogues and specs this run takes: all of them, or one group (`catalogueGroups.ts`). */

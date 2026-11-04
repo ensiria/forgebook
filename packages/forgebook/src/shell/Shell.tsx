@@ -7,7 +7,16 @@
 /* eslint-disable max-lines -- the page, its address and its keys; split by what it does when next touched */
 
 import type { StoryFiles, StoryLanguage, StorySource } from "@forgebook/story-format/source";
-import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentType,
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
@@ -38,6 +47,7 @@ import {
 import type { ViewSwitch } from "../switches.ts";
 import { usageLoader } from "../usedIn.ts";
 import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewParams } from "../viewState.ts";
+import type { WrittenHomeProps } from "./AuthoredHome.tsx";
 import type { ComponentPageProps } from "./ComponentPage.tsx";
 import { CatalogueContext, NO_PLUGINS, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
 import type { DocPageProps } from "./DocPage.tsx";
@@ -46,7 +56,7 @@ import type { HomePageProps } from "./HomePage.tsx";
 import { Icon } from "./icons.tsx";
 import { LazyPage } from "./LazyPage.tsx";
 import { LogicMark } from "./LogicMark.tsx";
-import { lazyModule } from "./lazyModule.tsx";
+import { type LazyModule, lazyModule } from "./lazyModule.tsx";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
@@ -101,6 +111,12 @@ export type ShellConfig = {
   readonly switches?: readonly ViewSwitch[];
   /** The catalogue's lists (its widths, zoom steps, backgrounds, story groups…); the defaults when none. */
   readonly lists?: CatalogueLists;
+  /**
+   * Loads the catalogue's written home (`forgebook.home.md`), drawn in place of the generated home: the page's entry
+   * gives it only for a catalogue that has one, so the others' first load carries nothing of it. None keeps the
+   * generated home.
+   */
+  readonly home?: () => Promise<ComponentType<WrittenHomeProps>>;
   /** Loads the catalogue's design tokens, on first use; none when it has none. */
   readonly loadTokens?: () => Promise<unknown>;
   /** The plugins with views (the generated page passes them); none by default. */
@@ -122,6 +138,26 @@ const HOME_PAGE = lazyModule<HomePageProps>(() => import("./HomePage.tsx").then(
 const COMPONENT_PAGE = lazyModule<ComponentPageProps>(() =>
   import("./ComponentPage.tsx").then((module) => module.ComponentPage)
 );
+
+/**
+ * The home: the catalogue's written one when it has one, the generated one otherwise, each loaded when first opened.
+ *
+ * @param props - the written home's module, if any, and each home's props.
+ */
+const ShellHome = ({
+  written,
+  home,
+  writtenProps
+}: {
+  readonly written: LazyModule<WrittenHomeProps> | undefined;
+  readonly home: HomePageProps;
+  readonly writtenProps: WrittenHomeProps;
+}): ReactNode =>
+  written === undefined ? (
+    <LazyPage module={HOME_PAGE} header={home.header} pageProps={home} />
+  ) : (
+    <LazyPage module={written} header={home.header} pageProps={writtenProps} />
+  );
 
 /**
  * The page an address names: one story, a component's page or a docs page with the heading or prop it opens at, or the
@@ -724,9 +760,12 @@ const ShellPage = ({
   frameUrl,
   addressTexts = "any",
   plugins = NO_PLUGINS,
-  loadTokens
+  loadTokens,
+  home
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
+  // the written home's module, loaded when the home is first opened
+  const writtenHome = useMemo(() => (home === undefined ? undefined : lazyModule(home)), [home]);
   const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
   const {
     width: sidebarWidth,
@@ -830,6 +869,36 @@ const ShellPage = ({
     />
   );
 
+  const homeProps = {
+    title,
+    tree,
+    sources,
+    recent,
+    hrefOf: (page: RecentPage): string => addressQuery(pageAddress(page), catalogue),
+    onOpen: (page: RecentPage): void => openPage(page),
+    header
+  };
+  const docProps = {
+    title,
+    plugins,
+    tree,
+    sources,
+    view: address.view,
+    touchOverrides,
+    onTouchChange: setTouchOverride,
+    frameUrl,
+    storyHrefOf,
+    onOpenStory: (story: TreeStory): void => openPage(storyPage(story)),
+    pageHrefOf: (id: string, anchor: string | undefined): string =>
+      addressQuery(pageAddress({ kind: "page", id, anchor }), catalogue),
+    onOpenAddress: (href: string): boolean => openLinkedPage(href, openPage),
+    heightOf: columnHeightOf,
+    backgroundOf: (pageSource: TreeSource): string | undefined =>
+      storyBackground(pageSource.background, address.view, catalogue, isSystemDark),
+    header,
+    scroll
+  };
+
   return (
     <div className="catalogue">
       <Sidebar
@@ -873,21 +942,6 @@ const ShellPage = ({
           fixed={fixedOfShown(fixedViews, shown)}
           deviceDefault={deviceOfShown(catalogue.device, shown)}
         />
-        {shown.kind === "home" ? (
-          <LazyPage
-            module={HOME_PAGE}
-            header={header}
-            pageProps={{
-              title,
-              tree,
-              sources,
-              recent,
-              hrefOf: (page: RecentPage): string => addressQuery(pageAddress(page), catalogue),
-              onOpen: (page: RecentPage): void => openPage(page),
-              header
-            }}
-          />
-        ) : null}
         {shown.kind === "component" ? (
           <LazyPage
             module={COMPONENT_PAGE}
@@ -924,6 +978,9 @@ const ShellPage = ({
             }}
           />
         ) : null}
+        {shown.kind === "home" ? (
+          <ShellHome written={writtenHome} home={homeProps} writtenProps={{ ...homeProps, ...docProps }} />
+        ) : null}
         {shown.kind === "page" ? (
           // keyed by the page: its frames, its text and its scrolling element are that page's alone
           <LazyPage
@@ -931,27 +988,11 @@ const ShellPage = ({
             module={DOC_PAGE}
             header={header}
             pageProps={{
+              ...docProps,
               location: shown.location,
               anchor: shown.anchor,
-              tree,
-              sources,
-              view: address.view,
-              touchOverrides,
-              onTouchChange: setTouchOverride,
-              frameUrl,
-              plugins,
-              storyHrefOf,
-              onOpenStory: (story: TreeStory): void => openPage(storyPage(story)),
-              pageHrefOf: (id: string, anchor: string | undefined): string =>
-                addressQuery(pageAddress({ kind: "page", id, anchor }), catalogue),
               onOpenPage: (id: string): void => openPage({ kind: "page", id }),
-              onOpenAnchor: openAnchor,
-              onOpenAddress: (href: string): boolean => openLinkedPage(href, openPage),
-              heightOf: columnHeightOf,
-              backgroundOf: (pageSource: TreeSource): string | undefined =>
-                storyBackground(pageSource.background, address.view, catalogue, isSystemDark),
-              header,
-              scroll
+              onOpenAnchor: openAnchor
             }}
           />
         ) : null}

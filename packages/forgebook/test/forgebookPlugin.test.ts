@@ -164,6 +164,7 @@ describe("forgebookPlugin's pages", () => {
     watch: [],
     lists: {},
     plugins: [],
+    home: undefined,
     hasPlayTools: false,
     frames: ISOLATED_FRAMES,
     build: { readableNames: false }
