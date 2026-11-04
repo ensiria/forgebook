@@ -115,7 +115,7 @@ describe("a static build's files module", () => {
 });
 
 describe("a files module's loaders", () => {
-  it("name each story file once, and give every loader of it", async () => {
+  it("name each story file once, for its index and every loader of it", async () => {
     const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
     const code = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
       hasUsage: false,
@@ -137,6 +137,7 @@ describe("a files module's loaders", () => {
       expect(Object.values(column ?? {}).every((loader) => typeof loader === "function")).toBe(true);
     }
     const first = keys[0] ?? "none";
-    expect(code.split(`${JSON.stringify(first)}, () =>`)).toHaveLength(2);
+    expect(code.split(JSON.stringify(first))).toHaveLength(2);
+    expect(Reflect.get(Reflect.get(loaders, "index"), first)).toHaveProperty("stories");
   });
 });
