@@ -39,6 +39,7 @@ import { STORY_FILE } from "./autoTitle.ts";
 import { axeAddress, axeBuildAsset } from "./axeScript.ts";
 import { groupTexts, type TextSources } from "./builtTexts.ts";
 import { catalogueConfig } from "./catalogueConfig.ts";
+import { currentCloseWatch } from "./closeWatch.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
@@ -281,6 +282,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   };
   /** The dev server; none in a build. */
   let devServer: ViteDevServer | undefined;
+  /** The files followed one by one, so an edit reaches the dev server at once. */
+  const watching = currentCloseWatch();
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
@@ -507,6 +510,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     },
     configureServer: (server: ViteDevServer): void => {
       devServer = server;
+      // no person waits for a page in a test run
+      watching.serve(isTestRun ? undefined : server);
       server.httpServer?.on("close", (): void => void docs?.close());
       // first: the frames' own origin, and the guard that keeps every other origin's page from reading this one
       if (config !== undefined)
@@ -565,10 +570,14 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const axe = config === undefined ? undefined : axeBuildAsset(PACKAGE_DIR);
       if (axe !== undefined) this.emitFile({ type: "asset", fileName: axe.fileName, source: axe.source });
     },
+    // a dev server without an HTTP server of its own (middleware mode) ends its close watch here only
+    closeServer: (context: { readonly reason: "restart" | "close" }): void => {
+      if (context.reason === "close") watching.close();
+    },
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
-    ...storyFileHotHooks(isRedrawing, served.changedBy),
+    ...storyFileHotHooks(isRedrawing, served.changedBy, watching),
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = await pagesModule(id);
       if (generated !== undefined) return generated;

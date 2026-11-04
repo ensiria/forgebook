@@ -12,6 +12,7 @@ import { transformWithOxc } from "vite";
 import { describe, expect, it } from "vitest";
 
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
+import { storyFileHotHooks } from "../src/vite/hotSnippets.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A story file with one story. */
@@ -179,6 +180,55 @@ describe("a story file's edit on a dev server", () => {
     rmSync(file);
     expect(hooks.hotUpdate(file, "delete")).toBeUndefined();
     expect(hooks.hotUpdate(file, "update")).toBeUndefined();
+    expect(fake.sent).toEqual([]);
+  });
+});
+
+describe("a story file's edit followed closely", () => {
+  /** A close watch that records what it follows and calls every update of `late` a late report. */
+  const watchingOf = (
+    late: string
+  ): {
+    readonly followed: string[];
+    readonly watching: Parameters<typeof storyFileHotHooks>[2];
+  } => {
+    const followed: string[] = [];
+    return {
+      followed,
+      watching: {
+        follow: (file: string): void => void followed.push(file),
+        isLateReport: (_environment: string, file: string): boolean => file === late
+      }
+    };
+  };
+
+  it("follows a story file a frame loads, on a dev server's pages only", () => {
+    const { followed, watching } = watchingOf("");
+    const { transform } = storyFileHotHooks(
+      () => true,
+      () => [],
+      watching
+    );
+    if (typeof transform !== "object") throw new Error("missing hook");
+    transform.handler.call({ environment: { name: "ssr" } } as never, ONE_STORY, "/kit/Badge.stories.tsx");
+    expect(followed).toEqual([]);
+    transform.handler.call({ environment: { name: "client" } } as never, ONE_STORY, "/kit/Badge.stories.tsx");
+    expect(followed).toEqual(["/kit/Badge.stories.tsx"]);
+  });
+
+  it("drops the late report of an edit the close watch handed on, of any file", () => {
+    const { watching } = watchingOf("/kit/Badge.tsx");
+    const fake = fakeEnvironment();
+    const { hotUpdate } = storyFileHotHooks(
+      () => true,
+      () => ["never"],
+      watching
+    );
+    if (typeof hotUpdate !== "function") throw new Error("missing hook");
+    const context = { environment: fake.environment } as never;
+    expect(hotUpdate.call(context, { file: "/kit/Badge.tsx", type: "update" } as never)).toEqual([]);
+    expect(hotUpdate.call(context, { file: "/kit/Other.tsx", type: "update" } as never)).toBeUndefined();
+    expect(hotUpdate.call(context, { file: "/kit/Badge.tsx", type: "create" } as never)).toBeUndefined();
     expect(fake.sent).toEqual([]);
   });
 });

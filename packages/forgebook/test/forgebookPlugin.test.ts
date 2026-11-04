@@ -30,6 +30,8 @@ const fakeServer = (): {
   const server = {
     // the catalogue's pages answer here; a plugin without a configuration passes every request on
     middlewares: { use: (): undefined => undefined },
+    // a watcher that polls, as on every system: no file is followed one by one (`closeWatch.ts`)
+    config: { server: { watch: { usePolling: true } } },
     watcher: {
       add: (paths: string[]): void => void record.added.push(...paths),
       on: (event: string, listener: (file: string) => void): void => void listeners.set(event, listener)
