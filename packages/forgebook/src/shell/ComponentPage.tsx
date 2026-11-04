@@ -8,11 +8,12 @@
  * (`useFrameQueue`): a component may have twenty stories. The view's live part reaches every frame as a message, as
  * on the story page; the props panel and Replay belong to a story's own page, which each story's name links to. The
  * documentation file's HTML is the package's own, made at build time (`vite/componentPage.ts`). Who reads the page
- * reorders and filters what goes around the frames (`audiencePage.ts`); what only one audience wants loads on first use.
+ * reorders and filters what goes around the frames (`audienceLayout.ts`); what only one audience wants loads on first use,
+ * its data alongside the sections' code rather than after it.
  *
  * @module
  */
-import { lazy, type ReactNode, Suspense, useMemo, useRef } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef } from "react";
 
 import { groupLabel } from "../catalogue.ts";
 import { type ComponentDocs, codeNameOf } from "../componentDocs.ts";
@@ -27,6 +28,7 @@ import {
 import { type ViewState, viewParams } from "../viewState.ts";
 import { ApiReference } from "./ApiReference.tsx";
 import type { AudienceSectionsProps } from "./AudienceSections.tsx";
+import { showsSection } from "./audienceLayout.ts";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext, type ExampleReading } from "./Example.tsx";
@@ -103,6 +105,31 @@ export type ComponentPageProps = {
 const AUDIENCE_SECTIONS = lazyModule(() =>
   import("./AudienceSections.tsx").then((module) => module.AudienceSections)
 );
+
+/**
+ * Starts loading what an audience's sections read (the design tokens, "Used in") as soon as the page is drawn for it.
+ * Asked by the sections themselves, these loads would wait for the sections' chunk and its styles first: seconds on a
+ * dev server's first visit, before a request that may itself take seconds. The loaders keep their answer, so the
+ * sections read it at once when they come.
+ *
+ * @param audience - who the page is drawn for.
+ * @param loadTokens - the catalogue's tokens loader; `undefined` when it has none.
+ * @param loadUsage - "Used in"'s loader; `undefined` when the catalogue turned it off.
+ */
+const useAudienceLoads = (
+  audience: ViewState["audience"],
+  loadTokens: (() => Promise<unknown>) | undefined,
+  loadUsage: (() => Promise<unknown>) | undefined
+): void => {
+  useEffect(() => {
+    const loads = [
+      showsSection(audience, "tokens") ? loadTokens?.() : undefined,
+      showsSection(audience, "usedIn") ? loadUsage?.() : undefined
+    ];
+    // a failed load is its section's to report, when it asks the same loader
+    for (const load of loads) void load?.catch(() => undefined);
+  }, [audience, loadTokens, loadUsage]);
+};
 
 /**
  * The page's lead: what the component is and does, from its file's `@module` comment (its own TSDoc is often a bare
@@ -242,6 +269,7 @@ export const ComponentPage = ({
     touchOverrides
   });
   useScrollMemory(pageRef, scroll);
+  useAudienceLoads(view.audience, loadTokens, usedIn?.load);
   const componentDocs = docs.status === "ready" ? docs.value : undefined;
   const isLogic = isLogicComponent(component);
   const reading: ExampleReading = {
