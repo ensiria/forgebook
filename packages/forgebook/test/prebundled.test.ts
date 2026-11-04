@@ -77,6 +77,16 @@ describe("prebundled", () => {
     expect(prebundled(CONFIG, LINKED)).not.toContain("forgebook/shell");
   });
 
+  it("adds the plugins' hosts only for a catalogue that lists a plugin with views", () => {
+    const installed: Resolve = (name: string): string => `/app/node_modules/${name}/index.js`;
+    expect(prebundled(CONFIG, installed)).not.toContain("forgebook/shell/plugin-hosts");
+    const withTab: ResolvedConfig = {
+      ...CONFIG,
+      plugins: [{ apiVersion: 1, id: "acme", tabs: [{ id: "acme", label: "Acme", view: "@acme/tab" }] }]
+    };
+    expect(prebundled(withTab, installed)).toContain("forgebook/shell/plugin-hosts");
+  });
+
   it("adds the written home's module only for a catalogue with a written home", () => {
     const installed: Resolve = (name: string): string => `/app/node_modules/${name}/index.js`;
     expect(prebundled(CONFIG, installed)).not.toContain("forgebook/shell/home");

@@ -39,6 +39,7 @@
     "./page-tree": "./src/pageTree.ts",
     "./shell": "./src/shell/mountShell.tsx",
     "./shell/home": "./src/shell/AuthoredHome.tsx",
+    "./shell/plugin-hosts": "./src/shell/pluginHosts.ts",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
     "./renderer": "./src/frame/renderer.ts",
@@ -157,6 +158,10 @@
       "./shell/home": {
         "types": "./dist/src/shell/AuthoredHome.d.ts",
         "default": "./dist/src/shell/AuthoredHome.js"
+      },
+      "./shell/plugin-hosts": {
+        "types": "./dist/src/shell/pluginHosts.d.ts",
+        "default": "./dist/src/shell/pluginHosts.js"
       },
       "./frame": {
         "types": "./dist/src/frame/mountFrame.d.ts",

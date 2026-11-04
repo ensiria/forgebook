@@ -180,6 +180,15 @@ describe("a catalogue's plugins", () => {
     expect(entry).not.toMatch(/^import .*@acme\/plugin/m);
   });
 
+  it("gives the shell the code that draws the plugins' views only with plugins that have views, loaded on first use", () => {
+    expect(shellEntry(CONFIG)).not.toContain("forgebook/shell/plugin-hosts");
+    const entry = shellEntry(listed);
+    expect(entry).toContain(
+      'pluginHosts: () => import("forgebook/shell/plugin-hosts").then((module) => module.pluginHosts),'
+    );
+    expect(entry).not.toMatch(/^import .*plugin-hosts/m);
+  });
+
   it("loads a docs block's view only when a page draws it", () => {
     const entry = shellEntry(listed);
     expect(entry).toContain('{ fence: "acme", load: () => import("@acme/plugin/block") }');
