@@ -73,6 +73,23 @@ test.describe("what a story draws", () => {
     await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
   });
 
+  test("a play's result shows while the component's docs are still read", async ({ page }) => {
+    // a first read of a project's docs can take longer than an assertion waits: held here until the play is seen
+    let releaseDocs = (): void => undefined;
+    const docsHeld = new Promise<void>((resolve) => {
+      releaseDocs = resolve;
+    });
+    await page.route(/[?&]forgebook-docs\b/, async (route) => {
+      await docsHeld;
+      await route.continue();
+    });
+    await page.goto(story("states-awaited--default"));
+    await isReady(page);
+    await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
+    await expect(page.getByText("Reading the component…")).toBeVisible();
+    releaseDocs();
+  });
+
   test("a story's texts follow the language, and its clock is the story's", async ({ page }) => {
     await page.goto(story("states-greeting--live"));
     await isReady(page);
