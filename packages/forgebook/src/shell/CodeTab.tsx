@@ -8,6 +8,7 @@
 import type { ReactNode } from "react";
 
 import { useCodeWriter } from "./codeWriter.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
 import { STRINGS } from "./strings.ts";
 import { useCopy } from "./useCopy.ts";
@@ -28,7 +29,7 @@ export const CodeTab = (props: CodeTabProps): ReactNode => {
     <div className="forgebook-prop-group">
       <div className="forgebook-calls__head">
         <h3 className="forgebook-prop-group__title">
-          {hasRender ? STRINGS.codeRender : STRINGS.codeFromArgs}
+          {hasRender ? LATER_STRINGS.codeRender : LATER_STRINGS.codeFromArgs}
         </h3>
         <button
           type="button"
@@ -36,7 +37,7 @@ export const CodeTab = (props: CodeTabProps): ReactNode => {
           onClick={(): void => copy(storyCodeText(props, write))}
           aria-live="polite"
         >
-          {isCopied ? STRINGS.copied : STRINGS.copy}
+          {isCopied ? STRINGS.copied : LATER_STRINGS.copy}
         </button>
       </div>
       <StoryCodeBlock {...props} />

@@ -21,6 +21,7 @@ import {
   type TreeFamily,
   type TreeSource
 } from "../storyTree.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
 import { STRINGS } from "./strings.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
@@ -135,7 +136,7 @@ const SourceIntro = ({ load }: { readonly load: StorySource["home"] }): ReactNod
   if (intro.status === "error") {
     return (
       <p className="forgebook-problems" role="alert">
-        {STRINGS.homeIntroError}: {intro.message}
+        {LATER_STRINGS.homeIntroError}: {intro.message}
       </p>
     );
   }
@@ -163,7 +164,7 @@ const FamilyCard = ({
     <article className="forgebook-home__card" aria-label={family.name}>
       <h3 className="forgebook-home__card-title">
         {family.name}
-        <span className="forgebook-home__count">{STRINGS.componentsCount(components.length)}</span>
+        <span className="forgebook-home__count">{LATER_STRINGS.componentsCount(components.length)}</span>
       </h3>
       <ul className="forgebook-home__components">
         {shown.map((component) => (
@@ -186,7 +187,7 @@ const FamilyCard = ({
           aria-expanded={isOpen}
           onClick={(): void => setIsOpen(!isOpen)}
         >
-          {isOpen ? STRINGS.showFewer : STRINGS.showAll(components.length)}
+          {isOpen ? LATER_STRINGS.showFewer : LATER_STRINGS.showAll(components.length)}
         </button>
       ) : null}
     </article>
@@ -255,8 +256,8 @@ export const HomePage = ({
             <h1 className="forgebook-home__title">{title}</h1>
             <p className="forgebook-doc__lead">
               {tree.sources.length === 0
-                ? STRINGS.homeEmpty
-                : STRINGS.homeSummary(
+                ? LATER_STRINGS.homeEmpty
+                : LATER_STRINGS.homeSummary(
                     componentCount,
                     tree.sources.filter((source) => source.families.length > 0).length
                   )}
@@ -264,7 +265,7 @@ export const HomePage = ({
           </header>
           {entries.length === 0 ? null : (
             <section className="forgebook-doc__section" aria-labelledby="forgebook-recent">
-              <h2 id="forgebook-recent">{STRINGS.recentlyOpened}</h2>
+              <h2 id="forgebook-recent">{LATER_STRINGS.recentlyOpened}</h2>
               <ul className="forgebook-home__recent">
                 {entries.map((entry) => (
                   <li key={`${entry.page.kind}:${entry.page.id}`}>

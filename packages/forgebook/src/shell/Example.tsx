@@ -27,6 +27,7 @@ import {
 } from "./DeviceSlot.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
 import { type StoryTouches, touchedView } from "./storyTouch.ts";
@@ -150,7 +151,7 @@ const ExampleCode = ({
           onClick={(): void => copy(storyCodeText(source, write))}
           aria-live="polite"
         >
-          {isCopied ? STRINGS.copied : STRINGS.copy}
+          {isCopied ? STRINGS.copied : LATER_STRINGS.copy}
         </button>
         <StoryCodeBlock {...source} />
       </div>
@@ -232,14 +233,14 @@ const TouchToggle = ({
       type="checkbox"
       role="switch"
       aria-checked={isTouch}
-      aria-label={STRINGS.touchNamed(story.name)}
+      aria-label={LATER_STRINGS.touchNamed(story.name)}
       className="forgebook-switch"
       checked={isTouch}
       onChange={(event: ChangeEvent<HTMLInputElement>): void =>
         onTouchChange(story.id, event.currentTarget.checked)
       }
     />
-    {STRINGS.touch}
+    {LATER_STRINGS.touch}
   </label>
 );
 
@@ -283,7 +284,7 @@ const ExampleBar = ({
           onClick={(): void => onCodeShownChange(!isCodeShown)}
         >
           <Icon name="chevronRight" size={12} />
-          {isCodeShown ? STRINGS.hideCode : STRINGS.showCode}
+          {isCodeShown ? LATER_STRINGS.hideCode : LATER_STRINGS.showCode}
         </button>
       ) : null}
       {isTouch === undefined ? null : (
@@ -293,20 +294,22 @@ const ExampleBar = ({
       <button
         type="button"
         className="forgebook-example__full"
-        aria-label={full.isFull ? STRINGS.backToPlaceNamed(story.name) : STRINGS.fillPageNamed(story.name)}
+        aria-label={
+          full.isFull ? LATER_STRINGS.backToPlaceNamed(story.name) : LATER_STRINGS.fillPageNamed(story.name)
+        }
         onClick={(event: MouseEvent<HTMLButtonElement>): void => full.toggle(event)}
       >
         <Icon name={full.isFull ? "collapse" : "expand"} size={12} />
-        {full.isFull ? STRINGS.backToPlace : STRINGS.fillPage}
+        {full.isFull ? LATER_STRINGS.backToPlace : LATER_STRINGS.fillPage}
       </button>
       <StoryLink
         story={story}
         hrefOf={context.hrefOf}
         onOpen={context.onOpen}
         className="forgebook-example__open"
-        label={STRINGS.openStoryNamed(story.name)}
+        label={LATER_STRINGS.openStoryNamed(story.name)}
       >
-        {STRINGS.openStory}
+        {LATER_STRINGS.openStory}
         <Icon name="external" size={12} />
       </StoryLink>
     </div>

@@ -57,10 +57,12 @@ case, with the reason (`// biome-ignore lint/…: the protocol names this field`
   repository type-checks with TypeScript 7, which has no compiler API), the props declared in the package only.
 - **Tools and agents get what the shell shows**: the dev server's answers (`src/vite/agentRoutes.ts`) load the same
   sources and previews as the pages; `forgebook stories`, `forgebook story` and `forgebook mcp` are its clients.
-- The shell's texts are in `src/shell/strings.ts`, one place. Messages between the shell and a frame are typed in
-  `src/messages.ts` and checked on arrival, from the other side's origin only: the frames run on an origin of their
-  own (`src/frameOrigins.ts`, the dev server's second port in `src/vite/framesServer.ts`), so a story cannot reach the
-  catalogue; nothing in the shell reads a frame's document directly.
+- The shell's texts are in `src/shell/strings.ts`, the first screen's; a part that loads later keeps its texts in a
+  module loaded with it (`laterStrings.ts`, `searchStrings.ts`), under the names a catalogue replaces (`strings`).
+  Messages between the shell and a frame are typed in `src/messages.ts` and checked on arrival, from the other side's
+  origin only: the frames run on an origin of their own (`src/frameOrigins.ts`, the dev server's second port in
+  `src/vite/framesServer.ts`), so a story cannot reach the catalogue; nothing in the shell reads a frame's document
+  directly.
 - **The core stays light.** No new dependency of `forgebook` without an issue first; a heavy tool (Playwright, Testing
   Library, Sass) is an optional peer the project installs.
 

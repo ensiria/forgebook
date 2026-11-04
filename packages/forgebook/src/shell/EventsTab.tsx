@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 
 import type { PropDocs } from "../componentDocs.ts";
 import { Code } from "./Code.tsx";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 
 /** The tab's props. */
@@ -56,7 +56,7 @@ export const EventsTab = ({ events, calls, onClearCalls }: EventsTabProps): Reac
     {/* a story whose only calls are a framework's (a router's `push`) has no events of its own to list */}
     {events.length === 0 ? null : (
       <div className="forgebook-prop-group">
-        <h3 className="forgebook-prop-group__title">{STRINGS.events}</h3>
+        <h3 className="forgebook-prop-group__title">{LATER_STRINGS.events}</h3>
         {events.map((event) => (
           <div key={event.name} className="forgebook-event">
             <code className="forgebook-prop__name">{event.name}</code>
@@ -71,12 +71,12 @@ export const EventsTab = ({ events, calls, onClearCalls }: EventsTabProps): Reac
     )}
     <div className="forgebook-prop-group forgebook-calls">
       <div className="forgebook-calls__head">
-        <h3 className="forgebook-prop-group__title">{STRINGS.calls}</h3>
+        <h3 className="forgebook-prop-group__title">{LATER_STRINGS.calls}</h3>
         <button type="button" className="forgebook-text-button" onClick={onClearCalls}>
-          {STRINGS.clearCalls}
+          {LATER_STRINGS.clearCalls}
         </button>
       </div>
-      {calls.length === 0 ? <p className="forgebook-prop__description">{STRINGS.noCalls}</p> : null}
+      {calls.length === 0 ? <p className="forgebook-prop__description">{LATER_STRINGS.noCalls}</p> : null}
       <ol className="forgebook-calls__list" aria-live="polite">
         {calls.map((call) => (
           <li key={`${call.time}-${call.name}-${call.values.join(",")}`} className="forgebook-calls__item">

@@ -33,10 +33,10 @@ import { showsSection } from "./audienceLayout.ts";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Example, type ExampleContext, type ExampleReading } from "./Example.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
-import { STRINGS } from "./strings.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
 import { useComponentDocs } from "./useComponentDocs.ts";
 import type { Loaded } from "./useLoaded.ts";
@@ -163,7 +163,7 @@ const Prose = ({ page }: { readonly page: Loaded<PageDoc> }): ReactNode => {
   if (page.status === "error") {
     return (
       <p className="forgebook-problems" role="alert">
-        {STRINGS.pageError}: {page.message}
+        {LATER_STRINGS.pageError}: {page.message}
       </p>
     );
   }
@@ -198,7 +198,7 @@ const AudienceSlot = ({
       loading={null}
       failed={(message: string): ReactNode => (
         <p className="forgebook-problems" role="alert">
-          {STRINGS.audienceError}: {message}
+          {LATER_STRINGS.audienceError}: {message}
         </p>
       )}
     />
@@ -353,7 +353,7 @@ export const ComponentPage = ({
           </AudienceSlot>
           {examples.length === 0 ? null : (
             <section className="forgebook-doc__section" aria-labelledby="forgebook-examples">
-              <h2 id="forgebook-examples">{STRINGS.examples}</h2>
+              <h2 id="forgebook-examples">{LATER_STRINGS.examples}</h2>
               {groupedStories(
                 examples,
                 catalogue.storyGroups.map((group) => group.id)

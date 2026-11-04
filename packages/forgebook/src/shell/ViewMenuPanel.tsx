@@ -31,8 +31,8 @@ import { ControlRow } from "./ControlRow.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { controlLabel } from "./controlLabel.ts";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { NamedViews } from "./NamedViews.tsx";
-import { STRINGS } from "./strings.ts";
 import type { ControlContext } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
 
@@ -142,7 +142,7 @@ const HiddenControls = ({
         aria-controls={listId}
         onClick={(): void => setIsOpen(!isOpen)}
       >
-        {STRINGS.hiddenControls(hidden.length, hidden.filter((each) => each.isPinned).length)}
+        {LATER_STRINGS.hiddenControls(hidden.length, hidden.filter((each) => each.isPinned).length)}
         <Icon name={isOpen ? "chevronDown" : "chevronRight"} size={12} />
       </button>
       {isOpen ? (
@@ -158,8 +158,8 @@ const HiddenControls = ({
                 <button
                   type="button"
                   className="forgebook-icon-button"
-                  aria-label={STRINGS.pinControl(label)}
-                  title={STRINGS.pinControl(label)}
+                  aria-label={LATER_STRINGS.pinControl(label)}
+                  title={LATER_STRINGS.pinControl(label)}
                   aria-pressed={isPinned}
                   onClick={(): void => layout.pin(control.id, !isPinned)}
                 >
@@ -168,8 +168,8 @@ const HiddenControls = ({
                 <button
                   type="button"
                   className="forgebook-icon-button"
-                  aria-label={STRINGS.showControl(label)}
-                  title={STRINGS.showControl(label)}
+                  aria-label={LATER_STRINGS.showControl(label)}
+                  title={LATER_STRINGS.showControl(label)}
                   onClick={(): void => layout.hide(control.id, false)}
                 >
                   <Icon name="eye" size={14} />
@@ -334,7 +334,7 @@ export const ViewMenuPanel = ({
           ))}
         </ol>
         <span id={hintId} className="forgebook-visually-hidden">
-          {STRINGS.moveControlHint}
+          {LATER_STRINGS.moveControlHint}
         </span>
         <span className="forgebook-visually-hidden" aria-live="polite">
           {announced}
@@ -351,7 +351,7 @@ export const ViewMenuPanel = ({
               layout.setIsWrapped(event.currentTarget.checked)
             }
           />
-          {STRINGS.wrapToolbar}
+          {LATER_STRINGS.wrapToolbar}
         </label>
       </div>
       <div className="forgebook-popover__foot">
@@ -362,18 +362,18 @@ export const ViewMenuPanel = ({
             context.onViewChange(withDefaults(context.view, switches, ids, catalogue.audience))
           }
         >
-          {STRINGS.resetView}
+          {LATER_STRINGS.resetView}
         </button>
         <button
           type="button"
           className="forgebook-text-button"
-          title={STRINGS.toolbarInBrowser}
+          title={LATER_STRINGS.toolbarInBrowser}
           disabled={!layout.isArranged}
           onClick={layout.reset}
         >
-          {STRINGS.resetToolbar}
+          {LATER_STRINGS.resetToolbar}
         </button>
-        <span className="forgebook-popover__note">{STRINGS.viewInAddress}</span>
+        <span className="forgebook-popover__note">{LATER_STRINGS.viewInAddress}</span>
       </div>
     </>
   );

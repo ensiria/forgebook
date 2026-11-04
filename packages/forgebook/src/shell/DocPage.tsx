@@ -34,6 +34,7 @@ import { useCatalogue } from "./catalogueContext.ts";
 import { DocBlocks, type DocBlocksContext, queuedBlocks } from "./DocBlocks.tsx";
 import { DocContents } from "./DocContents.tsx";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
@@ -149,8 +150,8 @@ const PageFoot = ({
     );
   return previous === undefined && next === undefined ? null : (
     <nav className="forgebook-docs__foot" aria-label={STRINGS.docsNav}>
-      {link(previous, STRINGS.previousPage, "previous")}
-      {link(next, STRINGS.nextPage, "next")}
+      {link(previous, LATER_STRINGS.previousPage, "previous")}
+      {link(next, LATER_STRINGS.nextPage, "next")}
     </nav>
   );
 };
@@ -291,7 +292,7 @@ export const DocPage = ({
             {isColumn ? null : contents}
             {loaded.status === "error" ? (
               <p className="forgebook-problems" role="alert">
-                {STRINGS.docPageError}: {loaded.message}
+                {LATER_STRINGS.docPageError}: {loaded.message}
               </p>
             ) : null}
             <DocBlocks blocks={content.blocks} context={context} />

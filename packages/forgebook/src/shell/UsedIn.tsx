@@ -16,7 +16,7 @@ import { type MouseEvent, type ReactNode, useId, useState } from "react";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import { isUsageIndex, USED_IN_SHOWN, type UsageIndex, type UsingComponent, usageLoader } from "../usedIn.ts";
 import { Icon } from "./icons.tsx";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { useFold } from "./useFold.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import { useStored } from "./useStored.ts";
@@ -123,7 +123,7 @@ const UserList = ({
               {user.component.name}
             </PageLink>
             <span className="forgebook-used-in__note">
-              {user.isDirect ? STRINGS.usedInStories(user.stories.length) : STRINGS.usedInThrough}
+              {user.isDirect ? LATER_STRINGS.usedInStories(user.stories.length) : LATER_STRINGS.usedInThrough}
             </span>
             <span className="forgebook-used-in__stories">
               {user.stories.map((story) => (
@@ -142,7 +142,7 @@ const UserList = ({
       </ul>
       {isAll || users.length <= USED_IN_SHOWN ? null : (
         <button type="button" className="forgebook-text-button" onClick={(): void => setIsAll(true)}>
-          {STRINGS.usedInMore(users.length - USED_IN_SHOWN)}
+          {LATER_STRINGS.usedInMore(users.length - USED_IN_SHOWN)}
         </button>
       )}
     </>
@@ -189,7 +189,7 @@ export const UsedIn = ({ title, source, componentOf, ...links }: UsedInProps): R
           <span className="forgebook-tree__chevron" data-open={isOpen ? "" : undefined}>
             <Icon name="chevronRight" size={14} />
           </span>
-          {STRINGS.usedIn}
+          {LATER_STRINGS.usedIn}
         </button>
       </h2>
       <div ref={fold.ref} id={bodyId} className="forgebook-used-in__body">

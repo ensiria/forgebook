@@ -29,6 +29,7 @@ import {
 } from "./audiencePage.ts";
 import { CodeText } from "./CodeText.tsx";
 import { Lead, PageApi } from "./ComponentPage.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
 import { PartsTab } from "./PartsTab.tsx";
 import { StoryCoverage, type StoryCoverageProps } from "./StoryCoverage.tsx";
@@ -340,7 +341,7 @@ const AudienceProse = ({
   if (page.status === "error") {
     return (
       <p className="forgebook-problems" role="alert">
-        {STRINGS.pageError}: {page.message}
+        {LATER_STRINGS.pageError}: {page.message}
       </p>
     );
   }

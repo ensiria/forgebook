@@ -8,7 +8,7 @@ import { type MouseEvent, type ReactNode, type RefObject, useEffect, useState } 
 
 import { headingElementId } from "../docAnchors.ts";
 import type { DocHeading } from "../docPages.ts";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 
 /** How far below the page's top a heading counts as being read, in CSS px. */
 const READING_LINE = 96;
@@ -130,14 +130,14 @@ export const DocContents = ({
   if (headings.length < 2) return null;
   const list = <ContentsList headings={headings} current={current} hrefOf={hrefOf} onOpen={onOpen} />;
   return isColumn ? (
-    <nav className="forgebook-contents forgebook-contents--column" aria-label={STRINGS.pageContents}>
-      <p className="forgebook-contents__title">{STRINGS.pageContents}</p>
+    <nav className="forgebook-contents forgebook-contents--column" aria-label={LATER_STRINGS.pageContents}>
+      <p className="forgebook-contents__title">{LATER_STRINGS.pageContents}</p>
       {list}
     </nav>
   ) : (
     <details className="forgebook-contents forgebook-contents--fold">
-      <summary className="forgebook-contents__title">{STRINGS.pageContents}</summary>
-      <nav aria-label={STRINGS.pageContents}>{list}</nav>
+      <summary className="forgebook-contents__title">{LATER_STRINGS.pageContents}</summary>
+      <nav aria-label={LATER_STRINGS.pageContents}>{list}</nav>
     </details>
   );
 };

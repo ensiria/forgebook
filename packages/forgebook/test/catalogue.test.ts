@@ -7,7 +7,8 @@
 import { describe, expect, it } from "vitest";
 
 import { catalogueSettings, groupLabel } from "../src/catalogue.ts";
-import { configureStrings, STRINGS, textsOfGroup } from "../src/shell/strings.ts";
+import { LATER_STRINGS } from "../src/shell/laterStrings.ts";
+import { configureStrings, STRINGS, textsByName, textsOfGroup } from "../src/shell/strings.ts";
 import { groupedStories } from "../src/storyTree.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { mergedLists } from "../src/vite/configFile.ts";
@@ -182,6 +183,32 @@ describe("configureStrings", () => {
       other: "Kept"
     });
     configureStrings({});
+  });
+
+  it("reaches the later parts' texts by the plain names they share with the first screen's", () => {
+    configureStrings({
+      copy: "Copia",
+      "droppedArgReasons.type": "Tipo",
+      "copied.x": "No",
+      usedInMore: "Many"
+    });
+    const usedInMore = (count: number): string => String(count);
+    const texts = textsByName({
+      copy: "Copy",
+      droppedArgReasons: { undeclared: "Not a prop", type: "Not its type" },
+      usedInMore
+    });
+    expect(texts).toEqual({
+      copy: "Copia",
+      droppedArgReasons: { undeclared: "Not a prop", type: "Tipo" },
+      usedInMore
+    });
+    configureStrings({});
+  });
+
+  it("keeps each text in one place: no later part's text has a name of the first screen's", () => {
+    const shared = Object.keys(LATER_STRINGS).filter((name) => Object.hasOwn(STRINGS, name));
+    expect(shared).toEqual([]);
   });
 
   it("replaces plain texts by their path, and leaves a text that takes values and an unknown path alone", () => {

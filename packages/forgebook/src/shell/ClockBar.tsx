@@ -9,8 +9,8 @@ import type { ReactNode } from "react";
 import { CLOCK_RATES, type ClockRate } from "../storyClock.ts";
 import type { StoryClockControls } from "./ClockControls.tsx";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { Segmented } from "./Segmented.tsx";
-import { STRINGS } from "./strings.ts";
 
 /** The controls' props. */
 export type ClockBarProps = {
@@ -25,10 +25,10 @@ export type ClockBarProps = {
  */
 export const ClockBar = ({ controls }: ClockBarProps): ReactNode => {
   const { state, change, restart } = controls;
-  const toggleLabel = state.isRunning ? STRINGS.clockPause : STRINGS.clockResume;
+  const toggleLabel = state.isRunning ? LATER_STRINGS.clockPause : LATER_STRINGS.clockResume;
   return (
     <fieldset className="forgebook-clock">
-      <legend className="forgebook-visually-hidden">{STRINGS.clockLabel}</legend>
+      <legend className="forgebook-visually-hidden">{LATER_STRINGS.clockLabel}</legend>
       <button
         type="button"
         className="forgebook-button forgebook-button--icon"
@@ -40,11 +40,11 @@ export const ClockBar = ({ controls }: ClockBarProps): ReactNode => {
       </button>
       <button type="button" className="forgebook-button" onClick={restart}>
         <Icon name="restart" size={14} />
-        {STRINGS.clockRestart}
+        {LATER_STRINGS.clockRestart}
       </button>
       <Segmented
-        label={STRINGS.clockSpeed}
-        options={CLOCK_RATES.map((rate) => ({ value: rate, label: STRINGS.clockRate(rate) }))}
+        label={LATER_STRINGS.clockSpeed}
+        options={CLOCK_RATES.map((rate) => ({ value: rate, label: LATER_STRINGS.clockRate(rate) }))}
         value={state.rate}
         onValueChange={(rate: ClockRate): void => change({ rate })}
       />

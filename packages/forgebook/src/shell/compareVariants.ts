@@ -13,6 +13,7 @@
 
 import type { CatalogueSettings } from "../catalogue.ts";
 import { type CompareAxes, SHEETS_CHOICES, type ViewState } from "../viewState.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { STRINGS } from "./strings.ts";
 
 /** What the compare view reads of the catalogue: its switches and its text sizes. */
@@ -85,7 +86,7 @@ export const compareVariants = (axes: CompareAxes, catalogue: CompareCatalogue):
   if (second === undefined) return firsts;
   return axisVariants(second, catalogue).flatMap((outer) =>
     firsts.map((inner) => ({
-      label: STRINGS.compareCell(outer.isDefault ? [inner.label] : [inner.label, outer.label]),
+      label: LATER_STRINGS.compareCell(outer.isDefault ? [inner.label] : [inner.label, outer.label]),
       viewOf: (view: ViewState): ViewState => outer.viewOf(inner.viewOf(view))
     }))
   );

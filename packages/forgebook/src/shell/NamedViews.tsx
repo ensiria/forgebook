@@ -28,7 +28,7 @@ import {
 import { parseView, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { useStored } from "./useStored.ts";
 
 /**
@@ -87,8 +87,8 @@ export const NamedViews = ({
         <button
           type="button"
           className="forgebook-named-view__remove"
-          aria-label={STRINGS.removeView(each.name)}
-          title={STRINGS.removeView(each.name)}
+          aria-label={LATER_STRINGS.removeView(each.name)}
+          title={LATER_STRINGS.removeView(each.name)}
           onClick={(): void => setSaved((current) => withoutView(current, each.name))}
         >
           <Icon name="close" size={10} />
@@ -97,15 +97,15 @@ export const NamedViews = ({
     </span>
   );
   return (
-    <section className="forgebook-named-views" aria-label={STRINGS.namedViews}>
+    <section className="forgebook-named-views" aria-label={LATER_STRINGS.namedViews}>
       {declared.map((each) => chip(each, false))}
       {saved.map((each) => chip(each, true))}
       {isNaming ? (
         <form className="forgebook-named-views__form" onSubmit={save}>
           <input
             type="text"
-            aria-label={STRINGS.viewName}
-            placeholder={STRINGS.viewName}
+            aria-label={LATER_STRINGS.viewName}
+            placeholder={LATER_STRINGS.viewName}
             value={name}
             // biome-ignore lint/a11y/noAutofocus: the field opens on the person's press, to be typed in at once
             autoFocus={true}
@@ -115,7 +115,7 @@ export const NamedViews = ({
         </form>
       ) : (
         <button type="button" className="forgebook-text-button" onClick={(): void => setIsNaming(true)}>
-          {STRINGS.saveView}
+          {LATER_STRINGS.saveView}
         </button>
       )}
     </section>
