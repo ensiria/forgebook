@@ -4,8 +4,8 @@
  * example.
  *
  * @remarks
- * The demo loads at once; the examples load as they come near the visible part of the page, a few at a time
- * (`useFrameQueue`): a component may have twenty stories. The view's live part reaches every frame as a message, as
+ * The frames load a few at a time (`useFrameQueue`), in the page's order, the demo first, each as it comes near the
+ * visible part of the page: a component may have twenty stories. The view's live part reaches every frame as a message, as
  * on the story page; the props panel and Replay belong to a story's own page, which each story's name links to. The
  * documentation file's HTML is the package's own, made at build time (`vite/componentPage.ts`). Who reads the page
  * reorders and filters what goes around the frames (`audienceLayout.ts`); what only one audience wants loads on first use,
@@ -261,10 +261,15 @@ export const ComponentPage = ({
     [component, demo]
   );
   const catalogue = useCatalogue();
-  const exampleIds = useMemo(() => examples.map((story) => story.id), [examples]);
+  // the demo first in the queue, at the top of the page, and counted in it: a frame of a library served as source asks
+  // for thousands of modules, and one more beside those the queue allows makes the browser refuse some of them
+  const queued = useMemo(
+    () => [...(demo === undefined ? [] : [demo.id]), ...examples.map((story) => story.id)],
+    [demo, examples]
+  );
   const { queue, ...frames } = usePageFrames({
     stories: component.stories,
-    queued: exampleIds,
+    queued,
     pageRef,
     view,
     touchOverrides
@@ -346,7 +351,15 @@ export const ComponentPage = ({
           <AudienceSlot place="beforeDemo" audience={audienceProps}>
             <Lead page={page} docs={componentDocs} />
           </AudienceSlot>
-          {demo === undefined ? null : <Example {...context} story={demo} isDemo={true} isMounted={true} />}
+          {demo === undefined ? null : (
+            <Example
+              {...context}
+              story={demo}
+              isDemo={true}
+              isMounted={queue.mounted.has(demo.id)}
+              observe={queue.observerOf(demo.id)}
+            />
+          )}
           <AudienceSlot place="afterDemo" audience={audienceProps}>
             <Prose page={page} />
             <PageApi docs={componentDocs} isLogic={isLogic} componentGroups={component.propGroups} />
