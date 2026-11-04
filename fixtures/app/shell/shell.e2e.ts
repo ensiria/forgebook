@@ -29,6 +29,33 @@ const settled = async (parts: Locator): Promise<void> => {
 /** Waits until the open popovers have finished growing in. */
 const popoversSettled = (page: Page): Promise<void> => settled(page.locator(".forgebook-popover"));
 
+/**
+ * Opens the View menu, and waits until its panel is drawn and has finished growing in.
+ *
+ * @remarks
+ * The button's name takes its dot's when a value it holds is changed. The panel's module loads the first time the menu
+ * opens, after the popover is drawn: its rows are read, and pressed, once its foot is there.
+ */
+const openView = async (page: Page): Promise<void> => {
+  await page.getByRole("button", { name: /^View/ }).click();
+  await expect(
+    page.getByRole("dialog", { name: "View" }).getByRole("button", { name: "Reset to defaults" })
+  ).toBeVisible();
+  await popoversSettled(page);
+};
+
+/**
+ * Picks an appearance in the open Appearance menu, and waits until the menu's button shows it.
+ *
+ * @remarks
+ * The menu closes on a choice. `check()` reads the radio again after its click, so on a busy page, where the menu is
+ * gone by then, it waits for a radio that never comes back: a click, and the button's name, say the choice was made.
+ */
+const chooseAppearance = async (page: Page, name: string): Promise<void> => {
+  await page.getByRole("dialog", { name: "Appearance" }).getByRole("radio", { name, exact: true }).click();
+  await expect(page.getByRole("button", { name: `Appearance: ${name}` })).toBeVisible();
+};
+
 /** Waits until the shown story's frame says it is ready (or failed). */
 const frameStatus = async (page: Page): Promise<string | null> => {
   const html = page.locator("iframe.forgebook-frame-view");
@@ -176,10 +203,7 @@ test.describe("the shell following the story", () => {
     await expect.poll(appearance).toBe("light");
 
     await page.getByRole("button", { name: /^Appearance/ }).click();
-    await page
-      .getByRole("dialog", { name: "Appearance" })
-      .getByRole("radio", { name: "Follow the story" })
-      .check();
+    await chooseAppearance(page, "Follow the story");
     await expect.poll(appearance).toBe("dark");
 
     await page.goto(story("overview", "theme=dark&compare=theme"));
@@ -188,7 +212,7 @@ test.describe("the shell following the story", () => {
     await page.goto(story("overview", "theme=dark"));
     await expect.poll(appearance).toBe("dark");
     await page.getByRole("button", { name: /^Appearance/ }).click();
-    await page.getByRole("dialog", { name: "Appearance" }).getByRole("radio", { name: "Light" }).check();
+    await chooseAppearance(page, "Light");
     await expect.poll(appearance).toBe("light");
   });
 });
@@ -887,12 +911,6 @@ test.describe("the toolbar each person arranges", () => {
       .locator(".forgebook-arrange")
       .evaluateAll((rows) => rows.map((each) => (each as HTMLElement).dataset["control"] ?? ""));
 
-  // the button's name takes its dot's when a value it holds is changed
-  const openView = async (page: Page): Promise<void> => {
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
-  };
-
   test("starts with View first, then the colour scheme, the contrast, the width and the device, the panel and Compare last", async ({
     page
   }) => {
@@ -1138,8 +1156,7 @@ test.describe("the stories' texts", () => {
     const root = frameOf(page).locator("html");
     await expect(root).toHaveAttribute("dir", "rtl");
     await root.evaluate((element) => element.setAttribute("data-test-mark", "kept"));
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page.getByRole("group", { name: "Direction" }).getByRole("radio", { name: "Left to right" }).check({
       force: true
     });
@@ -1369,8 +1386,7 @@ test.describe("touch", () => {
     await page.goto("/?story=kit:interaction-touch-pad--by-pointer");
     await frameStatus(page);
     await expect(frameOf(page).getByText("Open the row's menu for its actions")).toBeVisible();
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page
       .getByRole("dialog", { name: "View" })
       .getByRole("group", { name: "Touch" })
@@ -1398,8 +1414,7 @@ test.describe("touch", () => {
     await page.getByRole("link", { name: "Open the story Inbox", exact: true }).click();
     await frameStatus(page);
     await expect(frameOf(page).locator("html")).not.toHaveAttribute("data-forgebook-touch");
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page
       .getByRole("dialog", { name: "View" })
       .getByRole("group", { name: "Touch" })
@@ -1418,8 +1433,7 @@ test.describe("touch", () => {
   }) => {
     await page.goto(touchPad());
     await frameStatus(page);
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     // the limits are a note on an info button, not a paragraph: shown on hover, in the menu and on the bar
     await page.getByRole("dialog", { name: "View" }).getByRole("button", { name: "About Touch" }).hover();
     await expect(
@@ -1553,11 +1567,7 @@ test.describe("the panel", () => {
   }) => {
     await page.goto(story("overview"));
     await frameStatus(page);
-    const openView = async (): Promise<void> => {
-      await page.getByRole("button", { name: /^View/ }).click();
-      await popoversSettled(page);
-    };
-    await openView();
+    await openView(page);
     const views = page.getByRole("region", { name: "Views" });
     await views.getByRole("button", { name: "Dark phone" }).click();
     await expect(page).toHaveURL(/theme=dark/);
@@ -1569,7 +1579,7 @@ test.describe("the panel", () => {
     await expect(views.getByRole("button", { name: "Mine", exact: true })).toBeVisible();
     await page.goto(story("overview"));
     await frameStatus(page);
-    await openView();
+    await openView(page);
     await views.getByRole("button", { name: "Mine", exact: true }).click();
     await expect(page).toHaveURL(/width=360/);
     await views.getByRole("button", { name: "Remove the view Mine" }).click();
@@ -1586,8 +1596,7 @@ test.describe("the panel", () => {
     const afterT = new URL(page.url()).searchParams.get("theme");
     await page.keyboard.press("Shift+T");
     await expect(page).not.toHaveURL(new RegExp(`theme=${afterT}`));
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await page.getByRole("button", { name: "Theme: key T" }).click();
     await page.keyboard.press("c");
     // contrast has c: refused, said in place
@@ -1606,8 +1615,7 @@ test.describe("the panel", () => {
     await page.goto(story("overview", "theme=dark"));
     await frameStatus(page);
     await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(1);
-    await page.getByRole("button", { name: /^View/ }).click();
-    await popoversSettled(page);
+    await openView(page);
     await expect(page.getByRole("img", { name: "Theme: changed" })).toHaveCount(2);
     await page.goto(story("overview"));
     await frameStatus(page);
@@ -1624,10 +1632,7 @@ test.describe("the panel", () => {
     await expect(root).toHaveAttribute("data-forgebook-appearance", "dark");
     await page.getByRole("button", { name: "Appearance: System" }).click();
     await popoversSettled(page);
-    await page
-      .getByRole("dialog", { name: "Appearance" })
-      .getByRole("radio", { name: "Light" })
-      .check({ force: true });
+    await chooseAppearance(page, "Light");
     await expect(root).toHaveAttribute("data-forgebook-appearance", "light");
     await expect(page.getByRole("button", { name: "Appearance: Light" })).toBeVisible();
     await page.reload();
