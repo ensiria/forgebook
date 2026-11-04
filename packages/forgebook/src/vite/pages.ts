@@ -395,7 +395,9 @@ const previewsHot = (previews: readonly string[]): readonly string[] =>
     ? []
     : [
         "if (import.meta.hot)",
-        `  import.meta.hot.accept(${codeLiteral(previews)}, (next) =>`,
+        // plain JSON, unlike every other value here: Vite reads the accepted files as the text between the quotes,
+        // escapes undecoded, and resolves `\/` as no file; this module is never set inline in a page
+        `  import.meta.hot.accept(${JSON.stringify(previews)}, (next) =>`,
         `    window.dispatchEvent(new CustomEvent(${codeLiteral(PREVIEWS_EVENT)}, { detail: { next } }))`,
         "  );"
       ];

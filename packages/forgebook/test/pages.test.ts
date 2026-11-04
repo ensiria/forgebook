@@ -4,8 +4,11 @@
  *
  * @module
  */
-import { win32 } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, win32 } from "node:path";
 
+import { createServer } from "vite";
 import { describe, expect, it } from "vitest";
 
 import { codeLiteral } from "../src/codeLiteral.ts";
@@ -123,11 +126,46 @@ describe("the generated pages", () => {
 
   it("takes its previews' edits on a dev server, and none without previews", () => {
     const entry = frameEntry(CONFIG);
-    expect(entry).toContain(
-      `import.meta.hot.accept([${codeLiteral("/catalogue/forgebook.preview.tsx")}], (next) =>`
-    );
+    // as plain JSON: Vite reads the accepted files' text without decoding its escapes
+    expect(entry).toContain('import.meta.hot.accept(["/catalogue/forgebook.preview.tsx"], (next) =>');
     expect(entry).toContain('"forgebook:previews"');
     expect(frameEntry({ ...CONFIG, previews: [] })).not.toContain("import.meta.hot");
+  });
+
+  it("names its previews' files so that Vite's dev server finds them", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-previews-hot-"));
+    const preview = join(dir, "forgebook.preview.ts");
+    writeFileSync(preview, "export const parameters = {};\n");
+    // the entry's preview imports and its hot block alone: the rest imports modules only a catalogue serves; served as
+    // JavaScript, so Vite reads the text as written, with no transform that would decode its escapes first
+    const entry = frameEntry({ ...CONFIG, previews: [preview] })
+      .split("\n")
+      .filter(
+        (line, at, lines) =>
+          line.startsWith("import * as preview") || at >= lines.indexOf("if (import.meta.hot)")
+      )
+      .join("\n");
+    const server = await createServer({
+      root: dir,
+      configFile: false,
+      logLevel: "silent",
+      server: { middlewareMode: true, hmr: { port: 0 } },
+      plugins: [
+        {
+          name: "entry",
+          resolveId: (id: string): string | undefined => (id === "/entry.js" ? id : undefined),
+          load: (id: string): string | undefined => (id === "/entry.js" ? entry : undefined)
+        }
+      ]
+    });
+    try {
+      // Vite reads the accepted files as written, and fails on one it cannot resolve
+      const transformed = await server.transformRequest("/entry.js");
+      expect(transformed?.code).toContain("import.meta.hot.accept(");
+    } finally {
+      await server.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("hands the frame axe's address when there is one, with what it imports", () => {
