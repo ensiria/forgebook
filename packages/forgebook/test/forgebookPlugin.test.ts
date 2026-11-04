@@ -260,13 +260,18 @@ describe("forgebookPlugin in the dev server", () => {
 });
 
 /**
- * A build's load of the fixture kit's pattern, in one of the build's environments, with the files it wrote.
+ * A build's load of the fixture kit's pattern, in one of the build's environments, with its texts module when it
+ * imports one and the files they wrote.
  *
  * @param environment - the environment's name: `client` for the pages' files.
  */
 const builtPattern = async (
   environment: string
-): Promise<{ readonly code: string; readonly emitted: ReadonlyMap<string, Uint8Array> }> => {
+): Promise<{
+  readonly code: string;
+  readonly texts: string | undefined;
+  readonly emitted: ReadonlyMap<string, Uint8Array>;
+}> => {
   const plugin = forgebookPlugin({ framework: STUB_FRAMEWORK });
   const { config: configHook, resolveId, load, closeBundle } = plugin;
   if (
@@ -290,37 +295,53 @@ const builtPattern = async (
       throw new Error(message);
     }
   };
-  const id: unknown = Reflect.apply(resolveId, context, [
-    "./src/*.stories.tsx?forgebook-files",
-    join(KIT, "stories.ts"),
-    { isEntry: false }
-  ]);
-  const loaded: unknown = await Reflect.apply(load, context, [String(id)]);
+  const codeOf = async (source: string, importer: string): Promise<string> => {
+    const id: unknown = Reflect.apply(resolveId, context, [source, importer, { isEntry: false }]);
+    const loaded: unknown = await Reflect.apply(load, context, [String(id)]);
+    return typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
+  };
+  const code = await codeOf("./src/*.stories.tsx?forgebook-files", join(KIT, "stories.ts"));
+  const textsImport = /^import texts from ("[^"]+");$/m.exec(code)?.[1];
+  const texts = textsImport === undefined ? undefined : await codeOf(JSON.parse(textsImport), "");
   await Reflect.apply(closeBundle, undefined, []);
-  const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
-  return { code, emitted };
+  return { code, texts, emitted };
 };
+
+/**
+ * Each row's first column of a pattern's module, its file's key, in order.
+ *
+ * @param code - the module's code.
+ */
+const rowKeys = (code: string): string[] =>
+  [...code.matchAll(/^(?:const rows = \[)?\[("\.\/src\/[^"]+")/gm)].map((match) =>
+    JSON.parse(match[1] ?? "")
+  );
 
 describe("forgebookPlugin in a build", () => {
   it("writes a pattern's docs, code and pages as data, never a module each: a file a page asks for, or the text", async () => {
-    const { code, emitted } = await builtPattern("client");
+    const { code, texts, emitted } = await builtPattern("client");
     expect(code).not.toMatch(/\?forgebook-(docs|code|page)/);
-    const select = code.split("\n").find((row) => row.startsWith('["./src/Select.stories.tsx"'));
+    // the texts' rows are the pattern's, in the same order
+    const at = rowKeys(code).indexOf("./src/Select.stories.tsx");
+    expect(at).toBeGreaterThan(-1);
+    const rows = (texts ?? "").split("export default [")[1]?.split(",\n") ?? [];
+    expect(rows).toHaveLength(rowKeys(code).length);
     // its stories have a render and its component a page: both worth a file
-    const files = [...(select ?? "").matchAll(/packedText\("(assets\/[0-9a-f]{12}\.bin)"\)/g)].map(
+    const files = [...(rows[at] ?? "").matchAll(/packedText\("(assets\/[0-9a-f]{12}\.bin)"\)/g)].map(
       (match) => match[1] ?? ""
     );
     expect(files).toHaveLength(2);
-    const texts = files.map((file) => gunzipSync(emitted.get(file) ?? new Uint8Array()).toString());
-    expect(texts.some((text) => text.includes("select.inRow.caption"))).toBe(true);
-    expect(texts.some((text) => text.includes("Lets the user pick one value"))).toBe(true);
+    const written = files.map((file) => gunzipSync(emitted.get(file) ?? new Uint8Array()).toString());
+    expect(written.some((text) => text.includes("select.inRow.caption"))).toBe(true);
+    expect(written.some((text) => text.includes("Lets the user pick one value"))).toBe(true);
   });
 
   it("keeps the queries in a server environment's build, whose output no page fetches", async () => {
-    const { code, emitted } = await builtPattern("ssr");
+    const { code, texts, emitted } = await builtPattern("ssr");
     expect(code).toContain("?forgebook-docs");
     expect(code).toContain("?forgebook-code");
     expect(code).toContain("?forgebook-page");
+    expect(texts).toBeUndefined();
     expect(emitted.size).toBe(0);
   });
 });

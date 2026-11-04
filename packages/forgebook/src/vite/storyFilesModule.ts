@@ -7,7 +7,8 @@
  * One module per pattern, instead of an import per file: in development the browser fetched every index module one by
  * one, a few hundred requests per frame. The keys are the files' paths relative to the declaring module
  * (`../src/x.stories.tsx`), the same keys `storyFileKeys` gives the tests that read the files from the disk. A build
- * writes each file's docs, code and page in the module as data instead of their loaders' imports (`builtTexts.ts`).
+ * takes each file's docs, code and page from the group's texts module, written as data, instead of their loaders'
+ * imports (`builtTexts.ts`).
  *
  * @module
  */
@@ -16,7 +17,6 @@ import { globSync, readFileSync } from "node:fs";
 import type { StoryFileIndex } from "@forgebook/story-format/source";
 
 import { autoTitle, patternBase } from "./autoTitle.ts";
-import type { BuiltTexts } from "./builtTexts.ts";
 import { type DiskCache, isSettledSince, nowNs, stampPaths } from "./diskCache.ts";
 import { indexStoryFile } from "./indexStoryFile.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
@@ -100,6 +100,12 @@ export const SEARCH_PREFIX = "virtual:forgebook-search:";
 
 /** The id prefix of a docs pages' search index, the same way: the plugin answers it only on the first search. */
 export const PAGES_SEARCH_PREFIX = "virtual:forgebook-search-pages:";
+
+/**
+ * The id prefix of a group's texts module, the same way: a build's, imported by the group's module, which holds each
+ * file's docs, code and page as data (`builtTexts.ts`).
+ */
+export const TEXTS_PREFIX = "virtual:forgebook-texts:";
 
 /**
  * The id prefix of a group's reach module, what each story reaches, the same way: only the dev server's tools ask for
@@ -209,14 +215,15 @@ export const storyFilesModule = (
  * @param pattern - the pattern before `?forgebook-files`.
  * @param files - the story files it matches, indexed.
  * @param loaders - the group's loaders besides its story files'.
- * @param texts - a build's: each file's docs, code and page written as data; none imports each from its query.
+ * @param hasTexts - a build's: whether each file's docs, code and page come from the group's texts module, in the
+ * rows' order (`TEXTS_PREFIX`), and not each from its query.
  */
 export const storyFilesCode = (
   root: string,
   pattern: string,
   files: readonly IndexedStoryFile[],
   loaders: GroupLoaders,
-  texts?: BuiltTexts
+  hasTexts = false
 ): string => {
   const { hasUsage, hasReach } = loaders;
   // the group's id in Vite's form, as the plugin names the declaring module's folder
@@ -224,25 +231,27 @@ export const storyFilesCode = (
   const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   const search = JSON.stringify(`${SEARCH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   const reach = JSON.stringify(`${REACH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
+  const texts = JSON.stringify(`${TEXTS_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   // absolute paths in Vite's form: the module has no folder of its own, Vite serves them under /@fs/ in development,
   // and the queries' ids come back to the plugin as written here
   const absolute = (key: string): string => VITE_PATHS.resolve(folder, key);
   const path = (key: string): string => JSON.stringify(absolute(key));
   const query = (key: string, name: string): string =>
     `() => import(${JSON.stringify(`${absolute(key)}?${name}`)}).then((module) => module.default)`;
-  const textLoaders = (key: string): readonly string[] => {
-    const written = texts?.files.get(key);
-    if (written !== undefined) return [written.docs, written.code, written.page];
-    return [query(key, "forgebook-docs"), query(key, "forgebook-code"), query(key, "forgebook-page")];
-  };
+  const textLoaders = (key: string): readonly string[] =>
+    hasTexts
+      ? []
+      : [query(key, "forgebook-docs"), query(key, "forgebook-code"), query(key, "forgebook-page")];
   // a row per file, its name written once and not once per column (its index, each loader): a large catalogue's
   // names are a tenth of its index
   const rows = files.map(({ key, index }) =>
     [JSON.stringify(key), JSON.stringify(index), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")
   );
+  const written = `[${rows.map((row) => `[${row}]`).join(",\n")}]`;
   return [
-    ...(texts === undefined ? [] : texts.helpers),
-    `const rows = [${rows.map((row) => `[${row}]`).join(",\n")}];`,
+    ...(hasTexts ? [`import texts from ${texts};`] : []),
+    // a build's texts are their module's rows, in the same order: each joins its file's
+    `const rows = ${hasTexts ? `${written}.map((row, at) => row.concat(texts[at]))` : written};`,
     "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
     "export default {",
     "index: column(1),",
