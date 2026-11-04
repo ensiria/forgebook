@@ -801,6 +801,10 @@ the configuration:
 export default defineConfig({ /* … */ build: { readableNames: true } });
 ```
 
+A component's docs, a story file's code and a component's page are data, not scripts: a build writes each as a gzipped
+`.bin` file, which the page unpacks when it shows it, or in the story index itself when it is shorter than that file
+(a story file whose stories are all args has no code).
+
 ## Mocking an API
 
 A story that fetches gets its answers from [MSW](https://mswjs.io), through
@@ -858,7 +862,9 @@ The contract, with how to write one and what it leaves out, is [PLUGINS.md](http
 ## A preview for every pull request
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. A host that sets a `Content-Security-Policy` needs `blob:` in `script-src` for
-the Accessibility card: a build keeps axe gzipped, and the frame runs it from a blob once unpacked. This workflow builds on
+the Accessibility card: a build keeps axe gzipped, and the frame runs it from a blob once unpacked. It also needs the
+catalogue's own origin in `connect-src` (`'self'`): the page fetches the docs, code, pages and "Used in" a build keeps
+gzipped. This workflow builds on
 every pull request and keeps the result as an artefact; the last step is yours, and any host works:
 ```yaml
 # .github/workflows/catalogue-preview.yml
