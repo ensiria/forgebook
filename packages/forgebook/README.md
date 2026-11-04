@@ -673,8 +673,11 @@ Storybook's addons are not there), a preview's named exports beside its default
 export, and the text values of its `globalTypes` defaults and `initialGlobals`, which its decorators read. The answers
 to tools and agents read a preview's args and parameters on the server: a package it imports that only a browser can
 load (Storybook's docs blocks, which read `document` as they load) is left as a placeholder there, which the preview can
-keep in a parameter or call (an addon's factory) but not read. A preview that still cannot load (it reads one, or one of
-its own files reads `document`) leaves the answers working: it is left out of them and named among their problems. A
+keep in a parameter or call (an addon's factory), and what a call made can be looked into as `definePreview` does with
+its `addons: [docs()]`; but the preview cannot read a member of an export, nor use any placeholder as a string, a number
+or a list. A placeholder kept in args or parameters is left out of the answers, as a function is. A preview that still
+cannot load (it uses one so, or one of its own files reads `document`) leaves the
+answers working: it is left out of them and named among their problems, with what it used. A
 `**` pattern skips `node_modules` unless it names it.
 
 It lists what Storybook's indexer lists:

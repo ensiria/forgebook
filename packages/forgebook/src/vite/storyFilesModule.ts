@@ -219,12 +219,8 @@ export const storyFilesCode = (
   texts?: BuiltTexts
 ): string => {
   const { hasUsage, hasReach } = loaders;
-  const keys = files.map((file) => file.key);
   // the group's id in Vite's form, as the plugin names the declaring module's folder
   const folder = VITE_PATHS.normalize(root);
-  const index: Record<string, StoryFileIndex> = Object.fromEntries(
-    files.map((file) => [file.key, file.index])
-  );
   const usage = JSON.stringify(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   const search = JSON.stringify(`${SEARCH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
   const reach = JSON.stringify(`${REACH_PREFIX}${storyFilesGroupText(folder, pattern)}`);
@@ -239,20 +235,21 @@ export const storyFilesCode = (
     if (written !== undefined) return [written.docs, written.code, written.page];
     return [query(key, "forgebook-docs"), query(key, "forgebook-code"), query(key, "forgebook-page")];
   };
-  // a row per file, its name written once and not once per loader: a large catalogue's names are a tenth of its index
-  const rows = keys.map(
-    (key) => `[${[JSON.stringify(key), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")}]`
+  // a row per file, its name written once and not once per column (its index, each loader): a large catalogue's
+  // names are a tenth of its index
+  const rows = files.map(({ key, index }) =>
+    [JSON.stringify(key), JSON.stringify(index), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")
   );
   return [
     ...(texts === undefined ? [] : texts.helpers),
-    `const rows = [${rows.join(",\n")}];`,
+    `const rows = [${rows.map((row) => `[${row}]`).join(",\n")}];`,
     "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
     "export default {",
-    `index: ${JSON.stringify(index)},`,
-    "stories: column(1),",
-    "docs: column(2),",
-    "code: column(3),",
-    "pages: column(4),",
+    "index: column(1),",
+    "stories: column(2),",
+    "docs: column(3),",
+    "code: column(4),",
+    "pages: column(5),",
     `search: () => import(${search}).then((module) => module.default),`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasReach ? [`reach: () => import(${reach}).then((module) => module.default),`] : []),
