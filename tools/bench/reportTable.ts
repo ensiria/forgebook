@@ -21,17 +21,28 @@ const cell = (result: MetricResult | undefined): string => {
 };
 
 /**
- * The report's rows: a metric, then a cell per tool.
+ * A tool's column heading: its name, and for Forgebook at parity with Ladle, that it ran so, since its column then
+ * stands beside one of its defaults.
+ *
+ * @param report - the report.
+ * @param tool - the tool.
+ */
+const toolHeading = (report: BenchReport, tool: ToolName): string =>
+  tool === "forgebook" && report.features === "parity" ? "forgebook at parity" : tool;
+
+/**
+ * The report's rows: a metric, then a cell per tool; with each tool's column heading.
  *
  * @param report - the report.
  */
 export const reportRows = (
   report: BenchReport
-): { readonly tools: ToolName[]; readonly rows: string[][] } => {
+): { readonly tools: ToolName[]; readonly headings: string[]; readonly rows: string[][] } => {
   const tools = Object.keys(report.tools).filter((name): name is ToolName => name in report.tools);
   const metrics = [...new Set(tools.flatMap((tool) => Object.keys(report.tools[tool]?.metrics ?? {})))];
   return {
     tools,
+    headings: tools.map((tool) => toolHeading(report, tool)),
     rows: metrics.map((metric) => [metric, ...tools.map((tool) => cell(report.tools[tool]?.metrics[metric]))])
   };
 };
@@ -42,9 +53,11 @@ export const reportRows = (
  * @param report - the report.
  */
 export const reportMarkdown = (report: BenchReport): string => {
-  const { tools, rows } = reportRows(report);
+  const { headings, rows } = reportRows(report);
   const line = (cells: readonly string[]): string => `| ${cells.join(" | ")} |`;
-  return [line(["metric", ...tools]), line(["---", ...tools.map(() => "---")]), ...rows.map(line)].join("\n");
+  return [line(["metric", ...headings]), line(["---", ...headings.map(() => "---")]), ...rows.map(line)].join(
+    "\n"
+  );
 };
 
 /** Whether a parsed value is a report of the shape this benchmark writes. */
@@ -80,6 +93,8 @@ export const reportMismatches = (first: BenchReport, second: BenchReport): strin
     ...differs("corpus", first.corpus, second.corpus),
     ...differs("throttle", first.throttle, second.throttle),
     ...differs("frames", first.frames, second.frames),
+    // a report from before the choice ran the defaults
+    ...differs("features", first.features ?? "default", second.features ?? "default"),
     ...differs("machine", first.machine, second.machine),
     ...differs("forgebook", first.forgebook, second.forgebook),
     ...differs("startedAt", first.startedAt === second.startedAt ? "same run" : "", "")
