@@ -127,6 +127,9 @@ describe("isStoryCheckReport", () => {
   it("takes a report, and refuses what is not one", () => {
     expect(isStoryCheckReport(REPORT)).toBe(true);
     expect(isStoryCheckReport({ schema: 2, results: [] })).toBe(false);
+    // a catalogue that checks no accessibility says so, and nothing else stands there
+    expect(isStoryCheckReport({ ...REPORT, a11y: "off" })).toBe(true);
+    expect(isStoryCheckReport({ ...REPORT, a11y: "on" })).toBe(false);
     expect(
       isStoryCheckReport({
         schema: 1,

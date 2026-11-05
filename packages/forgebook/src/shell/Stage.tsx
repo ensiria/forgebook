@@ -13,7 +13,7 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { type PanelArgTypes, panelProps, settableProps } from "../argTypes.ts";
+import { panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
 import {
   type ArgValue,
@@ -24,7 +24,7 @@ import {
 } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
-import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
+import { type FixedView, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
 import {
@@ -56,13 +56,13 @@ import { dockTabs } from "./dockTabs.tsx";
 import { FrameView, tellFrames } from "./FrameView.tsx";
 import { framesOrigin } from "./framesOrigin.ts";
 import type { PluginReports, ShellPlugin } from "./pluginTabs.tsx";
+import { type ReportedPanel, reportedPanel } from "./reportedPanel.ts";
 import { StageCompare } from "./StageCompare.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryBar } from "./StoryBar.tsx";
 import { STRINGS } from "./strings.ts";
 import { useAddressArgs } from "./useAddressArgs.ts";
-import { useComponentDocs } from "./useComponentDocs.ts";
 import {
   type CheckResult,
   type EventCall,
@@ -71,17 +71,12 @@ import {
   useFrameMessages
 } from "./useFrameMessages.ts";
 import { useLiveView, useLoadedView } from "./useLiveView.ts";
+import { usePanelDocs } from "./usePanelDocs.ts";
 import { usePluginStory, usePluginTabs } from "./usePluginTabs.ts";
 import { type PageScroll, useScrollMemory } from "./useScrollMemory.ts";
 import { useStoryCheck } from "./useStoryCheck.ts";
 import { useStoryCode } from "./useStoryCode.ts";
 import { useWorstCase } from "./useWorstCase.ts";
-
-/** The `argTypes` of a story before its frame reported them. */
-const NO_ARG_TYPES: PanelArgTypes = {};
-
-/** What a story's frame reports for the panel and the stage. */
-type ReportedPanel = Pick<ReadyMessage, "argTypes" | "controls" | "actions" | "fixed" | "parameters">;
 
 /**
  * What the stage's handles set the width with; none, so no handles, when the story fixes the width.
@@ -96,22 +91,6 @@ const widthSetter = (
   onViewChange: (view: ViewState) => void
 ): ((width: StageWidth) => void) | undefined =>
   fixed.width === undefined ? (width: StageWidth): void => onViewChange({ ...view, width }) : undefined;
-
-/**
- * A story's `argTypes`, controls, actions and fixed view for the panel and the stage: as its frame read them once it ran, which sees a setting
- * written by code the index leaves out; the index's controls and no `argTypes` or actions before.
- *
- * @param panels - what each story's frame reported, by story.
- * @param story - the story.
- */
-const reportedPanel = (panels: ReadonlyMap<string, ReportedPanel>, story: TreeStory): ReportedPanel =>
-  panels.get(story.id) ?? {
-    argTypes: NO_ARG_TYPES,
-    controls: story.controls,
-    actions: [],
-    fixed: NOT_FIXED,
-    parameters: []
-  };
 
 /** The height of the first frame before its story reports its own, in CSS px. */
 const INITIAL_FRAME_HEIGHT = 240;
@@ -229,7 +208,6 @@ export const Stage = ({
 }: StageProps): ReactNode => {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const storyRef = useRef<HTMLDivElement>(null);
-  const docs = useComponentDocs(loadDocs);
   const code = useStoryCode(loadCode);
   // the story's own args, as each frame reported them, by story
   const [storyArgs, setStoryArgs] = useState<ReadonlyMap<string, PanelArgs>>(new Map());
@@ -241,6 +219,8 @@ export const Stage = ({
   const [storyPanels, setStoryPanels] = useState<ReadonlyMap<string, ReportedPanel>>(new Map());
   // the story is drawn with what it fixes of the view; a change from here keeps the user's own in the address
   const panel = reportedPanel(storyPanels, story);
+  const catalogue = useCatalogue();
+  const docs = usePanelDocs(loadDocs, component.name, storyArgs.get(story.id), panel.actions);
   const view = withFixed(ownView, panel.fixed);
   const onViewChange = (changed: ViewState): void =>
     onOwnViewChange(withOwnFixed(changed, ownView, panel.fixed));
@@ -249,7 +229,6 @@ export const Stage = ({
   const [traces, setTraces] = useState<ReadonlyMap<string, PlayTrace>>(new Map());
   // what each plugin's frame module last told its tab, by story: a plugin's report belongs to the story that sent it
   const [pluginReports, setPluginReports] = useState<PluginReports>(new Map());
-  const catalogue = useCatalogue();
   const { switches } = catalogue;
   const storyCheck = useStoryCheck(frameRef, frameAddress(frameUrl, story.id, view, switches));
   const eventNames = useMemo(
@@ -334,6 +313,9 @@ export const Stage = ({
     onPluginReport: (message: PluginReportMessage): void =>
       setPluginReports((current) => new Map(current).set(`${message.storyId}|${message.plugin}`, message)),
     // a story that changes its own args changes the panel's values, as the reader would
+    // a story that could not be shown reports no args: the panel built from them has none, rather than waiting
+    onFailed: (storyId: string): void =>
+      setStoryArgs((current) => (current.has(storyId) ? current : new Map(current).set(storyId, {}))),
     onStoryArgs: (storyId: string, args: PanelArgs): void =>
       storyId === story.id ? onPanelArgsChange(args) : undefined
   });

@@ -179,6 +179,11 @@ leave it out.
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.
 
+A catalogue may turn off its accessibility check (`a11y: false`) or its component docs (`componentDocs: false`). Then a
+check's report says `"a11y": "off"` (it ran no axe: a pass says nothing of accessibility), and `story` says
+`"componentDocs": "off"` with no `docs` and no required props: read the component's source for its props, and the
+story's args for what it sets; `changed` finds no story through the imports, so check the stories you touched by name.
+
 A story's frame runs on its own origin (the dev server's second port), unless the catalogue keeps it on its own
 (`frames: "same-origin"`, `forgebook dev --frames same-origin`): open a story by the `page` or `frame` link an answer
 gives, never by building a frame's address yourself, and do not expect a story's code to reach the catalogue's page or

@@ -30,7 +30,7 @@ export type PageCheckRequest = {
 const checkedPage = async (
   address: string,
   open: () => Promise<Page>,
-  a11y: A11ySettings
+  a11y: A11ySettings | undefined
 ): Promise<StoryCheckResult> => {
   const page = await open();
   const errors = watchedErrors(page);
@@ -47,7 +47,7 @@ const checkedPage = async (
       return result([{ kind: "frame", message: `It answered ${response.status()}` }]);
     }
     return result([
-      ...(await axeProblems(page, a11y)),
+      ...(a11y === undefined ? [] : await axeProblems(page, a11y)),
       ...(await spillProblems(page, "body")),
       ...(await focusProblems(page)),
       ...errorProblems(errors)
@@ -75,7 +75,7 @@ export const checkPages = async ({ addresses, lists }: PageCheckRequest): Promis
     for (const address of addresses) {
       results.push(await checkedPage(address, () => context.newPage(), a11y));
     }
-    return { schema: 1, results };
+    return { schema: 1, results, ...(a11y === undefined ? { a11y: "off" } : {}) };
   } finally {
     await browser.close();
   }

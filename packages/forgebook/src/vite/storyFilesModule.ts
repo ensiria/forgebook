@@ -184,6 +184,8 @@ export const indexedStoryFiles = (
 
 /** The loaders a group offers besides its story files'. */
 export type GroupLoaders = {
+  /** Whether it offers each story file's component docs (the catalogue reads them); `true` by default. */
+  readonly hasDocs?: boolean;
   /** Whether it offers its "Used in" (the catalogue did not turn it off). */
   readonly hasUsage: boolean;
   /** Whether it offers what each story reaches: only on a dev server, for its tools. */
@@ -196,7 +198,7 @@ export type GroupLoaders = {
  * @param root - the declaring module's folder.
  * @param pattern - the pattern before `?forgebook-files`.
  * @param watch - adds a file whose edit renews the module (each story file: its index is in the module).
- * @param loaders - the group's loaders besides its story files'; both by default.
+ * @param loaders - the group's loaders besides its story files'; all of them by default.
  * @param cache - the index kept between starts.
  * @returns the module's code, or a message saying which file cannot be indexed.
  */
@@ -226,7 +228,7 @@ export const storyFilesCode = (
   loaders: GroupLoaders,
   hasTexts = false
 ): string => {
-  const { hasUsage, hasReach } = loaders;
+  const { hasDocs = true, hasUsage, hasReach } = loaders;
   // the group's id in Vite's form, as the plugin names the declaring module's folder
   const folder = VITE_PATHS.normalize(root);
   const usage = codeLiteral(`${USAGE_PREFIX}${storyFilesGroupText(folder, pattern)}`);
@@ -242,7 +244,12 @@ export const storyFilesCode = (
   const textLoaders = (key: string): readonly string[] =>
     hasTexts
       ? []
-      : [query(key, "forgebook-docs"), query(key, "forgebook-code"), query(key, "forgebook-page")];
+      : // the docs' place is kept without them, so every row's columns stay where the module reads them
+        [
+          hasDocs ? query(key, "forgebook-docs") : "null",
+          query(key, "forgebook-code"),
+          query(key, "forgebook-page")
+        ];
   // a row per file, its name written once and not once per column (its index, each loader): a large catalogue's
   // names are a tenth of its index
   const rows = files.map(({ key, index }) =>
@@ -257,7 +264,7 @@ export const storyFilesCode = (
     "export default {",
     "index: column(1),",
     "stories: column(2),",
-    "docs: column(3),",
+    hasDocs ? "docs: column(3)," : "docs: {},",
     "code: column(4),",
     "pages: column(5),",
     `search: () => import(${search}).then((module) => module.default),`,

@@ -96,12 +96,13 @@ const judgementLines = (result: StoryCheckResult): readonly string[][] => {
 
 /**
  * A check's report as a table: one row per problem, its story, its view and its kind; a story that passes in a view gets
- * one row saying so.
+ * one row saying so. A catalogue that checks no accessibility says so first, so "passes" is not read as axe's.
  *
  * @param report - the check's report.
  * @param style - colours, glyphs and width.
  */
 export const checkText = (report: StoryCheckReport, style: OutputStyle): string =>
+  (report.a11y === "off" ? "Accessibility is not checked: the catalogue sets a11y: false.\n" : "") +
   table(
     report.results.flatMap((result) => [
       ...(result.problems.length === 0
