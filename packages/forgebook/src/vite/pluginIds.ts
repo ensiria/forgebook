@@ -86,6 +86,32 @@ export const virtualId = (source: string): string | undefined => {
 export const isGroupId = (id: string): boolean =>
   VIRTUAL_PREFIXES.some((prefix) => id.startsWith(`\0${prefix}`));
 
+/** The modules that read a group of story files' own files: named once its story files are. */
+const STORY_FILES_READERS: readonly string[] = [USAGE_PREFIX, REACH_PREFIX, SEARCH_PREFIX, TEXTS_PREFIX];
+
+/**
+ * The group a project's module names for a group's module: the story files of their "Used in", reach, search index and
+ * texts, the docs pages of their search index. Those read the same files and only their group's module imports them, so
+ * a client that already holds the group's module needs no other import to have been seen.
+ *
+ * @param id - a group's module's id.
+ */
+export const namingGroupOf = (id: string): string => {
+  const pagesSearch = `\0${PAGES_SEARCH_PREFIX}`;
+  if (id.startsWith(pagesSearch)) return `${DOCS_PAGES_PREFIX}${id.slice(pagesSearch.length)}`;
+  const reader = STORY_FILES_READERS.map((prefix) => `\0${prefix}`).find((mark) => id.startsWith(mark));
+  return reader === undefined ? id : `${FILES_PREFIX}${id.slice(reader.length)}`;
+};
+
+/**
+ * Whether a module's text names a group. Its transform must run for the plugin to see the import, so a cache of
+ * transforms must not keep it.
+ *
+ * @param code - the module's text.
+ */
+export const namesGroup = (code: string): boolean =>
+  [FILES_QUERY, DOCS_PAGES_QUERY, ...VIRTUAL_PREFIXES].some((name) => code.includes(name));
+
 /** The resolved id of the configuration's data module. */
 export const CONFIG_ID = `\0${CONFIG_MODULE}`;
 

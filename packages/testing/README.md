@@ -149,6 +149,9 @@ export default defineConfig({
 });
 ```
 
+The plugin keeps a module that imports story files out of Vitest's module cache (`fsModuleCache`), as a group must be
+listed anew on each run; every other module stays cached.
+
 `storyServerTests` also takes `wrap`: a second pass with every story inside a decorator (a provider with a partial
 translation catalogue), its HTML checked.
 

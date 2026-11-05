@@ -39,13 +39,116 @@ wait_close() {
     read -r -p 'Premi Invio per chiudere ' _ || true
   fi
 }
-# The results file of what there is, through the kit's Node part once Node and Forgebook are in place.
-write_what_there_is() {
-  if [ -n "$node_bin" ] && [ -f "$repo/node_modules/.kit-installed" ]; then
-    "$node_bin" "$repo/tools/bench/kit/kit.mts" --home "$KIT_HOME" --desktop "$(desktop_folder)" --results && return
+# Whether the Node part of the pinned commit is installed. A folder an earlier launch left holds the kit of that launch's
+# commit, which need not know the options this launcher passes.
+kit_is_installed() {
+  [ -n "$node_bin" ] && [ -f "$repo/node_modules/.kit-installed" ] && [ -f "$KIT_FOLDER/kit.pins" ] &&
+    [ "$(cat "$repo/node_modules/.kit-installed")" = "$(pin forgebook.commit)" ]
+}
+# A text as a regular expression matching it literally and whatever its case, as kitResults.ts matches, in a sed command
+# delimited by #: not every sed has a flag for case. A letter outside ASCII keeps its case here, and the search for what
+# is left finds it.
+any_case() {
+  local LC_ALL=C text="$1" index character lower upper result=""
+  for ((index = 0; index < ${#text}; index++)); do
+    character="${text:index:1}"
+    case "$character" in
+      [A-Za-z])
+        lower="$(printf '%s' "$character" | tr 'A-Z' 'a-z')"
+        upper="$(printf '%s' "$character" | tr 'a-z' 'A-Z')"
+        result+="[$lower$upper]"
+        ;;
+      [][\\.*^\$\(\)+?{}\|#]) result+="\\$character" ;;
+      *) result+="$character" ;;
+    esac
+  done
+  printf '%s' "$result"
+}
+# The logs alone, cleaned of the person's identity as kitResults.ts cleans the kit's file, and searched again: anything
+# left and nothing is archived. They need nothing installed, so what packs them is what the machine has.
+write_logs_archive() {
+  local not_word='[^[:alnum:]_-]'
+  # a user's folder in any account's name and any spelling, as kitResults.ts writes it
+  local folder_name='[^~\\/"'"'"'[:space:]:][^\\/"'"'"'[:space:]:]*' separator='(\\{1,2}|/)' users home_word
+  users="$(any_case Users)"
+  home_word="$(any_case home)"
+  local unix_folder="(^|[^[:alnum:]_.~-])/($users|$home_word)/$folder_name"
+  local windows_folder="(^|[^[:alnum:]_])[A-Za-z]:$separator$users$separator$folder_name"
+  local onedrive_left='OneDrive - ([^<]|<[^o])'
+  local user_name host_name pattern placeholder rules=() left=("$unix_folder" "$windows_folder" "$onedrive_left")
+  local stage log_file cleaned name folder stem archive
+  user_name="${USER:-$(id -un 2>/dev/null || true)}"
+  host_name="$(hostname 2>/dev/null || true)"
+  if [ "${#HOME}" -ge 3 ]; then
+    rules+=(-e "s#$(any_case "$HOME")#~#g")
+    left+=("$(any_case "$HOME")")
   fi
-  # the raw logs name the user's folder: they are pointed to, never offered as they are
-  say "Il file dei risultati non è stato creato. I registri sono in $LOG_FOLDER."
+  for name in "$user_name" "$host_name" "${host_name%%.*}"; do
+    [ "${#name}" -ge 3 ] || continue
+    placeholder='<computer>'
+    [ "$name" = "$user_name" ] && placeholder='<user>'
+    pattern="(^|$not_word)$(any_case "$name")(\$|$not_word)"
+    # twice: a match takes the character after it, which may be the one before the next match
+    rules+=(-e "s#$pattern#\\1$placeholder\\2#g" -e "s#$pattern#\\1$placeholder\\2#g")
+    left+=("$pattern")
+  done
+  rules+=(-e "s#$unix_folder#\\1~#g" -e "s#$windows_folder#\\1~#g")
+  rules+=(-e "s#OneDrive - [^\\\\/\"']+#OneDrive - <organisation>#g")
+  stage="$(mktemp -d)" || {
+    say "Non riesco a creare il file dei registri. I registri sono in $LOG_FOLDER."
+    return 0
+  }
+  for log_file in "$LOG_FOLDER"/*; do
+    [ -f "$log_file" ] || continue
+    name="$(basename "$log_file")"
+    cleaned="$stage/$name"
+    LC_ALL=C sed -E "${rules[@]}" "$log_file" >"$cleaned" || {
+      rm -rf "$stage"
+      say "Non riesco a creare il file dei registri. I registri sono in $LOG_FOLDER."
+      return 0
+    }
+    # the placeholders are no leak, though a user named user finds its name in them; the locale's own rules for case, so
+    # a capital outside ASCII is found too
+    LC_ALL=C sed -e 's/<user>//g' -e 's/<computer>//g' "$cleaned" >"$stage/.searched"
+    for pattern in "${left[@]}"; do
+      if grep -Eqai -e "$pattern" "$stage/.searched"; then
+        rm -rf "$stage"
+        say "Non creo il file dei registri: $name contiene ancora dati personali. I registri sono in $LOG_FOLDER."
+        return 0
+      fi
+    done
+  done
+  rm -f "$stage/.searched"
+  folder="$(desktop_folder)"
+  [ -d "$folder" ] || folder="$KIT_HOME"
+  stem="$folder/forgebook-bench-registri-$(date '+%Y%m%d-%H%M')"
+  archive="$stem.zip"
+  if command -v zip >/dev/null 2>&1; then
+    # no extra fields: they would hold the owner's ids
+    (cd "$stage" && zip -q -X -r "$archive" .) || archive=""
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -I -m zipfile -c "$archive" "$stage"/* || archive=""
+  else
+    # tar is what every system here has, and the launcher already asks for it; its headers would name the owner
+    archive="$stem.tar.gz"
+    tar --numeric-owner -czf "$archive" -C "$stage" . || archive=""
+  fi
+  rm -rf "$stage"
+  if [ -z "$archive" ]; then
+    say "Non riesco a creare il file dei registri. I registri sono in $LOG_FOLDER."
+    return 0
+  fi
+  # the name alone: the folder names the user
+  say "Ho scritto i registri, senza nome utente né nome del computer, sul Desktop: $(basename "$archive"). Mandalo così com'è."
+}
+# The results file of what there is: the kit's own, through Node, once the pinned commit is in place; otherwise, or when
+# the kit cannot write it, the launcher's logs alone.
+write_what_there_is() {
+  if kit_is_installed; then
+    "$node_bin" "$repo/tools/bench/kit/kit.mts" --home "$KIT_HOME" --desktop "$(desktop_folder)" --results && return 0
+    say "Il kit non ha creato il file dei risultati: metto insieme solo i registri."
+  fi
+  write_logs_archive
 }
 fail() {
   log "Errore: $1"
@@ -78,7 +181,7 @@ run_watched() {
   watched_pid=$pid
   local started=$SECONDS last_sign=$SECONDS last_beat=$SECONDS last_size=-1 size
   while kill -0 "$pid" 2>/dev/null; do
-    sleep 5
+    sleep 1
     size="$(wc -c <"$step_log" | tr -d ' ')"
     if [ "$size" != "$last_size" ]; then
       last_size="$size"
@@ -154,7 +257,7 @@ node_home="$KIT_HOME/tools/node-$node_version-$platform"
 # --results: only the results file of what there is, with nothing installed or run
 for argument in "$@"; do
   if [ "$argument" = --results ]; then
-    write_what_there_is
+    write_what_there_is || true
     wait_close
     exit 0
   fi
@@ -210,7 +313,9 @@ export GIT_CONFIG_GLOBAL="$KIT_HOME/gitconfig"
 export GIT_TERMINAL_PROMPT=0
 
 step 'pnpm'
-run_watched "L'attivazione di pnpm" 5 10 corepack enable --install-directory "$bin" pnpm
+# Yarn too, though the launcher never runs it: a library's tasks call it by name (Carbon's build), and without it on the
+# PATH they fail at once and that library is lost from the run
+run_watched "L'attivazione di pnpm" 5 10 corepack enable --install-directory "$bin" pnpm yarn
 
 commit="$(pin forgebook.commit)"
 step "Forgebook al commit ${commit:0:12}"

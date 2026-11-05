@@ -30,6 +30,7 @@ import type {
   ProgramRunner
 } from "@ensiria/cli-kit/exec.types";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
+import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { isOwnGroup, killTree } from "./processTree.ts";
 
@@ -167,18 +168,21 @@ const keepEnd = (text: string, chunk: string): string => {
   return joined.length > KEPT_OUTPUT ? joined.slice(-KEPT_OUTPUT) : joined;
 };
 
+/** How a run is stopped when its program goes quiet. */
+type SilenceWatch = {
+  /** How long it may print nothing, in milliseconds. */
+  readonly limitMs: number;
+  /** Told when that happened, before the tree is stopped. */
+  readonly onSilent: () => void;
+};
+
 /**
- * cli-kit's `ProgramRunner`, for programs that start others: the tree in a group of its own where the system has
- * them, all of it stopped at the time limit, and the run over at the program's exit.
- *
- * @remarks
- * Output is kept, as `capture` keeps it; a request for another mode is kept the same way, since the benchmark prints
- * nothing of the programs it runs. Its stdin is closed unless the request gives text, so a program that asks a
- * question reads its end instead of waiting for an answer.
+ * Runs a program as `treeRunner` says, and stops its tree too when it prints nothing for the given time.
  *
  * @param request - the program and how to run it.
+ * @param silence - how long it may stay quiet; without one, only the time limit stops it.
  */
-export const treeRunner: ProgramRunner = (request: ProgramRequest): Promise<ProgramOutcome> =>
+const runTree = (request: ProgramRequest, silence?: SilenceWatch): Promise<ProgramOutcome> =>
   new Promise((resolve) => {
     const child = spawn(request.program, [...request.args], {
       cwd: request.cwd,
@@ -191,42 +195,63 @@ export const treeRunner: ProgramRunner = (request: ProgramRequest): Promise<Prog
     let stderr = "";
     let isTimedOut = false;
     let isSettled = false;
+    let hasExited = false;
+    const stop = (): void => {
+      isTimedOut = true;
+      clearTimeout(timer);
+      clearTimeout(silenceTimer);
+      // a tree that will not go, or a kill that failed, must not hold the call: its pipes are closed from here
+      const pid = child.pid;
+      void (pid === undefined ? Promise.resolve() : killTree(pid)).then(() =>
+        setTimeout(() => {
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+          ended(null, null);
+        }, DRAIN_TIMEOUT)
+      );
+    };
+    const watchSilence = (): ReturnType<typeof setTimeout> | undefined =>
+      silence === undefined || isTimedOut || hasExited
+        ? undefined
+        : setTimeout(() => {
+            silence.onSilent();
+            // the failure's hint shows the end of stderr, and a tool may say where it was on stdout only
+            stderr = keepEnd(stderr, `\n${stdout}`);
+            stop();
+          }, silence.limitMs);
+    const onOutput = (): void => {
+      clearTimeout(silenceTimer);
+      silenceTimer = watchSilence();
+    };
+    let silenceTimer = watchSilence();
     child.stdout?.setEncoding("utf8").on("data", (chunk: string) => {
       stdout = keepEnd(stdout, chunk);
+      onOutput();
     });
     child.stderr?.setEncoding("utf8").on("data", (chunk: string) => {
       stderr = keepEnd(stderr, chunk);
+      onOutput();
     });
     const settle = (outcome: ProgramOutcome): void => {
       if (isSettled) return;
       isSettled = true;
       clearTimeout(timer);
+      clearTimeout(silenceTimer);
       resolve(outcome);
     };
     const ended = (code: number | null, signal: NodeJS.Signals | null): void =>
       settle(
         isTimedOut ? { kind: "timeout", stdout, stderr } : { kind: "ended", stdout, stderr, code, signal }
       );
-    const timer =
-      request.timeoutMs === undefined
-        ? undefined
-        : setTimeout(() => {
-            isTimedOut = true;
-            // a tree that will not go, or a kill that failed, must not hold the call: its pipes are closed from here
-            const pid = child.pid;
-            void (pid === undefined ? Promise.resolve() : killTree(pid)).then(() =>
-              setTimeout(() => {
-                child.stdout?.destroy();
-                child.stderr?.destroy();
-                ended(null, null);
-              }, DRAIN_TIMEOUT)
-            );
-          }, request.timeoutMs);
+    const timer = request.timeoutMs === undefined ? undefined : setTimeout(stop, request.timeoutMs);
     child.on("error", (error: NodeJS.ErrnoException) => {
       settle(error.code === "ENOENT" ? { kind: "missing" } : { kind: "failed", message: error.message });
     });
     child.on("close", ended);
     child.on("exit", (code, signal) => {
+      // the program is gone: what it left holding its pipes is the drain's to stop, not the silence's
+      hasExited = true;
+      clearTimeout(silenceTimer);
       // what the program started and left holding its pipes is stopped, then the pipes are closed from here
       const drain = setTimeout(() => {
         if (child.pid !== undefined) void killTree(child.pid);
@@ -238,6 +263,20 @@ export const treeRunner: ProgramRunner = (request: ProgramRequest): Promise<Prog
     });
     child.stdin?.end(request.input);
   });
+
+/**
+ * cli-kit's `ProgramRunner`, for programs that start others: the tree in a group of its own where the system has
+ * them, all of it stopped at the time limit, and the run over at the program's exit.
+ *
+ * @remarks
+ * Output is kept, as `capture` keeps it; a request for another mode is kept the same way, since the benchmark prints
+ * nothing of the programs it runs. Its stdin is closed unless the request gives text, so a program that asks a
+ * question reads its end instead of waiting for an answer.
+ *
+ * @param request - the program and how to run it.
+ */
+export const treeRunner: ProgramRunner = (request: ProgramRequest): Promise<ProgramOutcome> =>
+  runTree(request);
 
 /** A minute, in milliseconds. */
 const MINUTE = 60_000;
@@ -259,12 +298,24 @@ export const TIME_LIMITS = {
   prepare: 90 * MINUTE
 } as const;
 
+/**
+ * How long a library's own preparation may print nothing, in milliseconds. Its tools write when a task ends, and one
+ * task of a large design system takes minutes on a slow PC; half an hour of nothing is a tool waiting, which would
+ * otherwise cost the whole of `TIME_LIMITS.prepare` before the next library starts.
+ */
+export const PREPARE_SILENCE_MS = 30 * MINUTE;
+
 /** `exec`'s options for a program of the benchmark: a time limit is required, and the script's io. */
 export type ProgramOptions = ExecOptions & {
   /** How long it may run, in milliseconds, before its whole tree is stopped and the call fails. */
   readonly timeoutMs: number;
   /** The script's streams. */
   readonly io: ScriptIo;
+  /**
+   * How long it may print nothing, in milliseconds, before its whole tree is stopped and the call fails. None by
+   * default: an install or a fetch with its output turned down prints nothing for as long as it works.
+   */
+  readonly silenceMs?: number;
 };
 
 /**
@@ -276,16 +327,36 @@ export type ProgramOptions = ExecOptions & {
  * @param options - `exec`'s options, with the script's io, whose folder and environment the program is looked for in,
  * and a time limit.
  */
-export const execProgram = (
+export const execProgram = async (
   program: string,
   args: readonly string[],
-  options: ProgramOptions
+  { silenceMs, ...options }: ProgramOptions
 ): Promise<ExecResult> => {
   const resolved = invocation(program, args, {
     cwd: options.cwd ?? options.io.cwd,
     env: options.env ?? options.io.env
   });
   // a test's io answers in place of real programs; every other io gets the runner that stops whole trees
-  const io: ScriptIo = { ...options.io, runProgram: options.io.runProgram ?? treeRunner };
-  return exec(resolved.program, [...resolved.args], { ...options, io });
+  let isSilent = false;
+  const silence =
+    silenceMs === undefined
+      ? undefined
+      : {
+          limitMs: silenceMs,
+          onSilent: () => {
+            isSilent = true;
+          }
+        };
+  const runProgram: ProgramRunner = (request) => runTree(request, silence);
+  const io: ScriptIo = { ...options.io, runProgram: options.io.runProgram ?? runProgram };
+  try {
+    return await exec(resolved.program, [...resolved.args], { ...options, io });
+  } catch (error) {
+    if (!isSilent || !(error instanceof ScriptError)) throw error;
+    // exec's own message names the time limit, which is not what ended this one
+    const minutes = Math.round((silenceMs ?? 0) / MINUTE);
+    throw new ScriptError(`${program} printed nothing for ${minutes} minutes and was stopped`, {
+      hint: error.hint
+    });
+  }
 };

@@ -10,7 +10,8 @@ Linux desktop. They copy this folder, double-click one file, answer two question
 2. **Installs into the user's own folder**, without administrator rights: `%LOCALAPPDATA%\ForgebookBench` on Windows,
    `${XDG_DATA_HOME:-~/.local/share}/forgebook-bench` elsewhere (`FORGEBOOK_BENCH_HOME` moves it, and
    `FORGEBOOK_BENCH_DESKTOP` the results file). Node, and on Windows MinGit, from their projects' own sites, each
-   checked against the SHA-256 in `kit.pins`; pnpm through corepack; Forgebook cloned over HTTPS at the commit
+   checked against the SHA-256 in `kit.pins`; pnpm and Yarn through corepack (a library's own tasks call `yarn` by name:
+   without it on the `PATH` Carbon's preparation fails at once); Forgebook cloned over HTTPS at the commit
    `kit.pins` names; Playwright's Chromium. Every cache (npm, pnpm, corepack, Yarn, the browsers) stays in that folder,
    Git reads no configuration of the user's and never asks for credentials, and no tool asks a question: corepack's
    download prompt is off and every program the launchers run reads an empty stdin. On Linux, Git comes from the
@@ -66,6 +67,9 @@ that impossible to repeat in silence, at every level:
   least) is stopped with its whole process tree, the reason goes in `kit.json` and the console, and the kit goes on
   with the next part (`kitWatch.ts`). The launchers stop a step of their own the same way (an install silent for
   30 minutes, a fetch for 20, each with an upper limit too).
+- **A library's preparation** that prints nothing for 30 minutes (`PREPARE_SILENCE_MS`) is stopped with its tree, what it
+  last said goes in the part's log, and the kit goes on with the next part. Nx's terminal interface and daemon are off
+  (`toolEnvironment.ts`).
 - **The benchmark itself** never waits forever (its README, "Nothing waits forever"): every program it runs to
   completion has a time limit that holds for its whole tree, every stop of a server and every reading of a page has a
   deadline, and the machine's readings give up after a minute. The kit's limits sit above the benchmark's own, so a
@@ -74,8 +78,9 @@ that impossible to repeat in silence, at every level:
   `launcher-NN.log` (each program it ran), `kit.log` (every line the kit said, written before it is printed),
   `calibration.log` and one log per part (the benchmark's output).
 - **What there is, sent back.** When a step fails, the kit writes the results file of what there is before it reports
-  the failure; before Node is installed the Windows launcher zips its own logs, cleaned and checked the same way (the
-  Linux launcher then only says where they are). Launched again,
+  the failure. When the kit's Node part cannot run or cannot write it (nothing installed yet, no pnpm, a folder holding
+  the older kit of an earlier launch, whose options differ), the launcher zips its own logs, cleaned and checked the same
+  way, with what it has: PowerShell on Windows; on Linux and macOS `zip`, else Python, else a `.tar.gz`. Launched again,
   the menu offers «Crea il file dei risultati con quello che c'è»; `start-bench.cmd --results` (or `bash
   start-bench.sh --results`) does only that.
 
@@ -96,6 +101,13 @@ available, and the earlier version kept none of its own.
 | The request for an administrator's permission waits until someone answers | the Visual C++ step | 10 minutes in a helper process, then on without it |
 | The results file asked for a confirmation at the end of the run | `kitOutput.ts` | written without a question |
 
+The field PC's `carbon.log` ends with Lerna `exited with code 130`, `Failed tasks: typescript-config-carbon:build`. That is
+no sign of a hang or of an interrupt. That task's script starts with `yarn clean`, and the launchers left no `yarn` on the
+`PATH`: the same preparation fails the same way in about three seconds, with no key pressed, on macOS and on
+`windows-latest`, and with Yarn on the `PATH` it ends well on both (under two minutes on the runner, with no terminal). So
+Carbon was lost to the missing Yarn, and where the field run hung is still not established. A preparation that does go
+quiet is now stopped (a hanging task inside Carbon's Lerna, on macOS: stopped at its limit, nothing left running).
+
 ## Running it
 
 ```sh
@@ -109,6 +121,15 @@ start-bench.cmd --results              # only the results file of what there is
 
 ## Updating it
 
+- **The zip**: from the repository's root, for the commit `$commit`, always the kit's own tree:
+
+  ```sh
+  git archive --format=zip --prefix=forgebook-bench-kit/ --mtime="$(git log -1 --format=%cI "$commit")" \
+    -o forgebook-bench-kit.zip "$commit:tools/bench/kit"
+  ```
+
+  The same bytes each time. Archived from inside the folder or from the commit's root, Git applies the repository's `eol=lf`
+  and the `.cmd` and the `.ps1` lose their Windows line endings, which `cmd.exe` misreads.
 - **Forgebook's commit**: `forgebook.commit` in `kit.pins`, a full commit reachable on GitHub. The launchers run the
   kit's Node part and the benchmark from that commit, and measure the Forgebook packed from it, so a change to either
   ships by moving the pin, and a pin must hold this folder's Node part and the benchmark's Windows support.
@@ -138,10 +159,15 @@ Never run: **Windows x64** (the field PC is the first), the **full profile on Wi
 there: large Yarn installs, long paths, Fluent's `prepare` with MinGit's `sh`), the Visual C++ permission request on a
 real PC, a Desktop moved to OneDrive, an antivirus other than Defender, Linux on a desktop with a session.
 
-On this version, nothing has run on a Windows launcher. What ran:
+On this version, what ran:
 
-- **`windows-latest` CI**: the unit tests, among them the process-tree runner and the watchdog with real processes
-  (`taskkill` included).
+- **`windows-latest` CI, x64, on every pull request**: `start-bench.cmd` from a bare folder through Node, MinGit, pnpm's
+  activation, the clone, the install and Chromium to the help of the kit's Node part, then the results file three ways
+  (nothing installed, the installed kit, a kit left by an older launch); the unit tests, among them the process-tree
+  runner and the watchdog with real processes (`taskkill` included). No measurement.
+- **`launcherFlow.test.ts`**, on macOS and Linux: both launchers from their first line against local fakes of the downloads, the
+  clone, corepack and pnpm; the Windows one in PowerShell 7, with `SystemRoot` and `Get-CimInstance` standing in. It also
+  fails on a PowerShell variable spelled two ways: names ignore case, so `$node` and `$script:Node` are one variable.
 - **macOS**: `start-bench.sh` from nothing through calibration, the quick profile and the zip, one commit before the
   review's fixes (a heartbeat a minute, nothing left running, no trace of the user or the folder in the zip); on the
   final launcher, its failure path (a disk check that failed wrote the zip of what there was) and `run_watched` alone
@@ -160,5 +186,5 @@ On this version, nothing has run on a Windows launcher. What ran:
   watched child process; `kitWatch.ts` what the watch reads and decides; `kitJournal.ts` the journal;
   `kitOutput.ts` the results file and the reference.
 - `kitPlan.ts`, `kitState.ts`, `kitResults.ts`, `zipArchive.ts`: the logic, tested in `kit.test.ts`; the watch in
-  `kitWatch.test.ts` and `kitRunner.test.ts`.
+  `kitWatch.test.ts` and `kitRunner.test.ts`; the launchers in `launcherFlow.test.ts`, on `launcherFixture.ts`.
 - `reference.json`: the reference machine's durations.
