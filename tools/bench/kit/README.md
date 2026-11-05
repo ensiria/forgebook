@@ -121,6 +121,15 @@ start-bench.cmd --results              # only the results file of what there is
 
 ## Updating it
 
+- **The zip**: from the repository's root, for the commit `$commit`, always the kit's own tree:
+
+  ```sh
+  git archive --format=zip --prefix=forgebook-bench-kit/ --mtime="$(git log -1 --format=%cI "$commit")" \
+    -o forgebook-bench-kit.zip "$commit:tools/bench/kit"
+  ```
+
+  The same bytes each time. Archived from inside the folder or from the commit's root, Git applies the repository's `eol=lf`
+  and the `.cmd` and the `.ps1` lose their Windows line endings, which `cmd.exe` misreads.
 - **Forgebook's commit**: `forgebook.commit` in `kit.pins`, a full commit reachable on GitHub. The launchers run the
   kit's Node part and the benchmark from that commit, and measure the Forgebook packed from it, so a change to either
   ships by moving the pin, and a pin must hold this folder's Node part and the benchmark's Windows support.

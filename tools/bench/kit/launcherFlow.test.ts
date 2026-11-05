@@ -323,6 +323,23 @@ const pathOf = (root: string, programs: readonly string[]): string => {
   return folder;
 };
 
+describe.runIf(isUnix)("the kit's zip", () => {
+  it("keeps the Windows launchers' line endings when archived as the README says", () => {
+    const folder = mkdtempSync(join(tmpdir(), "kit-zip-"));
+    const file = join(folder, "kit.zip");
+    const archive = ["archive", "--format=zip", "--prefix=kit/", "--mtime=2026-01-01T00:00:00Z", "-o", file];
+    spawnSync("git", [...archive, "HEAD:tools/bench/kit"], { cwd: join(import.meta.dirname, "../../..") });
+    const launchers = ["kit/start-bench.cmd", "kit/start-bench.ps1"].map((name) =>
+      run("unzip", ["-p", file, name])
+    );
+    rmSync(folder, { recursive: true });
+    for (const text of launchers) {
+      expect(text.length).toBeGreaterThan(0);
+      expect(text.split("\r\n").length).toBe(text.split("\n").length);
+    }
+  });
+});
+
 describe.runIf(isUnix)("start-bench.sh's logs, on its own", () => {
   it(
     "falls back to a tar.gz on a machine with neither zip nor Python",
