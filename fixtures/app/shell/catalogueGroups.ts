@@ -31,6 +31,7 @@ const SPEC_CATALOGUES: Readonly<Record<string, readonly Catalogue[]>> = {
   "parity.e2e.ts": ["parity"],
   "preact.e2e.ts": ["preact"],
   "reactNative.e2e.ts": ["react-native"],
+  "restartedServer.e2e.ts": ["html"],
   "solid.e2e.ts": ["solid"],
   "svelte.e2e.ts": ["svelte"],
   "sveltekit.e2e.ts": ["sveltekit"],

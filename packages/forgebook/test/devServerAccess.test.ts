@@ -3,8 +3,7 @@
  * names and what Vite would serve, whatever address it asks for, and nothing at all when it is another site's page.
  *
  * @remarks
- * Every request is written by hand, with the headers a browser or a tool would send: `fetch` normalises a `..` away and
- * cannot set `Host`, `Origin` or `Sec-Fetch-*`.
+ * Every request is written by hand (`rawRequest.ts`).
  *
  * @module
  */
@@ -20,6 +19,7 @@ import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import { VITE_PATHS } from "../src/vite/vitePaths.ts";
+import { ask, fsAddress, listenOnFreePort, OWN_SCRIPT, portOf, TOOL_SCRIPT } from "./fixtures/rawRequest.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** What every file a client must not read holds. */
@@ -28,55 +28,11 @@ const SECRET = "TOP-SECRET";
 /** A story file's text. */
 const STORY = `export default { title: "Named" }; export const One = {}; // ${SECRET}\n`;
 
-/** The headers of a module script the catalogue's own page imports. */
-const OWN_SCRIPT = { "sec-fetch-site": "same-origin", "sec-fetch-mode": "cors", "sec-fetch-dest": "script" };
-
-/** The headers of a tool's request Vite answers as a module: a tool may send anything but a browser's facts. */
-const TOOL_SCRIPT = { "sec-fetch-dest": "script" };
-
 /** The headers of another site's page framing an address. */
 const FRAMED_ELSEWHERE = {
   "sec-fetch-site": "cross-site",
   "sec-fetch-mode": "navigate",
   "sec-fetch-dest": "iframe"
-};
-
-/** A response. */
-type Answer = { readonly status: number; readonly body: string };
-
-/**
- * Sends one request as written.
- *
- * @param port - the port.
- * @param path - the address, sent as it is.
- * @param headers - its headers.
- */
-const ask = (port: number, path: string, headers: Record<string, string> = {}): Promise<Answer> =>
-  new Promise((resolve, reject) => {
-    const sent = request({ host: "127.0.0.1", port, path, headers }, (response) => {
-      let body = "";
-      response.on("data", (chunk: Buffer): void => {
-        body += chunk.toString();
-      });
-      response.on("end", (): void => resolve({ status: response.statusCode ?? 0, body }));
-    });
-    sent.on("error", reject);
-    sent.end();
-  });
-
-/**
- * The address Vite serves a file under: `/@fs/C:/x` on Windows, `/@fs/x` elsewhere.
- *
- * @param file - the file, absolute in Vite's form.
- */
-const fsAddress = (file: string): string => `/@fs/${file.replace(/^\//, "")}`;
-
-/** The port a listening server took. */
-const portOf = (server: ViteDevServer): number => {
-  const address = server.httpServer?.address();
-  if (address === null || address === undefined || typeof address === "string")
-    throw new Error("The server does not listen");
-  return address.port;
 };
 
 describe("a dev server's two ports", () => {
@@ -143,9 +99,11 @@ describe("a dev server's two ports", () => {
       },
       plugins: [forgebookPlugin({ config })]
     });
-    await server.listen();
+    await listenOnFreePort(server);
     catalogue = portOf(server);
-    frames = catalogue + 1;
+    // the next free port when the catalogue's + 1 is taken: read from where its page sends a frame
+    const framePage = await ask(catalogue, "/frame.html?story=a--b", FRAMED_ELSEWHERE);
+    frames = Number(new URL(framePage.location ?? "").port);
   });
 
   afterAll(async () => {
@@ -170,6 +128,7 @@ describe("a dev server's two ports", () => {
       "forgebook-texts"
     ])("answers virtual:%s of a folder nothing imports with nothing", async (kind) => {
       const answer = await ask(catalogue, `/@id/__x00__virtual:${kind}:${outside}::0::*`, TOOL_SCRIPT);
+      expect(answer.status).toBe(404);
       expect(answer.body).not.toContain(SECRET);
       expect(answer.body).not.toMatch(/x\.stories|note\.md|id_rsa/);
     });
@@ -313,7 +272,7 @@ describe("a dev server's two ports", () => {
         'import files from "./listed*?forgebook-files";\nexport default files;\n'
       );
       const later = group.replace(`${project}::0::src/listed*`, `${project}/src::0::listed*`);
-      expect((await ask(catalogue, later, TOOL_SCRIPT)).body).toContain("export default null");
+      expect((await ask(catalogue, later, TOOL_SCRIPT)).status).toBe(404);
       await ask(catalogue, "/src/later.ts", OWN_SCRIPT);
       expect((await ask(catalogue, later, OWN_SCRIPT)).body).toContain("listed.stories.tsx");
     });

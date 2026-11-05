@@ -1028,7 +1028,8 @@ its `frame-src`, in the preview's `frameDomains`).
   read. Vite checks `Host`
   first (`server.allowedHosts`, plain HTTP only), which stops a site that reaches `127.0.0.1` through its own domain.
 - **Only the files your project names are listed or read.** A catalogue's `stories` and `docs`, and the groups a module
-  of yours imports (`?forgebook-files`), are the only groups the server reads, whatever an address names. A query that
+  of yours imports (`?forgebook-files`), are the only groups the server reads, whatever an address names: any other
+  answers 404. A catalogue's tab left open across a restart gets its groups all the same. A query that
   names one file (`?forgebook-code`, `?forgebook-markdown`) follows Vite's `server.fs`, as `?raw` does.
 - **`server.fs.deny` wins over your globs.** A file it refuses stays out of the catalogue, its search and "Used in", with
   a warning. A file your globs name outside `server.fs.allow` is listed and served, as Vite serves any file a module of
