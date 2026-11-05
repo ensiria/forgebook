@@ -10,6 +10,10 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   reads it, never MDX or addons). Files with the same title are one component, as in Storybook: each story keeps its
   own file (`file` in `forgebook stories --json`), and the component lists them all (`files`).
 - Every named export of a story file is a story; leave helpers and data out with the meta's `excludeStories`.
+- The catalogue lists the files its `stories` globs name in `forgebook.config.ts`; a glob that starts with `!` leaves
+  files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not
+  list is outside the globs, left out by a `!` one, or refused by Vite's `server.fs.deny` (the dev server warns): put it
+  where they list it, or change the globs on purpose.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
   the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the
@@ -59,8 +63,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   `({ props: args, template: "…" })`. The Code tab writes the story by the component's selector.
 - In a SvelteKit app (`framework: sveltekit()`), the types come from `@forgebook/sveltekit`, and a story sets the page its
   components read with `parameters.sveltekit`: `page: { url: "/blog/hello" }` (the route and params are read from
-  `src/routes`), `page.data` or the page's own `load` (run in the frame, its fetch answered by `parameters.msw`), and
-  `forms.result` for what an enhanced form's action answers. Links and `goto` move the story's page and are listed among
+  `src/routes`), `page.data` or the page's own `load` (run before the story is drawn, its fetch answered by
+  `parameters.msw` in the frame and in the server tests, where a fetch of the page's origin that no handler answers
+  fails the story), and `forms.result` for what an enhanced form's action answers. Links and `goto` move the story's page and are listed among
   its events; in a play, `storyPage()` from `@forgebook/sveltekit/page` reads where it went and the calls it made. A
   component that imports `$app/env/private` or `$app/server` fails in its frame by design: give it what it reads instead.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
@@ -68,7 +73,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   meaningful state, not one per prop value.
 - Add a worst case: very long text, words without spaces, huge numbers (`forgebook new` writes one).
 - To try a component as on a phone, the catalogue's Touch switch (`touch=touch` in a view: `--view "touch=touch"`)
-  sends the story a finger's events and a phone's hover and pointer media. It is a simulation: native scrolling, the
+  sends the story a finger's events and a phone's hover and pointer media; a tap on a text field focuses it and puts the
+  caret there. It is a simulation: native scrolling, the
   virtual keyboard and real Safari still need a device, or `forgebook dev --touch` (Chromium's real touch).
   A story reads it as `context.globals.touch` (`"mouse"` or `"touch"`) or fixes it with
   `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
@@ -102,8 +108,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`. A source gives each language's table, or a
   loader of it (`texts: { en: () => import("./locales/en.json") }`), which keeps the texts out of the catalogue's page.
-- Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic` and `design.figma` as plain values: the catalogue reads them without running
-  the file.
+- Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic`, `requiredFirst` and `design.figma` as plain
+  values: the catalogue reads them without running the file.
 - In a Next.js project (`framework: nextjs()`), stories take their types from `@forgebook/nextjs`. A story says where
   its component is with `parameters.nextjs.navigation` (`pathname`, `query`, `params`; `router` for the Pages Router),
   and what its server code reads with `nextjs.cookies`, `headers` and `draftMode`. A link or a router call moves the
@@ -117,6 +123,10 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - A component with many props names their groups in its TSDoc (`@group Paging`): `forgebook story` returns each
   prop's `group`, and a prop typed with a documented object (`texts?: FinderTexts`) its `members`, each with its type,
   default and TSDoc: read them to know every text a component takes before passing one.
+- `forgebook story --json` and `get_story` give `requiredProps` at the top, the names of the component's props every
+  use must set (events among them; a subcomponent's say it with their own `isRequired`); `docs.props` stays in the
+  order of the source, whatever the catalogue's `requiredFirst` shows a person.
+  Set every name in `requiredProps` when you use the component or write its story.
 
 ### Docs pages
 
@@ -154,7 +164,7 @@ leave it out.
 | `npx forgebook search onValueChange --json` | The whole catalogue by its text: which component has a prop, where the docs say something, with the address of the exact heading or prop |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` or `badge.component.ts` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
-| `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
+| `npx forgebook story <id> --json` | One story: the props every use must set (`requiredProps`), its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |
 | `npx forgebook page <id> --json` | One docs page: its Markdown, its headings, the address that opens it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
@@ -173,6 +183,11 @@ leave it out.
 
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.
+
+A catalogue may turn off its accessibility check (`a11y: false`) or its component docs (`componentDocs: false`). Then a
+check's report says `"a11y": "off"` (it ran no axe: a pass says nothing of accessibility), and `story` says
+`"componentDocs": "off"` with no `docs` and no required props: read the component's source for its props, and the
+story's args for what it sets; `changed` finds no story through the imports, so check the stories you touched by name.
 
 A story's frame runs on its own origin (the dev server's second port), unless the catalogue keeps it on its own
 (`frames: "same-origin"`, `forgebook dev --frames same-origin`): open a story by the `page` or `frame` link an answer

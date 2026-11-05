@@ -7,10 +7,12 @@
 import type { StorySource } from "@forgebook/story-format/source";
 import { describe, expect, it } from "vitest";
 
+import type { PropDocs } from "../src/componentDocs.ts";
 import { findStory, storyTree } from "../src/storyTree.ts";
 import {
   type CataloguePages,
   filteredStories,
+  isStoryDocument,
   jsonValue,
   type LoadedStoryParts,
   storiesDocument,
@@ -151,6 +153,51 @@ describe("storyDocument", () => {
     expect(document.args).toEqual({ size: "md", label: "Save" });
     expect(document.docs?.name).toBe("Button");
     expect(document.problems).toEqual([]);
+  });
+
+  it("names the required props first, the docs keeping the source's order whatever the catalogue's layout", () => {
+    const prop = (name: string, isRequired: boolean, kind: "text" | "event" = "text"): PropDocs => ({
+      name,
+      kind,
+      type: "string",
+      description: "",
+      isRequired
+    });
+    const props = [
+      prop("size", false),
+      prop("label", true),
+      prop("onPress", true, "event"),
+      prop("icon", false)
+    ];
+    const document = storyDocument(
+      location,
+      {
+        module: { value: { default: { title: "Actions/Button" }, Primary: {} } },
+        docs: { value: { ...buttonDocs, props } }
+      },
+      PAGES,
+      ""
+    );
+    expect(document.requiredProps).toEqual(["label", "onPress"]);
+    expect(document.docs?.props.map((each) => each.name)).toEqual(["size", "label", "onPress", "icon"]);
+    // first in the answer, so a client cutting a long one keeps it
+    expect(Object.keys(document).slice(0, 2)).toEqual(["schema", "requiredProps"]);
+    expect(isStoryDocument(JSON.parse(JSON.stringify(document)))).toBe(true);
+    const { requiredProps: _requiredProps, ...older } = document;
+    expect(isStoryDocument(older)).toBe(false);
+  });
+
+  it("names no required prop when the docs could not be read", () => {
+    const document = storyDocument(
+      location,
+      {
+        module: { value: { default: { title: "Actions/Button" }, Primary: {} } },
+        docs: { value: { error: "no program" } }
+      },
+      PAGES,
+      ""
+    );
+    expect(document.requiredProps).toEqual([]);
   });
 
   it("says why it could not read the story instead of failing", () => {

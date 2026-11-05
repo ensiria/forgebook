@@ -84,6 +84,35 @@ describe("catalogueAnswer", () => {
     ).toBe("serve");
   });
 
+  it("opens only a page for another origin's link or frame, never a module or a file", () => {
+    for (const site of ["cross-site", "same-site"]) {
+      const opened = { site, mode: "navigate", dest: "document" };
+      for (const address of [
+        "/src/secret.ts",
+        "/@fs/project/secret.ts?raw",
+        "/@id/__x00__virtual:forgebook-x"
+      ])
+        expect(catalogueAnswer(request(address, opened), FRAMED)).toBe("refuse");
+      expect(catalogueAnswer(request("/?story=a--b", opened), FRAMED)).toBe("serve");
+      expect(catalogueAnswer(request("/index.html", opened), FRAMED)).toBe("serve");
+      expect(catalogueAnswer(request("/frame.html", opened), FRAMED)).toBe("to-frames");
+    }
+    const typed = { site: "none", mode: "navigate", dest: "document" };
+    expect(catalogueAnswer(request("/src/Button.tsx", typed), FRAMED)).toBe("serve");
+    const unsaid = { ...TOOL, mode: "navigate", origin: "https://evil.example" };
+    expect(catalogueAnswer(request("/src/Button.tsx", unsaid), FRAMED)).toBe("refuse");
+  });
+
+  it("opens a public file for another origin's link, only as a page", () => {
+    const isPublic = (path: string): boolean => path === "/doc.pdf";
+    const opened = { site: "cross-site", mode: "navigate", dest: "document" } as const;
+    expect(catalogueAnswer(request("/doc.pdf", opened), FRAMED, isPublic)).toBe("serve");
+    expect(catalogueAnswer(request("/secret.pdf", opened), FRAMED, isPublic)).toBe("refuse");
+    expect(
+      catalogueAnswer(request("/doc.pdf", { site: "cross-site", dest: "image" }), FRAMED, isPublic)
+    ).toBe("refuse");
+  });
+
   it("opens a page made to be framed for another origin's page, only as a page", () => {
     const framed = { site: "cross-site", mode: "navigate", dest: "iframe" } as const;
     expect(catalogueAnswer(request("/__forgebook/api/preview?id=a--b", framed), FRAMED)).toBe("serve");

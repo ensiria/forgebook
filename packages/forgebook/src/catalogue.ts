@@ -12,7 +12,7 @@
  * @module
  */
 
-import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
+import type { RequiredFirst, StoryDeviceSetting } from "@forgebook/story-format/csf";
 
 import { type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
@@ -93,8 +93,11 @@ export type CatalogueLists = {
   readonly storyGroups?: readonly StoryGroupSetting[];
   /** The panel's tabs turned off, Forgebook's or a plugin's (`{ a11y: false }`). */
   readonly tabs?: Readonly<Partial<Record<PanelTabId, false>> & Record<string, false>>;
-  /** The accessibility rules. */
-  readonly a11y?: Partial<A11ySettings>;
+  /**
+   * The accessibility rules, or `false` to check nothing: no Accessibility tab or column, axe's script neither in a
+   * build nor offered to the frames, and the generated tests and `forgebook check` leave axe out.
+   */
+  readonly a11y?: false | Partial<A11ySettings>;
   /** The measuring grid's step, in CSS px. */
   readonly gridStep?: number;
   /** Texts of the shell replaced, by their name in `STRINGS` or `LATER_STRINGS` (a translation, another word). */
@@ -117,6 +120,13 @@ export type CatalogueLists = {
    * `false` builds nothing for it (no import graph is read) and leaves it out of the agents' answers.
    */
   readonly usedIn?: boolean;
+  /**
+   * Whether each component's docs are read from its types and TSDoc (its props, events, description, guidance and
+   * signature); `true` by default. `false` starts no TypeScript program: no API reference, the Props tab's controls
+   * come from the story's args and `argTypes`, and "Used in", which reads the import graph with the same programs, is
+   * off too.
+   */
+  readonly componentDocs?: boolean;
   /**
    * Who a component's page is read by before a person picks: `designer`, `coder` or `tester` reorder and filter the
    * page for them, and `everyone` (the default) draws all of it. The address's `audience` wins, so a link keeps its view;
@@ -152,6 +162,13 @@ export type CatalogueLists = {
    * groups named nowhere follow in the order they first appear. The props that name no group always come first.
    */
   readonly propGroups?: readonly string[];
+  /**
+   * Where every component's API reference and Props tab list the required props: first inside each group
+   * (`"in-groups"`, the default), all in one "Required" section before the groups (`"section"`), or in the order of
+   * the source (`false`). A meta's or a story's `parameters.requiredFirst` wins over it; a reader's "Required first"
+   * switch turns the ordering on or off over both.
+   */
+  readonly requiredFirst?: RequiredFirst;
 };
 
 /** The shell's own appearance: light, dark, the system's, or the colour scheme of the story shown. */
@@ -182,8 +199,13 @@ export type CatalogueSettings = {
   readonly storyGroups: readonly StoryGroupSetting[];
   /** The panel's tabs shown, Forgebook's then the plugins', by id. */
   readonly tabs: readonly string[];
-  /** The accessibility rules. */
-  readonly a11y: A11ySettings;
+  /**
+   * The accessibility rules the Accessibility tab and column, the frames and the tests check; none when it checks
+   * nothing (`a11y: false`).
+   */
+  readonly a11y: A11ySettings | undefined;
+  /** Whether each component's docs are read from its types. */
+  readonly hasComponentDocs: boolean;
   /** The measuring grid's step, in CSS px. */
   readonly gridStep: number;
   /** The shell's texts replaced, by name. */
@@ -208,6 +230,8 @@ export type CatalogueSettings = {
   readonly device: DeviceDefault;
   /** The prop groups listed first, in their order; none by default. */
   readonly propGroups: readonly string[];
+  /** Where the required props are listed when a component or a story does not say; `"in-groups"` by default. */
+  readonly requiredFirst: RequiredFirst;
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -315,6 +339,54 @@ const namedGroups = (lists: CatalogueLists): Pick<CatalogueSettings, "storyGroup
 });
 
 /**
+ * Whether a catalogue checks accessibility: unless its lists say `a11y: false`.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+export const checksA11y = (lists: CatalogueLists): boolean => lists.a11y !== false;
+
+/**
+ * Whether a catalogue reads its components' docs from their types: unless its lists say `componentDocs: false`.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+export const readsComponentDocs = (lists: CatalogueLists): boolean => lists.componentDocs !== false;
+
+/**
+ * Whether a catalogue offers "Used in": unless its lists turn it off, or turn off the component docs, whose
+ * TypeScript programs read the import graph it is joined from.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+export const offersUsedIn = (lists: CatalogueLists): boolean =>
+  lists.usedIn !== false && readsComponentDocs(lists);
+
+/**
+ * The panel's tabs a catalogue shows: Forgebook's then its plugins', less those it turns off, and the Accessibility
+ * tab when it checks nothing.
+ *
+ * @param lists - the lists its configuration sets.
+ * @param pluginTabs - the ids of the tabs its plugins add.
+ */
+const shownTabs = (lists: CatalogueLists, pluginTabs: readonly string[]): readonly string[] => {
+  const tabsOff = lists.tabs ?? {};
+  const hasA11y = checksA11y(lists);
+  return [...PANEL_TAB_IDS, ...pluginTabs].filter(
+    (tab) => tabsOff[tab] !== false && (hasA11y || tab !== "a11y")
+  );
+};
+
+/**
+ * A catalogue's accessibility rules, the defaults filled in; none when it checks nothing.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+const a11ySettings = (lists: CatalogueLists): A11ySettings | undefined => {
+  if (lists.a11y === false) return undefined;
+  return { tags: lists.a11y?.tags ?? DEFAULT_A11Y_TAGS, disabledRules: lists.a11y?.disabledRules ?? [] };
+};
+
+/**
  * A catalogue's settings, its lists' defaults filled in.
  *
  * @param title - the catalogue's title, for its storage's id.
@@ -336,7 +408,6 @@ export const catalogueSettings = (
     builtIn === false
       ? []
       : BUILT_IN_BACKDROPS.filter((backdrop) => builtIn === undefined || builtIn.includes(backdrop.id));
-  const tabsOff = lists.tabs ?? {};
   const controlsOff = lists.controls ?? {};
   const ownControls = OWN_CONTROL_IDS.filter((control) => controlsOff[control] !== false);
   const named = lists.toolbar ?? defaultToolbar(switches, ownControls);
@@ -355,23 +426,22 @@ export const catalogueSettings = (
     textSizes: withHundred(lists.textSizes, [100, 125, 150]),
     backdrops: [...offered, ...(lists.backgrounds?.custom ?? []).map(customBackdrop)],
     ...namedGroups(lists),
-    tabs: [...PANEL_TAB_IDS, ...pluginTabs].filter((tab) => tabsOff[tab] !== false),
-    a11y: {
-      tags: lists.a11y?.tags ?? DEFAULT_A11Y_TAGS,
-      disabledRules: lists.a11y?.disabledRules ?? []
-    },
+    tabs: shownTabs(lists, pluginTabs),
+    a11y: a11ySettings(lists),
+    hasComponentDocs: readsComponentDocs(lists),
     gridStep: lists.gridStep ?? 8,
     strings: lists.strings ?? {},
     ownControls,
     toolbar,
-    hasUsedIn: lists.usedIn !== false,
+    hasUsedIn: offersUsedIn(lists),
     audience,
     hasEmbed: controlsOff.embed !== false,
     appearance: lists.appearance ?? "system",
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
     views: catalogueViews(switches, lists.views),
     // checked when the configuration loads (`configFile.ts`): a model that is none is left out here
-    device: deviceDefaultOf(NO_DEVICE, lists.device)
+    device: deviceDefaultOf(NO_DEVICE, lists.device),
+    requiredFirst: lists.requiredFirst ?? "in-groups"
   };
 };
 

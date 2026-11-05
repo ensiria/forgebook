@@ -8,18 +8,18 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 import { defineScript, ScriptError } from "@ensiria/cli-kit/script";
 
-import type { BenchReport, FramesMode } from "./bench.types.ts";
+import type { BenchReport, FeaturesMode, FramesMode } from "./bench.types.ts";
 import { budgetLines, parseBudget } from "./budget.ts";
 import { stopLeftovers } from "./leftovers.ts";
 import { stopAllServers } from "./measure.ts";
 import { type BenchFolders, packForgebook, publishedForgebook } from "./prepare.ts";
 import { type RealRun, realTargets } from "./prepareRun.ts";
+import { execProgram, TIME_LIMITS } from "./programs.ts";
 import { corpusPaths, DEFINITION_FILE, definitionFolder, parseCorpus } from "./realCorpus.ts";
 import { parseReport, reportMarkdown, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
@@ -34,8 +34,8 @@ const REPOSITORY = resolve(import.meta.dirname, "../..");
 
 /** The report as a table for a terminal. */
 const plainTable = (report: BenchReport, style: OutputStyle): string => {
-  const { tools, rows } = reportRows(report);
-  return table(rows, { columns: ["metric", ...tools].map((header) => ({ header })) }, style);
+  const { headings, rows } = reportRows(report);
+  return table(rows, { columns: ["metric", ...headings].map((header) => ({ header })) }, style);
 };
 
 /** Whether a word names a group of metrics. */
@@ -75,9 +75,40 @@ const countProblems = ({ sweep, corpus }: BenchReport): readonly string[] => {
 };
 
 /** The tools a run measures, in report order. */
-const toolsOf = (real: RealRun | undefined, isCompared: boolean, frames: FramesMode): readonly Target[] => {
-  if (real === undefined) return targetsOf(frames, isCompared);
+const toolsOf = (
+  real: RealRun | undefined,
+  isCompared: boolean,
+  frames: FramesMode,
+  features: FeaturesMode
+): readonly Target[] => {
+  if (real === undefined) return targetsOf(frames, isCompared, features);
   return realTargets(forgebookTarget(frames), real.corpus, real.paths.clone, isCompared);
+};
+
+/**
+ * Which of Forgebook's features a run measures. Parity is a comparison with Ladle on equal terms, which only the
+ * generated library makes: a real library is measured with its own configuration, and without Ladle. The budget holds
+ * the defaults, which a run at parity would pass without measuring them.
+ *
+ * @param isParity - whether `--parity` was given.
+ * @param corpus - the real library named, if any.
+ * @param budget - the budget file named, if any.
+ * @throws when parity is asked on a real library or against a budget.
+ */
+const featuresOf = (
+  isParity: boolean,
+  corpus: string | undefined,
+  budget: string | undefined
+): FeaturesMode => {
+  if (isParity && corpus !== undefined)
+    throw new ScriptError("--parity measures the generated library only", {
+      hint: "A real library runs with its own configuration; leave out --corpus or --parity"
+    });
+  if (isParity && budget !== undefined)
+    throw new ScriptError("--parity cannot be checked against a budget", {
+      hint: "The budget holds Forgebook's defaults; leave out --budget or --parity"
+    });
+  return isParity ? "parity" : "default";
 };
 
 /** The groups a run measures: the ones named, or all of them. */
@@ -99,8 +130,9 @@ const forgebookUnderTest = async (
 ): Promise<{ readonly packages: Readonly<Record<string, string>>; readonly label: string }> => {
   if (version !== undefined) return { packages: publishedForgebook(version), label: version };
   const packages = await packForgebook(folders, io);
-  const { stdout: commit } = await exec("git", ["rev-parse", "--short", "HEAD"], { cwd: REPOSITORY, io });
-  const { stdout: changes } = await exec("git", ["status", "--porcelain"], { cwd: REPOSITORY, io });
+  const git = { cwd: REPOSITORY, io, timeoutMs: TIME_LIMITS.query };
+  const { stdout: commit } = await execProgram("git", ["rev-parse", "--short", "HEAD"], git);
+  const { stdout: changes } = await execProgram("git", ["status", "--porcelain"], git);
   // a published number names a commit: what makes it not one is said, or nobody can tell why
   if (changes.trim() !== "")
     warn(`the checkout has changes, so the report reads -dirty:\n${changes.trimEnd()}`);
@@ -155,6 +187,11 @@ await defineScript({
       description:
         "Where Forgebook's frames run: on an origin of their own (its default) or on the catalogue's."
     },
+    parity: {
+      type: "boolean",
+      description:
+        "Run Forgebook at parity with Ladle as it ships: no accessibility check, no props read from the types."
+    },
     throttle: {
       type: "number",
       default: 1,
@@ -193,11 +230,16 @@ await defineScript({
     {
       command: "bench --frames same-origin",
       description: "Forgebook with its frames on the catalogue's origin."
+    },
+    {
+      command: "bench --compare --parity",
+      description: "Forgebook without axe and the props from the types, beside Storybook and Ladle."
     }
   ],
   run: async ({ options, io, log, style, isJson, onExit }) => {
     const startedAt = Date.now();
     onExit(stopAllServers);
+    const features = featuresOf(options.parity, options.corpus, options.budget);
     // read first: this run overwrites the last report, which could otherwise be compared with itself
     const earlier = readOptional(options.against, parseReport);
     const budget = readOptional(options.budget, parseBudget);
@@ -207,14 +249,15 @@ await defineScript({
     mkdirSync(work, { recursive: true });
     const folders = { repository: REPOSITORY, work };
     const version = options["forgebook-version"];
+    const write = statusWriter(options.status, Date.now);
     log.info(version === undefined ? "Packing this checkout's Forgebook" : `Measuring Forgebook ${version}`);
+    if (version === undefined) write({ state: "working", activity: "pack", tool: "forgebook" });
     const { packages: forgebookPackages, label: forgebookLabel } = await forgebookUnderTest(
       version,
       folders,
       io,
       (message) => log.warn(message)
     );
-    const write = statusWriter(options.status, Date.now);
     // also when the run dies: a reader must not wait for a step that will not come
     const removeEnd = onExit(() => write({ state: "finished", warnings: 0 }));
     // whatever happens, an interruption included: a tool's daemon left running would weigh on every later run
@@ -231,7 +274,7 @@ await defineScript({
     try {
       report = await runBench({
         folders,
-        targets: toolsOf(real, options.compare, options.frames),
+        targets: toolsOf(real, options.compare, options.frames, features),
         ...(real === undefined ? {} : { real }),
         forgebookPackages,
         forgebookLabel,
@@ -242,10 +285,16 @@ await defineScript({
         port: options.port,
         throttle: options.throttle,
         frames: options.frames,
+        features,
         io,
         onStep: (step) => {
           write(step);
           log.info(`${step.tool} · ${step.metric} · ${step.run}/${step.runs}`);
+        },
+        onActivity: (activity) => {
+          write(activity);
+          const count = activity.of === undefined ? "" : ` · ${activity.count ?? 0}/${activity.of}`;
+          log.info(`${activity.tool ?? "library"} · ${activity.activity}${count}`);
         }
       });
     } finally {

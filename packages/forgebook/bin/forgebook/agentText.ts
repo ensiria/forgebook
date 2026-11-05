@@ -57,7 +57,7 @@ export const storiesText = (document: StoriesDocument, style: OutputStyle): stri
   );
 
 /**
- * One story's facts: where it is, where it opens, its args and its component's props.
+ * One story's facts: where it is, where it opens, its args, its component's props and those every use must set.
  *
  * @param document - the story document.
  * @param style - colours, glyphs and width.
@@ -71,7 +71,8 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["Frame", document.story.links.frame],
     ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
-    ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")]
+    ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")],
+    ["Required", document.requiredProps.length === 0 ? "none" : document.requiredProps.join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
   if (document.design !== undefined) entries.push(["Design", document.design.figma]);
@@ -95,12 +96,13 @@ const judgementLines = (result: StoryCheckResult): readonly string[][] => {
 
 /**
  * A check's report as a table: one row per problem, its story, its view and its kind; a story that passes in a view gets
- * one row saying so.
+ * one row saying so. A catalogue that checks no accessibility says so first, so "passes" is not read as axe's.
  *
  * @param report - the check's report.
  * @param style - colours, glyphs and width.
  */
 export const checkText = (report: StoryCheckReport, style: OutputStyle): string =>
+  (report.a11y === "off" ? "Accessibility is not checked: the catalogue sets a11y: false.\n" : "") +
   table(
     report.results.flatMap((result) => [
       ...(result.problems.length === 0

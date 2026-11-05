@@ -16,11 +16,12 @@ import { existsSync } from "node:fs";
 import { cp, lstat, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
+import { execProgram, TIME_LIMITS } from "./programs.ts";
 import { DEFINITION_FILE } from "./realCorpus.ts";
 import type { CorpusPaths, RealCorpus } from "./realCorpus.types.ts";
+import type { RunActivity } from "./statusFile.ts";
 import { toolEnvironment } from "./toolEnvironment.ts";
 
 /** Written in the clone once its dependencies are in, holding what was installed: a second run skips the install. */
@@ -37,12 +38,19 @@ const NO_SCRIPTS = {
 };
 
 /** Fetches the commit alone, or finds it there, and puts the clone back on it. */
-const fetchClone = async ({ repository, commit }: RealCorpus, clone: string, io: ScriptIo): Promise<void> => {
-  const git = (...args: readonly string[]): ReturnType<typeof exec> =>
-    exec("git", [...GIT, ...args], {
+const fetchClone = async (
+  { repository, commit }: RealCorpus,
+  clone: string,
+  io: ScriptIo,
+  onActivity: (activity: RunActivity) => void
+): Promise<void> => {
+  const git = (...args: readonly string[]): ReturnType<typeof execProgram> =>
+    execProgram("git", [...GIT, ...args], {
       cwd: clone,
       io,
       output: "capture",
+      // a clone's checkout of a large monorepo takes long on a slow disk too, so every step gets the fetch's limit
+      timeoutMs: TIME_LIMITS.fetch,
       // no prompt for credentials and no system configuration: a pinned public commit needs neither
       env: toolEnvironment(io.env, {
         GIT_LFS_SKIP_SMUDGE: "1",
@@ -64,6 +72,8 @@ const fetchClone = async ({ repository, commit }: RealCorpus, clone: string, io:
     await git("remote", "set-url", "origin", repository);
     await git("fetch", "--quiet", "--depth", "1", "--filter=blob:none", "origin", commit);
   }
+  // a line again: the fetch and the checkout of a large monorepo each take their own long while
+  onActivity({ state: "working", activity: "clone" });
   await git("checkout", "--quiet", "--force", commit);
   await git("reset", "--quiet", "--hard", commit);
   const { stdout } = await git("rev-parse", "HEAD");
@@ -75,10 +85,17 @@ const runCommand = async (
   [program, ...args]: readonly string[],
   clone: string,
   env: Readonly<Record<string, string>>,
+  timeoutMs: number,
   io: ScriptIo
 ): Promise<void> => {
   if (program === undefined) return;
-  await exec(program, args, { cwd: clone, io, output: "capture", env: toolEnvironment(io.env, env) });
+  await execProgram(program, args, {
+    cwd: clone,
+    io,
+    output: "capture",
+    env: toolEnvironment(io.env, env),
+    timeoutMs
+  });
 };
 
 /** What an install is made of: the commit and the commands, so a changed definition installs again. */
@@ -86,13 +103,24 @@ export const installStamp = ({ commit, install, prepare }: RealCorpus): string =
   JSON.stringify({ commit, install, prepare: prepare ?? [] });
 
 /** Installs the library's dependencies, once for a commit and its commands, and builds what its stories need. */
-const installLibrary = async (corpus: RealCorpus, clone: string, io: ScriptIo): Promise<void> => {
+const installLibrary = async (
+  corpus: RealCorpus,
+  clone: string,
+  io: ScriptIo,
+  onActivity: (activity: RunActivity) => void
+): Promise<void> => {
   const stamp = join(clone, INSTALLED_STAMP);
   const done = existsSync(stamp) ? (await readFile(stamp, "utf8")).trim() : "";
   if (done === installStamp(corpus)) return;
   await rm(stamp, { force: true });
-  await runCommand(corpus.install, clone, NO_SCRIPTS, io);
-  for (const command of corpus.prepare ?? []) await runCommand(command, clone, {}, io);
+  onActivity({ state: "working", activity: "install" });
+  await runCommand(corpus.install, clone, NO_SCRIPTS, TIME_LIMITS.install, io);
+  const commands = corpus.prepare ?? [];
+  for (const [index, command] of commands.entries()) {
+    // a line per command: each is bounded by its own limit, so the silence a watcher allows covers one
+    onActivity({ state: "working", activity: "prepare", count: index, of: commands.length });
+    await runCommand(command, clone, {}, TIME_LIMITS.prepare, io);
+  }
   await writeFile(stamp, `${installStamp(corpus)}\n`);
 };
 
@@ -156,7 +184,12 @@ const installForgebook = async (
   await writeFile(join(bench, "package.json"), JSON.stringify(manifest, null, 2));
   // no peers: they would bring a second React, and a library older than Forgebook's peer range is measured as it is
   const flags = ["--ignore-scripts", "--legacy-peer-deps", "--no-audit", "--no-fund", "--loglevel=error"];
-  await exec("npm", ["install", ...flags], { cwd: bench, io, output: "capture" });
+  await execProgram("npm", ["install", ...flags], {
+    cwd: bench,
+    io,
+    output: "capture",
+    timeoutMs: TIME_LIMITS.install
+  });
   const files = await readdir(definition);
   await Promise.all(
     files
@@ -175,6 +208,8 @@ export type CorpusRequest = {
   readonly packages: Readonly<Record<string, string>>;
   /** This repository's root. */
   readonly repository: string;
+  /** Told when a long step starts. */
+  readonly onActivity: (activity: RunActivity) => void;
 };
 
 /**
@@ -184,11 +219,13 @@ export type CorpusRequest = {
  * @param io - the script's streams.
  */
 export const prepareCorpus = async (
-  { corpus, paths, packages, repository }: CorpusRequest,
+  { corpus, paths, packages, repository, onActivity }: CorpusRequest,
   io: ScriptIo
 ): Promise<void> => {
-  await fetchClone(corpus, paths.clone, io);
+  onActivity({ state: "working", activity: "clone" });
+  await fetchClone(corpus, paths.clone, io, onActivity);
   await checkEditedFiles(corpus, paths);
-  await installLibrary(corpus, paths.clone, io);
+  await installLibrary(corpus, paths.clone, io, onActivity);
+  onActivity({ state: "working", activity: "install", tool: "forgebook" });
   await installForgebook(paths, packages, repository, io);
 };

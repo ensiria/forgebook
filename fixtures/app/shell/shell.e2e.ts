@@ -739,35 +739,43 @@ test.describe("the component's page", () => {
     await expect(page.locator(".forgebook-api__table").first().locator("tbody th")).toContainText([
       "options"
     ]);
-    // a part with no story file of its own, named in the meta's subcomponents, has its props under the component's
+    // a part with no story file of its own, named in the meta's subcomponents, has its props under the component's,
+    // its required one in its own section, naming its group, as the meta's section has it
     const group = page.getByRole("region", { name: "SelectGroup" });
     await expect(group.getByRole("heading", { level: 3 })).toHaveText("SelectGroup");
     await expect(group).toContainText("Groups a select's options under a label.");
-    await expect(group.locator(".forgebook-api__table").first().locator("tbody th")).toContainText([
-      "label",
-      "isFolded",
-      "children"
+    await expect(group.locator(".forgebook-api__group[data-required] tbody th")).toHaveText([
+      "label*Content"
     ]);
-    await expect(group.getByRole("heading", { level: 4 })).toHaveText("Events");
+    await expect(group.locator(".forgebook-api__table tbody th")).toHaveText([
+      "label*Content",
+      "isFolded",
+      "children",
+      "onFoldChange"
+    ]);
+    await expect(group.getByRole("heading", { level: 4 })).toHaveText(["Required", "Content", "Events"]);
     const examples = page.locator(".forgebook-example:not([data-demo])");
     await expect(examples.first()).toHaveAccessibleName("Overview");
     await expect(page.getByRole("article", { name: "In row", exact: true })).toHaveCount(0);
   });
 
-  test("the API reference lists the props naming no group first, then each group, and unfolds an object's members", async ({
+  test("the API reference lists the required props, then the props naming no group, then each group, and unfolds an object's members", async ({
     page
   }) => {
     await page.goto("/?component=kit:inputs-selection-select");
     const reference = page.getByRole("region", { name: "API reference" });
-    await expect(reference.locator(".forgebook-api__table").first().locator("tbody th")).toHaveText([
+    // the meta puts the required props in a section of their own, before every group
+    const required = reference.locator(":scope > .forgebook-api__group[data-required]");
+    await expect(required.locator(".forgebook-fold__name")).toHaveText("Required");
+    await expect(required.locator("tbody th")).toHaveText(["options*"]);
+    await expect(reference.locator(":scope > .forgebook-api").first().locator("tbody th")).toHaveText([
       "value",
       "size",
-      "options*",
       "hint",
       "classNames"
     ]);
     // the meta names Texts first, though Behaviour comes first in the props; every group starts open
-    const groups = reference.locator(":scope > .forgebook-api__group");
+    const groups = reference.locator(":scope > .forgebook-api__group:not([data-required])");
     await expect(groups.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
     await expect(groups.locator(".forgebook-fold__count")).toHaveText(["1 prop", "2 props"]);
     await expect(groups.nth(1).locator("tbody th")).toHaveText(["rows", "isDisabled"]);
@@ -789,6 +797,40 @@ test.describe("the component's page", () => {
     await expect(table).toContainText('"Nothing to pick"');
     // the events keep their heading, after the groups
     await expect(reference.getByRole("heading", { level: 3, name: "Events" })).toBeVisible();
+  });
+
+  test("the reader's Required first switch turns the ordering off and on for every component, across reloads", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const reference = page.getByRole("region", { name: "API reference" });
+    const ungrouped = reference.locator(":scope > .forgebook-api").first().locator("tbody th");
+    const ordering = reference.getByRole("switch", { name: "Required first" });
+    await expect(ordering).toBeChecked();
+    await ordering.uncheck();
+    // the source's order, the section gone
+    await expect(reference.locator(".forgebook-api__group[data-required]")).toHaveCount(0);
+    await expect(ungrouped).toHaveText(["value", "size", "options*", "hint", "classNames"]);
+    await page.reload();
+    await expect(ordering).not.toBeChecked();
+    await expect(ungrouped).toHaveText(["value", "size", "options*", "hint", "classNames"]);
+    // one switch for the whole catalogue: the Props tab follows it, and turns it back on
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const tab = page.locator(".forgebook-tab-props");
+    const tabOrdering = tab.getByRole("switch", { name: "Required first" });
+    await expect(tabOrdering).not.toBeChecked();
+    await expect(tab.locator(".forgebook-prop-group[data-required]")).toHaveCount(0);
+    await tabOrdering.check();
+    // on again, in the layout the meta chose
+    await expect(tab.locator(".forgebook-prop-group[data-required] .forgebook-prop__name")).toHaveText([
+      "options*"
+    ]);
+    await page.goto("/?component=kit:inputs-selection-select");
+    await expect(ordering).toBeChecked();
+    await expect(reference.locator(":scope > .forgebook-api__group[data-required] tbody th")).toHaveText([
+      "options*"
+    ]);
   });
 
   test("an example's box fills the page and goes back to its place, its story never loaded again", async ({
@@ -1518,15 +1560,37 @@ test.describe("the panel", () => {
     await page.goto(story("overview"));
     await frameStatus(page);
     const tab = page.locator(".forgebook-tab-props");
-    await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    // the meta's section of required props comes first
+    await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Required", "Texts", "Behaviour"]);
     // a group's number field and toggle sit in it, and set the story as anywhere else
     const behaviour = tab.locator(".forgebook-fold").filter({ hasText: "Behaviour" });
-    await expect(tab.locator(".forgebook-fold[open]")).toHaveCount(2);
+    await expect(tab.locator(".forgebook-fold[open]")).toHaveCount(3);
     await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
     await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
     await expect(frameOf(page).locator("select")).toBeDisabled();
     // the toggles that name no group stay under Toggles; Select has none left there
     await expect(tab.locator(".forgebook-prop-group__title", { hasText: "Toggles" })).toHaveCount(0);
+  });
+
+  test("Props puts the required props where the story says, over its meta's section", async ({ page }) => {
+    await page.goto(story("overview"));
+    await frameStatus(page);
+    const tab = page.locator(".forgebook-tab-props");
+    await expect(tab.getByRole("switch", { name: "Required first" })).toBeChecked();
+    await expect(tab.locator(".forgebook-prop-group[data-required] .forgebook-prop__name")).toHaveText([
+      "options*"
+    ]);
+    await expect(
+      tab.locator(".forgebook-prop-group", { hasText: "Other props" }).locator(".forgebook-prop__name")
+    ).toHaveText(["classNames"]);
+    // Hinted asks for them first in each group instead: no section, options first among the props it cannot set
+    await page.goto(story("hinted"));
+    await frameStatus(page);
+    await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
+    await expect(tab.locator(".forgebook-prop-group[data-required]")).toHaveCount(0);
+    await expect(
+      tab.locator(".forgebook-prop-group", { hasText: "Other props" }).locator(".forgebook-prop__name")
+    ).toHaveText(["options*", "classNames"]);
   });
 
   test("a shared link's values reach the frame only for the story's props, with their types; the rest are reported", async ({

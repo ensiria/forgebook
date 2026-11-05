@@ -450,6 +450,9 @@
   // the story on the page's background, not in a card: its bar, its room on the canvas, its place
   .forgebook-story {
     display: grid;
+    // one column no wider than the pane: an implicit `auto` column grows to its widest child's min-content (the bar's
+    // controls, a wide story), and the pane would scroll sideways instead of the stage scrolling on its own
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-2-5;
     margin: $space-4 $space-8 $space-8;
     min-width: 0;
@@ -461,8 +464,11 @@
     }
   }
 
+  // the controls wrap under the story's name when the pane cannot hold both on one line, so the bar never pushes the
+  // pane wider than the window
   .forgebook-story__bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: $space-2;
   }
@@ -616,6 +622,13 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
     gap: $space-3 $space-5;
+  }
+
+  // the Props tab's header: the "Required first" switch, at its end
+  .forgebook-tab-head {
+    display: flex;
+    justify-content: flex-end;
+    padding: $space-2-5 $space-3-5 0;
   }
 
   .forgebook-tab-note {
@@ -1715,9 +1728,12 @@
   }
 
   // the story's name and what to look at, above the story; the Replay button sits at the end
+  // grows into the bar's free room, and gives up its line to the controls below a readable width
   .forgebook-stage__heading {
-    flex: 1;
+    flex: 1 1 10rem;
     display: grid;
+    // no wider than its room in the bar, so a long name wraps instead of widening the pane
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-0-5;
     min-width: 0;
   }
@@ -1727,6 +1743,7 @@
     font: $text-row-label;
     font-weight: 600;
     color: $text;
+    overflow-wrap: break-word;
   }
 
   // always two lines tall, cut after two, so the story starts at the same height in every story of a component
@@ -1805,6 +1822,8 @@
   // the story's room, as a browser's device mode: the width above, the story centred between two handles
   .forgebook-viewport {
     display: grid;
+    // no wider than the pane: a story wider than it scrolls inside the canvas, not the pane
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-1-5;
   }
 
@@ -1933,17 +1952,24 @@
   .forgebook-home {
     box-sizing: border-box;
     display: grid;
+    // one column no wider than the page: an implicit `auto` column grows to its widest child's min-content (a code
+    // block's longest line, a props table, a heading's switch), and the page would scroll sideways on a narrow window
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-6;
     width: 100%;
     max-width: 56rem;
     margin: 0 auto;
     padding: $space-6 $space-8 $space-8;
+    // a word longer than the line (an address, a long name) breaks rather than pushing a narrow page sideways
+    overflow-wrap: break-word;
     // backwards, not both: a transform kept after the rise would make the page the box of an example over the page
     animation: forgebook-rise $duration-medium $ease-out backwards;
   }
 
   .forgebook-home__head {
     display: grid;
+    // as the page's column (`.forgebook-doc`): no wider than its box, so a long name wraps instead of widening it
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-2;
   }
 
@@ -1983,6 +2009,8 @@
 
   .forgebook-home__recent-link {
     display: grid;
+    // as the page's column (`.forgebook-doc`): no wider than its box, so a long name wraps instead of widening it
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-0-5;
     padding: $space-2 $space-3;
     border-radius: $radius-control;
@@ -2021,6 +2049,8 @@
 
   .forgebook-home__card {
     display: grid;
+    // as the page's column (`.forgebook-doc`): no wider than its box, so a long name wraps instead of widening it
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     justify-items: start;
     gap: $space-2;
@@ -2038,6 +2068,9 @@
     width: 100%;
     margin: 0;
     font: $text-card-title;
+    // the family's name is bare text, a flex item that cannot shrink below its longest word: `anywhere` lets that word
+    // break, so a long name fits a narrow card
+    overflow-wrap: anywhere;
   }
 
   .forgebook-home__count {
@@ -2048,6 +2081,8 @@
 
   .forgebook-home__components {
     display: grid;
+    // as the page's column (`.forgebook-doc`): no wider than its box, so a long name wraps instead of widening it
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-1;
     margin: 0;
     padding: 0;
@@ -2134,6 +2169,8 @@
 
   .forgebook-doc__section {
     display: grid;
+    // as the page's column (`.forgebook-doc`): no wider than the page, whatever its widest child
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-4;
 
     > h2 {
@@ -2150,6 +2187,8 @@
 
   .forgebook-doc__group {
     display: grid;
+    // as the section: no wider than the page, whatever its widest example
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-6;
   }
 
@@ -2180,11 +2219,15 @@
   // an example: its title and description above a box with its story, its bar and its code
   .forgebook-example {
     display: grid;
+    // no wider than the page: a wide story or a long line of code scrolls inside its box
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-2-5;
   }
 
   .forgebook-example__head {
     display: grid;
+    // as the page's column (`.forgebook-doc`): no wider than its box, so a long name wraps instead of widening it
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-1;
   }
 
@@ -2436,6 +2479,8 @@
   .forgebook-prose {
     font: $text-body;
     line-height: 1.6;
+    // a word longer than the line (an address, a long name) breaks rather than pushing a narrow page sideways
+    overflow-wrap: break-word;
 
     > :first-child {
       margin-top: 0;
@@ -2514,6 +2559,9 @@
       text-align: start;
       vertical-align: top;
       box-shadow: $line-bottom;
+      // `anywhere`, not `break-word`: a table's columns are sized by their cells' narrowest width, which only `anywhere`
+      // lets a long word give up, so a table fits a narrow page
+      overflow-wrap: anywhere;
     }
 
     th {
@@ -2570,6 +2618,44 @@
     color: $code-name;
   }
 
+  // the reference's heading, the reader's "Required first" switch at its end, under it on a narrow page
+  .forgebook-api__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2 $space-4;
+    margin-top: $space-4;
+
+    > h2 {
+      margin: 0;
+      font: $text-display;
+    }
+  }
+
+  // the switch that puts every component's required props first, in a props table's header
+  .forgebook-required-first {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1-5;
+    font: $text-caption;
+    font-weight: 500;
+    color: $text-secondary;
+    cursor: pointer;
+  }
+
+  // in the "Required" section, the group a prop belongs to, beside its name
+  .forgebook-prop__group {
+    margin-inline: $space-1-5 auto;
+    padding: 0 $space-1-5;
+    border-radius: 999px;
+    background: $fill;
+    font: $text-caption;
+    font-weight: 400;
+    color: $text-secondary;
+    white-space: nowrap;
+  }
+
   .forgebook-api__type {
     min-width: 10rem;
   }
@@ -2577,6 +2663,8 @@
   // a part named in the meta's `subcomponents`: its name as code, its summary, its tables, spaced like the section
   .forgebook-api__subcomponent {
     display: grid;
+    // as the section: no wider than the page, so its tables scroll on their own
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-3;
     margin-top: $space-4;
 

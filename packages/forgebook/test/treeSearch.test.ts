@@ -32,7 +32,8 @@ const BUTTON: TreeComponent = {
       device: undefined,
       design: undefined,
       tags: [],
-      hasPlay: false
+      hasPlay: false,
+      requiredFirst: undefined
     },
     {
       id: "kit:b--danger",
@@ -49,7 +50,8 @@ const BUTTON: TreeComponent = {
       device: undefined,
       design: undefined,
       tags: [],
-      hasPlay: false
+      hasPlay: false,
+      requiredFirst: undefined
     },
     {
       id: "kit:b--long",
@@ -66,7 +68,8 @@ const BUTTON: TreeComponent = {
       device: undefined,
       design: undefined,
       tags: [],
-      hasPlay: false
+      hasPlay: false,
+      requiredFirst: undefined
     }
   ],
   unlisted: [],
@@ -74,7 +77,8 @@ const BUTTON: TreeComponent = {
   related: [],
   keywords: ["Pressable", "CTA"],
   design: undefined,
-  propGroups: []
+  propGroups: [],
+  requiredFirst: undefined
 };
 
 /** A family holding it, and an alias of a component that lives elsewhere. */

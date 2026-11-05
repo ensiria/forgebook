@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { contrastSwitch, themeSwitch } from "../src/switches.ts";
 import type { ForgebookConfig } from "../src/vite/config.ts";
-import { findConfigFile, resolveConfig } from "../src/vite/configFile.ts";
+import { findConfigFile, loadConfigFile, resolveConfig } from "../src/vite/configFile.ts";
 import { VITE_PATHS, vitePathsOf } from "../src/vite/vitePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
@@ -32,6 +32,24 @@ describe("resolveConfig", () => {
       'the audience "manager" is none of everyone, designer, coder, tester'
     );
     expect(resolveConfig({ ...BASE, audience: "tester" }, "/catalogue").lists.audience).toBe("tester");
+  });
+
+  it("refuses a place for the required props that is none, and takes the catalogue's over a preset's", () => {
+    // a configuration is code: its types are not a promise
+    const loose: ForgebookConfig = { ...BASE };
+    Reflect.set(loose, "requiredFirst", "top");
+    expect(() => resolveConfig(loose, "/catalogue")).toThrow(
+      `${resolve("/catalogue", "forgebook.config")}: requiredFirst is "top", none of "in-groups", "section" and false`
+    );
+    const resolved = resolveConfig(
+      { ...BASE, requiredFirst: false, presets: [{ name: "a", requiredFirst: "section" }] },
+      "/catalogue"
+    );
+    expect(resolved.lists.requiredFirst).toBe(false);
+    expect(
+      resolveConfig({ ...BASE, presets: [{ name: "a", requiredFirst: "section" }] }, "/catalogue").lists
+        .requiredFirst
+    ).toBe("section");
   });
 
   it("merges the presets under the configuration: a switch or language of the same id is replaced in its place", () => {
@@ -90,6 +108,34 @@ describe("resolveConfig", () => {
     ).toThrow(
       `${resolve("/catalogue", "forgebook.config")}: "width" is a parameter of the address, not a switch's name`
     );
+  });
+});
+
+describe("loadConfigFile", () => {
+  /**
+   * Loads a configuration file written with the given lists.
+   *
+   * @param lists - the configuration's `stories` and `docs`.
+   */
+  const loaded = async (lists: object): Promise<unknown> => {
+    const file = join(folder(), "forgebook.config.mjs");
+    writeFileSync(file, `export default ${JSON.stringify({ framework: {}, title: "Catalogue", ...lists })};`);
+    return loadConfigFile(file);
+  };
+
+  it("refuses stories or docs made of `!` patterns alone: they leave files out of nothing", async () => {
+    await expect(loaded({ stories: ["!src/legacy/**"] })).rejects.toThrow(
+      /forgebook\.config\.mjs: its stories list nothing: every pattern is a `!` one \("!src\/legacy\/\*\*"\)/
+    );
+    await expect(loaded({ stories: ["src/**/*.stories.tsx"], docs: ["!docs/drafts/**"] })).rejects.toThrow(
+      /its docs list nothing/
+    );
+  });
+
+  it("takes `!` patterns beside one that lists files", async () => {
+    await expect(loaded({ stories: ["!src/legacy/**", "src/**/*.stories.tsx"] })).resolves.toMatchObject({
+      stories: ["!src/legacy/**", "src/**/*.stories.tsx"]
+    });
   });
 });
 

@@ -17,8 +17,8 @@
  *
  * A value the index needs (the title, a name, `parameters.controls`, `group`, `height`, `main`, the meta's `alsoIn`,
  * `related`, `keywords`) is read when written plainly; written by code, it is left to the frame, which reads it when
- * the story loads. `touch`, `logic`, `device`, `design.figma` and the meta's `propGroups` are read by the index only
- * (`indexedParameters.ts`, `indexFields.ts`), so written by code they are a problem.
+ * the story loads. `touch`, `logic`, `device`, `requiredFirst`, `design.figma` and the meta's `propGroups` are read by
+ * the index only (`indexedParameters.ts`, `indexFields.ts`), so written by code they are a problem.
  * A `design.figma` is checked here too, so the pages never carry the checker: one that is not a link to a Figma file is
  * noted and left out, and the file keeps its stories. A title written by code, or none, is the file's path
  * (`autoTitle`, as Storybook's auto-title); one written by code is also noted, since the author meant another. A value written plainly but wrongly
@@ -127,6 +127,7 @@ type StoryFields = Pick<
   | "isTouch"
   | "isLogic"
   | "device"
+  | "requiredFirst"
   | "tags"
 >;
 
@@ -438,6 +439,7 @@ type MetaFields = Pick<
   | "isTouch"
   | "isLogic"
   | "device"
+  | "requiredFirst"
   | "alsoIn"
   | "related"
   | "keywords"

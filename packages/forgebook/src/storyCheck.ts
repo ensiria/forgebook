@@ -103,6 +103,8 @@ export type StoryCheckReport = {
   readonly schema: 1;
   /** One result per story and view. */
   readonly results: readonly StoryCheckResult[];
+  /** `"off"` when the catalogue checks no accessibility (`a11y: false`): no result ran axe. Absent when it does. */
+  readonly a11y?: "off";
 };
 
 /** Every kind, for reading a report back. */
@@ -151,7 +153,8 @@ export const isStoryCheckReport = (value: unknown): value is StoryCheckReport =>
   value.schema === 1 &&
   "results" in value &&
   Array.isArray(value.results) &&
-  value.results.every(isResult);
+  value.results.every(isResult) &&
+  (!("a11y" in value) || value.a11y === undefined || value.a11y === "off");
 
 /** What a picture run is asked to do: a check's stories and views, and where the pictures go. */
 export type StoryShotRequest = StoryCheckRequest & {

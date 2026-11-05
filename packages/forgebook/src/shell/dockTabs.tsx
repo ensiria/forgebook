@@ -19,11 +19,13 @@ import { type ComponentDocs, codeNameOf, type PropDocs } from "../componentDocs.
 import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
+import type { TreeStory } from "../storyTree.ts";
 import type { CheckState } from "./A11yTab.tsx";
 import type { DockTab } from "./Dock.tsx";
 import { lazyModule } from "./lazyModule.tsx";
 import { LazyTab } from "./lazyTab.tsx";
-import { PropsTab, type TextArgNote } from "./PropsTab.tsx";
+import type { TextArgNote } from "./PropRows.tsx";
+import { PropsTab } from "./PropsTab.tsx";
 import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 import { a11yHint, interactionsHint, styleHooks } from "./tabSummaries.ts";
@@ -54,10 +56,11 @@ export type DockTabsInput = {
   readonly docs: Loaded<ComponentDocs>;
   /** The story file's code, as loaded. */
   readonly code: Loaded<StoryFileCode>;
-  /** The story's export name. */
-  readonly exportName: string;
-  /** Whether the story is about logic: its hook's signature comes first. */
-  readonly isLogic: boolean;
+  /**
+   * The story: its export name, whether it is about logic (its hook's signature comes first), and where it puts the
+   * required props (none for the catalogue's).
+   */
+  readonly story: Pick<TreeStory, "exportName" | "isLogic" | "requiredFirst">;
   /** The component's name from the sidebar, for the JSX when the docs have none. */
   readonly componentName: string;
   /** The props the story lets the panel set. */
@@ -129,6 +132,7 @@ const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] 
               namedValues={input.namedValues}
               textArgs={input.textArgs}
               componentGroups={input.propGroups}
+              requiredFirst={input.story.requiredFirst}
             />
           )
         }
@@ -187,7 +191,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
     ];
   }
   // the docs' place while they load or fail: the tab the story opens on once they are read
-  const docsTab: Pick<DockTab, "id" | "label"> = input.isLogic
+  const docsTab: Pick<DockTab, "id" | "label"> = input.story.isLogic
     ? { id: "signature", label: STRINGS.tabs.signature }
     : { id: "props", label: STRINGS.tabs.props };
   // the play's trace comes from the frame, not from the docs: a first read of a project's docs can take seconds, and a
@@ -200,7 +204,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   }
   const component = docs.value;
   const events = eventsOf(component.props, input.actions);
-  if (input.isLogic) return logicTabs(input, component);
+  if (input.story.isLogic) return logicTabs(input, component);
   const tabs: DockTab[] = [];
   tabs.push(...propsTab(input, panelProps(component.props, input.argTypes)));
   tabs.push(...eventsTab(input, events));
@@ -273,7 +277,7 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
           module={CODE_TAB}
           tabProps={{
             code: code.value,
-            exportName: input.exportName,
+            exportName: input.story.exportName,
             componentName: docs.status === "ready" ? codeNameOf(docs.value) : input.componentName,
             args: input.values
           }}

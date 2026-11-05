@@ -62,6 +62,15 @@ test.describe("forgebook story", () => {
       docs.props.map((prop: { readonly name: string }): [string, unknown] => [prop.name, prop])
     );
     expect(byName.get("rows")).toMatchObject({ group: "Behaviour" });
+    // the required props named at the top, the props kept in the source's order whatever the meta's section says
+    const answer = JSON.parse(run.stdout);
+    expect(Object.keys(answer).slice(0, 2)).toEqual(["schema", "requiredProps"]);
+    expect(answer.requiredProps).toEqual(["options"]);
+    expect(docs.props.slice(0, 3).map((prop: { readonly name: string }) => prop.name)).toEqual([
+      "value",
+      "size",
+      "rows"
+    ]);
     expect(byName.get("value")).not.toHaveProperty("group");
     expect(byName.get("texts")).toMatchObject({
       group: "Texts",

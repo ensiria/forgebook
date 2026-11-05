@@ -155,12 +155,21 @@ const readIndex = (root: string, pattern: string, key: string): ReturnType<typeo
 
 /** The patterns' modules a dev server serves, kept to tell an edit that changes a list. */
 export const servedPatterns = (): ServedPatterns => {
-  const served = new Map<string, ReadonlyMap<string, { readonly key: string; readonly index: string }>>();
+  // by group, each story file as served: its key, the pattern that lists it, its index
+  const served = new Map<
+    string,
+    ReadonlyMap<string, { readonly key: string; readonly pattern: string; readonly index: string }>
+  >();
   return {
     keep: (id: string, files: readonly IndexedStoryFile[]): void => {
       served.set(
         id,
-        new Map(files.map((file) => [file.file, { key: file.key, index: JSON.stringify(file.index) }]))
+        new Map(
+          files.map((file) => [
+            file.file,
+            { key: file.key, pattern: file.pattern, index: JSON.stringify(file.index) }
+          ])
+        )
       );
     },
     changedBy: (file: string): readonly string[] =>
@@ -169,8 +178,8 @@ export const servedPatterns = (): ServedPatterns => {
           // in Vite's form, as the served files are kept: a Windows path reaches here either way
           const kept = files.get(VITE_PATHS.normalize(file));
           if (kept === undefined) return false;
-          const { root, pattern } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-          const index = readIndex(root, pattern, kept.key);
+          const { root } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
+          const index = readIndex(root, kept.pattern, kept.key);
           return typeof index !== "string" && JSON.stringify(index) !== kept.index;
         })
         .map(([id]) => id)

@@ -107,6 +107,28 @@ npx forgebook build    # static files in dist/, for any web server
 Badge's page shows its stories, each in its own frame, and an API table read from `BadgeProps`: `label` required,
 `tone` with its three values and its default, each with its TSDoc.
 
+### Which files
+
+`stories` (and `docs`, for [docs pages](#docs-pages)) lists globs from the configuration's folder. A glob that starts
+with `!` leaves out the files it matches from what the others list, wherever it stands in the list, as Vite's
+`import.meta.glob` and fast-glob read it:
+
+```ts
+stories: [
+  "src/**/*.stories.tsx",
+  "src/**/*-story.tsx",
+  // drafts and the components still being moved in: listed by neither glob above
+  "!src/**/drafts/**",
+  "!src/components/Legacy*/**"
+]
+```
+
+A `!` glob is written from the same folder and with the same syntax as the others; one that names a folder
+(`!src/legacy`) leaves out every file in it. A file two globs list is listed once, its title made from the first one
+(when its meta writes none). A list of `!` globs alone lists nothing, and the catalogue refuses it. Adding a file a `!`
+glob leaves out, while the catalogue runs, changes nothing on the page. A file Vite's `server.fs.deny` refuses stays out
+too, with a warning.
+
 ## What a catalogue gives you
 
 - **One frame per story**, so a story's styles and globals never leak into another, and its address opens it alone.
@@ -139,6 +161,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 - **Props in groups**: a component with many props lists them under the groups their TSDoc names (`@group Paging`),
   and a prop typed with a documented object (`texts?: FinderTexts`) unfolds to list its members
   ([below](#props-in-groups)).
+- **Required props first**: what every use must set comes first, in each group or in a section of its own, and a
+  reader turns the ordering off with a switch ([below](#required-props-first)).
 - **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
   Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
   `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
@@ -214,7 +238,11 @@ The Touch switch (in View, `m` by default) lets a story be tried as on a phone, 
   `navigator.maxTouchPoints` says 5;
 - the cursor is a round dot; Shift fixes a centre, and a press then puts a second finger mirrored around it, so a drag
   pinches and rotates;
-- a drag scrolls what it can, as the `touch-action` on the way allows, and flings on.
+- a drag scrolls what it can, as the `touch-action` on the way allows, and flings on;
+- a tap on a text field (an input, a textarea, a contenteditable) focuses it and puts the caret under the finger, a
+  drag or a long press there does not, and a handler that cancels the tap leaves it unfocused, as on a phone; the
+  keyboard then types and selects in it as usual (in a closed shadow root, or on a non-editable part of a
+  contenteditable, a press focuses at once and the caret is the browser's, the simulation not reaching them).
 
 A story reads the switch in its globals (`context.globals.touch`, `"mouse"` or `"touch"`) to draw only the version
 that fits the pointer, and follows the switch live; a story fixes it with `globals: { touch: "touch" }`.
@@ -225,9 +253,9 @@ its example's bar turns that off for it; on its own page, the Touch switch is th
 catalogue is open, and the address keeps the switch the other stories follow.
 
 **It is a simulation.** Events made by a page are not trusted, so the browser's own reactions do not follow them:
-its native scrolling (the drag's scrolling is an approximation, without the rubber band), focus and selection from a
-touch, and `touch-action` applied by the browser. In Safari and Firefox the stories get pointer events only (only
-Chromium lets a page build touch events). A virtual keyboard, the viewport shrinking under it, safe areas and real iOS
+its native scrolling (the drag's scrolling is an approximation, without the rubber band), selecting a word or the page's
+text with a finger, and `touch-action` applied by the browser. In Safari and Firefox the stories get pointer events only (only
+Chromium lets a page build touch events), and Firefox does not place the caret inside an email or number field. A virtual keyboard, the viewport shrinking under it, safe areas and real iOS
 Safari need a device. For real touch events and native scrolling, `forgebook dev --touch` opens the catalogue in a
 Chromium window with Chromium's own touch emulation (it needs `@forgebook/testing` and Playwright, as `check` does).
 `controls: { touch: false }` takes the switch away.
@@ -408,6 +436,34 @@ export type FinderProps = {
   level, and only once unfolded, so large text types cost the page nothing until read.
 - With `eslint-plugin-tsdoc`, declare the tag in your `tsdoc.json`:
   `{ "tagName": "@group", "syntaxKind": "block", "allowMultiple": false }`.
+
+## Required props first
+
+The API reference and the Props tab list a component's required props before the others, so a reader sees at once
+what every use must set. Where they go is `requiredFirst`:
+
+```ts
+// forgebook.config.ts: every component
+export default defineConfig({ requiredFirst: "section" });
+
+// a component's meta, for its page and its stories; or one story, for its own Props tab
+export default { component: Finder, parameters: { requiredFirst: false } } satisfies Meta<typeof Finder>;
+```
+
+- `"in-groups"`, the default: the required props first inside each group, and among the props that name no group and
+  the events; the others keep the order of the source. In the Props tab, first among each kind of control.
+- `"section"`: one "Required" section before every group, all the required props in it, each naming its group (an
+  event says "Event"; the Props tab, which lists no events, leaves them to the Events tab); then the groups with the
+  others. A component whose props name no group has nothing to section, so it reads as
+  `"in-groups"`.
+- `false`: the order of the source.
+- The narrowest wins: a story's over its meta's, a meta's over the configuration's. Write it plainly (the index reads
+  it); anything else is reported where it is written.
+- A reader's "Required first" switch, in the header of both tables, turns the ordering on or off for the whole
+  catalogue, kept in the browser: off, the order of the source; on, the developer's layout (`"in-groups"` where the
+  developer chose `false` everywhere). The switch never picks between the two layouts.
+- Agents get the props in the order of the source and the names of the required ones at the top of
+  `forgebook story --json` and `get_story` (`requiredProps`): the setting shapes the pages only.
 
 ## Docs pages
 
@@ -711,7 +767,9 @@ its name.
 To try it on a Storybook project, run `npx forgebook init --from storybook` in the folder that holds `.storybook`. It
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
-computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
+computed `stories` list is read too, as the files it names (a list made with fast-glob and its `ignore`, for one,
+arrives with the ignored files already out); to keep the exclusion as globs, write it as `!` globs
+([above](#which-files)) in place of the files. The preview is read from its source, so only `globalTypes` written as plain values
 become switches. It reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML on Vite
 (`@storybook/react-vite`, `@storybook/vue3-vite`, `@storybook/svelte-vite`, `@storybook/sveltekit` (whose
 `sveltekit_experimental` parameters `@forgebook/sveltekit` reads as they are),
@@ -766,6 +824,35 @@ A monorepo that points its packages at their sources with an export condition (`
 `exports`, and `source` in Vite's `resolve.conditions`, set by a framework's plugins) needs nothing more with the
 `forgebook` command: its dev server reads the stories and previews it answers tools with on Node under the same
 conditions, those of other runtimes (`browser`) aside, unless a plugin names the server's own.
+
+## A lighter catalogue
+
+Two features cost the most and are on by default: the accessibility check, which ships axe (about 180 KB gzipped in a
+build), and the props read from the types, whose TypeScript programs are most of what the dev server holds on a first
+start. A catalogue that does not want them turns them off:
+
+```ts
+export default defineConfig({
+  framework: react(),
+  title: "Acme",
+  stories: ["src/**/*.stories.tsx"],
+  a11y: false,
+  componentDocs: false
+});
+```
+
+- `a11y: false` checks nothing: no Accessibility tab and no accessibility column on a tester's page, axe neither written
+  in a build nor offered to the frames (whose code that loads it is fetched only on a check), and the generated tests,
+  `forgebook check`, `check-page` and their tools leave axe out (their reports say `"a11y": "off"`). `tabs: { a11y: false }`
+  only hides the tab and keeps the rest. A preset that turns the check off keeps it off, whatever rules the catalogue writes.
+- `componentDocs: false` starts no TypeScript program: no API reference and no `props` fence on a page, no "Used in", and
+  the search finds names, stories and docs pages but no props. The Props tab still works: its controls come from the
+  story's args and `argTypes`, as Storybook's do without a docgen (a text, a number, a toggle from each arg's value, an
+  action as an event); a prop the story gives no arg is not listed. A shared link is then checked against those kinds:
+  where the story gives a text, a link may set any text, even for a prop whose type takes a few values only, so give
+  such a prop `argTypes` options (`{ control: "select", options: [...] }`) to keep a link to them. `forgebook story` answers `"componentDocs": "off"`
+  with no `docs`, and `forgebook changed` says it finds no story through the imports. `forgebook docs` and `forgebook new`
+  still read the types when run, since they are asked for that. `usedIn: true` with it is an error.
 
 ## Commands
 
@@ -930,6 +1017,26 @@ keep it.
 An embed (`?embed`) and an MCP client's inline preview are pages of the catalogue's origin that frame the story on the
 frames' origin in turn, as the catalogue does: a page or a host that frames them names the catalogue's origin only (in
 its `frame-src`, in the preview's `frameDomains`).
+
+### What the dev server gives a client
+
+`forgebook dev` listens on localhost unless you pass `--host`, and on both of its ports it answers with these limits:
+
+- **Another site's page gets nothing it can read.** A request a browser marks as another site's (`Sec-Fetch-Site`), or
+  with a foreign `Origin`, is refused for every module, file and API. A link or a frame from elsewhere can open the
+  catalogue's page, the frame page, an inline preview and a file of the public folder, whose content that site cannot
+  read. Vite checks `Host`
+  first (`server.allowedHosts`, plain HTTP only), which stops a site that reaches `127.0.0.1` through its own domain.
+- **Only the files your project names are listed or read.** A catalogue's `stories` and `docs`, and the groups a module
+  of yours imports (`?forgebook-files`), are the only groups the server reads, whatever an address names. A query that
+  names one file (`?forgebook-code`, `?forgebook-markdown`) follows Vite's `server.fs`, as `?raw` does.
+- **`server.fs.deny` wins over your globs.** A file it refuses stays out of the catalogue, its search and "Used in", with
+  a warning. A file your globs name outside `server.fs.allow` is listed and served, as Vite serves any file a module of
+  the project imports.
+
+A command, an agent or `curl` sends no browser headers: `forgebook mcp`, `forgebook stories` and the agent API
+(`/__forgebook/api/`) work as usual, and anyone who can reach the port can use them. With `--host` that means your whole
+network, so use it only on one you trust.
 
 ## Your look in the shell
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is

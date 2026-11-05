@@ -30,7 +30,8 @@ const storyOf = (isLogic: boolean): TreeStory => ({
   device: undefined,
   design: undefined,
   tags: [],
-  hasPlay: false
+  hasPlay: false,
+  requiredFirst: undefined
 });
 
 describe("a story about logic", () => {

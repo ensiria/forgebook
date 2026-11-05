@@ -1,19 +1,23 @@
 /**
  * Tests for the catalogue's Vite plugin: a `?forgebook-files` import answered with one module per pattern, the folders
- * it is given watched, and a story file added or removed there renewing the patterns' modules and reloading the page.
+ * it is given watched, and a story file added or removed there renewing the modules of the groups whose list it
+ * changes and reloading the page.
  *
  * @module
  */
-import { join } from "node:path";
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
 import type { UserConfig } from "vite";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { codeLiteral } from "../src/codeLiteral.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
+import { FILES_SPECIFIER_PREFIX, storyFilesGroupText } from "../src/vite/storyFilesModule.ts";
 import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
@@ -32,7 +36,7 @@ const fakeServer = (): {
     // the catalogue's pages answer here; a plugin without a configuration passes every request on
     middlewares: { use: (): undefined => undefined },
     // a watcher that polls, as on every system: no file is followed one by one (`closeWatch.ts`)
-    config: { server: { watch: { usePolling: true } } },
+    config: { root: "/fake-root", server: { watch: { usePolling: true } } },
     watcher: {
       add: (paths: string[]): void => void record.added.push(...paths),
       on: (event: string, listener: (file: string) => void): void => void listeners.set(event, listener)
@@ -66,6 +70,36 @@ const fakeServer = (): {
     emit: (event: "add" | "unlink", file: string): void => listeners.get(event)?.(file),
     server
   };
+};
+
+/** The folders of story files the tests write, removed at the end. */
+const FOLDERS: string[] = [];
+
+afterAll(() => {
+  for (const folder of FOLDERS) rmSync(folder, { recursive: true, force: true });
+});
+
+/**
+ * Writes a story file with one story and a meta without a title.
+ *
+ * @param dir - the folder.
+ * @param file - the file, relative to it.
+ */
+const writeStory = (dir: string, file: string): void => {
+  mkdirSync(dirname(join(dir, file)), { recursive: true });
+  writeFileSync(join(dir, file), "export default {};\nexport const One = {};\n");
+};
+
+/**
+ * A folder of story files on disk, for the tests that add and remove them.
+ *
+ * @param files - the story files, relative to it.
+ */
+const storyFolder = (files: readonly string[]): string => {
+  const dir = mkdtempSync(join(tmpdir(), "forgebook-plugin-listing-"));
+  FOLDERS.push(dir);
+  for (const file of files) writeStory(dir, file);
+  return dir;
 };
 
 /** The fixture package, whose story files the patterns match. */
@@ -222,7 +256,9 @@ describe("forgebookPlugin's pages", () => {
     expect(id).toBe("C:/Users/ada/app/.forgebook-stories.ts");
     const source = await hooks.load(String(id));
     const code = typeof source === "object" && source !== null && "code" in source ? String(source.code) : "";
-    expect(code).toContain(`${codeLiteral("./src/**/*.stories.tsx?forgebook-files")}`);
+    expect(code).toContain(
+      `import files from ${codeLiteral("virtual:forgebook-files:C:/Users/ada/app::0::src/**/*.stories.tsx")};`
+    );
   });
 });
 
@@ -235,32 +271,63 @@ describe("forgebookPlugin in the dev server", () => {
     expect(fake.added).toEqual(["/kit/src", "/kit/stories"]);
   });
 
-  it("renews the patterns' modules and reloads when a story file is added or removed", async () => {
+  it("renews a group's module and reloads when a story file it lists is added or removed", async () => {
+    const dir = storyFolder(["src/A.stories.tsx"]);
     const fake = fakeServer();
-    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK, watch: ["/kit/src"] }));
-    const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(KIT, "stories.ts")));
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK, watch: [join(dir, "src")] }));
+    const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(dir, "stories.ts")));
     await hooks.load(id);
     await hooks.closeBundle();
     hooks.configureServer(fake.server);
-    fake.emit("add", "/kit/src/a/A.stories.tsx");
-    fake.emit("unlink", "/kit/src/a/A.stories.tsx");
-    fake.emit("add", "/kit/src/a/A.tsx");
+    writeStory(dir, "src/B.stories.tsx");
+    fake.emit("add", join(dir, "src", "B.stories.tsx"));
+    // the reloaded pages ask for the module again
+    await hooks.load(id);
+    rmSync(join(dir, "src", "B.stories.tsx"));
+    fake.emit("unlink", join(dir, "src", "B.stories.tsx"));
+    fake.emit("add", join(dir, "src", "A.tsx"));
     expect(fake.invalidated).toEqual([id, id]);
     expect(fake.reloads).toBe(2);
   });
 
   it("renews them too in a catalogue that watches no folder of its own: a story file renamed in its own folder", async () => {
+    const dir = storyFolder(["src/Old.stories.tsx"]);
     const fake = fakeServer();
     const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
-    const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(KIT, "stories.ts")));
+    const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(dir, "stories.ts")));
     await hooks.load(id);
     await hooks.closeBundle();
     hooks.configureServer(fake.server);
-    fake.emit("unlink", join(KIT, "src", "Old.stories.tsx"));
-    fake.emit("add", join(KIT, "src", "New.stories.tsx"));
+    renameSync(join(dir, "src", "Old.stories.tsx"), join(dir, "src", "New.stories.tsx"));
+    fake.emit("unlink", join(dir, "src", "Old.stories.tsx"));
+    fake.emit("add", join(dir, "src", "New.stories.tsx"));
     expect(fake.added).toEqual([]);
     expect(fake.invalidated).toEqual([id, id]);
     expect(fake.reloads).toBe(2);
+  });
+
+  it("reloads nothing for a story file no group lists: one a `!` pattern leaves out, or outside every pattern", async () => {
+    const dir = storyFolder(["src/A.stories.tsx", "src/legacy/Kept.stories.tsx"]);
+    const fake = fakeServer();
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
+    const group = storyFilesGroupText(VITE_PATHS.normalize(dir), ["src/**/*.stories.tsx", "!src/legacy/**"]);
+    const id = String(hooks.resolveId(`${FILES_SPECIFIER_PREFIX}${group}`, join(dir, "stories.ts")));
+    const loaded = await hooks.load(id);
+    await hooks.closeBundle();
+    const code = typeof loaded === "object" && loaded !== null && "code" in loaded ? String(loaded.code) : "";
+    expect(code).toContain(codeLiteral("./src/A.stories.tsx"));
+    expect(code).not.toContain("Kept.stories.tsx");
+    hooks.configureServer(fake.server);
+    writeStory(dir, "src/legacy/Old.stories.tsx");
+    fake.emit("add", join(dir, "src", "legacy", "Old.stories.tsx"));
+    writeStory(dir, "other/B.stories.tsx");
+    fake.emit("add", join(dir, "other", "B.stories.tsx"));
+    expect(fake.invalidated).toEqual([]);
+    expect(fake.reloads).toBe(0);
+    writeStory(dir, "src/forms/New.stories.tsx");
+    fake.emit("add", join(dir, "src", "forms", "New.stories.tsx"));
+    expect(fake.invalidated).toEqual([id]);
+    expect(fake.reloads).toBe(1);
   });
 });
 

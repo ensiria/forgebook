@@ -11,6 +11,7 @@
  */
 import type { Browser } from "@playwright/test";
 
+import { withDeadline } from "./deadline.ts";
 import { baseOf, type MeasureContext, startServer, stopServer, waitForServer } from "./measure.ts";
 
 /** How many frames are open at once. */
@@ -138,12 +139,12 @@ const openStory = async (browser: Browser, { id, frame }: SweepStory): Promise<S
   try {
     await page.goto(frame, { waitUntil: "commit", timeout: STORY_TIMEOUT });
     await page.waitForFunction(HAS_STATUS, null, { timeout: STORY_TIMEOUT });
-    const shown = await page.evaluate(shownError);
+    const shown = await withDeadline(page.evaluate(shownError), STORY_TIMEOUT, "the frame's error");
     return { id, failure: typeof shown === "string" && shown !== "" ? firstLine(shown) : undefined };
   } catch {
     return { id, failure: firstLine(thrown[0] ?? "no status: the frame never said it was ready") };
   } finally {
-    await context.close();
+    await withDeadline(context.close(), STORY_TIMEOUT, "closing the frame").catch(() => undefined);
   }
 };
 
@@ -161,7 +162,9 @@ export const sweepStories = async (
   try {
     const base = baseOf(context);
     await waitForServer(server, base);
-    const answer = await fetch(`${base}__forgebook/api/stories`);
+    const answer = await fetch(`${base}__forgebook/api/stories`, {
+      signal: AbortSignal.timeout(STORY_TIMEOUT)
+    });
     // an answer without stories is a catalogue that could not be read, not an empty one
     if (!answer.ok)
       throw new Error(`the catalogue's list failed (${answer.status}): ${firstLine(await answer.text())}`);

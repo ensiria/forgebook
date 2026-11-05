@@ -32,6 +32,7 @@ describe("catalogueSettings", () => {
     expect(settings.gridStep).toBe(8);
     expect(settings.appearance).toBe("system");
     expect(settings.propGroups).toEqual([]);
+    expect(settings.requiredFirst).toBe("in-groups");
   });
 
   it("keeps the built-in backgrounds it names, adds its own, turns tabs off, and keeps 100 % among the steps", () => {
@@ -136,6 +137,14 @@ describe("mergedLists", () => {
       "Paging"
     ]);
   });
+
+  it("keeps where the required props go as the catalogue says, false included", () => {
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { requiredFirst: "section" }).requiredFirst).toBe(
+      "section"
+    );
+    expect(catalogueSettings("A", DEFAULT_SWITCHES, { requiredFirst: false }).requiredFirst).toBe(false);
+    expect(mergedLists([{ requiredFirst: false }, {}]).requiredFirst).toBe(false);
+  });
 });
 
 describe("story groups", () => {
@@ -159,6 +168,7 @@ describe("story groups", () => {
         design: undefined,
         tags: [],
         hasPlay: false,
+        requiredFirst: undefined,
         isMain: false,
         isTouch: false,
         isLogic: false

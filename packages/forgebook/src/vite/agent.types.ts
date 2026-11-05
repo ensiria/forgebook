@@ -157,6 +157,13 @@ export type StoriesDocument = {
 export type StoryDocument = {
   /** The shape's version. */
   readonly schema: AgentSchema;
+  /**
+   * The names of the component's required props (`isRequired`), events among them, in the order of the source: what
+   * every use must set. Its subcomponents' are not listed: their own `isRequired` says it. First in the answer, so a client that cuts a long one keeps it; `docs` keeps the source's
+   * order, whatever the catalogue's `requiredFirst` says, since that setting shapes the pages only. Empty when there
+   * are no docs.
+   */
+  readonly requiredProps: readonly string[];
   /** The story, with its links in the view asked for. */
   readonly story: AgentStory;
   /** Its component's id and title, and its "Used in" when the catalogue offers it. */
@@ -175,6 +182,11 @@ export type StoryDocument = {
   readonly args: Readonly<Record<string, unknown>>;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
   readonly problems: readonly string[];
+  /**
+   * `"off"` when the catalogue reads no component docs (`componentDocs: false`): `docs` is then none and
+   * `requiredProps` empty whatever the component declares, and there is no "Used in". Absent when it reads them.
+   */
+  readonly componentDocs?: "off";
 };
 
 /** Where a docs page opens, in the view the answer describes. */

@@ -151,6 +151,8 @@ const shellStrings = {
   rangeValue: (prop: string): string => `${prop}: value`,
   setByStory: "Set by the story",
   required: "Required",
+  requiredFirst: "Required first",
+  requiredFirstHint: "Every component's required props before the others; kept in this browser",
   resetArgs: "Reset",
   appearance: "Appearance",
   appearanceOf: (name: string): string => `Appearance: ${name}`,

@@ -1,6 +1,6 @@
 /**
- * The post page as SvelteKit draws it: its `load` run in the frame with the story's params, its `fetch` answered by the
- * story's mock, its data given to the page.
+ * The post page as SvelteKit draws it: its `load` run with the story's params, its `fetch` answered by the story's mock
+ * in the frame and in the generated server tests alike, its data given to the page.
  *
  * @module
  */
@@ -28,8 +28,8 @@ export default {
   parameters
 } satisfies Meta<typeof Post>;
 
-/** The page's load, run with the story's route; the generated server tests answer no fetch, so they leave it out. */
-export const Loaded: Story<typeof Post> = { tags: ["!test"] };
+/** The page's load, run with the story's route. */
+export const Loaded: Story<typeof Post> = {};
 
 /** The page's data given as it is, no load run: what a server load would have returned. */
 export const FromData: Story<typeof Post> = {

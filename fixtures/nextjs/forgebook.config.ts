@@ -1,6 +1,7 @@
 /**
  * The Next.js fixture's catalogue: the app's components and their stories, drawn as the app draws them. Google fonts
- * are not downloaded, so the shell's tests never reach the network: Inter shows as its fallback.
+ * are not downloaded, so the shell's tests never reach the network: Inter shows as its fallback. Its drafts' stories
+ * are left out with a `!` pattern, which the shell's tests check.
  *
  * @module
  */
@@ -10,5 +11,6 @@ import { defineConfig } from "forgebook";
 export default defineConfig({
   framework: nextjs({ googleFonts: "none" }),
   title: "Harbour",
-  stories: ["components/**/*.stories.tsx"]
+  // the drafts' stories are left out, whatever pattern lists them
+  stories: ["components/**/*.stories.tsx", "!components/drafts/**"]
 });

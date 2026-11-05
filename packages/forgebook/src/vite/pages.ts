@@ -20,6 +20,11 @@ import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { pluginFrameModule } from "./pluginConfig.ts";
+import {
+  DOCS_PAGES_SPECIFIER_PREFIX,
+  FILES_SPECIFIER_PREFIX,
+  storyFilesGroupText
+} from "./storyFilesModule.ts";
 import { HOME_QUERY } from "./textQueries.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
@@ -461,29 +466,29 @@ export const agentSourcesModule = (config: ResolvedConfig): string => {
 };
 
 /**
- * The source of the project's own stories and docs pages: one `?forgebook-files` or `?forgebook-docs-pages` import per
- * glob, named after the catalogue.
+ * The source of the project's own stories and docs pages: its `stories` as one group of story files and its `docs` as
+ * one group of docs pages, each imported by its patterns (`FILES_SPECIFIER_PREFIX`), so a `!` pattern leaves files out
+ * of what all the others list and a file two patterns list comes once; named after the catalogue.
  *
  * @param config - the configuration.
  */
-export const storiesSourceModule = (config: ResolvedConfig): string =>
-  [
-    ...config.stories.map(
-      (pattern, index) =>
-        `import files${index} from ${codeLiteral(`./${pattern.replace(/^\.\//, "")}?forgebook-files`)};`
-    ),
-    ...config.docs.map(
-      (pattern, index) =>
-        `import docs${index} from ${codeLiteral(`./${pattern.replace(/^\.\//, "")}?forgebook-docs-pages`)};`
-    ),
+export const storiesSourceModule = (config: ResolvedConfig): string => {
+  // the configuration's folder in Vite's form, as the plugin names an importer's: the patterns are relative to it
+  const folder = VITE_PATHS.normalize(config.dir);
+  const group = (prefix: string, patterns: readonly string[]): string =>
+    codeLiteral(`${prefix}${storyFilesGroupText(folder, patterns)}`);
+  const hasStories = config.stories.length > 0;
+  const hasDocs = config.docs.length > 0;
+  return [
+    ...(hasStories ? [`import files from ${group(FILES_SPECIFIER_PREFIX, config.stories)};`] : []),
+    ...(hasDocs ? [`import docs from ${group(DOCS_PAGES_SPECIFIER_PREFIX, config.docs)};`] : []),
     "export const source = {",
     `  id: ${codeLiteral(OWN_SOURCE_ID)},`,
     `  name: ${codeLiteral(config.title)},`,
-    `  files: [${config.stories.map((_pattern, index) => `files${index}`).join(", ")}],`,
-    ...(config.docs.length === 0
-      ? []
-      : [`  docs: [${config.docs.map((_pattern, index) => `docs${index}`).join(", ")}],`]),
+    `  files: [${hasStories ? "files" : ""}],`,
+    ...(hasDocs ? ["  docs: [docs],"] : []),
     "  sheets: { required: [], theme: [], restyled: [] }",
     "};",
     ""
   ].join("\n");
+};

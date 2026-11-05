@@ -51,6 +51,10 @@ describe("withFixed and withOwnFixed", () => {
     expect(shown.width).toBe(360);
   });
 
+  it("keeps the view's switches object when the story fixes no switch", () => {
+    expect(withFixed(own, NOT_FIXED).switches).toBe(own.switches);
+  });
+
   it("keeps the user's own values in the address when anything else changes", () => {
     const changed = { ...withFixed(own, fixed), text: 125 };
     const kept = withOwnFixed(changed, own, fixed);

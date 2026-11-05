@@ -35,12 +35,13 @@ import { catalogueSwitches, type ViewSwitch } from "../switches.ts";
 import {
   codeGlobalsOf,
   frameAddress,
+  isSameLiveView,
   type LiveView,
   languageOf,
+  liveView,
   type MeasureTool,
   parseView
 } from "../viewState.ts";
-import { checkStory } from "./checkStory.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
@@ -103,7 +104,7 @@ import.meta.hot?.on("vite:afterUpdate", (): void => {
  * @param message - the message.
  * @param controls - the rendered story's controls.
  * @param storyId - the story's id, for the answers.
- * @param rules - the catalogue's accessibility rules, for a check.
+ * @param rules - the catalogue's accessibility rules, for a check; none when it checks no accessibility.
  * @param axeUrl - the address of axe's script, for a check.
  * @param tellShell - tells the shell the check's result.
  */
@@ -111,7 +112,7 @@ const answerShell = (
   message: ShellMessage,
   controls: StoryControls,
   storyId: string,
-  rules: A11ySettings,
+  rules: A11ySettings | undefined,
   axeUrl: string | undefined,
   tellShell: ShellChannel["tell"]
 ): void => {
@@ -123,7 +124,13 @@ const answerShell = (
   else if (message.type === "forgebook:clock") controls.setClock(message.state);
   else if (message.type === "forgebook:clock-restart") controls.restartClock();
   else if (message.type === "forgebook:check") {
-    checkStory(document, rules, axeUrl)
+    // loaded on the first check: a frame that is never checked, or one of a catalogue that checks nothing, never
+    // fetches the code that loads axe
+    const checked =
+      rules === undefined
+        ? Promise.reject(new Error("The catalogue checks no accessibility (a11y: false)"))
+        : import("./checkStory.ts").then((module) => module.checkStory(document, rules, axeUrl));
+    checked
       .then((violations) => tellShell({ type: "forgebook:checked", storyId, violations }))
       .catch((error: unknown) =>
         tellShell({
@@ -166,6 +173,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   let fixed: FixedView = NOT_FIXED;
   // set once the story runs: a view the shell sends then changes its language and its globals without a new mount
   let changeShown: ((live: LiveView) => void) | undefined;
+  // the view both the root and the story's drawing show; none when they may differ, so the next view is applied whatever
+  // it says: a view that comes before the story runs reaches only the root, and an edit draws the story with new globals
+  let shownView: LiveView | undefined = liveView(view);
   // the shell sends the live part of a changed view: applied on the root, and kept in the address so a reload (an
   // edit, a stale module) shows the same view
   const showSpills = spillOutline(document, ".forgebook-frame", (count) =>
@@ -211,8 +221,17 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     if (message.type === "forgebook:tools") showTools(message.tools);
     if (message.type === "forgebook:spills") showSpills(message.isOn);
     if (message.type !== "forgebook:view") return;
-    applyView(document.documentElement, withFixed(message.view, fixed), catalogue);
+    const shown = withFixed(message.view, fixed);
+    // the same view again draws nothing: a story's state, and the time its draw takes, are not the shell's to spend
+    if (
+      changeShown !== undefined &&
+      shownView !== undefined &&
+      isSameLiveView(withFixed(shownView, fixed), shown)
+    )
+      return;
+    applyView(document.documentElement, shown, catalogue);
     changeShown?.(message.view);
+    shownView = changeShown === undefined ? undefined : message.view;
     const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
     window.history.replaceState(null, "", address);
   });
@@ -323,7 +342,10 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
             })
             .catch((error: unknown) => {
               // a language another choice replaced meanwhile is no longer the frame's concern
-              if (count === shownCount) reportError(error instanceof Error ? error.message : String(error));
+              if (count !== shownCount) return;
+              // the story still shows the view before this one: choosing this one again must try again
+              shownView = undefined;
+              reportError(error instanceof Error ? error.message : String(error));
             });
         };
       },
@@ -363,6 +385,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         return;
       }
       story = next;
+      shownView = undefined;
       running.setStory(next);
       if (controls !== undefined) tellReady();
     };
@@ -380,6 +403,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         return;
       }
       story = next;
+      shownView = undefined;
       running.setStory(next, [...preview.decorators, ...plugins.decorators]);
       if (controls !== undefined) tellReady();
     };

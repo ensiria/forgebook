@@ -104,6 +104,8 @@ describe("forgebook story", () => {
     expect(run.exitCode).toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({
       schema: 1,
+      // the stub's component documents no prop
+      requiredProps: [],
       args: { size: "md", label: "Save" },
       story: {
         links: {
@@ -150,7 +152,13 @@ describe("forgebook mcp", () => {
       .map((line) => JSON.parse(line));
     expect(answers).toMatchObject([
       { id: 1, result: { protocolVersion: "2025-11-25", serverInfo: { name: "forgebook" } } },
-      { id: 2, result: { isError: false, structuredContent: { args: { size: "md", label: "Save" } } } }
+      {
+        id: 2,
+        result: {
+          isError: false,
+          structuredContent: { requiredProps: [], args: { size: "md", label: "Save" } }
+        }
+      }
     ]);
   }, 60_000);
 });

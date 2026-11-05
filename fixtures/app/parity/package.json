@@ -1,0 +1,7 @@
+{
+  "name": "@fixture/parity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The fixture kit's catalogue with accessibility checks and component docs off. A package of its own so that Vite keeps its cache apart from the fixture app's when both start at once."
+}

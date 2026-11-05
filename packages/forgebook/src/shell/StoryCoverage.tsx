@@ -18,6 +18,7 @@ import { groupedStories, type TreeStory } from "../storyTree.ts";
 import type { CheckState } from "./A11yTab.tsx";
 import { AUDIENCE_TEXTS } from "./audiencePage.ts";
 import { CodeText } from "./CodeText.tsx";
+import { useCatalogue } from "./catalogueContext.ts";
 import { type ExampleContext, StoryLink } from "./Example.tsx";
 import { framesOrigin } from "./framesOrigin.ts";
 import { a11yHint } from "./tabSummaries.ts";
@@ -167,6 +168,8 @@ export const StoryCoverage = ({
   onOpen
 }: StoryCoverageProps): ReactNode => {
   const { checks, checkAll } = usePageChecks(pageRef, queue, settled);
+  // a catalogue that checks no accessibility has no column for it, nor a check to run
+  const hasA11y = useCatalogue().a11y !== undefined;
   const ordered = groupedStories(
     stories,
     storyGroups.map((group) => group.id)
@@ -181,13 +184,17 @@ export const StoryCoverage = ({
         <p className="forgebook-coverage__summary">
           {AUDIENCE_TEXTS.coverageSummary(stories.length, played, untested)}
         </p>
-        <button type="button" className="forgebook-button" onClick={checkAll}>
-          {AUDIENCE_TEXTS.coverageCheckAll}
-        </button>
+        {hasA11y ? (
+          <button type="button" className="forgebook-button" onClick={checkAll}>
+            {AUDIENCE_TEXTS.coverageCheckAll}
+          </button>
+        ) : null}
       </div>
-      <p className="forgebook-coverage__progress" role="status">
-        {checks.size === 0 ? "" : AUDIENCE_TEXTS.coverageChecked(finished, stories.length)}
-      </p>
+      {hasA11y ? (
+        <p className="forgebook-coverage__progress" role="status">
+          {checks.size === 0 ? "" : AUDIENCE_TEXTS.coverageChecked(finished, stories.length)}
+        </p>
+      ) : null}
       <div className="forgebook-api">
         <table className="forgebook-api__table">
           <thead>
@@ -196,7 +203,7 @@ export const StoryCoverage = ({
               <th scope="col">{AUDIENCE_TEXTS.coverageGroup}</th>
               <th scope="col">{AUDIENCE_TEXTS.coveragePlay}</th>
               <th scope="col">{AUDIENCE_TEXTS.coverageTests}</th>
-              <th scope="col">{AUDIENCE_TEXTS.coverageA11y}</th>
+              {hasA11y ? <th scope="col">{AUDIENCE_TEXTS.coverageA11y}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -215,7 +222,7 @@ export const StoryCoverage = ({
                 <td>{story.group === undefined ? "" : groupLabel(storyGroups, story.group)}</td>
                 <td>{story.hasPlay ? AUDIENCE_TEXTS.coverageHasPlay : AUDIENCE_TEXTS.coverageNoPlay}</td>
                 <td>{isUntested(story) ? AUDIENCE_TEXTS.coverageUntested : AUDIENCE_TEXTS.coverageTested}</td>
-                <td>{checkText(checks.get(story.id))}</td>
+                {hasA11y ? <td>{checkText(checks.get(story.id))}</td> : null}
               </tr>
             ))}
           </tbody>
