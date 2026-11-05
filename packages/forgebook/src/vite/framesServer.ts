@@ -91,6 +91,20 @@ const isProxied = (proxy: Readonly<Record<string, unknown>> | undefined, url: st
   );
 
 /**
+ * A request's path as an address parser reads it, which is how the routes behind the guards read it: a guard that read
+ * `//x/__forgebook/api/stories` as written would pass what the route answers as `/__forgebook/api/stories`.
+ *
+ * @param url - the request's address, as it was sent.
+ */
+const parsedPath = (url: string): string => {
+  try {
+    return new URL(url, "http://parsed.invalid").pathname;
+  } catch {
+    return (url.split("?")[0] ?? url).split("#")[0] ?? "/";
+  }
+};
+
+/**
  * What the browser says of a request.
  *
  * @param request - the request.
@@ -99,7 +113,7 @@ const factsOf = (request: IncomingMessage): RequestFacts => {
   const url = request.url ?? "/";
   const queryAt = url.indexOf("?");
   return {
-    path: (queryAt === -1 ? url : url.slice(0, queryAt)).split("#")[0] ?? "/",
+    path: parsedPath(url),
     query: queryAt === -1 ? "" : (url.slice(queryAt).split("#")[0] ?? ""),
     site: headerOf(request, "sec-fetch-site"),
     mode: headerOf(request, "sec-fetch-mode"),
@@ -128,17 +142,24 @@ const isPublicFile = (publicDir: string, path: string): boolean => {
 };
 
 /**
- * Whether a module's code, as Vite served it, names an address: how a worker's file (`?worker_file`) is started.
+ * Whether a module the catalogue imports names an address in its code, as a whole string: how a worker's file
+ * (`?worker_file`) is started. Only an imported module counts, and only a whole string: an address asked for directly
+ * writes its own query into its module's code (its HMR context), and a story's script could plant any address there.
  *
  * @param modules - the graph's modules.
  * @param url - the address, as the graph reads it; its `t=` left out.
  */
 const isNamedInCode = (
-  modules: readonly { readonly transformResult: { readonly code: string } | null }[],
+  modules: readonly {
+    readonly importers: ReadonlySet<unknown>;
+    readonly transformResult: { readonly code: string } | null;
+  }[],
   url: string
 ): boolean => {
-  const named = url.replace(/[?&]t=\d+/, "");
-  return modules.some((module) => module.transformResult?.code.includes(named) === true);
+  const named = JSON.stringify(url.replace(/[?&]t=\d+/, ""));
+  return modules.some(
+    (module) => module.importers.size > 0 && module.transformResult?.code.includes(named) === true
+  );
 };
 
 /**
@@ -271,7 +292,9 @@ export const framesServing = (
       next();
       return;
     }
-    const answer = catalogueAnswer(factsOf(request), framedPages);
+    const answer = catalogueAnswer(factsOf(request), framedPages, (path) =>
+      isPublicFile(server.config.publicDir, path)
+    );
     if (answer === "refuse") {
       turnDown(response, 403);
       return;

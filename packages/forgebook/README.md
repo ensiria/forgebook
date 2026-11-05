@@ -126,7 +126,8 @@ stories: [
 A `!` glob is written from the same folder and with the same syntax as the others; one that names a folder
 (`!src/legacy`) leaves out every file in it. A file two globs list is listed once, its title made from the first one
 (when its meta writes none). A list of `!` globs alone lists nothing, and the catalogue refuses it. Adding a file a `!`
-glob leaves out, while the catalogue runs, changes nothing on the page.
+glob leaves out, while the catalogue runs, changes nothing on the page. A file Vite's `server.fs.deny` refuses stays out
+too, with a warning.
 
 ## What a catalogue gives you
 
@@ -1016,6 +1017,26 @@ keep it.
 An embed (`?embed`) and an MCP client's inline preview are pages of the catalogue's origin that frame the story on the
 frames' origin in turn, as the catalogue does: a page or a host that frames them names the catalogue's origin only (in
 its `frame-src`, in the preview's `frameDomains`).
+
+### What the dev server gives a client
+
+`forgebook dev` listens on localhost unless you pass `--host`, and on both of its ports it answers with these limits:
+
+- **Another site's page gets nothing it can read.** A request a browser marks as another site's (`Sec-Fetch-Site`), or
+  with a foreign `Origin`, is refused for every module, file and API. A link or a frame from elsewhere can open the
+  catalogue's page, the frame page, an inline preview and a file of the public folder, whose content that site cannot
+  read. Vite checks `Host`
+  first (`server.allowedHosts`, plain HTTP only), which stops a site that reaches `127.0.0.1` through its own domain.
+- **Only the files your project names are listed or read.** A catalogue's `stories` and `docs`, and the groups a module
+  of yours imports (`?forgebook-files`), are the only groups the server reads, whatever an address names. A query that
+  names one file (`?forgebook-code`, `?forgebook-markdown`) follows Vite's `server.fs`, as `?raw` does.
+- **`server.fs.deny` wins over your globs.** A file it refuses stays out of the catalogue, its search and "Used in", with
+  a warning. A file your globs name outside `server.fs.allow` is listed and served, as Vite serves any file a module of
+  the project imports.
+
+A command, an agent or `curl` sends no browser headers: `forgebook mcp`, `forgebook stories` and the agent API
+(`/__forgebook/api/`) work as usual, and anyone who can reach the port can use them. With `--host` that means your whole
+network, so use it only on one you trust.
 
 ## Your look in the shell
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is

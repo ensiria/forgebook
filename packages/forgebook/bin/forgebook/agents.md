@@ -12,7 +12,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - Every named export of a story file is a story; leave helpers and data out with the meta's `excludeStories`.
 - The catalogue lists the files its `stories` globs name in `forgebook.config.ts`; a glob that starts with `!` leaves
   files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not
-  list is outside the globs or left out by a `!` one: put it where they list it, or change the globs on purpose.
+  list is outside the globs, left out by a `!` one, or refused by Vite's `server.fs.deny` (the dev server warns): put it
+  where they list it, or change the globs on purpose.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
   the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the
