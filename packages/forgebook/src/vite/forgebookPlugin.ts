@@ -13,9 +13,10 @@
  * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`), and the written home with `?forgebook-home`. It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
  * `pkg:` URLs, which the library's style sheets use.
  *
- * A pattern's module watches its story files, so an edit renews it. Vite watches only its root for new files, and the
+ * A group's module watches its story files, so an edit renews it. Vite watches only its root for new files, and the
  * sources' story files live in other packages: `watch` names their folders, and a story file added or removed there
- * renews every pattern's module and reloads the page, so the sidebar lists it at once.
+ * renews the modules of the groups whose list it changes and reloads the page, so the sidebar lists it at once; one no
+ * group lists (a `!` pattern leaves it out) reloads nothing.
  *
  * @module
  */
@@ -63,6 +64,7 @@ import {
   docsModule,
   docsValue,
   FILES_PREFIX,
+  listingRenewals,
   patternModule,
   REACH_ID_PREFIX,
   reachModule,
@@ -192,8 +194,8 @@ const docsModuleOf = async (
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
     return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
   }
-  const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
-  return { code: docPagesModule(root, pattern, watch, isServing, plugins), moduleType: "js" };
+  const { root, patterns } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
+  return { code: docPagesModule(root, patterns, watch, isServing, plugins), moduleType: "js" };
 };
 
 /**
@@ -205,8 +207,11 @@ const docsModuleOf = async (
  * @returns the plugin, for the app's `plugins`.
  */
 export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin => {
-  /** The modules of the patterns, renewed when a story file is added or removed. */
-  const filesModules = new Set<string>();
+  /**
+   * The modules of the groups of story files, with the files each listed when served (none while it could not be
+   * made), renewed when a story file is added to or removed from what one lists.
+   */
+  const filesModules = new Map<string, ReadonlySet<string> | undefined>();
   // what each pattern's module was served with: an edit of a story file that changes its list reloads the pages
   const served = servedPatterns();
   /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
@@ -334,7 +339,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         : { code: "export default [];", moduleType: "js" };
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
-    filesModules.add(id);
+    filesModules.set(id, undefined);
     const lists = config?.lists ?? {};
     const hasUsage = offersUsedIn(lists);
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
@@ -346,6 +351,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       isTestRun ? undefined : extractor().warm,
       startTexts
     );
+    filesModules.set(id, new Set(files.map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
     served.keep(id, files);
     return { code: `${code}\n${FILES_MODULE_HOT}`, moduleType: "js" };
@@ -367,8 +373,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param file - the file.
    */
   const modulesListing = (file: string): readonly string[] | undefined => {
-    // the patterns' modules list the story files; the groups' "Used in" read them
-    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules, ...searchModules];
+    // the groups' modules list the story files, their "Used in" and search indexes read them
+    if (STORY_FILE.test(file))
+      return listingRenewals(filesModules, file, [...usageModules, ...searchModules]);
     return DOCS_PAGE_FILE.test(file) && docsModules.size > 0 ? [...docsModules] : undefined;
   };
   /**
@@ -514,7 +521,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
           .catch(next);
       });
       // folders outside the configuration's are watched only when named; a story file added or removed anywhere the
-      // server watches (its own folder, a story file it loaded) renews the lists either way
+      // server watches (its own folder, a story file it loaded) renews the lists that change either way
       const watched = [...(config?.watch ?? []), ...(options.watch ?? [])];
       if (watched.length > 0) server.watcher.add(watched);
       const refresh = (file: string): void => {

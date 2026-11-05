@@ -7,6 +7,8 @@
 import { CONFIG_MODULE, TOKENS_MODULE } from "./pages.ts";
 import { FILES_PREFIX } from "./pluginModules.ts";
 import {
+  DOCS_PAGES_SPECIFIER_PREFIX,
+  FILES_SPECIFIER_PREFIX,
   PAGES_SEARCH_PREFIX,
   REACH_PREFIX,
   SEARCH_PREFIX,
@@ -21,8 +23,8 @@ const FILES_QUERY = "?forgebook-files";
 /** The query that asks for the docs pages a pattern matches (`./docs/*.md?forgebook-docs-pages`). */
 const DOCS_PAGES_QUERY = "?forgebook-docs-pages";
 
-/** The id of a pattern's docs pages: virtual, with the declaring module's folder and the pattern after it. */
-export const DOCS_PAGES_PREFIX = "\0forgebook-docs-pages:";
+/** The id of a group of docs pages: virtual, with the declaring module's folder and the patterns after it. */
+export const DOCS_PAGES_PREFIX = `\0${DOCS_PAGES_SPECIFIER_PREFIX}`;
 
 /**
  * The id of a `?forgebook-files` module: its prefix, then its group (`storyFilesGroupText`), which holds no `..`.
@@ -31,7 +33,7 @@ export const DOCS_PAGES_PREFIX = "\0forgebook-docs-pages:";
  * @param pattern - the pattern as the import writes it.
  */
 const filesId = (folder: string, pattern: string): string =>
-  `${FILES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
+  `${FILES_PREFIX}${storyFilesGroupText(folder, [pattern])}`;
 
 /**
  * The id of a pattern's module, when an import asks for one: its story files, or its docs pages.
@@ -43,11 +45,16 @@ export const patternId = (source: string, folder: string): string | null => {
   if (source.endsWith(FILES_QUERY)) return filesId(folder, source.slice(0, -FILES_QUERY.length));
   if (!source.endsWith(DOCS_PAGES_QUERY)) return null;
   const pattern = source.slice(0, -DOCS_PAGES_QUERY.length);
-  return `${DOCS_PAGES_PREFIX}${storyFilesGroupText(folder, pattern)}`;
+  return `${DOCS_PAGES_PREFIX}${storyFilesGroupText(folder, [pattern])}`;
 };
 
-/** The specifiers' prefixes of a group's virtual modules: its "Used in", its reach, its search indexes, its texts. */
+/**
+ * The specifiers' prefixes of a group's virtual modules: the group named by its patterns (story files or docs pages),
+ * its "Used in", its reach, its search indexes, its texts.
+ */
 const VIRTUAL_PREFIXES: readonly string[] = [
+  FILES_SPECIFIER_PREFIX,
+  DOCS_PAGES_SPECIFIER_PREFIX,
   USAGE_PREFIX,
   REACH_PREFIX,
   SEARCH_PREFIX,

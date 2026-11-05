@@ -169,8 +169,8 @@ export type GroupTexts = {
  * @param group - the group (`storyFilesGroupText`).
  */
 const groupKey = (group: string): string => {
-  const { root, pattern } = storyFilesGroupOf(group);
-  return storyFilesGroupText(VITE_PATHS.normalize(root), pattern);
+  const { root, patterns } = storyFilesGroupOf(group);
+  return storyFilesGroupText(VITE_PATHS.normalize(root), patterns);
 };
 
 /** A group's texts being read, with the files the reading watched. */
@@ -200,8 +200,8 @@ export const groupTexts = (): GroupTexts => {
     const reading = started.get(key);
     started.delete(key);
     if (reading === undefined) {
-      const { root, pattern } = storyFilesGroupOf(group);
-      return textsModuleCode(await read(indexedStoryFiles(root, pattern, sources.watch), sources), emit);
+      const { root, patterns } = storyFilesGroupOf(group);
+      return textsModuleCode(await read(indexedStoryFiles(root, patterns, sources.watch), sources), emit);
     }
     const texts = await reading.texts;
     for (const file of reading.watched) sources.watch(file);

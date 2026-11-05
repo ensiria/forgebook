@@ -106,8 +106,10 @@ describe("the generated pages", () => {
       `import { source as source0 } from ${codeLiteral("/catalogue/.forgebook-stories.ts")};`
     );
     const source = storiesSourceModule(docsOnly);
-    expect(source).toContain(`import docs0 from ${codeLiteral("./docs/**/*.md?forgebook-docs-pages")};`);
-    expect(source).toContain("  docs: [docs0],");
+    expect(source).toContain(
+      `import docs from ${codeLiteral("virtual:forgebook-docs-pages:/catalogue::0::docs/**/*.md")};`
+    );
+    expect(source).toContain("  docs: [docs],");
     expect(storiesSourceModule(CONFIG)).not.toContain("docs:");
   });
 
@@ -189,8 +191,26 @@ describe("the generated pages", () => {
       'export default {"title":"Acme \\u003cUI\\u003e","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}],"lists":{},"frames":{"kind":"ports","catalogue":5173,"frames":5174}};'
     );
     const source = storiesSourceModule(CONFIG);
-    expect(source).toContain(`import files0 from ${codeLiteral("./src/**/*.stories.tsx?forgebook-files")};`);
+    expect(source).toContain(
+      `import files from ${codeLiteral("virtual:forgebook-files:/catalogue::0::src/**/*.stories.tsx")};`
+    );
+    expect(source).toContain("  files: [files],");
     expect(source).toContain(`name: ${codeLiteral("Acme <UI>")},`);
+  });
+
+  it("imports the own stories as one group, so a `!` pattern leaves out what every other pattern lists", () => {
+    const stories = [
+      "src/**/*.stories.tsx",
+      "!src/**/legacy/*",
+      "../kit/*.stories.tsx",
+      "!../kit/Old.stories.tsx"
+    ];
+    const source = storiesSourceModule({ ...CONFIG, stories });
+    expect(source.match(/^import /gm)).toHaveLength(1);
+    expect(source).toContain(
+      `import files from ${codeLiteral("virtual:forgebook-files:/catalogue::0::src/**/*.stories.tsx::!0::src/**/legacy/*::1::kit/*.stories.tsx::!1::kit/Old.stories.tsx")};`
+    );
+    expect(storiesSourceModule({ ...CONFIG, stories: [] })).toContain("  files: [],");
   });
 });
 

@@ -104,6 +104,7 @@ export const scannedEntries = (
       match[1] === undefined ? [] : [VITE_PATHS.join(VITE_PATHS.dirname(file), match[1])]
     );
   });
-  // the previews too: what they import loads with the first story, and found then it reloads the page
+  // the previews too: what they import loads with the first story, and found then it reloads the page; the project's
+  // `!` patterns stay as they are, which Vite's scanner reads as fast-glob does, from the same folder
   return [...config.stories, ...fromSources, ...config.previews];
 };
