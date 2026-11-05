@@ -281,6 +281,7 @@ const PropsBlock = ({
           docs={docs.value}
           isLogic={isLogicComponent(location.component)}
           componentGroups={location.component.propGroups}
+          requiredFirst={location.component.requiredFirst}
         />
       ) : null}
     </div>

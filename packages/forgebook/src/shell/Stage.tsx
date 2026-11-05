@@ -405,8 +405,7 @@ export const Stage = ({
   const tabs = dockTabs({
     docs,
     code,
-    exportName: story.exportName,
-    isLogic: story.isLogic,
+    story,
     componentName: component.name,
     argTypes: panel.argTypes,
     controls: panel.controls,

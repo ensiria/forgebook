@@ -20,8 +20,9 @@ export default {
   alsoIn: ["Forms/Fields"],
   related: ["Foundations/Page"],
   args: { options: ["weekly", "monthly"], value: "weekly" },
-  // its texts listed before its behaviour, though its props name Behaviour first
-  parameters: { propGroups: ["Texts"] }
+  // its texts listed before its behaviour, though its props name Behaviour first; its required props in a section of
+  // their own, before every group
+  parameters: { propGroups: ["Texts"], requiredFirst: "section" }
 } satisfies Meta<typeof Select>;
 
 /** The default select. */
@@ -51,10 +52,13 @@ export const InRow: Story<typeof Select> = {
   parameters: { group: "in-context", main: true }
 };
 
-/** A hint named by its text key: the story shows it in the chosen language, the panel shows it with its key. */
+/**
+ * A hint named by its text key: the story shows it in the chosen language, the panel shows it with its key. Its Props
+ * tab lists the required props first in each group, over the meta's section.
+ */
 export const Hinted: Story<typeof Select> = {
   args: { hint: storyText("select.hint") },
-  parameters: { group: "states" }
+  parameters: { group: "states", requiredFirst: "in-groups" }
 };
 
 /** A list mounted beside the story's root, as a popover's portal is: the measuring tools reach it too. */

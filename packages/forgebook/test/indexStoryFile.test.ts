@@ -336,6 +336,43 @@ describe("indexStoryFile", () => {
     }
   });
 
+  it("reads where the meta and a story put the required props, and refuses them written by code or wrongly", () => {
+    const text = `export default { title: "A/B", parameters: { requiredFirst: "section" } };
+      export const Overview = {};
+      export const Grouped = { parameters: { requiredFirst: "in-groups" } };
+      export const AsWritten = { parameters: { requiredFirst: false } };`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      requiredFirst: "section",
+      stories: [
+        { exportName: "Overview" },
+        { exportName: "Grouped", requiredFirst: "in-groups" },
+        { exportName: "AsWritten", requiredFirst: false }
+      ]
+    });
+    // the index alone reads it, so a value written by code would be lost
+    const storyWriting = (written: string): unknown =>
+      indexStoryFile(
+        "A.stories.tsx",
+        `export default { title: "A/B" };\nexport const X = { parameters: { requiredFirst: ${written} } };`
+      );
+    for (const written of ['"first"', "true", "LAYOUT", "`section`"]) {
+      expect(storyWriting(written), written).toBe(
+        'A.stories.tsx: story X: `parameters.requiredFirst` must be written as a plain `"in-groups"`, `"section"` or `false`'
+      );
+    }
+    // a type's wrapper is no code
+    expect(storyWriting('"section" as const')).toEqual({
+      title: "A/B",
+      stories: [{ exportName: "X", requiredFirst: "section" }]
+    });
+    expect(
+      indexStoryFile("A.stories.tsx", 'export default { title: "A/B", parameters: { requiredFirst: 1 } };')
+    ).toBe(
+      'A.stories.tsx: the meta\'s `parameters.requiredFirst` must be written as a plain `"in-groups"`, `"section"` or `false`'
+    );
+  });
+
   it("refuses other places or related components written plainly but wrongly, and leaves code to the frame", () => {
     expect(indexStoryFile("A.stories.tsx", 'export default { title: "A/B", alsoIn: [1] };')).toBe(
       "A.stories.tsx: the meta's `alsoIn` must be written as a list of plain strings"

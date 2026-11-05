@@ -102,8 +102,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
   (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`. A source gives each language's table, or a
   loader of it (`texts: { en: () => import("./locales/en.json") }`), which keeps the texts out of the catalogue's page.
-- Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic` and `design.figma` as plain values: the catalogue reads them without running
-  the file.
+- Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic`, `requiredFirst` and `design.figma` as plain
+  values: the catalogue reads them without running the file.
 - In a Next.js project (`framework: nextjs()`), stories take their types from `@forgebook/nextjs`. A story says where
   its component is with `parameters.nextjs.navigation` (`pathname`, `query`, `params`; `router` for the Pages Router),
   and what its server code reads with `nextjs.cookies`, `headers` and `draftMode`. A link or a router call moves the
@@ -117,6 +117,10 @@ in JSON with `--json`, and every answer about a story carries the links that ope
 - A component with many props names their groups in its TSDoc (`@group Paging`): `forgebook story` returns each
   prop's `group`, and a prop typed with a documented object (`texts?: FinderTexts`) its `members`, each with its type,
   default and TSDoc: read them to know every text a component takes before passing one.
+- `forgebook story --json` and `get_story` give `requiredProps` at the top, the names of the component's props every
+  use must set (events among them; a subcomponent's say it with their own `isRequired`); `docs.props` stays in the
+  order of the source, whatever the catalogue's `requiredFirst` shows a person.
+  Set every name in `requiredProps` when you use the component or write its story.
 
 ### Docs pages
 
@@ -154,7 +158,7 @@ leave it out.
 | `npx forgebook search onValueChange --json` | The whole catalogue by its text: which component has a prop, where the docs say something, with the address of the exact heading or prop |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` or `badge.component.ts` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken |
-| `npx forgebook story <id> --json` | One story: its args, its component's props, the components whose stories use it, its design |
+| `npx forgebook story <id> --json` | One story: the props every use must set (`requiredProps`), its args, its component's props, the components whose stories use it, its design |
 | `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |
 | `npx forgebook page <id> --json` | One docs page: its Markdown, its headings, the address that opens it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |

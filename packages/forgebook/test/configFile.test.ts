@@ -34,6 +34,24 @@ describe("resolveConfig", () => {
     expect(resolveConfig({ ...BASE, audience: "tester" }, "/catalogue").lists.audience).toBe("tester");
   });
 
+  it("refuses a place for the required props that is none, and takes the catalogue's over a preset's", () => {
+    // a configuration is code: its types are not a promise
+    const loose: ForgebookConfig = { ...BASE };
+    Reflect.set(loose, "requiredFirst", "top");
+    expect(() => resolveConfig(loose, "/catalogue")).toThrow(
+      `${resolve("/catalogue", "forgebook.config")}: requiredFirst is "top", none of "in-groups", "section" and false`
+    );
+    const resolved = resolveConfig(
+      { ...BASE, requiredFirst: false, presets: [{ name: "a", requiredFirst: "section" }] },
+      "/catalogue"
+    );
+    expect(resolved.lists.requiredFirst).toBe(false);
+    expect(
+      resolveConfig({ ...BASE, presets: [{ name: "a", requiredFirst: "section" }] }, "/catalogue").lists
+        .requiredFirst
+    ).toBe("section");
+  });
+
   it("merges the presets under the configuration: a switch or language of the same id is replaced in its place", () => {
     const dark = { ...themeSwitch(), default: "dark" };
     const resolved = resolveConfig(

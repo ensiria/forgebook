@@ -13,7 +13,7 @@
  *
  * @module
  */
-import type { StoryDeviceSetting, StoryGroup } from "@forgebook/story-format/csf";
+import type { RequiredFirst, StoryDeviceSetting, StoryGroup } from "@forgebook/story-format/csf";
 import type {
   FigmaLink,
   StoryBackground,
@@ -63,6 +63,11 @@ export type TreeStory = {
   readonly device: StoryDeviceSetting | undefined;
   /** Its design (`parameters.design.figma`): its own, else the meta's; none by default, nor when its own was refused. */
   readonly design: FigmaLink | undefined;
+  /**
+   * Where its Props tab lists the required props (`parameters.requiredFirst`): its own, else its file's meta's; none
+   * when neither sets one, for the catalogue's.
+   */
+  readonly requiredFirst: RequiredFirst | undefined;
   /** Its tags, the meta's and its own (`!dev` keeps it out of the lists, `!test` out of the generated tests). */
   readonly tags: readonly string[];
   /** Whether a `play` function acts on it. */
@@ -107,6 +112,11 @@ export type TreeComponent = {
   readonly design: FigmaLink | undefined;
   /** The prop groups its meta lists first (`parameters.propGroups`), in their order; empty when none. */
   readonly propGroups: readonly string[];
+  /**
+   * Where its page lists the required props (its first file's meta's `parameters.requiredFirst`); none when it sets
+   * none, for the catalogue's.
+   */
+  readonly requiredFirst: RequiredFirst | undefined;
 };
 
 /** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`). */
@@ -364,6 +374,7 @@ const treeStory = (
       ? undefined
       : { ...entry.device, ...story.device },
   design,
+  requiredFirst: story.requiredFirst ?? entry.requiredFirst,
   tags: story.tags ?? [],
   hasPlay: story.hasPlay === true
 });
@@ -447,7 +458,8 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       keywords: metaList(component, "keywords"),
       design: componentDesign(component),
       // its first file's, as its docs are
-      propGroups: component.files[0]?.entry.propGroups ?? []
+      propGroups: component.files[0]?.entry.propGroups ?? [],
+      requiredFirst: component.files[0]?.entry.requiredFirst
     });
   }
   placeAliases(source, placed, families, problems);

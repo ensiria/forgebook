@@ -139,6 +139,8 @@ Badge's page shows its stories, each in its own frame, and an API table read fro
 - **Props in groups**: a component with many props lists them under the groups their TSDoc names (`@group Paging`),
   and a prop typed with a documented object (`texts?: FinderTexts`) unfolds to list its members
   ([below](#props-in-groups)).
+- **Required props first**: what every use must set comes first, in each group or in a section of its own, and a
+  reader turns the ordering off with a switch ([below](#required-props-first)).
 - **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
   Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
   `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
@@ -408,6 +410,34 @@ export type FinderProps = {
   level, and only once unfolded, so large text types cost the page nothing until read.
 - With `eslint-plugin-tsdoc`, declare the tag in your `tsdoc.json`:
   `{ "tagName": "@group", "syntaxKind": "block", "allowMultiple": false }`.
+
+## Required props first
+
+The API reference and the Props tab list a component's required props before the others, so a reader sees at once
+what every use must set. Where they go is `requiredFirst`:
+
+```ts
+// forgebook.config.ts: every component
+export default defineConfig({ requiredFirst: "section" });
+
+// a component's meta, for its page and its stories; or one story, for its own Props tab
+export default { component: Finder, parameters: { requiredFirst: false } } satisfies Meta<typeof Finder>;
+```
+
+- `"in-groups"`, the default: the required props first inside each group, and among the props that name no group and
+  the events; the others keep the order of the source. In the Props tab, first among each kind of control.
+- `"section"`: one "Required" section before every group, all the required props in it, each naming its group (an
+  event says "Event"; the Props tab, which lists no events, leaves them to the Events tab); then the groups with the
+  others. A component whose props name no group has nothing to section, so it reads as
+  `"in-groups"`.
+- `false`: the order of the source.
+- The narrowest wins: a story's over its meta's, a meta's over the configuration's. Write it plainly (the index reads
+  it); anything else is reported where it is written.
+- A reader's "Required first" switch, in the header of both tables, turns the ordering on or off for the whole
+  catalogue, kept in the browser: off, the order of the source; on, the developer's layout (`"in-groups"` where the
+  developer chose `false` everywhere). The switch never picks between the two layouts.
+- Agents get the props in the order of the source and the names of the required ones at the top of
+  `forgebook story --json` and `get_story` (`requiredProps`): the setting shapes the pages only.
 
 ## Docs pages
 
