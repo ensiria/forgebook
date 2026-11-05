@@ -37,7 +37,7 @@ import { currentCloseWatch } from "./closeWatch.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, NO_DOCS_EXTRACTOR } from "./docsExtractor.ts";
-import { devServerAccess } from "./fileAccess.ts";
+import { devServerAccess, VITEST_HOOKS } from "./fileAccess.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
@@ -192,7 +192,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   /** The groups' search indexes: any edit may change what a component's docs say. */
   const searchModules = new Set<string>();
   /** What a client may read of a dev server. */
-  const access = devServerAccess(invalidateEverywhere);
+  const access = devServerAccess();
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
   /** Where the frames run: the dev server's second port once it listens, the configuration's choice in a build. */
@@ -460,7 +460,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
     },
     configureServer: (server: ViteDevServer): void => {
-      access.serve(server);
+      access.serve(server, config === undefined ? undefined : pageModulePath(config.dir, AGENT_SOURCES_FILE));
+      server.middlewares.use((request, _response, next): void => {
+        access.settle(request.url ?? "/").then(() => next(), next);
+      });
       // no person waits for a page in a test run
       watching.serve(isTestRun ? undefined : server);
       server.httpServer?.on("close", (): void => void docs?.close());
@@ -530,11 +533,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       await docs?.close();
     },
     ...storyFileHotHooks(isRedrawing, served.changedBy, watching),
+    ...VITEST_HOOKS,
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = await pagesModule(id);
       if (generated !== undefined) return generated;
-      // an answer, not an error: an error would raise Vite's overlay on every reader's open page
-      if (access.isRefused(id)) return { code: "export default null;", moduleType: "js" };
+      const refusal = access.refusal(id);
+      if (refusal !== undefined) return refusal;
       // in Vite's form, the text Vite's module graph knows a file by: a Node path on Windows (`C:\app\x.md`) is another
       const watch = (file: string): void => this.addWatchFile(VITE_PATHS.normalize(file));
       const resolveImport = async (specifier: string, importer: string): Promise<string | undefined> => {
