@@ -6,10 +6,10 @@
  * Forgebook's configuration has no key for Vite, so the additions go through the framework's plugins. Its stories are
  * JSX in `.js` files, which only its Babel preset compiles, and they import `.mdx` pages Forgebook does not read, which
  * are answered here with an empty page. Its stories are the files `.storybook/main.ts` globs: `*.stories.*`, and
- * `*-story.*` (the experimental Pagination's). That file also leaves out the stories of the components moved from
- * ibm-products (`productMigratedStoryGlobs`), which only its next major's Storybook shows; a pattern of Forgebook's
- * leaves nothing out, so they are listed here, and the definition's `expected` counts them: 657 stories where
- * Storybook lists 509, a larger index for Forgebook's timings alone.
+ * `*-story.*` (the experimental Pagination's), less the stories of the components moved from ibm-products, which only
+ * its next major's Storybook shows: that file leaves them out with fast-glob's `ignore` and Carbon's own list
+ * (`productMigratedStoryGlobs`), read here from the same file as `!` patterns, so the index is Storybook's own: 509
+ * stories. The list's MDX pages match none of Forgebook's files.
  *
  * @module
  */
@@ -17,6 +17,9 @@
 import { react as forgebookReact } from "@forgebook/react/vite";
 import babel from "@rolldown/plugin-babel";
 import { defineConfig } from "forgebook";
+
+// beside `.storybook` in the library's folder, as this file is: Carbon's list of what its Storybook leaves out
+import { productMigratedStoryGlobs } from "../product-migrated-components.mjs";
 
 // its stories are JSX in `.js` files, which React's plugin reads only when told to
 const framework = forgebookReact({ include: /\.[jt]sx?$/ });
@@ -54,7 +57,8 @@ export default defineConfig({
     "../src/**/*.stories.js",
     "../src/**/*.stories.tsx",
     "../src/**/*-story.js",
-    "../src/**/*-story.tsx"
+    "../src/**/*-story.tsx",
+    ...productMigratedStoryGlobs.map((glob) => `!${glob}`)
   ],
   preview: "../.storybook/preview.js"
 });
