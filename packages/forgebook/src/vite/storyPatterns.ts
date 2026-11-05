@@ -75,6 +75,18 @@ const isLeftOut = (key: string, left: ReadonlySet<string>): boolean => {
   return segments.some((_segment, at) => at > 0 && left.has(segments.slice(0, at + 1).join("/")));
 };
 
+/**
+ * A pattern without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them. A loop,
+ * not a regular expression, whose backtracking a long run of slashes would make quadratic.
+ *
+ * @param pattern - the pattern.
+ */
+const withoutTrailingSlashes = (pattern: string): string => {
+  let end = pattern.length;
+  while (end > 0 && pattern[end - 1] === "/") end -= 1;
+  return pattern.slice(0, end);
+};
+
 /** A file a list of patterns lists, with the pattern that lists it. */
 export type ListedFile = {
   /** Its path relative to the patterns' folder, starting with `./` or `../`, with forward slashes. */
@@ -111,8 +123,7 @@ export const listedFiles = (
   const left = new Set(
     patterns
       .filter((each) => isNegated(each) && isWalkedFor(each))
-      // a folder's trailing slash dropped: the glob gives the folder without it
-      .flatMap((pattern) => keysOf(pattern.slice(NEGATION.length).replace(/\/+$/, "")))
+      .flatMap((pattern) => keysOf(withoutTrailingSlashes(pattern.slice(NEGATION.length))))
   );
   const listed = new Map<string, string>();
   for (const pattern of listing)
