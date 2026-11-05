@@ -1,0 +1,26 @@
+{
+  "machine": "Apple M3 Ultra, 28 CPU, 96,0 GB, macOS (darwin-arm64)",
+  "calibration": {
+    "prepareMs": 28043,
+    "measureMs": 16044,
+    "buildMs": 725
+  },
+  "items": {
+    "generated": {
+      "prepareMs": 42581,
+      "measureMs": 472831
+    },
+    "primer": {
+      "prepareMs": 53296,
+      "measureMs": 939530
+    },
+    "carbon": {
+      "prepareMs": 138847,
+      "measureMs": 1320910
+    },
+    "fluentui": {
+      "prepareMs": 78204,
+      "measureMs": 2151375
+    }
+  }
+}

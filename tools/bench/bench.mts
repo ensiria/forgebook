@@ -8,7 +8,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
@@ -20,6 +19,7 @@ import { stopLeftovers } from "./leftovers.ts";
 import { stopAllServers } from "./measure.ts";
 import { type BenchFolders, packForgebook, publishedForgebook } from "./prepare.ts";
 import { type RealRun, realTargets } from "./prepareRun.ts";
+import { execProgram, TIME_LIMITS } from "./programs.ts";
 import { corpusPaths, DEFINITION_FILE, definitionFolder, parseCorpus } from "./realCorpus.ts";
 import { parseReport, reportMarkdown, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
@@ -130,8 +130,9 @@ const forgebookUnderTest = async (
 ): Promise<{ readonly packages: Readonly<Record<string, string>>; readonly label: string }> => {
   if (version !== undefined) return { packages: publishedForgebook(version), label: version };
   const packages = await packForgebook(folders, io);
-  const { stdout: commit } = await exec("git", ["rev-parse", "--short", "HEAD"], { cwd: REPOSITORY, io });
-  const { stdout: changes } = await exec("git", ["status", "--porcelain"], { cwd: REPOSITORY, io });
+  const git = { cwd: REPOSITORY, io, timeoutMs: TIME_LIMITS.query };
+  const { stdout: commit } = await execProgram("git", ["rev-parse", "--short", "HEAD"], git);
+  const { stdout: changes } = await execProgram("git", ["status", "--porcelain"], git);
   // a published number names a commit: what makes it not one is said, or nobody can tell why
   if (changes.trim() !== "")
     warn(`the checkout has changes, so the report reads -dirty:\n${changes.trimEnd()}`);
@@ -248,14 +249,15 @@ await defineScript({
     mkdirSync(work, { recursive: true });
     const folders = { repository: REPOSITORY, work };
     const version = options["forgebook-version"];
+    const write = statusWriter(options.status, Date.now);
     log.info(version === undefined ? "Packing this checkout's Forgebook" : `Measuring Forgebook ${version}`);
+    if (version === undefined) write({ state: "working", activity: "pack", tool: "forgebook" });
     const { packages: forgebookPackages, label: forgebookLabel } = await forgebookUnderTest(
       version,
       folders,
       io,
       (message) => log.warn(message)
     );
-    const write = statusWriter(options.status, Date.now);
     // also when the run dies: a reader must not wait for a step that will not come
     const removeEnd = onExit(() => write({ state: "finished", warnings: 0 }));
     // whatever happens, an interruption included: a tool's daemon left running would weigh on every later run
@@ -288,6 +290,11 @@ await defineScript({
         onStep: (step) => {
           write(step);
           log.info(`${step.tool} · ${step.metric} · ${step.run}/${step.runs}`);
+        },
+        onActivity: (activity) => {
+          write(activity);
+          const count = activity.of === undefined ? "" : ` · ${activity.count ?? 0}/${activity.of}`;
+          log.info(`${activity.tool ?? "library"} · ${activity.activity}${count}`);
         }
       });
     } finally {
