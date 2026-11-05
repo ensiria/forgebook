@@ -1,3 +1,11 @@
+## 0.2.1 (2026-11-05)
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.1
+- Updated forgebook to 0.3.0
+- Updated @forgebook/testing to 0.2.1
+
 ## 0.2.0 (2026-11-04)
 
 ### 🚀 Features

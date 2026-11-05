@@ -1,3 +1,13 @@
+## 0.2.1 (2026-11-05)
+
+### 🚀 Features
+
+- **story-format:** a requiredFirst parameter and its place in the index ([06888b2](https://github.com/ensiria/forgebook/commit/06888b2))
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.0 (2026-11-04)
 
 ### 🚀 Features

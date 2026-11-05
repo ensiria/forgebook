@@ -1,3 +1,37 @@
+## 0.3.0 (2026-11-05)
+
+### 🚀 Features
+
+- **forgebook:** let a catalogue turn off its accessibility check and component docs ([62d841b](https://github.com/ensiria/forgebook/commit/62d841b))
+- ⚠️  **forgebook:** leave story files out with ! patterns ([0c2aad6](https://github.com/ensiria/forgebook/commit/0c2aad6))
+- **forgebook:** list a component's required props first ([f6ab928](https://github.com/ensiria/forgebook/commit/f6ab928))
+
+### 🩹 Fixes
+
+- **forgebook:** judge a listed file by its real path ([45122a6](https://github.com/ensiria/forgebook/commit/45122a6))
+- **forgebook:** give a tapped field its focus and caret under Touch ([48b16ba](https://github.com/ensiria/forgebook/commit/48b16ba))
+- **forgebook:** stop redrawing a story at every height report ([8359fb7](https://github.com/ensiria/forgebook/commit/8359fb7))
+- **forgebook:** read only what the project names on a dev server ([6490037](https://github.com/ensiria/forgebook/commit/6490037))
+- **forgebook:** drop a pattern's trailing slashes without a regular expression ([4579b93](https://github.com/ensiria/forgebook/commit/4579b93))
+- **shell:** keep every page within a 360 px window ([01548df](https://github.com/ensiria/forgebook/commit/01548df))
+- **sveltekit:** answer a server load's fetch with the story's mocks ([8509daf](https://github.com/ensiria/forgebook/commit/8509daf))
+
+### ⚠️  Breaking Changes
+
+- **forgebook:** leave story files out with ! patterns  ([0c2aad6](https://github.com/ensiria/forgebook/commit/0c2aad6))
+  forgebook/vite/story-files-module takes a group's patterns as
+  a list: storyFilesGroupText, indexedStoryFiles, storyFilesModule and
+  storyFilesCode take `readonly string[]`, StoryFilesGroup has `patterns` in
+  place of `pattern`, and IndexedStoryFile names the `pattern` that lists it.
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.1
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.0 (2026-11-04)
 
 ### 🚀 Features

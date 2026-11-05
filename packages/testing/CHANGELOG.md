@@ -1,3 +1,28 @@
+## 0.2.1 (2026-11-05)
+
+### 🚀 Features
+
+- **forgebook:** let a catalogue turn off its accessibility check and component docs ([62d841b](https://github.com/ensiria/forgebook/commit/62d841b))
+- ⚠️  **forgebook:** leave story files out with ! patterns ([0c2aad6](https://github.com/ensiria/forgebook/commit/0c2aad6))
+- **forgebook:** list a component's required props first ([f6ab928](https://github.com/ensiria/forgebook/commit/f6ab928))
+
+### ⚠️  Breaking Changes
+
+- **forgebook:** leave story files out with ! patterns  ([0c2aad6](https://github.com/ensiria/forgebook/commit/0c2aad6))
+  forgebook/vite/story-files-module takes a group's patterns as
+  a list: storyFilesGroupText, indexedStoryFiles, storyFilesModule and
+  storyFilesCode take `readonly string[]`, StoryFilesGroup has `patterns` in
+  place of `pattern`, and IndexedStoryFile names the `pattern` that lists it.
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.1
+- Updated forgebook to 0.3.0
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.0 (2026-11-04)
 
 ### 🚀 Features
