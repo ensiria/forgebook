@@ -6,11 +6,13 @@
  * @module
  */
 import { nextjs } from "@forgebook/nextjs/vite";
+import { msw } from "@forgebook/plugin-msw";
 import { defineConfig } from "forgebook";
 
 export default defineConfig({
   framework: nextjs({ googleFonts: "none" }),
   title: "Harbour",
+  plugins: [msw()],
   // the drafts' stories are left out, whatever pattern lists them
   stories: ["components/**/*.stories.tsx", "!components/drafts/**"]
 });

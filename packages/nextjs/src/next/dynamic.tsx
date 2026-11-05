@@ -5,8 +5,9 @@
  * Next.js's own `dynamic` is shaped by its compiler (a module id written into each call); in Vite a dynamic import is
  * already split, so `React.lazy` does the work. Without a `loading` component the story's own boundary waits for the
  * module, and the story counts as drawn only once it came (`nextFrameRenderer.tsx`), so a test or a screenshot never catches
- * the empty moment; with one, the loading state shows first, as in the app. `ssr: false` changes nothing: a story is
- * drawn in the browser.
+ * the empty moment; with one, the loading state shows first, as in the app. `ssr: false` changes nothing in a frame,
+ * where a story is drawn in the browser; a server render (the generated tests) leaves the component out, as Next.js's
+ * server does, so a module that needs a browser never loads there.
  *
  * @module
  */
@@ -34,7 +35,7 @@ export type DynamicLoadingProps = {
 export type DynamicOptions<TProps> = {
   /** What is drawn while the component loads. */
   readonly loading?: (props: DynamicLoadingProps) => ReactNode;
-  /** Whether the server renders it: no effect in a story. */
+  /** Whether the server renders it: no effect in a frame; `false` leaves it out of a server render. */
   readonly ssr?: boolean;
   /** The loader, when the options are the only argument. */
   readonly loader?: Loader<TProps>;
@@ -65,14 +66,17 @@ const dynamic = <TProps extends object>(
   });
   const { loading } = settings;
   // biome-ignore lint/correctness/noComponentHookFactories: next/dynamic's API makes a component per call, which the app calls once, at the top of its module
-  const Dynamic = (props: TProps): ReactNode =>
-    loading === undefined ? (
+  const Dynamic = (props: TProps): ReactNode => {
+    const shown = loading?.({ error: null, isLoading: true, pastDelay: true, timedOut: false });
+    if (settings.ssr === false && typeof window === "undefined") return shown;
+    return loading === undefined ? (
       <Lazy {...props} />
     ) : (
-      <Suspense fallback={loading({ error: null, isLoading: true, pastDelay: true, timedOut: false })}>
+      <Suspense fallback={shown}>
         <Lazy {...props} />
       </Suspense>
     );
+  };
   return Dynamic;
 };
 
