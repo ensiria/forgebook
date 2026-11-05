@@ -1,3 +1,9 @@
+## 0.2.2 (2026-11-05)
+
+### 🧱 Updated Dependencies
+
+- Updated forgebook to 0.3.1
+
 ## 0.2.1 (2026-11-05)
 
 ### 🧱 Updated Dependencies

@@ -1,3 +1,17 @@
+## 0.3.1 (2026-11-05)
+
+### 🩹 Fixes
+
+- **forgebook:** answer a client before the project's modules are read ([275bbb5](https://github.com/ensiria/forgebook/commit/275bbb5))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.2
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.3.0 (2026-11-05)
 
 ### 🚀 Features

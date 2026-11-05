@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/angular",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Forgebook for Angular and Analog: the story types and helpers, the renderer the frame mounts a story with, and the adapter that compiles components through Analog's Vite plugin and reads their inputs, outputs and projected content.",
   "license": "MIT",
   "repository": {
