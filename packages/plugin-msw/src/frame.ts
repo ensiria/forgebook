@@ -10,6 +10,7 @@ import {
   type PluginFrameHost,
   type PluginPrepareContext
 } from "forgebook/plugin";
+import { mockHandlersOf } from "forgebook/story-mocks";
 
 import {
   isStoryRequest,
@@ -18,7 +19,7 @@ import {
   shownUrl,
   withRequest
 } from "./networkReport.ts";
-import { handlerLabel, handlersOf, type MockTools, type StoryMocks, startStoryMocks } from "./storyMocks.ts";
+import { handlerLabel, type MockTools, type StoryMocks, startStoryMocks } from "./storyMocks.ts";
 
 /** MSW's browser module. */
 type MswBrowser = typeof import("msw/browser");
@@ -84,7 +85,7 @@ export const frame = definePluginFrame(({ report }: PluginFrameHost): PluginFram
     });
   return {
     prepare: async ({ parameters }: PluginPrepareContext): Promise<undefined> => {
-      const handlers = handlersOf(parameters).filter(isHandler);
+      const handlers = mockHandlersOf(parameters).filter(isHandler);
       if (mocks !== undefined) {
         const running = await mocks;
         if (isSameHandlers(shown, handlers)) return undefined;

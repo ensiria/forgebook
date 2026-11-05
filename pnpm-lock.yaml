@@ -269,9 +269,18 @@ importers:
       '@forgebook/nextjs':
         specifier: workspace:*
         version: link:../../packages/nextjs
+      '@forgebook/plugin-msw':
+        specifier: workspace:*
+        version: link:../../packages/plugin-msw
       '@forgebook/react':
         specifier: workspace:*
         version: link:../../packages/react
+      '@forgebook/story-format':
+        specifier: workspace:*
+        version: link:../../packages/story-format
+      '@forgebook/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@forgebook/typescript-config':
         specifier: workspace:*
         version: link:../../config/typescript
@@ -314,6 +323,9 @@ importers:
       vite:
         specifier: 8.3.5
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0)
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(happy-dom@21.0.4)(msw@3.0.3(@types/node@24.19.2)(typescript@7.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0)))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
 
   fixtures/nuxt:
     devDependencies:
@@ -1020,6 +1032,9 @@ importers:
       happy-dom:
         specifier: 21.0.4
         version: 21.0.4
+      msw:
+        specifier: 3.0.3
+        version: 3.0.3(@types/node@24.19.2)(typescript@7.0.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
       next:
         specifier: 16.4.4
         version: 16.4.4(@babel/core@7.29.7)(@playwright/test@1.64.1)(@types/node@24.19.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(sass@1.106.1)

@@ -82,7 +82,8 @@
     "./plugin": "./src/plugin.ts",
     "./plugin-react": "./src/pluginReact.tsx",
     "./figma-link": "./src/vite/figmaLink.ts",
-    "./code-literal": "./src/codeLiteral.ts"
+    "./code-literal": "./src/codeLiteral.ts",
+    "./story-mocks": "./src/storyMocks.ts"
   },
   "scripts": {
     "build": "package-build build",
@@ -335,6 +336,10 @@
       "./code-literal": {
         "types": "./dist/src/codeLiteral.d.ts",
         "default": "./dist/src/codeLiteral.js"
+      },
+      "./story-mocks": {
+        "types": "./dist/src/storyMocks.d.ts",
+        "default": "./dist/src/storyMocks.js"
       }
     },
     "bin": {
