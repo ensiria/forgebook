@@ -4,9 +4,10 @@
  *
  * @module
  */
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -80,5 +81,71 @@ describe("createDocsExtractor left idle", () => {
     await extractor.close();
     expect(terminate).toHaveBeenCalledTimes(1);
     terminate.mockRestore();
+  }, 60_000);
+});
+
+describe("createDocsExtractor ending a worker that is still loading", () => {
+  const folders: string[] = [];
+  afterAll(() => {
+    for (const folder of folders) rmSync(folder, { recursive: true, force: true });
+  });
+
+  /** A docs module that writes a file on its way through its loading, then does what `rest` says. */
+  const docsModuleWriting = (rest: string): { readonly url: string; readonly marker: string } => {
+    const folder = mkdtempSync(join(tmpdir(), "forgebook-docs-loading-"));
+    folders.push(folder);
+    const marker = join(folder, "loaded");
+    const file = join(folder, "docs.mjs");
+    writeFileSync(
+      file,
+      [
+        'import { writeFileSync } from "node:fs";',
+        "await new Promise((resolve) => setTimeout(resolve, 300));",
+        `writeFileSync(${JSON.stringify(marker)}, "");`,
+        rest,
+        "export const extractStoryComponent = () => ({ docs: { name: null } });"
+      ].join("\n")
+    );
+    return { url: pathToFileURL(file).href, marker };
+  };
+
+  it("waits for the modules on close, as Node aborts a process whose worker is ended loading one", async () => {
+    const { url, marker } = docsModuleWriting("");
+    const extractor = createDocsExtractor(url);
+    extractor.warm(join(KIT, "Select.stories.tsx"));
+    await extractor.close();
+    expect(existsSync(marker)).toBe(true);
+  }, 60_000);
+
+  it("waits for them on a second close as well, which a server's two ways of closing make", async () => {
+    const { url, marker } = docsModuleWriting("");
+    const extractor = createDocsExtractor(url);
+    extractor.warm(join(KIT, "Select.stories.tsx"));
+    void extractor.close();
+    await extractor.close();
+    expect(existsSync(marker)).toBe(true);
+  }, 60_000);
+
+  it("waits for them when left idle too: an answer that needs no docs module can come first", async () => {
+    const { url, marker } = docsModuleWriting("");
+    const terminate = vi.spyOn(Worker.prototype, "terminate");
+    const extractor = createDocsExtractor(url, { idleMs: 1 });
+    await extractor.usage([]);
+    await vi.waitFor(() => expect(terminate).toHaveBeenCalled(), { timeout: 30_000 });
+    expect(existsSync(marker)).toBe(true);
+    terminate.mockRestore();
+    await extractor.close();
+  }, 60_000);
+
+  it("closes anyway past the limit, when the loading never ends", async () => {
+    const { url, marker } = docsModuleWriting("await new Promise(() => undefined);");
+    const extractor = createDocsExtractor(url, { loadWaitMs: 50 });
+    extractor.warm(join(KIT, "Select.stories.tsx"));
+    // past the compiler's import, which the abort comes from, before the limit is put to the test
+    await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 30_000 });
+    const closing = Date.now();
+    await extractor.close();
+    // far below the default limit, so a close that ignored the option would fail here
+    expect(Date.now() - closing).toBeLessThan(20_000);
   }, 60_000);
 });
