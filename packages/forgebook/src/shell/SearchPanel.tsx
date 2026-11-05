@@ -44,12 +44,10 @@ import type { StoryTree } from "../storyTree.ts";
 import { SEARCH_STRINGS } from "./searchStrings.ts";
 import { shownTree } from "./treeSearch.ts";
 import { useSearchIndex } from "./useSearchIndex.ts";
+import { SIDE_BY_SIDE_WIDTH } from "./useSidebarLayout.ts";
 
 /** How much a page shows: what a person reads before refining the words. */
 const LIMITS = { results: 24, hits: 3 };
-
-/** The narrowest window where the list opens beside the sidebar: a smaller one has it over the sidebar, under the field. */
-const BESIDE_WIDTH = 720;
 
 /** The room between the field and the list when the list opens under it, in CSS px. */
 const LIST_GAP = 6;
@@ -67,7 +65,8 @@ const LIST_WIDTH = "38rem";
  * @param sidebarWidth - the sidebar's width, in CSS px.
  */
 const listPlace = (field: DOMRect, sidebarWidth: number): CSSProperties => {
-  if (window.innerWidth < BESIDE_WIDTH) return { top: field.bottom + LIST_GAP, insetInline: LIST_MARGIN };
+  if (window.innerWidth < SIDE_BY_SIDE_WIDTH)
+    return { top: field.bottom + LIST_GAP, insetInline: LIST_MARGIN };
   const start = sidebarWidth + LIST_MARGIN;
   return {
     top: field.top,

@@ -376,6 +376,19 @@ test.describe("a catalogue with its own look throughout", () => {
     await expect(page.locator("body")).not.toContainText("Forgebook");
   });
 
+  test("slides its sidebar over the page on a phone's width, in its own colours", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 700 });
+    await page.goto(WHITE_LABEL);
+    const sidebar = page.locator(".forgebook-sidebar");
+    await expect(sidebar).not.toBeInViewport();
+    await page.getByRole("button", { name: "Show the sidebar" }).click();
+    await expect(sidebar).toBeInViewport({ ratio: 1 });
+    await expect(page.locator(".forgebook-main")).toHaveAttribute("inert");
+    await page.keyboard.press("Escape");
+    await expect(sidebar).not.toBeInViewport();
+    await expect(page.getByRole("button", { name: "Show the sidebar" })).toBeFocused();
+  });
+
   test("an embed wears the theme in both appearances: colours, fonts and corners", async ({ page }) => {
     await page.goto(`${WHITE_LABEL}?embed&story=${STORY}`);
     await ready(storyFrame(page));

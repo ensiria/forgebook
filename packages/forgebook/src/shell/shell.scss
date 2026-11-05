@@ -72,6 +72,44 @@
     transition: margin-inline-start $duration-slide $ease-slide;
   }
 
+  // on a narrow window it lies over the page, which keeps the whole width (`useSidebarLayout.ts`); hidden, its shadow
+  // goes too, or it would show at the window's edge
+  .forgebook-sidebar[data-overlay] {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 22;
+    height: auto;
+    // a width kept from a wide window leaves room to tap outside
+    max-width: calc(100vw - #{$space-8});
+    transition:
+      margin-inline-start $duration-slide $ease-slide,
+      box-shadow $duration-slide $ease-slide;
+
+    &[data-open] {
+      box-shadow: $shadow-popover;
+    }
+  }
+
+  // the page under a sidebar lying over it, dimmed: a tap here closes the sidebar and reaches nothing behind it, a story's
+  // frame included
+  .forgebook-sidebar-shade {
+    position: fixed;
+    inset: 0;
+    z-index: 21;
+    background: $shade;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity $duration-slide $ease-slide,
+      visibility $duration-slide;
+
+    &[data-open] {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+
   // the sidebar's foot: the shell's appearance, below the tree, which scrolls above it
   .forgebook-appearance {
     position: relative;
@@ -2852,7 +2890,9 @@
       animation-name: forgebook-appear;
     }
 
-    .forgebook-sidebar {
+    .forgebook-sidebar,
+    .forgebook-sidebar[data-overlay],
+    .forgebook-sidebar-shade {
       transition: none;
     }
 

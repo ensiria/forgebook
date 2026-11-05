@@ -12,7 +12,7 @@
  */
 
 import type { StorySource } from "@forgebook/story-format/source";
-import { type MouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from "react";
 
 import type { SearchTarget } from "../search.ts";
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
@@ -63,6 +63,12 @@ export type SidebarProps = SidebarPageLinks & {
   readonly width: number;
   /** Whether it is shown: hidden, it slides out and stays mounted, so its search and open families come back with it. */
   readonly isOpen: boolean;
+  /** Whether it lies over the page and not beside it, on a narrow window. */
+  readonly isOverlay: boolean;
+  /** The sidebar's element. */
+  readonly sidebarRef: Ref<HTMLElement>;
+  /** Its button that hides it. */
+  readonly hideButtonRef: Ref<HTMLButtonElement>;
   /** Hides the sidebar. */
   readonly onHide: () => void;
   /** Shows it again. */
@@ -141,6 +147,9 @@ export const Sidebar = ({
   onOpenPage,
   width,
   isOpen,
+  isOverlay,
+  sidebarRef,
+  hideButtonRef,
   onHide,
   onShow,
   appearance,
@@ -191,8 +200,10 @@ export const Sidebar = ({
     // hidden, it slides out by its own width (a margin, so a drag of its handle never waits for a transition) and
     // leaves Tab and screen readers
     <aside
+      ref={sidebarRef}
       className="forgebook-sidebar"
       data-open={isOpen ? "" : undefined}
+      data-overlay={isOverlay ? "" : undefined}
       inert={!isOpen}
       style={{ width, marginInlineStart: isOpen ? 0 : -width }}
     >
@@ -216,6 +227,7 @@ export const Sidebar = ({
           <span className="forgebook-brand__name">{title}</span>
         </a>
         <button
+          ref={hideButtonRef}
           type="button"
           className="forgebook-icon-button forgebook-brand__hide"
           title={STRINGS.hideSidebar}
