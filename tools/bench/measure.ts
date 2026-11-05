@@ -13,11 +13,13 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { isAbsolute, join, relative } from "node:path";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import { contentSize } from "./diskUsage.ts";
+import { samplePeak } from "./processes.ts";
+import { hasEnded, isOwnGroup, killTree, STOP_TIMEOUT, waitForExit } from "./processTree.ts";
+import { execProgram, invocation } from "./programs.ts";
 import { emptyOutput, type KeptOutput, keepOutput, outputText } from "./serverOutput.ts";
 import { type StampedPage, stampedPage, stampScript, waitForStamps } from "./stamps.ts";
 import { serveStatic } from "./staticServer.ts";
@@ -30,6 +32,9 @@ const SAMPLE_TIMEOUT = 180_000;
 
 /** How often a starting server is asked whether it answers, in milliseconds. */
 const POLL_INTERVAL = 25;
+
+/** How long one poll of a starting server may wait for its answer, in milliseconds. */
+const POLL_REQUEST_TIMEOUT = 10_000;
 
 /** The pause between two edits, so one update does not land on the last, in milliseconds. */
 const EDIT_PAUSE = 150;
@@ -106,7 +111,7 @@ const isPortTaken = (port: number): Promise<boolean> =>
   });
 
 /**
- * A dev server, in a process group of its own, so stopping it stops whatever it started.
+ * A dev server, in a process group of its own where the system has them, so stopping it stops whatever it started.
  *
  * @throws when one of its ports is taken: what answered there would pass for this server, with a time near zero.
  */
@@ -116,11 +121,17 @@ export const startServer = async (context: MeasureContext): Promise<ChildProcess
     if (await isPortTaken(port)) throw new Error(`port ${port} is already taken`);
   }
   const command = context.target.dev(context.port);
-  const server = spawn(programOf(context, command), [...command.args], {
+  const env = environment(context.io, command);
+  const { program, args } = invocation(programOf(context, command), command.args, {
     cwd: context.directory,
-    detached: true,
+    env
+  });
+  const server = spawn(program, [...args], {
+    cwd: context.directory,
+    detached: isOwnGroup,
     stdio: ["ignore", "pipe", "pipe"],
-    env: environment(context.io, command)
+    env,
+    windowsHide: true
   });
   liveServers.add(server);
   const output = emptyOutput();
@@ -134,20 +145,29 @@ export const startServer = async (context: MeasureContext): Promise<ChildProcess
 /** Each server's output as kept (`serverOutput.ts`), read when it stops before answering. */
 const serverOutput = new WeakMap<ChildProcess, KeptOutput>();
 
-/** Whether a server's process has ended, by its own exit or a signal. */
-const hasEnded = (server: ChildProcess): boolean => server.exitCode !== null || server.signalCode !== null;
+/**
+ * Stops a server and waits for it to be gone, so the next one finds the port free; for a while only, since a server
+ * that will not go must not hold the run: the next sample then finds its port taken and fails, saying so.
+ */
+export const stopServer = async (server: ChildProcess): Promise<void> => {
+  liveServers.delete(server);
+  if (hasEnded(server) || server.pid === undefined) return;
+  await killTree(server.pid);
+  await waitForExit(server, STOP_TIMEOUT);
+};
 
-/** Stops a server and waits for it to be gone, so the next one finds the port free. */
-export const stopServer = (server: ChildProcess): Promise<void> =>
-  new Promise((resolve) => {
-    liveServers.delete(server);
-    if (hasEnded(server) || server.pid === undefined) {
-      resolve();
-      return;
-    }
-    server.once("exit", () => resolve());
-    process.kill(-server.pid, "SIGKILL");
+/**
+ * Closes a page's browser context, for a while only: a browser that stopped answering would hold the run forever, and
+ * the next sample's own context, or the browser's end, says what is wrong with it.
+ */
+const closeContext = async (browserContext: BrowserContext): Promise<void> => {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, STOP_TIMEOUT);
   });
+  await Promise.race([browserContext.close().catch(() => undefined), deadline]);
+  clearTimeout(timer);
+};
 
 /** Stops every server alive, when a run is interrupted. */
 export const stopAllServers = async (): Promise<void> => {
@@ -178,7 +198,10 @@ export const waitForServer = async (
       const last = text === "" ? "" : `: ${text}`;
       throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})${last}`);
     }
-    const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`).then(
+    // a server that takes the connection and never answers would hold one poll past the deadline: each has its own
+    const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`, {
+      signal: AbortSignal.timeout(POLL_REQUEST_TIMEOUT)
+    }).then(
       async (response) => {
         // the body is never read: left open, a long first build would pile up a connection per poll
         await response.body?.cancel();
@@ -274,7 +297,7 @@ export const measureStart = async (context: MeasureContext, isCold: boolean): Pr
     const [story = 0, sidebar = 0] = await settledStamps(stamped, keys, start + SAMPLE_TIMEOUT);
     return { story: story - start, sidebar: sidebar - start };
   } finally {
-    await browserContext.close();
+    await closeContext(browserContext);
     await stopServer(server);
   }
 };
@@ -285,12 +308,14 @@ export const measureStart = async (context: MeasureContext, isCold: boolean): Pr
  * @param context - the measurement's context.
  * @param kind - which file is edited.
  * @param edits - how many edits.
+ * @param onEdit - told how many edits are done, after each one's time is taken and before the pause that follows it.
  * @returns the milliseconds of each edit; the file is put back afterwards.
  */
 export const measureEdits = async (
   context: MeasureContext,
   kind: EditKind,
-  edits: number
+  edits: number,
+  onEdit: (done: number, total: number) => void = () => undefined
 ): Promise<number[]> => {
   const { file, text, mark } = context.subject.edit(kind);
   const original = await readFile(file, "utf8");
@@ -307,12 +332,13 @@ export const measureEdits = async (
       await writeFile(file, text(original, shown));
       const [drawn = 0] = await waitForStamps(stamped, [shown], start + SAMPLE_TIMEOUT);
       samples.push(drawn - start);
+      onEdit(samples.length, edits);
       await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE + Math.random() * EDIT_JITTER));
     }
     return samples;
   } finally {
     await writeFile(file, original);
-    await browserContext.close();
+    await closeContext(browserContext);
     await stopServer(server);
   }
 };
@@ -349,42 +375,17 @@ export const measureComponentPage = async (context: MeasureContext, address: str
       props: props === undefined ? undefined : props - start
     };
   } finally {
-    await browserContext.close();
+    await closeContext(browserContext);
     await stopServer(server);
   }
-};
-
-/**
- * The dev server's process tree's memory now, in bytes.
- *
- * @param rootPid - the server's process.
- * @param io - the script's streams.
- */
-const treeMemory = async (rootPid: number, io: ScriptIo): Promise<number> => {
-  const { stdout } = await exec("ps", ["-A", "-o", "pid=,ppid=,rss="], { io, output: "capture" });
-  const rows = stdout
-    .trim()
-    .split("\n")
-    .map((line) => line.trim().split(/\s+/).map(Number));
-  const tree = new Set([rootPid]);
-  let isGrowing = true;
-  while (isGrowing) {
-    isGrowing = false;
-    for (const [pid = 0, parent = 0] of rows) {
-      if (tree.has(parent) && !tree.has(pid)) {
-        tree.add(pid);
-        isGrowing = true;
-      }
-    }
-  }
-  return rows.reduce((sum, [pid = 0, , rss = 0]) => (tree.has(pid) ? sum + rss * 1024 : sum), 0);
 };
 
 /**
  * The dev server's peak memory across a start and a visit to a page.
  *
  * @remarks
- * A run of its own, since reading `ps` in a loop would disturb a timing. Resident memory summed over the process tree,
+ * A run of its own, since reading the process table in a loop would disturb a timing. Resident memory summed over the
+ * process tree,
  * so pages shared between processes count more than once: a tool of several processes reads a little high.
  *
  * @param context - the measurement's context.
@@ -400,28 +401,21 @@ export const measureMemory = async (
   if (isCold) await removeCaches(context);
   const { browserContext, page } = await openPage(context, TALL_VIEWPORT);
   const server = await startServer(context);
-  let peak = 0;
-  let isDone = false;
   const pid = server.pid;
   if (pid === undefined) throw new Error("the server did not start");
-  const sampling = (async (): Promise<void> => {
-    while (!isDone) {
-      peak = Math.max(peak, await treeMemory(pid, context.io));
-      await new Promise((resolve) => setTimeout(resolve, MEMORY_INTERVAL));
-    }
-  })();
+  const sampler = samplePeak(pid, MEMORY_INTERVAL, context.io);
+  let peak = 0;
   try {
     await waitForServer(server, baseOf(context), context.target.readyPath);
     await page.goto(address);
     await quiet(page);
     await new Promise((resolve) => setTimeout(resolve, SETTLE * 2));
-    return peak;
   } finally {
-    isDone = true;
-    await sampling;
-    await browserContext.close();
+    peak = await sampler.stop();
+    await closeContext(browserContext);
     await stopServer(server);
   }
+  return peak;
 };
 
 /** One build. */
@@ -444,7 +438,7 @@ export const measureBuild = async (context: MeasureContext): Promise<BuildSample
   // relative to the project, as every tool reads it: Ladle joins its folder to the one it runs in, an absolute one too
   const command = context.target.build(relative(context.directory, out));
   const start = Date.now();
-  await exec(programOf(context, command), [...command.args], {
+  await execProgram(programOf(context, command), command.args, {
     cwd: context.directory,
     env: environment(context.io, command),
     io: context.io,
@@ -518,7 +512,7 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
     await page.locator(search.ready).waitFor({ timeout: SAMPLE_TIMEOUT });
     return { ...first, search: total(new Set([...main].filter((path) => !loaded.has(path)))) };
   } finally {
-    await browserContext.close();
+    await closeContext(browserContext);
     await server.close();
   }
 };

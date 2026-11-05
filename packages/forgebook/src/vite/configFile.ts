@@ -35,6 +35,7 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
+import { patternsProblem } from "./storyPatterns.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
@@ -254,6 +255,19 @@ const isListed = (config: object, key: string): boolean => {
 };
 
 /**
+ * Why a configuration's list of globs lists nothing by construction (only `!` patterns), or none.
+ *
+ * @param config - what the file exports by default.
+ * @param key - the list's key.
+ */
+const globsProblem = (config: object, key: string): string | undefined => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list)
+    ? patternsProblem(list.filter((item: unknown): item is string => typeof item === "string"))
+    : undefined;
+};
+
+/**
  * Why a loaded configuration cannot be used, or none.
  *
  * @param config - what the file exports by default.
@@ -273,6 +287,10 @@ const configProblem = (config: unknown): string | undefined => {
     return 'its home is neither a path (`home: "docs/home.md"`) nor false';
   if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
+  for (const key of ["stories", "docs"]) {
+    const problem = globsProblem(config, key);
+    if (problem !== undefined) return `its ${key} list nothing: ${problem}`;
+  }
   return framesProblem("frames" in config ? config.frames : undefined);
 };
 

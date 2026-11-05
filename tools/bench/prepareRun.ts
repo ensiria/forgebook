@@ -22,6 +22,7 @@ import {
 } from "./prepare.ts";
 import { prepareCorpus } from "./prepareCorpus.ts";
 import type { CorpusPaths, RealCorpus } from "./realCorpus.types.ts";
+import type { RunActivity } from "./statusFile.ts";
 import { generatedSubject, realSubject } from "./subject.ts";
 import { libraryStorybook, type Target, withPorts } from "./targets.ts";
 
@@ -59,6 +60,8 @@ export type PrepareRequest = {
   readonly throttle: number;
   /** The script's streams. */
   readonly io: ScriptIo;
+  /** Told when a long step starts, for the status file. */
+  readonly onActivity: (activity: RunActivity) => void;
 };
 
 /** What the tools of a run are prepared into. */
@@ -93,6 +96,7 @@ export const prepareGenerated = async (request: PrepareRequest, prepared: Prepar
   const { folders, targets, io, size } = request;
   const corpus = buildCorpus(size);
   const bareSource = targetSource(folders.repository, "bare");
+  request.onActivity({ state: "working", activity: "install" });
   const bare = await installTarget(bareSource, join(folders.work, "bare"), undefined, io);
   const forgebookOnly = (target: Target): Readonly<Record<string, string>> | undefined =>
     target.name === "forgebook" ? request.forgebookPackages : undefined;
@@ -101,8 +105,10 @@ export const prepareGenerated = async (request: PrepareRequest, prepared: Prepar
     const metrics: Record<string, MetricResult> = {};
     prepared.report[target.name] = metrics;
     try {
+      request.onActivity({ state: "working", activity: "install", tool: target.name });
       const source = targetSource(folders.repository, target.name);
       const result = await installTarget(source, directory, forgebookOnly(target), io);
+      request.onActivity({ state: "working", activity: "install", tool: target.name });
       const onBare = await installOnBare(source, bareSource, join(folders.work, `${target.name}-on-bare`), {
         packages: forgebookOnly(target),
         bareSize: bare.size,
@@ -157,7 +163,10 @@ export const prepareReal = async (
   prepared: PreparedRun
 ): Promise<string> => {
   const { folders, io, forgebookPackages: packages, targets } = request;
-  await prepareCorpus({ corpus, paths, packages, repository: folders.repository }, io);
+  await prepareCorpus(
+    { corpus, paths, packages, repository: folders.repository, onActivity: request.onActivity },
+    io
+  );
   for (const { target, port } of withPorts(targets, request.port)) {
     const metrics: Record<string, MetricResult> = {};
     prepared.report[target.name] = metrics;

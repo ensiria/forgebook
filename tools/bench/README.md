@@ -77,11 +77,26 @@ command exits non-zero at the end.
 
 ## The machine
 
-A timing is only as good as the machine's quiet. On macOS every group of metrics starts by reading the charger, the
-thermal state, Time Machine, Spotlight and the idle CPU, and so does the end of the run; the readings go in the report
-and anything suspicious is a warning. A noisy run is flagged, never silently kept. A cold start means the tool's caches
-are cold, not the system's: its file cache cannot be emptied without root, and the first start after an install reads
-higher than the rest.
+A timing is only as good as the machine's quiet. Every group of metrics starts by reading the machine, and so does the
+end of the run; the readings go in the report and anything suspicious is a warning. A noisy run is flagged, never
+silently kept. Each system is read with what it has, and a reading it cannot give is left out:
+
+- **macOS**: the charger, the thermal state, Time Machine, Spotlight on the volume, the idle CPU and the load.
+- **Windows**: the mains or the battery, the idle CPU, the antivirus Windows knows and whether it scans files as they
+  are opened, the CPU the antivirus, the indexer and Windows Update take, and the power plan. The shares come from
+  two snapshots of the raw process counters a second apart, which read the same in every language of Windows.
+- **Linux**: the mains or the battery, the idle CPU, the load, and the CPU the indexer (Tracker, Baloo), an antivirus
+  (ClamAV) and the updates (apt, PackageKit) take, from `/proc` and `/sys`.
+
+The report also names the system (`os`) on Windows and Linux, whose `system` is a kernel's number.
+
+A cold start means the tool's caches are cold, not the system's: its file cache cannot be emptied without root, and the
+first start after an install reads higher than the rest.
+
+On Windows a package's command is a `.cmd` shim, which Node cannot start without a shell: the benchmark reads the shim
+and runs its script with Node (`programs.ts`), so the server's process is Node itself. A server's tree is stopped with
+`taskkill /T` there, and its memory is the working set summed over the tree, read by one PowerShell that stays open for
+the measurement (`processes.ts`).
 
 `--throttle 4` slows the browser's CPU, for the metrics of a page. Node is not slowed, so the result is an indication of a
 slow page and not of a slow computer.
@@ -126,9 +141,9 @@ node tools/bench/bench.mts --corpus primer --compare --work /some/folder
   in its definition, and is measured with Forgebook alone. Ladle has no place here: it does not draw object stories.
 - **Every story is opened.** The `sweep` group, first on a real library, starts a dev server, opens each story's frame and
   groups what fails by cause, in the report's `sweep`. A build that exits 0 says nothing about the stories.
-- **`expected`** is what Storybook's own indexer counts at that commit, with the library's own globs. Where the
-  library's configuration leaves out files a Forgebook pattern cannot (Carbon's), its definition lists them and counts
-  them too, and says so: the larger index weighs on Forgebook's timings only. A run that lists
+- **`expected`** is what Storybook's own indexer counts at that commit, with the library's own globs. What the library's
+  configuration leaves out, its definition leaves out too, with `!` patterns (Carbon's `forgebook.config.ts` reads the
+  library's own list of them), so both tools index the same stories. A run that lists
   fewer stories, or draws fewer than it lists, fails at the end with the difference; the timings are still in the report.
 - **The install metrics** are absent: what the tool adds to a library is measured on the generated one.
 
@@ -152,7 +167,30 @@ reason: raising one is a decision, not a chore.
 ## Following a run
 
 `--status <file>` appends a JSON line per step, only between samples, so whatever follows the file cannot wake up during
-a measurement. `tail -F` reads it from anywhere.
+a measurement. `tail -F` reads it from anywhere. Lines have three shapes:
+
+- a sample about to be taken: `{"at", "tool", "metric", "run", "runs", "done", "total"}`, where `done` and `total`
+  count the samples of the whole run;
+- a long step outside the measurements, as it starts: `{"at", "state": "working", "activity", "tool"?}`, with
+  `pack`, `install`, `clone` or `prepare`, and for the sweep every 25 stories with `"count"` and `"of"`, its stories:
+  a reader can tell an install of an hour from a run that stopped;
+- the end: `{"at", "state": "finished", "warnings"}`, the only line whose `state` means the run is over.
+
+## Nothing waits forever
+
+A run on a machine nobody watches must end, whatever goes wrong: a silent wait of hours costs the whole run. So every
+wait has a deadline, and what it waited for is stopped with everything it started.
+
+- **Programs** run to completion (installs, clones, a library's preparation, packing, builds, `ps`, PowerShell) go
+  through `execProgram` (`programs.ts`), which needs a time limit and holds it for the whole process tree. A child that
+  outlives the program and keeps its output open (an install script's, a build's worker) does not keep the call
+  waiting: the program's exit ends it, and what it left is stopped. Running through cli-kit's `exec` alone, a timeout
+  stops only the program, and the call then waits for its children.
+- **Servers** are stopped with their tree and waited for, for 15 s at most (`processTree.ts`); each poll of a starting
+  server has its own timeout.
+- **Pages**: every reading of a frame (`stamps.ts`, `sweep.ts`) has a deadline, since a page whose script is stuck never
+  answers Playwright's `evaluate`; closing a context or the browser has one too.
+- **The machine's readings** give up after a minute (WMI can stall), and the reading is left out.
 
 ## The files
 
@@ -172,6 +210,9 @@ a measurement. `tail -F` reads it from anywhere.
 - `leftovers.ts`: what a run left running, found and stopped.
 - `serverOutput.ts`: what a server printed, kept to say why it stopped: its first error and its last lines.
 - `machine.ts`, `benchStats.ts`, `reportTable.ts`, `statusFile.ts`, `staticServer.ts`, `diskUsage.ts`: what they say.
+- `programs.ts`, `processTree.ts`, `processes.ts`, `powershell.ts`, `deadline.ts`: how a program, a process tree and
+  PowerShell are run on each system, and the deadlines of every wait.
+- `kit/`: the bench kit, which installs and runs all this on a machine that has nothing (its own README).
 - `budget.ts`, `budget.json`: the check of a pull request, and its limits.
 - `targets/`: the pinned tools.
 

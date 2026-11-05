@@ -26,7 +26,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { test as base, expect } from "@playwright/test";
@@ -50,6 +50,9 @@ const KEPT_FOLDER = join(tmpdir(), `forgebook-shell-edits-${hashOf(import.meta.d
  */
 const WATCHER_WINDOW_MS = 2 * 50;
 
+/** The fixture app's folder, the root of its catalogue's dev server. */
+const APP_FOLDER = join(import.meta.dirname, "..");
+
 /** The file that keeps a file's original bytes. */
 const keptPath = (file: string): string => join(KEPT_FOLDER, `${hashOf(file)}.bytes`);
 
@@ -72,7 +75,10 @@ const keep = (file: string, bytes: Buffer): void => {
  * @param file - the file's absolute path.
  */
 const served = async (file: string): Promise<string> => {
-  const path = normalizePath(file).replace(/^\/?/, "/@fs/");
+  // a file of the catalogue's own folder is served from the root; `/@fs/` is for what lies outside it, and refuses it
+  const path = file.startsWith(`${APP_FOLDER}${sep}`)
+    ? `/${normalizePath(relative(APP_FOLDER, file))}`
+    : normalizePath(file).replace(/^\/?/, "/@fs/");
   const response = await fetch(new URL(path, `http://127.0.0.1:${framesPortOf("app")}`));
   return response.text();
 };

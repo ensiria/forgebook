@@ -1,7 +1,7 @@
 /**
  * Tests for a package's story files read from the disk: their keys are the catalogue plugin's (relative to the declaring
- * module, also for a pattern that climbs out of its folder), so `storyFilesMismatch` compares like with like, and two
- * patterns of one source never share a key.
+ * module, also for a pattern that climbs out of its folder), so `storyFilesMismatch` compares like with like, two
+ * patterns of one source never share a key, and a `!` pattern leaves files out as the plugin's does.
  *
  * @module
  */
@@ -50,5 +50,20 @@ describe("storyFiles", () => {
     });
     rmSync(project, { recursive: true, force: true });
     expect(keys).toEqual(["../src/A.stories.tsx", "./src/A.stories.tsx"]);
+  });
+
+  it("leaves out what a `!` pattern matches and lists a file two patterns match once, as the plugin does", () => {
+    const options = {
+      sourceId: "kit",
+      name: "Kit",
+      root: KIT,
+      patterns: ["./src/*.stories.tsx", "!./src/Form.stories.tsx", "./src/Select.stories.tsx"]
+    };
+    const files = storyFiles(options);
+    expect(files).not.toContain("./src/Form.stories.tsx");
+    expect(files.filter((file) => file === "./src/Select.stories.tsx")).toHaveLength(1);
+    const [group] = indexedSource(options).files;
+    expect(Object.keys(group?.index ?? {})).toEqual(files);
+    expect(() => storyFiles({ ...options, patterns: ["!./src/Form.stories.tsx"] })).toThrow(/`!`/);
   });
 });

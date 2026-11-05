@@ -1,11 +1,20 @@
 /**
- * Tests for what a run leaves running: `ps`'s elapsed times, and the processes from the work folder found in its table.
+ * Tests for what a run leaves running: `ps`'s elapsed times, and the processes from the work folder found in its table,
+ * on macOS and Linux and on Windows.
  *
  * @module
  */
 import { describe, expect, it } from "vitest";
 
-import { elapsedSeconds, LISTING_COMMAND, leftoversIn } from "./leftovers.ts";
+import {
+  elapsedSeconds,
+  folderLeftovers,
+  LISTING_COMMAND,
+  leftoversIn,
+  type ProcessEntry,
+  programName,
+  runLeftovers
+} from "./leftovers.ts";
 
 /**
  * A `ps` table: the run (40) and the shell that started it (30); Nx's daemon, detached; an older server; an unrelated
@@ -40,5 +49,49 @@ describe("leftovers", () => {
 
   it("reads a folder given with its final separator alike", () => {
     expect(leftoversIn(TABLE, "/work/", 300, 40).map(({ pid }) => pid)).toEqual([50, 80, 81]);
+  });
+});
+
+/** A Windows table: the kit (10), the run (40), a server it started (80); Nx's daemon whose parent ended (50); a
+ * person's editor on a report of the kit's folder (60, older than the run); an unrelated process (70). */
+const WINDOWS_ROWS: readonly ProcessEntry[] = [
+  {
+    pid: 10,
+    parent: 5,
+    seconds: 900,
+    command: "C:\\Kit\\node.exe C:\\Kit\\repo\\tools\\bench\\kit\\kit.mts"
+  },
+  { pid: 40, parent: 10, seconds: 300, command: "C:\\Kit\\node.exe C:\\Kit\\repo\\tools\\bench\\bench.mts" },
+  {
+    pid: 80,
+    parent: 40,
+    seconds: 60,
+    command: '"C:\\Kit\\node.exe" C:\\Kit\\Work\\forgebook\\bin\\forgebook.js'
+  },
+  {
+    pid: 50,
+    parent: 4711,
+    seconds: 120,
+    command: "node C:/kit/work/corpus/fluentui/node_modules/nx/daemon.js"
+  },
+  { pid: 60, parent: 2, seconds: 7200, command: "notepad.exe C:\\Kit\\work\\report.json" },
+  { pid: 70, parent: 2, seconds: 60, command: "C:\\Windows\\explorer.exe" }
+];
+
+describe("leftovers on Windows", () => {
+  it("takes a process whose parent ended for a detached one, in any case and with either separator", () => {
+    expect(runLeftovers(WINDOWS_ROWS, "C:\\Kit\\work", 300, 40, "win32").map(({ pid }) => pid)).toEqual([
+      80, 50
+    ]);
+  });
+
+  it("finds whatever runs from the kit's folders, whatever its age, never the kit itself", () => {
+    expect(folderLeftovers(WINDOWS_ROWS, ["c:/kit/work"], 40).map(({ pid }) => pid)).toEqual([80, 50, 60]);
+    expect(folderLeftovers(WINDOWS_ROWS, ["C:\\Kit\\repo"], 40)).toEqual([]);
+  });
+
+  it("names a program without its folder or extension", () => {
+    expect(programName('"C:\\Kit\\node.exe" C:\\Kit\\work\\x.js')).toBe("node");
+    expect(programName("/usr/bin/node /work/x.js")).toBe("node");
   });
 });

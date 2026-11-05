@@ -231,7 +231,7 @@ const collectPages = (
     (match) => match[1] ?? []
   );
   const pages = patterns.flatMap((pattern) =>
-    indexedDocPages(VITE_PATHS.dirname(file), pattern, (): void => undefined)
+    indexedDocPages(VITE_PATHS.dirname(file), [pattern], (): void => undefined)
   );
   for (const page of pages)
     for (const note of page.index.notes ?? [])

@@ -120,7 +120,9 @@ export const withFixed = <TView extends FixableView & Partial<Pick<ViewState, "w
   fixed: FixedView
 ): TView => ({
   ...view,
-  switches: { ...view.switches, ...fixed.switches },
+  // the same object when the story fixes no switch: a new one would tell the frames of a view that did not change
+  switches:
+    Object.keys(fixed.switches).length === 0 ? view.switches : { ...view.switches, ...fixed.switches },
   ...(fixed.backdrop === undefined ? {} : { backdrop: fixed.backdrop }),
   ...(fixed.width === undefined || view.width === undefined ? {} : { width: fixed.width })
 });
