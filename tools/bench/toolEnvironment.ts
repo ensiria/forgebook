@@ -1,6 +1,7 @@
 /**
  * The environment the tools' and the libraries' commands run in: what a program needs to run, never the rest of the
- * developer's or the CI job's variables, and the variables that keep a library's tools from leaving daemons behind.
+ * developer's or the CI job's variables, and the variables that keep a library's tools from leaving daemons behind or
+ * waiting for a person.
  *
  * @remarks
  * A real library's install, its `prepare` and its own Storybook run that library's code and its dependencies': the
@@ -68,11 +69,16 @@ export const KEPT_VARIABLES: readonly string[] = [
   ...KIT_VARIABLES
 ];
 
-/** The variables that keep a library's tools from starting a daemon that outlives the command. */
-export const NO_DAEMONS: Readonly<Record<string, string>> = {
+/** The variables that keep a library's tools from starting a daemon that outlives them, or a screen nobody reads. */
+export const UNATTENDED: Readonly<Record<string, string>> = {
   // Nx's daemon and the workers of its plugins
   NX_DAEMON: "false",
   NX_ISOLATE_PLUGINS: "false",
+  // Nx's terminal interface takes the keyboard and waits for a key at the end of a run; it needs a terminal today, and
+  // this says so whatever a later Nx decides
+  NX_TUI: "false",
+  // what a task calling Yarn would otherwise send out: a run measures, and tells nobody
+  YARN_ENABLE_TELEMETRY: "0",
   // Turborepo's daemon
   TURBO_DAEMON: "false"
 };
@@ -95,5 +101,5 @@ export const toolEnvironment = (
   for (const [name, value] of Object.entries(env)) {
     if (value !== undefined && wanted.has(key(name))) kept[name] = value;
   }
-  return { ...kept, ...NO_DAEMONS, ...added };
+  return { ...kept, ...UNATTENDED, ...added };
 };

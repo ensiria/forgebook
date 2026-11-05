@@ -92,6 +92,53 @@ jobs:
         run: pnpm --filter @fixture/app test:shell --trace retain-on-failure
         env:
           FORGEBOOK_SHELL_GROUP: 3/3
+      # the bench kit's launcher, as a person starts it, so a launcher is never first run by a person: from a bare folder
+      # through its downloads, pnpm's activation, the clone and the install to the help of the kit's Node part, no
+      # measurement; and the results file each way, with nothing installed, from the installed kit, and past a kit left
+      # by an older launch
+      - name: bench kit launcher
+        if: ${{ !cancelled() }}
+        shell: powershell
+        timeout-minutes: 30
+        env:
+          FORGEBOOK_BENCH_HOME: ${{ runner.temp }}\bench-kit
+          FORGEBOOK_BENCH_DESKTOP: ${{ runner.temp }}\bench-kit-desktop
+          FORGEBOOK_BENCH_NO_PAUSE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $desktop = $env:FORGEBOOK_BENCH_DESKTOP
+          New-Item -ItemType Directory -Path $desktop | Out-Null
+          function Start-Launcher([string] $Arguments) {
+            $output = Join-Path $env:RUNNER_TEMP 'bench-kit-output.txt'
+            cmd /c "tools\bench\kit\start-bench.cmd $Arguments > `"$output`" 2>&1"
+            $code = $LASTEXITCODE
+            Get-Content -LiteralPath $output -Encoding UTF8
+            if ($code -ne 0) { throw "start-bench.cmd $Arguments ended with code $code" }
+            return
+          }
+          function Assert-OneResult([string] $Pattern) {
+            $found = @(Get-ChildItem -LiteralPath $desktop -Filter $Pattern)
+            if ($found.Count -ne 1) { throw "expected one $Pattern on the Desktop, found $($found.Count)" }
+            Get-ChildItem -LiteralPath $desktop | Remove-Item -Force
+          }
+          Start-Launcher '--results'
+          Assert-OneResult 'forgebook-bench-registri-*.zip'
+          Start-Launcher '--help'
+          $log = Get-Content -LiteralPath (Join-Path $env:FORGEBOOK_BENCH_HOME 'logs\launcher.log') -Encoding UTF8 -Raw
+          if ($log -notmatch 'Kit finito \(codice 0\)') { throw 'the launcher did not reach the kit''s Node part' }
+          $marker = Join-Path $env:FORGEBOOK_BENCH_HOME 'repo\node_modules\.kit-installed'
+          if (-not (Test-Path -LiteralPath (Join-Path $env:FORGEBOOK_BENCH_HOME 'bin\yarn.cmd'))) { throw 'no yarn on the PATH' }
+          Start-Launcher '--results'
+          Assert-OneResult 'forgebook-bench-risultati-*.zip'
+          Set-Content -LiteralPath $marker -Value 'a commit of an older launch'
+          Start-Launcher '--results'
+          Assert-OneResult 'forgebook-bench-registri-*.zip'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: windows-bench-kit-logs-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/bench-kit/logs
+          retention-days: 7
       # what a failed browser test saw (its page, the frames in it, the error): a failure that shows on one runner only
       # can then be read instead of guessed; one per attempt, so a rerun keeps the failure before it
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
