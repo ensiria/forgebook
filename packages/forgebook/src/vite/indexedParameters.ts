@@ -1,6 +1,7 @@
 /**
- * The parameters only the story index reads, never the frame: `touch`, `logic` and `device`, which the shell needs
- * before a story loads (to start it touched, to mark it, to draw its device around it).
+ * The parameters only the story index reads, never the frame: `touch`, `logic`, `device` and `requiredFirst`, which
+ * the shell needs before a story loads (to start it touched, to mark it, to draw its device around it, to order the
+ * props of its Props tab and of its component's page).
  *
  * @remarks
  * Written by code, such a parameter would be lost, since the frame does not read it: it is a problem, as one written
@@ -9,15 +10,16 @@
  *
  * @module
  */
-import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
+import type { RequiredFirst, StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryIndexEntry } from "@forgebook/story-format/source";
 import type { ESTree } from "vite";
 
 import { deviceSettingProblem, isDeviceOrientation } from "../deviceView.ts";
+import { REQUIRED_FIRST_LAYOUTS } from "../propGroups.ts";
 import { type Fields, keyName, parameter, unwrapped } from "./indexFields.ts";
 
 /** What the index keeps of these parameters: each only when written. */
-export type IndexedParameters = Pick<StoryIndexEntry, "isTouch" | "isLogic" | "device">;
+export type IndexedParameters = Pick<StoryIndexEntry, "isTouch" | "isLogic" | "device" | "requiredFirst">;
 
 /** Why `parameters.device` cannot be read as it is written. */
 const DEVICE_PROBLEM =
@@ -104,6 +106,22 @@ const deviceOf = (value: ESTree.Expression | undefined): StoryDeviceSetting | un
 };
 
 /**
+ * `parameters.requiredFirst`: `undefined` when none, `"in-groups"`, `"section"` or `false` written plainly, or a
+ * problem otherwise.
+ *
+ * @param value - the parameter's value.
+ */
+const requiredFirstOf = (value: ESTree.Expression | undefined): RequiredFirst | undefined | Error => {
+  if (value === undefined) return undefined;
+  const written = value.type === "Literal" ? value.value : undefined;
+  const layout = REQUIRED_FIRST_LAYOUTS.find((each) => each === written);
+  if (layout !== undefined) return layout;
+  return new Error(
+    '`parameters.requiredFirst` must be written as a plain `"in-groups"`, `"section"` or `false`'
+  );
+};
+
+/**
  * The parameters only the index reads, each only when written, or the first problem.
  *
  * @param fields - the story's or the meta's fields.
@@ -115,9 +133,12 @@ export const indexedParameters = (fields: Fields): IndexedParameters | Error => 
   if (logic instanceof Error) return logic;
   const device = deviceOf(parameter(fields, "device"));
   if (device instanceof Error) return device;
+  const requiredFirst = requiredFirstOf(parameter(fields, "requiredFirst"));
+  if (requiredFirst instanceof Error) return requiredFirst;
   return {
     ...(touch === undefined ? {} : { isTouch: touch }),
     ...(logic === undefined ? {} : { isLogic: logic }),
-    ...(device === undefined ? {} : { device })
+    ...(device === undefined ? {} : { device }),
+    ...(requiredFirst === undefined ? {} : { requiredFirst })
   };
 };

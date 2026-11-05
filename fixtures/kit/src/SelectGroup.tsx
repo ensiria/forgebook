@@ -8,13 +8,21 @@ import type { ReactNode } from "react";
 
 /** A group's props. */
 export type SelectGroupProps = {
-  /** The group's label, above its options. */
+  /**
+   * The group's label, above its options.
+   *
+   * @group Content
+   */
   readonly label: string;
   /** Whether the group starts folded. @defaultValue `false` */
   readonly isFolded?: boolean;
   /** Called when the group is folded or unfolded. */
   readonly onFoldChange?: (isFolded: boolean) => void;
-  /** The options. */
+  /**
+   * The options.
+   *
+   * @group Content
+   */
   readonly children?: ReactNode;
 };
 

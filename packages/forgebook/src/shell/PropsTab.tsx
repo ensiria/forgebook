@@ -10,29 +10,28 @@
  * lists them (`propGroups.ts`): each group's controls, its toggles, then its props the panel cannot set. Each starts
  * open, and a reader may fold it away. A component whose props name no group shows the tab as it always was.
  *
+ * The required props come first among each kind of control and in each group, or in one "Required" group before the
+ * others, each naming its group, as the story, its component, the catalogue and the reader's switch at the top of the
+ * tab say (`useRequiredFirst.ts`).
+ *
  * @module
  */
 
+import type { RequiredFirst } from "@forgebook/story-format/csf";
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
-import { type ChangeEvent, type ReactNode, useId } from "react";
+import type { ReactNode } from "react";
 
-import { isColorProp, isNamedProp, type PanelProp, settableProps } from "../argTypes.ts";
-import { type ArgValue, isNamedArg, type PanelArgs } from "../messages.ts";
+import { isNamedProp, type PanelProp, settableProps } from "../argTypes.ts";
+import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
-import { groupedProps, propGroupOrder } from "../propGroups.ts";
+import { canOrderRequired, laidOutProps, propGroupOrder } from "../propGroups.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
-import { ChoiceControl, NumberField, textOf } from "./PropFields.tsx";
+import { PropControl, ReadOnlyProp, type TextArgNote, Toggle } from "./PropRows.tsx";
+import { RequiredFirstSwitch } from "./RequiredFirstSwitch.tsx";
 import { STRINGS } from "./strings.ts";
+import { useRequiredFirst } from "./useRequiredFirst.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
-
-/** A prop the story gives a text by its key (`storyText("key")`): the key, and whether the panel wrote over it. */
-export type TextArgNote = {
-  /** The text's key. */
-  readonly key: string;
-  /** Whether the panel holds a value of its own for the prop. */
-  readonly isChanged: boolean;
-};
 
 /** The tab's props. */
 export type PropsTabProps = {
@@ -57,11 +56,12 @@ export type PropsTabProps = {
    * none by default.
    */
   readonly componentGroups?: readonly string[];
+  /**
+   * Where the story puts the required props (`parameters.requiredFirst`, its own or its meta's); none for the
+   * catalogue's.
+   */
+  readonly requiredFirst?: RequiredFirst | undefined;
 };
-
-/** A CSS colour as the colour picker takes it (`#rrggbb`), or black when the value is not one. */
-const pickerColor = (value: ArgValue | undefined): string =>
-  typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000";
 
 /** No prop named by a text key. */
 const NO_TEXT_ARGS: Readonly<Record<string, TextArgNote>> = {};
@@ -69,235 +69,32 @@ const NO_TEXT_ARGS: Readonly<Record<string, TextArgNote>> = {};
 /** No group named first. */
 const NO_GROUPS: readonly string[] = [];
 
-/** A prop's name, whether it is required, and its type (whole in the tooltip when it is cut). */
-const PropHead = ({ prop }: { readonly prop: PanelProp }): ReactNode => (
-  <div className="forgebook-prop__head">
-    <code className="forgebook-prop__name">
-      {prop.label ?? prop.name}
-      {prop.isRequired ? (
-        <span className="forgebook-prop__required" title={STRINGS.required}>
-          *
-        </span>
-      ) : null}
-    </code>
-    <code className="forgebook-prop__type" title={prop.type}>
-      {prop.type}
-    </code>
-  </div>
-);
-
-/** A prop's description and default, under its control. */
-const PropNote = ({ id, prop }: { readonly id: string; readonly prop: PanelProp }): ReactNode =>
-  prop.description === "" && prop.defaultValue === undefined ? null : (
-    <p id={id} className="forgebook-prop__description">
-      {prop.description}
-      {prop.defaultValue === undefined ? null : (
-        <>
-          {prop.description === "" ? null : " "}
-          {STRINGS.defaultIs} <code>{prop.defaultValue}</code>
-        </>
-      )}
-    </p>
-  );
-
-/**
- * Where a prop's text comes from, under its field: the key of the story's text, and a way back to it once the panel
- * wrote over it.
- *
- * @param props - the note, the prop's name and the value setter.
- */
-const TextArgLine = ({
-  note,
-  name,
-  onValueChange
-}: {
-  readonly note: TextArgNote;
-  readonly name: string;
-  readonly onValueChange: PropsTabProps["onValueChange"];
-}): ReactNode => (
-  <p className="forgebook-prop__text-arg">
-    {STRINGS.fromTexts} <code>{note.key}</code>
-    {note.isChanged ? (
-      <button
-        type="button"
-        className="forgebook-text-button"
-        onClick={(): void => onValueChange(name, undefined)}
-      >
-        {STRINGS.backToText}
-      </button>
-    ) : null}
-  </p>
-);
-
-/** One adjustable prop with its control. */
-const PropControl = ({
-  prop,
-  value,
-  named,
-  textArg,
-  onValueChange
-}: {
-  readonly prop: PanelProp;
-  readonly value: ArgValue | undefined;
-  /** The values the source names for the prop's type, when it names some. */
-  readonly named: Readonly<Record<string, unknown>> | undefined;
-  /** Where the story's text for the prop comes from, when the story names one by its key. */
-  readonly textArg: TextArgNote | undefined;
-  readonly onValueChange: PropsTabProps["onValueChange"];
-}): ReactNode => {
-  // the description is shown under the control and named by it, so the control's name is the prop alone
-  const descriptionId = useId();
-  const label = prop.label ?? prop.name;
-  if (named !== undefined) {
-    return (
-      <div className="forgebook-prop">
-        <PropHead prop={prop} />
-        <select
-          aria-label={label}
-          aria-describedby={descriptionId}
-          value={isNamedArg(value) ? value.named : ""}
-          onChange={(event: ChangeEvent<HTMLSelectElement>): void => {
-            const chosen = event.target.value;
-            onValueChange(prop.name, chosen === "" ? undefined : { of: prop.type, named: chosen });
-          }}
-        >
-          <option value="">{STRINGS.unset}</option>
-          {Object.keys(named).map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <PropNote id={descriptionId} prop={prop} />
-      </div>
-    );
-  }
-  if (prop.kind === "choice") {
-    return (
-      <div className="forgebook-prop">
-        <PropHead prop={prop} />
-        <ChoiceControl
-          prop={prop}
-          value={value}
-          descriptionId={descriptionId}
-          onValueChange={onValueChange}
-        />
-        <PropNote id={descriptionId} prop={prop} />
-      </div>
-    );
-  }
-  if (prop.kind === "number") {
-    return (
-      <div className="forgebook-prop">
-        <PropHead prop={prop} />
-        <div className="forgebook-prop__field">
-          <NumberField
-            prop={prop}
-            value={value}
-            descriptionId={descriptionId}
-            onValueChange={onValueChange}
-          />
-        </div>
-        <PropNote id={descriptionId} prop={prop} />
-      </div>
-    );
-  }
-  return (
-    <div className="forgebook-prop">
-      <PropHead prop={prop} />
-      <div className="forgebook-prop__field">
-        <input
-          type="text"
-          aria-label={label}
-          aria-describedby={descriptionId}
-          value={textOf(value)}
-          onChange={(event: ChangeEvent<HTMLInputElement>): void => {
-            const text = event.target.value;
-            onValueChange(prop.name, text === "" ? undefined : text);
-          }}
-        />
-        {/* a colour picker beside the text: the field still takes any CSS colour, a token's var() included */}
-        {isColorProp(prop) ? (
-          <input
-            type="color"
-            className="forgebook-prop__color"
-            aria-label={STRINGS.pickColor(label)}
-            value={pickerColor(value)}
-            onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-              onValueChange(prop.name, event.target.value)
-            }
-          />
-        ) : null}
-      </div>
-      {textArg === undefined ? null : (
-        <TextArgLine note={textArg} name={prop.name} onValueChange={onValueChange} />
-      )}
-      <PropNote id={descriptionId} prop={prop} />
-    </div>
-  );
-};
-
-/** A toggle: its name in a compact checkbox, its description as the tooltip and for screen readers. */
-const Toggle = ({
-  prop,
-  value,
-  onValueChange
-}: {
-  readonly prop: PanelProp;
-  readonly value: ArgValue | undefined;
-  readonly onValueChange: PropsTabProps["onValueChange"];
-}): ReactNode => {
-  const descriptionId = useId();
-  return (
-    <label className="forgebook-toggle" title={prop.description}>
-      <input
-        type="checkbox"
-        checked={value === true}
-        aria-describedby={descriptionId}
-        onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-          onValueChange(prop.name, event.target.checked)
-        }
-      />
-      <code>{prop.label ?? prop.name}</code>
-      <span id={descriptionId} className="forgebook-visually-hidden">
-        {prop.description}
-      </span>
-    </label>
-  );
-};
-
-/** A prop the panel cannot set: its name, its type and its description, for reading. */
-const ReadOnlyProp = ({ prop }: { readonly prop: PanelProp }): ReactNode => (
-  <div className="forgebook-prop">
-    <PropHead prop={prop} />
-    <p className="forgebook-prop__description">{prop.description}</p>
-  </div>
-);
-
 /**
  * A group the props' TSDoc names, under its name: its controls in the order of the props, its toggles, then the props
- * the panel cannot set.
+ * the panel cannot set. The "Required" group is drawn as one, each of its props naming its own group.
  *
- * @param props - the group's name and props, and how each prop is drawn.
+ * @param props - the group's name and props, how each prop is drawn, and whether it is the "Required" group.
  */
 const NamedGroup = ({
   name,
   props,
   isSettable,
   control,
-  toggle
+  toggle,
+  isRequired = false
 }: {
   readonly name: string;
   readonly props: readonly PanelProp[];
   readonly isSettable: (prop: PanelProp) => boolean;
-  readonly control: (prop: PanelProp) => ReactNode;
-  readonly toggle: (prop: PanelProp) => ReactNode;
+  readonly control: (prop: PanelProp, showsGroup: boolean) => ReactNode;
+  readonly toggle: (prop: PanelProp, showsGroup: boolean) => ReactNode;
+  readonly isRequired?: boolean;
 }): ReactNode => {
   const controls = props.filter((prop) => isSettable(prop) && prop.kind !== "toggle");
   const toggles = props.filter((prop) => isSettable(prop) && prop.kind === "toggle");
   const others = props.filter((prop) => !isSettable(prop));
   return (
-    <div className="forgebook-prop-group">
+    <div className="forgebook-prop-group" data-required={isRequired || undefined}>
       <details className="forgebook-fold" open>
         <summary className="forgebook-fold__summary forgebook-prop-group__title">
           <Icon name="chevronRight" size={12} />
@@ -305,12 +102,16 @@ const NamedGroup = ({
           <span className="forgebook-fold__count">{STRINGS.propCount(props.length)}</span>
         </summary>
         <div className="forgebook-prop-group__body">
-          {controls.length === 0 ? null : <div className="forgebook-prop-grid">{controls.map(control)}</div>}
-          {toggles.length === 0 ? null : <div className="forgebook-toggles">{toggles.map(toggle)}</div>}
+          {controls.length === 0 ? null : (
+            <div className="forgebook-prop-grid">{controls.map((prop) => control(prop, isRequired))}</div>
+          )}
+          {toggles.length === 0 ? null : (
+            <div className="forgebook-toggles">{toggles.map((prop) => toggle(prop, isRequired))}</div>
+          )}
           {others.length === 0 ? null : (
             <div className="forgebook-prop-grid">
               {others.map((prop) => (
-                <ReadOnlyProp key={prop.name} prop={prop} />
+                <ReadOnlyProp key={prop.name} prop={prop} showsGroup={isRequired} />
               ))}
             </div>
           )}
@@ -359,31 +160,42 @@ export const PropsTab = ({
   worstCase,
   namedValues = {},
   textArgs = NO_TEXT_ARGS,
-  componentGroups = NO_GROUPS
+  componentGroups = NO_GROUPS,
+  requiredFirst
 }: PropsTabProps): ReactNode => {
   const catalogue = useCatalogue();
+  const ordering = useRequiredFirst(requiredFirst);
   const isNamed = (prop: PanelProp): boolean => isNamedProp(prop, namedValues);
   const allSettable = settableProps(props, controls, namedValues);
   const isSettable = (prop: PanelProp): boolean => allSettable.includes(prop);
-  const propGroups = groupedProps(
-    props.filter((prop) => prop.kind !== "event"),
-    propGroupOrder(componentGroups, catalogue.propGroups)
+  const listed = props.filter((prop) => prop.kind !== "event");
+  const { required, groups: propGroups } = laidOutProps(
+    listed,
+    propGroupOrder(componentGroups, catalogue.propGroups),
+    ordering.layout
   );
-  // the props that name no group are drawn as the tab always drew them, by control
+  // the props that name no group are drawn as the tab always drew them, by control, in the layout's order
   const ungrouped = propGroups.find((group) => group.name === undefined)?.props ?? [];
-  const settable = allSettable.filter((prop) => ungrouped.includes(prop));
-  const control = (prop: PanelProp): ReactNode => (
+  const settable = ungrouped.filter(isSettable);
+  const control = (prop: PanelProp, showsGroup: boolean): ReactNode => (
     <PropControl
       key={prop.name}
       prop={prop}
+      showsGroup={showsGroup}
       value={values[prop.name]}
       named={isNamed(prop) ? namedValues[prop.type] : undefined}
       textArg={textArgs[prop.name]}
       onValueChange={onValueChange}
     />
   );
-  const toggle = (prop: PanelProp): ReactNode => (
-    <Toggle key={prop.name} prop={prop} value={values[prop.name]} onValueChange={onValueChange} />
+  const toggle = (prop: PanelProp, showsGroup: boolean): ReactNode => (
+    <Toggle
+      key={prop.name}
+      prop={prop}
+      showsGroup={showsGroup}
+      value={values[prop.name]}
+      onValueChange={onValueChange}
+    />
   );
   const groups = [
     {
@@ -400,17 +212,32 @@ export const PropsTab = ({
   const hasControls = controls === "all" || controls.length > 0;
   return (
     <div className="forgebook-tab-props">
+      {canOrderRequired(listed) ? (
+        <div className="forgebook-tab-head">
+          <RequiredFirstSwitch state={ordering} />
+        </div>
+      ) : null}
       {hasControls ? null : <p className="forgebook-tab-note">{STRINGS.fixedExamples}</p>}
+      {required.length === 0 ? null : (
+        <NamedGroup
+          name={STRINGS.required}
+          props={required}
+          isSettable={isSettable}
+          control={control}
+          toggle={toggle}
+          isRequired={true}
+        />
+      )}
       {groups.map((group) => (
         <div key={group.title} className="forgebook-prop-group">
           <h3 className="forgebook-prop-group__title">{group.title}</h3>
-          <div className="forgebook-prop-grid">{group.props.map(control)}</div>
+          <div className="forgebook-prop-grid">{group.props.map((prop) => control(prop, false))}</div>
         </div>
       ))}
       {toggles.length === 0 ? null : (
         <div className="forgebook-prop-group">
           <h3 className="forgebook-prop-group__title">{STRINGS.propGroups.toggle}</h3>
-          <div className="forgebook-toggles">{toggles.map(toggle)}</div>
+          <div className="forgebook-toggles">{toggles.map((prop) => toggle(prop, false))}</div>
         </div>
       )}
       {others.length === 0 ? null : (
@@ -420,7 +247,7 @@ export const PropsTab = ({
           </h3>
           <div className="forgebook-prop-grid">
             {others.map((prop) => (
-              <ReadOnlyProp key={prop.name} prop={prop} />
+              <ReadOnlyProp key={prop.name} prop={prop} showsGroup={false} />
             ))}
           </div>
         </div>

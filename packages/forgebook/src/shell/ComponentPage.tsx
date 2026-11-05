@@ -13,6 +13,7 @@
  *
  * @module
  */
+import type { RequiredFirst } from "@forgebook/story-format/csf";
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef } from "react";
 
 import { groupLabel } from "../catalogue.ts";
@@ -207,19 +208,27 @@ const AudienceSlot = ({
 /**
  * The API reference; nothing without props, or a signature for what is about logic.
  *
- * @param props - the component's docs, whether it is about logic, and the prop groups its meta lists first.
+ * @param props - the component's docs, whether it is about logic, the prop groups its meta lists first, and where its
+ * meta puts the required props.
  */
 export const PageApi = ({
   docs,
   isLogic,
-  componentGroups
+  componentGroups,
+  requiredFirst
 }: {
   readonly docs: ComponentDocs | undefined;
   readonly isLogic: boolean;
   readonly componentGroups: readonly string[];
+  readonly requiredFirst: RequiredFirst | undefined;
 }): ReactNode =>
   docs === undefined || (docs.props.length === 0 && !(isLogic && docs.signature !== undefined)) ? null : (
-    <ApiReference docs={docs} isLogic={isLogic} componentGroups={componentGroups} />
+    <ApiReference
+      docs={docs}
+      isLogic={isLogic}
+      componentGroups={componentGroups}
+      requiredFirst={requiredFirst}
+    />
   );
 
 /**
@@ -362,7 +371,12 @@ export const ComponentPage = ({
           )}
           <AudienceSlot place="afterDemo" audience={audienceProps}>
             <Prose page={page} />
-            <PageApi docs={componentDocs} isLogic={isLogic} componentGroups={component.propGroups} />
+            <PageApi
+              docs={componentDocs}
+              isLogic={isLogic}
+              componentGroups={component.propGroups}
+              requiredFirst={component.requiredFirst}
+            />
           </AudienceSlot>
           {examples.length === 0 ? null : (
             <section className="forgebook-doc__section" aria-labelledby="forgebook-examples">

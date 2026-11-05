@@ -618,6 +618,13 @@
     gap: $space-3 $space-5;
   }
 
+  // the Props tab's header: the "Required first" switch, at its end
+  .forgebook-tab-head {
+    display: flex;
+    justify-content: flex-end;
+    padding: $space-2-5 $space-3-5 0;
+  }
+
   .forgebook-tab-note {
     margin: 0;
     padding: $space-3 $space-3-5 0;
@@ -2568,6 +2575,44 @@
     font: $text-mono;
     font-weight: 600;
     color: $code-name;
+  }
+
+  // the reference's heading, the reader's "Required first" switch at its end, under it on a narrow page
+  .forgebook-api__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2 $space-4;
+    margin-top: $space-4;
+
+    > h2 {
+      margin: 0;
+      font: $text-display;
+    }
+  }
+
+  // the switch that puts every component's required props first, in a props table's header
+  .forgebook-required-first {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1-5;
+    font: $text-caption;
+    font-weight: 500;
+    color: $text-secondary;
+    cursor: pointer;
+  }
+
+  // in the "Required" section, the group a prop belongs to, beside its name
+  .forgebook-prop__group {
+    margin-inline: $space-1-5 auto;
+    padding: 0 $space-1-5;
+    border-radius: 999px;
+    background: $fill;
+    font: $text-caption;
+    font-weight: 400;
+    color: $text-secondary;
+    white-space: nowrap;
   }
 
   .forgebook-api__type {

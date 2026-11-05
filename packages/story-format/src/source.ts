@@ -12,7 +12,7 @@
  *
  * @module
  */
-import type { StoryDeviceSetting, StoryGroup } from "./csf.ts";
+import type { RequiredFirst, StoryDeviceSetting, StoryGroup } from "./csf.ts";
 import type { StoryTextTable } from "./texts.ts";
 
 /** What a Figma file is, as the embed's address names it. */
@@ -74,6 +74,8 @@ export type StoryIndexEntry = {
   readonly isLogic?: boolean;
   /** The story's own `parameters.device`, when it sets one: the device it is shown in by default. */
   readonly device?: StoryDeviceSetting;
+  /** The story's own `parameters.requiredFirst`, when it sets one: where its Props tab lists the required props. */
+  readonly requiredFirst?: RequiredFirst;
   /**
    * The first sentence of the story's TSDoc, or its `parameters.docs.description.story`: what it shows and what to
    * notice.
@@ -112,6 +114,11 @@ export type StoryFileIndex = {
   readonly isLogic?: boolean;
   /** The meta's `parameters.device`, when it sets one: every story's device unless it sets its own fields. */
   readonly device?: StoryDeviceSetting;
+  /**
+   * The meta's `parameters.requiredFirst`, when it sets one: where the component's page and its stories' Props tabs
+   * list the required props, unless a story says otherwise.
+   */
+  readonly requiredFirst?: RequiredFirst;
   /** The meta's `alsoIn`, when it sets one: the other places the component is listed in. */
   readonly alsoIn?: readonly string[];
   /** The meta's `related`, when it sets one: the titles of the components its page names at its top. */

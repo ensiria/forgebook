@@ -12,7 +12,7 @@
  * @module
  */
 
-import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
+import type { RequiredFirst, StoryDeviceSetting } from "@forgebook/story-format/csf";
 
 import { type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
 import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop } from "./backdrops.ts";
@@ -152,6 +152,13 @@ export type CatalogueLists = {
    * groups named nowhere follow in the order they first appear. The props that name no group always come first.
    */
   readonly propGroups?: readonly string[];
+  /**
+   * Where every component's API reference and Props tab list the required props: first inside each group
+   * (`"in-groups"`, the default), all in one "Required" section before the groups (`"section"`), or in the order of
+   * the source (`false`). A meta's or a story's `parameters.requiredFirst` wins over it; a reader's "Required first"
+   * switch turns the ordering on or off over both.
+   */
+  readonly requiredFirst?: RequiredFirst;
 };
 
 /** The shell's own appearance: light, dark, the system's, or the colour scheme of the story shown. */
@@ -208,6 +215,8 @@ export type CatalogueSettings = {
   readonly device: DeviceDefault;
   /** The prop groups listed first, in their order; none by default. */
   readonly propGroups: readonly string[];
+  /** Where the required props are listed when a component or a story does not say; `"in-groups"` by default. */
+  readonly requiredFirst: RequiredFirst;
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -371,7 +380,8 @@ export const catalogueSettings = (
     keys: usableKeys([...switches.map((each) => each.id), ...ownControls], lists.keys),
     views: catalogueViews(switches, lists.views),
     // checked when the configuration loads (`configFile.ts`): a model that is none is left out here
-    device: deviceDefaultOf(NO_DEVICE, lists.device)
+    device: deviceDefaultOf(NO_DEVICE, lists.device),
+    requiredFirst: lists.requiredFirst ?? "in-groups"
   };
 };
 

@@ -31,7 +31,8 @@ const story = (name: string, description?: string): TreeStory => ({
   device: undefined,
   design: undefined,
   tags: [],
-  hasPlay: false
+  hasPlay: false,
+  requiredFirst: undefined
 });
 
 /** A component. */
@@ -47,6 +48,7 @@ const component = (
   files: [`./${title}.stories.tsx`],
   design: undefined,
   propGroups: [],
+  requiredFirst: undefined,
   stories,
   unlisted: [],
   alsoIn: [],

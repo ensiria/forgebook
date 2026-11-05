@@ -22,6 +22,7 @@ import { AUDIENCE_IDS } from "../audiences.ts";
 import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
 import { deviceSettingProblem } from "../deviceView.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
+import { REQUIRED_FIRST_LAYOUTS } from "../propGroups.ts";
 import {
   frameThemeCss,
   mergedThemes,
@@ -187,14 +188,15 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn }),
   ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
-  ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups })
+  ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups }),
+  ...(lists.requiredFirst === undefined ? {} : { requiredFirst: lists.requiredFirst })
 });
 
 /**
  * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
  * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
- * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar and the
- * prop groups' order the last that names one; the device field by field.
+ * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar, the
+ * prop groups' order and where the required props go the last that names one; the device field by field.
  *
  * @param all - the presets' lists, then the catalogue's.
  */
@@ -309,17 +311,22 @@ const deviceProblem = (device: unknown): string | undefined => {
 
 /**
  * The configuration's and the presets' lists, once checked where the shell would leave a mistake out: a device that
- * cannot be used.
+ * cannot be used, a place for the required props that is none.
  *
  * @param all - the presets' lists, then the configuration's.
  * @param dir - the configuration's folder, for the message.
- * @throws when a device cannot be used.
+ * @throws when a device cannot be used, or `requiredFirst` is none of its layouts.
  */
 const checkedLists = (all: readonly CatalogueLists[], dir: string): readonly CatalogueLists[] => {
   for (const lists of all) {
     const problem = lists.device === undefined ? undefined : deviceProblem(lists.device);
     if (problem !== undefined)
       throw new Error(`${resolve(dir, "forgebook.config")}: Forgebook's device: ${problem}`);
+    // a configuration is written by JavaScript too, which no type stops
+    if (lists.requiredFirst !== undefined && !REQUIRED_FIRST_LAYOUTS.includes(lists.requiredFirst))
+      throw new Error(
+        `${resolve(dir, "forgebook.config")}: requiredFirst is ${typeof lists.requiredFirst === "string" ? `"${lists.requiredFirst}"` : String(lists.requiredFirst)}, none of "in-groups", "section" and false`
+      );
   }
   return all;
 };

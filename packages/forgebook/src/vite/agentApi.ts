@@ -276,6 +276,7 @@ export const storyDocument = (
   if (problem !== undefined) problems.push(problem);
   return {
     schema: 1,
+    requiredProps: (docs?.props ?? []).filter((prop) => prop.isRequired).map((prop) => prop.name),
     story,
     component: {
       id: component.id,
@@ -361,7 +362,11 @@ export const isStoriesDocument = (value: unknown): value is StoriesDocument =>
  * @param value - the answer's body.
  */
 export const isStoryDocument = (value: unknown): value is StoryDocument =>
-  isRecord(value) && value["schema"] === 1 && isRecord(value["story"]) && Array.isArray(value["problems"]);
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["requiredProps"]) &&
+  isRecord(value["story"]) &&
+  Array.isArray(value["problems"]);
 
 /**
  * Whether a value is the tokens document, as a client receives it over HTTP.

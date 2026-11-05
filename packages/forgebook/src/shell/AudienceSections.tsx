@@ -366,7 +366,14 @@ const Section = ({ id, ...props }: AudienceSectionsProps & { readonly id: PageSe
     case "prose":
       return <AudienceProse page={page} reading={AUDIENCE_PAGES[props.audience].prose} />;
     case "api":
-      return <PageApi docs={docs} isLogic={isLogic} componentGroups={component.propGroups} />;
+      return (
+        <PageApi
+          docs={docs}
+          isLogic={isLogic}
+          componentGroups={component.propGroups}
+          requiredFirst={component.requiredFirst}
+        />
+      );
     case "parts":
       return <PartsSection docs={docs} />;
     case "pages":

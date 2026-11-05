@@ -57,7 +57,7 @@ export const storiesText = (document: StoriesDocument, style: OutputStyle): stri
   );
 
 /**
- * One story's facts: where it is, where it opens, its args and its component's props.
+ * One story's facts: where it is, where it opens, its args, its component's props and those every use must set.
  *
  * @param document - the story document.
  * @param style - colours, glyphs and width.
@@ -71,7 +71,8 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["Frame", document.story.links.frame],
     ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
-    ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")]
+    ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")],
+    ["Required", document.requiredProps.length === 0 ? "none" : document.requiredProps.join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
   if (document.design !== undefined) entries.push(["Design", document.design.figma]);

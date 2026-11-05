@@ -37,8 +37,7 @@ const HOOK_DOCS: ComponentDocs = {
 const inputOf = (isLogic: boolean): DockTabsInput => ({
   docs: { status: "ready", value: HOOK_DOCS },
   code: { status: "none" },
-  exportName: "Filled",
-  isLogic,
+  story: { exportName: "Filled", isLogic, requiredFirst: undefined },
   componentName: "useForm",
   controls: "all",
   argTypes: {},

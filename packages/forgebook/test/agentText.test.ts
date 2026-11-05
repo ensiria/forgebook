@@ -55,6 +55,7 @@ describe("storyText", () => {
     if (component === undefined || story === undefined) throw new Error("the fixture's story is missing");
     const document: StoryDocument = {
       schema: 1,
+      requiredProps: [],
       story,
       component,
       docs: undefined,
@@ -70,6 +71,24 @@ describe("storyText", () => {
     expect(storyText(document, wide)).toContain("https://www.figma.com/design/File1");
     const { design: _design, ...withoutDesign } = document;
     expect(storyText(withoutDesign, wide)).not.toContain("Design");
+  });
+
+  it("names the props every use must set, or says there are none", () => {
+    const [component] = DOCUMENT.components;
+    const story = component?.stories[0];
+    if (component === undefined || story === undefined) throw new Error("the fixture's story is missing");
+    const document: StoryDocument = {
+      schema: 1,
+      requiredProps: ["options", "onValueChange"],
+      story,
+      component,
+      docs: undefined,
+      args: {},
+      problems: []
+    };
+    const wide: OutputStyle = { ...NARROW, width: 120 };
+    expect(storyText(document, wide)).toMatch(/Required\s+options, onValueChange/);
+    expect(storyText({ ...document, requiredProps: [] }, wide)).toMatch(/Required\s+none/);
   });
 });
 

@@ -181,6 +181,30 @@ describe("storyTree", () => {
     expect(findStory(phone, "kit:touch-plain--other")?.story.isTouch).toBe(false);
   });
 
+  it("places a story's required props by its own setting, else its meta's; a component's page by its meta's", () => {
+    const tree = storyTree([
+      source({
+        "./r.stories.tsx": {
+          title: "Inputs/Field",
+          requiredFirst: "section",
+          stories: [
+            { exportName: "Plain" },
+            { exportName: "Grouped", requiredFirst: "in-groups" },
+            { exportName: "Written", requiredFirst: false }
+          ]
+        },
+        "./s.stories.tsx": { title: "Inputs/Other", stories: [{ exportName: "Plain" }] }
+      })
+    ]);
+    expect(findStory(tree, "kit:inputs-field--plain")?.story.requiredFirst).toBe("section");
+    expect(findStory(tree, "kit:inputs-field--grouped")?.story.requiredFirst).toBe("in-groups");
+    expect(findStory(tree, "kit:inputs-field--written")?.story.requiredFirst).toBe(false);
+    expect(findStory(tree, "kit:inputs-field--plain")?.component.requiredFirst).toBe("section");
+    // none set: the catalogue's, which the shell reads
+    expect(findStory(tree, "kit:inputs-other--plain")?.story.requiredFirst).toBeUndefined();
+    expect(findStory(tree, "kit:inputs-other--plain")?.component.requiredFirst).toBeUndefined();
+  });
+
   it("marks a story about logic: its own setting, else the meta's", () => {
     const logic = storyTree([
       source({
