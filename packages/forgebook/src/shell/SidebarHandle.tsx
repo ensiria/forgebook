@@ -1,5 +1,6 @@
 /**
- * The handle on the sidebar's right edge: dragged, or moved with the arrow keys, it sets the sidebar's width.
+ * The handle on the sidebar's right edge: dragged, or moved with the arrow keys, it sets the sidebar's width; on a narrow
+ * window, where the sidebar lies over the page at no chosen width, the shade on the page takes its place.
  *
  * @module
  */
@@ -67,6 +68,36 @@ export const SidebarHandle = ({
       tabIndex={0}
       onPointerDown={startResize}
       onKeyDown={resizeWithKeys}
+    />
+  );
+};
+
+/**
+ * What borders the sidebar: beside the page its handle, while shown; over it the shade on the page.
+ *
+ * @param props - where the sidebar lies, whether it is shown, its width and how to hide it.
+ */
+export const SidebarEdge = ({
+  isOverlay,
+  isOpen,
+  width,
+  onWidthChange,
+  onHide
+}: {
+  readonly isOverlay: boolean;
+  readonly isOpen: boolean;
+  readonly width: number;
+  readonly onWidthChange: (width: number) => void;
+  readonly onHide: () => void;
+}): ReactNode => {
+  if (!isOverlay) return isOpen ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null;
+  return (
+    // the pointer's way out; Escape and the sidebar's own button are the others, so the shade stays out of the tree
+    <div
+      className="forgebook-sidebar-shade"
+      data-open={isOpen ? "" : undefined}
+      aria-hidden="true"
+      onClick={onHide}
     />
   );
 };

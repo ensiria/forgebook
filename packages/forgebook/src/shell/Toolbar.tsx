@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { type MouseEvent, type ReactNode, useId, useRef } from "react";
+import { type MouseEvent, type ReactNode, type Ref, useId, useRef } from "react";
 
 import type { CatalogueSettings } from "../catalogue.ts";
 import { type DeviceDefault, NO_DEVICE } from "../deviceView.ts";
@@ -37,8 +37,10 @@ export type ToolbarProps = {
   readonly isStoryPage?: boolean;
   /** Whether a component's page is shown: the audience changes nothing elsewhere. */
   readonly isComponentPage?: boolean;
-  /** Shows the hidden sidebar; none while it is shown. */
+  /** Shows the hidden sidebar; none while it is shown beside the page. */
   readonly onShowSidebar?: (() => void) | undefined;
+  /** The button that shows the sidebar, where the focus goes back when a sidebar over the page closes. */
+  readonly showSidebarRef?: Ref<HTMLButtonElement> | undefined;
   /** The width the shown story really has, in CSS px, for the width field; none on a component's page. */
   readonly shownWidth?: number | undefined;
   /** What the shown story fixes of the view: shown, and not changeable here; nothing by default. */
@@ -155,8 +157,12 @@ const CompareMenu = ({
  *
  * @param props - what showing the sidebar does.
  */
-export const ShowSidebarButton = ({ onShowSidebar }: { readonly onShowSidebar: () => void }): ReactNode => (
+export const ShowSidebarButton = ({
+  onShowSidebar,
+  showSidebarRef
+}: Pick<ToolbarProps, "showSidebarRef"> & { readonly onShowSidebar: () => void }): ReactNode => (
   <button
+    ref={showSidebarRef}
     type="button"
     className="forgebook-icon-button"
     title={STRINGS.showSidebar}
@@ -178,6 +184,7 @@ export const Toolbar = ({
   isStoryPage = true,
   isComponentPage = false,
   onShowSidebar,
+  showSidebarRef,
   shownWidth,
   fixed = NOT_FIXED,
   isLogic = false,
@@ -204,7 +211,9 @@ export const Toolbar = ({
   const onBar = layout.isWrapped ? pinned : pinned.filter((each) => !moved.includes(each.control.id));
   return (
     <div className={layout.isWrapped ? "forgebook-toolbar forgebook-toolbar--wrap" : "forgebook-toolbar"}>
-      {onShowSidebar === undefined ? null : <ShowSidebarButton onShowSidebar={onShowSidebar} />}
+      {onShowSidebar === undefined ? null : (
+        <ShowSidebarButton onShowSidebar={onShowSidebar} showSidebarRef={showSidebarRef} />
+      )}
       <ViewMenu
         layout={layout}
         ownView={ownView}

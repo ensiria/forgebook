@@ -334,7 +334,6 @@ test.describe("docs pages", () => {
   }) => {
     await page.setViewportSize({ width: 360, height: 700 });
     await page.goto(docs("kit:guides-theming"));
-    await page.getByRole("button", { name: "Hide the sidebar" }).click();
     const fold = page.locator("details.forgebook-contents");
     await expect(fold).toBeVisible();
     await expect(fold.getByRole("link", { name: "More contrast" })).toBeHidden();

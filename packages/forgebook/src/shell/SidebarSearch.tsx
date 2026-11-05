@@ -141,10 +141,15 @@ export const SidebarSearch = ({
               event.preventDefault();
               return;
             }
-            // Escape empties the search first, then leaves the field
+            // Escape empties the search first, then leaves the field; emptying uses the key up, so a sidebar lying over
+            // the page stays open for it (`useSidebarOverlay.ts`)
             if (event.key !== "Escape") return;
-            if (query === "") event.currentTarget.blur();
-            else onQueryChange("");
+            if (query === "") {
+              event.currentTarget.blur();
+              return;
+            }
+            event.preventDefault();
+            onQueryChange("");
           }}
           placeholder={STRINGS.searchPlaceholder}
           aria-label={STRINGS.searchLabel}
