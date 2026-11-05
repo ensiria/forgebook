@@ -14,6 +14,7 @@
  *
  * @module
  */
+import { realpathSync } from "node:fs";
 import { join } from "node:path";
 
 import { isFileLoadingAllowed, type ResolvedConfig, type ViteDevServer } from "vite";
@@ -41,15 +42,31 @@ const FILE_QUERIES: readonly string[] = [
 ];
 
 /**
- * Whether Vite refuses a file whatever `server.fs.allow` says: `deny`, or a path it will not trust (a `:` in it). Vite
- * offers no check of this step alone, so this asks its whole check with an `allow` that covers the file.
+ * A listed file's real path, in Vite's form. Vite refuses a Windows short name (`RUNNER~1`), which could dodge `deny`,
+ * and a system's temporary folder is often written with one: the long name lets the file be judged by what it is. So
+ * does a link's target, which is the file that would be read.
+ *
+ * @param file - the file, absolute.
+ */
+const realFile = (file: string): string => {
+  try {
+    return VITE_PATHS.normalize(realpathSync.native(file));
+  } catch {
+    return file;
+  }
+};
+
+/**
+ * Whether Vite refuses a listed file whatever `server.fs.allow` says: `deny`, or a path it will not trust (a `:` in it).
+ * Vite offers no check of this step alone, so this asks its whole check with an `allow` that covers the file.
  *
  * @param config - the dev server's configuration.
  * @param file - the file, absolute in Vite's form.
  */
 export const isFileRefused = (config: ResolvedConfig, file: string): boolean => {
-  const fs = { ...config.server.fs, allow: [VITE_PATHS.dirname(file)] };
-  return !isFileLoadingAllowed({ ...config, server: { ...config.server, fs } }, file);
+  const real = realFile(file);
+  const fs = { ...config.server.fs, allow: [VITE_PATHS.dirname(real)] };
+  return !isFileLoadingAllowed({ ...config, server: { ...config.server, fs } }, real);
 };
 
 /**

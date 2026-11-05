@@ -8,7 +8,7 @@
  *
  * @module
  */
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** What every file a client must not read holds. */
@@ -63,6 +64,13 @@ const ask = (port: number, path: string, headers: Record<string, string> = {}): 
     sent.end();
   });
 
+/**
+ * The address Vite serves a file under: `/@fs/C:/x` on Windows, `/@fs/x` elsewhere.
+ *
+ * @param file - the file, absolute in Vite's form.
+ */
+const fsAddress = (file: string): string => `/@fs/${file.replace(/^\//, "")}`;
+
 /** The port a listening server took. */
 const portOf = (server: ViteDevServer): number => {
   const address = server.httpServer?.address();
@@ -81,11 +89,12 @@ describe("a dev server's two ports", () => {
   let frames = 0;
 
   beforeAll(async () => {
-    // the real path: a temporary folder may be a link, and Vite compares the paths it resolves
-    base = realpathSync(mkdtempSync(join(tmpdir(), "forgebook-access-")));
-    project = join(base, "project");
-    outside = join(base, "outside");
-    named = join(base, "named");
+    // the real path in Vite's form: a temporary folder may be a link or a Windows short name, and every address below
+    // is written from these
+    base = VITE_PATHS.normalize(realpathSync.native(mkdtempSync(join(tmpdir(), "forgebook-access-"))));
+    project = `${base}/project`;
+    outside = `${base}/outside`;
+    named = `${base}/named`;
     for (const folder of [join(project, "src"), join(project, "docs"), outside, named])
       mkdirSync(folder, { recursive: true });
     writeFileSync(join(project, "src", "listed.stories.tsx"), "export default {}; export const One = {};\n");
@@ -196,12 +205,12 @@ describe("a dev server's two ports", () => {
         expect(answer.body).not.toContain(SECRET);
         expect(answer.body).not.toMatch(/x\.stories|id_rsa/);
       }
-      expect((await ask(catalogue, `/@fs${outside}/id_rsa`)).status).toBe(403);
+      expect((await ask(catalogue, fsAddress(`${outside}/id_rsa`))).status).toBe(403);
     });
 
     it("does not make Vite serve a file by naming it in a group", async () => {
       await ask(catalogue, `/@id/virtual:forgebook-files:${outside}::0::*`, TOOL_SCRIPT);
-      const answer = await ask(catalogue, `/@fs${outside}/id_rsa`);
+      const answer = await ask(catalogue, fsAddress(`${outside}/id_rsa`));
       expect(answer.status).toBe(403);
       expect(answer.body).not.toContain(SECRET);
     });
@@ -210,7 +219,7 @@ describe("a dev server's two ports", () => {
       "keeps ?%s inside server.fs, through a folder it allows too",
       async (query) => {
         const paths = [
-          `/@fs${outside}/note.md`,
+          fsAddress(`${outside}/note.md`),
           `/@id/${project}/../outside/note.md`,
           `/@id/${project}/.env`,
           `/@id/${project}/docs/denied.md`
@@ -239,6 +248,22 @@ describe("a dev server's two ports", () => {
       expect(docs.body).not.toContain("denied.md");
     });
 
+    it.skipIf(process.platform === "win32")("judges a link by the file it leads to", async () => {
+      const file = join(project, "src", "link.stories.tsx");
+      symlinkSync(join(project, "src", "denied.stories.tsx"), file);
+      writeFileSync(
+        join(project, "linked.ts"),
+        'import files from "./src/l*?forgebook-files";\nexport default files;\n'
+      );
+      const { body } = await ask(catalogue, "/linked.ts", OWN_SCRIPT);
+      const group = /"(\/@id\/__x00__virtual:forgebook-files:[^"]+)"/.exec(body)?.[1];
+      if (group === undefined) throw new Error("The source imports no group");
+      const listed = await ask(catalogue, group, OWN_SCRIPT);
+      rmSync(file);
+      expect(listed.body).toContain("listed.stories.tsx");
+      expect(listed.body).not.toContain("link.stories.tsx");
+    });
+
     it("keeps a search index to the same files", async () => {
       const pages = (await ownGroups()).find((url) => url.includes("forgebook-docs-pages"));
       if (pages === undefined) throw new Error("The catalogue imports no docs pages");
@@ -255,7 +280,7 @@ describe("a dev server's two ports", () => {
       if (files === undefined) throw new Error("The catalogue imports no story files");
       const listed = await ask(catalogue, files, OWN_SCRIPT);
       expect(listed.body).toContain("named.stories.tsx");
-      const story = await ask(catalogue, `/@fs${named}/named.stories.tsx`, OWN_SCRIPT);
+      const story = await ask(catalogue, fsAddress(`${named}/named.stories.tsx`), OWN_SCRIPT);
       expect(story.status).toBe(200);
     });
 
@@ -332,7 +357,7 @@ describe("a dev server's two ports", () => {
       const paths = [
         "/src/listed.stories.tsx",
         "/@vite/client",
-        `/@fs${project}/src/listed.stories.tsx?forgebook-code`,
+        `${fsAddress(`${project}/src/listed.stories.tsx`)}?forgebook-code`,
         "/__open-in-editor?file=a.ts"
       ];
       for (const path of paths) {
