@@ -797,6 +797,35 @@ A monorepo that points its packages at their sources with an export condition (`
 `forgebook` command: its dev server reads the stories and previews it answers tools with on Node under the same
 conditions, those of other runtimes (`browser`) aside, unless a plugin names the server's own.
 
+## A lighter catalogue
+
+Two features cost the most and are on by default: the accessibility check, which ships axe (about 180 KB gzipped in a
+build), and the props read from the types, whose TypeScript programs are most of what the dev server holds on a first
+start. A catalogue that does not want them turns them off:
+
+```ts
+export default defineConfig({
+  framework: react(),
+  title: "Acme",
+  stories: ["src/**/*.stories.tsx"],
+  a11y: false,
+  componentDocs: false
+});
+```
+
+- `a11y: false` checks nothing: no Accessibility tab and no accessibility column on a tester's page, axe neither written
+  in a build nor offered to the frames (whose code that loads it is fetched only on a check), and the generated tests,
+  `forgebook check`, `check-page` and their tools leave axe out (their reports say `"a11y": "off"`). `tabs: { a11y: false }`
+  only hides the tab and keeps the rest. A preset that turns the check off keeps it off, whatever rules the catalogue writes.
+- `componentDocs: false` starts no TypeScript program: no API reference and no `props` fence on a page, no "Used in", and
+  the search finds names, stories and docs pages but no props. The Props tab still works: its controls come from the
+  story's args and `argTypes`, as Storybook's do without a docgen (a text, a number, a toggle from each arg's value, an
+  action as an event); a prop the story gives no arg is not listed. A shared link is then checked against those kinds:
+  where the story gives a text, a link may set any text, even for a prop whose type takes a few values only, so give
+  such a prop `argTypes` options (`{ control: "select", options: [...] }`) to keep a link to them. `forgebook story` answers `"componentDocs": "off"`
+  with no `docs`, and `forgebook changed` says it finds no story through the imports. `forgebook docs` and `forgebook new`
+  still read the types when run, since they are asked for that. `usedIn: true` with it is an error.
+
 ## Commands
 
 | Command | What it does |

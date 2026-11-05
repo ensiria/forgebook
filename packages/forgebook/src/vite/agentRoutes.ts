@@ -21,6 +21,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { StorySource } from "@forgebook/story-format/source";
 import { createIdResolver, type ViteDevServer } from "vite";
 
+import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
@@ -28,7 +29,12 @@ import { sourceFiles } from "../sourceFiles.ts";
 import { findComponentByTitle, findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
 import { frameAddressOf } from "../viewState.ts";
-import type { AgentChangedStory, ChangedStoriesDocument, ErrorsDocument } from "./agent.types.ts";
+import type {
+  AgentChangedStory,
+  ChangedStoriesDocument,
+  ErrorsDocument,
+  StoryDocument
+} from "./agent.types.ts";
 import {
   type CataloguePages,
   type LoadedStoryParts,
@@ -227,7 +233,7 @@ const errorsAnswer = (context: RouteContext, live: LiveErrors | undefined): Agen
 export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer> => {
   const { config, params, tree, pages, view, loaded } = context;
   const usage =
-    config.lists.usedIn !== false && params.get("usedIn") === "true"
+    offersUsedIn(config.lists) && params.get("usedIn") === "true"
       ? await usageBySource(loaded.sources)
       : undefined;
   return { status: 200, body: storiesDocument(config.title, tree, pages, view, usage) };
@@ -273,7 +279,15 @@ const changedAnswer = async ({
         : [{ id: found.id, title: story.title, links: storyLinks(pages, found.id, view) }];
     })
   );
-  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems: [] };
+  // without the import graph no story is found, which must not read as a change that touches none
+  const problems = offersUsedIn(config.lists)
+    ? []
+    : [
+        readsComponentDocs(config.lists)
+          ? "No story is found through the imports: the catalogue turns Used in off (usedIn: false), whose import graph this reads"
+          : "No story is found through the imports: the catalogue reads no component docs (componentDocs: false), whose programs read the import graph"
+      ];
+  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems };
   return { status: 200, body };
 };
 
@@ -297,10 +311,15 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
     docs: await settled(files.docs[file]),
     preview: loaded.preview
   };
-  const index = config.lists.usedIn === false ? undefined : await sourceUsage(source);
+  const index = offersUsedIn(config.lists) ? await sourceUsage(source) : undefined;
   // a usage that cannot be read leaves "Used in" out, never the story
   const usage = index === undefined || typeof index === "string" ? undefined : { tree, index };
-  return { status: 200, body: storyDocument(location, parts, pages, view, usage) };
+  const document = storyDocument(location, parts, pages, view, usage);
+  // an agent must tell docs turned off from a story file that names no component
+  const body: StoryDocument = readsComponentDocs(config.lists)
+    ? document
+    : { ...document, componentDocs: "off" };
+  return { status: 200, body };
 };
 
 /**

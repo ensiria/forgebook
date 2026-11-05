@@ -31,4 +31,16 @@ describe("bench", () => {
     const { status } = run("--against", ENTRY);
     expect(status).not.toBe(0);
   });
+
+  it("refuses parity on a real library, which runs with its own configuration and without Ladle", () => {
+    const { status, stderr } = run("--parity", "--corpus", "primer");
+    expect(status).not.toBe(0);
+    expect(String(stderr)).toContain("--parity measures the generated library only");
+  });
+
+  it("refuses parity against the budget, which holds the defaults", () => {
+    const { status, stderr } = run("--parity", "--budget", ENTRY);
+    expect(status).not.toBe(0);
+    expect(String(stderr)).toContain("--parity cannot be checked against a budget");
+  });
 });

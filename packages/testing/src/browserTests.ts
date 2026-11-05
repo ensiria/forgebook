@@ -106,22 +106,22 @@ export type StoryBrowserTestsOptions = StoryFilesOptions & {
 const messages = (problems: readonly StoryProblem[]): string[] => problems.map((problem) => problem.message);
 
 /**
- * Runs the checks of one planned test on a shown story: axe, then for a story about its looks the spills, the
- * source's own check, and the overlays last (it resizes the window, which may close what the story left open). A story
- * about logic gets axe only.
+ * Runs the checks of one planned test on a shown story: axe (unless the catalogue checks no accessibility), then for a
+ * story about its looks the spills, the source's own check, and the overlays last (it resizes the window, which may
+ * close what the story left open). A story about logic gets axe only.
  *
  * @param page - the story's frame, ready.
  * @param planned - the story, its variant and whether its layout is checked.
- * @param a11y - the catalogue's accessibility rules.
+ * @param a11y - the catalogue's accessibility rules; none when it checks no accessibility (`a11y: false`).
  * @param check - the source's own check, if any.
  */
 const expectChecksPass = async (
   page: Page,
   planned: PlannedStoryTest,
-  a11y: A11ySettings,
+  a11y: A11ySettings | undefined,
   check: ((page: Page) => Promise<void>) | undefined
 ): Promise<void> => {
-  expect(messages(await axeProblems(page, a11y))).toEqual([]);
+  if (a11y !== undefined) expect(messages(await axeProblems(page, a11y))).toEqual([]);
   if (!planned.hasLookChecks) return;
   expect(messages(await spillProblems(page))).toEqual([]);
   await check?.(page);

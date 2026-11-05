@@ -23,6 +23,13 @@ Forgebook's dev server takes two ports then, its own and the frames', named on i
 fails the sample instead of moving the frames onto the next tool's. A static build keeps the frames on the catalogue's
 origin unless its configuration names two hosts, so `shellJs` and `frameJs` are read on one origin.
 
+`--parity` measures Forgebook at parity with Ladle as it ships, which neither checks accessibility (it builds axe as an
+empty module unless its a11y addon is on) nor reads props from the types: the generated catalogue's configuration sets
+`a11y: false` and `componentDocs: false`, so `firstPropsTable` is `n/a`. The report's `features` says which ran
+(`default` or `parity`), its tables head the column `forgebook at parity`, and two reports of different features are not
+compared. Publish both columns, Forgebook as it is and at parity, beside Ladle's. A real library runs with its own
+configuration, so `--parity` takes the generated library only.
+
 | Metric | Definition |
 |---|---|
 | `coldStart` | process spawned → the first story visible, every cache removed |

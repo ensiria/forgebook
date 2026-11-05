@@ -37,12 +37,12 @@ import { hasLookChecks } from "./storyTestPlan.ts";
  *
  * @param page - a fresh page.
  * @param storyPage - the story and the view.
- * @param a11y - the catalogue's accessibility settings.
+ * @param a11y - the catalogue's accessibility settings; none when it checks no accessibility (`a11y: false`).
  */
 const checkedPage = async (
   page: Page,
   storyPage: StoryPage,
-  a11y: A11ySettings,
+  a11y: A11ySettings | undefined,
   semantic: SemanticModel | undefined
 ): Promise<StoryCheckResult> => {
   const errors = watchedErrors(page);
@@ -68,7 +68,7 @@ const checkedPage = async (
         ...(await overlayProblems(page, isOverlayChecked(storyPage.view), storyPage.story.height))
       ]
     : [];
-  const axe = await axeProblems(page, a11y);
+  const axe = a11y === undefined ? [] : await axeProblems(page, a11y);
   const checked = result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(errors)]);
   return semantic === undefined
     ? checked
@@ -86,5 +86,5 @@ export const checkStories = async (request: StoryCheckRequest): Promise<StoryChe
   const results = await eachStoryPage(request, (page, storyPage) =>
     checkedPage(page, storyPage, a11y, request.semantic)
   );
-  return { schema: 1, results };
+  return { schema: 1, results, ...(a11y === undefined ? { a11y: "off" } : {}) };
 };

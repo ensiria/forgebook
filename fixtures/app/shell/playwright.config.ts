@@ -69,7 +69,9 @@ const SERVERS: Readonly<Record<Catalogue, { folder: string; configFile?: string 
   sveltekit: { folder: join(import.meta.dirname, "..", "..", "sveltekit") },
   "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") },
   // the fixture app without its written home, for the home every catalogue without one keeps (`home.e2e.ts`)
-  "generated-home": { folder: join(import.meta.dirname, ".."), configFile: "forgebook.generated.config.ts" }
+  "generated-home": { folder: join(import.meta.dirname, ".."), configFile: "forgebook.generated.config.ts" },
+  // the kit with accessibility checks and component docs off, for what a catalogue offers without them (`parity.e2e.ts`)
+  parity: { folder: join(import.meta.dirname, ".."), configFile: "parity/forgebook.config.ts" }
 };
 
 /** The catalogues and specs this run takes: all of them, or one group (`catalogueGroups.ts`). */

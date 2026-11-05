@@ -12,7 +12,7 @@
  */
 import { join, relative } from "node:path";
 
-import type { FramesMode, ToolName } from "./bench.types.ts";
+import type { FeaturesMode, FramesMode, ToolName } from "./bench.types.ts";
 import type { CorpusComponent, StoryForm } from "./corpus.ts";
 import type { CorpusStorybook } from "./realCorpus.types.ts";
 
@@ -113,8 +113,13 @@ export default {
 /** Every frames mode, as `--frames` names them. */
 export const FRAMES_MODES = ["isolated", "same-origin"] as const satisfies readonly FramesMode[];
 
-/** Forgebook's configuration, as its README writes one, with the theme switch. */
-const FORGEBOOK_CONFIG = `import { react } from "@forgebook/react/vite";
+/**
+ * Forgebook's configuration, as its README writes one, with the theme switch; at parity with Ladle as it ships, without
+ * the accessibility check and the props read from the types, as the README turns them off.
+ *
+ * @param features - which of its features run.
+ */
+const forgebookConfig = (features: FeaturesMode): string => `import { react } from "@forgebook/react/vite";
 import { defineConfig } from "forgebook";
 import { themeSwitch } from "forgebook/switches";
 
@@ -122,7 +127,7 @@ export default defineConfig({
   framework: react(),
   title: "Bench",
   stories: ["src/components/*.stories.tsx"],
-  switches: [themeSwitch()]
+  switches: [themeSwitch()]${features === "parity" ? ",\n  a11y: false,\n  componentDocs: false" : ""}
 });
 `;
 
@@ -146,16 +151,21 @@ const forgebookComponent = (component: CorpusComponent): string =>
  * @remarks
  * With its frames on an origin of their own, the dev server takes a second port for them, named so that a port taken
  * fails the sample instead of moving the frames to one that may belong to another tool. The other placement is asked on
- * the command line, so a real library's own configuration is measured as it is in both.
+ * the command line, so a real library's own configuration is measured as it is in both. At parity it draws no props
+ * table, so the page's metric of it is absent.
  *
  * @param frames - where its frames run.
+ * @param features - which of its features run; its defaults unless named.
  */
-export const forgebookTarget = (frames: FramesMode): Target => ({
+export const forgebookTarget = (frames: FramesMode, features: FeaturesMode = "default"): Target => ({
   name: "forgebook",
   form: "csf3",
   packages: ["forgebook", "@forgebook/react", "vite", "react"],
   mainPackage: "forgebook",
-  configFiles: { "forgebook.config.ts": FORGEBOOK_CONFIG, "forgebook.preview.ts": FORGEBOOK_PREVIEW },
+  configFiles: {
+    "forgebook.config.ts": forgebookConfig(features),
+    "forgebook.preview.ts": FORGEBOOK_PREVIEW
+  },
   caches: ["node_modules/.vite"],
   ports: frames === "isolated" ? 2 : 1,
   dev: (port) => ({
@@ -174,7 +184,7 @@ export const forgebookTarget = (frames: FramesMode): Target => ({
     `${base}?story=${forgebookComponent(component)}--${firstStory(component).toLowerCase()}`,
   componentUrl: (base, component) => `${base}?component=${forgebookComponent(component)}`,
   search: { field: ".forgebook-search input", ready: ".forgebook-search-panel[data-ready]" },
-  propsTable: ".forgebook-api__table"
+  ...(features === "parity" ? {} : { propsTable: ".forgebook-api__table" })
 });
 
 /** Forgebook as a user gets it: its frames on an origin of their own. */
@@ -297,8 +307,13 @@ export const withPorts = <TTarget extends Pick<Target, "ports">>(
  *
  * @param frames - where Forgebook's frames run.
  * @param isComparing - whether Storybook and Ladle are measured too.
+ * @param features - which of Forgebook's features run; its defaults unless named.
  */
-export const targetsOf = (frames: FramesMode, isComparing: boolean): readonly Target[] => {
-  const forgebook = forgebookTarget(frames);
+export const targetsOf = (
+  frames: FramesMode,
+  isComparing: boolean,
+  features: FeaturesMode = "default"
+): readonly Target[] => {
+  const forgebook = forgebookTarget(frames, features);
   return isComparing ? [forgebook, STORYBOOK, LADLE] : [forgebook];
 };
