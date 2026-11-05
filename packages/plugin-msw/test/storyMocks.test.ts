@@ -8,7 +8,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   handlerLabel,
-  handlersOf,
   type MockEvent,
   type MockRequest,
   type MockTools,
@@ -122,19 +121,6 @@ beforeEach(() => {
   calls.length = 0;
   listeners.clear();
   stubPage({ state: "activated" });
-});
-
-describe("handlersOf", () => {
-  it("finds none in a story without any", () => {
-    expect(handlersOf({})).toEqual([]);
-    expect(handlersOf({ msw: {} })).toEqual([]);
-    expect(handlersOf({ msw: { handlers: [] } })).toEqual([]);
-  });
-
-  it("reads a list, or a record of lists, as MSW's Storybook addon writes them", () => {
-    expect(handlersOf({ msw: { handlers: ["a", "b"] } })).toEqual(["a", "b"]);
-    expect(handlersOf({ msw: { handlers: { users: ["a"], posts: ["b", "c"] } } })).toEqual(["a", "b", "c"]);
-  });
 });
 
 describe("handlerLabel", () => {

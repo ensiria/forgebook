@@ -73,18 +73,6 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * The handlers a story's parameters declare, flat.
- *
- * @param parameters - the story's parameters.
- */
-export const handlersOf = (parameters: Readonly<Record<string, unknown>>): readonly unknown[] => {
-  const msw = parameters["msw"];
-  const handlers = isRecord(msw) ? msw["handlers"] : undefined;
-  if (Array.isArray(handlers)) return handlers;
-  return isRecord(handlers) ? Object.values(handlers).flat() : [];
-};
-
-/**
  * What a handler answers, as MSW's own log writes it (`GET /api/users`).
  *
  * @param handler - a handler; `info.header` is MSW's since version 2.

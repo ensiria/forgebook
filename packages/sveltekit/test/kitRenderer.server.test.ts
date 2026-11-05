@@ -15,7 +15,6 @@ import { HttpResponse, http, passthrough } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { kitRenderer } from "../src/kitRenderer.ts";
-import { mockHandlersOf } from "../src/loadFetch.ts";
 import PostPage from "./components/PostPage.svelte";
 
 /** A load's event, as much as these loads read. */
@@ -233,6 +232,34 @@ describe("a page's load drawn on a server", () => {
     );
   });
 
+  it.each(["http://127.0.0.1/api/title", "http://[::1]/api/title"])(
+    "answers %s beside a localhost page, the same server",
+    async (input) => {
+      const requested = spyOnNetwork();
+      expect(await renderPage(titleLoad(input), { msw: { handlers: [titleHandler("Mocked")] } })).toContain(
+        "<h1>Mocked</h1>"
+      );
+      expect(requested).toEqual([]);
+    }
+  );
+
+  it("fails on a loopback name beside a localhost page when no handler answers", async () => {
+    await expect(renderPage(titleLoad("http://127.0.0.1/api/title"))).rejects.toThrow(
+      "GET http://127.0.0.1/api/title"
+    );
+  });
+
+  it("fetches this machine's other ports and schemes as other origins", async () => {
+    const requested = spyOnNetwork();
+    const load = async ({ fetch }: LoadEvent): Promise<object> => {
+      await fetch("http://127.0.0.1:9/title").catch(() => undefined);
+      await fetch("https://localhost/title").catch(() => undefined);
+      return { title: "offline" };
+    };
+    expect(await renderPage(load)).toContain("<h1>offline</h1>");
+    expect(requested).toEqual(["http://127.0.0.1:9/title", "https://localhost/title"]);
+  });
+
   it("fetches an address on another origin as it is", async () => {
     const requested = spyOnNetwork();
     const load = async ({ fetch }: LoadEvent): Promise<object> => {
@@ -241,18 +268,5 @@ describe("a page's load drawn on a server", () => {
     };
     expect(await renderPage(load)).toContain("<h1>offline</h1>");
     expect(requested).toEqual(["https://api.example.com/title"]);
-  });
-});
-
-describe("mockHandlersOf", () => {
-  it("reads a list, a record of lists, and nothing", () => {
-    expect(mockHandlersOf({ msw: { handlers: ["a", "b"] } })).toEqual(["a", "b"]);
-    expect(mockHandlersOf({ msw: { handlers: { users: ["a"], posts: ["b", "c"] } } })).toEqual([
-      "a",
-      "b",
-      "c"
-    ]);
-    expect(mockHandlersOf({})).toEqual([]);
-    expect(mockHandlersOf({ msw: "none" })).toEqual([]);
   });
 });

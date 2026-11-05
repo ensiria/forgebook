@@ -131,13 +131,15 @@ function `use:enhance` takes runs as in the app. A POST form without `use:enhanc
 
 Generated server tests take `kitRenderer` from `@forgebook/sveltekit/renderer`: a page's `load` runs first, and a server
 render never reaches the network for the page's own origin. A load's `fetch` of a path, or of an address on the story's
-page's origin (`http://localhost` unless `page.url` names another), is answered by the story's `parameters.msw`
+page's origin (`http://localhost` unless `page.url` names another; `127.0.0.1` and `[::1]` count as `localhost` on the
+same port), is answered by the story's `parameters.msw`
 handlers, the ones the frame uses, run in Node by MSW's `getResponse` (MSW 2.11 or later, installed by the project): no
 request is intercepted, so tests running at once keep their own mocks. A mocked redirect is followed through the
 handlers and `HttpResponse.error()` rejects the fetch, as in the frame; `{ once: true }` handlers answer again in each
 render. When no handler answers, or one answers `passthrough()`, the story fails with the address and what to give
 instead: a handler, or the page's data (`serverData`, `page.data`); it fails even when the load catches the error. An
-address on another origin, `127.0.0.1` beside a `localhost` page among them, is fetched as it is.
+address on another origin, another port of this machine among them, is fetched as it is, and so is what a load or a handler
+asks of the global `fetch` rather than the load's own: only the load's `fetch` is covered.
 
 ## Not drawn
 

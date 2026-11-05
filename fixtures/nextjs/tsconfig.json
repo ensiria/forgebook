@@ -16,6 +16,8 @@
     "forgebook.config.ts",
     "forgebook.preview.tsx",
     "next.config.ts",
-    "types.d.ts"
+    "stories.ts",
+    "types.d.ts",
+    "vitest.config.ts"
   ]
 }

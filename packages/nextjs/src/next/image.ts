@@ -5,7 +5,7 @@
  * @module
  */
 
-import external from "next/dist/shared/lib/image-external.js";
+import external, * as namespace from "next/dist/shared/lib/image-external.js";
 import type NextImage from "next/image";
 import type { getImageProps as nextGetImageProps } from "next/image";
 
@@ -27,7 +27,10 @@ const isGetImageProps = (value: unknown): value is typeof nextGetImageProps => t
 
 /** Next.js's `getImageProps`: the props of the `<img>` the component would draw. */
 export const getImageProps = defaultExport(
-  typeof loaded === "object" && loaded !== null ? Reflect.get(loaded, "getImageProps") : undefined,
+  // a bundler's default import is the whole CommonJS `exports`; Node's test runner unwraps it to the component, and
+  // only the module's namespace still names this
+  (typeof loaded === "object" && loaded !== null ? Reflect.get(loaded, "getImageProps") : undefined) ??
+    Reflect.get(namespace, "getImageProps"),
   isGetImageProps,
   "next/image's getImageProps"
 );
