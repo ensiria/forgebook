@@ -156,6 +156,13 @@ export type ArgTypes<TArgs> = { readonly [Name in keyof TArgs]?: ArgType } & Rea
   Record<string, ArgType>
 >;
 
+/**
+ * Where a component's required props are listed in its API reference and Props tab: `in-groups` puts them first
+ * inside each group (and in the props that name none), `section` lists them all in one "Required" section before
+ * every group, each naming its group, and `false` keeps the order of the source.
+ */
+export type RequiredFirst = "in-groups" | "section" | false;
+
 /** A component's or a story's design, in the tool it was drawn in. */
 export type StoryDesign = {
   /**
@@ -243,6 +250,13 @@ export type StoryParameters = {
    * first appear. Written plainly, a list of string literals (the index reads it).
    */
   readonly propGroups?: readonly string[];
+  /**
+   * Where the required props are listed (`RequiredFirst`): on a meta, for the component's page and every story's
+   * Props tab; on a story, for its own Props tab, over the meta's. Both win over the catalogue's `requiredFirst`;
+   * a reader's "Required first" switch turns the ordering on or off over all three, never choosing the layout.
+   * `in-groups` by default. Written plainly, `"in-groups"`, `"section"` or `false` (the index reads it).
+   */
+  readonly requiredFirst?: RequiredFirst;
   /** CSF's documentation block; the catalogue reads the component's one-line description from it. */
   readonly docs?: { readonly description?: { readonly component?: string } };
 };
