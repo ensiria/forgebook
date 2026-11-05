@@ -20,7 +20,13 @@ import type { ForgebookPlugin } from "../plugin.ts";
 import { readLinkedFile } from "./docPageLinks.ts";
 import { compiledDocPage, compiledHome, docPageIndex } from "./docPageMarkdown.ts";
 import { pluginFences } from "./pluginConfig.ts";
-import { PAGES_SEARCH_PREFIX, storyFileKeys, storyFilesGroupText } from "./storyFilesModule.ts";
+import {
+  EVERY_FILE,
+  type IsFileKept,
+  PAGES_SEARCH_PREFIX,
+  storyFileKeys,
+  storyFilesGroupText
+} from "./storyFilesModule.ts";
 import { DOCS_PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -50,14 +56,16 @@ const watchedRead =
  * @param patterns - the patterns, `!` ones included (`listedFiles`).
  * @param watch - adds a file whose edit renews the module that read it.
  * @param fences - the fences the catalogue's plugins draw, which are not code; none by default.
+ * @param isKept - whether a listed page may be read; every one by default.
  */
 export const indexedDocPages = (
   root: string,
   patterns: readonly string[],
   watch: (file: string) => void,
-  fences: readonly string[] = []
+  fences: readonly string[] = [],
+  isKept: IsFileKept = EVERY_FILE
 ): IndexedDocPage[] => {
-  return storyFileKeys(root, patterns).map((key) => {
+  return storyFileKeys(root, patterns, isKept).map((key) => {
     const file = resolve(root, key);
     watch(file);
     return { key, file, index: docPageIndex(file, readFileSync(file, "utf8"), watchedRead(watch), fences) };
@@ -76,15 +84,17 @@ const objectOf = (keys: readonly string[], value: (key: string) => string): stri
  * @param watch - adds a file whose edit renews the module (each page: its index is in the module).
  * @param isServing - whether a dev server runs, whose tools read a page's Markdown.
  * @param plugins - the catalogue's plugins, whose fences a page may draw; none by default.
+ * @param isKept - whether a listed page may be read; every one by default.
  */
 export const docPagesModule = (
   root: string,
   patterns: readonly string[],
   watch: (file: string) => void,
   isServing: boolean,
-  plugins: readonly ForgebookPlugin[] = []
+  plugins: readonly ForgebookPlugin[] = [],
+  isKept: IsFileKept = EVERY_FILE
 ): string => {
-  const pages = indexedDocPages(root, patterns, watch, pluginFences(plugins));
+  const pages = indexedDocPages(root, patterns, watch, pluginFences(plugins), isKept);
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
   const page = (key: string): string => codeLiteral(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);

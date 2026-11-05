@@ -20,7 +20,7 @@ import { compiledDocPage } from "./docPageMarkdown.ts";
 import { indexedDocPages } from "./docPagesModule.ts";
 import type { DocsResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
-import { type IndexedStoryFile, indexedStoryFiles } from "./storyFilesModule.ts";
+import { EVERY_FILE, type IndexedStoryFile, type IsFileKept, indexedStoryFiles } from "./storyFilesModule.ts";
 
 /** A heading of the pages' HTML: its anchor, and what is inside it. */
 const HEADING = /<h[1-6] id="doc-([^"]*)"[^>]*>([\s\S]*?)<\/h[1-6]>/g;
@@ -215,9 +215,10 @@ export const storySearchModule = async (
   watch: (file: string) => void,
   extract: (storyFile: string) => Promise<DocsResult>,
   isServing: boolean,
-  pack: PackJson
+  pack: PackJson,
+  isKept: IsFileKept = EVERY_FILE
 ): Promise<string> => {
-  const files = indexedStoryFiles(root, patterns, watch);
+  const files = indexedStoryFiles(root, patterns, watch, undefined, isKept);
   const entries = await Promise.all(
     files.map(async (file) => ({ file, ...entryOf(file, await extract(file.file), watch) }))
   );
@@ -238,14 +239,16 @@ export const storySearchModule = async (
  * @param patterns - the group's patterns.
  * @param watch - adds a file whose edit renews the module.
  * @param pack - writes the index's JSON as the module's value.
+ * @param isKept - whether a listed page may be read; every one by default.
  */
 export const pagesSearchModule = (
   root: string,
   patterns: readonly string[],
   watch: (file: string) => void,
-  pack: PackJson
+  pack: PackJson,
+  isKept: IsFileKept = EVERY_FILE
 ): string => {
-  const pages = indexedDocPages(root, patterns, watch).map(({ key, file }) => [
+  const pages = indexedDocPages(root, patterns, watch, [], isKept).map(({ key, file }) => [
     key,
     blockSections(compiledDocPage(file, readFileSync(file, "utf8")).blocks)
   ]);

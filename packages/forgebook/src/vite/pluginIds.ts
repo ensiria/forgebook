@@ -9,6 +9,7 @@ import { FILES_PREFIX } from "./pluginModules.ts";
 import {
   DOCS_PAGES_SPECIFIER_PREFIX,
   FILES_SPECIFIER_PREFIX,
+  GROUP_SEPARATOR,
   PAGES_SEARCH_PREFIX,
   REACH_PREFIX,
   SEARCH_PREFIX,
@@ -42,6 +43,8 @@ const filesId = (folder: string, pattern: string): string =>
  * @param folder - the importing module's folder.
  */
 export const patternId = (source: string, folder: string): string | null => {
+  // the separator of a group's id: a folder that holds it would read back as patterns of its own
+  if (folder.includes(GROUP_SEPARATOR)) return null;
   if (source.endsWith(FILES_QUERY)) return filesId(folder, source.slice(0, -FILES_QUERY.length));
   if (!source.endsWith(DOCS_PAGES_QUERY)) return null;
   const pattern = source.slice(0, -DOCS_PAGES_QUERY.length);
@@ -73,6 +76,15 @@ export const virtualId = (source: string): string | undefined => {
   if (source === TOKENS_MODULE) return TOKENS_ID;
   return VIRTUAL_PREFIXES.some((prefix) => source.startsWith(prefix)) ? `\0${source}` : undefined;
 };
+
+/**
+ * Whether an id names a group's module: one whose patterns are written in the id itself, so that whoever writes the id
+ * chooses what the plugin reads.
+ *
+ * @param id - the module's id.
+ */
+export const isGroupId = (id: string): boolean =>
+  VIRTUAL_PREFIXES.some((prefix) => id.startsWith(`\0${prefix}`));
 
 /** The resolved id of the configuration's data module. */
 export const CONFIG_ID = `\0${CONFIG_MODULE}`;

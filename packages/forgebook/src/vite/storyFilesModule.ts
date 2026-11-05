@@ -41,7 +41,7 @@ export type StoryFilesGroup = {
 };
 
 /** Between a group's parts in a module's id: no path or pattern holds it. */
-const GROUP_SEPARATOR = "::";
+export const GROUP_SEPARATOR = "::";
 
 /** Before a pattern's count of climbed folders in a module's id, when it is a `!` pattern. */
 const NEGATED_MARK = "!";
@@ -93,15 +93,32 @@ export const storyFilesGroupOf = (text: string): StoryFilesGroup => {
 };
 
 /**
+ * Whether a file a group lists may be read. A dev server refuses what `server.fs.deny` names (`fileAccess.ts`).
+ *
+ * @param file - the file, absolute in Vite's form.
+ */
+export type IsFileKept = (file: string) => boolean;
+
+/** Every file a group lists: a build's, and a test's that reads the files from the disk. */
+export const EVERY_FILE: IsFileKept = (): boolean => true;
+
+/**
  * The story files patterns list, as paths relative to `root` starting with `./` or `../`, each once, sorted: the union
  * of the patterns less what the `!` ones match (`listedFiles`).
  *
  * @param root - the folder the patterns are relative to: the declaring module's.
  * @param patterns - the patterns (`../src/**\/*.stories.tsx`, `!../src/**\/legacy/*`).
+ * @param isKept - whether a listed file may be read; every one by default.
  * @throws when every pattern is a `!` one.
  */
-export const storyFileKeys = (root: string, patterns: readonly string[]): string[] =>
-  listedFiles(root, patterns).map((file) => file.key);
+export const storyFileKeys = (
+  root: string,
+  patterns: readonly string[],
+  isKept: IsFileKept = EVERY_FILE
+): string[] =>
+  listedFiles(root, patterns)
+    .map((file) => file.key)
+    .filter((key) => isKept(VITE_PATHS.resolve(root, key)));
 
 /**
  * The specifier prefix of a group of story files named by its patterns, the group following (`storyFilesGroupText`):
@@ -181,18 +198,21 @@ export const storyFileIndex = (root: string, pattern: string, key: string): Stor
  * @param patterns - the patterns (`storyFileKeys`).
  * @param watch - adds a file whose edit renews the module that read it.
  * @param cache - the index kept between starts, which holds while the files it came from do; none reads them all.
+ * @param isKept - whether a listed file may be read; every one by default.
  * @throws when a story file cannot be indexed.
  */
 export const indexedStoryFiles = (
   root: string,
   patterns: readonly string[],
   watch: (file: string) => void,
-  cache?: DiskCache<KeptIndex>
+  cache?: DiskCache<KeptIndex>,
+  isKept: IsFileKept = EVERY_FILE
 ): IndexedStoryFile[] => {
   const name = storyFilesGroupText(VITE_PATHS.normalize(root), patterns);
   const since = nowNs();
   const kept = cache?.read(name);
-  const files = listedFiles(root, patterns).map(({ key, pattern }) => {
+  const listed = listedFiles(root, patterns).filter(({ key }) => isKept(VITE_PATHS.resolve(root, key)));
+  const files = listed.map(({ key, pattern }) => {
     const file = VITE_PATHS.resolve(root, key);
     watch(file);
     const known = kept?.[key];

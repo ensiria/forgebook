@@ -22,14 +22,7 @@
  */
 import { extname, join, resolve } from "node:path";
 
-import {
-  type ConfigEnv,
-  isFileLoadingAllowed,
-  type Logger,
-  type Plugin,
-  type UserConfig,
-  type ViteDevServer
-} from "vite";
+import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { checksA11y, offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
@@ -44,6 +37,7 @@ import { currentCloseWatch } from "./closeWatch.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, NO_DOCS_EXTRACTOR } from "./docsExtractor.ts";
+import { devServerAccess } from "./fileAccess.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
@@ -72,9 +66,15 @@ import {
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
-import { type IndexedStoryFile, isKeptIndex, type KeptIndex, storyFilesGroupOf } from "./storyFilesModule.ts";
+import {
+  type IndexedStoryFile,
+  type IsFileKept,
+  isKeptIndex,
+  type KeptIndex,
+  storyFilesGroupOf
+} from "./storyFilesModule.ts";
 import { tokensModule } from "./storylessRoutes.ts";
-import { CODE_QUERY, DOCS_PAGE_QUERY, HOME_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
+import { DOCS_PAGE_QUERY, DOCS_QUERY, HOME_QUERY, RENEWED_QUERIES, TEXT_QUERIES } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /** This module's folder, in the core's package: the core's own dependencies resolve from here, not the project's. */
@@ -95,37 +95,6 @@ const DOCS_PAGE_FILE = /\.md$/;
 
 /** A TypeScript source file, whose edit may change a component's docs. */
 const SOURCE_FILE = /\.tsx?$/;
-
-/** The query that asks for a story file's component docs. */
-const DOCS_QUERY = "?forgebook-docs";
-
-/** The queries `textModules.ts` answers. */
-const TEXT_QUERIES: readonly string[] = [CODE_QUERY, PAGE_QUERY, MARKDOWN_QUERY];
-
-/** The queries of a story file's modules the shell reads, which hand an edit to it in place on a dev server. */
-const RENEWED_QUERIES: readonly string[] = [DOCS_QUERY, CODE_QUERY, PAGE_QUERY];
-
-/** The queries the plugin answers with a file's text, so each read keeps to what the dev server may serve. */
-const FILE_QUERIES: readonly string[] = [
-  DOCS_QUERY,
-  CODE_QUERY,
-  PAGE_QUERY,
-  MARKDOWN_QUERY,
-  DOCS_PAGE_QUERY,
-  HOME_QUERY
-];
-
-/**
- * Whether a dev server may read the file a query names: a plugin's answer never passes Vite's own check of
- * `server.fs`, so without this any file could be asked for by adding a query to its address.
- *
- * @param id - the module's id.
- * @param server - the dev server; none in a build, which reads only what the sources import.
- */
-const isReadable = (id: string, server: ViteDevServer | undefined): boolean =>
-  server === undefined ||
-  !FILE_QUERIES.some((query) => id.endsWith(query)) ||
-  isFileLoadingAllowed(server.config, id.slice(0, id.lastIndexOf("?")));
 
 /** The plugin's options. */
 export type ForgebookPluginOptions = {
@@ -177,12 +146,14 @@ const requestedPage = (url: string): PageFile | undefined => {
  * @param watch - adds a file whose edit renews the module.
  * @param isServing - whether a dev server runs.
  * @param plugins - the catalogue's plugins, whose fences a page may draw.
+ * @param isKept - whether a page its group lists may be read.
  */
 const docsModuleOf = async (
   id: string,
   watch: (file: string) => void,
   isServing: boolean,
-  plugins: ResolvedConfig["plugins"]
+  plugins: ResolvedConfig["plugins"],
+  isKept: IsFileKept
 ): Promise<{ code: string; moduleType: "js" } | undefined> => {
   const isHome = id.endsWith(HOME_QUERY);
   const isPage = id.endsWith(DOCS_PAGE_QUERY);
@@ -195,7 +166,7 @@ const docsModuleOf = async (
     return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
   }
   const { root, patterns } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
-  return { code: docPagesModule(root, patterns, watch, isServing, plugins), moduleType: "js" };
+  return { code: docPagesModule(root, patterns, watch, isServing, plugins, isKept), moduleType: "js" };
 };
 
 /**
@@ -220,6 +191,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const docsModules = new Set<string>();
   /** The groups' search indexes: any edit may change what a component's docs say. */
   const searchModules = new Set<string>();
+  /** What a client may read of a dev server. */
+  const access = devServerAccess(invalidateEverywhere);
   /** The errors the open frames report, for `forgebook errors` and the agents. */
   const live = createLiveErrors();
   /** Where the frames run: the dev server's second port once it listens, the configuration's choice in a build. */
@@ -239,8 +212,6 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     if (id === CONFIG_ID) return { code: configModule(config, await framesPlacement()), moduleType: "js" };
     return generatedModule(id, config, command);
   };
-  /** The dev server; none in a build. */
-  let devServer: ViteDevServer | undefined;
   /** The files followed one by one, so an edit reaches the dev server at once. */
   const watching = currentCloseWatch();
   /** Whether a dev server runs, or a build: tools ask only the former. */
@@ -250,7 +221,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const search = searchIndexes({
     extract: (storyFile: string) => extractor().extract(storyFile),
     isServing,
-    track: (id: string, isPages: boolean) => (isPages ? docsModules : searchModules).add(id)
+    track: (id: string, isPages: boolean) => (isPages ? docsModules : searchModules).add(id),
+    isKept: access.isKept
   });
   // a build's docs, code and pages of each group's story files, read while the build loads the stories
   const texts = groupTexts();
@@ -329,13 +301,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   ): Promise<{ code: string; moduleType: "js" } | undefined> => {
     if (id.startsWith(USAGE_ID_PREFIX)) {
       usageModules.add(id);
-      return usageModule(id, watch, extractor().usage, indexCache(), pack);
+      return usageModule(id, watch, extractor().usage, indexCache(), pack, access.isKept);
     }
     // what each story reaches is for the dev server's tools only: a build ships none of it
     if (id.startsWith(REACH_ID_PREFIX)) {
       usageModules.add(id);
       return isServing()
-        ? reachModule(id, watch, extractor().usage, indexCache())
+        ? reachModule(id, watch, extractor().usage, indexCache(), access.isKept)
         : { code: "export default [];", moduleType: "js" };
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
@@ -349,7 +321,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       { hasDocs: readsComponentDocs(lists), hasUsage, hasReach: hasUsage && isServing() },
       indexCache(),
       isTestRun ? undefined : extractor().warm,
-      startTexts
+      startTexts,
+      access.isKept
     );
     filesModules.set(id, new Set(files.map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
@@ -375,7 +348,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const modulesListing = (file: string): readonly string[] | undefined => {
     // the groups' modules list the story files, their "Used in" and search indexes read them
     if (STORY_FILE.test(file))
-      return listingRenewals(filesModules, file, [...usageModules, ...searchModules]);
+      return listingRenewals(filesModules, file, [...usageModules, ...searchModules], access.isKept);
     return DOCS_PAGE_FILE.test(file) && docsModules.size > 0 ? [...docsModules] : undefined;
   };
   /**
@@ -399,7 +372,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       return docsModule(await search.docsOf(id.slice(0, -DOCS_QUERY.length)), watch);
     }
     if (id.startsWith(DOCS_PAGES_PREFIX)) docsModules.add(id);
-    const docsPages = await docsModuleOf(id, watch, isServing(), config?.plugins ?? []);
+    const docsPages = await docsModuleOf(id, watch, isServing(), config?.plugins ?? [], access.isKept);
     if (docsPages !== undefined) return docsPages;
     if (!TEXT_QUERIES.some((query) => id.endsWith(query))) return undefined;
     // loaded on the first of these queries: the highlighter, the Markdown reader and what they need stay out of a
@@ -464,11 +437,19 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       };
     },
     resolveId(source: string, importer: string | undefined): string | null {
+      const isModule = access.isModule(importer);
       const virtual = virtualId(source);
-      if (virtual !== undefined) return virtual;
+      if (virtual !== undefined) {
+        if (isModule) access.noteImported(virtual);
+        return virtual;
+      }
       const generated = config === undefined ? undefined : generatedId(source, config.dir);
       if (generated !== undefined) return generated;
-      return importer === undefined ? null : patternId(source, VITE_PATHS.dirname(importer));
+      if (!access.isModule(importer)) return null;
+      // the importer's file: its id may carry whatever query an address gave it
+      const pattern = patternId(source, VITE_PATHS.dirname(importer.split("?")[0] ?? importer));
+      if (pattern !== null) access.noteImported(pattern);
+      return pattern;
     },
     // a warning and not a failure: a theme a reader can still use must not stop a catalogue from building
     configResolved: (resolved: { readonly logger: Logger; readonly cacheDir: string }): void => {
@@ -479,7 +460,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
     },
     configureServer: (server: ViteDevServer): void => {
-      devServer = server;
+      access.serve(server);
       // no person waits for a page in a test run
       watching.serve(isTestRun ? undefined : server);
       server.httpServer?.on("close", (): void => void docs?.close());
@@ -553,7 +534,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const generated = await pagesModule(id);
       if (generated !== undefined) return generated;
       // an answer, not an error: an error would raise Vite's overlay on every reader's open page
-      if (!isReadable(id, devServer)) return { code: "export default null;", moduleType: "js" };
+      if (access.isRefused(id)) return { code: "export default null;", moduleType: "js" };
       // in Vite's form, the text Vite's module graph knows a file by: a Node path on Windows (`C:\app\x.md`) is another
       const watch = (file: string): void => this.addWatchFile(VITE_PATHS.normalize(file));
       const resolveImport = async (specifier: string, importer: string): Promise<string | undefined> => {

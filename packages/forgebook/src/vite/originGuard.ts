@@ -6,7 +6,13 @@
  * @remarks
  * Vite's CORS lets any page on `localhost` or `127.0.0.1` read the dev server, whatever its port: a frame on a second
  * port would read the catalogue's agent API and files as before. So the catalogue refuses a request another origin
- * sends, unless it is a navigation (a link, an embed), which shows a page but lets nobody read it.
+ * sends, unless it opens one of its pages (a link, an embed) or a public file, which shows it but lets nobody read it.
+ * No other address is opened for another origin's page: a server's route acts when opened (`/__open-in-editor` opens a
+ * file), and a module or a source file has no use as a page.
+ *
+ * Vite checks `Host` first, on both ports, against `server.allowedHosts`: a page that reaches `127.0.0.1` through its
+ * own domain (DNS rebinding) is not told apart here, since it is same-origin for its browser, and over plain HTTP on
+ * that domain its browser sends no `Sec-Fetch-*`.
  *
  * The frames' origin would otherwise serve everything the catalogue's does, and a story's script would read the
  * project from there. It serves a script or a `fetch` (whose body a script reads) only for a module that another
@@ -24,7 +30,10 @@
 
 /** What a browser says of a request, from its headers. */
 export type RequestFacts = {
-  /** Its path, without the query (`/frame.html`). */
+  /**
+   * Its path as an address parser reads it, without the query (`/frame.html`): the routes behind the guards read the
+   * same, so `//x/__forgebook/api/stories` or `/./__forgebook/api/stories` is the route it would reach.
+   */
   readonly path: string;
   /** Its query, with its `?` (`?raw`); empty without one. */
   readonly query: string;
@@ -63,6 +72,9 @@ const OPAQUE_DESTS: ReadonlySet<string> = new Set([
 
 /** The queries that ask Vite for a module made from a file (its text, its address…), never a file as it is. */
 const TRANSFORM_QUERY = /[?&](?:raw|import|inline|url|worker|worker_file|sharedworker)(?:[&=]|$)/;
+
+/** The catalogue's pages, by their addresses: what another origin's page may open, with public files and framed routes. */
+const CATALOGUE_PAGES: ReadonlySet<string> = new Set(["/", "/index.html", FRAME_PAGE_PATH]);
 
 /** The dev server's own routes (`/__forgebook/api/`, `/__open-in-editor`): never a story's. */
 const SERVER_ROUTE_PREFIX = "/__";
@@ -117,18 +129,23 @@ export type CatalogueAnswer = "serve" | "refuse" | "to-frames";
 
 /**
  * What the catalogue's origin does with a request: the frame page goes to the frames' origin, another origin's
- * request is refused, the rest is served.
+ * request is refused unless it opens a page or a public file, the rest is served.
  *
  * @param request - what the browser says of it.
  * @param framedPages - the server's routes that are pages made to be framed by another origin's page (a client's
  *   inline preview), which only show a story and act on nothing.
+ * @param isPublic - whether a path names a file of the public folder; asked only of another origin's navigation.
  */
-export const catalogueAnswer = (request: RequestFacts, framedPages: ReadonlySet<string>): CatalogueAnswer => {
+export const catalogueAnswer = (
+  request: RequestFacts,
+  framedPages: ReadonlySet<string>,
+  isPublic: (path: string) => boolean = (): boolean => false
+): CatalogueAnswer => {
   if (isFromAnotherOrigin(request)) return "refuse";
-  const isFramedPage = framedPages.has(request.path) && isDocumentRequest(request);
-  // a route of the server acts when it is opened (`/__open-in-editor` opens a file): not on another page's say
-  if (request.path.startsWith(SERVER_ROUTE_PREFIX) && !isFramedPage && isAnyFromAnotherOrigin(request))
-    return "refuse";
+  const isOpenable = (): boolean =>
+    CATALOGUE_PAGES.has(request.path) ||
+    (isDocumentRequest(request) && (framedPages.has(request.path) || isPublic(request.path)));
+  if (isAnyFromAnotherOrigin(request) && !isOpenable()) return "refuse";
   return request.path === FRAME_PAGE_PATH ? "to-frames" : "serve";
 };
 
