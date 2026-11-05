@@ -8,11 +8,15 @@
     "dev": "forgebook dev",
     "build": "forgebook build",
     "next": "next dev",
+    "test": "vitest run",
     "typecheck": "tsc -p ."
   },
   "devDependencies": {
     "@forgebook/nextjs": "workspace:*",
+    "@forgebook/plugin-msw": "workspace:*",
     "@forgebook/react": "workspace:*",
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/testing": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/dom": "10.4.2",
@@ -26,6 +30,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwindcss": "4.3.3",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   }
 }

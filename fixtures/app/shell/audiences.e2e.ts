@@ -185,7 +185,6 @@ test.describe("audiences of a component's page", () => {
   test("fits a phone's width without the page scrolling sideways", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto(`${SELECT}&audience=tester`);
-    await page.getByRole("button", { name: "Hide the sidebar" }).click();
     await expect(headings(page).first()).toHaveText("What the stories cover");
     const scroll = page.locator(".forgebook-scroll");
     await expect

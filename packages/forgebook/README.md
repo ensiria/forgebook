@@ -194,6 +194,15 @@ too, with a warning.
 
 It adds about a dozen packages to a React and Vite project.
 
+## On a narrow window
+
+Below 720 px the sidebar stops taking room from the page. It starts closed, opens from the toolbar's sidebar button and
+slides over the page, which keeps the whole width and cannot be reached while the sidebar is open. A tap outside it,
+Escape (once the search is empty and no menu is open), its own button or opening any page closes it, and the focus goes
+back to the button, unless a search's result has taken it to what it found. Opening it there changes
+nothing a wider window remembers: the sidebar a person showed or hid on a wide window is as they left it, width
+included. A reduced-motion preference shows and hides it at once.
+
 ## The toolbar
 
 The View menu holds every control: the catalogue's switches, and Forgebook's own (the background, the style sheets, the
@@ -498,8 +507,8 @@ The buttons read their colours from the page's theme.
 
 The field at the top of the sidebar searches the whole catalogue. The tree filters by name as you type, for browsing;
 beside it a list ranks everything the words find, each component or page with what matched inside it and why (a prop,
-an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere, ↑ and ↓
-move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
+an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere (with the sidebar hidden, ⌘K alone,
+which shows it), ↑ and ↓ move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
 
 A prop has an address of its own, so a link to one can be pasted anywhere: `?component=acme:inputs-select#prop.value`,
 and `#prop.Group.label` for a prop of a part named in `subcomponents`. A heading of a component's documentation file

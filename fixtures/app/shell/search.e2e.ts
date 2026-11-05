@@ -169,6 +169,7 @@ test.describe("the search", () => {
   test("fits a phone, under the field", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto("/");
+    await page.getByRole("button", { name: "Show the sidebar" }).click();
     await page.getByRole("searchbox").fill("value");
     const box = await page.locator(".forgebook-search-panel").boundingBox();
     const field = await page.locator(".forgebook-search").boundingBox();

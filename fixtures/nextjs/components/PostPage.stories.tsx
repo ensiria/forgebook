@@ -23,4 +23,4 @@ export const ReturningReader: Story<typeof PostPage> = {
 };
 
 /** A slug with no post: Next.js would draw the not-found page. */
-export const Missing: Story<typeof PostPage> = { args: { slug: "no-such-post" } };
+export const Missing: Story<typeof PostPage> = { tags: ["!test"], args: { slug: "no-such-post" } };

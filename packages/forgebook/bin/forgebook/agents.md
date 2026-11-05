@@ -115,7 +115,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   and what its server code reads with `nextjs.cookies`, `headers` and `draftMode`. A link or a router call moves the
   story's route and is listed among its events; a `play` reads where it went with `storyRoute()`
   (`@forgebook/nextjs/route`). Async server components are drawn; what they reach on a server (a database, the file
-  system) is not there: fetch it and mock it with `parameters.msw`.
+  system) is not there: fetch it and mock it with `parameters.msw`. In the server tests a server component's `fetch` never
+  reaches the network, whatever its address: a fetch no handler answers fails the story, naming the address.
 
 - Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
   `@replacedBy`. `forgebook story` returns them as `docs.guidance`: read them before using a component, and never use a

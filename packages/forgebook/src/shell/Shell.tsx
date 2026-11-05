@@ -59,7 +59,7 @@ import { type LazyModule, lazyModule } from "./lazyModule.tsx";
 import { type LoadPluginHosts, PluginHostsContext } from "./pluginHostsContext.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
-import { SidebarHandle } from "./SidebarHandle.tsx";
+import { SidebarEdge } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
 import { StoryPicker } from "./StoryPicker.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
@@ -71,6 +71,7 @@ import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
 import { useShownView } from "./useShownView.ts";
 import { useSidebarLayout } from "./useSidebarLayout.ts";
+import { useSidebarOverlay } from "./useSidebarOverlay.ts";
 import { useStoryHeights } from "./useStoryHeights.ts";
 import { useStoryIdsElement } from "./useStoryIdsElement.ts";
 import { useStoryKeys } from "./useStoryKeys.ts";
@@ -402,7 +403,7 @@ const ShellBar = ({ isHome, ...toolbar }: ToolbarProps & { readonly isHome: bool
   isHome ? (
     <div className="forgebook-toolbar">
       {toolbar.onShowSidebar === undefined ? null : (
-        <ShowSidebarButton onShowSidebar={toolbar.onShowSidebar} />
+        <ShowSidebarButton onShowSidebar={toolbar.onShowSidebar} showSidebarRef={toolbar.showSidebarRef} />
       )}
     </div>
   ) : (
@@ -772,18 +773,30 @@ const ShellPage = ({
   // the written home's module, loaded when the home is first opened
   const writtenHome = useMemo(() => (home === undefined ? undefined : lazyModule(home)), [home]);
   const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
-  const {
-    width: sidebarWidth,
-    setWidth: setSidebarWidth,
-    isOpen: isSidebarOpen,
-    setIsOpen: setIsSidebarOpen
-  } = useSidebarLayout();
-  const showSidebar = useCallback((): void => setIsSidebarOpen(true), [setIsSidebarOpen]);
   const catalogue = useCatalogue();
   const { address, visit, pageAddress, openPage, openFound, openAnchor, replaceAddress } = useAddress(
     catalogue,
     addressTexts
   );
+  const {
+    width: sidebarWidth,
+    setWidth: setSidebarWidth,
+    isOpen: isSidebarOpen,
+    setIsOpen: setIsSidebarOpen,
+    isOverlay: isSidebarOverlay
+  } = useSidebarLayout(visit);
+  const showSidebar = useCallback((): void => setIsSidebarOpen(true), [setIsSidebarOpen]);
+  const hideSidebar = useCallback((): void => setIsSidebarOpen(false), [setIsSidebarOpen]);
+  const {
+    isOver: isSidebarOver,
+    sidebarRef,
+    hideButtonRef,
+    showButtonRef
+  } = useSidebarOverlay({
+    isOverlay: isSidebarOverlay,
+    isOpen: isSidebarOpen,
+    onClose: hideSidebar
+  });
   // each page's last scroll position, kept across the component pages and the stage
   const scrollPositions = useRef(new Map<string, number>());
   const scroll: PageScroll = { visit, positions: scrollPositions.current };
@@ -909,7 +922,10 @@ const ShellPage = ({
       <Sidebar
         width={sidebarWidth}
         isOpen={isSidebarOpen}
-        onHide={(): void => setIsSidebarOpen(false)}
+        isOverlay={isSidebarOverlay}
+        sidebarRef={sidebarRef}
+        hideButtonRef={hideButtonRef}
+        onHide={hideSidebar}
         onShow={showSidebar}
         appearance={appearance}
         title={title}
@@ -933,8 +949,15 @@ const ShellPage = ({
           openPage(titledPage(idsByTitle, sourceId, componentTitle))
         }
       />
-      {isSidebarOpen ? <SidebarHandle width={sidebarWidth} onWidthChange={setSidebarWidth} /> : null}
-      <main className="forgebook-main">
+      <SidebarEdge
+        isOverlay={isSidebarOverlay}
+        isOpen={isSidebarOpen}
+        width={sidebarWidth}
+        onWidthChange={setSidebarWidth}
+        onHide={hideSidebar}
+      />
+      {/* under a sidebar lying over it, the page leaves Tab, screen readers and the pointer */}
+      <main className="forgebook-main" inert={isSidebarOver}>
         <ShellBar
           isHome={hasNoStories(shown)}
           view={shownView}
@@ -942,7 +965,9 @@ const ShellPage = ({
           isStoryPage={shown.kind === "story"}
           isComponentPage={shown.kind === "component"}
           isLogic={isLogicPage(shown)}
-          onShowSidebar={isSidebarOpen ? undefined : (): void => setIsSidebarOpen(true)}
+          // under a sidebar lying over the page the button stays, so the bar's controls never move behind it
+          onShowSidebar={isSidebarOpen && !isSidebarOver ? undefined : showSidebar}
+          showSidebarRef={showButtonRef}
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}
           deviceDefault={deviceOfShown(catalogue.device, shown)}
