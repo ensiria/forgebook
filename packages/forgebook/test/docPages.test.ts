@@ -307,17 +307,17 @@ describe("isDocPage", () => {
 describe("the modules", () => {
   it("indexes the fixture's pages, each with a loader, and the Markdown only on a dev server", () => {
     const watched: string[] = [];
-    const code = docPagesModule(KIT_DIR, "docs/**/*.md", (file) => watched.push(file), true);
+    const code = docPagesModule(KIT_DIR, ["docs/**/*.md"], (file) => watched.push(file), true);
     expect(code).toContain(
       `${codeLiteral("./docs/getting-started.md")}: () => import(${codeLiteral(`${VITE_PATHS.join(KIT_DIR, "docs/getting-started.md")}${DOCS_PAGE_QUERY}`)})`
     );
     expect(code).toContain("module.text");
     expect(new Set(watched).size).toBe(5);
-    expect(docPagesModule(KIT_DIR, "docs/**/*.md", () => undefined, false)).not.toContain("module.text");
+    expect(docPagesModule(KIT_DIR, ["docs/**/*.md"], () => undefined, false)).not.toContain("module.text");
   });
 
   it("finds every link of the fixture's pages among its pages", () => {
-    const pages = indexedDocPages(KIT_DIR, "docs/**/*.md", () => undefined);
+    const pages = indexedDocPages(KIT_DIR, ["docs/**/*.md"], () => undefined);
     expect(pages.flatMap((each) => each.index.notes ?? [])).toEqual([]);
     expect(pages.find((each) => each.key === "./docs/getting-started.md")?.index.stories).toHaveLength(3);
   });

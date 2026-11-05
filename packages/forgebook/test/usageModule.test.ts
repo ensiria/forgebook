@@ -88,8 +88,8 @@ describe("mergedUsage", () => {
 describe("a catalogue that turns Used in off", () => {
   it("offers no usage loader in its files' modules, and says so in its settings", () => {
     const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
-    const offered = storyFilesModule(dir, "./*.stories.tsx", () => undefined);
-    const off = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+    const offered = storyFilesModule(dir, ["./*.stories.tsx"], () => undefined);
+    const off = storyFilesModule(dir, ["./*.stories.tsx"], () => undefined, {
       hasUsage: false,
       hasReach: false
     });
@@ -108,7 +108,7 @@ describe("a catalogue that turns Used in off", () => {
 describe("a static build's files module", () => {
   it('offers "Used in" without what each story reaches, which only the dev server\'s tools read', () => {
     const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
-    const built = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+    const built = storyFilesModule(dir, ["./*.stories.tsx"], () => undefined, {
       hasUsage: true,
       hasReach: false
     });
@@ -120,7 +120,7 @@ describe("a static build's files module", () => {
 describe("a files module's loaders", () => {
   it("name each story file once, for its index and every loader of it", async () => {
     const dir = VITE_PATHS.join(import.meta.dirname, "fixtures", "usage");
-    const code = storyFilesModule(dir, "./*.stories.tsx", () => undefined, {
+    const code = storyFilesModule(dir, ["./*.stories.tsx"], () => undefined, {
       hasUsage: false,
       hasReach: false
     });

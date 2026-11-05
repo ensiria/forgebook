@@ -201,7 +201,7 @@ const entryOf = (
  * A group of story files' search index, as the code of its module.
  *
  * @param root - the declaring module's folder.
- * @param pattern - the pattern.
+ * @param patterns - the group's patterns.
  * @param watch - adds a file whose edit renews the module.
  * @param extract - reads a story file's component.
  * @param isServing - whether a dev server runs: only its tools read the problems, which name files on this computer, so
@@ -211,13 +211,13 @@ const entryOf = (
  */
 export const storySearchModule = async (
   root: string,
-  pattern: string,
+  patterns: readonly string[],
   watch: (file: string) => void,
   extract: (storyFile: string) => Promise<DocsResult>,
   isServing: boolean,
   pack: PackJson
 ): Promise<string> => {
-  const files = indexedStoryFiles(root, pattern, watch);
+  const files = indexedStoryFiles(root, patterns, watch);
   const entries = await Promise.all(
     files.map(async (file) => ({ file, ...entryOf(file, await extract(file.file), watch) }))
   );
@@ -235,17 +235,17 @@ export const storySearchModule = async (
  * A group of docs pages' search index, as the code of its module.
  *
  * @param root - the declaring module's folder.
- * @param pattern - the pattern.
+ * @param patterns - the group's patterns.
  * @param watch - adds a file whose edit renews the module.
  * @param pack - writes the index's JSON as the module's value.
  */
 export const pagesSearchModule = (
   root: string,
-  pattern: string,
+  patterns: readonly string[],
   watch: (file: string) => void,
   pack: PackJson
 ): string => {
-  const pages = indexedDocPages(root, pattern, watch).map(({ key, file }) => [
+  const pages = indexedDocPages(root, patterns, watch).map(({ key, file }) => [
     key,
     blockSections(compiledDocPage(file, readFileSync(file, "utf8")).blocks)
   ]);

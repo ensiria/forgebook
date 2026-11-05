@@ -9,14 +9,9 @@
  *
  * @module
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-import type { StoryFileIndex, StorySource } from "@forgebook/story-format/source";
+import type { StorySource } from "@forgebook/story-format/source";
 import { sourceFiles } from "forgebook/source-files";
-import { autoTitle, patternBase } from "forgebook/vite/auto-title";
-import { indexStoryFile } from "forgebook/vite/index-story-file";
-import { storyFileKeys } from "forgebook/vite/story-files-module";
+import { indexedStoryFiles, storyFileKeys } from "forgebook/vite/story-files-module";
 
 /** Where a package's story files are. */
 export type StoryFilesOptions = {
@@ -26,14 +21,18 @@ export type StoryFilesOptions = {
   readonly name: string;
   /** The folder the patterns are relative to: the folder of the module that declares the source. */
   readonly root: string;
-  /** The same patterns as the source's `?forgebook-files` imports, relative to `root` (`../src/**\/*.stories.tsx`). */
+  /**
+   * The same patterns as the source's `?forgebook-files` imports, relative to `root` (`../src/**\/*.stories.tsx`), or
+   * the catalogue's `stories`: a `!` pattern leaves out what it matches from what the others list.
+   */
   readonly patterns: readonly string[];
 };
 
 /**
- * The story files the patterns match, as the source's keys (`./x` or `../x`, relative to `root`), sorted.
+ * The story files the patterns list, as the source's keys (`./x` or `../x`, relative to `root`), each once, sorted.
  *
  * @param options - where the files are.
+ * @throws When every pattern is a `!` one: they leave files out, and nothing lists any.
  */
 export const storyFiles = (options: StoryFilesOptions): string[] =>
   storyFileKeys(options.root, options.patterns);
@@ -42,21 +41,12 @@ export const storyFiles = (options: StoryFilesOptions): string[] =>
  * A source with its index read from the disk and no loaders: enough for the story tree, the ids and the tests.
  *
  * @param options - where the files are.
- * @throws When a story file cannot be indexed.
+ * @throws When a story file cannot be indexed, or every pattern is a `!` one.
  */
 export const indexedSource = (options: StoryFilesOptions): StorySource => {
-  const index: Record<string, StoryFileIndex> = {};
-  for (const file of storyFiles(options)) {
-    // the title the plugin gives: from the first pattern that matches the file, as each pattern is one module
-    const pattern = options.patterns.find((candidate) =>
-      storyFileKeys(options.root, [candidate]).includes(file)
-    );
-    const title = pattern === undefined ? undefined : autoTitle(patternBase(pattern), file);
-    const text = readFileSync(join(options.root, file), "utf8");
-    const entry = indexStoryFile(file, text, title === undefined ? {} : { autoTitle: title });
-    if (typeof entry === "string") throw new Error(entry);
-    index[file] = entry;
-  }
+  // indexed as the plugin indexes them: a file's title from the first pattern that lists it
+  const files = indexedStoryFiles(options.root, options.patterns, (): void => undefined);
+  const index = Object.fromEntries(files.map((file) => [file.key, file.index]));
   return {
     id: options.sourceId,
     name: options.name,

@@ -106,7 +106,7 @@ describe("textsModuleCode", () => {
 const SELECT = "./src/Select.stories.tsx";
 
 /** The kit's group of one story file: its folder in Vite's form, as the texts module's id writes it. */
-const GROUP = storyFilesGroupText(VITE_PATHS.normalize(KIT_DIR), SELECT);
+const GROUP = storyFilesGroupText(VITE_PATHS.normalize(KIT_DIR), [SELECT]);
 
 /** The kit's pattern's module's id. */
 const FILES_ID = `${FILES_PREFIX}${GROUP}`;
@@ -170,7 +170,10 @@ describe("groupTexts", () => {
       () => asked.resolve(undefined)
     );
     const file = join(KIT_DIR, SELECT);
-    texts.starter(FILES_ID, sources)([{ key: SELECT, file, index: { title: "Select", stories: [] } }]);
+    texts.starter(
+      FILES_ID,
+      sources
+    )([{ key: SELECT, pattern: SELECT, file, index: { title: "Select", stories: [] } }]);
     // the docs are asked for with no texts module loaded yet
     await asked.promise;
     let isWritten = false;
@@ -200,7 +203,7 @@ describe("groupTexts", () => {
         byPattern
       )
     );
-    start([{ key: SELECT, file, index: { title: "Select", stories: [] } }]);
+    start([{ key: SELECT, pattern: SELECT, file, index: { title: "Select", stories: [] } }]);
     await textsCode(
       texts,
       kitSources(
@@ -228,7 +231,10 @@ describe("groupTexts", () => {
       () => undefined
     );
     const file = join(KIT_DIR, SELECT);
-    texts.starter(FILES_ID, failing)([{ key: SELECT, file, index: { title: "Select", stories: [] } }]);
+    texts.starter(
+      FILES_ID,
+      failing
+    )([{ key: SELECT, pattern: SELECT, file, index: { title: "Select", stories: [] } }]);
     // a failure before the module asks ends nothing, and its module's load still says why
     await new Promise((settle) => setTimeout(settle, 10));
     await expect(textsCode(texts, sources)).rejects.toThrow("no docs");

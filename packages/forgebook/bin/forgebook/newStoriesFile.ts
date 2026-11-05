@@ -12,6 +12,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { autoTitle, patternBase } from "../../src/vite/autoTitle.ts";
 import { findConfigFile, loadConfigFile } from "../../src/vite/configFile.ts";
+import { isNegated } from "../../src/vite/storyPatterns.ts";
 import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import { frameworkDocsModule } from "../frameworkDocs.ts";
 import { newStories } from "./newStories.ts";
@@ -24,10 +25,14 @@ export type NewStoriesFile = {
   readonly text: string;
 };
 
-/** The folder the title starts from: the catalogue's first stories pattern's, else `src` for a file under it. */
+/**
+ * The folder the title starts from: the catalogue's first stories pattern's (a `!` one lists nothing), else `src` for
+ * a file under it.
+ */
 const titleBase = async (packageDir: string, storiesFile: string): Promise<string> => {
   const config = findConfigFile(packageDir);
-  const [pattern] = config === undefined ? [] : (await loadConfigFile(config)).stories;
+  const patterns = config === undefined ? [] : (await loadConfigFile(config)).stories;
+  const pattern = patterns.find((each) => !isNegated(each));
   if (pattern !== undefined) return patternBase(pattern).replace(/^\.\//, "");
   return VITE_PATHS.relative(packageDir, storiesFile).split("/")[0] === "src" ? "src" : "";
 };
