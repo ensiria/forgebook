@@ -100,7 +100,7 @@ type LaidProp = {
  * @param group - its group, if any.
  */
 const prop = (name: string, group?: string): LaidProp => ({
-  name: name.replace("*", ""),
+  name: name.endsWith("*") ? name.slice(0, -1) : name,
   ...(group === undefined ? {} : { group }),
   isRequired: name.endsWith("*"),
   kind: name.startsWith("on") ? "event" : "text"
