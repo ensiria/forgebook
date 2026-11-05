@@ -11,7 +11,7 @@
  * Every program the benchmark runs to completion goes through `execProgram`, which needs a time limit and enforces it
  * on the whole tree: cli-kit's own runner stops only the program it started and then waits for its output pipes to
  * close, and a grandchild that inherited them (a package's install script, a build's worker) keeps them open, so the
- * wait never ends, on Windows above all, where stopping a process leaves its children running. Here the tree is
+ * wait lasts as long as they do. Here the tree is
  * stopped, and the end of the program is its exit: pipes still open a few seconds later are closed from this side.
  * Parsing is pure; the file system is passed in.
  *

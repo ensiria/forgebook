@@ -81,12 +81,13 @@ that impossible to repeat in silence, at every level:
 
 ### The hang's likely causes, and what fixed each
 
-Read in the code of the kit's earlier version (the field run's logs were not available):
+Read in the code of the kit's earlier version. None is established as the field run's cause: its logs were not
+available, and the earlier version kept none of its own.
 
 | Cause | Where | Fix |
 |---|---|---|
 | QuickEdit: a click in the window suspends every write to the console | the Windows console | the launcher turns it off |
-| A program's time limit stopped only the program, then waited for its output pipes, which a child holding them (an install script's, a build's worker) keeps open: forever on Windows, where stopping a process leaves its children running | cli-kit's `exec`, under every install, clone, preparation and build | `execProgram` stops the tree and ends at the program's exit (`programs.ts`); reproduced on macOS: a 2 s limit returned after the child's 12 s |
+| A program's time limit stopped only the program, then waited for its output pipes, which a child holding them (an install script's, a build's worker) keeps open, for as long as that child lives | cli-kit's `exec`, under every install, clone, preparation and build | `execProgram` stops the tree and ends at the program's exit (`programs.ts`). Reproduced on macOS: a 2 s limit returned after the child's 12 s. Not shown on Windows: in the same test on `windows-latest` a child started by Node without `detached` was gone with its parent, so there this can hold only for a child that detaches |
 | Most programs had no time limit at all: a stalled `npm install`, `yarn install` or `git fetch` waits forever | `prepare.ts`, `prepareCorpus.ts` | every one has a limit; Git gives up on a transfer slower than 1 kB/s for five minutes |
 | A frame whose script is stuck never answers Playwright's `evaluate`, which has no timeout, and the loop that waits for a story reads every frame | `stamps.ts`, `sweep.ts` | each reading has a deadline |
 | Stopping a server waited for its exit without a limit; on Windows `taskkill` can fail | `measure.ts` | 15 s, then the run goes on |
@@ -137,7 +138,17 @@ Never run: **Windows x64** (the field PC is the first), the **full profile on Wi
 there: large Yarn installs, long paths, Fluent's `prepare` with MinGit's `sh`), the Visual C++ permission request on a
 real PC, a Desktop moved to OneDrive, an antivirus other than Defender, Linux on a desktop with a session.
 
-On this version, see the pull request that brought it to `develop` for what was run and where.
+On this version, nothing has run on a Windows launcher. What ran:
+
+- **`windows-latest` CI**: the unit tests, among them the process-tree runner and the watchdog with real processes
+  (`taskkill` included).
+- **macOS**: `start-bench.sh` from nothing through calibration, the quick profile and the zip, one commit before the
+  review's fixes (a heartbeat a minute, nothing left running, no trace of the user or the folder in the zip); on the
+  final launcher, its failure path (a disk check that failed wrote the zip of what there was) and `run_watched` alone
+  (empty stdin, a failing step, a silent step stopped with its child after a minute).
+- **PowerShell 7 on macOS**: the Windows launcher parsed, and its functions run: quoting, identity removal, a watched
+  program, a silent one stopped, the fallback zip. Not Windows PowerShell 5.1, not `SetConsoleMode`, not `Start-Process`
+  on a `.cmd`, not the elevation helper.
 
 ## The files
 
