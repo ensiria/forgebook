@@ -1,0 +1,37 @@
+// The touch fields' look: a fixed-width font and no padding or border, so a field's width in `ch` tells a test where
+// each character is.
+.touch-fields {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  font: 20px / 1.4 monospace;
+}
+
+.touch-fields input:not([type="checkbox"], [type="range"]),
+.touch-fields textarea,
+.touch-fields__editable {
+  box-sizing: content-box;
+  width: 30ch;
+  padding: 0;
+  border: 0;
+  outline: 1px solid rgb(128 128 128);
+  font: inherit;
+  resize: none;
+}
+
+// A log of a fixed height: as it grows it must not move the fields a test is about to tap.
+.touch-fields ul {
+  height: 6rem;
+  margin: 0;
+  overflow: auto;
+}
+
+// A fixed height: a log that grew would move the fields, the frame being centred on the stage, between a test's reading
+// a place and its tap.
+.touch-fields ul {
+  width: 30ch;
+  height: 12rem;
+  margin: 0;
+  overflow: auto;
+  font-size: 12px;
+}

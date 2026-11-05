@@ -69,7 +69,8 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   meaningful state, not one per prop value.
 - Add a worst case: very long text, words without spaces, huge numbers (`forgebook new` writes one).
 - To try a component as on a phone, the catalogue's Touch switch (`touch=touch` in a view: `--view "touch=touch"`)
-  sends the story a finger's events and a phone's hover and pointer media. It is a simulation: native scrolling, the
+  sends the story a finger's events and a phone's hover and pointer media; a tap on a text field focuses it and puts the
+  caret there. It is a simulation: native scrolling, the
   virtual keyboard and real Safari still need a device, or `forgebook dev --touch` (Chromium's real touch).
   A story reads it as `context.globals.touch` (`"mouse"` or `"touch"`) or fixes it with
   `globals: { touch: "touch" }`. A story meant for a phone writes `parameters.touch: true` (or its meta does): the
