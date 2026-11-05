@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/testing",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Tests from a package's stories: each story and variant in the browser with axe, spills and overlays, screenshots, and each story rendered on the server.",
   "license": "MIT",
   "repository": {

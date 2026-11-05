@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/nuxt",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Forgebook for Nuxt: a Nuxt project's components drawn outside Nuxt, with its auto-imports, its aliases, its router, NuxtLink, useFetch and useAsyncData, useState and its runtime config, on Vite.",
   "keywords": [
     "nuxt",

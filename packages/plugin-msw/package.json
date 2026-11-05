@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/plugin-msw",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "MSW for Forgebook: a story's API answered by its handlers, and a Network tab with its handlers and its requests.",
   "keywords": [
     "forgebook",

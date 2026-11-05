@@ -1,3 +1,20 @@
+## 0.3.2 (2026-11-05)
+
+### 🩹 Fixes
+
+- **forgebook:** require a Vite with the server.fs fixes ([f40739a](https://github.com/ensiria/forgebook/commit/f40739a))
+- **nextjs:** answer a server component's fetch with the story's mocks ([1e36ff7](https://github.com/ensiria/forgebook/commit/1e36ff7))
+- **forgebook:** end the docs worker only once its modules are loaded ([bdfca17](https://github.com/ensiria/forgebook/commit/bdfca17))
+- **forgebook:** slide the sidebar over the page on a narrow window ([8edf45f](https://github.com/ensiria/forgebook/commit/8edf45f))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.3
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.3.1 (2026-11-05)
 
 ### 🩹 Fixes

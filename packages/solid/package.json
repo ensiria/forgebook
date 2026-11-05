@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/solid",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Forgebook for Solid: the story types and primitives, the renderer the frame mounts a story with, args updating in place as signals do, and the adapter that reads a Solid component's props.",
   "license": "MIT",
   "repository": {

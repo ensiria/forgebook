@@ -1,3 +1,17 @@
+## 0.2.3 (2026-11-05)
+
+### 🩹 Fixes
+
+- **nextjs:** answer a server component's fetch with the story's mocks ([1e36ff7](https://github.com/ensiria/forgebook/commit/1e36ff7))
+
+### 🧱 Updated Dependencies
+
+- Updated forgebook to 0.3.2
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.2 (2026-11-05)
 
 ### 🧱 Updated Dependencies

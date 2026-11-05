@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/svelte",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Forgebook for Svelte 5: the story types and the context helpers, the renderer the frame mounts a story with, and the adapter that reads a Svelte component's props, snippets and callback props.",
   "license": "MIT",
   "repository": {

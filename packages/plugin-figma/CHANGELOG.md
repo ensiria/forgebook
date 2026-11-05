@@ -1,3 +1,10 @@
+## 0.2.3 (2026-11-05)
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.3
+- Updated forgebook to 0.3.2
+
 ## 0.2.2 (2026-11-05)
 
 ### 🧱 Updated Dependencies

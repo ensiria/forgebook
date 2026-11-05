@@ -1,3 +1,18 @@
+## 0.2.3 (2026-11-05)
+
+### 🩹 Fixes
+
+- **forgebook:** require a Vite with the server.fs fixes ([f40739a](https://github.com/ensiria/forgebook/commit/f40739a))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.3
+- Updated forgebook to 0.3.2
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.2 (2026-11-05)
 
 ### 🩹 Fixes
