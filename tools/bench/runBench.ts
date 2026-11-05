@@ -12,7 +12,14 @@
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { chromium } from "@playwright/test";
 
-import type { BenchReport, FramesMode, MachineReading, MetricResult, ToolName } from "./bench.types.ts";
+import type {
+  BenchReport,
+  FeaturesMode,
+  FramesMode,
+  MachineReading,
+  MetricResult,
+  ToolName
+} from "./bench.types.ts";
 import { summary } from "./benchStats.ts";
 import type { CorpusSize } from "./corpus.ts";
 import { withDeadline } from "./deadline.ts";
@@ -81,6 +88,8 @@ export type BenchRequest = {
   readonly throttle: number;
   /** Where Forgebook's frames run, as its target was configured. */
   readonly frames: FramesMode;
+  /** Which of Forgebook's features run, as its target was configured. */
+  readonly features: FeaturesMode;
   /** The script's streams. */
   readonly io: ScriptIo;
   /** Reports a step, before its sample starts. */
@@ -290,6 +299,11 @@ const pageGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promise
   );
   record(visits, "componentPage", "ms", (sample) => sample.stories);
   record(visits, "firstPropsTable", "ms", (sample) => sample.props);
+  // a page without a props table (Forgebook at parity reads no props) has no such number, which is not a failure
+  for (const tool of paged.filter((each) => each.context.target.propsTable === undefined)) {
+    const { name } = tool.context.target;
+    tool.metrics["firstPropsTable"] = { kind: "absent", reason: `${name} draws no props table here` };
+  }
 };
 
 /** The server's memory, on a story's page, which every tool has, and on a component's. */
@@ -429,6 +443,7 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
     runs,
     throttle: request.throttle,
     frames: request.frames,
+    features: request.features,
     machine: machineInfo(process.version, await systemName(io)),
     readings,
     warnings,

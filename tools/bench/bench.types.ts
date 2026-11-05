@@ -12,6 +12,12 @@ export type ToolName = "forgebook" | "storybook" | "ladle";
 /** Where Forgebook's frames run: on an origin of their own, its default, or on the catalogue's. */
 export type FramesMode = "isolated" | "same-origin";
 
+/**
+ * Which of Forgebook's features run: its defaults, or those at parity with Ladle as it ships, which neither checks
+ * accessibility nor reads props from the types (`a11y: false`, `componentDocs: false`).
+ */
+export type FeaturesMode = "default" | "parity";
+
 /** What a metric's samples come to. Times in milliseconds, sizes in bytes. */
 export type Summary = {
   /** The middle sample. */
@@ -139,6 +145,11 @@ export type BenchReport = {
    * that had no such choice, whose frames always shared the catalogue's origin.
    */
   readonly frames?: FramesMode;
+  /**
+   * Which of Forgebook's features ran: its defaults, or at parity with Ladle (no accessibility check, no props read
+   * from the types). Absent from a report of a Forgebook that had no such choice, which ran its defaults.
+   */
+  readonly features?: FeaturesMode;
   /** The machine. */
   readonly machine: MachineInfo;
   /** Its load before each group and at the end, where it can be read. */

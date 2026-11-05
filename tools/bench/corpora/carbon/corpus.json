@@ -17,8 +17,8 @@
   ],
   "folder": "packages/react",
   "expected": {
-    "files": 173,
-    "stories": 657
+    "files": 137,
+    "stories": 509
   },
   "measured": {
     "forgebookStory": "stories:components-button--default",

@@ -24,6 +24,7 @@ import {
   type KitStore,
   setCurrentStore
 } from "./kitStore.ts";
+import { type LoadFetch, loadFetch, mockHandlersOf } from "./loadFetch.ts";
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -36,49 +37,73 @@ const toError = (error: unknown): Error => {
   return new Error(`${read.status ?? 500}: ${read.message}`);
 };
 
-/**
- * The address a load fetches: in a page, as the frame's `fetch` reads it, so the catalogue's mocks answer a path; on a
- * server, which has no page to read a path from, from the story's page, as SvelteKit's `fetch` does.
- *
- * @param input - what the load fetches.
- * @param pageUrl - the story's page.
- */
-const pageRequest = (input: string, pageUrl: URL): string =>
-  typeof location === "undefined" ? new URL(input, pageUrl).href : input;
+/** The page a load runs for. */
+type LoadTarget = Pick<KitPage, "url" | "params" | "route">;
 
 /**
- * The loader of a story's page data: its loads in order, the layouts' first, each `parent()` the data above it.
+ * Runs a story's loads in order, the layouts' first, each `parent()` the data above it.
  *
  * @param kit - the story's settings.
  * @param store - the story's page, which records what the loads call.
+ * @param at - the page they load.
+ * @param fetch - the loads' `fetch`.
+ * @param afterLoad - runs after each load, before its data is taken: it throws to stop them.
+ * @returns the data, every load's merged.
+ */
+const runLoads = async (
+  kit: StoryKit,
+  store: KitStore,
+  at: LoadTarget,
+  fetch: LoadFetch,
+  afterLoad: () => void
+): Promise<Readonly<Record<string, unknown>>> => {
+  let merged: Readonly<Record<string, unknown>> = kit.page.data;
+  for (const [index, load] of kit.loads.entries()) {
+    const above = merged;
+    const isPage = index === kit.loads.length - 1;
+    const result: unknown = await load({
+      params: at.params,
+      url: at.url,
+      route: at.route,
+      fetch,
+      // the page's server data is the page's load's; a layout's server load is given by `page.data`
+      data: isPage ? kit.serverData : null,
+      parent: async (): Promise<Readonly<Record<string, unknown>>> => above,
+      depends: (...dependencies: string[]): void => store.record("depends", dependencies),
+      setHeaders: (): void => undefined,
+      untrack: <TValue>(read: () => TValue): TValue => read()
+    });
+    afterLoad();
+    merged = { ...merged, ...(isRecord(result) ? result : {}) };
+  }
+  return merged;
+};
+
+/**
+ * The loader of a story's page data: its loads, or its server data without them.
+ *
+ * @param kit - the story's settings.
+ * @param store - the story's page, which records what the loads call.
+ * @param handlers - the story's mock handlers, which answer the loads' fetches on a server.
  * @returns the loader, or none for a story that gives no load and no server data.
  */
-const loaderOf = (kit: StoryKit, store: KitStore): DataLoader | undefined => {
+const loaderOf = (kit: StoryKit, store: KitStore, handlers: readonly unknown[]): DataLoader | undefined => {
   if (kit.loads.length === 0 && kit.serverData === null) return undefined;
-  return async (
-    at: Pick<KitPage, "url" | "params" | "route">
-  ): Promise<Readonly<Record<string, unknown>>> => {
-    let merged: Readonly<Record<string, unknown>> = kit.page.data;
-    if (kit.loads.length === 0) return { ...merged, ...kit.serverData };
-    for (const [index, load] of kit.loads.entries()) {
-      const above = merged;
-      const isPage = index === kit.loads.length - 1;
-      const result: unknown = await load({
-        params: at.params,
-        url: at.url,
-        route: at.route,
-        fetch: (input: RequestInfo | URL, init?: RequestInit): Promise<Response> =>
-          globalThis.fetch(typeof input === "string" ? pageRequest(input, at.url) : input, init),
-        // the page's server data is the page's load's; a layout's server load is given by `page.data`
-        data: isPage ? kit.serverData : null,
-        parent: async (): Promise<Readonly<Record<string, unknown>>> => above,
-        depends: (...dependencies: string[]): void => store.record("depends", dependencies),
-        setHeaders: (): void => undefined,
-        untrack: <TValue>(read: () => TValue): TValue => read()
+  return async (at: LoadTarget): Promise<Readonly<Record<string, unknown>>> => {
+    if (kit.loads.length === 0) return { ...kit.page.data, ...kit.serverData };
+    // a fetch no mock answered on a server fails the page, though its load caught it or threw an error of its own:
+    // what the load drew instead is not the page
+    let unanswered: Error | undefined;
+    const fetch = loadFetch(at.url, handlers, (error: Error) => {
+      unanswered ??= error;
+    });
+    try {
+      return await runLoads(kit, store, at, fetch, () => {
+        if (unanswered !== undefined) throw unanswered;
       });
-      merged = { ...merged, ...(isRecord(result) ? result : {}) };
+    } catch (thrown) {
+      throw unanswered ?? thrown;
     }
-    return merged;
   };
 };
 
@@ -194,7 +219,7 @@ const storeOf = (drawing: StoryDrawing): { readonly store: KitStore; readonly re
       ? shared
       : { store: createKitStore(key, drawing.onEvent), mounts: 0 };
   if (entry !== shared) {
-    entry.store.setLoader(loaderOf(entry.store.kit, entry.store));
+    entry.store.setLoader(loaderOf(entry.store.kit, entry.store, mockHandlersOf(key)));
     SHARED.set(key, entry);
   }
   entry.mounts += 1;

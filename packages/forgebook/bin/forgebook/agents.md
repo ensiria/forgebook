@@ -10,6 +10,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   reads it, never MDX or addons). Files with the same title are one component, as in Storybook: each story keeps its
   own file (`file` in `forgebook stories --json`), and the component lists them all (`files`).
 - Every named export of a story file is a story; leave helpers and data out with the meta's `excludeStories`.
+- The catalogue lists the files its `stories` globs name in `forgebook.config.ts`; a glob that starts with `!` leaves
+  files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not
+  list is outside the globs or left out by a `!` one: put it where they list it, or change the globs on purpose.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
   the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the
@@ -59,8 +62,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   `({ props: args, template: "…" })`. The Code tab writes the story by the component's selector.
 - In a SvelteKit app (`framework: sveltekit()`), the types come from `@forgebook/sveltekit`, and a story sets the page its
   components read with `parameters.sveltekit`: `page: { url: "/blog/hello" }` (the route and params are read from
-  `src/routes`), `page.data` or the page's own `load` (run in the frame, its fetch answered by `parameters.msw`), and
-  `forms.result` for what an enhanced form's action answers. Links and `goto` move the story's page and are listed among
+  `src/routes`), `page.data` or the page's own `load` (run before the story is drawn, its fetch answered by
+  `parameters.msw` in the frame and in the server tests, where a fetch of the page's origin that no handler answers
+  fails the story), and `forms.result` for what an enhanced form's action answers. Links and `goto` move the story's page and are listed among
   its events; in a play, `storyPage()` from `@forgebook/sveltekit/page` reads where it went and the calls it made. A
   component that imports `$app/env/private` or `$app/server` fails in its frame by design: give it what it reads instead.
 - `parameters.main: true` marks the one real, well-made use drawn at the top of the component's page.
@@ -177,6 +181,11 @@ leave it out.
 
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.
+
+A catalogue may turn off its accessibility check (`a11y: false`) or its component docs (`componentDocs: false`). Then a
+check's report says `"a11y": "off"` (it ran no axe: a pass says nothing of accessibility), and `story` says
+`"componentDocs": "off"` with no `docs` and no required props: read the component's source for its props, and the
+story's args for what it sets; `changed` finds no story through the imports, so check the stories you touched by name.
 
 A story's frame runs on its own origin (the dev server's second port), unless the catalogue keeps it on its own
 (`frames: "same-origin"`, `forgebook dev --frames same-origin`): open a story by the `page` or `frame` link an answer

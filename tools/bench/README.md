@@ -23,6 +23,13 @@ Forgebook's dev server takes two ports then, its own and the frames', named on i
 fails the sample instead of moving the frames onto the next tool's. A static build keeps the frames on the catalogue's
 origin unless its configuration names two hosts, so `shellJs` and `frameJs` are read on one origin.
 
+`--parity` measures Forgebook at parity with Ladle as it ships, which neither checks accessibility (it builds axe as an
+empty module unless its a11y addon is on) nor reads props from the types: the generated catalogue's configuration sets
+`a11y: false` and `componentDocs: false`, so `firstPropsTable` is `n/a`. The report's `features` says which ran
+(`default` or `parity`), its tables head the column `forgebook at parity`, and two reports of different features are not
+compared. Publish both columns, Forgebook as it is and at parity, beside Ladle's. A real library runs with its own
+configuration, so `--parity` takes the generated library only.
+
 | Metric | Definition |
 |---|---|
 | `coldStart` | process spawned → the first story visible, every cache removed |
@@ -134,9 +141,9 @@ node tools/bench/bench.mts --corpus primer --compare --work /some/folder
   in its definition, and is measured with Forgebook alone. Ladle has no place here: it does not draw object stories.
 - **Every story is opened.** The `sweep` group, first on a real library, starts a dev server, opens each story's frame and
   groups what fails by cause, in the report's `sweep`. A build that exits 0 says nothing about the stories.
-- **`expected`** is what Storybook's own indexer counts at that commit, with the library's own globs. Where the
-  library's configuration leaves out files a Forgebook pattern cannot (Carbon's), its definition lists them and counts
-  them too, and says so: the larger index weighs on Forgebook's timings only. A run that lists
+- **`expected`** is what Storybook's own indexer counts at that commit, with the library's own globs. What the library's
+  configuration leaves out, its definition leaves out too, with `!` patterns (Carbon's `forgebook.config.ts` reads the
+  library's own list of them), so both tools index the same stories. A run that lists
   fewer stories, or draws fewer than it lists, fails at the end with the difference; the timings are still in the report.
 - **The install metrics** are absent: what the tool adds to a library is measured on the generated one.
 

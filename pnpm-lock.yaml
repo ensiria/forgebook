@@ -1451,6 +1451,9 @@ importers:
       happy-dom:
         specifier: 21.0.4
         version: 21.0.4
+      msw:
+        specifier: 3.0.3
+        version: 3.0.3(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass-embedded@1.106.1)(sass@1.106.1)(terser@5.51.2)(yaml@2.9.0))
       svelte:
         specifier: 5.57.3
         version: 5.57.3(@typescript-eslint/types@8.72.1)

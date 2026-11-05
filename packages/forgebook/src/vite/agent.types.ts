@@ -182,6 +182,11 @@ export type StoryDocument = {
   readonly args: Readonly<Record<string, unknown>>;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
   readonly problems: readonly string[];
+  /**
+   * `"off"` when the catalogue reads no component docs (`componentDocs: false`): `docs` is then none and
+   * `requiredProps` empty whatever the component declares, and there is no "Used in". Absent when it reads them.
+   */
+  readonly componentDocs?: "off";
 };
 
 /** Where a docs page opens, in the view the answer describes. */

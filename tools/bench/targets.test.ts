@@ -58,6 +58,15 @@ describe("targets", () => {
     expect(sameOrigin.configFiles).toEqual(FORGEBOOK.configFiles);
   });
 
+  it("runs Forgebook at parity with Ladle without axe and the props from the types, and no props table", () => {
+    const parity = forgebookTarget("isolated", "parity");
+    expect(parity.configFiles["forgebook.config.ts"]).toContain("a11y: false,\n  componentDocs: false");
+    expect(parity.propsTable).toBeUndefined();
+    expect(parity.dev(4000).args).toEqual(FORGEBOOK.dev(4000).args);
+    expect(FORGEBOOK.configFiles["forgebook.config.ts"]).not.toMatch(/a11y|componentDocs/);
+    expect(targetsOf("isolated", true, "parity")[0]?.propsTable).toBeUndefined();
+  });
+
   it("gives each tool ports of its own, after the ports of the one before", () => {
     const ports = withPorts(targetsOf("isolated", true), 62_100).map(({ target, port }) => [
       target.name,

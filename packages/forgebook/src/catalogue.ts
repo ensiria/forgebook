@@ -93,8 +93,11 @@ export type CatalogueLists = {
   readonly storyGroups?: readonly StoryGroupSetting[];
   /** The panel's tabs turned off, Forgebook's or a plugin's (`{ a11y: false }`). */
   readonly tabs?: Readonly<Partial<Record<PanelTabId, false>> & Record<string, false>>;
-  /** The accessibility rules. */
-  readonly a11y?: Partial<A11ySettings>;
+  /**
+   * The accessibility rules, or `false` to check nothing: no Accessibility tab or column, axe's script neither in a
+   * build nor offered to the frames, and the generated tests and `forgebook check` leave axe out.
+   */
+  readonly a11y?: false | Partial<A11ySettings>;
   /** The measuring grid's step, in CSS px. */
   readonly gridStep?: number;
   /** Texts of the shell replaced, by their name in `STRINGS` or `LATER_STRINGS` (a translation, another word). */
@@ -117,6 +120,13 @@ export type CatalogueLists = {
    * `false` builds nothing for it (no import graph is read) and leaves it out of the agents' answers.
    */
   readonly usedIn?: boolean;
+  /**
+   * Whether each component's docs are read from its types and TSDoc (its props, events, description, guidance and
+   * signature); `true` by default. `false` starts no TypeScript program: no API reference, the Props tab's controls
+   * come from the story's args and `argTypes`, and "Used in", which reads the import graph with the same programs, is
+   * off too.
+   */
+  readonly componentDocs?: boolean;
   /**
    * Who a component's page is read by before a person picks: `designer`, `coder` or `tester` reorder and filter the
    * page for them, and `everyone` (the default) draws all of it. The address's `audience` wins, so a link keeps its view;
@@ -189,8 +199,13 @@ export type CatalogueSettings = {
   readonly storyGroups: readonly StoryGroupSetting[];
   /** The panel's tabs shown, Forgebook's then the plugins', by id. */
   readonly tabs: readonly string[];
-  /** The accessibility rules. */
-  readonly a11y: A11ySettings;
+  /**
+   * The accessibility rules the Accessibility tab and column, the frames and the tests check; none when it checks
+   * nothing (`a11y: false`).
+   */
+  readonly a11y: A11ySettings | undefined;
+  /** Whether each component's docs are read from its types. */
+  readonly hasComponentDocs: boolean;
   /** The measuring grid's step, in CSS px. */
   readonly gridStep: number;
   /** The shell's texts replaced, by name. */
@@ -324,6 +339,54 @@ const namedGroups = (lists: CatalogueLists): Pick<CatalogueSettings, "storyGroup
 });
 
 /**
+ * Whether a catalogue checks accessibility: unless its lists say `a11y: false`.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+export const checksA11y = (lists: CatalogueLists): boolean => lists.a11y !== false;
+
+/**
+ * Whether a catalogue reads its components' docs from their types: unless its lists say `componentDocs: false`.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+export const readsComponentDocs = (lists: CatalogueLists): boolean => lists.componentDocs !== false;
+
+/**
+ * Whether a catalogue offers "Used in": unless its lists turn it off, or turn off the component docs, whose
+ * TypeScript programs read the import graph it is joined from.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+export const offersUsedIn = (lists: CatalogueLists): boolean =>
+  lists.usedIn !== false && readsComponentDocs(lists);
+
+/**
+ * The panel's tabs a catalogue shows: Forgebook's then its plugins', less those it turns off, and the Accessibility
+ * tab when it checks nothing.
+ *
+ * @param lists - the lists its configuration sets.
+ * @param pluginTabs - the ids of the tabs its plugins add.
+ */
+const shownTabs = (lists: CatalogueLists, pluginTabs: readonly string[]): readonly string[] => {
+  const tabsOff = lists.tabs ?? {};
+  const hasA11y = checksA11y(lists);
+  return [...PANEL_TAB_IDS, ...pluginTabs].filter(
+    (tab) => tabsOff[tab] !== false && (hasA11y || tab !== "a11y")
+  );
+};
+
+/**
+ * A catalogue's accessibility rules, the defaults filled in; none when it checks nothing.
+ *
+ * @param lists - the lists its configuration sets.
+ */
+const a11ySettings = (lists: CatalogueLists): A11ySettings | undefined => {
+  if (lists.a11y === false) return undefined;
+  return { tags: lists.a11y?.tags ?? DEFAULT_A11Y_TAGS, disabledRules: lists.a11y?.disabledRules ?? [] };
+};
+
+/**
  * A catalogue's settings, its lists' defaults filled in.
  *
  * @param title - the catalogue's title, for its storage's id.
@@ -345,7 +408,6 @@ export const catalogueSettings = (
     builtIn === false
       ? []
       : BUILT_IN_BACKDROPS.filter((backdrop) => builtIn === undefined || builtIn.includes(backdrop.id));
-  const tabsOff = lists.tabs ?? {};
   const controlsOff = lists.controls ?? {};
   const ownControls = OWN_CONTROL_IDS.filter((control) => controlsOff[control] !== false);
   const named = lists.toolbar ?? defaultToolbar(switches, ownControls);
@@ -364,16 +426,14 @@ export const catalogueSettings = (
     textSizes: withHundred(lists.textSizes, [100, 125, 150]),
     backdrops: [...offered, ...(lists.backgrounds?.custom ?? []).map(customBackdrop)],
     ...namedGroups(lists),
-    tabs: [...PANEL_TAB_IDS, ...pluginTabs].filter((tab) => tabsOff[tab] !== false),
-    a11y: {
-      tags: lists.a11y?.tags ?? DEFAULT_A11Y_TAGS,
-      disabledRules: lists.a11y?.disabledRules ?? []
-    },
+    tabs: shownTabs(lists, pluginTabs),
+    a11y: a11ySettings(lists),
+    hasComponentDocs: readsComponentDocs(lists),
     gridStep: lists.gridStep ?? 8,
     strings: lists.strings ?? {},
     ownControls,
     toolbar,
-    hasUsedIn: lists.usedIn !== false,
+    hasUsedIn: offersUsedIn(lists),
     audience,
     hasEmbed: controlsOff.embed !== false,
     appearance: lists.appearance ?? "system",

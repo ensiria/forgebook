@@ -13,13 +13,13 @@
  * come the same way, with `?forgebook-docs-pages` (`docPagesModule.ts`), and the written home with `?forgebook-home`. It also sets Lightning CSS as the CSS transformer with the forced-states visitor (`forcedStates.ts`) and lets Sass resolve
  * `pkg:` URLs, which the library's style sheets use.
  *
- * A pattern's module watches its story files, so an edit renews it. Vite watches only its root for new files, and the
+ * A group's module watches its story files, so an edit renews it. Vite watches only its root for new files, and the
  * sources' story files live in other packages: `watch` names their folders, and a story file added or removed there
- * renews every pattern's module and reloads the page, so the sidebar lists it at once.
+ * renews the modules of the groups whose list it changes and reloads the page, so the sidebar lists it at once; one no
+ * group lists (a `!` pattern leaves it out) reloads nothing.
  *
  * @module
  */
-import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 
 import {
@@ -31,43 +31,40 @@ import {
   type ViteDevServer
 } from "vite";
 
+import { checksA11y, offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
-import { axeAddress, axeBuildAsset } from "./axeScript.ts";
+import { axeBuildAsset } from "./axeScript.ts";
 import { groupTexts, type TextSources } from "./builtTexts.ts";
 import { catalogueConfig } from "./catalogueConfig.ts";
 import { currentCloseWatch } from "./closeWatch.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
-import { createDocsExtractor, type DocsExtractor } from "./docsExtractor.ts";
+import { createDocsExtractor, type DocsExtractor, NO_DOCS_EXTRACTOR } from "./docsExtractor.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
+import { generatedId, generatedModule } from "./generatedModules.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { FILES_MODULE_HOT, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
 import { type EmitAsset, inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
-  agentSourcesModule,
   configModule,
-  frameEntry,
-  PAGE_ENTRIES,
   PAGE_FILES,
   type PageFile,
   pageHtml,
-  pageModuleOf,
-  pageModulePath,
-  shellEntry,
-  storiesSourceModule
+  pageModulePath
 } from "./pages.ts";
 import { CONFIG_ID, DOCS_PAGES_PREFIX, patternId, TOKENS_ID, virtualId } from "./pluginIds.ts";
 import {
   docsModule,
   docsValue,
   FILES_PREFIX,
+  listingRenewals,
   patternModule,
   REACH_ID_PREFIX,
   reachModule,
@@ -197,49 +194,8 @@ const docsModuleOf = async (
     const file = id.slice(0, -DOCS_PAGE_QUERY.length);
     return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
   }
-  const { root, pattern } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
-  return { code: docPagesModule(root, pattern, watch, isServing, plugins), moduleType: "js" };
-};
-
-/**
- * A module the plugin generates for a catalogue's pages, when the id names one: an entry, the project's own stories'
- * source, or a page's HTML (unless the folder has one of its own). The configuration's data waits for the frames'
- * placement, so the plugin's `load` makes it.
- *
- * @param id - the module's id.
- * @param config - the catalogue's configuration.
- * @param command - whether a dev server runs, or a build: where the frame finds axe's script.
- */
-const generatedModule = (
-  id: string,
-  config: ResolvedConfig,
-  command: ConfigEnv["command"]
-): { code: string; moduleType: "js" } | string | undefined => {
-  const named = pageModuleOf(id, config.dir);
-  if (named === undefined) return undefined;
-  if (named.kind === "entry") {
-    const code =
-      named.page === "index.html" ? shellEntry(config) : frameEntry(config, axeAddress(command, PACKAGE_DIR));
-    return { code, moduleType: "js" };
-  }
-  if (named.kind === "stories-source") return { code: storiesSourceModule(config), moduleType: "js" };
-  if (named.kind === "agent-sources") return { code: agentSourcesModule(config), moduleType: "js" };
-  return existsSync(id) ? undefined : pageHtml(named.page, config, builtPlacement(config.frames));
-};
-
-/**
- * The id of a module the plugin generates for a catalogue's pages, when an import names one: a page or an entry by
- * its address (`/index.html`, `/.forgebook-shell.ts`) or by its path, a source by its path.
- *
- * @param source - the import's specifier.
- * @param dir - the configuration's folder.
- */
-const generatedId = (source: string, dir: string): string | undefined => {
-  const byAddress = PAGE_FILES.find((page) => source === `/${PAGE_ENTRIES[page]}`);
-  if (byAddress !== undefined) return pageModulePath(dir, PAGE_ENTRIES[byAddress]);
-  const pageByAddress = PAGE_FILES.find((page) => source === `/${page}`);
-  if (pageByAddress !== undefined) return pageModulePath(dir, pageByAddress);
-  return pageModuleOf(source, dir) === undefined ? undefined : VITE_PATHS.normalize(source);
+  const { root, patterns } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
+  return { code: docPagesModule(root, patterns, watch, isServing, plugins), moduleType: "js" };
 };
 
 /**
@@ -251,8 +207,11 @@ const generatedId = (source: string, dir: string): string | undefined => {
  * @returns the plugin, for the app's `plugins`.
  */
 export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin => {
-  /** The modules of the patterns, renewed when a story file is added or removed. */
-  const filesModules = new Set<string>();
+  /**
+   * The modules of the groups of story files, with the files each listed when served (none while it could not be
+   * made), renewed when a story file is added to or removed from what one lists.
+   */
+  const filesModules = new Map<string, ReadonlySet<string> | undefined>();
   // what each pattern's module was served with: an edit of a story file that changes its list reloads the pages
   const served = servedPatterns();
   /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
@@ -328,6 +287,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   // build and would hold every other answer of the dev server meanwhile
   let docs: DocsExtractor | undefined;
   const extractor = (): DocsExtractor => {
+    // a catalogue that reads no component docs never starts the worker: its programs are most of the server's memory
+    if (config !== undefined && !readsComponentDocs(config.lists)) return NO_DOCS_EXTRACTOR;
     const framework = config?.framework ?? options.framework;
     if (framework === undefined)
       throw new Error("Forgebook has no framework: add forgebook.config.ts, or give the plugin `framework`");
@@ -378,17 +339,19 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         : { code: "export default [];", moduleType: "js" };
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
-    filesModules.add(id);
-    const hasUsage = config?.lists.usedIn !== false;
+    filesModules.set(id, undefined);
+    const lists = config?.lists ?? {};
+    const hasUsage = offersUsedIn(lists);
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
     const { files, code } = patternModule(
       id,
       watch,
-      { hasUsage, hasReach: hasUsage && isServing() },
+      { hasDocs: readsComponentDocs(lists), hasUsage, hasReach: hasUsage && isServing() },
       indexCache(),
       isTestRun ? undefined : extractor().warm,
       startTexts
     );
+    filesModules.set(id, new Set(files.map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
     served.keep(id, files);
     return { code: `${code}\n${FILES_MODULE_HOT}`, moduleType: "js" };
@@ -410,8 +373,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param file - the file.
    */
   const modulesListing = (file: string): readonly string[] | undefined => {
-    // the patterns' modules list the story files; the groups' "Used in" read them
-    if (STORY_FILE.test(file)) return [...filesModules, ...usageModules, ...searchModules];
+    // the groups' modules list the story files, their "Used in" and search indexes read them
+    if (STORY_FILE.test(file))
+      return listingRenewals(filesModules, file, [...usageModules, ...searchModules]);
     return DOCS_PAGE_FILE.test(file) && docsModules.size > 0 ? [...docsModules] : undefined;
   };
   /**
@@ -463,7 +427,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const componentFiles = (config?.framework ?? options.framework)?.componentFiles;
     const docsOf = async (storyFile: string): Promise<unknown> =>
       docsValue(await search.docsOf(storyFile), watch);
-    const sources: TextSources = { docsOf, watch, resolveImport, componentFiles };
+    const hasDocs = config === undefined || readsComponentDocs(config.lists);
+    const sources: TextSources = {
+      docsOf: hasDocs ? docsOf : undefined,
+      watch,
+      resolveImport,
+      componentFiles
+    };
     // a build's browser files only: a dev server answers each text from its query, and no texts module
     const startTexts = emit === undefined ? undefined : texts.starter(id, sources);
     return (
@@ -551,7 +521,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
           .catch(next);
       });
       // folders outside the configuration's are watched only when named; a story file added or removed anywhere the
-      // server watches (its own folder, a story file it loaded) renews the lists either way
+      // server watches (its own folder, a story file it loaded) renews the lists that change either way
       const watched = [...(config?.watch ?? []), ...(options.watch ?? [])];
       if (watched.length > 0) server.watcher.add(watched);
       const refresh = (file: string): void => {
@@ -567,7 +537,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     generateBundle(): void {
       // axe's script, for the frames' Accessibility card: loaded by the frame, never imported; the browser's build only
       if (this.environment.name !== "client") return;
-      const axe = config === undefined ? undefined : axeBuildAsset(PACKAGE_DIR);
+      // a catalogue that checks no accessibility ships none of it
+      const axe = config === undefined || !checksA11y(config.lists) ? undefined : axeBuildAsset(PACKAGE_DIR);
       if (axe !== undefined) this.emitFile({ type: "asset", fileName: axe.fileName, source: axe.source });
     },
     // a dev server without an HTTP server of its own (middleware mode) ends its close watch here only

@@ -1,5 +1,6 @@
 /**
- * The modules that answer a `?forgebook-docs-pages` import: every page a pattern matches as one module with each page's
+ * The modules that answer a group of docs pages, a `?forgebook-docs-pages` import's pattern or a catalogue's `docs`
+ * list (`DOCS_PAGES_SPECIFIER_PREFIX`): every page the group lists as one module with each page's
  * index, and the loader of the page itself, and each page's own module.
  *
  * @remarks
@@ -23,7 +24,7 @@ import { PAGES_SEARCH_PREFIX, storyFileKeys, storyFilesGroupText } from "./story
 import { DOCS_PAGE_QUERY } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
-/** A page a pattern matches, with its key and its index. */
+/** A page a group lists, with its key and its index. */
 export type IndexedDocPage = {
   /** Its path relative to the declaring module (`./docs/theming.md`). */
   readonly key: string;
@@ -43,20 +44,20 @@ const watchedRead =
   };
 
 /**
- * Every page a pattern matches, indexed.
+ * Every page a group's patterns list, indexed.
  *
  * @param root - the declaring module's folder.
- * @param pattern - the pattern.
+ * @param patterns - the patterns, `!` ones included (`listedFiles`).
  * @param watch - adds a file whose edit renews the module that read it.
  * @param fences - the fences the catalogue's plugins draw, which are not code; none by default.
  */
 export const indexedDocPages = (
   root: string,
-  pattern: string,
+  patterns: readonly string[],
   watch: (file: string) => void,
   fences: readonly string[] = []
 ): IndexedDocPage[] => {
-  return storyFileKeys(root, [pattern]).map((key) => {
+  return storyFileKeys(root, patterns).map((key) => {
     const file = resolve(root, key);
     watch(file);
     return { key, file, index: docPageIndex(file, readFileSync(file, "utf8"), watchedRead(watch), fences) };
@@ -68,26 +69,26 @@ const objectOf = (keys: readonly string[], value: (key: string) => string): stri
   `{${keys.map((key) => `${codeLiteral(key)}: ${value(key)}`).join(",\n")}}`;
 
 /**
- * The code of the module for one pattern.
+ * The code of the module for one group.
  *
  * @param root - the declaring module's folder.
- * @param pattern - the pattern before `?forgebook-docs-pages`.
+ * @param patterns - the group's patterns.
  * @param watch - adds a file whose edit renews the module (each page: its index is in the module).
  * @param isServing - whether a dev server runs, whose tools read a page's Markdown.
  * @param plugins - the catalogue's plugins, whose fences a page may draw; none by default.
  */
 export const docPagesModule = (
   root: string,
-  pattern: string,
+  patterns: readonly string[],
   watch: (file: string) => void,
   isServing: boolean,
   plugins: readonly ForgebookPlugin[] = []
 ): string => {
-  const pages = indexedDocPages(root, pattern, watch, pluginFences(plugins));
+  const pages = indexedDocPages(root, patterns, watch, pluginFences(plugins));
   const keys = pages.map((page) => page.key);
   const index: Record<string, DocPageIndex> = Object.fromEntries(pages.map((page) => [page.key, page.index]));
   const page = (key: string): string => codeLiteral(`${VITE_PATHS.resolve(root, key)}${DOCS_PAGE_QUERY}`);
-  const search = codeLiteral(`${PAGES_SEARCH_PREFIX}${storyFilesGroupText(root, pattern)}`);
+  const search = codeLiteral(`${PAGES_SEARCH_PREFIX}${storyFilesGroupText(root, patterns)}`);
   return [
     "export default {",
     `index: ${codeLiteral(index)},`,

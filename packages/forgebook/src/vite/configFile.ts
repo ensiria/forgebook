@@ -35,6 +35,7 @@ import type { FrameworkAdapter } from "./adapter.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
+import { patternsProblem } from "./storyPatterns.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
@@ -186,6 +187,7 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.gridStep === undefined ? {} : { gridStep: lists.gridStep }),
   ...(lists.toolbar === undefined ? {} : { toolbar: lists.toolbar }),
   ...(lists.usedIn === undefined ? {} : { usedIn: lists.usedIn }),
+  ...(lists.componentDocs === undefined ? {} : { componentDocs: lists.componentDocs }),
   ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
   ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups }),
@@ -195,8 +197,9 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
 /**
  * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
  * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
- * earlier one with the same id or name; the tabs, the controls and the rules turned off by any; the toolbar, the
- * prop groups' order and where the required props go the last that names one; the device field by field.
+ * earlier one with the same id or name; the tabs, the controls and the rules turned off by any, and the accessibility
+ * check too (`a11y: false`); the toolbar, the prop groups' order, where the required props go and whether the
+ * component docs are read the last that names one; the device field by field.
  *
  * @param all - the presets' lists, then the catalogue's.
  */
@@ -217,7 +220,10 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
     merged = { ...merged, ...singleValues(lists) };
   }
   const builtIn = all.findLast((lists) => lists.backgrounds?.builtIn !== undefined)?.backgrounds?.builtIn;
-  const tags = all.findLast((lists) => lists.a11y?.tags !== undefined)?.a11y?.tags;
+  const rules = all.flatMap((lists) =>
+    lists.a11y === undefined || lists.a11y === false ? [] : [lists.a11y]
+  );
+  const tags = rules.findLast((each) => each.tags !== undefined)?.tags;
   return {
     ...merged,
     ...(device === undefined ? {} : { device }),
@@ -228,10 +234,13 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
     storyGroups: mergedById(all.map((lists) => lists.storyGroups)),
     tabs,
     controls,
-    a11y: {
-      ...(tags === undefined ? {} : { tags }),
-      disabledRules: [...new Set(all.flatMap((lists) => lists.a11y?.disabledRules ?? []))]
-    },
+    // a check one list turns off stays off, as a tab does: a preset's library may have no use for it
+    a11y: all.some((lists) => lists.a11y === false)
+      ? false
+      : {
+          ...(tags === undefined ? {} : { tags }),
+          disabledRules: [...new Set(rules.flatMap((each) => each.disabledRules ?? []))]
+        },
     strings,
     keys,
     // a later list's view of the same name replaces an earlier one's, where it was
@@ -243,6 +252,19 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
 const isListed = (config: object, key: string): boolean => {
   const list: unknown = Reflect.get(config, key);
   return Array.isArray(list) && list.length > 0;
+};
+
+/**
+ * Why a configuration's list of globs lists nothing by construction (only `!` patterns), or none.
+ *
+ * @param config - what the file exports by default.
+ * @param key - the list's key.
+ */
+const globsProblem = (config: object, key: string): string | undefined => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list)
+    ? patternsProblem(list.filter((item: unknown): item is string => typeof item === "string"))
+    : undefined;
 };
 
 /**
@@ -265,6 +287,10 @@ const configProblem = (config: unknown): string | undefined => {
     return 'its home is neither a path (`home: "docs/home.md"`) nor false';
   if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
     return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
+  for (const key of ["stories", "docs"]) {
+    const problem = globsProblem(config, key);
+    if (problem !== undefined) return `its ${key} list nothing: ${problem}`;
+  }
   return framesProblem("frames" in config ? config.frames : undefined);
 };
 
@@ -311,11 +337,13 @@ const deviceProblem = (device: unknown): string | undefined => {
 
 /**
  * The configuration's and the presets' lists, once checked where the shell would leave a mistake out: a device that
- * cannot be used, a place for the required props that is none.
+ * cannot be used, a place for the required props that is none, an accessibility setting that is neither rules nor
+ * `false`.
  *
  * @param all - the presets' lists, then the configuration's.
  * @param dir - the configuration's folder, for the message.
- * @throws when a device cannot be used, or `requiredFirst` is none of its layouts.
+ * @throws when a device cannot be used, `requiredFirst` is none of its layouts, or `a11y` is neither rules nor
+ *   `false`.
  */
 const checkedLists = (all: readonly CatalogueLists[], dir: string): readonly CatalogueLists[] => {
   for (const lists of all) {
@@ -327,8 +355,32 @@ const checkedLists = (all: readonly CatalogueLists[], dir: string): readonly Cat
       throw new Error(
         `${resolve(dir, "forgebook.config")}: requiredFirst is ${typeof lists.requiredFirst === "string" ? `"${lists.requiredFirst}"` : String(lists.requiredFirst)}, none of "in-groups", "section" and false`
       );
+    const a11y: unknown = lists.a11y;
+    if (
+      a11y !== undefined &&
+      a11y !== false &&
+      (typeof a11y !== "object" || a11y === null || Array.isArray(a11y))
+    )
+      throw new Error(
+        `${resolve(dir, "forgebook.config")}: a11y is ${String(a11y)}: write its rules ({ tags, disabledRules }), or false to check nothing`
+      );
   }
   return all;
+};
+
+/**
+ * Why the merged lists ask for what cannot be, or none: an audience that is none of the ids (the page reads it as one,
+ * and a configuration is written by JavaScript too, which no type stops), or "Used in" turned on with the component
+ * docs off, whose TypeScript programs read the import graph it is joined from.
+ *
+ * @param lists - the presets' lists and the configuration's, merged.
+ */
+const mergedListsProblem = (lists: CatalogueLists): string | undefined => {
+  if (lists.audience !== undefined && !AUDIENCE_IDS.includes(lists.audience))
+    return `the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`;
+  if (lists.usedIn === true && lists.componentDocs === false)
+    return "usedIn is true with componentDocs false: Used in reads the import graph with the programs componentDocs turns off";
+  return undefined;
 };
 
 /** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
@@ -416,12 +468,8 @@ export const resolveConfig = (
   const tokenThemed = tokenThemeOf(fromTokens, tokens, dir);
   const theme = mergedThemes([tokenThemed.theme, ...declaredThemes]);
   const lists = mergedLists(checkedLists([...presets, config], dir));
-  // the page reads it as one of the ids, and a configuration is written by JavaScript too, which no type stops
-  if (lists.audience !== undefined && !AUDIENCE_IDS.includes(lists.audience)) {
-    throw new Error(
-      `${resolve(dir, "forgebook.config")}: the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`
-    );
-  }
+  const listsProblem = mergedListsProblem(lists);
+  if (listsProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${listsProblem}`);
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
   const ownPreview =
