@@ -23,6 +23,9 @@ const BEHIND_FILE = fileURLToPath(
   new URL("../../storybook/reexported/HotEditBehind.stories.tsx", import.meta.url)
 );
 
+/** The catalogue's preview, whose globals a story of the hot-edit file shows. */
+const PREVIEW_FILE = fileURLToPath(new URL("../forgebook.preview.ts", import.meta.url));
+
 /** The address of a story of the hot-edit file. */
 const story = (name: string, query = ""): string =>
   `/?story=sb:storybook-hot-edit--${name}${query === "" ? "" : `&${query}`}`;
@@ -46,7 +49,7 @@ const replacing =
 test("every story of the hot-edit file is ready in its frame, without a page error", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  for (const name of ["own", "behind"]) {
+  for (const name of ["own", "behind", "from-globals"]) {
     await page.goto(`/frame.html?story=sb:storybook-hot-edit--${name}`);
     await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "ready");
   }
@@ -92,4 +95,24 @@ test("draws an edit of the file its story is re-exported from, and keeps the tex
   await fileEdits.write(BEHIND_FILE, replacing('"Written behind a re-export"', '"Edited behind"'));
   await expect(frameOf(page).getByText("Edited behind")).toBeVisible();
   await expect(field).toHaveValue("typed before the edit");
+});
+
+test("draws an edit of a story's globals, once the frame has already been sent the same view", async ({
+  page,
+  fileEdits
+}) => {
+  await page.goto(story("from-globals"));
+  await expect(frameOf(page).getByText("Written in the globals")).toBeVisible();
+  await fileEdits.write(OWN_FILE, replacing('"Written in the globals"', '"Edited in the globals"'));
+  await expect(frameOf(page).getByText("Edited in the globals")).toBeVisible();
+});
+
+test("draws an edit of the preview's globals, once the frame has already been sent the same view", async ({
+  page,
+  fileEdits
+}) => {
+  await page.goto(story("from-globals"));
+  await expect(frameOf(page).getByText("Written in the preview")).toBeVisible();
+  await fileEdits.write(PREVIEW_FILE, replacing('"Written in the preview"', '"Edited in the preview"'));
+  await expect(frameOf(page).getByText("Edited in the preview")).toBeVisible();
 });

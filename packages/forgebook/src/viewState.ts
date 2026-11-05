@@ -386,6 +386,22 @@ export const liveView = (view: ViewState): LiveView => ({
 });
 
 /**
+ * Whether two live views show the same: their backdrop, text size and each switch's value, whatever the objects.
+ *
+ * @param left - a live view.
+ * @param right - the other.
+ */
+export const isSameLiveView = (left: LiveView, right: LiveView): boolean => {
+  const leftIds = Object.keys(left.switches);
+  return (
+    left.backdrop === right.backdrop &&
+    left.text === right.text &&
+    leftIds.length === Object.keys(right.switches).length &&
+    leftIds.every((id) => left.switches[id] === right.switches[id])
+  );
+};
+
+/**
  * The scheme a view draws in: its colour scheme switch's, light when the catalogue has none.
  *
  * @param view - the view's switches.
