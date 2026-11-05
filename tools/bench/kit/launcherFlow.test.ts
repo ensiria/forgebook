@@ -73,6 +73,8 @@ ConvertTo-Json -Compress @{ errors = @($errors | ForEach-Object { $_.Message });
 const inspectVariables = (file: string): { errors: string[]; collisions: string[] } => {
   const result = spawnSync("pwsh", powershellArgs(VARIABLES_SCRIPT), {
     encoding: "utf8",
+    // PowerShell's start on a busy runner can take over a minute
+    timeout: FLOW_LIMIT_MS - 10_000,
     env: { ...processIo().env, KIT_PS1: file }
   });
   const parsed: { errors: string[]; collisions: string[] } = JSON.parse(result.stdout);
@@ -80,31 +82,39 @@ const inspectVariables = (file: string): { errors: string[]; collisions: string[
 };
 
 describe.runIf(hasPwsh)("start-bench.ps1's variables", () => {
-  it("parses, and spells every variable one way", () => {
-    expect(inspectVariables(join(import.meta.dirname, "start-bench.ps1"))).toEqual({
-      errors: [],
-      collisions: []
-    });
-  }, 60_000);
+  it(
+    "parses, and spells every variable one way",
+    () => {
+      expect(inspectVariables(join(import.meta.dirname, "start-bench.ps1"))).toEqual({
+        errors: [],
+        collisions: []
+      });
+    },
+    FLOW_LIMIT_MS
+  );
 
-  it("finds a name spelled two ways, across scopes, parameters and strings", () => {
-    const folder = mkdtempSync(join(tmpdir(), "kit-variables-"));
-    const file = join(folder, "sample.ps1");
-    writeFileSync(
-      file,
-      [
-        "$node = 'folder'",
-        "$script:Node = Join-Path $node 'node.exe'",
-        "function Work([string] $Text) { $Text }",
-        '$sample = "$TEXT;"',
-        "$env:Path = $env:PATH",
-        "$fine = 1; $script:fine = 2"
-      ].join("\n")
-    );
-    const { collisions } = inspectVariables(file);
-    rmSync(folder, { recursive: true });
-    expect(collisions.toSorted()).toEqual(["Text (3, 3) / TEXT (4)", "node (1, 2) / Node (2)"]);
-  }, 60_000);
+  it(
+    "finds a name spelled two ways, across scopes, parameters and strings",
+    () => {
+      const folder = mkdtempSync(join(tmpdir(), "kit-variables-"));
+      const file = join(folder, "sample.ps1");
+      writeFileSync(
+        file,
+        [
+          "$node = 'folder'",
+          "$script:Node = Join-Path $node 'node.exe'",
+          "function Work([string] $Text) { $Text }",
+          '$sample = "$TEXT;"',
+          "$env:Path = $env:PATH",
+          "$fine = 1; $script:fine = 2"
+        ].join("\n")
+      );
+      const { collisions } = inspectVariables(file);
+      rmSync(folder, { recursive: true });
+      expect(collisions.toSorted()).toEqual(["Text (3, 3) / TEXT (4)", "node (1, 2) / Node (2)"]);
+    },
+    FLOW_LIMIT_MS
+  );
 });
 
 it.skipIf(hasPwsh || !isCi(processIo().env))("has PowerShell on CI", () => {
