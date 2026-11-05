@@ -16,7 +16,9 @@ import {
   frameAddressOf,
   hasViewChanges,
   isMoreContrastOf,
+  isSameLiveView,
   isTouchView,
+  type LiveView,
   languageOf,
   parseView,
   schemeOf,
@@ -328,5 +330,28 @@ describe("the device in the address", () => {
     expect(viewParams(view, switches).toString()).toBe(
       "device=tablet&orientation=tablet&forgebook.device=pixel-9"
     );
+  });
+});
+
+describe("whether two live views show the same", () => {
+  const shown: LiveView = { switches: { theme: "dark", lang: "it" }, backdrop: "plain", text: 100 };
+
+  it("reads the values, not the objects or the order of the switches", () => {
+    expect(
+      isSameLiveView(shown, { switches: { lang: "it", theme: "dark" }, backdrop: "plain", text: 100 })
+    ).toBe(true);
+  });
+
+  it.each([
+    ["a switch's value", { ...shown, switches: { theme: "light", lang: "it" } }],
+    ["the language", { ...shown, switches: { theme: "dark", lang: "en" } }],
+    ["a switch set", { ...shown, switches: { theme: "dark", lang: "it", motion: "reduced" } }],
+    ["a switch taken away", { ...shown, switches: { theme: "dark" } }],
+    ["another switch in its place", { ...shown, switches: { theme: "dark", dir: "it" } }],
+    ["the backdrop", { ...shown, backdrop: "paper" }],
+    ["the text size", { ...shown, text: 110 }]
+  ])("sees a change of %s", (_name, other) => {
+    expect(isSameLiveView(shown, other)).toBe(false);
+    expect(isSameLiveView(other, shown)).toBe(false);
   });
 });
