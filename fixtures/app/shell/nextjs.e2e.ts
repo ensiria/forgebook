@@ -4,9 +4,31 @@
  *
  * @module
  */
-import { expect, type FrameLocator, type Page, test } from "@playwright/test";
+import { rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { test as base, expect, type FrameLocator, type Page } from "@playwright/test";
 
 import { catalogueUrl } from "./ports";
+
+/** The Next.js fixture's folder. */
+const FIXTURE = join(import.meta.dirname, "..", "..", "nextjs");
+
+/**
+ * The tests, with story files they add to the fixture while its catalogue runs, removed when the test ends however it
+ * ends: a `finally` in the test's body does not run after a timeout.
+ */
+const test = base.extend<{ addStoryFile: (file: string, text: string) => void }>({
+  // biome-ignore lint/correctness/noEmptyPattern: Playwright reads a fixture's dependencies from this parameter
+  addStoryFile: async ({}, use) => {
+    const added: string[] = [];
+    await use((file: string, text: string): void => {
+      added.push(file);
+      writeFileSync(join(FIXTURE, file), text);
+    });
+    for (const file of added) rmSync(join(FIXTURE, file), { force: true });
+  }
+});
 
 test.use({ baseURL: catalogueUrl("nextjs") });
 
@@ -172,5 +194,46 @@ test.describe("server components and variables", () => {
     expect(env).toContain('"NEXT_PUBLIC_SITE_URL":"https://harbour.example"');
     expect(env).not.toContain("HARBOUR_DATABASE_PASSWORD");
     expect(env).not.toContain("invented-secret");
+  });
+});
+
+test.describe("the story globs", () => {
+  /**
+   * The ids of the catalogue's components, as the agents' answers list them.
+   *
+   * @param page - a page of the catalogue.
+   */
+  const componentIds = async (page: Page): Promise<readonly string[]> => {
+    const answer: unknown = await (await page.request.get("/__forgebook/api/stories")).json();
+    const components: unknown =
+      typeof answer === "object" && answer !== null ? Reflect.get(answer, "components") : undefined;
+    return Array.isArray(components)
+      ? components.map((component: unknown) =>
+          typeof component === "object" && component !== null ? String(Reflect.get(component, "id")) : ""
+        )
+      : [];
+  };
+
+  test("a story file a `!` pattern leaves out is never listed, nor one added there while the catalogue runs", async ({
+    page,
+    addStoryFile
+  }) => {
+    await page.goto("/");
+    const sidebar = page.getByRole("navigation", { name: "Components" });
+    // the Site group counts its components: Hero, Navigation and Search, without the draft
+    await expect(sidebar.getByRole("button", { name: "Site 3", exact: true })).toBeVisible();
+    expect(await componentIds(page)).toContain("stories:site-navigation");
+    expect(await componentIds(page)).not.toContain("stories:site-draft-banner");
+    // a page that reloads loses this mark: a file no pattern lists changes no list, so nothing reloads
+    await page.evaluate(() => Reflect.set(window, "forgebookKept", true));
+    addStoryFile(
+      "components/drafts/LaterBanner.stories.tsx",
+      'export default { title: "Site/Later banner" };\nexport const Default = { render: () => "Later" };\n'
+    );
+    // the dev server sees a new file within a second; it must still be absent well after
+    await page.waitForTimeout(2000);
+    expect(await componentIds(page)).not.toContain("stories:site-later-banner");
+    await expect(sidebar.getByRole("button", { name: "Site 3", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => Reflect.get(window, "forgebookKept"))).toBe(true);
   });
 });

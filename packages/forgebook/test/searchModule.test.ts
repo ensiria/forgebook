@@ -96,20 +96,20 @@ describe("blockSections", () => {
 
 describe("the modules", () => {
   it("offers a group's index as a loader, whatever else is turned off", () => {
-    const files = storyFilesModule(KIT_DIR, "./src/*.stories.tsx", () => undefined, {
+    const files = storyFilesModule(KIT_DIR, ["./src/*.stories.tsx"], () => undefined, {
       hasUsage: false,
       hasReach: false
     });
     expect(files).toContain("search: () => import(");
     expect(files).toContain("virtual:forgebook-search:");
-    const pages = docPagesModule(KIT_DIR, "docs/**/*.md", () => undefined, false);
+    const pages = docPagesModule(KIT_DIR, ["docs/**/*.md"], () => undefined, false);
     expect(pages).toContain("virtual:forgebook-search-pages:");
   });
 
   it("indexes every docs page, with the anchors the page draws", () => {
     const watched: string[] = [];
     const index = indexOf(
-      pagesSearchModule(KIT_DIR, "docs/**/*.md", (file) => watched.push(file), inlineJson)
+      pagesSearchModule(KIT_DIR, ["docs/**/*.md"], (file) => watched.push(file), inlineJson)
     );
     const key = "./docs/guides/theming.md";
     const sections = index.pages?.[key] ?? [];
@@ -133,7 +133,7 @@ describe("the modules", () => {
     };
     const code = await storySearchModule(
       KIT_DIR,
-      "./src/Select.stories.tsx",
+      ["./src/Select.stories.tsx"],
       () => undefined,
       async (): Promise<DocsResult> => {
         const read: unknown = { docs, file: "/x/Select.tsx", sources: ["/x/Select.tsx"] };
@@ -163,7 +163,7 @@ describe("the modules", () => {
     };
     const code = await storySearchModule(
       KIT_DIR,
-      "./src/Select.stories.tsx",
+      ["./src/Select.stories.tsx"],
       () => undefined,
       async (): Promise<DocsResult> => {
         const read: unknown = { docs, file: "/x/Select.tsx", sources: [] };
@@ -194,7 +194,7 @@ describe("the modules", () => {
     };
     const code = await storySearchModule(
       KIT_DIR,
-      "./src/useUndo.stories.tsx",
+      ["./src/useUndo.stories.tsx"],
       () => undefined,
       async (): Promise<DocsResult> => {
         const read: unknown = { docs, file: "/x/useUndo.ts", sources: [] };
@@ -211,7 +211,7 @@ describe("the modules", () => {
   it("indexes a component's documentation file, with its headings' anchors", async () => {
     const code = await storySearchModule(
       KIT_DIR,
-      "./src/Select.stories.tsx",
+      ["./src/Select.stories.tsx"],
       () => undefined,
       noDocs,
       true,
@@ -229,7 +229,7 @@ describe("the modules", () => {
     const index = indexOf(
       await storySearchModule(
         KIT_DIR,
-        "./src/Select.stories.tsx",
+        ["./src/Select.stories.tsx"],
         () => undefined,
         async () => "no program",
         true,
@@ -243,7 +243,7 @@ describe("the modules", () => {
   it("keeps what names this computer's files out of a static build", async () => {
     const code = await storySearchModule(
       KIT_DIR,
-      "./src/Select.stories.tsx",
+      ["./src/Select.stories.tsx"],
       () => undefined,
       async () => "/home/me/x.tsx cannot be read",
       false,
@@ -254,7 +254,7 @@ describe("the modules", () => {
 
   it("leaves out a component with nothing to add", async () => {
     const index = indexOf(
-      await storySearchModule(KIT_DIR, "./src/Form.stories.tsx", () => undefined, noDocs, true, inlineJson)
+      await storySearchModule(KIT_DIR, ["./src/Form.stories.tsx"], () => undefined, noDocs, true, inlineJson)
     );
     expect(index.components).toEqual({});
   });

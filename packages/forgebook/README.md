@@ -107,6 +107,27 @@ npx forgebook build    # static files in dist/, for any web server
 Badge's page shows its stories, each in its own frame, and an API table read from `BadgeProps`: `label` required,
 `tone` with its three values and its default, each with its TSDoc.
 
+### Which files
+
+`stories` (and `docs`, for [docs pages](#docs-pages)) lists globs from the configuration's folder. A glob that starts
+with `!` leaves out the files it matches from what the others list, wherever it stands in the list, as Vite's
+`import.meta.glob` and fast-glob read it:
+
+```ts
+stories: [
+  "src/**/*.stories.tsx",
+  "src/**/*-story.tsx",
+  // drafts and the components still being moved in: listed by neither glob above
+  "!src/**/drafts/**",
+  "!src/components/Legacy*/**"
+]
+```
+
+A `!` glob is written from the same folder and with the same syntax as the others; one that names a folder
+(`!src/legacy`) leaves out every file in it. A file two globs list is listed once, its title made from the first one
+(when its meta writes none). A list of `!` globs alone lists nothing, and the catalogue refuses it. Adding a file a `!`
+glob leaves out, while the catalogue runs, changes nothing on the page.
+
 ## What a catalogue gives you
 
 - **One frame per story**, so a story's styles and globals never leak into another, and its address opens it alone.
@@ -741,7 +762,9 @@ its name.
 To try it on a Storybook project, run `npx forgebook init --from storybook` in the folder that holds `.storybook`. It
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
-computed `stories` list is read too; the preview is read from its source, so only `globalTypes` written as plain values
+computed `stories` list is read too, as the files it names (a list made with fast-glob and its `ignore`, for one,
+arrives with the ignored files already out); to keep the exclusion as globs, write it as `!` globs
+([above](#which-files)) in place of the files. The preview is read from its source, so only `globalTypes` written as plain values
 become switches. It reads React, Vue, Svelte, Preact, Solid, Web Components and plain HTML on Vite
 (`@storybook/react-vite`, `@storybook/vue3-vite`, `@storybook/svelte-vite`, `@storybook/sveltekit` (whose
 `sveltekit_experimental` parameters `@forgebook/sveltekit` reads as they are),

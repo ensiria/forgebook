@@ -23,6 +23,8 @@
  */
 import type { Frame, Page } from "@playwright/test";
 
+import { withDeadline } from "./deadline.ts";
+
 /** What the page is told to watch for, besides the stories' own texts. */
 export type StampWatch = {
   /** Texts stamped when the top page's body holds them. */
@@ -63,6 +65,12 @@ export type FrameReading = {
 
 /** How often the harness asks for a stamp, in milliseconds. */
 const ASK_INTERVAL = 20;
+
+/**
+ * How long one reading of a frame may take, in milliseconds: a frame whose script is stuck never answers, and the
+ * reading is then taken as none, so the wait reaches its own deadline and fails the sample.
+ */
+const ASK_TIMEOUT = 10_000;
 
 /** The global a stamping document reads its stamps through. */
 const STAMPS_GLOBAL = "benchStamps";
@@ -290,13 +298,17 @@ export const stampedPage = (page: Page): StampedPage => {
     if (existing !== undefined) return existing;
     const parentFrame = frame.parentFrame();
     const created: StampedFrame = {
-      evaluate: (expression) => frame.evaluate(expression),
+      evaluate: (expression) => withDeadline(frame.evaluate(expression), ASK_TIMEOUT, "a frame's reading"),
       shown: async () => {
-        const element = await frame.frameElement();
+        const element = await withDeadline(frame.frameElement(), ASK_TIMEOUT, "a frame's element");
         try {
-          return await element.evaluate(shownInPage);
+          return await withDeadline(
+            element.evaluate(shownInPage),
+            ASK_TIMEOUT,
+            "a frame's element's reading"
+          );
         } finally {
-          await element.dispose();
+          await element.dispose().catch(() => undefined);
         }
       },
       parent: parentFrame === null ? undefined : stampedFrame(parentFrame)

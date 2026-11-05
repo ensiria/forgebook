@@ -1,0 +1,4 @@
+# The Windows launchers keep Windows line endings in every checkout: the kit folder is copied as it is to the PC that
+# runs it, and cmd.exe misreads a batch file with bare line feeds.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

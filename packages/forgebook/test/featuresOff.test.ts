@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { docsOfArgs, propsOfArgs } from "../src/argsProps.ts";
 import { catalogueSettings } from "../src/catalogue.ts";
+import { codeLiteral } from "../src/codeLiteral.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
 import { textsModuleCode } from "../src/vite/builtTexts.ts";
 import type { ForgebookConfig } from "../src/vite/config.ts";
@@ -195,6 +196,21 @@ describe("the plugin without component docs", () => {
     await plugin.close();
   });
 
+  it("offers no docs, Used in nor reach in the group a configuration's stories make, `!` patterns and all", async () => {
+    const stories = ["src/*.stories.tsx", "src/Select.stories.tsx", "!src/Form.stories.tsx"];
+    const plugin = await pluginOf({ ...kitConfig({ componentDocs: false }), stories }, "serve");
+    const source = await plugin.load(join(KIT_DIR, ".forgebook-stories.ts"));
+    const literal = /import files from ("[^"]+");/.exec(source)?.[1] ?? '""';
+    const specifier: unknown = JSON.parse(literal);
+    const code = await plugin.load(plugin.resolve(String(specifier), join(KIT_DIR, ".forgebook-stories.ts")));
+    expect(code).toContain(codeLiteral("./src/Select.stories.tsx"));
+    expect(code).not.toContain(codeLiteral("./src/Form.stories.tsx"));
+    expect(code).toContain("docs: {},");
+    expect(code).not.toContain("usage:");
+    expect(code).not.toContain("reach:");
+    await plugin.close();
+  });
+
   it("answers every story file as one without a component, and starts nothing", async () => {
     expect(await NO_DOCS_EXTRACTOR.extract("/any/A.stories.tsx")).toEqual({ docs: { name: null } });
     expect(await NO_DOCS_EXTRACTOR.usage([])).toMatch(/componentDocs: false/);
@@ -203,7 +219,7 @@ describe("the plugin without component docs", () => {
   it("keeps the docs' place in a build's rows, with nothing in it", () => {
     const code = textsModuleCode([[undefined, {}, { html: "", summary: "" }]], () => 0);
     expect(code).toMatch(/export default \[\[null, writtenText\d, writtenText\d\]\];/);
-    const pattern = storyFilesCode("/kit", "./src/*.stories.tsx", [], {
+    const pattern = storyFilesCode("/kit", ["./src/*.stories.tsx"], [], {
       hasDocs: false,
       hasUsage: false,
       hasReach: false
