@@ -52,7 +52,7 @@
   "peerDependencies": {
     "forgebook": "workspace:^",
     "svelte": "^5.46.4",
-    "vite": "^8.0.0",
+    "vite": "^8.3.4",
     "msw": "^2.11.0 || ^3.0.0"
   },
   "peerDependenciesMeta": {

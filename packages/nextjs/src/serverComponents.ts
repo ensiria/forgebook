@@ -12,8 +12,8 @@
  * The swap reaches the story's component, what its render returns, and what the catalogue's decorators return: the
  * elements, and the elements in their props. An async component a synchronous one creates while it renders is out of
  * reach (a client component's own body): React 19 draws it as it does in the browser. What the server code reaches is
- * not there either (a database, the file system): `fetch` is mocked with `parameters.msw`, other modules with a
- * story's stand-ins.
+ * not there either (a database, the file system): `fetch` is mocked with `parameters.msw`, in the frame and in a server
+ * render (`serverFetch.ts`), other modules with a story's stand-ins.
  *
  * @module
  */

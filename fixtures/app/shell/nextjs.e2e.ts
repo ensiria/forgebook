@@ -42,7 +42,8 @@ const STORY_IDS = [
   "site-search--empty",
   "site-search--with-results",
   "blog-post-page--first-visit",
-  "blog-post-page--returning-reader"
+  "blog-post-page--returning-reader",
+  "blog-latest-post--loaded"
 ];
 
 /**
@@ -169,6 +170,11 @@ test.describe("routes", () => {
 });
 
 test.describe("server components and variables", () => {
+  test("a server component's fetch of a full address is answered by the story's mock", async ({ page }) => {
+    await page.goto(frame("blog-latest-post--loaded"));
+    await expect(page.getByRole("heading", { name: "First light over the harbour" })).toBeVisible();
+  });
+
   test("an async server component is awaited, reading the story's cookie", async ({ page }) => {
     await page.goto(frame("blog-post-page--returning-reader"));
     await reaches(page, "ready");

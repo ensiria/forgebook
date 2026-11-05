@@ -6,7 +6,7 @@ through `useRoute`, `navigateTo` and `NuxtLink`, `useFetch` and `useAsyncData`, 
 `useRuntimeConfig` and `useAppConfig`. It is [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) with a
 Vite plugin and a story's own Nuxt.
 
-**Requirements:** Nuxt 3 or 4 · Vue 3.5 · vue-router 4.5 or 5 (Nuxt's) · `forgebook` · Vite 8 · React in the project, for
+**Requirements:** Nuxt 3 or 4 · Vue 3.5 · vue-router 4.5 or 5 (Nuxt's) · `forgebook` · Vite 8.3.4+ · React in the project, for
 the catalogue's own interface (the frames that draw your components load none) ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/nuxt/LICENSE)
 

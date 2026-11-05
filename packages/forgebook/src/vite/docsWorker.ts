@@ -9,7 +9,7 @@
  * read builds one, and a changed source file (`{ kind: "changed" }`) renews them on their next read. A usage request
  * (`{ kind: "usage", id, files }`) is answered from the same programs (`usageGraph.ts`). A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
  * it is (plain data), with the files it can change with (`docsDependencies.ts`), which the dev server keeps it on disk
- * with.
+ * with. Unasked, it says `{ kind: "loaded" }` once its modules are loaded.
  *
  * @module
  */
@@ -18,7 +18,13 @@ import { parentPort, workerData } from "node:worker_threads";
 import { type DocsModule, isDocsModule } from "./adapter.ts";
 import { isSettledSince, nowNs, type PathStamp, stampPaths } from "./diskCache.ts";
 import { docsDependencies } from "./docsDependencies.ts";
-import type { DocsRequest, DocsResponse, DocsResult, DocsWorkerData } from "./docsExtractor.ts";
+import type {
+  DocsRequest,
+  DocsResponse,
+  DocsResult,
+  DocsWorkerData,
+  DocsWorkerLoaded
+} from "./docsExtractor.ts";
 import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
 import { usageGraph } from "./usageGraph.ts";
 
@@ -50,6 +56,12 @@ if (isWorkerData(workerData) && !workerData.readsEverything) readAskedFilesOnly(
 
 /** The framework's docs module, loaded once, before the first answer. */
 const docsModule = loadDocsModule();
+
+// the extractor waits for this before it ends the thread: `endOnceLoaded` says why
+void docsModule.then((): void => {
+  const loaded: DocsWorkerLoaded = { kind: "loaded" };
+  parentPort?.postMessage(loaded);
+});
 
 /** The extractor's result, or why it threw: a throw would end the worker and every request waiting on it. */
 const extracted = async (storyFile: string): Promise<DocsResult> => {

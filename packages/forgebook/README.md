@@ -9,7 +9,7 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > and every change is in the
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
-**Requirements:** Node 22.18 or later · Vite 8 (the catalogue is built on it; other bundlers are not supported) · React 19 through
+**Requirements:** Node 22.18 or later · Vite 8.3.4+ (the catalogue is built on it; other bundlers are not supported) · React 19 through
 [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
 [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) (a Nuxt project's through
 [`@forgebook/nuxt`](https://www.npmjs.com/package/@forgebook/nuxt)), Svelte 5 through
@@ -193,6 +193,15 @@ too, with a warning.
   story in the browser with axe, spills and overlays, screenshots, and every story rendered on the server.
 
 It adds about a dozen packages to a React and Vite project.
+
+## On a narrow window
+
+Below 720 px the sidebar stops taking room from the page. It starts closed, opens from the toolbar's sidebar button and
+slides over the page, which keeps the whole width and cannot be reached while the sidebar is open. A tap outside it,
+Escape (once the search is empty and no menu is open), its own button or opening any page closes it, and the focus goes
+back to the button, unless a search's result has taken it to what it found. Opening it there changes
+nothing a wider window remembers: the sidebar a person showed or hid on a wide window is as they left it, width
+included. A reduced-motion preference shows and hides it at once.
 
 ## The toolbar
 
@@ -498,8 +507,8 @@ The buttons read their colours from the page's theme.
 
 The field at the top of the sidebar searches the whole catalogue. The tree filters by name as you type, for browsing;
 beside it a list ranks everything the words find, each component or page with what matched inside it and why (a prop,
-an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere, ↑ and ↓
-move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
+an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere (with the sidebar hidden, ⌘K alone,
+which shows it), ↑ and ↓ move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
 
 A prop has an address of its own, so a link to one can be pasted anywhere: `?component=acme:inputs-select#prop.value`,
 and `#prop.Group.label` for a prop of a part named in `subcomponents`. A heading of a component's documentation file

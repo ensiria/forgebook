@@ -15,6 +15,7 @@
  */
 import { svelteRenderer } from "@forgebook/svelte/renderer";
 import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
+import { mockHandlersOf } from "forgebook/story-mocks";
 
 import { hrefCallbacksOf, type KitPage, type StoryKit } from "./kitParameters.ts";
 import {
@@ -24,7 +25,7 @@ import {
   type KitStore,
   setCurrentStore
 } from "./kitStore.ts";
-import { type LoadFetch, loadFetch, mockHandlersOf } from "./loadFetch.ts";
+import { type LoadFetch, loadFetch } from "./loadFetch.ts";
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>

@@ -5,7 +5,7 @@ A Next.js project's components in [Forgebook](https://www.npmjs.com/package/forg
 components. Next.js is React, so this is React's adapter ([`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react))
 with what Next.js's modules need in a browser; the catalogue stays on Vite, and Next.js's own bundler is not run.
 
-**Requirements:** Next.js 15 or 16 · React 19 · `forgebook` · Vite 8 ·
+**Requirements:** Next.js 15 or 16 · React 19 · `forgebook` · Vite 8.3.4+ ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/nextjs/LICENSE)
 
 ```sh
@@ -88,8 +88,38 @@ honestly out of reach in a browser:
 - There is no RSC stream: no streaming of `Suspense` boundaries from a server, no `"use cache"`, no route segment
   config, no middleware, no `generateMetadata` (a story draws a component, not a route).
 - An async component created inside a client component's own render is drawn by React 19 itself, which warns about it.
-- The generated server-render tests (`@forgebook/testing/server`) render synchronously, so a story with a server
-  component fails there.
+
+### Server tests
+
+Generated server tests (`@forgebook/testing/server`) take `nextRenderer` from `@forgebook/nextjs/renderer` and run on
+Node. They wait for a story's server components, as Next.js's server does, and a `fetch` in them never reaches the
+network: the story's `parameters.msw` handlers answer it, the ones the frame uses, run in Node by MSW's `getResponse`
+(MSW 2.11 or later, installed by the project).
+
+```tsx
+export const Loaded: Story<typeof Posts> = {
+  parameters: {
+    msw: { handlers: [http.get("https://api.example.com/posts", () => HttpResponse.json([{ title: "Hello" }]))] }
+  }
+};
+```
+
+- Every address goes through the handlers, whatever its origin: a server component's fetches are all absolute, and
+  nothing tells an API from whatever answers on the test machine. `localhost` and `127.0.0.1` are no exception. On this
+  machine a handler's path (`/api/posts`) answers any port; on another origin a handler names the full address.
+- When no handler answers, or one answers `passthrough()` or fetches `bypass()`, the story fails with the method, the
+  address and what to give instead; it fails even when the component catches the error. So does a fetch of a path
+  (`/api/posts`), which Next.js's server refuses too.
+- Each render has its own handlers: the global `fetch` is wrapped once, and asks an async context which render called
+  it, so tests running at once keep their own mocks and a fetch outside a render is the real one. A mocked redirect is followed through the handlers, `HttpResponse.error()`
+  rejects the fetch, and `{ once: true }` handlers answer again in each render. Next.js's fetch options
+  (`next: { revalidate }`, `cache`) are accepted and do nothing: nothing is cached.
+- Only the global `fetch` called during a render is covered. Not covered: a client that uses `node:http` or a socket, a
+  story's `loaders`, which run before the render, and a reference to `fetch` a module took before
+  `@forgebook/nextjs/renderer` was imported. A story with no fetch needs no MSW.
+- A render error fails the test, one inside a `Suspense` boundary too, and so does a render that has not finished in
+  4.5 seconds. A story that stays loading on purpose (`delay("infinite")`) takes the `!test` tag.
+  `next/dynamic` with `ssr: false` draws only its `loading`, as Next.js's server does.
 
 ## Not supported
 

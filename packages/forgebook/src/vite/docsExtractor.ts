@@ -10,7 +10,7 @@
  * the disk keeps no docs at all (a first start, a build), one warm-up at a time and only while nothing waits. For the
  * same reason a dev server's worker left with nothing to do ends (`IDLE_MS`), so the memory a first start took does
  * not stay with the server until it stops. Requests are answered in order. The worker never keeps the process alive
- * (`unref`), and `close` ends it when the build or the server ends.
+ * (`unref`), and `close` ends it when the build or the server ends, once its modules are loaded (`endOnceLoaded`).
  *
  * @module
  */
@@ -122,6 +122,12 @@ export type DocsWorkerData = {
   readonly keepsAnswers: boolean;
 };
 
+/** What the worker says of its own, unasked: that its modules, the framework's docs module's included, are loaded. */
+export type DocsWorkerLoaded = {
+  /** The message's kind. */
+  readonly kind: "loaded";
+};
+
 /** How an extractor reads. */
 export type DocsExtractorOptions = {
   /** Whether every story's docs will be read, as in a build; a dev server's reads by default. */
@@ -133,6 +139,8 @@ export type DocsExtractorOptions = {
    * never ends before the build does.
    */
   readonly idleMs?: number;
+  /** How long ending the worker waits for its modules to load, in milliseconds; `LOAD_WAIT_MS` by default. */
+  readonly loadWaitMs?: number;
 };
 
 /** Whether what a cache file holds is a story file's docs, never a message. */
@@ -156,6 +164,12 @@ const YOUNG_GENERATION_MB = 8;
  * looks keeps them, renewed after each edit rather than built again (seconds, in a large monorepo).
  */
 export const IDLE_MS = 5 * 60_000;
+
+/**
+ * How long ending a worker waits for its modules to load, in milliseconds: well past a slow machine's load of the
+ * compiler, and a limit so that a docs module whose loading never ends cannot keep a server from closing.
+ */
+const LOAD_WAIT_MS = 30_000;
 
 /**
  * The worker's young generation in a build, in MB: a build reads every story's docs in one go, and with the dev
@@ -198,6 +212,29 @@ export const NO_DOCS_EXTRACTOR: DocsExtractor = {
 };
 
 /**
+ * Ends a worker once its modules are loaded.
+ *
+ * @remarks
+ * Node 24 aborts the whole process when a worker is terminated while it reads the exports of a CommonJS module it
+ * imports, and the compiler is one: a command answered before the warm-up's worker had loaded would die with nothing
+ * printed. Past the loading, terminating is safe and stops a program being built at once, which a request to the worker
+ * to end by itself would have to wait for.
+ *
+ * @param worker - the worker.
+ * @param loaded - settled once its modules are loaded, or it has ended.
+ * @param waitMs - how long to wait for that, in milliseconds.
+ */
+const endOnceLoaded = async (worker: Worker, loaded: Promise<void>, waitMs: number): Promise<void> => {
+  let limit: ReturnType<typeof setTimeout> | undefined;
+  const overLimit = new Promise<void>((resolve) => {
+    limit = setTimeout(resolve, waitMs);
+  });
+  await Promise.race([loaded, overLimit]);
+  clearTimeout(limit);
+  await worker.terminate();
+};
+
+/**
  * A docs extractor with its worker, started on its first request.
  *
  * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).
@@ -206,7 +243,12 @@ export const NO_DOCS_EXTRACTOR: DocsExtractor = {
  */
 export const createDocsExtractor = (
   docsModule: string,
-  { readsEverything = false, cacheFolder, idleMs = IDLE_MS }: DocsExtractorOptions = {}
+  {
+    readsEverything = false,
+    cacheFolder,
+    idleMs = IDLE_MS,
+    loadWaitMs = LOAD_WAIT_MS
+  }: DocsExtractorOptions = {}
 ): DocsExtractor => {
   // the code that writes the answers: this package's and the framework's docs, whose edit or new version is a miss
   const code = cacheFolder === undefined ? undefined : codeStampOf(docsModule);
@@ -220,6 +262,8 @@ export const createDocsExtractor = (
   const docsCache = cacheOf("docs", isKeptDocs);
   const usageCache = cacheOf("usage", isKeptUsage);
   let worker: Worker | undefined;
+  // settled once the current worker's modules are loaded, or it has ended
+  let workerLoaded: Promise<void> = Promise.resolve();
   let nextId = 0;
   // the changes the watcher reported: an answer read across one may have read a file before it changed, so it is not kept
   let changes = 0;
@@ -232,16 +276,22 @@ export const createDocsExtractor = (
   // the warm-ups not sent yet: one goes out only when nothing is pending, so a read never waits behind them all
   const warmUps: string[] = [];
   let idle: ReturnType<typeof setTimeout> | undefined;
+  // every ending under way: a second close must wait for the first's too, as a process may exit once it resolves
+  let ending: Promise<unknown> = Promise.resolve();
+  // lets the current worker go, so the next request starts another, and ends it
+  const endWorker = async (): Promise<void> => {
+    const running = worker;
+    worker = undefined;
+    if (running !== undefined)
+      ending = Promise.all([ending, endOnceLoaded(running, workerLoaded, loadWaitMs)]);
+    await ending;
+  };
   // ends the worker once nothing is asked of it for a while; a request in the meantime keeps it
   const stopWhenIdle = (): void => {
     clearTimeout(idle);
     // a build reads every story, and a quiet stretch in it would build every program again
     if (readsEverything || pending.size > 0 || warmUps.length > 0) return;
-    idle = setTimeout(() => {
-      const running = worker;
-      worker = undefined;
-      void running?.terminate();
-    }, idleMs);
+    idle = setTimeout(() => void endWorker(), idleMs);
     idle.unref();
   };
   const sendWarmUp = (): void => {
@@ -260,7 +310,14 @@ export const createDocsExtractor = (
       }
     });
     created.unref();
-    created.on("message", (response: DocsResponse): void => {
+    workerLoaded = new Promise((resolve) => {
+      created.on("message", (message: DocsResponse | DocsWorkerLoaded): void => {
+        if (message.kind === "loaded") resolve();
+      });
+      created.once("exit", () => resolve());
+    });
+    created.on("message", (response: DocsResponse | DocsWorkerLoaded): void => {
+      if (response.kind === "loaded") return;
       pending.get(response.id)?.(response);
       pending.delete(response.id);
       sendWarmUp();
@@ -350,10 +407,8 @@ export const createDocsExtractor = (
     },
     close: async (): Promise<void> => {
       clearTimeout(idle);
-      const running = worker;
-      worker = undefined;
       warmUps.length = 0;
-      await running?.terminate();
+      await endWorker();
     }
   };
 };
