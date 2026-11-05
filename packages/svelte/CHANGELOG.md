@@ -1,3 +1,19 @@
+## 0.2.1 (2026-11-05)
+
+### 🩹 Fixes
+
+- **sveltekit:** answer a server load's fetch with the story's mocks ([8509daf](https://github.com/ensiria/forgebook/commit/8509daf))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.1
+- Updated forgebook to 0.3.0
+- Updated @forgebook/testing to 0.2.1
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.0 (2026-11-04)
 
 ### 🚀 Features
