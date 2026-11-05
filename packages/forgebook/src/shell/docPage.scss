@@ -200,6 +200,9 @@
     --forgebook-tone: #{$accent-text};
 
     display: grid;
+    // one column no wider than the block: an implicit `auto` column grows to its widest child's min-content (a long
+    // word, a line of code), and the page would scroll sideways on a narrow window
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-2;
     min-width: 0;
     margin: 0;
@@ -239,6 +242,8 @@
   // tabs: a row of labels on a line, the chosen one underlined in the accent
   .forgebook-tabs {
     display: grid;
+    // as an aside's: no wider than the block, whatever its widest child
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-3;
     min-width: 0;
   }
@@ -278,6 +283,8 @@
 
   .forgebook-tabs__panel {
     display: grid;
+    // as an aside's: no wider than the block, whatever its widest child
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-4;
     min-width: 0;
 
@@ -289,6 +296,8 @@
   // steps: a numbered line down the left, each step's number in a ring on it
   .forgebook-steps {
     display: grid;
+    // as an aside's: no wider than the block, whatever its widest child
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-5;
     margin: 0;
     padding: 0;
@@ -299,6 +308,8 @@
   .forgebook-steps__step {
     position: relative;
     display: grid;
+    // as an aside's: no wider than the block, whatever its widest child
+    grid-template-columns: minmax(0, 1fr);
     gap: $space-3;
     min-width: 0;
     // the number's ring and the room after it
@@ -343,6 +354,8 @@
 
   .forgebook-card {
     display: grid;
+    // as an aside's: no wider than the block, whatever its widest child
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: $space-2;
     min-width: 0;
