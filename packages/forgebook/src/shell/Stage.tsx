@@ -221,7 +221,9 @@ export const Stage = ({
   const panel = reportedPanel(storyPanels, story);
   const catalogue = useCatalogue();
   const docs = usePanelDocs(loadDocs, component.name, storyArgs.get(story.id), panel.actions);
-  const view = withFixed(ownView, panel.fixed);
+  // kept while neither changes: every new switches' object sends the frames the view, and a story whose height moves
+  // renders the stage at each report
+  const view = useMemo(() => withFixed(ownView, panel.fixed), [ownView, panel.fixed]);
   const onViewChange = (changed: ViewState): void =>
     onOwnViewChange(withOwnFixed(changed, ownView, panel.fixed));
   const [calls, setCalls] = useState<readonly EventCall[]>([]);
