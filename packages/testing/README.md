@@ -11,7 +11,7 @@ tests:
 - **on the server** (Vitest), each story rendered to a string, so no component reads `window` or `document` while it
   renders, and its controls checked against its args.
 
-**Requirements:** `forgebook` · Vite 8 · `@playwright/test` 1.64+ · Vitest 5 · Docker for the visual tests ·
+**Requirements:** `forgebook` · Vite 8.3.4+ · `@playwright/test` 1.64+ · Vitest 5 · Docker for the visual tests ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/testing/LICENSE)
 
 ```sh

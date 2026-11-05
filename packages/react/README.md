@@ -3,7 +3,7 @@
 React for [Forgebook](https://www.npmjs.com/package/forgebook): the story types, the renderer the frame mounts a story
 with, and the adapter that reads a React component's props from its TypeScript types.
 
-**Requirements:** React 18.2 or 19 · `forgebook` · Vite 8 · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/react/LICENSE)
+**Requirements:** React 18.2 or 19 · `forgebook` · Vite 8.3.4+ · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/react/LICENSE)
 
 ```sh
 npm install --save-dev forgebook @forgebook/react
