@@ -243,6 +243,14 @@ const unzip = (archive: Buffer): Record<string, string> => {
   return files;
 };
 
+describe("leaks", () => {
+  it("takes no placeholder for the name of a user called User or a computer called Computer", () => {
+    const identity = { home: "C:\\Users\\User", user: "User", host: "Computer" };
+    const cleaned = anonymize("User on Computer in C:\\Users\\User\\work", identity);
+    expect(leaks(cleaned, identity)).toEqual([]);
+  });
+});
+
 describe("zipArchive", () => {
   it("writes files a reader finds again, names in UTF-8 included", () => {
     const archive = zipArchive(

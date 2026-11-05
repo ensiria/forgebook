@@ -26,8 +26,9 @@ $LauncherLog = Join-Path $LogFolder 'launcher.log'
 $Gigabyte = 1GB
 $script:ConsoleMode = -1
 $script:StepNumber = 0
-$script:Node = $null
-$script:Repo = $null
+$script:NodeProgram = $null
+$script:RepoFolder = $null
+$script:PinnedCommit = $null
 
 # The file that marks the kit's own folder: only a folder holding it is ever deleted
 $KitMarker = '.forgebook-bench-kit'
@@ -94,6 +95,17 @@ function Wait-Close {
   if (-not $env:FORGEBOOK_BENCH_NO_PAUSE) { Write-Host ''; [void](Read-Host 'Premi Invio per chiudere') }
 }
 
+# What names the person and the computer, with what stands for each: the environment's names and the system's, which the
+# kit's Node part reads and which can differ from them (a computer's long name against the 15 letters of its NetBIOS one).
+function Get-Identity {
+  $hostName = ''
+  try { $hostName = [Net.Dns]::GetHostName() } catch { }
+  $found = @()
+  foreach ($name in @($env:USERNAME, [Environment]::UserName)) { $found += [pscustomobject]@{ Name = $name; Placeholder = '<user>' } }
+  foreach ($name in @($hostName, $hostName.Split('.')[0], $env:COMPUTERNAME, [Environment]::MachineName)) { $found += [pscustomobject]@{ Name = $name; Placeholder = '<computer>' } }
+  return @($found | Where-Object { $_.Name -and $_.Name.Length -ge 3 })
+}
+
 # The person's identity out of a text: the home folder as ~, the user's and the computer's names as placeholders, as
 # the kit's Node part does (kitResults.ts) for the results file.
 function Hide-Identity([string] $Text) {
@@ -105,10 +117,8 @@ function Hide-Identity([string] $Text) {
     $spellings = @($profileFolder.Replace('\', '\\'), $profileFolder, $profileFolder.Replace('\', '/'))
     foreach ($spelling in $spellings) { $result = [regex]::Replace($result, [regex]::Escape($spelling), '~', 'IgnoreCase') }
   }
-  foreach ($pair in @(@($env:USERNAME, '<user>'), @($env:COMPUTERNAME, '<computer>'))) {
-    if ($pair[0] -and $pair[0].Length -ge 3) {
-      $result = [regex]::Replace($result, '(?<![\w-])' + [regex]::Escape($pair[0]) + '(?![\w-])', $pair[1], 'IgnoreCase')
-    }
+  foreach ($pair in (Get-Identity)) {
+    $result = [regex]::Replace($result, '(?<![\w-])' + [regex]::Escape($pair.Name) + '(?![\w-])', $pair.Placeholder, 'IgnoreCase')
   }
   # any user's folder, the short MARIOR~1 form included, and a OneDrive folder's organisation
   $result = [regex]::Replace($result, $UserFolderPattern, '~', 'IgnoreCase')
@@ -122,8 +132,10 @@ $UserFolderPattern = '(?:\b[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)|(?<![\w.~-])
 function Test-Identity([string] $Text) {
   if ([regex]::IsMatch($Text, $UserFolderPattern, 'IgnoreCase')) { return $true }
   if ($Text.Replace('OneDrive - <organisation>', '').Contains('OneDrive - ')) { return $true }
-  foreach ($name in @($env:USERNAME, $env:COMPUTERNAME)) {
-    if ($name -and $name.Length -ge 3 -and [regex]::IsMatch($Text, '(?<![\w-])' + [regex]::Escape($name) + '(?![\w-])', 'IgnoreCase')) { return $true }
+  # the placeholders are no leak, though a user named User finds its name in them
+  $withoutPlaceholders = $Text.Replace('<user>', '').Replace('<computer>', '')
+  foreach ($pair in (Get-Identity)) {
+    if ([regex]::IsMatch($withoutPlaceholders, '(?<![\w-])' + [regex]::Escape($pair.Name) + '(?![\w-])', 'IgnoreCase')) { return $true }
   }
   return $false
 }
@@ -135,32 +147,49 @@ function Get-Desktop {
   return $KitHome
 }
 
-# The results file of what there is: the kit's own, through Node, once Node and Forgebook are in place; the launcher's
-# logs alone, cleaned of the person's identity, before that.
+# Whether the Node part of the pinned commit is installed. A folder an earlier launch left holds the kit of that launch's
+# commit, which need not know the options this launcher passes.
+function Test-KitInstalled {
+  if (-not ($script:NodeProgram -and $script:RepoFolder -and $script:PinnedCommit)) { return $false }
+  $marker = Join-Path $script:RepoFolder 'node_modules\.kit-installed'
+  if (-not (Test-Path -LiteralPath $marker)) { return $false }
+  return ([string](Get-Content -LiteralPath $marker -Raw)).Trim() -eq $script:PinnedCommit
+}
+
+# The results file of what there is: the kit's own, through Node, once the pinned commit is in place; otherwise, or when
+# the kit cannot write it, the launcher's logs alone, which need nothing installed. Those go through the same cleaning
+# and the same refusal as the kit's file, so a name the kit refused to archive is not archived here either.
 function Write-WhatThereIs {
-  if ($script:Node -and $script:Repo -and (Test-Path -LiteralPath (Join-Path $script:Repo 'node_modules\.kit-installed'))) {
-    # the kit's own file, or none: when it refuses (a name it could not take out), the launcher does not try its own
-    & $script:Node (Join-Path $script:Repo 'tools\bench\kit\kit.mts') --home $KitHome --desktop (Get-Desktop) --results
-    if ($LASTEXITCODE -ne 0) { Say "Non ho creato il file dei risultati. I registri sono in $LogFolder." }
-    return
+  $isKitInstalled = $false
+  try { $isKitInstalled = Test-KitInstalled } catch { }
+  if ($isKitInstalled) {
+    try {
+      & $script:NodeProgram (Join-Path $script:RepoFolder 'tools\bench\kit\kit.mts') --home $KitHome --desktop (Get-Desktop) --results
+      if ($LASTEXITCODE -eq 0) { return }
+      Say "Il kit non ha creato il file dei risultati (codice $LASTEXITCODE): metto insieme solo i registri."
+    } catch {
+      Say "Il kit non parte ($($_.Exception.Message)): metto insieme solo i registri."
+    }
   }
   try {
     $stage = Join-Path ([IO.Path]::GetTempPath()) ('forgebook-bench-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $stage | Out-Null
-    foreach ($file in Get-ChildItem -LiteralPath $LogFolder -File) {
-      $text = Hide-Identity ([IO.File]::ReadAllText($file.FullName))
-      if (Test-Identity $text) {
+    foreach ($logFile in Get-ChildItem -LiteralPath $LogFolder -File) {
+      # a log a stopped program still holds is left out: the others are what the file is for
+      try { $raw = [IO.File]::ReadAllText($logFile.FullName) } catch { Warn "non riesco a leggere $($logFile.Name): lo lascio fuori."; continue }
+      $cleaned = Hide-Identity $raw
+      if (Test-Identity $cleaned) {
         Remove-Item -LiteralPath $stage -Recurse -Force
-        Say "Non creo il file dei registri: $($file.Name) contiene ancora dati personali. I registri sono in $LogFolder."
+        Say "Non creo il file dei registri: $($logFile.Name) contiene ancora dati personali. I registri sono in $LogFolder."
         return
       }
-      [IO.File]::WriteAllText((Join-Path $stage $file.Name), $text, (New-Object Text.UTF8Encoding $false))
+      [IO.File]::WriteAllText((Join-Path $stage $logFile.Name), $cleaned, (New-Object Text.UTF8Encoding $false))
     }
-    $zip = Join-Path (Get-Desktop) ('forgebook-bench-registri-{0:yyyyMMdd-HHmm}.zip' -f (Get-Date))
-    Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
+    $archive = Join-Path (Get-Desktop) ('forgebook-bench-registri-{0:yyyyMMdd-HHmm}.zip' -f (Get-Date))
+    Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $archive -Force
     Remove-Item -LiteralPath $stage -Recurse -Force
     # the name alone: a Desktop under OneDrive names the employer
-    Say "Ho scritto i registri, senza nome utente né nome del computer, sul Desktop: $(Split-Path -Leaf $zip). Mandalo così com'è."
+    Say "Ho scritto i registri, senza nome utente né nome del computer, sul Desktop: $(Split-Path -Leaf $archive). Mandalo così com'è."
   } catch {
     Say "Non riesco a creare il file dei registri ($($_.Exception.Message)). I registri sono in $LogFolder."
   }
@@ -234,8 +263,8 @@ function Invoke-Watched([string] $What, [string] $Program, [string[]] $Arguments
   }
   $process.WaitForExit()
   if ($process.ExitCode -ne 0) {
-    foreach ($file in @($errorLog, $stepLog)) {
-      if ((Get-Size $file) -gt 0) { Get-Content -LiteralPath $file -Tail 15 | ForEach-Object { Write-Host "  $_" } }
+    foreach ($logFile in @($errorLog, $stepLog)) {
+      if ((Get-Size $logFile) -gt 0) { Get-Content -LiteralPath $logFile -Tail 15 | ForEach-Object { Write-Host "  $_" } }
     }
     Fail "$What non è riuscito (codice $($process.ExitCode)). Il registro è $stepLog."
   }
@@ -245,8 +274,8 @@ function Read-Pins([string] $File) {
   $pins = @{}
   foreach ($line in Get-Content -LiteralPath $File) {
     if ($line -match '^\s*#' -or $line -notmatch '=') { continue }
-    $key, $value = $line -split '=', 2
-    $pins[$key.Trim()] = $value.Trim()
+    $pinKey, $pinValue = $line -split '=', 2
+    $pins[$pinKey.Trim()] = $pinValue.Trim()
   }
   return $pins
 }
@@ -288,9 +317,9 @@ function Expand-Once([string] $Zip, [string] $Destination) {
 
 # Whether the Visual C++ runtime is installed: native modules Storybook and Ladle load (oxc-resolver, Rollup's) need
 # it, and a fresh Windows may not have it.
-function Test-VcRuntime([string] $Platform) {
+function Test-VcRuntime([string] $TargetPlatform) {
   $system = Join-Path $env:SystemRoot 'System32'
-  $files = @('vcruntime140.dll', 'msvcp140.dll') + $(if ($Platform -eq 'win-x64') { @('vcruntime140_1.dll') } else { @() })
+  $files = @('vcruntime140.dll', 'msvcp140.dll') + $(if ($TargetPlatform -eq 'win-x64') { @('vcruntime140_1.dll') } else { @() })
   return -not ($files | Where-Object { -not (Test-Path -LiteralPath (Join-Path $system $_)) })
 }
 
@@ -301,13 +330,13 @@ $VcRuntimeWait = 10
 # Windows asks for permission, and a refusal, or no answer within the wait, leaves the kit going without Storybook and
 # Ladle. The request runs in a helper PowerShell of its own, since asking for elevation blocks its caller until someone
 # answers; the helper is stopped when the wait is over.
-function Install-VcRuntime([string] $Platform, [hashtable] $Pins, [string] $Downloads) {
-  if (Test-VcRuntime $Platform) { return }
+function Install-VcRuntime([string] $TargetPlatform, [hashtable] $PinList, [string] $DownloadFolder) {
+  if (Test-VcRuntime $TargetPlatform) { return }
   Step 'Runtime Microsoft Visual C++'
   Say 'Su questo PC manca il runtime Microsoft Visual C++, che serve a Storybook e a Ladle. Lo installo dal sito di Microsoft.'
   Say "Windows chiederà il permesso di un amministratore: è l'unico passo che lo richiede. Aspetto al massimo $VcRuntimeWait minuti."
-  $installer = Join-Path $Downloads "vc_redist-$Platform.exe"
-  Get-Verified $Pins["vcredist.$Platform.url"] $Pins["vcredist.$Platform.sha256"] $installer
+  $installer = Join-Path $DownloadFolder "vc_redist-$TargetPlatform.exe"
+  Get-Verified $PinList["vcredist.$TargetPlatform.url"] $PinList["vcredist.$TargetPlatform.sha256"] $installer
   $signature = Get-AuthenticodeSignature -LiteralPath $installer
   if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
     Fail 'il programma di installazione del runtime non è firmato da Microsoft. Non lo uso.'
@@ -334,7 +363,7 @@ function Install-VcRuntime([string] $Platform, [hashtable] $Pins, [string] $Down
     }
   }
   if ($helper.HasExited -and $helper.ExitCode -ne 0) { Say "Permesso negato o installazione non riuscita (codice $($helper.ExitCode))." }
-  if (-not (Test-VcRuntime $Platform)) {
+  if (-not (Test-VcRuntime $TargetPlatform)) {
     Warn 'il runtime non è installato, quindi Storybook e Ladle non potranno essere misurati. Il resto della prova va avanti.'
   }
 }
@@ -352,7 +381,7 @@ function Stop-Sleep {
 
 # Removes the kit's folder, asked for by the Node part: Node removes the deep folders, whose paths Remove-Item cannot
 # always handle, then the rest goes, Node included.
-function Remove-Kit([string] $Node) {
+function Remove-Kit([string] $NodeProgram) {
   # only a folder the kit made: never the user's own folder or a drive, whatever FORGEBOOK_BENCH_HOME says
   $full = [IO.Path]::GetFullPath($KitHome).TrimEnd('\')
   if (-not (Test-Path -LiteralPath (Join-Path $KitHome $KitMarker)) -or $full -eq [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') -or $full -eq [IO.Path]::GetPathRoot($full).TrimEnd('\')) {
@@ -363,7 +392,7 @@ function Remove-Kit([string] $Node) {
   foreach ($child in Get-ChildItem -LiteralPath $KitHome -Force) {
     if ($child.Name -eq 'tools') { continue }
     # single quotes inside: Windows PowerShell passes a native program an argument's double quotes stripped
-    & $Node -e 'require(''fs'').rmSync(process.argv[1], { recursive: true, force: true })' $child.FullName
+    & $NodeProgram -e 'require(''fs'').rmSync(process.argv[1], { recursive: true, force: true })' $child.FullName
   }
   Remove-Item -LiteralPath $KitHome -Recurse -Force
   Write-Host "Cartella $KitHome cancellata."
@@ -387,17 +416,19 @@ try {
     '^(Arm64|ARM64)$' { $platform = 'win-arm64' }
     default { Fail "questo PC ($machine) non è supportato: serve Windows a 64 bit." }
   }
-  if ([Environment]::OSVersion.Version.Major -lt 10) { Fail 'serve Windows 10 o 11.' }
+  # $IsWindows is false only in PowerShell 7 on another system, which runs this script for the launcher's own tests
+  if ($IsWindows -ne $false -and [Environment]::OSVersion.Version.Major -lt 10) { Fail 'serve Windows 10 o 11.' }
 
   $pinsFile = Join-Path $KitFolder 'kit.pins'
   if (-not (Test-Path -LiteralPath $pinsFile)) { Fail "manca kit.pins accanto a questo file: copia tutta la cartella del kit." }
   $pins = Read-Pins $pinsFile
+  $script:PinnedCommit = $pins['forgebook.commit']
   $tools = Join-Path $KitHome 'tools'
   $downloads = Join-Path $KitHome 'downloads'
   $nodeUnpacked = Join-Path $tools "node-$($pins['node.version'])"
-  $script:Repo = Join-Path $KitHome 'repo'
+  $script:RepoFolder = Join-Path $KitHome 'repo'
   $existingNode = if (Test-Path -LiteralPath $nodeUnpacked) { Get-ChildItem -LiteralPath $nodeUnpacked -Directory | Select-Object -First 1 } else { $null }
-  if ($null -ne $existingNode) { $script:Node = Join-Path $existingNode.FullName 'node.exe' }
+  if ($null -ne $existingNode) { $script:NodeProgram = Join-Path $existingNode.FullName 'node.exe' }
 
   # --results: only the results file of what there is, with nothing installed or run
   if ($KitArgs -contains '--results') {
@@ -419,8 +450,8 @@ try {
   $nodeZip = Join-Path $downloads "node-$($pins['node.version'])-$platform.zip"
   Get-Verified $pins["node.$platform.url"] $pins["node.$platform.sha256"] $nodeZip
   Expand-Once $nodeZip $nodeUnpacked
-  $node = (Get-ChildItem -LiteralPath $nodeUnpacked -Directory | Select-Object -First 1).FullName
-  $script:Node = Join-Path $node 'node.exe'
+  $nodeFolder = (Get-ChildItem -LiteralPath $nodeUnpacked -Directory | Select-Object -First 1).FullName
+  $script:NodeProgram = Join-Path $nodeFolder 'node.exe'
 
   Install-VcRuntime $platform $pins $downloads
 
@@ -435,7 +466,7 @@ try {
   $bin = Join-Path $KitHome 'bin'
   New-Item -ItemType Directory -Path $bin -Force | Out-Null
   # MinGit's shell tools go last: Fluent's preparation needs its sh, and Windows' own find and sort must win
-  $env:Path = "$node;$(Join-Path $git 'cmd');$bin;$env:Path;$(Join-Path $git 'usr\bin')"
+  $env:PATH = @($nodeFolder, (Join-Path $git 'cmd'), $bin, $env:PATH, (Join-Path $git 'usr\bin')) -join [IO.Path]::PathSeparator
   $env:COREPACK_HOME = Join-Path $KitHome 'corepack'
   $env:COREPACK_ENABLE_DOWNLOAD_PROMPT = '0'
   $env:COREPACK_ENABLE_AUTO_PIN = '0'
@@ -456,47 +487,46 @@ try {
 
   Step 'pnpm'
   # corepack's script run by Node itself: through corepack.cmd, cmd.exe would read a & or a % in the folder's path
-  $corepack = Join-Path $node 'node_modules\corepack\dist\corepack.js'
-  Invoke-Watched 'L''attivazione di pnpm' $script:Node @($corepack, 'enable', '--install-directory', $bin, 'pnpm') 5 10
+  $corepack = Join-Path $nodeFolder 'node_modules\corepack\dist\corepack.js'
+  # Yarn too, though the launcher never runs it: a library's tasks call it by name (Carbon's build), and without it on
+  # the PATH they fail at once and that library is lost from the run
+  Invoke-Watched 'L''attivazione di pnpm' $script:NodeProgram @($corepack, 'enable', '--install-directory', $bin, 'pnpm', 'yarn') 5 10
 
-  Step "Forgebook al commit $($pins['forgebook.commit'].Substring(0, 12))"
-  $repo = $script:Repo
-  $commit = $pins['forgebook.commit']
-  if (-not (Test-Path -LiteralPath (Join-Path $repo '.git'))) {
-    Invoke-Watched 'git init' 'git' @('init', '--quiet', $repo) 2 5
-    Invoke-Watched 'git remote' 'git' @('-C', $repo, 'remote', 'add', 'origin', $pins['forgebook.repository']) 2 5
+  Step "Forgebook al commit $($script:PinnedCommit.Substring(0, 12))"
+  if (-not (Test-Path -LiteralPath (Join-Path $script:RepoFolder '.git'))) {
+    Invoke-Watched 'git init' 'git' @('init', '--quiet', $script:RepoFolder) 2 5
+    Invoke-Watched 'git remote' 'git' @('-C', $script:RepoFolder, 'remote', 'add', 'origin', $pins['forgebook.repository']) 2 5
   }
-  $head = (& git -C $repo rev-parse --verify --quiet HEAD) | Out-String
-  if ($head.Trim() -ne $commit) {
-    Invoke-Watched 'Lo scaricamento di Forgebook' 'git' @('-C', $repo, 'fetch', '--quiet', '--depth', '1', 'origin', $commit) 20 60
-    Invoke-Watched 'git checkout' 'git' @('-C', $repo, 'checkout', '--quiet', '--force', $commit) 10 20
+  $head = (& git -C $script:RepoFolder rev-parse --verify --quiet HEAD) | Out-String
+  if ($head.Trim() -ne $script:PinnedCommit) {
+    Invoke-Watched 'Lo scaricamento di Forgebook' 'git' @('-C', $script:RepoFolder, 'fetch', '--quiet', '--depth', '1', 'origin', $script:PinnedCommit) 20 60
+    Invoke-Watched 'git checkout' 'git' @('-C', $script:RepoFolder, 'checkout', '--quiet', '--force', $script:PinnedCommit) 10 20
   }
-  if ((& git -C $repo status --porcelain | Out-String).Trim() -ne '') {
-    Invoke-Watched 'git reset' 'git' @('-C', $repo, 'reset', '--quiet', '--hard', $commit) 10 20
+  if ((& git -C $script:RepoFolder status --porcelain | Out-String).Trim() -ne '') {
+    Invoke-Watched 'git reset' 'git' @('-C', $script:RepoFolder, 'reset', '--quiet', '--hard', $script:PinnedCommit) 10 20
   }
 
-  Set-Location -LiteralPath $repo
-  $installed = Join-Path $repo 'node_modules\.kit-installed'
-  if (-not ((Test-Path -LiteralPath $installed) -and ((Get-Content -LiteralPath $installed -Raw).Trim() -eq $commit))) {
+  Set-Location -LiteralPath $script:RepoFolder
+  if (-not (Test-KitInstalled)) {
     Step 'Dipendenze di Forgebook (qualche minuto)'
     Invoke-Watched 'pnpm install' 'pnpm' @('install', '--frozen-lockfile', '--reporter', 'append-only') 30 90
-    Set-Content -LiteralPath $installed -Value $commit
+    Set-Content -LiteralPath (Join-Path $script:RepoFolder 'node_modules\.kit-installed') -Value $script:PinnedCommit
   }
 
   $chromium = Join-Path $env:PLAYWRIGHT_BROWSERS_PATH '.kit-chromium'
-  if (-not ((Test-Path -LiteralPath $chromium) -and ((Get-Content -LiteralPath $chromium -Raw).Trim() -eq $commit))) {
+  if (-not ((Test-Path -LiteralPath $chromium) -and ((Get-Content -LiteralPath $chromium -Raw).Trim() -eq $script:PinnedCommit))) {
     Step 'Chromium per le misure'
     Invoke-Watched 'L''installazione di Chromium' 'pnpm' @('--filter', '@forgebook/tools', 'exec', 'playwright', 'install', 'chromium') 20 60
-    Set-Content -LiteralPath $chromium -Value $commit
+    Set-Content -LiteralPath $chromium -Value $script:PinnedCommit
   }
 
   Stop-Sleep
   Write-Log 'Passo al kit (Node): il suo registro è kit.log.'
   # the kit asks its questions itself, and writes the results file of what there is when a run fails
-  & $script:Node (Join-Path $repo 'tools\bench\kit\kit.mts') --home $KitHome --desktop (Get-Desktop) @KitArgs
+  & $script:NodeProgram (Join-Path $script:RepoFolder 'tools\bench\kit\kit.mts') --home $KitHome --desktop (Get-Desktop) @KitArgs
   $status = $LASTEXITCODE
   Write-Log "Kit finito (codice $status)."
-  if (Test-Path -LiteralPath (Join-Path $KitHome 'clean-requested')) { Restore-Console; Remove-Kit $script:Node }
+  if (Test-Path -LiteralPath (Join-Path $KitHome 'clean-requested')) { Restore-Console; Remove-Kit $script:NodeProgram }
   Wait-Close
   exit $status
 } catch {

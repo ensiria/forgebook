@@ -26,6 +26,7 @@ describe("toolEnvironment", () => {
   it("turns the tools' daemons off, and lets a command's own variables win", () => {
     const env = toolEnvironment({ PATH: "/bin" }, { NX_DAEMON: "true", BROWSER: "none" });
     expect(env["TURBO_DAEMON"]).toBe("false");
+    expect(env["NX_TUI"]).toBe("false");
     expect(env["NX_DAEMON"]).toBe("true");
     expect(env["BROWSER"]).toBe("none");
   });

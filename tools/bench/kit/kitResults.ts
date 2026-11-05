@@ -83,16 +83,20 @@ export const anonymize = (text: string, identity: Identity): string => {
  * @param identity - what names the person and the computer.
  * @returns the kinds found: `home`, `user`, `computer`, `user folder`, `OneDrive`.
  */
-export const leaks = (text: string, identity: Identity): string[] => [
-  ...(new RegExp(USER_FOLDER.source, "i").test(text) ? ["user folder"] : []),
-  ...(text.replaceAll(ORGANISATION_PLACEHOLDER, "").includes("OneDrive - ") ? ["OneDrive"] : []),
-  ...(identity.home.length >= MIN_NAME_LENGTH &&
-  spellings(identity.home).some((spelling) => text.toLowerCase().includes(spelling.toLowerCase()))
-    ? ["home"]
-    : []),
-  ...(identity.user.length >= MIN_NAME_LENGTH && word(identity.user).test(text) ? ["user"] : []),
-  ...(identity.host.length >= MIN_NAME_LENGTH && word(identity.host).test(text) ? ["computer"] : [])
-];
+export const leaks = (text: string, identity: Identity): string[] => {
+  // the placeholders are no leak, though a user named User finds its name in them
+  const named = text.replaceAll(USER_PLACEHOLDER, "").replaceAll(HOST_PLACEHOLDER, "");
+  return [
+    ...(new RegExp(USER_FOLDER.source, "i").test(text) ? ["user folder"] : []),
+    ...(text.replaceAll(ORGANISATION_PLACEHOLDER, "").includes("OneDrive - ") ? ["OneDrive"] : []),
+    ...(identity.home.length >= MIN_NAME_LENGTH &&
+    spellings(identity.home).some((spelling) => text.toLowerCase().includes(spelling.toLowerCase()))
+      ? ["home"]
+      : []),
+    ...(identity.user.length >= MIN_NAME_LENGTH && word(identity.user).test(named) ? ["user"] : []),
+    ...(identity.host.length >= MIN_NAME_LENGTH && word(identity.host).test(named) ? ["computer"] : [])
+  ];
+};
 
 /**
  * The note at the top of the archive, in Italian, for whoever opens it.
