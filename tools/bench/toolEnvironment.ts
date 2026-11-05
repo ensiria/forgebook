@@ -5,10 +5,35 @@
  * @remarks
  * A real library's install, its `prepare` and its own Storybook run that library's code and its dependencies': the
  * tokens and keys an environment holds (a registry's, a cloud's, the CI's) are not theirs to read. So a command gets
- * the variables listed here, when set, and what its definition adds.
+ * the variables listed here, when set, and what its definition adds. The bench kit's variables are listed by name too:
+ * they keep every cache in the kit's folder and every tool from asking a question nobody is there to answer. Names
+ * are matched whatever their case, as Windows names them (`Path`).
  *
  * @module
  */
+
+/**
+ * The variables the bench kit's launchers set: the caches in the kit's folder, no download prompt from corepack, and
+ * Git with no configuration of the user's, no credentials asked and long paths on Windows.
+ */
+export const KIT_VARIABLES: readonly string[] = [
+  "COREPACK_HOME",
+  "COREPACK_ENABLE_DOWNLOAD_PROMPT",
+  "COREPACK_ENABLE_AUTO_PIN",
+  "npm_config_cache",
+  "npm_config_store_dir",
+  "npm_config_update_notifier",
+  "npm_config_fund",
+  "PLAYWRIGHT_BROWSERS_PATH",
+  "YARN_GLOBAL_FOLDER",
+  "GIT_CONFIG_NOSYSTEM",
+  "GIT_CONFIG_GLOBAL",
+  "GIT_TERMINAL_PROMPT",
+  "GCM_INTERACTIVE",
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_KEY_0",
+  "GIT_CONFIG_VALUE_0"
+];
 
 /** The variables a command keeps from the harness's environment: paths, locale, terminal, proxies, Windows' basics. */
 export const KEPT_VARIABLES: readonly string[] = [
@@ -33,7 +58,14 @@ export const KEPT_VARIABLES: readonly string[] = [
   "PATHEXT",
   "USERPROFILE",
   "APPDATA",
-  "LOCALAPPDATA"
+  "LOCALAPPDATA",
+  "SystemDrive",
+  "WINDIR",
+  "ProgramData",
+  "ProgramFiles",
+  "NUMBER_OF_PROCESSORS",
+  "PROCESSOR_ARCHITECTURE",
+  ...KIT_VARIABLES
 ];
 
 /** The variables that keep a library's tools from starting a daemon that outlives the command. */
@@ -56,9 +88,9 @@ export const toolEnvironment = (
   added: Readonly<Record<string, string>> = {}
 ): Record<string, string> => {
   const kept: Record<string, string> = {};
-  for (const name of KEPT_VARIABLES) {
-    const value = env[name];
-    if (value !== undefined) kept[name] = value;
+  const wanted = new Set(KEPT_VARIABLES.map((name) => name.toUpperCase()));
+  for (const [name, value] of Object.entries(env)) {
+    if (value !== undefined && wanted.has(name.toUpperCase())) kept[name] = value;
   }
   return { ...kept, ...NO_DAEMONS, ...added };
 };

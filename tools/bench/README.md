@@ -160,7 +160,25 @@ reason: raising one is a decision, not a chore.
 ## Following a run
 
 `--status <file>` appends a JSON line per step, only between samples, so whatever follows the file cannot wake up during
-a measurement. `tail -F` reads it from anywhere.
+a measurement. `tail -F` reads it from anywhere. A long step outside the measurements writes a line too, as it starts
+(`"state": "working"` with `pack`, `install`, `clone` or `prepare`) and, for the sweep, every 25 stories with the
+count: a reader can tell an install of an hour from a run that stopped.
+
+## Nothing waits forever
+
+A run on a machine nobody watches must end, whatever goes wrong: a silent wait of hours costs the whole run. So every
+wait has a deadline, and what it waited for is stopped with everything it started.
+
+- **Programs** run to completion (installs, clones, a library's preparation, packing, builds, `ps`, PowerShell) go
+  through `execProgram` (`programs.ts`), which needs a time limit and holds it for the whole process tree. A child that
+  outlives the program and keeps its output open (an install script's, a build's worker) does not keep the call
+  waiting: the program's exit ends it, and what it left is stopped. Running through cli-kit's `exec` alone, a timeout
+  stops only the program, and the call then waits for its children.
+- **Servers** are stopped with their tree and waited for, for 15 s at most (`processTree.ts`); each poll of a starting
+  server has its own timeout.
+- **Pages**: every reading of a frame (`stamps.ts`, `sweep.ts`) has a deadline, since a page whose script is stuck never
+  answers Playwright's `evaluate`; closing a context or the browser has one too.
+- **The machine's readings** give up after a minute (WMI can stall), and the reading is left out.
 
 ## The files
 
@@ -180,7 +198,8 @@ a measurement. `tail -F` reads it from anywhere.
 - `leftovers.ts`: what a run left running, found and stopped.
 - `serverOutput.ts`: what a server printed, kept to say why it stopped: its first error and its last lines.
 - `machine.ts`, `benchStats.ts`, `reportTable.ts`, `statusFile.ts`, `staticServer.ts`, `diskUsage.ts`: what they say.
-- `programs.ts`, `processes.ts`, `powershell.ts`: how a program, a process tree and PowerShell are run on each system.
+- `programs.ts`, `processTree.ts`, `processes.ts`, `powershell.ts`, `deadline.ts`: how a program, a process tree and
+  PowerShell are run on each system, and the deadlines of every wait.
 - `kit/`: the bench kit, which installs and runs all this on a machine that has nothing (its own README).
 - `budget.ts`, `budget.json`: the check of a pull request, and its limits.
 - `targets/`: the pinned tools.

@@ -1,20 +1,24 @@
 /**
- * A dev server's process tree: its resident memory, read while it runs, and stopping all of it.
+ * A process tree's resident memory, read while it runs.
  *
  * @remarks
- * On macOS and Linux the table comes from `ps`, read on each sample, and the tree is stopped through its process
- * group. Windows has neither: one PowerShell stays open for the whole measurement and prints the table on each tick,
- * since starting PowerShell costs more than the interval, and the tree is stopped with `taskkill /T`. The working set
- * is Windows' resident memory. Parsing is pure.
+ * On macOS and Linux the table comes from `ps`, read on each sample. Windows has no `ps`: one PowerShell stays open for
+ * the whole measurement and prints the table on each tick, since starting PowerShell costs more than the interval. The
+ * working set is Windows' resident memory. Stopping the sampler has a deadline, like every wait of the benchmark on a
+ * process (`processTree.ts`). Parsing is pure.
  *
  * @module
  */
-import { type ChildProcess, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
 import { powershellArgs } from "./powershell.ts";
+import { STOP_TIMEOUT } from "./processTree.ts";
+import { execProgram } from "./programs.ts";
+
+/** How long one reading of the process table may take, in milliseconds. */
+const TABLE_TIMEOUT = 60_000;
 
 /** A process, as the table lists it. */
 export type ProcessRow = {
@@ -110,7 +114,12 @@ const windowsPeak = (root: number, intervalMs: number, io: ScriptIo): PeakSample
           resolve(peak);
           return;
         }
-        sampler.once("exit", () => resolve(peak));
+        // a sampler stuck in a WMI query must not hold the measurement: its peak so far is the answer
+        const timer = setTimeout(() => resolve(peak), STOP_TIMEOUT);
+        sampler.once("exit", () => {
+          clearTimeout(timer);
+          resolve(peak);
+        });
         sampler.kill();
       })
   };
@@ -122,7 +131,11 @@ const psPeak = (root: number, intervalMs: number, io: ScriptIo): PeakSampler => 
   let isDone = false;
   const sampling = (async (): Promise<void> => {
     while (!isDone) {
-      const { stdout } = await exec("ps", ["-A", "-o", "pid=,ppid=,rss="], { io, output: "capture" });
+      const { stdout } = await execProgram("ps", ["-A", "-o", "pid=,ppid=,rss="], {
+        io,
+        output: "capture",
+        timeoutMs: TABLE_TIMEOUT
+      });
       peak = Math.max(peak, treeMemory(parsePsRows(stdout), root));
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
@@ -145,23 +158,3 @@ const psPeak = (root: number, intervalMs: number, io: ScriptIo): PeakSampler => 
  */
 export const samplePeak = (root: number, intervalMs: number, io: ScriptIo): PeakSampler =>
   process.platform === "win32" ? windowsPeak(root, intervalMs, io) : psPeak(root, intervalMs, io);
-
-/**
- * Whether a server is started in a process group of its own: on macOS and Linux, so stopping the group stops what it
- * started. Windows has no such group; a detached process there gets a console window of its own instead.
- */
-export const isOwnGroup = process.platform !== "win32";
-
-/**
- * Stops a process and everything it started, at once.
- *
- * @param child - the process, started with `detached: isOwnGroup`.
- */
-export const killTree = (child: ChildProcess): void => {
-  if (child.pid === undefined) return;
-  if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-    return;
-  }
-  process.kill(-child.pid, "SIGKILL");
-};

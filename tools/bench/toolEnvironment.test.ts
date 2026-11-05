@@ -29,4 +29,17 @@ describe("toolEnvironment", () => {
     expect(env["NX_DAEMON"]).toBe("true");
     expect(env["BROWSER"]).toBe("none");
   });
+
+  it("keeps a variable whatever the case Windows names it in, and the kit's caches", () => {
+    const env = toolEnvironment({
+      Path: "C:\\bin",
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
+      npm_config_cache: "C:\\kit\\npm",
+      npm_config_authtoken: "secret"
+    });
+    expect(env["Path"]).toBe("C:\\bin");
+    expect(env["COREPACK_ENABLE_DOWNLOAD_PROMPT"]).toBe("0");
+    expect(env["npm_config_cache"]).toBe("C:\\kit\\npm");
+    expect(Object.values(env)).not.toContain("secret");
+  });
 });

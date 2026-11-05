@@ -8,8 +8,9 @@
  *
  * @module
  */
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
+
+import { execProgram, TIME_LIMITS } from "./programs.ts";
 
 /**
  * The arguments that run a script in a PowerShell without the user's profile and without prompts.
@@ -31,17 +32,19 @@ export const powershellArgs = (script: string): string[] => [
  *
  * @param script - the script; what it writes to stdout must be JSON.
  * @param io - the script's streams.
- * @returns the document, or nothing when the script failed or printed no JSON: a reading is never worth a failed run.
+ * @returns the document, or nothing when the script failed, ran past its time or printed no JSON: a reading is never
+ * worth a failed run.
  */
 export const powershellJson = async (script: string, io: ScriptIo): Promise<unknown> => {
-  const { stdout, code } = await exec("powershell.exe", powershellArgs(script), {
-    io,
-    output: "capture",
-    check: false
-  });
-  if (code !== 0) return undefined;
   try {
-    return JSON.parse(stdout);
+    // WMI can take minutes to answer, or never, when its service is unwell: the reading is then simply missing
+    const { stdout, code } = await execProgram("powershell.exe", powershellArgs(script), {
+      io,
+      output: "capture",
+      check: false,
+      timeoutMs: TIME_LIMITS.query
+    });
+    return code === 0 ? JSON.parse(stdout) : undefined;
   } catch {
     return undefined;
   }

@@ -15,6 +15,7 @@ import { chromium } from "@playwright/test";
 import type { BenchReport, FramesMode, MachineReading, MetricResult, ToolName } from "./bench.types.ts";
 import { summary } from "./benchStats.ts";
 import type { CorpusSize } from "./corpus.ts";
+import { withDeadline } from "./deadline.ts";
 import { machineInfo, noiseWarnings, readMachine, systemName } from "./machine.ts";
 import {
   baseOf,
@@ -34,7 +35,8 @@ import {
   realCorpusInfo,
   type ToolRun
 } from "./prepareRun.ts";
-import type { RunStep } from "./statusFile.ts";
+import { STOP_TIMEOUT } from "./processTree.ts";
+import type { RunActivity, RunStep } from "./statusFile.ts";
 import { type SweepResult, sweepStories } from "./sweep.ts";
 import type { Target } from "./targets.ts";
 
@@ -43,6 +45,9 @@ export const METRIC_GROUPS = ["install", "start", "hmr", "page", "memory", "buil
 
 /** A group of metrics. */
 export type MetricGroup = (typeof METRIC_GROUPS)[number];
+
+/** How many stories the sweep opens between two lines of the status file. */
+const SWEEP_REPORT_EVERY = 25;
 
 /** Runs of the memory metrics: a peak is steadier than a time. */
 const MEMORY_RUNS = 3;
@@ -77,6 +82,8 @@ export type BenchRequest = {
   readonly io: ScriptIo;
   /** Reports a step, before its sample starts. */
   readonly onStep: (step: RunStep) => void;
+  /** Reports a long step outside the measurements: an install, a library's preparation, the sweep's progress. */
+  readonly onActivity: (activity: RunActivity) => void;
 };
 
 /** How many samples a group takes of a tool, for the status's progress; only Forgebook is swept. */
@@ -315,7 +322,7 @@ const buildGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promis
 /** The stories that draw, Forgebook's alone: Storybook is what a story is read against. */
 const sweepGroup =
   (found: { result?: SweepResult }) =>
-  async ({ tools, turns }: GroupRun): Promise<void> => {
+  async ({ tools, turns, request }: GroupRun): Promise<void> => {
     for (const tool of tools) {
       const { name } = tool.context.target;
       if (name !== "forgebook") {
@@ -324,7 +331,11 @@ const sweepGroup =
       }
       turns.step(tool, "storiesDrawn", 1, 1);
       try {
-        const result = await sweepStories(tool.context, () => undefined);
+        const result = await sweepStories(tool.context, (done, total) => {
+          // often enough to tell a long sweep from a stuck one, seldom enough to keep the file small
+          if (done % SWEEP_REPORT_EVERY === 0 || done === total)
+            request.onActivity({ state: "working", activity: "sweep", tool: name, done, total });
+        });
         found.result = result;
         tool.metrics["storiesListed"] = measured("count", [result.listed]);
         tool.metrics["storiesDrawn"] = measured("count", [result.drawn]);
@@ -393,7 +404,8 @@ export const runBench = async (request: BenchRequest): Promise<BenchReport> => {
     }
     await readNow("end");
   } finally {
-    await browser.close();
+    // a browser that stopped answering must not hold the report: what is left of it is stopped as a leftover
+    await withDeadline(browser.close(), STOP_TIMEOUT, "closing the browser").catch(() => undefined);
   }
   return {
     version: 1,

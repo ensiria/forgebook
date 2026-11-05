@@ -36,6 +36,18 @@ describe("statusWriter", () => {
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ at: 2000, state: "finished", warnings: 1 });
   });
 
+  it("says what a run is busy with between measurements", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "bench-status-")), "status.jsonl");
+    statusWriter(file, (): number => 3000)({ state: "working", activity: "sweep", done: 25, total: 100 });
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
+      at: 3000,
+      state: "working",
+      activity: "sweep",
+      done: 25,
+      total: 100
+    });
+  });
+
   it("writes nothing without a file", () => {
     expect(() =>
       statusWriter(

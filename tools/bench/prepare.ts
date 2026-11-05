@@ -17,7 +17,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { ToolName } from "./bench.types.ts";
 import { type Corpus, projectFiles } from "./corpus.ts";
 import { diskUsage } from "./diskUsage.ts";
-import { execProgram } from "./programs.ts";
+import { execProgram, TIME_LIMITS } from "./programs.ts";
 import type { Target } from "./targets.ts";
 
 /** Forgebook's packages a catalogue installs. */
@@ -53,12 +53,18 @@ export const packForgebook = async (
   const packs = join(work, "packs");
   await rm(packs, { recursive: true, force: true });
   await mkdir(packs, { recursive: true });
-  await execProgram("pnpm", ["build"], { cwd: repository, io, output: "capture" });
+  await execProgram("pnpm", ["build"], {
+    cwd: repository,
+    io,
+    output: "capture",
+    timeoutMs: TIME_LIMITS.pack
+  });
   for (const name of FORGEBOOK_PACKAGES) {
     await execProgram("pnpm", ["pack", "--pack-destination", packs], {
       cwd: join(repository, "packages", name),
       io,
-      output: "capture"
+      output: "capture",
+      timeoutMs: TIME_LIMITS.pack
     });
   }
   const files = await readdir(packs);
@@ -103,7 +109,12 @@ export const installTarget = async (
   await cp(source, directory, { recursive: true });
   const flags = ["--no-audit", "--no-fund", "--loglevel=error"];
   if (packages === undefined) {
-    await execProgram("npm", ["ci", ...flags], { cwd: directory, io, output: "capture" });
+    await execProgram("npm", ["ci", ...flags], {
+      cwd: directory,
+      io,
+      output: "capture",
+      timeoutMs: TIME_LIMITS.install
+    });
   } else {
     const manifest: unknown = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
     if (typeof manifest !== "object" || manifest === null)
@@ -123,13 +134,19 @@ export const installTarget = async (
         ...(story === undefined ? {} : { overrides: { "@forgebook/story-format": story } })
       })
     );
-    await execProgram("npm", ["install", ...flags], { cwd: directory, io, output: "capture" });
+    await execProgram("npm", ["install", ...flags], {
+      cwd: directory,
+      io,
+      output: "capture",
+      timeoutMs: TIME_LIMITS.install
+    });
   }
   const { stdout } = await execProgram("npm", ["ls", "--all", "--parseable"], {
     cwd: directory,
     io,
     output: "capture",
-    check: false
+    check: false,
+    timeoutMs: TIME_LIMITS.query
   });
   return {
     size: await diskUsage(join(directory, "node_modules")),
@@ -192,7 +209,8 @@ export const installOnBare = async (
   await execProgram("npm", ["install", "--no-audit", "--no-fund", "--loglevel=error"], {
     cwd: directory,
     io,
-    output: "capture"
+    output: "capture",
+    timeoutMs: TIME_LIMITS.install
   });
   const size = await diskUsage(join(directory, "node_modules"));
   await rm(directory, { recursive: true, force: true });

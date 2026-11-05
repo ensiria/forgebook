@@ -15,11 +15,11 @@ import { readdir, readFile } from "node:fs/promises";
 import { arch, cpus, platform, release, totalmem } from "node:os";
 import { join } from "node:path";
 
-import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
 import type { MachineInfo, MachineReadings } from "./bench.types.ts";
 import { powershellJson } from "./powershell.ts";
+import { execProgram, TIME_LIMITS } from "./programs.ts";
 
 /** Below this idle share a machine is too busy for its timings to be trusted. */
 const MIN_IDLE_PERCENT = 85;
@@ -397,14 +397,23 @@ export const systemName = async (io: ScriptIo): Promise<string | undefined> => {
 
 /** The mount point of a folder's volume. */
 const mountPoint = async (directory: string, io: ScriptIo): Promise<string> => {
-  const { stdout } = await exec("df", [directory], { io, output: "capture" });
+  const { stdout } = await execProgram("df", [directory], {
+    io,
+    output: "capture",
+    timeoutMs: TIME_LIMITS.query
+  });
   return stdout.trim().split("\n").at(-1)?.split(/\s+/).at(-1) ?? directory;
 };
 
 /** The macOS readings. */
 const readMacos = async (directory: string, io: ScriptIo): Promise<MachineReadings> => {
   const read = async (command: string, args: readonly string[]): Promise<string> => {
-    const { stdout } = await exec(command, [...args], { io, check: false, output: "capture" });
+    const { stdout } = await execProgram(command, args, {
+      io,
+      check: false,
+      output: "capture",
+      timeoutMs: TIME_LIMITS.query
+    });
     return stdout;
   };
   return parseReadings({
@@ -502,7 +511,7 @@ const readLinux = async (): Promise<MachineReadings> => {
 export const readMachine = async (directory: string, io: ScriptIo): Promise<MachineReadings | undefined> => {
   switch (platform()) {
     case "darwin":
-      return readMacos(directory, io);
+      return readMacos(directory, io).catch(() => undefined);
     case "win32":
       return parseWindowsReadings(await powershellJson(WINDOWS_SCRIPT, io));
     case "linux":

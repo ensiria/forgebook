@@ -17,7 +17,8 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import { contentSize } from "./diskUsage.ts";
-import { isOwnGroup, killTree, samplePeak } from "./processes.ts";
+import { samplePeak } from "./processes.ts";
+import { hasEnded, isOwnGroup, killTree, STOP_TIMEOUT, waitForExit } from "./processTree.ts";
 import { execProgram, invocation } from "./programs.ts";
 import { emptyOutput, type KeptOutput, keepOutput, outputText } from "./serverOutput.ts";
 import { type StampedPage, stampedPage, stampScript, waitForStamps } from "./stamps.ts";
@@ -31,6 +32,9 @@ const SAMPLE_TIMEOUT = 180_000;
 
 /** How often a starting server is asked whether it answers, in milliseconds. */
 const POLL_INTERVAL = 25;
+
+/** How long one poll of a starting server may wait for its answer, in milliseconds. */
+const POLL_REQUEST_TIMEOUT = 10_000;
 
 /** The pause between two edits, so one update does not land on the last, in milliseconds. */
 const EDIT_PAUSE = 150;
@@ -141,20 +145,29 @@ export const startServer = async (context: MeasureContext): Promise<ChildProcess
 /** Each server's output as kept (`serverOutput.ts`), read when it stops before answering. */
 const serverOutput = new WeakMap<ChildProcess, KeptOutput>();
 
-/** Whether a server's process has ended, by its own exit or a signal. */
-const hasEnded = (server: ChildProcess): boolean => server.exitCode !== null || server.signalCode !== null;
+/**
+ * Stops a server and waits for it to be gone, so the next one finds the port free; for a while only, since a server
+ * that will not go must not hold the run: the next sample then finds its port taken and fails, saying so.
+ */
+export const stopServer = async (server: ChildProcess): Promise<void> => {
+  liveServers.delete(server);
+  if (hasEnded(server) || server.pid === undefined) return;
+  await killTree(server.pid);
+  await waitForExit(server, STOP_TIMEOUT);
+};
 
-/** Stops a server and waits for it to be gone, so the next one finds the port free. */
-export const stopServer = (server: ChildProcess): Promise<void> =>
-  new Promise((resolve) => {
-    liveServers.delete(server);
-    if (hasEnded(server) || server.pid === undefined) {
-      resolve();
-      return;
-    }
-    server.once("exit", () => resolve());
-    killTree(server);
+/**
+ * Closes a page's browser context, for a while only: a browser that stopped answering would hold the run forever, and
+ * the next sample's own context, or the browser's end, says what is wrong with it.
+ */
+const closeContext = async (browserContext: BrowserContext): Promise<void> => {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, STOP_TIMEOUT);
   });
+  await Promise.race([browserContext.close().catch(() => undefined), deadline]);
+  clearTimeout(timer);
+};
 
 /** Stops every server alive, when a run is interrupted. */
 export const stopAllServers = async (): Promise<void> => {
@@ -185,7 +198,10 @@ export const waitForServer = async (
       const last = text === "" ? "" : `: ${text}`;
       throw new Error(`the server stopped (${server.exitCode ?? server.signalCode})${last}`);
     }
-    const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`).then(
+    // a server that takes the connection and never answers would hold one poll past the deadline: each has its own
+    const hasAnswered = await fetch(readyPath === undefined ? address : `${address}${readyPath}`, {
+      signal: AbortSignal.timeout(POLL_REQUEST_TIMEOUT)
+    }).then(
       async (response) => {
         // the body is never read: left open, a long first build would pile up a connection per poll
         await response.body?.cancel();
@@ -281,7 +297,7 @@ export const measureStart = async (context: MeasureContext, isCold: boolean): Pr
     const [story = 0, sidebar = 0] = await settledStamps(stamped, keys, start + SAMPLE_TIMEOUT);
     return { story: story - start, sidebar: sidebar - start };
   } finally {
-    await browserContext.close();
+    await closeContext(browserContext);
     await stopServer(server);
   }
 };
@@ -319,7 +335,7 @@ export const measureEdits = async (
     return samples;
   } finally {
     await writeFile(file, original);
-    await browserContext.close();
+    await closeContext(browserContext);
     await stopServer(server);
   }
 };
@@ -356,7 +372,7 @@ export const measureComponentPage = async (context: MeasureContext, address: str
       props: props === undefined ? undefined : props - start
     };
   } finally {
-    await browserContext.close();
+    await closeContext(browserContext);
     await stopServer(server);
   }
 };
@@ -393,7 +409,7 @@ export const measureMemory = async (
     await new Promise((resolve) => setTimeout(resolve, SETTLE * 2));
   } finally {
     peak = await sampler.stop();
-    await browserContext.close();
+    await closeContext(browserContext);
     await stopServer(server);
   }
   return peak;
@@ -493,7 +509,7 @@ export const measureFirstLoad = async (context: MeasureContext): Promise<LoadSam
     await page.locator(search.ready).waitFor({ timeout: SAMPLE_TIMEOUT });
     return { ...first, search: total(new Set([...main].filter((path) => !loaded.has(path)))) };
   } finally {
-    await browserContext.close();
+    await closeContext(browserContext);
     await server.close();
   }
 };
