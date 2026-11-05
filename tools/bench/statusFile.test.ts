@@ -38,13 +38,13 @@ describe("statusWriter", () => {
 
   it("says what a run is busy with between measurements", () => {
     const file = join(mkdtempSync(join(tmpdir(), "bench-status-")), "status.jsonl");
-    statusWriter(file, (): number => 3000)({ state: "working", activity: "sweep", done: 25, total: 100 });
+    statusWriter(file, (): number => 3000)({ state: "working", activity: "sweep", count: 25, of: 100 });
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
       at: 3000,
       state: "working",
       activity: "sweep",
-      done: 25,
-      total: 100
+      count: 25,
+      of: 100
     });
   });
 

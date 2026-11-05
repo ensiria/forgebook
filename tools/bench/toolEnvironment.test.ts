@@ -31,15 +31,38 @@ describe("toolEnvironment", () => {
   });
 
   it("keeps a variable whatever the case Windows names it in, and the kit's caches", () => {
-    const env = toolEnvironment({
-      Path: "C:\\bin",
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
-      npm_config_cache: "C:\\kit\\npm",
-      npm_config_authtoken: "secret"
-    });
+    const env = toolEnvironment(
+      {
+        Path: "C:\\bin",
+        COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
+        npm_config_cache: "C:\\kit\\npm",
+        npm_config_authtoken: "secret"
+      },
+      {},
+      "win32"
+    );
     expect(env["Path"]).toBe("C:\\bin");
     expect(env["COREPACK_ENABLE_DOWNLOAD_PROMPT"]).toBe("0");
     expect(env["npm_config_cache"]).toBe("C:\\kit\\npm");
     expect(Object.values(env)).not.toContain("secret");
+  });
+
+  it("passes no Git configuration through the environment, and a name only in its case off Windows", () => {
+    const env = toolEnvironment(
+      {
+        PATH: "/bin",
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "http.extraheader",
+        GIT_CONFIG_VALUE_0: "secret",
+        http_proxy: "http://user:secret@proxy"
+      },
+      {},
+      "linux"
+    );
+    expect(
+      Object.keys(env).filter((name) => name.startsWith("GIT_CONFIG_C") || name.includes("KEY"))
+    ).toEqual([]);
+    expect(Object.values(env)).not.toContain("secret");
+    expect(Object.values(env)).not.toContain("http://user:secret@proxy");
   });
 });

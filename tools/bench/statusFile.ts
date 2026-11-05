@@ -40,7 +40,9 @@ export type ActivityName =
   /** A library's own preparation: what its stories import, built. */
   | "prepare"
   /** Opening every story of a library. */
-  | "sweep";
+  | "sweep"
+  /** A group of edits, between two of its edits: part of a measurement, written in the pause between samples. */
+  | "edit";
 
 /** A long step outside the measurements, written as it starts, and for the sweep as it goes. */
 export type RunActivity = {
@@ -50,10 +52,13 @@ export type RunActivity = {
   readonly activity: ActivityName;
   /** The tool it is for, when it is one tool's. */
   readonly tool?: ToolName;
-  /** The items done, when it counts them. */
-  readonly done?: number;
-  /** The items in all, when it counts them. */
-  readonly total?: number;
+  /**
+   * The items of this step done, when it counts them (the sweep's stories): not the run's steps, which a sample's
+   * `done` counts.
+   */
+  readonly count?: number;
+  /** The items of this step in all, when it counts them. */
+  readonly of?: number;
 };
 
 /** The last line of a run. */

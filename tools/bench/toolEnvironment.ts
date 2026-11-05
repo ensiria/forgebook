@@ -6,15 +6,18 @@
  * A real library's install, its `prepare` and its own Storybook run that library's code and its dependencies': the
  * tokens and keys an environment holds (a registry's, a cloud's, the CI's) are not theirs to read. So a command gets
  * the variables listed here, when set, and what its definition adds. The bench kit's variables are listed by name too:
- * they keep every cache in the kit's folder and every tool from asking a question nobody is there to answer. Names
- * are matched whatever their case, as Windows names them (`Path`).
+ * they keep every cache in the kit's folder and every tool from asking a question nobody is there to answer. On
+ * Windows names are matched whatever their case, as Windows names them (`Path`); elsewhere a name is its case, so a
+ * lower-case `http_proxy`, which may hold a password, is not passed on.
  *
  * @module
  */
 
 /**
  * The variables the bench kit's launchers set: the caches in the kit's folder, no download prompt from corepack, and
- * Git with no configuration of the user's, no credentials asked and long paths on Windows.
+ * Git with no configuration of the user's and no credentials asked. Git's settings themselves go in the kit's own
+ * configuration file, never through `GIT_CONFIG_COUNT` and its pairs: a developer's or a CI's environment puts
+ * credentials there (an `http.extraheader`), and a count passed without all its pairs makes every `git` fail.
  */
 export const KIT_VARIABLES: readonly string[] = [
   "COREPACK_HOME",
@@ -29,10 +32,7 @@ export const KIT_VARIABLES: readonly string[] = [
   "GIT_CONFIG_NOSYSTEM",
   "GIT_CONFIG_GLOBAL",
   "GIT_TERMINAL_PROMPT",
-  "GCM_INTERACTIVE",
-  "GIT_CONFIG_COUNT",
-  "GIT_CONFIG_KEY_0",
-  "GIT_CONFIG_VALUE_0"
+  "GCM_INTERACTIVE"
 ];
 
 /** The variables a command keeps from the harness's environment: paths, locale, terminal, proxies, Windows' basics. */
@@ -82,15 +82,18 @@ export const NO_DAEMONS: Readonly<Record<string, string>> = {
  *
  * @param env - the harness's environment.
  * @param added - what the command adds.
+ * @param platform - the system, whose rule for the case of a name applies.
  */
 export const toolEnvironment = (
   env: Readonly<Record<string, string | undefined>>,
-  added: Readonly<Record<string, string>> = {}
+  added: Readonly<Record<string, string>> = {},
+  platform: NodeJS.Platform = process.platform
 ): Record<string, string> => {
   const kept: Record<string, string> = {};
-  const wanted = new Set(KEPT_VARIABLES.map((name) => name.toUpperCase()));
+  const key = (name: string): string => (platform === "win32" ? name.toUpperCase() : name);
+  const wanted = new Set(KEPT_VARIABLES.map(key));
   for (const [name, value] of Object.entries(env)) {
-    if (value !== undefined && wanted.has(name.toUpperCase())) kept[name] = value;
+    if (value !== undefined && wanted.has(key(name))) kept[name] = value;
   }
   return { ...kept, ...NO_DAEMONS, ...added };
 };

@@ -251,7 +251,7 @@ await defineScript({
         },
         onActivity: (activity) => {
           write(activity);
-          const count = activity.total === undefined ? "" : ` · ${activity.done ?? 0}/${activity.total}`;
+          const count = activity.of === undefined ? "" : ` · ${activity.count ?? 0}/${activity.of}`;
           log.info(`${activity.tool ?? "library"} · ${activity.activity}${count}`);
         }
       });

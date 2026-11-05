@@ -46,6 +46,9 @@ export const METRIC_GROUPS = ["install", "start", "hmr", "page", "memory", "buil
 /** A group of metrics. */
 export type MetricGroup = (typeof METRIC_GROUPS)[number];
 
+/** How many edits a group of edits makes between two lines of the status file. */
+const EDIT_REPORT_EVERY = 5;
+
 /** How many stories the sweep opens between two lines of the status file. */
 const SWEEP_REPORT_EVERY = 25;
 
@@ -252,14 +255,24 @@ const startGroup = async ({ tools, request: { runs }, turns }: GroupRun): Promis
 };
 
 /** Edits of a story and of a component. */
-const hmrGroup = async ({ tools, request: { edits }, turns }: GroupRun): Promise<void> => {
+const hmrGroup = async ({ tools, request, turns }: GroupRun): Promise<void> => {
+  const { edits } = request;
+  // a group of edits is one step but can last long: a line now and then tells a slow machine from a stuck one
+  const onEdit =
+    (tool: ToolRun) =>
+    (done: number, total: number): void => {
+      if (done % EDIT_REPORT_EVERY === 0 || done === total) {
+        const name = tool.context.target.name;
+        request.onActivity({ state: "working", activity: "edit", tool: name, count: done, of: total });
+      }
+    };
   await warmUp("hmr", tools, "hmrStory", turns);
   const story = await inTurns(tools, "hmr", "hmrStory", 1, turns, (tool) =>
-    measureEdits(tool.context, "story", edits)
+    measureEdits(tool.context, "story", edits, onEdit(tool))
   );
   for (const [tool, samples] of story) tool.metrics["hmrStory"] = measured("ms", samples.flat());
   const component = await inTurns(tools, "hmr", "hmrComponent", 1, turns, (tool) =>
-    measureEdits(tool.context, "component", edits)
+    measureEdits(tool.context, "component", edits, onEdit(tool))
   );
   for (const [tool, samples] of component) tool.metrics["hmrComponent"] = measured("ms", samples.flat());
 };
@@ -334,7 +347,7 @@ const sweepGroup =
         const result = await sweepStories(tool.context, (done, total) => {
           // often enough to tell a long sweep from a stuck one, seldom enough to keep the file small
           if (done % SWEEP_REPORT_EVERY === 0 || done === total)
-            request.onActivity({ state: "working", activity: "sweep", tool: name, done, total });
+            request.onActivity({ state: "working", activity: "sweep", tool: name, count: done, of: total });
         });
         found.result = result;
         tool.metrics["storiesListed"] = measured("count", [result.listed]);

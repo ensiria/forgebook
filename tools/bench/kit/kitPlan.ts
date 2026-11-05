@@ -121,7 +121,14 @@ export const phaseTiming = (startedAt: number, endedAt: number, status: string):
   const firstStep = status
     .split("\n")
     .filter((line) => line.trim() !== "")
-    .map((line): unknown => JSON.parse(line))
+    .map((line): unknown => {
+      // a line cut short by a run stopped mid-write is no step
+      try {
+        return JSON.parse(line);
+      } catch {
+        return undefined;
+      }
+    })
     .find(
       (step): step is { readonly at: number } =>
         typeof step === "object" &&

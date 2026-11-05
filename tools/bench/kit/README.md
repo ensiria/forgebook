@@ -34,8 +34,9 @@ Linux desktop. They copy this folder, double-click one file, answer two question
    `leftovers.ts`): a server left behind would hold its port and its CPU.
 6. **Writes the results**: one zip on the Desktop with the reports, the kit's own summary (`kit.json`: profile, estimate
    and real durations, why a part was stopped, the machine's description) and the logs. Every text is cleaned first
-   (`kitResults.ts`): the home folder becomes `~`, the user's and the computer's names placeholders, and a text where
-   any is left stops the kit. The list of files and what they hold is shown as it is written; nothing is asked, since
+   (`kitResults.ts`): the home folder becomes `~`, and so does any user's folder in any spelling (Windows' short
+   `MARIOR~1` included), the user's and the computer's names and a OneDrive folder's organisation become placeholders,
+   and a text where any is left stops the kit. Messages name the results file without its folder. The list of files and what they hold is shown as it is written; nothing is asked, since
    writing a file on the Desktop sends nothing anywhere.
 
 What it did is in `state.json`: launched again, it offers to resume a run that stopped, to start over, to write the
@@ -52,10 +53,15 @@ that impossible to repeat in silence, at every level:
   the console until a key is pressed, without a sign: the kit's Node process then blocks on its next line.
 - **A line every minute.** While a part runs, the kit says where it is: `Ancora in corso, Primer (GitHub): misuro
   forgebook · hmrStory, passo 112 di 340 (32%); da 37 minuti.` The launchers do the same for their own long steps.
+- **Git** gets its settings from the kit's own configuration file (long paths, and a transfer slower than 1 kB/s for
+  five minutes given up), never from `GIT_CONFIG_COUNT`, which the benchmark does not pass on to the tools it runs.
+- **Deleting** the kit's folder («Cancella tutto») happens only for a folder holding the kit's marker file, never the
+  user's own folder or a drive, whatever `FORGEBOOK_BENCH_HOME` says.
 - **Watchdogs.** The kit looks at the run's log and status file every 15 seconds, by their sizes alone, and reads the
   status file only when it grew, which happens only between measurements (`kitRunner.ts`). The benchmark writes a
-  status line before each sample and at the start of each long step outside the measurements (packing, installs, a
-  library's clone and preparation, every 25 stories of the sweep). A run silent past what its phase allows (15 minutes
+  status line before each sample and at the start of each long step outside the measurements (packing, each install,
+  the fetch and the checkout of a library, each command of its preparation, every 25 stories of the sweep, every 5
+  edits of a group of edits). A run silent past what its phase allows (15 minutes
   starting, 100 preparing, 30 sweeping or measuring) or past its part's limit (three times its estimate, two hours at
   least) is stopped with its whole process tree, the reason goes in `kit.json` and the console, and the kit goes on
   with the next part (`kitWatch.ts`). The launchers stop a step of their own the same way (an install silent for
@@ -68,7 +74,8 @@ that impossible to repeat in silence, at every level:
   `launcher-NN.log` (each program it ran), `kit.log` (every line the kit said, written before it is printed),
   `calibration.log` and one log per part (the benchmark's output).
 - **What there is, sent back.** When a step fails, the kit writes the results file of what there is before it reports
-  the failure; before Node is installed the Windows launcher zips its own logs, cleaned the same way. Launched again,
+  the failure; before Node is installed the Windows launcher zips its own logs, cleaned and checked the same way (the
+  Linux launcher then only says where they are). Launched again,
   the menu offers «Crea il file dei risultati con quello che c'è»; `start-bench.cmd --results` (or `bash
   start-bench.sh --results`) does only that.
 

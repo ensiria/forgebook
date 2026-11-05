@@ -38,7 +38,12 @@ const NO_SCRIPTS = {
 };
 
 /** Fetches the commit alone, or finds it there, and puts the clone back on it. */
-const fetchClone = async ({ repository, commit }: RealCorpus, clone: string, io: ScriptIo): Promise<void> => {
+const fetchClone = async (
+  { repository, commit }: RealCorpus,
+  clone: string,
+  io: ScriptIo,
+  onActivity: (activity: RunActivity) => void
+): Promise<void> => {
   const git = (...args: readonly string[]): ReturnType<typeof execProgram> =>
     execProgram("git", [...GIT, ...args], {
       cwd: clone,
@@ -67,6 +72,8 @@ const fetchClone = async ({ repository, commit }: RealCorpus, clone: string, io:
     await git("remote", "set-url", "origin", repository);
     await git("fetch", "--quiet", "--depth", "1", "--filter=blob:none", "origin", commit);
   }
+  // a line again: the fetch and the checkout of a large monorepo each take their own long while
+  onActivity({ state: "working", activity: "clone" });
   await git("checkout", "--quiet", "--force", commit);
   await git("reset", "--quiet", "--hard", commit);
   const { stdout } = await git("rev-parse", "HEAD");
@@ -108,8 +115,12 @@ const installLibrary = async (
   await rm(stamp, { force: true });
   onActivity({ state: "working", activity: "install" });
   await runCommand(corpus.install, clone, NO_SCRIPTS, TIME_LIMITS.install, io);
-  if ((corpus.prepare ?? []).length > 0) onActivity({ state: "working", activity: "prepare" });
-  for (const command of corpus.prepare ?? []) await runCommand(command, clone, {}, TIME_LIMITS.prepare, io);
+  const commands = corpus.prepare ?? [];
+  for (const [index, command] of commands.entries()) {
+    // a line per command: each is bounded by its own limit, so the silence a watcher allows covers one
+    onActivity({ state: "working", activity: "prepare", count: index, of: commands.length });
+    await runCommand(command, clone, {}, TIME_LIMITS.prepare, io);
+  }
   await writeFile(stamp, `${installStamp(corpus)}\n`);
 };
 
@@ -212,7 +223,7 @@ export const prepareCorpus = async (
   io: ScriptIo
 ): Promise<void> => {
   onActivity({ state: "working", activity: "clone" });
-  await fetchClone(corpus, paths.clone, io);
+  await fetchClone(corpus, paths.clone, io, onActivity);
   await checkEditedFiles(corpus, paths);
   await installLibrary(corpus, paths.clone, io, onActivity);
   onActivity({ state: "working", activity: "install", tool: "forgebook" });

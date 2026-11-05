@@ -308,12 +308,14 @@ export const measureStart = async (context: MeasureContext, isCold: boolean): Pr
  * @param context - the measurement's context.
  * @param kind - which file is edited.
  * @param edits - how many edits.
+ * @param onEdit - told how many edits are done, after each one's time is taken and before the pause that follows it.
  * @returns the milliseconds of each edit; the file is put back afterwards.
  */
 export const measureEdits = async (
   context: MeasureContext,
   kind: EditKind,
-  edits: number
+  edits: number,
+  onEdit: (done: number, total: number) => void = () => undefined
 ): Promise<number[]> => {
   const { file, text, mark } = context.subject.edit(kind);
   const original = await readFile(file, "utf8");
@@ -330,6 +332,7 @@ export const measureEdits = async (
       await writeFile(file, text(original, shown));
       const [drawn = 0] = await waitForStamps(stamped, [shown], start + SAMPLE_TIMEOUT);
       samples.push(drawn - start);
+      onEdit(samples.length, edits);
       await new Promise((resolve) => setTimeout(resolve, EDIT_PAUSE + Math.random() * EDIT_JITTER));
     }
     return samples;

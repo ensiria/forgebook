@@ -15,7 +15,7 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import { select } from "@ensiria/cli-kit/prompts";
 import { defineScript, ScriptError } from "@ensiria/cli-kit/script";
@@ -69,7 +69,7 @@ const earlierRun = async (state: KitState, asker: Asker): Promise<EarlierChoice 
   const ended = items.filter(({ id }) => state.items[id] !== undefined).length;
   const isComplete = ended === items.length;
   const description = isComplete
-    ? `La prova ${PROFILE_NAMES[state.profile]} è finita${state.archive === undefined ? "" : ` e i risultati sono in ${state.archive}`}.`
+    ? `La prova ${PROFILE_NAMES[state.profile]} è finita${state.archive === undefined ? "" : ` e i risultati sono in ${basename(state.archive)}`}.`
     : `Una prova ${PROFILE_NAMES[state.profile]} si è fermata: ${ended} parti su ${items.length} completate.`;
   asker.log.info(description);
   return select<EarlierChoice>(

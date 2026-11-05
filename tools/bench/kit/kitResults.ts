@@ -5,8 +5,9 @@
  * The reports and the logs are measurements, but a failure's message quotes a command line, and a command line holds
  * paths under the user's folder, so the user's name. Every text is rewritten before it is archived: the home folder
  * becomes `~`, the user's name and the computer's name become placeholders, in every spelling a path takes (both
- * separators, and the doubled backslash of a JSON string). Then each text is searched again, and anything left is a
- * leak the kit refuses to archive. Pure.
+ * separators, and the doubled backslash of a JSON string). Any user's folder is cut the same way whatever spells it
+ * (Windows' short `MARIOR~1`, another account), and a OneDrive folder's name, which names an employer, becomes a
+ * placeholder. Then each text is searched again, and anything left is a leak the kit refuses to archive. Pure.
  *
  * @module
  */
@@ -42,6 +43,19 @@ const spellings = (path: string): string[] => {
   );
 };
 
+/**
+ * A user's folder in any spelling: a Windows profile (`C:\Users\<name>`, a separator doubled in JSON, the short
+ * `MARIOR~1` form included), a Linux home, a macOS one. Its owner's name is the segment after `Users` or `home`.
+ */
+const USER_FOLDER =
+  /(?:\b[A-Za-z]:(?:\\{1,2}|\/)Users(?:\\{1,2}|\/)|(?<![\w.~-])\/(?:Users|home)\/)(?!~)[^\\/"'\s:]+/gi;
+
+/** A OneDrive folder's name: `OneDrive - <organisation>`, up to the next separator or quote. */
+const ONEDRIVE = /OneDrive - [^\\/"'\n]+/g;
+
+/** The placeholder of a OneDrive folder's organisation. */
+export const ORGANISATION_PLACEHOLDER = "OneDrive - <organisation>";
+
 /** A name as a whole word, whatever its case: `<user>` must not eat part of `username`. */
 const word = (name: string): RegExp => new RegExp(`(?<![\\w-])${literal(name)}(?![\\w-])`, "gi");
 
@@ -59,7 +73,7 @@ export const anonymize = (text: string, identity: Identity): string => {
   }
   if (identity.user.length >= MIN_NAME_LENGTH) result = result.replace(word(identity.user), USER_PLACEHOLDER);
   if (identity.host.length >= MIN_NAME_LENGTH) result = result.replace(word(identity.host), HOST_PLACEHOLDER);
-  return result;
+  return result.replace(USER_FOLDER, "~").replace(ONEDRIVE, ORGANISATION_PLACEHOLDER);
 };
 
 /**
@@ -67,9 +81,11 @@ export const anonymize = (text: string, identity: Identity): string => {
  *
  * @param text - the text.
  * @param identity - what names the person and the computer.
- * @returns the kinds found: `home`, `user`, `computer`.
+ * @returns the kinds found: `home`, `user`, `computer`, `user folder`, `OneDrive`.
  */
 export const leaks = (text: string, identity: Identity): string[] => [
+  ...(new RegExp(USER_FOLDER.source, "i").test(text) ? ["user folder"] : []),
+  ...(text.replaceAll(ORGANISATION_PLACEHOLDER, "").includes("OneDrive - ") ? ["OneDrive"] : []),
   ...(identity.home.length >= MIN_NAME_LENGTH &&
   spellings(identity.home).some((spelling) => text.toLowerCase().includes(spelling.toLowerCase()))
     ? ["home"]

@@ -16,7 +16,7 @@
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
-import { powershellJson } from "./powershell.ts";
+import { powershellArgs, powershellJson } from "./powershell.ts";
 import { killTree } from "./processTree.ts";
 import { execProgram, TIME_LIMITS } from "./programs.ts";
 
@@ -140,7 +140,7 @@ export const runLeftovers = (
     row.seconds <= runSeconds &&
     namesPathIn(row.command, folder);
   return rows
-    .filter((row) => !own.has(row.pid) && row.command !== LISTING_COMMAND)
+    .filter((row) => !own.has(row.pid) && !isListing(row.command))
     .filter((row) => isDescendant(row.pid) || isDetached(row))
     .map(({ pid, command }) => ({ pid, command }));
 };
@@ -172,7 +172,7 @@ export const folderLeftovers = (
 ): Leftover[] => {
   const own = lineOf(rows, self);
   return rows
-    .filter((row) => !own.has(row.pid) && row.command !== LISTING_COMMAND)
+    .filter((row) => !own.has(row.pid) && !isListing(row.command))
     .filter((row) => folders.some((folder) => namesPathIn(row.command, folder)))
     .map(({ pid, command }) => ({ pid, command }));
 };
@@ -189,10 +189,17 @@ export const programName = (command: string): string => {
   return (program.split(/[\\/]/).at(-1) ?? program).replace(/\.exe$/i, "");
 };
 
-/** The Windows process list, in the shape of `ps`'s columns. */
+/** The Windows process list, in the shape of `ps`'s columns; the listing itself is no leftover (`isListing`). */
 const WINDOWS_TABLE = `@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine } | ForEach-Object {
   @{ pid = [int]$_.ProcessId; parent = [int]$_.ParentProcessId; seconds = [int]((Get-Date) - $_.CreationDate).TotalSeconds; command = [string]$_.CommandLine }
 }) | ConvertTo-Json -Compress`;
+
+/**
+ * Whether a row is the listing of the processes itself: `ps`, or the PowerShell that lists them on Windows, which a
+ * run starts and which ends as soon as it answered, its id free for another process.
+ */
+const isListing = (command: string): boolean =>
+  command === LISTING_COMMAND || command.includes(powershellArgs(WINDOWS_TABLE).at(-1) ?? LISTING_COMMAND);
 
 /** A Windows row, checked. */
 const windowsEntry = (row: unknown): ProcessEntry[] => {

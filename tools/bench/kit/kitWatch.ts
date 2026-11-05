@@ -14,6 +14,7 @@
  *
  * @module
  */
+import type { ActivityName } from "../statusFile.ts";
 import { formatDuration } from "./kitPlan.ts";
 
 /** A minute, in milliseconds. */
@@ -34,10 +35,11 @@ export type WatchPhase =
  * How long each phase may go without a sign of life, in milliseconds.
  *
  * @remarks
- * Starting: the benchmark reads its arguments and writes its first line within seconds. Preparing: one install or one
- * command of a library's preparation may take up to 90 minutes before the benchmark stops it itself. Sweeping: a story
- * gives up after 45 seconds and 25 of them, four at a time, are a line. Measuring: the longest sample, a build, gives
- * up after 9 minutes, a machine's reading after one.
+ * Starting: the benchmark reads its arguments and writes its first line within seconds. Preparing: a line comes before
+ * each install, each command of a library's preparation, the fetch and the checkout, and each may take up to 90
+ * minutes before the benchmark stops it itself. Sweeping: a story gives up after 45 seconds and 25 of them, four at a
+ * time, are a line. Measuring: a sample gives up within a few minutes (a server's start and a page's draw 3 each, a
+ * build 9), a group of edits writes a line every 5 edits, and a machine's reading gives up after a minute.
  */
 export const SILENCE_LIMITS: Readonly<Record<WatchPhase, number>> = {
   starting: 15 * MINUTE,
@@ -129,8 +131,8 @@ export const parseStatusLine = (line: string): StatusLine | undefined => {
       kind: "activity",
       activity,
       tool: textOf(value, "tool"),
-      done: numberOf(value, "done"),
-      total: numberOf(value, "total")
+      done: numberOf(value, "count"),
+      total: numberOf(value, "of")
     };
   }
   const [tool, metric] = [textOf(value, "tool"), textOf(value, "metric")];
@@ -160,6 +162,7 @@ export const phaseOf = (line: StatusLine | undefined): WatchPhase => {
   if (line === undefined) return "starting";
   if (line.kind === "step") return "measuring";
   if (line.kind === "end") return "measuring";
+  if (line.activity === "edit") return "measuring";
   return line.activity === "sweep" ? "sweeping" : "preparing";
 };
 
@@ -242,13 +245,17 @@ const PHASE_NAMES: Readonly<Record<WatchPhase, string>> = {
 };
 
 /** What a long step is, for a person. */
-const ACTIVITY_NAMES: Readonly<Record<string, string>> = {
+const ACTIVITY_NAMES: Readonly<Record<ActivityName, string>> = {
   pack: "preparo i pacchetti di Forgebook",
   install: "installo le dipendenze",
   clone: "scarico il codice della libreria",
   prepare: "preparo la libreria",
-  sweep: "apro ogni storia"
+  sweep: "apro ogni storia",
+  edit: "modifico i file e misuro l'aggiornamento"
 };
+
+/** Whether a status line's activity is one the benchmark writes, as against one of a newer benchmark. */
+const isActivityName = (name: string): name is ActivityName => Object.hasOwn(ACTIVITY_NAMES, name);
 
 /** A share, in whole percent. */
 const percent = (done: number, total: number): number => (total > 0 ? Math.floor((done / total) * 100) : 0);
@@ -265,7 +272,7 @@ export const describeStatus = (line: StatusLine | undefined): string => {
     const share = percent(line.done, line.total);
     return `misuro ${line.tool} · ${line.metric}, passo ${line.done + 1} di ${line.total} (${share}%)`;
   }
-  const what = ACTIVITY_NAMES[line.activity] ?? line.activity;
+  const what = isActivityName(line.activity) ? ACTIVITY_NAMES[line.activity] : line.activity;
   const tool = line.tool === undefined ? "" : ` (${line.tool})`;
   const count = line.total === undefined ? "" : `: ${line.done ?? 0} di ${line.total}`;
   return `${what}${tool}${count}`;

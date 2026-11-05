@@ -108,6 +108,7 @@ export const prepareGenerated = async (request: PrepareRequest, prepared: Prepar
       request.onActivity({ state: "working", activity: "install", tool: target.name });
       const source = targetSource(folders.repository, target.name);
       const result = await installTarget(source, directory, forgebookOnly(target), io);
+      request.onActivity({ state: "working", activity: "install", tool: target.name });
       const onBare = await installOnBare(source, bareSource, join(folders.work, `${target.name}-on-bare`), {
         packages: forgebookOnly(target),
         bareSize: bare.size,

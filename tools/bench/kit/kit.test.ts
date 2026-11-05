@@ -58,6 +58,11 @@ describe("phaseTiming", () => {
     expect(phaseTiming(1000, 2500, status)).toEqual({ prepareMs: 500, measureMs: 1000 });
   });
 
+  it("reads past a last line cut short", () => {
+    const status = `${JSON.stringify({ at: 1500, tool: "forgebook", metric: "build", done: 0, total: 1 })}\n{"at":20`;
+    expect(phaseTiming(1000, 2500, status)).toEqual({ prepareMs: 500, measureMs: 1000 });
+  });
+
   it("counts a run that never measured as preparation", () => {
     expect(phaseTiming(1000, 4000, "")).toEqual({ prepareMs: 3000, measureMs: 0 });
   });
@@ -197,8 +202,25 @@ describe("anonymize", () => {
     expect(cleaned).toBe(`${USER_PLACEHOLDER} on ${HOST_PLACEHOLDER} ran mrossiano`);
   });
 
+  it("cuts any user's folder, a short Windows name and a OneDrive organisation included", () => {
+    const text = [
+      "C:\\Users\\MARIOR~1\\AppData\\Local\\Temp",
+      '{"p":"C:\\\\Users\\\\Other\\\\x"}',
+      "C:/Users/Mario Rossi/OneDrive - Acme S.p.A/Desktop",
+      "/home/bob/.cache"
+    ].join("\n");
+    const cleaned = anonymize(text, identity);
+    expect(cleaned).toBe(
+      ["~\\AppData\\Local\\Temp", '{"p":"~\\\\x"}', "~/OneDrive - <organisation>/Desktop", "~/.cache"].join(
+        "\n"
+      )
+    );
+    expect(leaks(cleaned, identity)).toEqual([]);
+    expect(leaks("D:/Users/someone/x and OneDrive - Acme", identity)).toEqual(["user folder", "OneDrive"]);
+  });
+
   it("finds what is left", () => {
-    expect(leaks("MINI-PC said C:/Users/Mario Rossi", identity)).toEqual(["home", "computer"]);
+    expect(leaks("MINI-PC said C:/Users/Mario Rossi", identity)).toEqual(["user folder", "home", "computer"]);
   });
 });
 

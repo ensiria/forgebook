@@ -102,6 +102,11 @@ const windowsPeak = (root: number, intervalMs: number, io: ScriptIo): PeakSample
     stdio: ["ignore", "pipe", "ignore"],
     windowsHide: true
   });
+  let hasFailed = false;
+  // a sampler that could not start reads nothing, and the metric fails for want of a peak, not the run
+  sampler.on("error", () => {
+    hasFailed = true;
+  });
   sampler.stdout.setEncoding("utf8").on("data", (chunk: string) => {
     const lines = `${pending}${chunk}`.split(/\r?\n/);
     pending = lines.pop() ?? "";
@@ -110,7 +115,7 @@ const windowsPeak = (root: number, intervalMs: number, io: ScriptIo): PeakSample
   return {
     stop: () =>
       new Promise((resolve) => {
-        if (sampler.exitCode !== null || sampler.signalCode !== null) {
+        if (hasFailed || sampler.exitCode !== null || sampler.signalCode !== null) {
           resolve(peak);
           return;
         }
@@ -131,12 +136,13 @@ const psPeak = (root: number, intervalMs: number, io: ScriptIo): PeakSampler => 
   let isDone = false;
   const sampling = (async (): Promise<void> => {
     while (!isDone) {
-      const { stdout } = await execProgram("ps", ["-A", "-o", "pid=,ppid=,rss="], {
+      // a reading that failed is skipped: the peak is the highest of those that came
+      const read = await execProgram("ps", ["-A", "-o", "pid=,ppid=,rss="], {
         io,
         output: "capture",
         timeoutMs: TABLE_TIMEOUT
-      });
-      peak = Math.max(peak, treeMemory(parsePsRows(stdout), root));
+      }).catch(() => undefined);
+      if (read !== undefined) peak = Math.max(peak, treeMemory(parsePsRows(read.stdout), root));
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
   })();

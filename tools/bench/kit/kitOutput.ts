@@ -6,7 +6,7 @@
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, hostname, userInfo } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
@@ -82,7 +82,8 @@ export const writeResults = async (
   const stamp = `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}`;
   const file = join(folder, `forgebook-bench-${state.profile ?? "risultati"}-${stamp}.zip`);
   writeFileSync(file, zipArchive(entries, new Date()));
-  asker.log.success(`Risultati salvati in ${file}`);
+  // the name alone: a Desktop under OneDrive names the employer, and this line goes in the journal and the next file
+  asker.log.success(`Risultati salvati sul Desktop: ${basename(file)}`);
   return file;
 };
 

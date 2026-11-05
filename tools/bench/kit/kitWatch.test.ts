@@ -43,8 +43,8 @@ const SWEEP = JSON.stringify({
   state: "working",
   activity: "sweep",
   tool: "forgebook",
-  done: 250,
-  total: 1500
+  count: 250,
+  of: 1500
 });
 
 describe("parseStatusLine", () => {
@@ -80,6 +80,15 @@ describe("phaseOf", () => {
     expect(phaseOf(parseStatusLine(INSTALL))).toBe("preparing");
     expect(phaseOf(parseStatusLine(SWEEP))).toBe("sweeping");
     expect(phaseOf(parseStatusLine(STEP))).toBe("measuring");
+    const edits = JSON.stringify({
+      at: 4,
+      state: "working",
+      activity: "edit",
+      tool: "ladle",
+      count: 5,
+      of: 60
+    });
+    expect(phaseOf(parseStatusLine(edits))).toBe("measuring");
   });
 });
 

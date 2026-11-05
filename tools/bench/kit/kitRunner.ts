@@ -203,7 +203,8 @@ export const runBenchmark = (request: BenchRequest, io: ScriptIo, log: Logger): 
         PORT,
         "--json"
       ],
-      // a group of its own where there are groups, so stopping it stops its servers and browsers too
+      // a group of its own where there are groups, so stopping it stops what it runs in that group; its servers and
+      // browser have groups of their own, and the folder sweep after each part (`clearLeftovers`) stops those
       {
         cwd: REPOSITORY,
         env: io.env,

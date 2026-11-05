@@ -160,9 +160,14 @@ reason: raising one is a decision, not a chore.
 ## Following a run
 
 `--status <file>` appends a JSON line per step, only between samples, so whatever follows the file cannot wake up during
-a measurement. `tail -F` reads it from anywhere. A long step outside the measurements writes a line too, as it starts
-(`"state": "working"` with `pack`, `install`, `clone` or `prepare`) and, for the sweep, every 25 stories with the
-count: a reader can tell an install of an hour from a run that stopped.
+a measurement. `tail -F` reads it from anywhere. Lines have three shapes:
+
+- a sample about to be taken: `{"at", "tool", "metric", "run", "runs", "done", "total"}`, where `done` and `total`
+  count the samples of the whole run;
+- a long step outside the measurements, as it starts: `{"at", "state": "working", "activity", "tool"?}`, with
+  `pack`, `install`, `clone` or `prepare`, and for the sweep every 25 stories with `"count"` and `"of"`, its stories:
+  a reader can tell an install of an hour from a run that stopped;
+- the end: `{"at", "state": "finished", "warnings"}`, the only line whose `state` means the run is over.
 
 ## Nothing waits forever
 

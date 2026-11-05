@@ -17,7 +17,17 @@ LAUNCHER_LOG="$LOG_FOLDER/launcher.log"
 step_number=0
 node_bin=""
 repo="$KIT_HOME/repo"
+# The file that marks the kit's own folder: only a folder holding it is ever deleted
+KIT_MARKER=.forgebook-bench-kit
+is_new_folder=0
+[ -d "$KIT_HOME" ] || is_new_folder=1
 mkdir -p "$LOG_FOLDER"
+if [ "$is_new_folder" = 1 ] || [ -f "$KIT_HOME/state.json" ] || [ -d "$KIT_HOME/tools" ]; then
+  touch "$KIT_HOME/$KIT_MARKER"
+fi
+# the step running now, stopped with its group when the launcher is interrupted
+watched_pid=""
+trap 'if [ -n "$watched_pid" ]; then kill -KILL -- "-$watched_pid" 2>/dev/null || true; fi; exit 130' INT TERM
 
 # Every line the person sees goes to the launcher's log first, with the time: the terminal is no record.
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$1" >>"$LAUNCHER_LOG" 2>/dev/null || true; }
@@ -34,7 +44,8 @@ write_what_there_is() {
   if [ -n "$node_bin" ] && [ -f "$repo/node_modules/.kit-installed" ]; then
     "$node_bin" "$repo/tools/bench/kit/kit.mts" --home "$KIT_HOME" --desktop "$(desktop_folder)" --results && return
   fi
-  say "I registri sono in $LOG_FOLDER: mandali così come sono."
+  # the raw logs name the user's folder: they are pointed to, never offered as they are
+  say "Il file dei risultati non è stato creato. I registri sono in $LOG_FOLDER."
 }
 fail() {
   log "Errore: $1"
@@ -64,6 +75,7 @@ run_watched() {
   "$@" </dev/null >"$step_log" 2>&1 &
   local pid=$!
   set +m
+  watched_pid=$pid
   local started=$SECONDS last_sign=$SECONDS last_beat=$SECONDS last_size=-1 size
   while kill -0 "$pid" 2>/dev/null; do
     sleep 5
@@ -84,6 +96,7 @@ run_watched() {
   done
   local code=0
   wait "$pid" || code=$?
+  watched_pid=""
   if [ "$code" -ne 0 ]; then
     tail -n 15 "$step_log" | sed 's/^/  /'
     fail "$what non è riuscito (codice $code). Il registro è $step_log."
@@ -179,7 +192,9 @@ node_bin="$node_home/bin/node"
 
 # Everything the tools write stays in the kit's folder; nothing asks a question, and Git reads no configuration of the
 # user's, asks for no credentials and gives up on a transfer that stalls.
-touch "$KIT_HOME/gitconfig"
+# Git's settings in the kit's own file, which every Git the benchmark starts reads too: a transfer slower than 1 kB/s
+# for five minutes is given up
+printf '[http]\n\tlowSpeedLimit = 1000\n\tlowSpeedTime = 300\n' >"$KIT_HOME/gitconfig"
 export PATH="$node_home/bin:$bin:$PATH"
 export COREPACK_HOME="$KIT_HOME/corepack"
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -193,11 +208,6 @@ export YARN_GLOBAL_FOLDER="$KIT_HOME/yarn"
 export GIT_CONFIG_NOSYSTEM=1
 export GIT_CONFIG_GLOBAL="$KIT_HOME/gitconfig"
 export GIT_TERMINAL_PROMPT=0
-export GIT_CONFIG_COUNT=2
-export GIT_CONFIG_KEY_0=http.lowSpeedLimit
-export GIT_CONFIG_VALUE_0=1000
-export GIT_CONFIG_KEY_1=http.lowSpeedTime
-export GIT_CONFIG_VALUE_1=300
 
 step 'pnpm'
 run_watched "L'attivazione di pnpm" 5 10 corepack enable --install-directory "$bin" pnpm
@@ -249,6 +259,11 @@ log 'Passo al kit (Node): il suo registro è kit.log.'
 log "Kit finito (codice $status)."
 if [ -f "$KIT_HOME/clean-requested" ]; then
   cd "$HOME"
+  # only a folder the kit made: never the user's own folder or the root, whatever FORGEBOOK_BENCH_HOME says
+  kit_full="$(cd "$KIT_HOME" && pwd -P)"
+  if [ ! -f "$KIT_HOME/$KIT_MARKER" ] || [ "$kit_full" = "$(cd "$HOME" && pwd -P)" ] || [ "$kit_full" = / ]; then
+    fail "non cancello $KIT_HOME: non è una cartella creata dal kit."
+  fi
   rm -rf "$KIT_HOME"
   say "Cartella $KIT_HOME cancellata."
 fi

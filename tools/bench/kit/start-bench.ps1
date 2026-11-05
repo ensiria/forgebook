@@ -29,7 +29,13 @@ $script:StepNumber = 0
 $script:Node = $null
 $script:Repo = $null
 
+# The file that marks the kit's own folder: only a folder holding it is ever deleted
+$KitMarker = '.forgebook-bench-kit'
+$isNewFolder = -not (Test-Path -LiteralPath $KitHome)
 New-Item -ItemType Directory -Path $LogFolder -Force | Out-Null
+if ($isNewFolder -or (Test-Path -LiteralPath (Join-Path $KitHome 'state.json')) -or (Test-Path -LiteralPath (Join-Path $KitHome 'tools'))) {
+  New-Item -ItemType File -Path (Join-Path $KitHome $KitMarker) -Force | Out-Null
+}
 
 # Every line the person sees goes to the launcher's log first, with the time: the console is no record.
 function Write-Log([string] $Text) {
@@ -104,7 +110,22 @@ function Hide-Identity([string] $Text) {
       $result = [regex]::Replace($result, '(?<![\w-])' + [regex]::Escape($pair[0]) + '(?![\w-])', $pair[1], 'IgnoreCase')
     }
   }
-  return $result
+  # any user's folder, the short MARIOR~1 form included, and a OneDrive folder's organisation
+  $result = [regex]::Replace($result, $UserFolderPattern, '~', 'IgnoreCase')
+  return [regex]::Replace($result, 'OneDrive - [^\\/"''\n]+', 'OneDrive - <organisation>')
+}
+
+# A user's folder in any spelling, as kitResults.ts writes it.
+$UserFolderPattern = '(?:\b[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)|(?<![\w.~-])/(?:Users|home)/)(?!~)[^\\/"''\s:]+'
+
+# Whether a cleaned text still names the person, the computer or a user's folder: then it is not archived.
+function Test-Identity([string] $Text) {
+  if ([regex]::IsMatch($Text, $UserFolderPattern, 'IgnoreCase')) { return $true }
+  if ($Text.Replace('OneDrive - <organisation>', '').Contains('OneDrive - ')) { return $true }
+  foreach ($name in @($env:USERNAME, $env:COMPUTERNAME)) {
+    if ($name -and $name.Length -ge 3 -and [regex]::IsMatch($Text, '(?<![\w-])' + [regex]::Escape($name) + '(?![\w-])', 'IgnoreCase')) { return $true }
+  }
+  return $false
 }
 
 function Get-Desktop {
@@ -118,20 +139,28 @@ function Get-Desktop {
 # logs alone, cleaned of the person's identity, before that.
 function Write-WhatThereIs {
   if ($script:Node -and $script:Repo -and (Test-Path -LiteralPath (Join-Path $script:Repo 'node_modules\.kit-installed'))) {
+    # the kit's own file, or none: when it refuses (a name it could not take out), the launcher does not try its own
     & $script:Node (Join-Path $script:Repo 'tools\bench\kit\kit.mts') --home $KitHome --desktop (Get-Desktop) --results
-    if ($LASTEXITCODE -eq 0) { return }
+    if ($LASTEXITCODE -ne 0) { Say "Non ho creato il file dei risultati. I registri sono in $LogFolder." }
+    return
   }
   try {
     $stage = Join-Path ([IO.Path]::GetTempPath()) ('forgebook-bench-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $stage | Out-Null
     foreach ($file in Get-ChildItem -LiteralPath $LogFolder -File) {
       $text = Hide-Identity ([IO.File]::ReadAllText($file.FullName))
+      if (Test-Identity $text) {
+        Remove-Item -LiteralPath $stage -Recurse -Force
+        Say "Non creo il file dei registri: $($file.Name) contiene ancora dati personali. I registri sono in $LogFolder."
+        return
+      }
       [IO.File]::WriteAllText((Join-Path $stage $file.Name), $text, (New-Object Text.UTF8Encoding $false))
     }
     $zip = Join-Path (Get-Desktop) ('forgebook-bench-registri-{0:yyyyMMdd-HHmm}.zip' -f (Get-Date))
     Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
     Remove-Item -LiteralPath $stage -Recurse -Force
-    Say "Ho scritto i registri, senza nome utente né nome del computer, in $zip. Mandalo così com'è."
+    # the name alone: a Desktop under OneDrive names the employer
+    Say "Ho scritto i registri, senza nome utente né nome del computer, sul Desktop: $(Split-Path -Leaf $zip). Mandalo così com'è."
   } catch {
     Say "Non riesco a creare il file dei registri ($($_.Exception.Message)). I registri sono in $LogFolder."
   }
@@ -283,7 +312,8 @@ function Install-VcRuntime([string] $Platform, [hashtable] $Pins, [string] $Down
   if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
     Fail 'il programma di installazione del runtime non è firmato da Microsoft. Non lo uso.'
   }
-  $quoted = $installer -replace "'", "''"
+  # every quote PowerShell reads as a single quote escaped, typographic ones included (a name such as D’Amico)
+  $quoted = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($installer)
   $script = "try { `$p = Start-Process -FilePath '$quoted' -ArgumentList '/install','/quiet','/norestart' -Verb RunAs -Wait -PassThru; exit `$p.ExitCode } catch { exit 1602 }"
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
   $helper = Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $encoded" -WindowStyle Hidden -PassThru
@@ -323,6 +353,12 @@ function Stop-Sleep {
 # Removes the kit's folder, asked for by the Node part: Node removes the deep folders, whose paths Remove-Item cannot
 # always handle, then the rest goes, Node included.
 function Remove-Kit([string] $Node) {
+  # only a folder the kit made: never the user's own folder or a drive, whatever FORGEBOOK_BENCH_HOME says
+  $full = [IO.Path]::GetFullPath($KitHome).TrimEnd('\')
+  if (-not (Test-Path -LiteralPath (Join-Path $KitHome $KitMarker)) -or $full -eq [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') -or $full -eq [IO.Path]::GetPathRoot($full).TrimEnd('\')) {
+    Warn "non cancello ${KitHome}: non è una cartella creata dal kit."
+    return
+  }
   Set-Location -LiteralPath $env:USERPROFILE
   foreach ($child in Get-ChildItem -LiteralPath $KitHome -Force) {
     if ($child.Name -eq 'tools') { continue }
@@ -409,22 +445,19 @@ try {
   $env:npm_config_fund = 'false'
   $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $KitHome 'browsers'
   $env:YARN_GLOBAL_FOLDER = Join-Path $KitHome 'yarn'
+  # Git's settings in the kit's own file, which every Git the benchmark starts reads too: long paths, and a transfer
+  # slower than 1 kB/s for five minutes given up
   $gitConfig = Join-Path $KitHome 'gitconfig'
-  if (-not (Test-Path -LiteralPath $gitConfig)) { New-Item -ItemType File -Path $gitConfig | Out-Null }
+  [IO.File]::WriteAllText($gitConfig, "[core]`n`tlongpaths = true`n[http]`n`tlowSpeedLimit = 1000`n`tlowSpeedTime = 300`n")
   $env:GIT_CONFIG_NOSYSTEM = '1'
   $env:GIT_CONFIG_GLOBAL = $gitConfig
   $env:GIT_TERMINAL_PROMPT = '0'
   $env:GCM_INTERACTIVE = 'never'
-  $env:GIT_CONFIG_COUNT = '3'
-  $env:GIT_CONFIG_KEY_0 = 'core.longpaths'
-  $env:GIT_CONFIG_VALUE_0 = 'true'
-  $env:GIT_CONFIG_KEY_1 = 'http.lowSpeedLimit'
-  $env:GIT_CONFIG_VALUE_1 = '1000'
-  $env:GIT_CONFIG_KEY_2 = 'http.lowSpeedTime'
-  $env:GIT_CONFIG_VALUE_2 = '300'
 
   Step 'pnpm'
-  Invoke-Watched 'L''attivazione di pnpm' (Join-Path $node 'corepack.cmd') @('enable', '--install-directory', $bin, 'pnpm') 5 10
+  # corepack's script run by Node itself: through corepack.cmd, cmd.exe would read a & or a % in the folder's path
+  $corepack = Join-Path $node 'node_modules\corepack\dist\corepack.js'
+  Invoke-Watched 'L''attivazione di pnpm' $script:Node @($corepack, 'enable', '--install-directory', $bin, 'pnpm') 5 10
 
   Step "Forgebook al commit $($pins['forgebook.commit'].Substring(0, 12))"
   $repo = $script:Repo
@@ -466,6 +499,9 @@ try {
   if (Test-Path -LiteralPath (Join-Path $KitHome 'clean-requested')) { Restore-Console; Remove-Kit $script:Node }
   Wait-Close
   exit $status
+} catch {
+  # an error no step expected still ends with the results file and a window that stays open
+  Fail "errore imprevisto: $($_.Exception.Message)"
 } finally {
   Restore-Console
 }

@@ -212,7 +212,15 @@ export const treeRunner: ProgramRunner = (request: ProgramRequest): Promise<Prog
         ? undefined
         : setTimeout(() => {
             isTimedOut = true;
-            if (child.pid !== undefined) void killTree(child.pid);
+            // a tree that will not go, or a kill that failed, must not hold the call: its pipes are closed from here
+            const pid = child.pid;
+            void (pid === undefined ? Promise.resolve() : killTree(pid)).then(() =>
+              setTimeout(() => {
+                child.stdout?.destroy();
+                child.stderr?.destroy();
+                ended(null, null);
+              }, DRAIN_TIMEOUT)
+            );
           }, request.timeoutMs);
     child.on("error", (error: NodeJS.ErrnoException) => {
       settle(error.code === "ENOENT" ? { kind: "missing" } : { kind: "failed", message: error.message });
