@@ -40,7 +40,6 @@ import {
   type MeasureTool,
   parseView
 } from "../viewState.ts";
-import { checkStory } from "./checkStory.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
@@ -103,7 +102,7 @@ import.meta.hot?.on("vite:afterUpdate", (): void => {
  * @param message - the message.
  * @param controls - the rendered story's controls.
  * @param storyId - the story's id, for the answers.
- * @param rules - the catalogue's accessibility rules, for a check.
+ * @param rules - the catalogue's accessibility rules, for a check; none when it checks no accessibility.
  * @param axeUrl - the address of axe's script, for a check.
  * @param tellShell - tells the shell the check's result.
  */
@@ -111,7 +110,7 @@ const answerShell = (
   message: ShellMessage,
   controls: StoryControls,
   storyId: string,
-  rules: A11ySettings,
+  rules: A11ySettings | undefined,
   axeUrl: string | undefined,
   tellShell: ShellChannel["tell"]
 ): void => {
@@ -123,7 +122,13 @@ const answerShell = (
   else if (message.type === "forgebook:clock") controls.setClock(message.state);
   else if (message.type === "forgebook:clock-restart") controls.restartClock();
   else if (message.type === "forgebook:check") {
-    checkStory(document, rules, axeUrl)
+    // loaded on the first check: a frame that is never checked, or one of a catalogue that checks nothing, never
+    // fetches the code that loads axe
+    const checked =
+      rules === undefined
+        ? Promise.reject(new Error("The catalogue checks no accessibility (a11y: false)"))
+        : import("./checkStory.ts").then((module) => module.checkStory(document, rules, axeUrl));
+    checked
       .then((violations) => tellShell({ type: "forgebook:checked", storyId, violations }))
       .catch((error: unknown) =>
         tellShell({

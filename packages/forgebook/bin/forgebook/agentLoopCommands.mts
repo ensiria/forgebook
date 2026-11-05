@@ -78,6 +78,8 @@ const changedOf = async (
   const body = await askCatalogue(config, options.url, "changed", params, log);
   if (!isChangedStoriesDocument(body))
     throw new ScriptError("The catalogue's answer has an unexpected shape");
+  // said aloud: an empty list then means the imports were not read, not that the change touches nothing
+  for (const problem of body.problems) log.warn(problem);
   return body;
 };
 

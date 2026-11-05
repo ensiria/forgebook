@@ -33,8 +33,11 @@ import { VITE_PATHS } from "./vitePaths.ts";
 
 /** What a build reads of a story file, by its absolute path: each text as its query's module answers it. */
 type TextReaders = {
-  /** The component's docs, or `{ error }`: the framework's, whose shape the panel checks. */
-  readonly docsOf: (storyFile: string) => Promise<unknown>;
+  /**
+   * The component's docs, or `{ error }`: the framework's, whose shape the panel checks; none when the catalogue reads
+   * no component docs.
+   */
+  readonly docsOf: ((storyFile: string) => Promise<unknown>) | undefined;
   /** Each story's `render` and its coloured HTML, or `{ error }`. */
   readonly codeOf: (storyFile: string) => Promise<KeptCode>;
   /** The component's documentation file as HTML and its file's summary. */
@@ -91,7 +94,7 @@ const textWriter = (
  */
 const readTexts = (files: readonly IndexedStoryFile[], read: TextReaders): Promise<readonly FileTexts[]> =>
   Promise.all(
-    files.map(({ file }) => Promise.all([read.docsOf(file), read.codeOf(file), read.pageOf(file)]))
+    files.map(({ file }) => Promise.all([read.docsOf?.(file), read.codeOf(file), read.pageOf(file)]))
   );
 
 /**
@@ -104,14 +107,17 @@ const readTexts = (files: readonly IndexedStoryFile[], read: TextReaders): Promi
 export const textsModuleCode = (texts: readonly FileTexts[], emit: EmitAsset): string => {
   // written in the files' order once all are read, so the names in the module do not depend on which read ended first
   const writer = textWriter(emit);
-  const rows = texts.map((each) => `[${each.map((text) => writer.loaderOf(text)).join(", ")}]`);
+  // a text not read (the docs of a catalogue that reads none) has no loader, and its place stays in the row
+  const rows = texts.map(
+    (each) => `[${each.map((text) => (text === undefined ? "null" : writer.loaderOf(text))).join(", ")}]`
+  );
   return [packedLoaderMaker(PACKED), ...writer.written(), `export default [${rows.join(",\n")}];`].join("\n");
 };
 
 /** What the plugin gives a build's texts: the docs as the panel reads them, and what reading a page needs. */
 export type TextSources = Pick<TextModuleContext, "watch" | "resolveImport" | "componentFiles"> & {
-  /** A story file's component docs as the panel reads them, or `{ error }`. */
-  readonly docsOf: (storyFile: string) => Promise<unknown>;
+  /** A story file's component docs as the panel reads them, or `{ error }`; none when the catalogue reads none. */
+  readonly docsOf: ((storyFile: string) => Promise<unknown>) | undefined;
 };
 
 /**

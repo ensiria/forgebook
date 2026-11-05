@@ -28,6 +28,7 @@ const SPEC_CATALOGUES: Readonly<Record<string, readonly Catalogue[]>> = {
   "html.e2e.ts": ["html"],
   "nextjs.e2e.ts": ["nextjs"],
   "nuxt.e2e.ts": ["nuxt"],
+  "parity.e2e.ts": ["parity"],
   "preact.e2e.ts": ["preact"],
   "reactNative.e2e.ts": ["react-native"],
   "solid.e2e.ts": ["solid"],

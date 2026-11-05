@@ -184,6 +184,20 @@ const codeStampOf = (docsModule: string): string | undefined => {
 };
 
 /**
+ * The extractor of a catalogue that reads no component docs (`componentDocs: false`): it starts no worker and builds no
+ * TypeScript program, answers every story file as one whose meta names no component, and every group's usage with why
+ * there is none.
+ */
+export const NO_DOCS_EXTRACTOR: DocsExtractor = {
+  extract: () => Promise.resolve({ docs: { name: null } }),
+  usage: () => Promise.resolve("The catalogue reads no component docs (componentDocs: false)"),
+  warm: () => undefined,
+  changed: () => undefined,
+  listed: () => undefined,
+  close: () => Promise.resolve()
+};
+
+/**
  * A docs extractor with its worker, started on its first request.
  *
  * @param docsModule - the URL of the framework's docs module (`FrameworkAdapter.docsModule`).

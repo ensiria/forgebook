@@ -34,17 +34,6 @@ export const PAGE_FILES = ["index.html", "frame.html"] as const;
 /** A page's file name. */
 export type PageFile = (typeof PAGE_FILES)[number];
 
-/**
- * The page a request names, when it names one: `/` is the shell's.
- *
- * @param url - the request's address.
- */
-export const requestedPage = (url: string): PageFile | undefined => {
-  const path = url.split("?")[0] ?? "";
-  const name = path === "/" ? "index.html" : path.replace(/^\//, "");
-  return PAGE_FILES.find((page) => page === name);
-};
-
 /** The module the pages read the configuration's data from. */
 export const CONFIG_MODULE = "virtual:forgebook/config";
 

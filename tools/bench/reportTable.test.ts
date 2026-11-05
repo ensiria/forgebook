@@ -58,6 +58,16 @@ describe("reportRows", () => {
   });
 });
 
+describe("reportRows at parity", () => {
+  it("heads Forgebook's column with the features it ran, so it stands apart from its defaults", () => {
+    expect(reportRows({ ...REPORT, features: "parity" }).headings).toEqual(["forgebook at parity", "ladle"]);
+    expect(reportRows(REPORT).headings).toEqual(["forgebook", "ladle"]);
+    expect(reportMarkdown({ ...REPORT, features: "parity" }).split("\n")[0]).toBe(
+      "| metric | forgebook at parity | ladle |"
+    );
+  });
+});
+
 describe("reportMarkdown", () => {
   it("writes a table a job summary can draw, with nothing cut", () => {
     const lines = reportMarkdown(REPORT).split("\n");
@@ -88,6 +98,11 @@ describe("reportMismatches", () => {
     expect(reportMismatches(REPORT, { ...later, corpus: { components: 1, stories: 1 } })).toEqual([
       "corpus differs"
     ]);
+  });
+
+  it("refuses Forgebook measured with other features, a report before the choice reading as its defaults", () => {
+    expect(reportMismatches(REPORT, { ...later, features: "parity" })).toEqual(["features differs"]);
+    expect(reportMismatches(REPORT, { ...later, features: "default" })).toEqual([]);
   });
 
   it("refuses Forgebook's frames measured on another origin", () => {
