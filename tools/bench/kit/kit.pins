@@ -8,7 +8,7 @@
 # Node is 24.14.0, the version the reference numbers were measured with: in 24.22.2 the fetch the harness polls servers
 # with throws setTypeOfService EINVAL from a socket callback on macOS, which ends the run and leaves its servers behind.
 forgebook.repository=https://github.com/ensiria/forgebook.git
-forgebook.commit=0c17b600ea5a3617702023c8a52fdb51b4e8c198
+forgebook.commit=6d1f80595cb9e372396081c6e7b69cf600afd280
 node.version=24.14.0
 node.win-x64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip
 node.win-x64.sha256=313fa40c0d7b18575821de8cb17483031fe07d95de5994f6f435f3b345f85c66

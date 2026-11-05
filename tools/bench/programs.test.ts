@@ -3,9 +3,10 @@
  *
  * @module
  */
+import { processIo } from "@ensiria/cli-kit/io";
 import { describe, expect, it } from "vitest";
 
-import { invocation, type ProgramSystem, shimScript } from "./programs.ts";
+import { execProgram, invocation, type ProgramSystem, shimScript } from "./programs.ts";
 
 /** A shim as npm's `cmd-shim` writes it, in a project's `node_modules\.bin`. */
 const NPM_SHIM = `@ECHO off\r
@@ -138,4 +139,48 @@ describe("invocation", () => {
     const system = windows({ "C:\\kit\\node\\odd.cmd": "@echo off\r\n" });
     expect(() => invocation("odd", [], where, system)).toThrow(/not a command shim/);
   });
+});
+
+describe("execProgram's silence", () => {
+  /** The streams of a real program. */
+  const Io = processIo();
+
+  it("stops a program that goes quiet, with its tree, saying where it was", async () => {
+    const quiet = "console.log('at the last task'); setInterval(() => {}, 1000);";
+    await expect(
+      execProgram(process.execPath, ["-e", quiet], {
+        io: Io,
+        output: "capture",
+        timeoutMs: 60_000,
+        silenceMs: 1000
+      })
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("printed nothing for"),
+      hint: expect.stringContaining("at the last task")
+    });
+  }, 30_000);
+
+  it("leaves a program alone while it prints", async () => {
+    const talking =
+      "let n = 0; const t = setInterval(() => { console.log(n); if (++n === 8) clearInterval(t); }, 200);";
+    const { stdout } = await execProgram(process.execPath, ["-e", talking], {
+      io: Io,
+      output: "capture",
+      timeoutMs: 60_000,
+      silenceMs: 1000
+    });
+    expect(stdout).toContain("7");
+  }, 30_000);
+
+  it("gives up at the time limit whatever the program prints", async () => {
+    const talking = "setInterval(() => console.log('still here'), 100);";
+    await expect(
+      execProgram(process.execPath, ["-e", talking], {
+        io: Io,
+        output: "capture",
+        timeoutMs: 1000,
+        silenceMs: 800
+      })
+    ).rejects.toThrow("ran past 1000 ms");
+  }, 30_000);
 });

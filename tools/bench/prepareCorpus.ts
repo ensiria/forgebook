@@ -18,7 +18,7 @@ import { join } from "node:path";
 
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
-import { execProgram, TIME_LIMITS } from "./programs.ts";
+import { execProgram, PREPARE_SILENCE_MS, TIME_LIMITS } from "./programs.ts";
 import { DEFINITION_FILE } from "./realCorpus.ts";
 import type { CorpusPaths, RealCorpus } from "./realCorpus.types.ts";
 import type { RunActivity } from "./statusFile.ts";
@@ -33,8 +33,7 @@ const GIT = ["-c", "core.hooksPath=/dev/null"];
 /** What keeps an install from running a package's scripts, for the package managers npm's flag does not reach. */
 const NO_SCRIPTS = {
   npm_config_ignore_scripts: "true",
-  YARN_ENABLE_SCRIPTS: "false",
-  YARN_ENABLE_TELEMETRY: "0"
+  YARN_ENABLE_SCRIPTS: "false"
 };
 
 /** Fetches the commit alone, or finds it there, and puts the clone back on it. */
@@ -85,7 +84,7 @@ const runCommand = async (
   [program, ...args]: readonly string[],
   clone: string,
   env: Readonly<Record<string, string>>,
-  timeoutMs: number,
+  limits: { readonly timeoutMs: number; readonly silenceMs?: number },
   io: ScriptIo
 ): Promise<void> => {
   if (program === undefined) return;
@@ -94,7 +93,7 @@ const runCommand = async (
     io,
     output: "capture",
     env: toolEnvironment(io.env, env),
-    timeoutMs
+    ...limits
   });
 };
 
@@ -114,12 +113,18 @@ const installLibrary = async (
   if (done === installStamp(corpus)) return;
   await rm(stamp, { force: true });
   onActivity({ state: "working", activity: "install" });
-  await runCommand(corpus.install, clone, NO_SCRIPTS, TIME_LIMITS.install, io);
+  await runCommand(corpus.install, clone, NO_SCRIPTS, { timeoutMs: TIME_LIMITS.install }, io);
   const commands = corpus.prepare ?? [];
   for (const [index, command] of commands.entries()) {
     // a line per command: each is bounded by its own limit, so the silence a watcher allows covers one
     onActivity({ state: "working", activity: "prepare", count: index, of: commands.length });
-    await runCommand(command, clone, {}, TIME_LIMITS.prepare, io);
+    await runCommand(
+      command,
+      clone,
+      {},
+      { timeoutMs: TIME_LIMITS.prepare, silenceMs: PREPARE_SILENCE_MS },
+      io
+    );
   }
   await writeFile(stamp, `${installStamp(corpus)}\n`);
 };
