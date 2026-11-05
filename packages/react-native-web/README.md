@@ -5,7 +5,7 @@ browser through [react-native-web](https://necolas.github.io/react-native-web/),
 TypeScript types as React's are.
 
 **Requirements:** React 18.2 or 19 · `react-native` 0.76 or later (its types; 0.88 is the one tested) ·
-`react-native-web` 0.21 · `forgebook` · Vite 8 · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/react-native-web/LICENSE)
+`react-native-web` 0.21 · `forgebook` · Vite 8.3.4+ · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/react-native-web/LICENSE)
 
 ```sh
 npm install --save-dev forgebook @forgebook/react-native-web react-native-web

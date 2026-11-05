@@ -5,7 +5,7 @@ catalogue, with what they read of the app (`$app/state`, `$app/navigation`, `$ap
 the public environment, `$lib` and a page's `load`) given by each story. Built on
 [`@forgebook/svelte`](https://www.npmjs.com/package/@forgebook/svelte), on Vite.
 
-**Requirements:** SvelteKit 2 or 3 · Svelte 5.46 · `forgebook` · Vite 8 · React in the project, for the catalogue's own
+**Requirements:** SvelteKit 2 or 3 · Svelte 5.46 · `forgebook` · Vite 8.3.4+ · React in the project, for the catalogue's own
 interface (the frames that draw your components load none) ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/sveltekit/LICENSE)
 
