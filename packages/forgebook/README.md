@@ -237,7 +237,11 @@ The Touch switch (in View, `m` by default) lets a story be tried as on a phone, 
   `navigator.maxTouchPoints` says 5;
 - the cursor is a round dot; Shift fixes a centre, and a press then puts a second finger mirrored around it, so a drag
   pinches and rotates;
-- a drag scrolls what it can, as the `touch-action` on the way allows, and flings on.
+- a drag scrolls what it can, as the `touch-action` on the way allows, and flings on;
+- a tap on a text field (an input, a textarea, a contenteditable) focuses it and puts the caret under the finger, a
+  drag or a long press there does not, and a handler that cancels the tap leaves it unfocused, as on a phone; the
+  keyboard then types and selects in it as usual (in a closed shadow root, or on a non-editable part of a
+  contenteditable, a press focuses at once and the caret is the browser's, the simulation not reaching them).
 
 A story reads the switch in its globals (`context.globals.touch`, `"mouse"` or `"touch"`) to draw only the version
 that fits the pointer, and follows the switch live; a story fixes it with `globals: { touch: "touch" }`.
@@ -248,9 +252,9 @@ its example's bar turns that off for it; on its own page, the Touch switch is th
 catalogue is open, and the address keeps the switch the other stories follow.
 
 **It is a simulation.** Events made by a page are not trusted, so the browser's own reactions do not follow them:
-its native scrolling (the drag's scrolling is an approximation, without the rubber band), focus and selection from a
-touch, and `touch-action` applied by the browser. In Safari and Firefox the stories get pointer events only (only
-Chromium lets a page build touch events). A virtual keyboard, the viewport shrinking under it, safe areas and real iOS
+its native scrolling (the drag's scrolling is an approximation, without the rubber band), selecting a word or the page's
+text with a finger, and `touch-action` applied by the browser. In Safari and Firefox the stories get pointer events only (only
+Chromium lets a page build touch events), and Firefox does not place the caret inside an email or number field. A virtual keyboard, the viewport shrinking under it, safe areas and real iOS
 Safari need a device. For real touch events and native scrolling, `forgebook dev --touch` opens the catalogue in a
 Chromium window with Chromium's own touch emulation (it needs `@forgebook/testing` and Playwright, as `check` does).
 `controls: { touch: false }` takes the switch away.

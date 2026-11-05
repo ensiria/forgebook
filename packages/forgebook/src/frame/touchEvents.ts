@@ -4,7 +4,7 @@
  *
  * @remarks
  * A page cannot make trusted events, so these are dispatched ones: the story's handlers see a finger, the browser's
- * own reactions (scrolling, focus) do not follow them. A touch pointer is captured by the element it went down on,
+ * own reactions (scrolling, focus) do not follow them: the layer makes up for a tap's focus (`touchCaret.ts`). A touch pointer is captured by the element it went down on,
  * as the browser does; a story that captures it elsewhere moves it there (`touchLayer.ts` patches the capture calls
  * for the simulated pointers' ids).
  *
@@ -173,8 +173,9 @@ export const sendMouse = (type: string, finger: Finger): boolean => {
  *
  * @param target - the real click's target.
  * @param finger - the finger that tapped.
+ * @returns whether no handler cancelled it.
  */
-export const sendClick = (target: EventTarget, finger: Finger): void => {
+export const sendClick = (target: EventTarget, finger: Finger): boolean =>
   target.dispatchEvent(
     new PointerEvent("click", {
       bubbles: true,
@@ -193,4 +194,3 @@ export const sendClick = (target: EventTarget, finger: Finger): void => {
       height: CONTACT_PX
     })
   );
-};

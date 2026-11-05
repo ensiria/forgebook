@@ -11,11 +11,14 @@
  * no button down sends nothing: a finger does not hover. Shift fixes a centre beside the mouse (the second finger shows 80 px to its left); a press then puts a
  * second finger mirrored around it, so dragging pinches and rotates. The real cursor is hidden and the fingers are
  * dots (`touchDots.ts`). While it is on, `navigator.maxTouchPoints` and `ontouchstart` say touch, and capturing a
- * simulated pointer works. A simulation: the events are not trusted, so the browser's own scrolling, focus from a
- * touch, a virtual keyboard and real Safari stay a device's (or `forgebook dev --touch`'s).
+ * simulated pointer works. A tap on an editable field focuses it and puts the caret there (`touchCaret.ts`), the real
+ * press on one doing nothing: a finger that drags or holds there must not focus it. A simulation: the events are not
+ * trusted, so the browser's own scrolling, a virtual keyboard and real Safari stay a device's (or
+ * `forgebook dev --touch`'s).
  *
  * @module
  */
+import { deepElementAt, editableFieldOf, tapField, tapLabel } from "./touchCaret.ts";
 import { type TouchDots, touchDots } from "./touchDots.ts";
 import { type Finger, sendClick, sendMouse, sendPointer, sendTouch } from "./touchEvents.ts";
 import { dragAxis, isDragging, LONG_PRESS_MS, mirroredFinger, type Point } from "./touchGesture.ts";
@@ -212,6 +215,18 @@ const pressMove = (state: LayerState, press: Press, event: PointerEvent): void =
 };
 
 /**
+ * A tap's compatibility mouse events, and the focus on an editable field a real finger's comes with: a handler that
+ * cancels the `mousedown` leaves the field without it.
+ *
+ * @param document - the frame's document.
+ * @param finger - the finger that tapped.
+ */
+const sendTapMouse = (document: Document, finger: Finger): void => {
+  if (sendMouse("mousedown", finger)) tapField(document, finger.point);
+  sendMouse("mouseup", finger);
+};
+
+/**
  * A press ends: the fingers lift, a scroll flings on, a tap sends the mouse's compatibility events and readies its
  * click.
  *
@@ -246,11 +261,18 @@ const pressUp = (state: LayerState, press: Press, isCancel: boolean, time: numbe
   const isTap = !isCancel && !press.isDrag && !press.isLongPress && press.fingers.length === 1;
   const isClicking = isTap && !press.isTouchCancelled && !isEndCancelled;
   state.tapper = isClicking ? first : undefined;
-  if (isClicking && !press.isDownCancelled && first !== undefined) {
-    sendMouse("mousedown", first);
-    sendMouse("mouseup", first);
-  }
+  if (isClicking && !press.isDownCancelled && first !== undefined) sendTapMouse(state.document, first);
   drawDots(state);
+};
+
+/**
+ * Whether a real event began in an editable field.
+ *
+ * @param event - the event.
+ */
+const isInField = (event: Event): boolean => {
+  const [origin] = event.composedPath();
+  return origin instanceof Node && editableFieldOf(origin) !== undefined;
 };
 
 /**
@@ -274,16 +296,19 @@ const handledApart = (state: LayerState, event: Event): boolean => {
     state.tapper = undefined;
     // after the real click's dispatch: cancelling it undoes a checkbox's toggle at its end, a click sent inside it too
     const { target } = event;
+    const [origin] = event.composedPath();
     if (finger !== undefined && target !== null)
       state.clickTimer = window.setTimeout((): void => {
         state.clickTimer = undefined;
-        sendClick(target, finger);
+        if (sendClick(target, finger)) tapLabel(origin);
       }, 0);
     return true;
   }
   if (event.type === "contextmenu" && !(isMouseEvent && event.button === 2)) return true;
   if (event.type !== "selectstart" && event.type !== "dragstart" && event.type !== "contextmenu")
     return false;
+  // inside a field the keyboard selects (Shift and an arrow): only the finger's selection of the page stays out
+  if (event.type === "selectstart" && isInField(event)) return true;
   event.preventDefault();
   event.stopImmediatePropagation();
   return true;
@@ -335,6 +360,18 @@ const pointerInput = (state: LayerState, event: PointerEvent): void => {
 };
 
 /**
+ * A real press on an editable field does nothing there: the browser would focus it and start a selection at once, when
+ * a finger's reaction waits for its lift (`touchCaret.ts`) and never comes from a drag or a long press.
+ *
+ * @param state - the simulation's state.
+ * @param event - the real press.
+ */
+const keepFieldForTap = (state: LayerState, event: MouseEvent): void => {
+  const element = deepElementAt(state.document, { x: event.clientX, y: event.clientY });
+  if (element !== undefined && editableFieldOf(element) !== undefined) event.preventDefault();
+};
+
+/**
  * What the simulation does with one real event, before the story sees it: the story never sees a real one.
  *
  * @param state - the simulation's state.
@@ -344,6 +381,7 @@ const intercept = (state: LayerState, event: Event): void => {
   if (!event.isTrusted || handledApart(state, event)) return;
   event.stopImmediatePropagation();
   if (event instanceof PointerEvent) pointerInput(state, event);
+  else if (event.type === "mousedown" && event instanceof MouseEvent) keepFieldForTap(state, event);
 };
 
 /**
