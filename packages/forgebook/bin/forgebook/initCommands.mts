@@ -1,66 +1,19 @@
 /**
- * The command that starts a catalogue: `init --from storybook` writes `forgebook.config.ts` from a project's Storybook
- * files, so a project on Storybook tries Forgebook in one command, its stories read as they are.
+ * The command that starts a catalogue: `init` writes `forgebook.config.ts` from what a project's files say, so a new user
+ * or an agent gets a catalogue that draws in one command, with no question asked.
  *
  * @remarks
- * Defined here, on the scope `forgebookCommands.mts` hands it, so the commands module stays a list of commands; the reading is the
- * importer's (`importers/storybook.ts`), the writing `initConfig.ts`'s. A configuration already there is never
- * replaced unless asked (`--force`): it may hold a person's work.
+ * Defined here, on the scope `forgebookCommands.mts` hands it, so the commands module stays a list of commands; what it
+ * does is `initRun.ts`'s. The run loads the compiler to read the project's files, so only this command loads it. A file
+ * already there is never replaced unless asked (`--force`): it may hold a person's work.
  *
  * @module
  */
-import { existsSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { join, resolve } from "node:path";
-
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
-import { ScriptError } from "@ensiria/cli-kit/script";
 
-import { CONFIG_FILES } from "../../src/vite/configFile.ts";
 import { COMMAND, type ForgebookOptions } from "./catalogueCommands.ts";
-import type { ImportedConfig } from "./importers/storybook.ts";
-import { frameworkPeers } from "./importers/storybookFrameworks.ts";
-import { CONFIG_FILE, initConfigText } from "./initConfig.ts";
-
-/**
- * The modules the written configuration needs, by the package that has each: what it imports, and the framework's
- * peers.
- *
- * @param imported - what the importer read: the framework and its options.
- */
-const configImports = (
-  imported: Pick<ImportedConfig, "framework" | "frameworkOptions">
-): Readonly<Record<string, string>> => ({
-  forgebook: "forgebook",
-  [`@forgebook/${imported.framework}`]: `@forgebook/${imported.framework}/vite`,
-  ...Object.fromEntries(
-    frameworkPeers(imported.framework, imported.frameworkOptions).map((peer) => [
-      peer,
-      `${peer}/package.json`
-    ])
-  )
-});
-
-/**
- * The packages the written configuration needs that the project cannot load yet.
- *
- * @param dir - the project's folder.
- * @param imported - what the importer read: the framework and its options.
- */
-const missingPackages = (
-  dir: string,
-  imported: Pick<ImportedConfig, "framework" | "frameworkOptions">
-): string[] => {
-  const require = createRequire(join(dir, "package.json"));
-  return Object.entries(configImports(imported)).flatMap(([name, specifier]) => {
-    try {
-      require.resolve(specifier);
-      return [];
-    } catch {
-      return [name];
-    }
-  });
-};
+import { CONFIG_FILE } from "./initConfig.ts";
+import { FRAMEWORK_NAMES } from "./newProject/projectFrameworks.ts";
 
 /**
  * The commands.
@@ -72,45 +25,45 @@ export const initCommands = (
 ): Readonly<Record<string, CommandNode>> => ({
   init: forgebook.command({
     summary:
-      "Write forgebook.config.ts from another tool's files: Storybook's story globs, preview and globals.",
+      "Write forgebook.config.ts, and a preview with the app's global style sheets, from the project's files.",
+    json: true,
     options: {
       from: {
         type: "string",
-        required: true,
         choices: ["storybook"],
         valueName: "tool",
         description:
-          "The tool whose files are read (its folder in the current one: .storybook, or on-device Storybook's .rnstorybook)."
+          "Read this tool's files (its folder in the current one: .storybook, or on-device Storybook's .rnstorybook). Loading its main runs the project's code."
       },
-      force: { type: "boolean", description: `Replace a ${CONFIG_FILE} that is already there.` }
+      framework: {
+        type: "string",
+        valueName: "name",
+        choices: [...FRAMEWORK_NAMES],
+        description:
+          "The framework the stories are written for, when package.json does not settle it (html for none); starts from the dependencies even on Storybook."
+      },
+      install: {
+        type: "boolean",
+        description:
+          "Run the package manager's install of what the configuration imports; as any install, it runs what the project's package manager settings and the packages' scripts say."
+      },
+      force: { type: "boolean", description: `Replace a ${CONFIG_FILE} or a preview that is already there.` }
     },
     examples: [
-      {
-        command: `${COMMAND} init --from storybook`,
-        description: "Read .storybook and write the configuration."
-      }
+      { command: `${COMMAND} init`, description: "Read the project and write the files." },
+      { command: `${COMMAND} init --json`, description: "The same, as a document, for an agent." },
+      { command: `${COMMAND} init --from storybook`, description: "Read .storybook." }
     ],
-    run: async ({ options, log }): Promise<void> => {
-      const file = resolve(CONFIG_FILE);
-      // any configuration the catalogue would read, not only the file written: a new .ts would win over a .mts
-      const existing = CONFIG_FILES.find((name) => existsSync(resolve(name)));
-      if (existing !== undefined && options.force !== true)
-        throw new ScriptError(`${existing} is already there`, {
-          hint: "Give --force to replace it with the one read from Storybook"
-        });
-      // the importer reads Storybook's files with the compiler: only this command loads it
-      const { importStorybook } = await import("./importers/storybook.ts");
-      const imported = await importStorybook(process.cwd());
-      if (typeof imported === "string") throw new ScriptError(imported);
-      writeFileSync(file, initConfigText(imported, "Storybook"));
-      log.success(`${CONFIG_FILE} written: ${imported.stories.length} story globs`);
-      for (const note of imported.notes) log.warn(note);
-      const missing = missingPackages(process.cwd(), imported);
-      if (missing.length > 0)
-        log.info(`Install what it imports first: npm install --save-dev ${missing.join(" ")}`);
-      log.info(
-        `Next: ${COMMAND} dev to open the catalogue, ${COMMAND} stories to list what did not read, ` +
-          `${COMMAND} agents for the project's coding agents`
+    run: async ({ options, io, log, isJson }): Promise<void> => {
+      const { runInit } = await import("./initRun.ts");
+      await runInit(
+        {
+          from: options.from,
+          framework: options.framework,
+          isForced: options.force === true,
+          shouldInstall: options.install === true
+        },
+        { io, log, isJson }
       );
     }
   })

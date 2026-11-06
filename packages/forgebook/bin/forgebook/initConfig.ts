@@ -1,5 +1,6 @@
 /**
- * The `forgebook.config.ts` that `forgebook init` writes, from what an importer read of another tool's files.
+ * The `forgebook.config.ts` that `forgebook init` writes, from what an importer read of another tool's files or from a
+ * project's dependencies.
  *
  * @remarks
  * Pure: the configuration in, the file's text out. The file is written as a person would write it (the `defineConfig`
@@ -45,9 +46,10 @@ const adapterArgument = (options: Readonly<Record<string, unknown>> | undefined)
  * The configuration file's text.
  *
  * @param imported - what the importer read.
- * @param tool - the tool's name, for the file's comment (`Storybook`).
+ * @param tool - the tool's name, for the file's comment (`Storybook`); none for a configuration read from the project's
+ *   dependencies.
  */
-export const initConfigText = (imported: ImportedConfig, tool: string): string => {
+export const initConfigText = (imported: ImportedConfig, tool: string | undefined): string => {
   const adapter = ADAPTER_FUNCTIONS[imported.framework];
   const fields = [
     `  framework: ${adapter}(${adapterArgument(imported.frameworkOptions)}),`,
@@ -57,7 +59,7 @@ export const initConfigText = (imported: ImportedConfig, tool: string): string =
     ...(imported.switches === undefined
       ? []
       : [
-          `  // from the preview's globalTypes: applied by code, as ${tool}'s decorators read them`,
+          `  // from the preview's globalTypes: applied by code, as ${tool ?? "the app"}'s decorators read them`,
           `  switches: ${sourceOf(imported.switches, "  ")},`
         ])
   ];
@@ -66,7 +68,9 @@ export const initConfigText = (imported: ImportedConfig, tool: string): string =
   fields[last] = fields[last]?.replace(/,$/, "") ?? "";
   return [
     "/**",
-    ` * The catalogue's configuration, written by \`forgebook init --from ${tool.toLowerCase()}\` from ${tool}'s files.`,
+    tool === undefined
+      ? " * The catalogue's configuration, written by `forgebook init` from the project's dependencies."
+      : ` * The catalogue's configuration, written by \`forgebook init --from ${tool.toLowerCase()}\` from ${tool}'s files.`,
     " *",
     " * @module",
     " */",

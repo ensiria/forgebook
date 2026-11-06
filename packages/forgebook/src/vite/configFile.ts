@@ -49,7 +49,7 @@ export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "for
 export const HOME_FILE = "forgebook.home.md";
 
 /** The names a preview may have beside the configuration, in the order they are looked for. */
-const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebook.preview.js"];
+export const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebook.preview.js"];
 
 /** The shell's look, ready for its page. */
 export type ResolvedShell = {
