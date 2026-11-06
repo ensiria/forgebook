@@ -79,6 +79,9 @@ export const storyCheckCommands = (
       const problems = report.results.reduce((count, result) => count + result.problems.length, 0);
       if (problems > 0)
         throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
+      const notVerified = report.results.filter((result) => result.notVerified !== undefined).length;
+      if (notVerified > 0)
+        throw new ScriptError(`${notVerified} not verified`, { exitCode: EXIT.failure, isReported: true });
     }
   })
 });

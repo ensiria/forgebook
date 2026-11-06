@@ -304,6 +304,7 @@ describe("the verify tool", () => {
         stories: [],
         ran: 0,
         failures: [],
+        notVerified: [],
         code: { checked: [], problems: [], notes: [] },
         problems: 0
       })

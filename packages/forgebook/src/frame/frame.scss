@@ -55,6 +55,16 @@
     vertical-align: middle;
   }
 
+  // in the page's flow, above the story: the frame is sized to the body and a picture cut to it, and a notice laid over
+  // them would be cut with them
+  .forgebook-frame-pending {
+    margin: 0;
+    padding: $space-2 $space-3;
+    font: $text-mono-small;
+    color: #fff;
+    background: #8a1c1c;
+  }
+
   .forgebook-frame-error {
     margin: $space-6;
     font: $text-body;

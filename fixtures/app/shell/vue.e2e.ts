@@ -20,6 +20,7 @@ const STORY_IDS = [
   "inputs-counter--default",
   "inputs-stepped--default",
   "states-awaited--default",
+  "states-awaited--in-a-boundary-of-its-own",
   "states-fragile--default",
   "states-greeting--live",
   "logic-use-toggle--default"
@@ -72,6 +73,15 @@ test.describe("what a story draws", () => {
     await isReady(page);
     await expect(frameOf(page).getByTestId("awaited")).toHaveText("Awaited");
     await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
+  });
+
+  test("a boundary the story wrote is waited for: at ready its content is there and its fallback gone", async ({
+    page
+  }) => {
+    await page.goto("/frame.html?story=vue:states-awaited--in-a-boundary-of-its-own");
+    await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "ready");
+    expect(await page.getByTestId("late").count()).toBe(1);
+    expect(await page.getByTestId("fallback").count()).toBe(0);
   });
 
   test("a play's result shows while the component's docs are still read", async ({ page }) => {

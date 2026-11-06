@@ -5,15 +5,15 @@
  *
  * @remarks
  * Shared by `checkStories.ts` and `shotStories.ts`, which `forgebook check` and `forgebook shot` load from the project.
- * A frame that never says it is ready is told apart from one that says it failed, so a story stuck loading is never
- * taken for one that passed.
+ * A frame that never says it is ready is told apart from one that says it failed, and one that gave up on what its story
+ * loads from both, so a story stuck loading is never taken for one that passed.
  *
  * @module
  */
 import { chromium, type Page } from "@playwright/test";
 import { catalogueSettings } from "forgebook/catalogue";
 import { deviceFrameAddress, deviceViewport, type NamedDevice, namedDevice } from "forgebook/device-picture";
-import { ERROR_MESSAGE_CLASS, STATUS_ATTRIBUTE } from "forgebook/frame-status";
+import { ERROR_MESSAGE_CLASS, PENDING_REASON_ATTRIBUTE, STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryCheckRequest, StoryCheckStory } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
 import { defaultView, frameAddress, parseView, type ViewState } from "forgebook/view-state";
@@ -48,8 +48,8 @@ export type StoryPage = {
   readonly frame: string;
 };
 
-/** What a frame said once opened: ready, failed, or nothing in time. */
-export type FrameStatus = "ready" | "error" | "silent";
+/** What a frame said once opened: ready, failed, gave up on what the story loads, or nothing in time. */
+export type FrameStatus = "ready" | "error" | "pending" | "silent";
 
 /**
  * The views a request names: every variant of the browser tests, or each view given (the default view without any).
@@ -127,7 +127,17 @@ export const frameErrorOf = async (page: Page): Promise<string | undefined> => {
 };
 
 /**
- * Opens a story's frame in its window and waits until it says it is ready or that it failed.
+ * Why a frame gave up on what its story loads.
+ *
+ * @param page - the frame's page, its status `pending`.
+ * @returns the frame's reason.
+ */
+export const pendingReasonOf = async (page: Page): Promise<string> =>
+  (await page.locator("html").getAttribute(PENDING_REASON_ATTRIBUTE)) ??
+  "The frame gave up waiting for the story";
+
+/**
+ * Opens a story's frame in its window and waits until it says it is ready, that it failed or that it gave up.
  *
  * @param page - a fresh page.
  * @param storyPage - the story and the view.
@@ -143,14 +153,16 @@ export const openedStory = async (page: Page, storyPage: StoryPage): Promise<Fra
   await page.goto(storyPage.frame);
   try {
     await page.waitForFunction(
-      (attribute) => ["ready", "error"].includes(document.documentElement.getAttribute(attribute) ?? ""),
+      (attribute) =>
+        ["ready", "error", "pending"].includes(document.documentElement.getAttribute(attribute) ?? ""),
       STATUS_ATTRIBUTE,
       { timeout: READY_MS }
     );
   } catch {
     return "silent";
   }
-  return (await page.locator("html").getAttribute(STATUS_ATTRIBUTE)) === "ready" ? "ready" : "error";
+  const status = await page.locator("html").getAttribute(STATUS_ATTRIBUTE);
+  return status === "ready" || status === "pending" ? status : "error";
 };
 
 /**

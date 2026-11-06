@@ -5,7 +5,8 @@
  * @remarks
  * Pure, so the rule the whole command exists for can be read and tested apart: a change is verified only if every changed
  * UI file reached a story that actually ran, and what was not checked is never counted as passed. A story that was
- * listed and did not run covers nothing, so the coverage is read from the results and not from the graph. A changed file
+ * listed and did not run covers nothing, so the coverage is read from the results and not from the graph, and a story
+ * whose frame gave up on what it loads did not run: no check saw it in its final state. A changed file
  * that no one sees does not fail, whatever it reaches; what `check-code` finds in it (a turned-off check, a deleted test)
  * is said as a note. An empty change passes only against a commit someone named: with none, the work may simply be
  * committed where this cannot look (a shallow clone, a default branch it does not know).
@@ -20,6 +21,7 @@ import type {
   VerifiedUiFile,
   VerifyDocument,
   VerifyFailure,
+  VerifyNotVerified,
   VerifyVerdict
 } from "../../src/vite/agent.types.ts";
 
@@ -66,7 +68,9 @@ const verifiedFile = (
     coverage: "none",
     stories: 0,
     ...(file.stories.length > 0
-      ? { reason: `its stories did not run: ${notRun ?? "the check left them out"}` }
+      ? {
+          reason: `its stories did not run: ${notRun ?? "the check left them out, or never saw them in their final state"}`
+        }
       : { reason: "no story reaches it.", fix: fixOf(file) })
   };
 };
@@ -88,10 +92,11 @@ const verdictOf = (
   problems: number,
   skipped: readonly string[],
   catalogueProblems: readonly string[],
-  isBlind: boolean
+  isBlind: boolean,
+  notVerified: number
 ): VerifyVerdict => {
   if (problems > 0) return "failed";
-  if (files.some((each) => each.coverage === "none")) return "not-verified";
+  if (notVerified > 0 || files.some((each) => each.coverage === "none")) return "not-verified";
   if (isBlind || catalogueProblems.length > 0) return "not-verified";
   if (files.length === 0) return "nothing-to-verify";
   return skipped.length > 0 ? "partly-verified" : "verified";
@@ -102,7 +107,16 @@ const skippedOf = (input: VerifyFindings, notRun: string | undefined): readonly 
   const { changed, code, report, isQuick, isSinceNamed, since } = input;
   const hasUi = changed.uiFiles.length > 0;
   const hasStories = changed.stories.length > 0;
+  const notAwaited = new Set(
+    (report?.results ?? []).filter((each) => each.isNotAwaited === true).map((each) => each.storyId)
+  );
   return [
+    // a story may mean it, and a preview that sets it for all of them turns the wait off: either way, said
+    ...(notAwaited.size === 0
+      ? []
+      : [
+          `${notAwaited.size === 1 ? "1 story" : `${notAwaited.size} stories`} checked without waiting for what it loads: parameters.suspense.expected`
+        ]),
     // nothing a token names was touched when no UI file changed, so its absence said nothing about the change
     ...(hasUi ? code.skipped : []),
     ...(report?.a11y === "off" && hasStories
@@ -144,21 +158,38 @@ export type VerifyFindings = {
 };
 
 /** What a line says of a change with no UI file. */
-const noUiWords = ({ files, ran, problems }: Omit<VerifyDocument, "summary" | "schema">): string => {
+const noUiWords = ({
+  files,
+  ran,
+  problems,
+  notVerified
+}: Omit<VerifyDocument, "summary" | "schema">): string => {
   const stories = ran === 0 ? "" : `, ${ran} checks of the stories they reach`;
-  const found = problems === 0 ? "" : `: ${counted(problems, "problem")}`;
-  return `No changed UI file (${counted(files.length, "other file")}${stories})${found}`;
+  const found = [
+    ...(problems === 0 ? [] : [counted(problems, "problem")]),
+    ...(notVerified.length === 0 ? [] : [`${notVerified.length} not verified`])
+  ].join(", ");
+  return `No changed UI file (${counted(files.length, "other file")}${stories})${found === "" ? "" : `: ${found}`}`;
 };
 
 /** What a line says after the coverage. */
 const outcomeWords = (
-  { verdict, uiFiles, problems, variants, ran }: Omit<VerifyDocument, "summary" | "schema">,
+  {
+    verdict,
+    uiFiles,
+    problems,
+    variants,
+    ran,
+    notVerified: unseen
+  }: Omit<VerifyDocument, "summary" | "schema">,
   catalogueProblems: readonly string[]
 ): string => {
-  const notVerified = uiFiles.some((each) => each.coverage === "none") || catalogueProblems.length > 0;
+  const notVerified =
+    unseen.length > 0 || uiFiles.some((each) => each.coverage === "none") || catalogueProblems.length > 0;
   const where = variants === "all" ? "in every variant" : "in the default view";
   return [
     ...(notVerified ? ["not verified"] : []),
+    ...(unseen.length > 0 ? [`${unseen.length} not seen in its final state: the frame gave up`] : []),
     ...(problems > 0 ? [counted(problems, "problem")] : []),
     ...(verdict === "verified" || verdict === "partly-verified"
       ? [`verified ${where} (${counted(ran, "check")})`]
@@ -202,7 +233,10 @@ const summaryOf = (
 export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const { since, base, changed, code, report, notRun, isQuick, isSinceNamed } = input;
   const results = report?.results ?? [];
-  const ran = new Set(results.map((result) => result.storyId));
+  // a story not seen in a view is left out of what ran there; seen in another it still covers its file, and the verdict
+  // says not verified from `notVerified` either way
+  const seenResults = results.filter((result) => result.notVerified === undefined);
+  const ran = new Set(seenResults.map((result) => result.storyId));
   const uiFiles = changed.uiFiles.map((file) => verifiedFile(file, ran, notRun));
   const links = new Map(changed.stories.map((story) => [story.id, story.links]));
   const failures = results
@@ -211,6 +245,13 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
       const storyLinks = links.get(storyId);
       return { storyId, view, problems: found, ...(storyLinks === undefined ? {} : { links: storyLinks }) };
     });
+  const notVerified = results.flatMap(({ storyId, view, notVerified: reason }): VerifyNotVerified[] => {
+    if (reason === undefined) return [];
+    const storyLinks = links.get(storyId);
+    return [
+      { storyId, view, notVerified: reason, ...(storyLinks === undefined ? {} : { links: storyLinks }) }
+    ];
+  });
   // a change no one sees does not fail; what the code check found in it is still said
   const seen = new Set(changed.uiFiles.map((file) => file.file));
   const codeProblems = code.problems.filter((problem) => seen.has(problem.file));
@@ -221,7 +262,7 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   // a story file that cannot be read may be the change, whatever else changed
   const catalogueProblems = changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []);
   const isBlind = changed.files.length === 0 && !isSinceNamed;
-  const verdict = verdictOf(uiFiles, problems, skipped, catalogueProblems, isBlind);
+  const verdict = verdictOf(uiFiles, problems, skipped, catalogueProblems, isBlind, notVerified.length);
   const allSkipped = [...skipped, ...catalogueProblems];
   const variants: VerifyDocument["variants"] = isQuick ? "default" : "all";
   const body = {
@@ -232,8 +273,9 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
     uiFiles,
     storyCount: changed.stories.length,
     stories: changed.stories.slice(0, STORIES_LISTED),
-    ran: results.length,
+    ran: seenResults.length,
     failures,
+    notVerified,
     code: { checked: code.checked, problems: codeProblems, notes },
     problems
   };

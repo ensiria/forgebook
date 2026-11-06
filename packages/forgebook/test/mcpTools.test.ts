@@ -14,7 +14,8 @@ import { switchesDocument } from "../src/vite/switchesDocument.ts";
 /** The questions the tools asked. */
 const asked: string[] = [];
 
-const TOOLS = catalogueTools({
+/** What the tools reach the catalogue through. */
+const REACH: Parameters<typeof catalogueTools>[0] = {
   ask: async (route: string, params: URLSearchParams): Promise<AgentAnswer> => {
     asked.push(`${route}?${params.toString()}`);
     return { status: 200, body: { schema: 1 } };
@@ -48,7 +49,9 @@ const TOOLS = catalogueTools({
     ],
     "/project"
   )
-});
+};
+
+const TOOLS = catalogueTools(REACH);
 
 const tool = (name: string): (typeof TOOLS)[number] => {
   const found = TOOLS.find((each) => each.name === name);
@@ -142,5 +145,39 @@ describe("story_address with values", () => {
     asked.length = 0;
     await tool("story_address").call({ id: "kit:a--b" });
     expect(asked[0]?.startsWith("stories?")).toBe(true);
+  });
+});
+
+describe("check_story on a story its frame gave up on", () => {
+  /** The tool, answering this report. */
+  const checkTool = (notVerified: string | undefined): (typeof TOOLS)[number] => {
+    const tools = catalogueTools({
+      ...REACH,
+      check: async () => ({
+        schema: 1,
+        results: [
+          {
+            storyId: "kit:a--b",
+            view: "",
+            frame: "f",
+            problems: [],
+            ...(notVerified === undefined ? {} : { notVerified })
+          }
+        ]
+      })
+    });
+    const found = tools.find((each) => each.name === "check_story");
+    if (found === undefined) throw new Error("check_story is one of the tools");
+    return found;
+  };
+
+  it("answers an error with the reason, as an agent reads it", async () => {
+    const answer = await checkTool("still loading").call({ id: "kit:a--b" });
+    expect(answer.isError).toBe(true);
+    expect(JSON.stringify(answer.structured)).toContain("still loading");
+  });
+
+  it("is no error when the checks ran and found nothing", async () => {
+    expect((await checkTool(undefined).call({ id: "kit:a--b" })).isError).toBe(false);
   });
 });

@@ -116,6 +116,9 @@ structure view), starting Vite through the package manager that runs them (`vite
 another command). A story that breaks a rule fails all its variants; `storyBrowserTests` also takes `check`, a rule of
 the package's own run on every frame.
 
+A test fails on a story its frame gave up on (status `pending`: something still loading after the wait of
+`parameters.suspense`), with the frame's reason, before any check runs: a fallback is not what the check is for.
+
 A story about logic (`parameters: { logic: true }`, a hook's or a function's scene) is tested once, in the catalogue's
 default view, named `logic`: the variants only change how it looks. Its test still waits for the frame to be ready, so
 its play has to pass, and fails on an error in the page; axe runs too, since the scene is a page a person uses and a

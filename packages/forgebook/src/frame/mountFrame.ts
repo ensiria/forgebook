@@ -5,7 +5,7 @@
  * @remarks
  * One document per story: the style sheets of the Styles setting, the switches on the root and anything the
  * story mounts on `body` stay in this document. The tests open the same address and wait for `data-forgebook-status`
- * on the root (`ready` or `error`), never for a delay. A Live story's clock runs from its start, or stays held there when
+ * on the root (`ready`, `error` or `pending`), never for a delay. A Live story's clock runs from its start, or stays held there when
  * the address says so (`clock=held`, what the tests open). The framework is the renderer the framework package
  * passes (`renderer.ts`); nothing here depends on one.
  *
@@ -46,7 +46,13 @@ import {
 import { detailOf, previewValue } from "./callValues.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
-import { ERROR_MESSAGE_CLASS, FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
+import {
+  ERROR_MESSAGE_CLASS,
+  FRAME_STARTED_ATTRIBUTE,
+  NOT_AWAITED_ATTRIBUTE,
+  PENDING_REASON_ATTRIBUTE,
+  STATUS_ATTRIBUTE
+} from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import { panelArgsOf, storyArgsOf } from "./panelValues.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
@@ -55,6 +61,7 @@ import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
 import { type ShellChannel, shellChannel } from "./shellChannel.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
+import type { StoryOutcome } from "./storyContent.ts";
 import { mergedPreviews, readPreview, readStory, startingGlobals } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
 import type { ValueSheets } from "./valueSheets.ts";
@@ -101,9 +108,11 @@ const tellDevServer = (report: LiveErrorReport): void => {
   import.meta.hot?.send(LIVE_ERROR_EVENT, report);
 };
 
-// a story that threw is gone from its frame, so a hot update has nothing to update: the fix shows only in a new page
+// a story that threw is gone from its frame, so a hot update has nothing to update: the fix shows only in a new page; a
+// story the frame gave up on keeps saying so until a new page waits for it again
 import.meta.hot?.on("vite:afterUpdate", (): void => {
-  if (document.documentElement.getAttribute(STATUS_ATTRIBUTE) === "error") window.location.reload();
+  const status = document.documentElement.getAttribute(STATUS_ATTRIBUTE);
+  if (status === "error" || status === "pending") window.location.reload();
 });
 
 /**
@@ -162,6 +171,8 @@ const failedToLoad = (message: string, fail: (reason: string) => void): void => 
  * @param message - the message.
  * @param controls - the rendered story's controls.
  * @param storyId - the story's id, for the answers.
+ * @param pendingReason - why the story was not seen in its final state, if so: a check of what it shows now would pass
+ *   on a fallback, so it answers this instead.
  * @param rules - the catalogue's accessibility rules, for a check; none when it checks no accessibility.
  * @param axeUrl - the address of axe's script, for a check.
  * @param tellShell - tells the shell the check's result.
@@ -170,6 +181,7 @@ const answerShell = (
   message: ShellMessage,
   controls: StoryControls,
   storyId: string,
+  pendingReason: string | undefined,
   rules: A11ySettings | undefined,
   axeUrl: string | undefined,
   tellShell: ShellChannel["tell"]
@@ -184,9 +196,12 @@ const answerShell = (
   else if (message.type === "forgebook:check") {
     // loaded on the first check: a frame that is never checked, or one of a catalogue that checks nothing, never
     // fetches the code that loads axe
+    const refusal =
+      pendingReason ??
+      (rules === undefined ? "The catalogue checks no accessibility (a11y: false)" : undefined);
     const checked =
-      rules === undefined
-        ? Promise.reject(new Error("The catalogue checks no accessibility (a11y: false)"))
+      refusal !== undefined || rules === undefined
+        ? Promise.reject(new Error(refusal))
         : import("./checkStory.ts").then((module) => module.checkStory(document, rules, axeUrl));
     checked
       .then((violations) => tellShell({ type: "forgebook:checked", storyId, violations }))
@@ -198,6 +213,39 @@ const answerShell = (
         })
       );
   }
+};
+
+/**
+ * Says on the page that the frame gave up on what the story loads: a person looking at the story, or at its picture,
+ * must not take the fallback for the story. Out of the story's own element, so the story is laid out as it was.
+ *
+ * @param reason - why.
+ */
+const showPending = (reason: string): void => {
+  const notice = document.createElement("p");
+  notice.className = "forgebook-frame-pending";
+  notice.setAttribute("role", "status");
+  notice.textContent = `Not verified: ${reason}`;
+  document.body.prepend(notice);
+};
+
+/**
+ * Says how a story ended on the frame's root and on its page.
+ *
+ * @param outcome - how it ended; an error that came during the wait stands, and this leaves it there.
+ * @param storyId - the story's id, for the dev server.
+ * @param isNotAwaited - whether the story said not to wait for what it loads, which a check reports.
+ * @returns why it was not seen in its final state, if so.
+ */
+const showOutcome = (outcome: StoryOutcome, storyId: string, isNotAwaited: boolean): string | undefined => {
+  if (outcome.status === "error") return undefined;
+  if (isNotAwaited) document.documentElement.setAttribute(NOT_AWAITED_ATTRIBUTE, "");
+  document.documentElement.setAttribute(STATUS_ATTRIBUTE, outcome.status);
+  if (outcome.status === "ready") return undefined;
+  document.documentElement.setAttribute(PENDING_REASON_ATTRIBUTE, outcome.reason);
+  showPending(outcome.reason);
+  tellDevServer({ kind: "render", storyId, view: window.location.search, message: outcome.reason });
+  return outcome.reason;
 };
 
 /** The play tools a project installed, for a story that uses them. */
@@ -350,10 +398,12 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     await showValueSheets?.(withFixed(view, fixed).switches);
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
     let controls: StoryControls | undefined;
+    // why the story was not seen in its final state: a check of what it shows would pass on a fallback
+    let pendingReason: string | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
     shell.listen((message: ShellMessage): void => {
       if (controls !== undefined)
-        answerShell(message, controls, storyId, catalogue.a11y, config.axeUrl, tellShell);
+        answerShell(message, controls, storyId, pendingReason, catalogue.a11y, config.axeUrl, tellShell);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them); a
     // language the source gives as a loader is loaded as it is shown
@@ -401,14 +451,15 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       ...shown,
       resolveArgs: (args: PanelArgs): Readonly<Record<string, unknown>> =>
         storyArgsOf(args, source.namedValues),
-      onControlsReady: (next: StoryControls): void => {
+      onControlsReady: (next: StoryControls, outcome: StoryOutcome): void => {
         controls = next;
         clearRetry(sessionStorageOf(window), window.location.href);
         // the height first: the shell sizes the frame to the drawn story before anything reads it as ready, instead of
         // waiting on the resize observer, which may report after the ready status
         reportSize();
-        document.documentElement.setAttribute(STATUS_ATTRIBUTE, "ready");
-        tellReady();
+        pendingReason = showOutcome(outcome, storyId, story.suspense.isExpected);
+        // the shell keeps an error it was told, and would read this as the story being fine again
+        if (outcome.status !== "error") tellReady();
         changeShown = (live: LiveView): void => {
           shownCount += 1;
           const count = shownCount;

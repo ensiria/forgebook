@@ -424,7 +424,8 @@ export type VerifyVerdict =
   /** Nothing was found, but `skipped` names what was not checked. */
   | "partly-verified"
   /**
-   * A changed UI file has no story that ran, the catalogue has a problem that stops it telling, or nothing changed since
+   * A changed UI file has no story that ran, a story that reaches the change was never seen in its final state (its frame
+   * gave up on what it loads: `notVerified`), the catalogue has a problem that stops it telling, or nothing changed since
    * a start nobody named: the work may be committed where this cannot see it.
    */
   | "not-verified"
@@ -487,6 +488,8 @@ export type VerifyDocument = {
   readonly ran: number;
   /** The pairs that found something, with the links that open the story; those that pass are only counted. */
   readonly failures: readonly VerifyFailure[];
+  /** The pairs no check saw in their final state: their frame gave up on what the story loads. None of them passed. */
+  readonly notVerified: readonly VerifyNotVerified[];
   /** What the change adds, by `check-code`. */
   readonly code: {
     /** What was checked. */
@@ -498,6 +501,18 @@ export type VerifyDocument = {
   };
   /** How many problems there are, in `failures` and `code.problems` together. */
   readonly problems: number;
+};
+
+/** A story and view whose checks did not run, since its frame gave up on what the story loads. */
+export type VerifyNotVerified = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view, or the variant's name. */
+  readonly view: string;
+  /** Why, as the frame says it. */
+  readonly notVerified: string;
+  /** The links that open the story. */
+  readonly links?: AgentChangedStory["links"];
 };
 
 /** What a change adds that breaks the design system. */

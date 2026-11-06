@@ -25,6 +25,9 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`); a model's id in the view (`iphone-16`) frames it in that device |
 | `npx forgebook shot <id> --update` then `npx forgebook diff <id> --json` | Baselines, then what changed against them: the region, the percentage, a marked picture |
 
+A story still loading when its frame gave up (`notVerified`, on `check`'s results and in `verify`'s answer) passed
+nothing: its checks did not run. `verify` answers `not-verified` then, or `failed` when something else was found.
+
 `verify` answers one `verdict`: `verified`; `partly-verified`, when `skipped` names what was not checked (colours and
 sizes with no tokens file, accessibility with `a11y: false`, a UI file of another catalogue); `nothing-to-verify`, when no
 UI file changed (read `skipped` and `code.notes` there too); `not-verified`, when a changed UI file has no story that ran,

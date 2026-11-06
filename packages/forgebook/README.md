@@ -1126,6 +1126,39 @@ the plugin too, since each would otherwise give a catalogue that looks right and
   saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
   may match nothing.
 
+## Stories that load
+
+A frame says a story is ready only once what the story loads is in the page, so `check`, `verify`, `shot`, the generated
+tests and the compare view read the content and never a fallback. A play function starts after the same wait, and the
+frame waits again after it, for what its clicks load. For React (Next.js and React Native too) and Vue (Nuxt too), that
+is every `Suspense` boundary, whoever wrote it, however deep; in React also a transition or a deferred value still
+loading, which shows no fallback.
+
+The wait is bounded: 10 s by default. Past it the frame's status is `pending`, with the reason on the page and in
+`data-forgebook-pending-reason`. `check` reports the story `notVerified` and exits non-zero, `verify` answers
+`not-verified`, `shot` marks the picture `pending`, the generated test fails and the Accessibility card does not pass it:
+what shows is not what you meant to check. Say so when a story is meant to stay there, or give it longer:
+
+```tsx
+export const Loading = { parameters: { suspense: { expected: true } } }; // a loading state: ready at once
+export const Slow = { parameters: { suspense: { timeout: 15_000 } } }; // in ms; in the preview, for every story
+```
+
+`check` stops listening to a frame at 30 s, and a generated test at 25 s: past that a longer `timeout` fails as a frame
+that never answered, never as a pass. A story with `expected` is checked as it first drew, and `verify` names it in
+`skipped`, so a preview cannot turn the wait off unseen.
+
+React and Vue do not say what is pending in public, so the adapters read their private tree. Each page first tries that
+reading on a boundary known to be pending and on one known not to be; on a version of React or Vue where it no longer
+works, every story is `pending` with that reason instead of ready on a guess. A cost of about one tree walk per story,
+in the adapter. A root a story creates itself with `createRoot` is out of reach, and so is what a story loads without
+`Suspense` (a `useEffect` fetch with a spinner): a play function can wait for that with `findBy…`.
+
+The other adapters have no such wait. Angular's `drawn` waits for the application to be stable. Preact's
+`preact/compat` `Suspense` and Solid's `<Suspense>` are not read; a story using them is ready once drawn, so its play
+function has to wait for the content. Svelte, Web Components and plain HTML have no fallback to read (Svelte's `{#await}`
+is a state of the component: the same).
+
 ## Commands
 
 | Command | What it does |
@@ -1558,7 +1591,7 @@ src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Bad
 The exit is non-zero on `failed` and `not-verified`, zero on `verified`, `partly-verified` and `nothing-to-verify`. The
 JSON answer is schema 2: `verdict`, `summary`, `skipped`, `since`, `base`, `variants`, `files`, `uiFiles` (each with its
 `coverage`, and its `reason` and `fix` when not covered), `storyCount`, `stories` (the first twenty, with their links),
-`ran`, `failures` (only what found something), `code` (`checked`, `problems`, `notes`) and `problems`.
+`ran`, `failures` (only what found something), `notVerified` (stories still loading when the frame gave up), `code` (`checked`, `problems`, `notes`) and `problems`.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
 component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),

@@ -329,7 +329,7 @@ export const catalogueTools = ({
   {
     name: "check_story",
     description:
-      "Run the catalogue's checks on a story in a browser, as its tests do: accessibility (axe), elements spilling out of their parents, overlays past the frame, the page's errors (a failed play among them), a story that could not be shown. Give a component's id to check all its stories. Needs @forgebook/testing and Playwright in the project.",
+      "Run the catalogue's checks on a story in a browser, as its tests do: accessibility (axe), elements spilling out of their parents, overlays past the frame, the page's errors (a failed play among them), a story that could not be shown; `notVerified` on a result means its frame gave up on what the story loads and no check ran, which is an error too. Give a component's id to check all its stories. Needs @forgebook/testing and Playwright in the project.",
     inputSchema: {
       type: "object",
       properties: {
@@ -364,7 +364,12 @@ export const catalogueTools = ({
         isSemantic: args["semantic"] === true
       });
       if (typeof report === "string") return { structured: { error: report }, isError: true };
-      return { structured: report, isError: report.results.some((result) => result.problems.length > 0) };
+      return {
+        structured: report,
+        isError: report.results.some(
+          (result) => result.problems.length > 0 || result.notVerified !== undefined
+        )
+      };
     }
   },
   {
@@ -420,7 +425,7 @@ export const catalogueTools = ({
         data: readFileSync(each.file).toString("base64"),
         mimeType: "image/png"
       }));
-      return { structured: report, isError: false, images };
+      return { structured: report, isError: report.shots.some((each) => each.status !== undefined), images };
     }
   },
   previewTool({ ask, serve: servePreview })

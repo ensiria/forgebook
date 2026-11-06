@@ -75,7 +75,23 @@ export type LoadedStory = {
   readonly layout: NonNullable<StoryParameters["layout"]>;
   /** A Live story's clock start, in ms since the Unix epoch (`parameters.clock`); none for a still. */
   readonly clockStart: number | undefined;
+  /** How the frame waits for a loading state (`parameters.suspense`). */
+  readonly suspense: StorySuspense;
 };
+
+/** How the frame waits for what a story loads before it says the story is ready. */
+export type StorySuspense = {
+  /** Whether the story is meant to stay in a loading state: the frame does not wait, and it is simply ready. */
+  readonly isExpected: boolean;
+  /** The most to wait, in milliseconds. */
+  readonly timeout: number;
+};
+
+/**
+ * How long a frame waits by default, in milliseconds: a lazy module on a dev server still preparing its dependencies
+ * takes seconds, and `forgebook check` stops listening to a silent frame at 30.
+ */
+const SUSPENSE_TIMEOUT = 10_000;
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -173,6 +189,20 @@ const ownOrMeta = <TFunction>(
 };
 
 /**
+ * How the frame waits for a story, from its parameter; a timeout that is no time at all is the default's.
+ *
+ * @param setting - `parameters.suspense`.
+ */
+const suspenseOf = (setting: unknown): StorySuspense => {
+  const timeout = isRecord(setting) ? setting["timeout"] : undefined;
+  return {
+    isExpected: isRecord(setting) && setting["expected"] === true,
+    timeout:
+      typeof timeout === "number" && timeout > 0 && Number.isFinite(timeout) ? timeout : SUSPENSE_TIMEOUT
+  };
+};
+
+/**
  * The meta and one story of a loaded module, merged.
  *
  * @param module - the module, as `import()` gave it.
@@ -221,7 +251,8 @@ export const readStory = (
       ...(isRecord(story["globals"]) ? story["globals"] : {})
     },
     layout: layout === "centered" || layout === "fullscreen" ? layout : "padded",
-    clockStart: clockStartOf(parameters["clock"])
+    clockStart: clockStartOf(parameters["clock"]),
+    suspense: suspenseOf(parameters["suspense"])
   };
 };
 

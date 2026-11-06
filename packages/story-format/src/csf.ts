@@ -246,6 +246,14 @@ export type StoryParameters = {
    */
   readonly height?: number;
   /**
+   * How the frame waits for what the story loads (a React or Vue `Suspense` boundary still showing its fallback) before
+   * it says the story is ready, so no check reads the fallback for the story. `expected: true` is for a story meant to
+   * stay there, a loading state: it is ready at once, and its play function may look at the fallback. `timeout` is the
+   * most to wait, in milliseconds, 10000 by default; past it the story is `pending`, which every check reads as not
+   * verified. The wait may run twice, before and after a play; `forgebook check` stops listening at 30000 and a generated test at 25000. In a catalogue's preview, for every story.
+   */
+  readonly suspense?: { readonly expected?: boolean; readonly timeout?: number };
+  /**
    * Whether the story is meant for a phone: it starts touched with the catalogue's simulated finger, whatever the
    * toolbar's Touch switch says, and its example and its page offer to turn that off for it. On a meta, for every
    * story of the file; a story's own `false` leaves it out. Written plainly (`touch: true`, the index reads it).
