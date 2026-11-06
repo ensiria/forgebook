@@ -58,7 +58,7 @@ const DEFAULT_FILES = "**/*.@(mdx|stories.@(js|jsx|mjs|ts|tsx))";
 const SCRIPT_EXTENSIONS = ["ts", "mts", "tsx", "js", "mjs", "cjs", "jsx"];
 
 /** Whether a value is a plain object. */
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+export const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
@@ -326,7 +326,7 @@ export const previewSwitches = (
  *
  * @param dir - the project's folder.
  */
-const projectTitle = (dir: string): string => {
+export const projectTitle = (dir: string): string => {
   const manifest = projectManifest(dir);
   return typeof manifest["name"] === "string" && manifest["name"] !== "" ? manifest["name"] : basename(dir);
 };
@@ -336,7 +336,7 @@ const projectTitle = (dir: string): string => {
  *
  * @param dir - the project's folder.
  */
-const projectManifest = (dir: string): Readonly<Record<string, unknown>> => {
+export const projectManifest = (dir: string): Readonly<Record<string, unknown>> => {
   const file = join(dir, "package.json");
   const parsed: unknown = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
   return isRecord(parsed) ? parsed : {};
@@ -382,16 +382,22 @@ const loadedMain = async (
 };
 
 /**
+ * The Storybook folder of a project: the first of Storybook's folders that holds a `main`.
+ *
+ * @param projectDir - the project's folder, absolute.
+ * @returns its path, or none for a project without one.
+ */
+export const findStorybookDir = (projectDir: string): string | undefined =>
+  STORYBOOK_DIRS.map((name) => join(projectDir, name)).find((dir) => scriptFile(dir, "main") !== undefined);
+
+/**
  * Reads a project's Storybook configuration.
  *
  * @param projectDir - the project's folder, absolute.
  * @returns what a Forgebook configuration takes from it, or why it cannot be read.
  */
 export const importStorybook = async (projectDir: string): Promise<ImportedConfig | string> => {
-  const found = STORYBOOK_DIRS.map((name) => join(projectDir, name)).find(
-    (dir) => scriptFile(dir, "main") !== undefined
-  );
-  const storybookDir = found ?? join(projectDir, STORYBOOK_DIRS[0] ?? ".storybook");
+  const storybookDir = findStorybookDir(projectDir) ?? join(projectDir, STORYBOOK_DIRS[0] ?? ".storybook");
   const mainFile = scriptFile(storybookDir, "main");
   if (mainFile === undefined) return `No .storybook/main (or .rnstorybook/main) file in ${projectDir}`;
   const main = await loadedMain(mainFile, projectDir);

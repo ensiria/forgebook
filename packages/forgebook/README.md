@@ -47,9 +47,87 @@ sidebar's index, kept with the files they were read from, so a later start answe
 TypeScript until one of those files, a configuration or the lock file changes. Removing `node_modules/.vite` starts from
 nothing.
 
+## Start with one command
+
+```sh
+npx forgebook init
+```
+
+It asks nothing, so an agent can run it. In the folder of the package that holds the components, it reads the framework
+(React, Vue, Svelte, Solid, Preact, Lit, Angular, Next.js, Nuxt, SvelteKit, React Native Web) and the package manager
+from the project's files, and writes:
+
+- `forgebook.config.ts`: the adapter, the title, and story globs over the folders that exist;
+- `forgebook.preview.ts` (`.tsx` where stories are), when the app loads global style sheets: the imports of its entry
+  (Vite's `index.css`, a Next.js root layout's `globals.css`, a SvelteKit layout's, `angular.json`'s `styles`), since
+  stories look wrong without them. Nuxt's adapter reads `css` from `nuxt.config` itself, so it needs none.
+
+Then it prints what is left, each thing named, and the next commands. The packages to add are in the exact command of
+the project's package manager; `--install` runs it. It lists React and Vite even on Vue, say, because Forgebook's shell
+needs them and not every package manager installs a peer by itself.
+
+```sh
+npx forgebook new src/Badge.tsx   # a component's first stories
+npx forgebook dev                 # the catalogue, live
+npx forgebook stories --json      # what it lists, and what did not read
+```
+
+It writes nothing and exits with an error when:
+
+- a file is already there (a configuration or a preview, under any name it is read by): `--force` replaces it;
+- `package.json` names no framework it supports, or two that stand on their own: `--framework <name>` chooses (`html`
+  for no framework). An adapter already in `package.json` settles it;
+- a framework, React or Vite in `package.json` cannot reach the version Forgebook takes: the message names each.
+
+- the project has a `.storybook` (or `.rnstorybook`) folder: `--from storybook` takes [that route](#from-storybook),
+  which loads its `main` and so runs its code, or `--framework <name>` starts from the dependencies;
+- a file it would write is a link: it never writes through one, even with `--force`.
+
+`init` runs no code of the project unless `--from storybook` or `--install` asks it to; `--install` is an install like
+any other, with the project's package manager settings and the packages' scripts. `--json` prints the result as a document, a refusal
+too (`refused`, `message`, `hint`, `supported`, exit code 1; a wrong command line is exit code 2, with no document), with `nextSteps` as `{ kind, file, message }`: `kind` is `style-sheet`,
+`provider`, `portal`, `head`, `font`, `alias`, `vite-plugin`, `postcss`, `setup`, `version` or `storybook`.
+
+### What init cannot work out
+
+A catalogue runs no entry of the app and reads no `vite.config`, so what those do for the app does not happen for a
+story. Each of these is reported with the file it was read from:
+
+- **Providers**, the components that wrap the app, and what it installs (`app.use(router)`, `provideRouter()`): a decorator
+  in the preview gives them to the stories that need them.
+- **Portals**: an element beside the app's root in its page (`#modal-root`). A decorator adds it.
+- **The page's head**: a font's or a CDN's `<link>` goes to `head` in the configuration.
+- **Vite plugins and aliases**: Tailwind's plugin, `resolve.alias`, `tsconfig.json`'s `paths`. Without its alias, a story
+  whose component imports through one does not draw. They go through the adapter:
+
+  ```ts
+  // forgebook.config.ts
+  import { react } from "@forgebook/react/vite";
+  import tailwindcss from "@tailwindcss/vite";
+  import { defineConfig } from "forgebook";
+
+  const adapter = react();
+
+  export default defineConfig({
+    framework: {
+      ...adapter,
+      vitePlugins: async () => [
+        ...((await adapter.vitePlugins?.()) ?? []),
+        tailwindcss(),
+        { name: "project-aliases", config: () => ({ resolve: { tsconfigPaths: true } }) }
+      ]
+    },
+    title: "My components",
+    stories: ["src/**/*.stories.tsx"]
+  });
+  ```
+
+- **PostCSS**: a `postcss.config` is run by the Next.js and React Native Web adapters only; the others compile style
+  sheets with Lightning CSS, so Tailwind goes through its Vite plugin, as above.
+
 ## A first catalogue
 
-A component, with its props typed and documented:
+The same by hand, which is also what the command writes. A component, with its props typed and documented:
 
 ```tsx
 // src/Badge.tsx
@@ -773,6 +851,8 @@ and whose root holds the stories, with the paths to the packages' sources, gets 
 It does not read MDX, doc blocks or addons. Actions are explicit only: an `on*` prop is not turned into an action by
 its name.
 
+### From Storybook
+
 To try it on a Storybook project, run `npx forgebook init --from storybook` in the folder that holds `.storybook`. It
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
 and a switch for each toolbar global of the preview, applied by code as its decorators expect. `main` is loaded, so a
@@ -871,7 +951,7 @@ export default defineConfig({
 | `forgebook prebundle` | Pre-bundles the catalogue's dependencies, as `dev` does on a first start: before it, in CI or an image |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
-| `forgebook init --from storybook` | Writes `forgebook.config.ts` from a project's `.storybook` (or on-device `.rnstorybook`) folder: its framework, story globs, preview and toolbar globals |
+| `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
