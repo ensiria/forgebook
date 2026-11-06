@@ -59,7 +59,7 @@ import { type LazyModule, lazyModule } from "./lazyModule.tsx";
 import { type LoadPluginHosts, PluginHostsContext } from "./pluginHostsContext.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
-import { SidebarEdge } from "./SidebarHandle.tsx";
+import { SidebarShade } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
 import { StoryPicker } from "./StoryPicker.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
@@ -599,9 +599,10 @@ const ShellHeader = ({
       </div>
     ) : null}
     {message === undefined ? null : (
-      <p className="forgebook-empty" role="alert">
-        {message}
-      </p>
+      // the message is all the page has: a heading of its own names the page, inside the alert that announces it
+      <div role="alert">
+        <h1 className="forgebook-empty">{message}</h1>
+      </div>
     )}
     {location === undefined ? null : (
       <header className="forgebook-header">
@@ -921,6 +922,7 @@ const ShellPage = ({
     <div className="catalogue">
       <Sidebar
         width={sidebarWidth}
+        onWidthChange={setSidebarWidth}
         isOpen={isSidebarOpen}
         isOverlay={isSidebarOverlay}
         sidebarRef={sidebarRef}
@@ -949,13 +951,7 @@ const ShellPage = ({
           openPage(titledPage(idsByTitle, sourceId, componentTitle))
         }
       />
-      <SidebarEdge
-        isOverlay={isSidebarOverlay}
-        isOpen={isSidebarOpen}
-        width={sidebarWidth}
-        onWidthChange={setSidebarWidth}
-        onHide={hideSidebar}
-      />
+      <SidebarShade isOverlay={isSidebarOverlay} isOpen={isSidebarOpen} onHide={hideSidebar} />
       {/* under a sidebar lying over it, the page leaves Tab, screen readers and the pointer */}
       <main className="forgebook-main" inert={isSidebarOver}>
         <ShellBar

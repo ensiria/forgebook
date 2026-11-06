@@ -35,12 +35,12 @@ test.describe("docs blocks", () => {
     ]);
     const tones = await asides.evaluateAll((each) => each.map((aside) => aside.getAttribute("data-tone")));
     expect(tones.slice(5)).toEqual(["note", "tip", "important", "caution", "danger"]);
-    await expect(page.getByRole("complementary", { name: "Danger" }).first()).toContainText("what breaks");
+    await expect(page.getByRole("note", { name: "Danger" }).first()).toContainText("what breaks");
   });
 
   test("draws a story inside an aside and inside a step", async ({ page }) => {
     await page.goto(BLOCKS);
-    const inAside = page.getByRole("complementary", { name: "A tip with its own title" }).locator("iframe");
+    const inAside = page.getByRole("note", { name: "A tip with its own title" }).locator("iframe");
     await expect(inAside.contentFrame().locator("html")).toHaveAttribute("data-forgebook-status", "ready");
     await reach(page, ".forgebook-steps");
     await expect(page.locator(".forgebook-steps__step")).toHaveCount(3);

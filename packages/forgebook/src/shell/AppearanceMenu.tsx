@@ -26,7 +26,7 @@ const ICONS: Readonly<Record<Appearance, IconName>> = {
  * @param props - the appearance shown and its setter.
  */
 export const AppearanceMenu = ({ appearance, setAppearance, offered }: AppearanceState): ReactNode => {
-  const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
+  const { isOpen, isDrawn, setIsOpen, closeAfterChoice, buttonRef, panelRef, panelId } = usePopover();
   const name = useId();
   return (
     <div className="forgebook-appearance">
@@ -59,7 +59,7 @@ export const AppearanceMenu = ({ appearance, setAppearance, offered }: Appearanc
                   checked={each === appearance}
                   onChange={(): void => {
                     setAppearance(each);
-                    setIsOpen(false);
+                    closeAfterChoice();
                   }}
                 />
                 <Icon name={ICONS[each]} size={14} />
