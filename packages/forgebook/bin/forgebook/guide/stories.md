@@ -10,6 +10,10 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not
   list is outside the globs, left out by a `!` one, or refused by Vite's `server.fs.deny` (the dev server warns): put it
   where they list it, or change the globs on purpose.
+- A story glob that matches nothing stops `forgebook build`, `stories`, `check` and `verify` with an exit code of 1 and
+  names the glob; `forgebook dev` warns, and `list_stories` carries it in `problems` until a file matches. A misspelt
+  configuration key, a toolbar naming no control and a file that does not load (`file:line:column` for a syntax error)
+  stop every command the same way, so read the message before looking elsewhere.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
   the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the
@@ -29,7 +33,8 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
 - Add a worst case: very long text, words without spaces, huge numbers (`forgebook new` writes one).
-- A link or an embed may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the
+- A link or an embed may carry the Props tab's values (`args=` in the address, as JSON or in a Storybook link's form,
+  `label:Hello+world;count:5;open:!true`; what a story cannot take is listed above it, by name). The catalogue applies only the
   props the story's panel can set, with a value of their type; to show a story with other values, write a story with
   those args rather than a link.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.

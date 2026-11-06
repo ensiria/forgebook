@@ -19,6 +19,7 @@ import {
   checkedArgsMessage,
   type DroppedArg
 } from "../addressArgs.ts";
+import type { AddressLink } from "../addressArgsParam.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
 import { type PanelArgs, panelArgsParam } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
@@ -65,6 +66,8 @@ const NO_NAMED_VALUES: NamedValues = {};
 export type AddressArgsInput = {
   /** The values the address names. */
   readonly panelArgs: PanelArgs;
+  /** What else the address says of them: how to type them, and which could not be read. */
+  readonly link: AddressLink | undefined;
   /** The component's docs. */
   readonly docs: Loaded<ComponentDocs>;
   /** The story's own args its frame reported; none before it is ready. */
@@ -105,13 +108,14 @@ export type AddressArgs = {
  * @param input - the address's values and what the stage knows of the story.
  */
 export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
-  const { panelArgs, docs, storyArgs, argTypes, controls, frames } = input;
+  const { panelArgs, link, docs, storyArgs, argTypes, controls, frames } = input;
+  const typeValue = link?.typeValue;
   const namedValues = input.namedValues ?? NO_NAMED_VALUES;
   const checked = useMemo((): CheckedArgs | undefined => {
     const ready = storyArgs === undefined ? undefined : { args: storyArgs, argTypes, controls };
     const declaration = declarationOf(docs, ready, namedValues);
-    return declaration === undefined ? undefined : checkedAddressArgs(panelArgs, declaration);
-  }, [panelArgs, docs, storyArgs, argTypes, controls, namedValues]);
+    return declaration === undefined ? undefined : checkedAddressArgs(panelArgs, declaration, typeValue);
+  }, [panelArgs, typeValue, docs, storyArgs, argTypes, controls, namedValues]);
   const acceptedParam = checked === undefined ? undefined : panelArgsParam(checked.accepted);
   // the values reach the frames from the address, so going back in the history sets them too; compared as text, so a
   // frame is told again only when they change
@@ -121,14 +125,18 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     if (acceptedParam === undefined || sealedRef.current === undefined) return;
     tellFrames(frames.current, checkedArgsMessage(sealedRef.current));
   }, [acceptedParam, frames]);
+  // said with the check's: the note's button keeps what the story accepts, which is not known before
+  const unread = (link?.unread ?? []).map((name): DroppedArg => ({ name, reason: "unreadable" }));
   return {
     accepted: checked?.accepted ?? NO_ARGS,
     checked: checked?.sealed,
-    dropped: checked?.dropped ?? NOTHING_DROPPED,
+    dropped: checked === undefined ? NOTHING_DROPPED : [...unread, ...checked.dropped],
     acceptedParam,
     acceptedFor: (message: ReadyDeclaration): AcceptedArgs | undefined => {
       const declaration = declarationOf(docs, message, namedValues);
-      return declaration === undefined ? undefined : checkedAddressArgs(panelArgs, declaration).sealed;
+      return declaration === undefined
+        ? undefined
+        : checkedAddressArgs(panelArgs, declaration, typeValue).sealed;
     }
   };
 };

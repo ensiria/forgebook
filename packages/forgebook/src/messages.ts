@@ -220,18 +220,22 @@ export type ShellMessage =
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/**
+ * Whether a value is one the panel can show.
+ *
+ * @param value - any value.
+ */
+export const isArgValue = (value: unknown): value is ArgValue =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "number" ||
+  typeof value === "boolean" ||
+  isChoiceList(value) ||
+  isNamedArg(value);
+
 /** Whether a value is a set of args the panel can show. */
 export const isPanelArgs = (value: unknown): value is PanelArgs =>
-  isRecord(value) &&
-  Object.values(value).every(
-    (arg) =>
-      arg === null ||
-      typeof arg === "string" ||
-      typeof arg === "number" ||
-      typeof arg === "boolean" ||
-      isChoiceList(arg) ||
-      isNamedArg(arg)
-  );
+  isRecord(value) && Object.values(value).every(isArgValue);
 
 /**
  * Whether a value is a multiple choice's values: a list of texts and numbers.

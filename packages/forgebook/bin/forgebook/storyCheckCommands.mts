@@ -9,7 +9,7 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { checkText } from "./agentText.ts";
-import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runStoryCheck } from "./storyCheckRun.ts";
 
@@ -62,7 +62,7 @@ export const storyCheckCommands = (
       }
     ],
     run: async ({ args, options, io, isJson, style }): Promise<void> => {
-      const config = await configOf(options.config);
+      const config = await configWithStoriesOf(options.config);
       const report = await runStoryCheck(
         config,
         options.url,

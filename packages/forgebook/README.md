@@ -245,7 +245,7 @@ too, with a warning.
   Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
   `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
   (`onclick`, `innerHTML`, a text for a number) is left out and listed above the story, with a button that removes it
-  from the address. A value that is code never comes from a link.
+  from the address, as is one that cannot be read at all. A value that is code never comes from a link.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break and every number a huge one, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
@@ -825,6 +825,14 @@ cannot load (it uses one so, or one of its own files reads `document`) leaves th
 answers working: it is left out of them and named among their problems, with what it used. A
 `**` pattern skips `node_modules` unless it names it.
 
+A link keeps working too: `args=` reads Storybook's form (`label:Hello+world;count:5;open:!true;tags[0]:a;tags[1]:b`,
+with `!null`, `!hex(…)`, `!rgb(…)`, `!hsl(…)` and `!date(…)`) as well as Forgebook's own JSON, told apart by JSON's first
+`{`. Its values are typed by the prop that receives them, so `5` is a number for a number and stays `5` for a text, and they
+meet the same check as any link's. Forgebook writes its own form once a value changes in the panel. What an arg here
+cannot hold (an object such as `style.color:red`, a list with a gap, `!undefined`) is named above the story, not dropped
+in silence. An arg's `argTypes.<name>.if` (`{ arg: "kind", eq: "link" }`, `{ global: "theme", neq: "dark" }`, with `truthy`,
+`exists`, `eq` or `neq`) hides its control the same way Storybook's does, and leaves its value alone.
+
 It lists what Storybook's indexer lists:
 
 - every named export as a story, whatever writes its value: an object, a function, a helper's result
@@ -942,6 +950,23 @@ export default defineConfig({
   such a prop `argTypes` options (`{ control: "select", options: [...] }`) to keep a link to them. `forgebook story` answers `"componentDocs": "off"`
   with no `docs`, and `forgebook changed` says it finds no story through the imports. `forgebook docs` and `forgebook new`
   still read the types when run, since they are asked for that. `usedIn: true` with it is an error.
+
+## When a configuration is refused
+
+Everything below stops every command with an exit code of 1 and a message that names the mistake, and a Vite build with
+the plugin too, since each would otherwise give a catalogue that looks right and is not:
+
+- **A key nothing reads.** `toolbr: […]` says `it has no key "toolbr". Did you mean toolbar?`; a preset's keys and those of
+  `build`, `shell`, `a11y`, `backgrounds`, `widthRange` and `controls` are checked too. An adapter's and a plugin's options
+  are their own functions' arguments, so nothing adds a key to the configuration.
+- **A toolbar, a key or a view the shell cannot use**, as [the toolbar](#the-toolbar) says.
+- **A file that does not load.** A syntax error is named as `/path/forgebook.config.ts:3:3: …`, in the configuration or in a
+  TypeScript file it imports. In a JavaScript file it imports, Node gives no place, and the message names the configuration.
+- **A story pattern that matches nothing**, for `forgebook build`, `stories`, `check` and `verify`: each pattern is read on
+  its own, so a mistaken one beside one that works is named as well, and what a `!` pattern leaves out does not count.
+  `forgebook dev` warns instead and opens a home that says where it looks, since you may be about to write the first story;
+  saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
+  may match nothing.
 
 ## Commands
 

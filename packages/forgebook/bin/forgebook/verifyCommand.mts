@@ -10,7 +10,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { catalogueClient } from "./agentClient.ts";
 import { verifyText } from "./agentText.ts";
-import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { runStoriesCheck } from "./storyCheckRun.ts";
 import { isVerifyFailure, runVerify } from "./verifyRun.ts";
 
@@ -50,7 +50,7 @@ export const verifyCommands = (
       { command: `${COMMAND} verify --quick`, description: "While you work: the default view of each story." }
     ],
     run: async ({ options, io, log, isJson, style }): Promise<void> => {
-      const config = await configOf(options.config);
+      const config = await configWithStoriesOf(options.config);
       const client = await catalogueClient(config, options.url);
       try {
         const document = await runVerify(

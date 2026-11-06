@@ -23,7 +23,14 @@ import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
 import { buildFailureText } from "./buildFailure.ts";
 import { settleAgentIndex } from "./builtCatalogue.ts";
-import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
+import {
+  askCatalogue,
+  COMMAND,
+  configOf,
+  configWithStoriesOf,
+  FORGEBOOK_OPTIONS,
+  printAnswer
+} from "./catalogueCommands.ts";
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
 import { devCommands } from "./devCommands.mts";
 import { guideCommands } from "./guideCommand.mts";
@@ -70,7 +77,10 @@ await defineCommands({
         }
       ],
       run: async ({ options, log }): Promise<void> => {
-        const config = withReadableNames(await configOf(options.config), options["readable-names"]);
+        const config = withReadableNames(
+          await configWithStoriesOf(options.config),
+          options["readable-names"]
+        );
         const outDir = resolve(config.dir, options.out ?? "dist");
         const vite = await catalogueVite(config, {
           ...(options.base === undefined ? {} : { base: options.base }),
@@ -123,7 +133,7 @@ await defineCommands({
         { command: `${COMMAND} stories --component button --json`, description: "The buttons, as JSON." }
       ],
       run: async ({ options, io, log, isJson, style }): Promise<void> => {
-        const config = await configOf(options.config);
+        const config = await configWithStoriesOf(options.config);
         const params = new URLSearchParams({
           view: options.view ?? "",
           usedIn: String(options["used-in"] === true)

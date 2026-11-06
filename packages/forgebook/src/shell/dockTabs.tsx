@@ -14,6 +14,7 @@
 import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 
+import { isArgShown } from "../argConditions.ts";
 import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
 import { type ComponentDocs, codeNameOf, type PropDocs } from "../componentDocs.ts";
 import type { ArgValue, PanelArgs } from "../messages.ts";
@@ -71,6 +72,8 @@ export type DockTabsInput = {
   readonly actions: readonly string[];
   /** The values of the moment: the story's args with the panel's over them. */
   readonly values: PanelArgs;
+  /** The switches' values of the moment, for the args whose `argTypes.if` reads a global. */
+  readonly globals: Readonly<Record<string, unknown>>;
   /** Called with a changed value; `undefined` removes the panel's value. */
   readonly onValueChange: (name: string, value: ArgValue | undefined) => void;
   /** Removes every value the panel set. */
@@ -115,8 +118,11 @@ const notice = (text: string, isProblem: boolean): ReactNode => (
  * @param input - what the tabs are built from.
  * @param props - the props, from the types with the `argTypes` laid over them.
  */
-const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] =>
-  props.some((prop) => prop.kind !== "event")
+const propsTab = (input: DockTabsInput, all: readonly PanelProp[]): DockTab[] => {
+  // the condition is the moment's, so it is tested here and not where the props are declared: a value set while an arg
+  // is hidden, from the address or the story, is still the story's
+  const props = all.filter((prop) => isArgShown(input.argTypes[prop.name]?.if, input.values, input.globals));
+  return props.some((prop) => prop.kind !== "event")
     ? [
         {
           id: "props",
@@ -138,6 +144,7 @@ const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] 
         }
       ]
     : [];
+};
 
 /**
  * The events the Events tab lists: the component's, then the story's actions its types do not name.

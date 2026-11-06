@@ -14,6 +14,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { checkedArgsMessage } from "../addressArgs.ts";
+import type { AddressLink } from "../addressArgsParam.ts";
 import { panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
 import { type ArgValue, type PanelArgs, panelArgsParam, type ShellMessage } from "../messages.ts";
@@ -110,6 +111,8 @@ export type StageProps = {
    * unchecked; the stage hands the frames only those the story declares.
    */
   readonly panelArgs: PanelArgs;
+  /** What else the address says of the values: how to type them, and which could not be read. */
+  readonly addressLink: AddressLink | undefined;
   /** Called with the panel's changed values. */
   readonly onPanelArgsChange: (args: PanelArgs) => void;
   /** The matrix's axes (kept in the address): the rows' prop, then the columns'; empty draws the story alone. */
@@ -155,7 +158,7 @@ const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
  * frame, so the device chosen is left out: the embed is the story at the width its iframe gives it.
  *
  * @param view - the reader's view, without what the story fixes, which the story fixes again.
- * @param panelArgs - the values set in the panel.
+ * @param panelArgs - the values set in the panel, once checked: typed, and only those the story takes.
  * @param switches - the catalogue's switches.
  */
 const embedQuery = (view: ViewState, panelArgs: PanelArgs, switches: readonly ViewSwitch[]): string => {
@@ -187,6 +190,7 @@ export const Stage = ({
   onViewChange: onOwnViewChange,
   onFixedChange,
   panelArgs,
+  addressLink,
   onPanelArgsChange,
   matrixAxes,
   onMatrixAxesChange,
@@ -249,6 +253,7 @@ export const Stage = ({
   // the address's values reach the frames only once checked against what the story declares
   const addressArgs = useAddressArgs({
     panelArgs,
+    link: addressLink,
     docs,
     storyArgs: storyArgs.get(story.id),
     argTypes: panel.argTypes,
@@ -385,6 +390,7 @@ export const Stage = ({
     controls: panel.controls,
     actions: panel.actions,
     values,
+    globals: view.switches,
     onValueChange: changeValue,
     onReset: (): void => onPanelArgsChange({}),
     worstCase: worstCase.state,
@@ -424,7 +430,7 @@ export const Stage = ({
               frameAddress={frameAddress(frameUrl, story.id, view, switches)}
               embed={{
                 title,
-                query: embedQuery(ownView, panelArgs, switches),
+                query: embedQuery(ownView, acceptedArgs, switches),
                 height: embedHeight(view, reportedHeight ?? lastHeight, story)
               }}
             />

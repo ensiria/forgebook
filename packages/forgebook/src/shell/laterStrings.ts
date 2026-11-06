@@ -94,7 +94,11 @@ export const LATER_STRINGS = lateStrings({
   examples: "Examples",
   pageError: "The component's page could not be read",
   droppedArgs: "The link sets values this story does not take; they were left out:",
-  droppedArgReasons: { undeclared: "not one of its props", type: "not of the prop's type" },
+  droppedArgReasons: {
+    undeclared: "not one of its props",
+    type: "not of the prop's type",
+    unreadable: "its value could not be read"
+  },
   removeDroppedArgs: "Remove them from the address",
   events: "Events",
   calls: "Calls",
