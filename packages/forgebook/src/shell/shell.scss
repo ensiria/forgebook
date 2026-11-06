@@ -1091,7 +1091,8 @@
   .forgebook-popover.forgebook-popover--up {
     top: auto;
     bottom: calc(100% - $space-1);
-    left: $space-3;
+    // the sidebar clips what passes its edge: its panel fits a sidebar at its narrowest
+    left: $space-2;
     transform-origin: bottom left;
   }
 
