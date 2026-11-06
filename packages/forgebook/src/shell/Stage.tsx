@@ -385,8 +385,9 @@ export const Stage = ({
       address: deviceAddress(frameAddress(frameUrl, story.id, view, switches), framed),
       width: framed?.area.width ?? view.width,
       background: backgroundOf(view),
-      // as the frames receive them: checked, and typed
-      args: acceptedArgs,
+      // a link whose form does not say the types needs the check's values; these are told once, when the aside's frame is
+      // ready, and the check may still be waiting for the docs, so the address's own go for a form that says them
+      args: addressLink?.typeValue === undefined ? panelArgs : acceptedArgs,
       view: liveView(view)
     }
   });

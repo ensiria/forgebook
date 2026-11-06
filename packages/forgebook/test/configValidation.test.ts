@@ -7,7 +7,8 @@
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -99,10 +100,15 @@ describe("loadConfigFile", () => {
 
 describe("placeInStack", () => {
   it("reads Node's decorated stack, and nothing else", () => {
-    const stack = 'file:///a/b.ts:3\n  title: "x"\n  framework: 1,\n  ^^^^^^^^^\n};\n\nSyntaxError [X]: y';
-    expect(placeInStack(stack)).toEqual({ file: "/a/b.ts", line: 3, column: 3 });
-    expect(placeInStack(stack.replace("file://", ""))).toEqual({ file: "/a/b.ts", line: 3, column: 3 });
+    const file = resolve("/a/b.ts");
+    const rest = '\n  title: "x"\n  framework: 1,\n  ^^^^^^^^^\n};\n\nSyntaxError [X]: y';
+    expect(placeInStack(`${pathToFileURL(file).href}:3${rest}`)).toEqual({ file, line: 3, column: 3 });
+    expect(placeInStack(`${file}:3${rest}`)).toEqual({ file, line: 3, column: 3 });
     expect(placeInStack("SyntaxError: y\n    at z (node:internal:1:1)")).toBeUndefined();
+  });
+
+  it("reads a Windows path", () => {
+    expect(placeInStack("C:\\a\\b.ts:2\n^^^\n")).toEqual({ file: "C:\\a\\b.ts", line: 2, column: 1 });
   });
 });
 
