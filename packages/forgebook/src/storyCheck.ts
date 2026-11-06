@@ -61,6 +61,8 @@ export type StoryCheckRequest = {
   readonly views: readonly string[];
   /** Check every variant the catalogue's browser tests check instead of the views given. */
   readonly isAllVariants: boolean;
+  /** How many pages to open at once; one by default. */
+  readonly concurrency?: number;
   /** The model that judges what axe cannot see; none leaves the pages on this machine. */
   readonly semantic?: SemanticModel;
 };

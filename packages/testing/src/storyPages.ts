@@ -134,7 +134,7 @@ export const openedStory = async (page: Page, storyPage: StoryPage): Promise<Fra
 
 /**
  * Visits every story page of a request on one browser, each on a page in a context of its own (axe asks for one, and no
- * story's storage reaches the next).
+ * story's storage reaches the next), as many at once as the request says.
  *
  * @param request - the request.
  * @param visit - what to do on each: its answer is collected.
@@ -146,15 +146,28 @@ export const eachStoryPage = async <TResult>(
 ): Promise<TResult[]> => {
   const browser = await chromium.launch();
   try {
+    const pages = storyPagesOf(request);
     const answers: TResult[] = [];
-    for (const storyPage of storyPagesOf(request)) {
-      const context = await browser.newContext();
-      try {
-        answers.push(await visit(await context.newPage(), storyPage));
-      } finally {
-        await context.close();
+    let next = 0;
+    // each page has a context of its own, so nothing is shared but the browser; answers keep the request's order
+    const worker = async (): Promise<void> => {
+      while (next < pages.length) {
+        const index = next;
+        next += 1;
+        const storyPage = pages[index];
+        if (storyPage === undefined) return;
+        const context = await browser.newContext();
+        try {
+          answers[index] = await visit(await context.newPage(), storyPage);
+        } finally {
+          await context.close();
+        }
       }
-    }
+    };
+    const { concurrency = 1 } = request;
+    // a value that is no count must not start no worker: an empty report reads as a pass
+    const workers = Number.isInteger(concurrency) && concurrency > 1 ? concurrency : 1;
+    await Promise.all(Array.from({ length: workers }, worker));
     return answers;
   } finally {
     await browser.close();

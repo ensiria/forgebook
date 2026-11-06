@@ -18,7 +18,6 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import type { StoryCheckReport } from "../../src/storyCheck.ts";
 import type { ChangedStoriesDocument } from "../../src/vite/agent.types.ts";
 import { isChangedStoriesDocument, isFoundComponentsDocument } from "../../src/vite/agentApi.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
@@ -29,7 +28,8 @@ import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } f
 import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { storyCheckCommands } from "./storyCheckCommands.mts";
-import { runPageCheck, runStoryCheck, runStoryShot } from "./storyCheckRun.ts";
+import { runPageCheck, runStoryShot } from "./storyCheckRun.ts";
+import { verifyCommands } from "./verifyCommand.mts";
 import { BASELINES_FOLDER, updateBaselines } from "./visualCommands.mts";
 
 /**
@@ -92,6 +92,7 @@ export const agentLoopCommands = (
   forgebook: CommandScope<ForgebookOptions>
 ): Readonly<Record<string, CommandNode>> => ({
   ...storyCheckCommands(forgebook),
+  ...verifyCommands(forgebook),
   find: forgebook.command({
     summary: "Find components by what they are for, in your own words.",
     json: true,
@@ -138,44 +139,6 @@ export const agentLoopCommands = (
       const body = await changedOf(config, options, log);
       const text = body.stories.map((story) => story.id).join("\n");
       io.stdout.write(isJson ? formatJson(body) : `${text === "" ? "No story touched." : text}\n`);
-    }
-  }),
-  verify: forgebook.command({
-    summary: "Run the catalogue's checks on every story a change touches, with one exit code.",
-    json: true,
-    options: {
-      since: {
-        type: "string",
-        valueName: "ref",
-        description: "The commit to compare with; HEAD by default, so what is not committed."
-      },
-      url: URL_OPTION
-    },
-    examples: [
-      { command: `${COMMAND} verify`, description: "Before you say a change is done." },
-      { command: `${COMMAND} verify --since origin/develop --json`, description: "In a pull request." }
-    ],
-    run: async ({ options, io, log, isJson, style }): Promise<void> => {
-      const config = await configOf(options.config);
-      const { stories, files } = await changedOf(config, options, log);
-      const reports: StoryCheckReport[] = [];
-      for (const story of stories) {
-        const report = await runStoryCheck(config, options.url, {
-          id: story.id,
-          views: [],
-          isAllVariants: false
-        });
-        if (typeof report === "string") throw new ScriptError(report);
-        reports.push(report);
-      }
-      const problems = reports
-        .flatMap((report) => report.results)
-        .reduce((sum, each) => sum + each.problems.length, 0);
-      const text =
-        reports.length === 0 ? "No story touched." : reports.map((each) => checkText(each, style)).join("\n");
-      io.stdout.write(isJson ? formatJson({ schema: 1, files, stories, reports, problems }) : `${text}\n`);
-      if (problems > 0)
-        throw new ScriptError(`${problems} problems`, { exitCode: EXIT.failure, isReported: true });
     }
   }),
   "check-page": forgebook.command({

@@ -6,7 +6,9 @@
  * `--output=…` for an option and overwrites a file. The diff asks for one fixed form whatever the user's git settings,
  * since colours, external diff tools and other prefixes all read as an empty change, which is a check passing with
  * nothing checked. A change starts where the branch left `since`, or what `since` gained afterwards is read as this
- * change's.
+ * change's. A branch's committed work counts as its change, so a check run after a commit does not find nothing and
+ * pass: `branchStart` names the default branch to start from, and a clone with no history to find the start in is told
+ * apart from a name that means nothing.
  *
  * @module
  */
@@ -40,8 +42,15 @@ export type GitChange = {
 export const gitOutput = async (dir: string, ...args: readonly string[]): Promise<string> =>
   (await run("git", ["-c", "core.quotePath=false", ...args], { cwd: dir, maxBuffer: MAX_OUTPUT })).stdout;
 
-/** The lines of a list git wrote. */
-const listed = (text: string): readonly string[] => text.split("\n").filter((line) => line !== "");
+/**
+ * The names of a list git wrote with `-z`: otherwise it quotes a name that holds a quotation mark or a tab, which then
+ * matches no file and no rule.
+ */
+const listed = (text: string): readonly string[] => text.split("\0").filter((name) => name !== "");
+
+/** The new files git does not track, in the whole repository: from a subfolder it would list that folder's only. */
+const untrackedFiles = async (root: string): Promise<readonly string[]> =>
+  listed(await gitOutput(root, "ls-files", "-z", "--others", "--exclude-standard", "--full-name"));
 
 /**
  * The commit a change starts from.
@@ -62,20 +71,64 @@ export const changeBase = async (dir: string, since: string): Promise<string | u
 };
 
 /**
+ * Why a change has no start, in words that say what to do: a shallow clone, which is CI's default, knows the commit and
+ * not what it shares with this one.
+ *
+ * @param dir - a folder of the repository.
+ * @param since - a commit, as asked.
+ */
+export const noBaseReason = async (dir: string, since: string): Promise<string> => {
+  try {
+    await gitOutput(dir, "rev-parse", "--verify", "--quiet", "--end-of-options", `${since}^{commit}`);
+    return `"${since}" shares no history with this commit here: in a shallow clone, fetch the whole history (fetch-depth: 0)`;
+  } catch {
+    return `"${since}" names no commit here`;
+  }
+};
+
+/** The branches a repository's work usually starts from, when its remote names none. */
+const USUAL_DEFAULT_BRANCHES = ["origin/main", "origin/master", "main", "master"];
+
+/**
+ * Where a branch's work starts when nobody says: the default branch, or `HEAD` when there is none to start from. On the
+ * default branch itself that is what is not pushed.
+ *
+ * @param dir - a folder of the repository.
+ * @returns the name to compare with.
+ */
+export const branchStart = async (dir: string): Promise<string> => {
+  const named = await gitOutput(dir, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD").catch(
+    () => ""
+  );
+  for (const branch of [named.trim(), ...USUAL_DEFAULT_BRANCHES]) {
+    if (branch !== "" && (await changeBase(dir, branch)) !== undefined) return branch;
+  }
+  return "HEAD";
+};
+
+/** The files a change touches. */
+export type ChangedFiles = {
+  /** The repository's folder. */
+  readonly root: string;
+  /** The files, tracked or new, relative to it. */
+  readonly files: readonly string[];
+  /** Those it deletes. */
+  readonly deleted: readonly string[];
+};
+
+/**
  * The files a change touches, tracked or new.
  *
  * @param dir - a folder of the repository.
  * @param base - the commit it starts from.
- * @returns the repository's folder, and the files relative to it.
+ * @returns the repository's folder, the files relative to it, and which of them it deletes.
  */
-export const changedFiles = async (
-  dir: string,
-  base: string
-): Promise<{ readonly root: string; readonly files: readonly string[] }> => {
+export const changedFiles = async (dir: string, base: string): Promise<ChangedFiles> => {
   const root = (await gitOutput(dir, "rev-parse", "--show-toplevel")).trim();
-  const tracked = listed(await gitOutput(dir, "diff", "--no-ext-diff", "--name-only", base, "--"));
-  const untracked = listed(await gitOutput(dir, "ls-files", "--others", "--exclude-standard", "--full-name"));
-  return { root, files: [...new Set([...tracked, ...untracked])] };
+  const names = ["--no-ext-diff", "--no-relative", "--name-only", "-z"];
+  const tracked = listed(await gitOutput(dir, "diff", ...names, base, "--"));
+  const deleted = listed(await gitOutput(dir, "diff", ...names, "--diff-filter=D", base, "--"));
+  return { root, files: [...new Set([...tracked, ...(await untrackedFiles(root))])], deleted };
 };
 
 /**
@@ -105,11 +158,21 @@ export const catalogueChangedFiles = (
  */
 export const gitChange = async (dir: string, since: string): Promise<GitChange | string> => {
   const base = await changeBase(dir, since);
-  if (base === undefined) return `"${since}" names no commit here`;
-  const form = ["--no-ext-diff", "--no-textconv", "--no-color", "--src-prefix=a/", "--dst-prefix=b/"];
+  if (base === undefined) return noBaseReason(dir, since);
+  const form = [
+    "--no-ext-diff",
+    "--no-textconv",
+    "--no-color",
+    "--no-relative",
+    "--src-prefix=a/",
+    "--dst-prefix=b/"
+  ];
+  const root = (await gitOutput(dir, "rev-parse", "--show-toplevel")).trim();
   return {
     diff: await gitOutput(dir, "diff", ...form, "--unified=0", base, "--"),
-    deleted: listed(await gitOutput(dir, "diff", ...form, "--name-only", "--diff-filter=D", base, "--")),
-    untracked: listed(await gitOutput(dir, "ls-files", "--others", "--exclude-standard", "--full-name"))
+    deleted: listed(
+      await gitOutput(dir, "diff", ...form, "--name-only", "-z", "--diff-filter=D", base, "--")
+    ),
+    untracked: await untrackedFiles(root)
   };
 };

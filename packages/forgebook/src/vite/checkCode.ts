@@ -61,7 +61,7 @@ const SUPPRESSION =
 const HAS_REASON = /(?:biome-ignore [^:]+:\s*\S|eslint-disable[^*]*--\s*\S|@ts-expect-error\s+\S)/;
 
 /** The files where a raw value is a mistake: styles and components. */
-const CHECKED_FILE = /\.(?:css|scss|sass|less|tsx|jsx|vue|svelte|astro)$/;
+export const CHECKED_FILE = /\.(?:css|scss|sass|less|tsx|jsx|vue|svelte|astro)$/;
 
 /** Where raw values belong: stories, tests, tokens and what a tool wrote. */
 const LEFT_ALONE =

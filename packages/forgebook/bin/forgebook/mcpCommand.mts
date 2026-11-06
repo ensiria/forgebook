@@ -18,7 +18,8 @@ import { previewResource } from "./mcpPreview.ts";
 import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
-import { runPageCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
+import { runPageCheck, runStoriesCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
+import { runVerify } from "./verifyRun.ts";
 import { baselinesOf, visualDiffTool } from "./visualCommands.mts";
 
 /**
@@ -87,6 +88,15 @@ export const mcpCommands = (
               newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
             check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
             shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
+            verify: (input) =>
+              runVerify(
+                {
+                  dir: config.dir,
+                  ask: client.ask,
+                  check: (stories) => runStoriesCheck(config, options.url, stories)
+                },
+                input
+              ),
             checkPage: (address) => runPageCheck(config, [address]),
             servePreview: preview.serve,
             plugins: pluginsDocument(config.plugins)

@@ -9,7 +9,8 @@
  * into its own JSX; a story without JSX renders its meta's component. A component is known by the file that declares
  * it and its name there, so two imports of one component are one. The import graph holds the modules the rendered
  * components reach through the package's own imports, never a dependency's (`node_modules`): "used through" follows
- * those edges. A lowercase tag is an element (`<div>`), not a component. A component reached only through code the
+ * those edges, by what each import names: a name taken through a barrel counts for the file that declares it, or every
+ * file a barrel lists would look used (`usageImports.ts`). A lowercase tag is an element (`<div>`), not a component. A component reached only through code the
  * checker cannot follow (a computed lazy import, a component handed in as a prop) is not found.
  *
  * @module
@@ -17,6 +18,7 @@
 import ts from "typescript-6";
 
 import { configurationOf, programFor } from "./docsProgram.ts";
+import { importsOf, textImportsOf } from "./usageImports.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /** A component, by the file that declares it and its name there. */
@@ -243,58 +245,6 @@ const fileUsage = (request: UsageRequestFile, program: ts.Program): StoryFileUsa
 };
 
 /**
- * The package's own modules a module imports or re-exports from, resolved as its program resolves them.
- *
- * @param source - the module.
- * @param program - its program.
- * @param cache - the program's resolution cache.
- */
-/**
- * Whether an import or an export takes types only (`import type`, `export type`, `import { type A }`).
- *
- * @param statement - the statement.
- */
-const isTypeOnly = (statement: ts.Statement): boolean => {
-  if (ts.isExportDeclaration(statement)) return statement.isTypeOnly;
-  if (!ts.isImportDeclaration(statement)) return false;
-  const clause = statement.importClause;
-  if (clause === undefined) return false;
-  if (clause.isTypeOnly) return true;
-  // `import { type A, type B }`: every name a type, and no default
-  const bindings = clause.namedBindings;
-  return (
-    clause.name === undefined &&
-    bindings !== undefined &&
-    ts.isNamedImports(bindings) &&
-    bindings.elements.length > 0 &&
-    bindings.elements.every((element) => element.isTypeOnly)
-  );
-};
-
-const importsOf = (source: ts.SourceFile, program: ts.Program, cache: ts.ModuleResolutionCache): string[] => {
-  const targets: string[] = [];
-  for (const statement of source.statements) {
-    const specifier =
-      (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
-      statement.moduleSpecifier !== undefined &&
-      ts.isStringLiteral(statement.moduleSpecifier)
-        ? statement.moduleSpecifier.text
-        : undefined;
-    // a type renders nothing: a file that only takes types from another does not use its components
-    if (specifier === undefined || isTypeOnly(statement)) continue;
-    const resolved = ts.resolveModuleName(
-      specifier,
-      source.fileName,
-      program.getCompilerOptions(),
-      ts.sys,
-      cache
-    ).resolvedModule;
-    if (resolved !== undefined && !resolved.isExternalLibraryImport) targets.push(resolved.resolvedFileName);
-  }
-  return targets;
-};
-
-/**
  * The import graph of the modules the given files reach, through the package's own imports.
  *
  * @param starts - the files to start from.
@@ -322,9 +272,10 @@ const reachedImports = (
     const program = programs.find((candidate) => candidate.getSourceFile(file) !== undefined);
     const source = program?.getSourceFile(file);
     const cache = program === undefined ? undefined : caches.get(program);
+    // a style sheet or a single-file component is in no program, and it still imports what it draws with
     const targets =
       program === undefined || source === undefined || cache === undefined
-        ? []
+        ? textImportsOf(file, programs[0], programs[0] === undefined ? undefined : caches.get(programs[0]))
         : importsOf(source, program, cache);
     imports[file] = targets;
     queue.push(...targets);
@@ -350,6 +301,8 @@ const groupGraph = (group: readonly UsageRequestFile[]): UsageGraph | string => 
     if (usage !== undefined) files.push(usage);
   }
   const starts = files.flatMap((file) => [
+    // what a story file imports itself runs with its stories: a single-file component, a sheet, a fixture
+    file.storyFile,
     ...(file.component === undefined ? [] : [file.component.file]),
     ...file.stories.flatMap((story) => story.renders.map((ref) => ref.file))
   ]);
