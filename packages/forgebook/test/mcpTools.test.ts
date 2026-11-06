@@ -70,3 +70,22 @@ describe("token tools", () => {
     expect(JSON.stringify(result)).toContain("schema");
   });
 });
+
+describe("story_address with values", () => {
+  it("hands the values to the catalogue as JSON, and declares them", async () => {
+    expect(JSON.stringify(tool("story_address").inputSchema)).toContain("forgebookUnset");
+    asked.length = 0;
+    await tool("story_address").call({ id: "kit:a--b", view: "theme=dark", args: { tags: ["ü"] } });
+    const params = new URLSearchParams(asked[0]?.split("?")[1]);
+    expect(asked[0]?.startsWith("story?")).toBe(true);
+    expect(params.get("id")).toBe("kit:a--b");
+    expect(params.get("view")).toBe("theme=dark");
+    expect(params.get("args")).toBe('{"tags":["ü"]}');
+  });
+
+  it("without values, asks for the list as before", async () => {
+    asked.length = 0;
+    await tool("story_address").call({ id: "kit:a--b" });
+    expect(asked[0]?.startsWith("stories?")).toBe(true);
+  });
+});

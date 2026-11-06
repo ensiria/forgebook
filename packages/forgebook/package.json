@@ -47,6 +47,7 @@
     "./story-module": "./src/frame/storyModule.ts",
     "./messages": "./src/messages.ts",
     "./jsx-code": "./src/jsxCode.ts",
+    "./arg-expression": "./src/argExpression.ts",
     "./component-docs": "./src/componentDocs.ts",
     "./vite/adapter": "./src/vite/adapter.ts",
     "./vite/docs-program": "./src/vite/docsProgram.ts",
@@ -192,6 +193,10 @@
       "./jsx-code": {
         "types": "./dist/src/jsxCode.d.ts",
         "default": "./dist/src/jsxCode.js"
+      },
+      "./arg-expression": {
+        "types": "./dist/src/argExpression.d.ts",
+        "default": "./dist/src/argExpression.js"
       },
       "./component-docs": {
         "types": "./dist/src/componentDocs.d.ts",

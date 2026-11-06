@@ -11,7 +11,8 @@
  *
  * @module
  */
-import { type ArgValue, isNamedArg, type PanelArgs } from "forgebook/messages";
+import { argExpression } from "forgebook/arg-expression";
+import { type ArgValue, isNamedArg, type NamedArg, type PanelArgs } from "forgebook/messages";
 import type { StoryCodeWriter } from "forgebook/renderer";
 
 import { snippetOfArg } from "./snippetArgs.ts";
@@ -35,9 +36,8 @@ const attribute = (name: string, value: ArgValue): string => {
     return isPlainText(value) ? `${name}="${value}"` : `${name}={${expression(value)}}`;
   // a named value is written by its name, as the source's module exports it (`icon={IconFolder}`)
   if (isNamedArg(value)) return `${name}={${value.named}}`;
-  // a multiple choice's values, as the source writes a list
-  if (Array.isArray(value)) return `${name}={[${value.map(expression).join(", ")}]}`;
-  return `${name}={${String(value)}}`;
+  // a list or an object, as the source writes one; a number, `null` and `false` read as themselves
+  return `${name}={${argExpression(value, { text: expression, named: (named: NamedArg): string => named.named })}}`;
 };
 
 /** A text as Svelte's markup holds it: a tag or an expression it writes stays text. */

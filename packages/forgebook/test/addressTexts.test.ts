@@ -57,6 +57,15 @@ describe("addressArgsFor", () => {
     expect(addressArgsFor(args, "any")).toBe(args);
   });
 
+  it("reads a nested value's texts and names too, for one whose texts may become markup", () => {
+    expect(addressArgsFor({ ok: { label: "plain", list: ["a", 1] } }, "plain")).toEqual({
+      ok: { label: "plain", list: ["a", 1] }
+    });
+    expect(addressArgsFor({ bad: { label: "<img>" } }, "plain")).toEqual({});
+    expect(addressArgsFor({ bad: ["fine", { x: "<b>" }] }, "plain")).toEqual({});
+    expect(addressArgsFor({ bad: { "a b<": 1 } }, "plain")).toEqual({});
+  });
+
   it("keeps only values whose name and texts are plain for one whose texts may become markup", () => {
     expect(addressArgsFor(args, "plain")).toEqual({
       tone: "danger",

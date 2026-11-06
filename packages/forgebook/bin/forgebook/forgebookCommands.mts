@@ -298,6 +298,12 @@ await defineCommands({
           description:
             "The view the links open in, as the catalogue's address writes it (theme=dark&lang=it)."
         },
+        args: {
+          type: "string",
+          valueName: "json",
+          description:
+            "Values to set, as JSON: checked as a link's are, against `controls`; the links carry those taken, and a value left out fails the command."
+        },
         url: {
           type: "string",
           env: "FORGEBOOK_URL",
@@ -312,11 +318,19 @@ await defineCommands({
         {
           command: `${COMMAND} story kit:actions-button--primary --view theme=dark --json`,
           description: "A story, its links in the dark theme, as JSON."
+        },
+        {
+          command: `${COMMAND} story kit:forms-select--overview --args '{"tags":["a","b"]}' --json`,
+          description: "The links that open a story with these values, once checked."
         }
       ],
       run: async ({ args, options, io, log, isJson, style }): Promise<void> => {
         const config = await configOf(options.config);
-        const params = new URLSearchParams({ id: args.id, view: options.view ?? "" });
+        const params = new URLSearchParams({
+          id: args.id,
+          view: options.view ?? "",
+          ...(options.args === undefined ? {} : { args: options.args })
+        });
         const body = await askCatalogue(config, options.url, "story", params, log);
         if (!isStoryDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
         printAnswer(storyText(body, style), body, body.problems, { io, log, isJson });

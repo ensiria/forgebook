@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type ArgDeclaration, checkedAddressArgs, typedLinkArgs } from "../src/addressArgs.ts";
+import { type ArgDeclaration, checkedAddressArgs } from "../src/addressArgs.ts";
 import { type ArgsParamRead, readArgsParam as readFirstScreen } from "../src/addressArgsParam.ts";
 import type { PropDocs } from "../src/componentDocs.ts";
 import { type ArgValue, type PanelArgs, panelArgsParam } from "../src/messages.ts";
@@ -78,7 +78,6 @@ describe("readArgsParam, Storybook's form", () => {
     ["a list of objects", "arr[0].one:A;label:Hi", ["arr"]],
     ["a list with a hole", "arr[1]:B;label:Hi", ["arr"]],
     ["a list holding what a list cannot", "arr[0]:!true;label:Hi", ["arr"]],
-    ["an undefined", "gone:!undefined;label:Hi", ["gone"]],
     ["a date that is none", "at:!date(soon);label:Hi", ["at"]],
     ["no colon", "flag;label:Hi", ["flag"]],
     ["no name", ":x;label:Hi", [":x"]]
@@ -111,9 +110,9 @@ describe("readArgsParam, Forgebook's form", () => {
   });
 
   it("names what it cannot read, entry by entry, or the whole parameter", () => {
-    const read = readArgsParam('{"a":"b","nested":{"c":1},"list":[true]}');
-    expect(read.args).toEqual({ a: "b" });
-    expect(read.link?.unread).toEqual(["nested", "list"]);
+    const read = readArgsParam('{"a":"b","nested":{"c":1},"list":[true],"bad":{"__proto__":{}}}');
+    expect(read.args).toEqual({ a: "b", nested: { c: 1 }, list: [true] });
+    expect(read.link?.unread).toEqual(["bad"]);
     expect(read.link?.typeValue).toBeUndefined();
     expect(readArgsParam("{not json").link?.unread).toEqual(["args"]);
     expect(readArgsParam("{not json").args).toEqual({});
@@ -225,28 +224,6 @@ describe("a round trip of every control type", () => {
       { name: "isOpen", reason: "type" },
       { name: "tone", reason: "type" }
     ]);
-  });
-});
-
-describe("typedLinkArgs", () => {
-  it("types by what the frame knows of an arg, and as Storybook does for one it does not", () => {
-    const { typeValue } = readArgsParam("a:b").link ?? {};
-    expect(typeValue).toBeDefined();
-    if (typeValue === undefined) return;
-    const args = { isOpen: "false", label: "123", other: "5", list: ["1", "a"] };
-    expect(
-      typedLinkArgs(
-        args,
-        {
-          props: [],
-          argTypes: {},
-          controls: "all",
-          storyArgs: { isOpen: true, label: "x" },
-          namedValues: {}
-        },
-        typeValue
-      )
-    ).toEqual({ isOpen: false, label: "123", other: 5, list: [1, "a"] });
   });
 });
 

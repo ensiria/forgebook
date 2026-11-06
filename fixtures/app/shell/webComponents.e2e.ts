@@ -87,8 +87,8 @@ test.describe("the panel on a custom element", () => {
     await page.goto(story("inputs-badge--default"));
     await isReady(page);
     await expect(page.getByLabel("label", { exact: true })).toHaveValue("New");
-    await expect(page.getByLabel("item-count")).toHaveValue("3");
-    await expect(page.getByLabel("#default")).toBeVisible();
+    await expect(page.getByLabel("item-count", { exact: true })).toHaveValue("3");
+    await expect(page.getByLabel("#default", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Events" }).click();
     await expect(page.getByText("@remove")).toBeVisible();
     await expect(page.getByText("The person took it away.")).toBeVisible();
@@ -106,7 +106,7 @@ test.describe("the panel on a custom element", () => {
       .getByRole("radio", { name: "danger" })
       .check({ force: true });
     await expect(frameOf(page).locator("fixture-badge")).toHaveAttribute("tone", "danger");
-    await page.getByLabel("#default").fill("in the slot");
+    await page.getByLabel("#default", { exact: true }).fill("in the slot");
     await expect(frameOf(page).locator("fixture-badge")).toContainText("in the slot");
   });
 

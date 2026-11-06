@@ -16,17 +16,16 @@ import "./frame.scss";
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 
-import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
 import { shownLanguage } from "../languages.ts";
 import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
-import { detailOf, type PanelArgs, previewValue, type ShellMessage } from "../messages.ts";
-import { panelArgsOf, storyArgsOf } from "../namedValues.ts";
+import type { PanelArgs, ShellMessage } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { applySafeArea } from "../safeAreaParameter.ts";
 import { sourceFiles } from "../sourceFiles.ts";
+import { actionNames, excludedControls, panelArgTypesOf } from "../storyArgTypes.ts";
 import { isClockHeldIn } from "../storyClock.ts";
 import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGlobals.ts";
 import { shownTexts, storyTextKeysOf, withStoryTexts } from "../storyTexts.ts";
@@ -42,10 +41,12 @@ import {
   type MeasureTool,
   parseView
 } from "../viewState.ts";
+import { detailOf, previewValue } from "./callValues.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
+import { panelArgsOf, storyArgsOf } from "./panelValues.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
 import type { FrameRenderer, StoryDrawing } from "./renderer.ts";

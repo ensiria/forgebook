@@ -17,7 +17,7 @@
  */
 import type { ArgsParamRead } from "./addressArgsParam.ts";
 import type { PanelProp } from "./argTypes.ts";
-import { type ArgValue, isChoiceList } from "./messages.ts";
+import { type ArgValue, isChoiceList, UNSET_ARG } from "./messages.ts";
 
 /** A number as Storybook's links write it. */
 const NUMBER_TEXT = /^-?[0-9]+(\.[0-9]+)?$/;
@@ -45,7 +45,10 @@ const typedText = (prop: PanelProp, text: string): string | number | boolean => 
     prop.control === "number" ||
     prop.control === "range" ||
     prop.control === "date" ||
-    (prop.control === undefined && prop.kind === "number");
+    (prop.control === undefined && prop.kind === "number") ||
+    // a mixed union's number (`"sm" | number`): a text it takes too stays one only when the text is no number
+    (prop.shape?.kind === "union" && prop.shape.of.some((member) => member.kind === "number")) ||
+    (prop.shape?.kind === "list" && prop.shape.of.kind === "number");
   return isNumeric && NUMBER_TEXT.test(text) ? Number(text) : text;
 };
 
@@ -110,7 +113,7 @@ const colorOf = (marked: string): string | undefined => {
  */
 const storybookValue = (text: string): ArgValue | undefined => {
   if (!text.startsWith("!")) return text;
-  if (text === "!undefined") return undefined;
+  if (text === "!undefined") return UNSET_ARG;
   if (text === "!null") return null;
   if (text === "!true") return true;
   if (text === "!false") return false;

@@ -144,9 +144,20 @@ const shellStrings = {
   unknownComponent: (id: string): string =>
     `No component "${id}": it may have been renamed. Pick one in the sidebar.`,
   props: "Props",
-  propGroups: { choice: "Choices", text: "Text and numbers", toggle: "Toggles" },
+  propGroups: {
+    choice: "Choices",
+    text: "Text and numbers",
+    structured: "Objects and lists",
+    toggle: "Toggles"
+  },
   otherProps: "Other props",
   unset: "—",
+  unsetProp: (prop: string): string => `${prop}: leave without a value`,
+  resetProp: (prop: string): string => `${prop}: back to the story's value`,
+  stateUnset: "no value",
+  stateEmpty: "empty text",
+  editorsLoading: "Loading the fields…",
+  editorsFailed: (message: string): string => `The fields could not be loaded: ${message}`,
   unsetDefault: (value: string): string => `— (${value})`,
   defaultIs: "Default:",
   pickColor: (prop: string): string => `${prop}: pick a colour`,

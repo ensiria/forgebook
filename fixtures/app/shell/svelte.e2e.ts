@@ -88,7 +88,7 @@ test.describe("the panel on a Svelte component", () => {
     await page.goto(story("inputs-badge--default"));
     await isReady(page);
     await expect(page.getByLabel("label", { exact: true })).toHaveValue("New");
-    await expect(page.getByLabel("#children")).toBeVisible();
+    await expect(page.getByLabel("#children", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Events" }).click();
     await expect(page.getByText("onremove")).toBeVisible();
     await expect(page.getByText("The person took it away.")).toBeVisible();
@@ -99,7 +99,7 @@ test.describe("the panel on a Svelte component", () => {
     await isReady(page);
     await page.getByLabel("label", { exact: true }).fill("Changed");
     await expect(frameOf(page).locator(".badge")).toContainText("Changed");
-    await page.getByLabel("#children").fill("in the snippet");
+    await page.getByLabel("#children", { exact: true }).fill("in the snippet");
     await expect(frameOf(page).locator(".badge")).toContainText("in the snippet");
   });
 
@@ -132,9 +132,9 @@ test.describe("the panel on a Svelte component", () => {
   test("shows a story's error, and leaves it when the value changes back", async ({ page }) => {
     await page.goto(story("states-fragile--default"));
     await isReady(page);
-    await page.getByLabel("text").fill("boom");
+    await page.getByLabel("text", { exact: true }).fill("boom");
     await expect(frameOf(page).locator("body")).toContainText("Fragile broke");
-    await page.getByLabel("text").fill("Fine again");
+    await page.getByLabel("text", { exact: true }).fill("Fine again");
     await expect(frameOf(page).getByTestId("fragile")).toHaveText("Fine again");
     await expect(frameOf(page).locator("body")).not.toContainText("Fragile broke");
   });

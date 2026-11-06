@@ -17,5 +17,9 @@ export const source: StorySource = {
   name: "Storybook stories",
   files: [tsxFiles, jsxFiles],
   docs: [docs],
+  namedValues: {
+    ValueIcon: { Star: (): string => "★", Heart: (): string => "♥" },
+    ReactNode: { Bold: "A named node" }
+  },
   sheets: { required: [], theme: [], restyled: [] }
 };

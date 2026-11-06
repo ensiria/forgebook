@@ -16,18 +16,11 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { AddressLink } from "../addressArgsParam.ts";
 import { panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import {
-  type ArgValue,
-  type PanelArgs,
-  panelArgsParam,
-  parsePanelArgsParam,
-  type ShellMessage
-} from "../messages.ts";
+import { type PanelArgs, parsePanelArgsParam, type ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
-import type { ViewSwitch } from "../switches.ts";
 import {
   frameAddress,
   isComparing,
@@ -38,7 +31,6 @@ import {
   type StageWidth,
   schemeOf,
   type ViewState,
-  viewParams,
   type Zoom
 } from "../viewState.ts";
 import { useStoryClockControls } from "./ClockControls.tsx";
@@ -62,6 +54,7 @@ import { StageCompare } from "./StageCompare.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryBar } from "./StoryBar.tsx";
+import { embedHeight, embedQuery, takesArgs, usePanelValues } from "./stageArgs.ts";
 import { STRINGS } from "./strings.ts";
 import { useAddressArgs } from "./useAddressArgs.ts";
 import {
@@ -111,6 +104,8 @@ export type StageProps = {
   readonly onViewChange: (view: ViewState) => void;
   /** Called with what a story fixes of the view, once its frame read it, for the toolbar to show. */
   readonly onFixedChange: (storyId: string, fixed: FixedView) => void;
+  /** Loads the catalogue's design tokens; none when it has none. */
+  readonly loadTokens?: (() => Promise<unknown>) | undefined;
   /**
    * The values set in the Props tab, over the story's own args (kept in the address): as the address names them, so
    * unchecked; the stage hands the frames only those the story declares.
@@ -149,39 +144,12 @@ export type StageProps = {
   readonly scroll: PageScroll;
 };
 
-/**
- * Whether a story's args change what it draws: not for a story of fixed examples, nor for one about logic, whose scene
- * takes none.
- *
- * @param story - the story.
- */
-const takesArgs = (story: Pick<TreeStory, "isLogic" | "controls">): boolean =>
-  !story.isLogic && (story.controls === "all" || story.controls.length > 0);
+/** No args of the story's own, as one value: what is computed from them is kept while it stays the same. */
+const NO_OWN_ARGS: PanelArgs = {};
 
-/**
- * What an embed of the story keeps of the page: its view and the values set in the panel. An embed draws no device
- * frame, so the device chosen is left out: the embed is the story at the width its iframe gives it.
- *
- * @param view - the reader's view, without what the story fixes, which the story fixes again.
- * @param panelArgs - the values set in the panel, once checked: typed, and only those the story takes.
- * @param switches - the catalogue's switches.
- */
-const embedQuery = (view: ViewState, panelArgs: PanelArgs, switches: readonly ViewSwitch[]): string => {
-  const params = viewParams({ ...view, device: "auto", orientation: "auto" }, switches);
-  const args = panelArgsParam(panelArgs);
-  if (args !== "") params.set("args", args);
-  return params.toString();
-};
-
-/**
- * The height an embed's iframe starts at: as tall as the frame is on the stage.
- *
- * @param view - the view, with the height set on the stage.
- * @param contentHeight - the story's content, in CSS px.
- * @param story - the story, with the height its scene declares.
- */
-const embedHeight = (view: ViewState, contentHeight: number, story: Pick<TreeStory, "height">): number =>
-  view.height === "auto" ? Math.max(contentHeight, story.height ?? 0) : view.height;
+/** A story's own args, as its frame reported them; none before it did. */
+const ownArgsOf = (reported: ReadonlyMap<string, PanelArgs>, storyId: string): PanelArgs =>
+  reported.get(storyId) ?? NO_OWN_ARGS;
 
 /**
  * The stage.
@@ -194,6 +162,7 @@ export const Stage = ({
   view: ownView,
   onViewChange: onOwnViewChange,
   onFixedChange,
+  loadTokens,
   panelArgs,
   addressLink,
   onPanelArgsChange,
@@ -266,13 +235,19 @@ export const Stage = ({
     namedValues
   });
   const acceptedArgs = addressArgs.accepted;
-  const values = { ...storyArgs.get(story.id), ...acceptedArgs };
+  const ownArgs = ownArgsOf(storyArgs, story.id);
+  const panelValues = usePanelValues(acceptedArgs, ownArgs, onPanelArgsChange);
+  const { values } = panelValues;
   const settable = useMemo(
     () =>
       docs.status === "ready"
-        ? settableProps(panelProps(docs.value.props, panel.argTypes), panel.controls, namedValues ?? {})
+        ? settableProps(
+            panelProps(docs.value.props, panel.argTypes, ownArgs),
+            panel.controls,
+            namedValues ?? {}
+          )
         : [],
-    [docs, panel.argTypes, panel.controls, namedValues]
+    [docs, panel.argTypes, panel.controls, namedValues, ownArgs]
   );
   const worstCase = useWorstCase({
     storyRef,
@@ -280,6 +255,8 @@ export const Stage = ({
     settable,
     values,
     panelArgs: acceptedArgs,
+    namedValues,
+    worstOfShape: addressArgs.worstOfShape,
     onPanelArgsChange
   });
 
@@ -340,12 +317,6 @@ export const Stage = ({
     if (acceptedParam === undefined) return;
     tellFrames(storyRef.current, { type: "forgebook:args", args: parsePanelArgsParam(acceptedParam) });
   }, [acceptedParam]);
-  // a change starts from the values the story takes: one the address named and the story does not is let go
-  const changeValue = (name: string, value: ArgValue | undefined): void => {
-    const { [name]: _removed, ...rest } = acceptedArgs;
-    onPanelArgsChange(value === undefined ? rest : { ...rest, [name]: value });
-  };
-
   const replay = (): void => {
     const message: ShellMessage = { type: "forgebook:replay" };
     frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
@@ -402,8 +373,11 @@ export const Stage = ({
     controls: panel.controls,
     actions: panel.actions,
     values,
+    panelArgs: acceptedArgs,
+    storyArgs: ownArgs,
+    loadTokens,
     globals: view.switches,
-    onValueChange: changeValue,
+    onValueChange: panelValues.change,
     onReset: (): void => onPanelArgsChange({}),
     worstCase: worstCase.state,
     namedValues,

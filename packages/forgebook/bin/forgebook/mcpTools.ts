@@ -22,6 +22,7 @@ import { previewTool } from "./mcpPreview.ts";
 import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
+import { SET_ARGS_PROPERTY, setArgsResult } from "./setArgsTool.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
 /** The session's folder for pictures; made on the first call. */
@@ -264,7 +265,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -285,18 +286,20 @@ export const catalogueTools = ({
   {
     name: "story_address",
     description:
-      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe.",
+      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe. With args, the links open the story with those values, once checked as a link's are against the controls get_story lists; what it takes and what it leaves out are in the answer.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string", description: "The story's id, as list_stories gives it." },
-        view: VIEW
+        view: VIEW,
+        args: SET_ARGS_PROPERTY
       },
       required: ["id"],
       additionalProperties: false
     },
     call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
       const id = textOf(args, "id") ?? "";
+      if (args["args"] !== undefined) return setArgsResult(ask, id, textOf(args, "view"), args["args"]);
       const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
       const named = namedStory(answer.body, id);

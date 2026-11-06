@@ -157,7 +157,8 @@ too, with a warning.
 - **Widths** to draw a story at, and a **compare** view that draws the same story once per value of one or two
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
-  their TSDoc, nothing written twice.
+  their TSDoc, nothing written twice: objects and lists as nested fields, mixed unions, tokens and named values too
+  ([below](#the-panels-controls)).
 - **Props in groups**: a component with many props lists them under the groups their TSDoc names (`@group Paging`),
   and a prop typed with a documented object (`texts?: FinderTexts`) unfolds to list its members
   ([below](#props-in-groups)).
@@ -165,11 +166,12 @@ too, with a warning.
   reader turns the ordering off with a switch ([below](#required-props-first)).
 - **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
   Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
-  `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
-  (`onclick`, `innerHTML`, a text for a number) is left out and listed above the story, with a button that removes it
-  from the address, as is one that cannot be read at all. A value that is code never comes from a link.
+  `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type, an object with only
+  the fields its type declares; anything else (`onclick`, `innerHTML`, a text for a number) is left out and listed above
+  the story, with a button that removes it from the address, as is one that cannot be read at all. A value that is code
+  never comes from a link.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
-  long to break and every number a huge one, kept in the address; the elements that then spill out of their parents
+  long to break, every number a huge one and every list many items, nested ones too, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
 - **Examples that fill the page**: on a component's page, any story's box opens over the page, at a width of its own,
   without loading its story again.
@@ -474,6 +476,53 @@ export default { component: Finder, parameters: { requiredFirst: false } } satis
 - Agents get the props in the order of the source and the names of the required ones at the top of
   `forgebook story --json` and `get_story` (`requiredProps`): the setting shapes the pages only.
 
+## The panel's controls
+
+The Props tab draws a control for each prop from its type, with nothing to write:
+
+| The prop's type | Its control |
+|---|---|
+| `string`, `number`, `boolean` | a field, a number, a toggle; a text with a line break becomes a text area |
+| `"sm" \| "md"` | buttons or a list; a search past 12 values |
+| `readonly string[]`, `{ a: string; b?: number }` | nested fields, with add, remove and reorder by buttons, so a keyboard does it too |
+| `[number, number]`, `Record<string, number>` | a field per item; names and values |
+| `"sm" \| number`, `string \| string[]` | choose the type, then the value |
+| `unknown`, `object`, a type too deep or wider than 40 fields | JSON, checked as it is typed |
+| a component, a function, a node | what the source's `namedValues` offer for its type, searched by name; a node takes a text too |
+
+A story names another control the way Storybook's do, and a few of Forgebook's own:
+
+```ts
+argTypes: {
+  note: { control: "textarea" },
+  options: { control: "object" }, // fields from the type, else from the story's own arg, else JSON
+  accent: { control: { type: "token", of: "color" } }, // from the catalogue's `tokens`
+  gap: { control: { type: "token", of: "space", format: "var(--{name})" } }, // writes `var(--space-small)`
+  cover: { control: { type: "file", accept: "image/*" } }
+}
+```
+
+`of` is a token's type or a part of its name. A prop asks for tokens from its TSDoc as well (`@token color`). The tokens
+load when such a control is drawn; without any to offer it stays a text field.
+
+Each value has three states, and the panel keeps them apart: the story's own (nothing in the address), the panel's (an
+empty text included), and no value at all, where the component receives `undefined` over what the story's args give it.
+Beside each field, one button leaves it with no value and another goes back to the story's; a cleared number has no
+value. The address writes no value as `{"forgebookUnset":true}`.
+
+Every value is plain JSON, kept in `args=`, text in any script included, and checked when a link is opened, in an embed
+too: an object may hold only the fields its type declares. What JSON's fallback holds has no type to check against, so
+what would run if a component spread the object on an element is left out (`onclick`, `innerHTML`, `srcdoc`, Vue's
+`.innerHTML`, an address that starts with `javascript:`), as is a named value; `__proto__`, `constructor`, `prototype` and
+values nested over 16 levels are not read at all. A token's value is a plain text, as a colour's is, and a link may give
+another. A file is kept in the link as a `data:` address, so a `file` control takes about 6 KB, of a picture, sound, film,
+plain text or a PDF. An object of exactly `of` and `named` reads as a named value. A very long value makes a very long
+address, which some servers refuse, so the worst case leaves out a value too long for one.
+
+A `Date` prop has no control: JSON cannot hold one. The `date` control sets a number of ms, as Storybook's does.
+
+The editors are one chunk that loads when the first such prop is drawn: a catalogue of plain props never asks for it.
+
 ## Docs pages
 
 Guides, foundations and recipes are Markdown files with a little front matter, not MDX: a page is read at build time, and
@@ -751,7 +800,7 @@ A link keeps working too: `args=` reads Storybook's form (`label:Hello+world;cou
 with `!null`, `!hex(…)`, `!rgb(…)`, `!hsl(…)` and `!date(…)`) as well as Forgebook's own JSON, told apart by JSON's first
 `{`. Its values are typed by the prop that receives them, so `5` is a number for a number and stays `5` for a text, and they
 meet the same check as any link's. Forgebook writes its own form once a value changes in the panel. What an arg here
-cannot hold (an object such as `style.color:red`, a list with a gap, `!undefined`) is named above the story, not dropped
+cannot hold (an object such as `style.color:red`, a list with a gap) is named above the story, not dropped
 in silence. An arg's `argTypes.<name>.if` (`{ arg: "kind", eq: "link" }`, `{ global: "theme", neq: "dark" }`, with `truthy`,
 `exists`, `eq` or `neq`) hides its control the same way Storybook's does, and leaves its value alone.
 
@@ -1143,6 +1192,10 @@ It is on by default. The theme reaches everything Forgebook draws: the catalogue
 missing-story messages, and the box a frame shows when a story fails.
 
 ## For agents
+
+A story's values can be set without the panel: `controls` in `forgebook story --json` and `get_story` says what each prop
+takes, and `forgebook story <id> --args '<json>'` or `story_address` with `args` checks the values as a link's are and
+answers the links that carry them ([the panel's controls](#the-panels-controls)).
 
 `forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
 and the commands that check one, as a section of `AGENTS.md` (renewed in place when it runs again; `--skill` writes

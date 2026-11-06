@@ -11,7 +11,8 @@
  *
  * @module
  */
-import { type ArgValue, isNamedArg, type PanelArgs } from "forgebook/messages";
+import { argExpression } from "forgebook/arg-expression";
+import { type ArgValue, isNamedArg, type NamedArg, type PanelArgs } from "forgebook/messages";
 import type { StoryCodeWriter } from "forgebook/renderer";
 
 import { slotOfArg } from "./slotArgs.ts";
@@ -40,9 +41,8 @@ const attribute = (name: string, value: ArgValue): string => {
   if (typeof value === "string") return `${prop}="${attributeText(value)}"`;
   // a named value is written by its name, as the source's module exports it (`:icon="IconFolder"`)
   if (isNamedArg(value)) return `:${prop}="${value.named}"`;
-  // a multiple choice's values, as the source writes a list
-  if (Array.isArray(value)) return `:${prop}="[${value.map(expression).join(", ")}]"`;
-  return `:${prop}="${String(value)}"`;
+  // a list or an object, as the source writes one; a number, `null` and `false` read as themselves
+  return `:${prop}="${argExpression(value, { text: expression, named: (named: NamedArg): string => named.named })}"`;
 };
 
 /** The longest line the attributes stay on one line for, in characters. */

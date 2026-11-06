@@ -24,7 +24,6 @@ import {
   useSyncExternalStore
 } from "react";
 
-import { typedLinkArgs } from "../addressArgs.ts";
 import {
   type AddressLink,
   type ArgsParamRead,
@@ -34,11 +33,13 @@ import {
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import { EMBED_SIZE_TYPE, type EmbedSizeMessage } from "../embed.ts";
 import type { PanelArgs, ShellMessage } from "../messages.ts";
+import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";
 import { type FixedView, NOT_FIXED, withFixed } from "../storyGlobals.ts";
 import { findStory, type StoryLocation, storyTree } from "../storyTree.ts";
 import { frameAddress, parseView, STAGE_HEIGHT_RANGE, type ViewState } from "../viewState.ts";
 import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import type { EmbedSource } from "./embedArgs.ts";
 import { FrameView } from "./FrameView.tsx";
 import { framesOrigin } from "./framesOrigin.ts";
 import { LATER_STRINGS } from "./laterStrings.ts";
@@ -145,6 +146,8 @@ type EmbedStoryProps = {
   readonly unreadArgs: readonly string[];
   /** Types the values by what the frame says of its args, for a link whose form does not say. */
   readonly typeValue: AddressLink["typeValue"];
+  /** What the check on the values reads of the story's source. */
+  readonly loading: EmbedSource;
   /** The frame page's address. */
   readonly frameUrl: string;
 };
@@ -160,34 +163,27 @@ const EmbedStory = ({
   panelArgs,
   unreadArgs,
   typeValue,
+  loading,
   frameUrl
 }: EmbedStoryProps): ReactNode => {
   const catalogue = useCatalogue();
   const { story, component, source } = location;
   const [fixed, setFixed] = useState<FixedView>(NOT_FIXED);
   const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [dropped, setDropped] = useState<readonly string[]>([]);
+  const shownUnread = [...unreadArgs, ...dropped];
   const { heights, settled } = useFrameMessages({
     onReady: (frame: Window, message: ReadyMessage): void => {
       setFixed(message.fixed);
       setFailure(undefined);
-      const args: ShellMessage = {
-        type: "forgebook:args",
-        args:
-          typeValue === undefined
-            ? panelArgs
-            : typedLinkArgs(
-                panelArgs,
-                {
-                  props: [],
-                  argTypes: message.argTypes,
-                  controls: message.controls,
-                  storyArgs: message.args,
-                  namedValues: {}
-                },
-                typeValue
-              )
-      };
-      frame.postMessage(args, framesOrigin());
+      if (Object.keys(panelArgs).length === 0) return;
+      void import("./embedArgs.ts")
+        .then(({ checkedEmbedArgs }) => checkedEmbedArgs(panelArgs, message, typeValue, loading))
+        .then(({ accepted, dropped }) => {
+          const args: ShellMessage = { type: "forgebook:args", args: accepted };
+          setDropped(dropped.map((each) => each.name));
+          frame.postMessage(args, framesOrigin());
+        });
     },
     onCall: (): void => undefined,
     onFailed: (_storyId: string, message: string): void => setFailure(message)
@@ -223,7 +219,7 @@ const EmbedStory = ({
       {failure === undefined ? null : (
         <EmbedNotice message={STRINGS.embedFailed} detail={failure} isFailure={true} />
       )}
-      {unreadArgs.length === 0 ? null : <EmbedNotice message={STRINGS.embedArgsUnread(unreadArgs)} />}
+      {shownUnread.length === 0 ? null : <EmbedNotice message={STRINGS.embedArgsUnread(shownUnread)} />}
       {/* kept while it failed: a frame that recovers (an edited story) says so, and takes the page back */}
       <div
         className="forgebook-embed__story"
@@ -284,6 +280,8 @@ const EmbedContent = ({
   }
   // the frame takes its values once, when it is ready: it starts when they are known
   if (waiting !== undefined) return null;
+  const source = sources.find((each) => each.id === location.source.id);
+  const files = source === undefined ? undefined : sourceFiles(source);
   return (
     <EmbedStory
       location={location}
@@ -292,6 +290,10 @@ const EmbedContent = ({
       panelArgs={addressArgsFor(read.args, addressTexts)}
       unreadArgs={read.link?.unread ?? []}
       typeValue={read.link?.typeValue}
+      loading={{
+        loadDocs: files === undefined ? undefined : files.docs[location.story.file],
+        namedValues: source?.namedValues ?? {}
+      }}
       frameUrl={frameUrl}
     />
   );

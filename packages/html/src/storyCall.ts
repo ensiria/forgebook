@@ -10,7 +10,8 @@
  *
  * @module
  */
-import { type ArgValue, isNamedArg, type PanelArgs } from "forgebook/messages";
+import { argExpression } from "forgebook/arg-expression";
+import type { ArgValue, NamedArg, PanelArgs } from "forgebook/messages";
 import type { StoryCodeWriter } from "forgebook/renderer";
 
 /** A name JavaScript writes bare: as a key, or a value by its name. */
@@ -31,12 +32,13 @@ const keyText = (name: string): string => (IDENTIFIER.test(name) ? name : JSON.s
  *
  * @param value - the arg's value.
  */
-const valueText = (value: ArgValue): string => {
-  // a named value is written by its name, as the source's module exports it (`icon: starIcon`)
-  if (isNamedArg(value)) return IDENTIFIER.test(value.named) ? value.named : JSON.stringify(value.named);
-  if (Array.isArray(value)) return `[${value.map((item) => JSON.stringify(item)).join(", ")}]`;
-  return JSON.stringify(value);
-};
+const valueText = (value: ArgValue): string =>
+  argExpression(value, {
+    text: (text: string): string => JSON.stringify(text),
+    // a named value is written by its name, as the source's module exports it (`icon: starIcon`)
+    named: (named: NamedArg): string =>
+      IDENTIFIER.test(named.named) ? named.named : JSON.stringify(named.named)
+  });
 
 /**
  * The call of a story's function with these args.

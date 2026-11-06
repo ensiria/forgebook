@@ -26,7 +26,7 @@ import type {
 } from "@forgebook/story-format/csf";
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
-import { controlsOfParameter, mergedArgTypes } from "../argTypes.ts";
+import { controlsOfParameter, mergedArgTypes } from "../storyArgTypes.ts";
 
 /** Args as the frame handles them: whatever the story's component takes. */
 export type LoadedArgs = Readonly<Record<string, unknown>>;

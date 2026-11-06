@@ -72,6 +72,12 @@ export type DockTabsInput = {
   readonly actions: readonly string[];
   /** The values of the moment: the story's args with the panel's over them. */
   readonly values: PanelArgs;
+  /** The panel's own values, for what can go back to the story's. */
+  readonly panelArgs: PanelArgs;
+  /** The story's own args, for a control no type describes. */
+  readonly storyArgs: PanelArgs;
+  /** Loads the catalogue's design tokens; none when it has none. */
+  readonly loadTokens: (() => Promise<unknown>) | undefined;
   /** The switches' values of the moment, for the args whose `argTypes.if` reads a global. */
   readonly globals: Readonly<Record<string, unknown>>;
   /** Called with a changed value; `undefined` removes the panel's value. */
@@ -131,6 +137,8 @@ const propsTab = (input: DockTabsInput, all: readonly PanelProp[]): DockTab[] =>
             <PropsTab
               props={props}
               values={input.values}
+              panelArgs={input.panelArgs}
+              loadTokens={input.loadTokens}
               controls={input.controls}
               onValueChange={input.onValueChange}
               onReset={input.onReset}
@@ -192,7 +200,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   // a story without a component (a render of its own) still has the args its `argTypes` name
   if (docs.status === "none") {
     return [
-      ...propsTab(input, panelProps([], input.argTypes)),
+      ...propsTab(input, panelProps([], input.argTypes, input.storyArgs)),
       ...eventsTab(input, eventsOf([], input.actions)),
       ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)])
     ];
@@ -213,7 +221,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   const events = eventsOf(component.props, input.actions);
   if (input.story.isLogic) return logicTabs(input, component);
   const tabs: DockTab[] = [];
-  tabs.push(...propsTab(input, panelProps(component.props, input.argTypes)));
+  tabs.push(...propsTab(input, panelProps(component.props, input.argTypes, input.storyArgs)));
   tabs.push(...eventsTab(input, events));
   if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
   if (component.parts.length > 0 || styleHooks(component).length > 0) {

@@ -10,7 +10,8 @@
  * @module
  */
 import { type FramesPlacement, type PageLocation, pageOrigins } from "../frameOrigins.ts";
-import { type FrameMessage, isShellMessage, type ShellMessage } from "../messages.ts";
+import type { FrameMessage, ShellMessage } from "../messages.ts";
+import { isShellMessage } from "./shellMessageCheck.ts";
 
 /** A message's event, as the frame reads it. */
 export type ShellEvent = {
