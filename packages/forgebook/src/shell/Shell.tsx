@@ -125,6 +125,11 @@ export type ShellConfig = {
   readonly home?: () => Promise<ComponentType<WrittenHomeProps>>;
   /** Loads the catalogue's design tokens, on first use; none when it has none. */
   readonly loadTokens?: () => Promise<unknown>;
+  /**
+   * Loads the previews of the catalogue's galleries, when one first opens; none when it gives none. The generated page
+   * gives what the configuration's check allowed; the page checks nothing itself.
+   */
+  readonly loadSwitchPreviews?: ToolbarProps["loadSwitchPreviews"];
   /** Loads each custom control `argControls` registers, by name; none when it registers none. */
   readonly argControls?: ArgControlLoaders;
   /** The plugins with views (the generated page passes them); none by default. */
@@ -797,6 +802,7 @@ const ShellPage = ({
   addressTexts = "any",
   plugins = NO_PLUGINS,
   loadTokens,
+  loadSwitchPreviews,
   argControls,
   home
 }: ShellConfig): ReactNode => {
@@ -999,6 +1005,7 @@ const ShellPage = ({
           shownWidth={shown.kind === "story" ? shownWidth : undefined}
           fixed={fixedOfShown(fixedViews, shown)}
           deviceDefault={deviceOfShown(catalogue.device, shown)}
+          loadSwitchPreviews={loadSwitchPreviews}
         />
         {shown.kind === "component" ? (
           <LazyPage

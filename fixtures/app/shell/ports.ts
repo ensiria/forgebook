@@ -35,7 +35,8 @@ export const CATALOGUES = [
   "sveltekit",
   "react-native",
   "generated-home",
-  "parity"
+  "parity",
+  "themes"
 ] as const;
 
 /** A catalogue the suite runs. */

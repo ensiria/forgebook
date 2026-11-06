@@ -15,6 +15,21 @@
 
 import { DEVICE_PARAMETER, ORIENTATION_PARAMETER } from "./deviceView.ts";
 
+/**
+ * What a gallery shows of a value before it is applied (`control: "gallery"`): a picture the catalogue provides, or a
+ * few colours with a font's name.
+ *
+ * @remarks
+ * Nothing here loads from an address. The picture is a file on disk, which the build gives an address of its own;
+ * the colours paint swatches; the font is a name, drawn in that font only where the reader has it installed. The
+ * configuration's check refuses anything else (`vite/switchValuesCheck.ts`).
+ */
+export type SwitchPreview =
+  /** A picture: a file by its path from the configuration's folder, or absolute (a preset's). */
+  | { readonly image: string }
+  /** Up to eight CSS colours, and a font's name to show beside them; none by default. */
+  | { readonly swatches: readonly string[]; readonly font?: string };
+
 /** One value a switch offers. */
 export type SwitchValue = {
   /** The value, as the address and the root's attribute write it (`dark`). */
@@ -29,6 +44,22 @@ export type SwitchValue = {
   readonly isMore?: boolean;
   /** For a `language` switch: whether the language reads right to left, which draws the story right to left. */
   readonly isRightToLeft?: boolean;
+  /** What a gallery shows of it; a value with none shows its label's first letter. */
+  readonly preview?: SwitchPreview;
+  /**
+   * The values this value sets on other switches, by switch id (`{ theme: "dark" }`: a look drawn only for dark). While
+   * it is chosen, each named switch draws that value and its control is off, saying what sets it; the address keeps the
+   * reader's own value, which comes back when the value is left. It wins over the address, and over what a story fixes.
+   * When two values imply different values of a switch, the one of the switch declared first wins. An implied value
+   * implies nothing further: the configuration's check refuses one that would.
+   */
+  readonly implies?: Readonly<Record<string, string>>;
+  /**
+   * A style sheet of this value alone: a file by its path from the configuration's folder, or absolute (a preset's).
+   * Loaded only while the value is drawn, with Styles › Full, after the source's sheets, the switches' in the order they
+   * are declared. A change of value keeps the old sheet until the new one has loaded.
+   */
+  readonly sheet?: string;
 };
 
 /** Where a switch applies. */
@@ -51,6 +82,9 @@ export type SwitchApply =
  */
 export type SwitchRole = "colorScheme" | "contrast" | "language" | "direction" | "touch";
 
+/** The ways a switch can be offered. */
+export type SwitchControlKind = "segments" | "list" | "gallery";
+
 /** A switch of the toolbar or the View menu. */
 export type ViewSwitch = {
   /** A stable id, the address's parameter (`theme`). */
@@ -65,8 +99,11 @@ export type ViewSwitch = {
   readonly apply: SwitchApply;
   /** What the catalogue reads of it; none for a switch only the library reads. */
   readonly role?: SwitchRole;
-  /** How the View menu offers it: a row of segments (by default, up to six values) or a list. */
-  readonly control?: "segments" | "list";
+  /**
+   * How the toolbar and the View menu offer it: a row of segments (by default, up to six values), a list, or a gallery,
+   * a menu whose items show each value's `preview`.
+   */
+  readonly control?: SwitchControlKind;
   /** What a reader should know of it, in a sentence or two: under its row in the View menu and in its tooltip. */
   readonly description?: string;
 };
@@ -260,11 +297,54 @@ export const switchValueOf = (each: ViewSwitch, value: string | undefined): Swit
   each.values.find((candidate) => candidate.value === (value ?? each.default));
 
 /**
+ * The values other switches' values imply, by the implied switch's id, each with the value that implies it.
+ *
+ * @remarks
+ * Read from the values alone, so applying it twice gives the same answer: the shell, a frame and a tool opening a
+ * frame's address agree without telling each other. A switch already implied implies nothing itself, and one whose value
+ * already implies cannot be implied, so a value that is not drawn never implies, and the switch declared first wins a
+ * conflict.
+ *
+ * @param values - the switches' values, by id; a switch left out has its default.
+ * @param switches - the catalogue's switches.
+ */
+export const impliedSwitches = (
+  values: Readonly<Record<string, string>>,
+  switches: readonly ViewSwitch[]
+): ReadonlyMap<string, { readonly value: string; readonly by: SwitchValue }> => {
+  const implied = new Map<string, { readonly value: string; readonly by: SwitchValue }>();
+  const implying = new Set<string>();
+  for (const each of switches) {
+    const by = switchValueOf(each, values[each.id]);
+    if (by?.implies === undefined || implied.has(each.id)) continue;
+    implying.add(each.id);
+    for (const [id, value] of Object.entries(by.implies))
+      if (!implied.has(id) && !implying.has(id)) implied.set(id, { value, by });
+  }
+  return implied;
+};
+
+/**
+ * The switches' values as they are drawn: the ones given, with what their values imply over them.
+ *
+ * @param values - the switches' values, by id.
+ * @param switches - the catalogue's switches.
+ */
+export const shownSwitches = (
+  values: Readonly<Record<string, string>>,
+  switches: readonly ViewSwitch[]
+): Readonly<Record<string, string>> => {
+  const shown = { ...values };
+  for (const [id, { value }] of impliedSwitches(values, switches)) shown[id] = value;
+  return shown;
+};
+
+/**
  * How the View menu offers a switch: as it declares, or segments up to six values and a list past them.
  *
  * @param each - the switch.
  */
-export const switchControl = (each: ViewSwitch): "segments" | "list" =>
+export const switchControl = (each: ViewSwitch): SwitchControlKind =>
   each.control ?? (each.values.length <= 6 ? "segments" : "list");
 
 /**

@@ -289,6 +289,7 @@ describe("the verify tool", () => {
       shot: async () => "unused",
       servePreview: async () => "unused",
       plugins: { schema: 1, apiVersions: [1], plugins: [] },
+      switches: { schema: 1, switches: [] },
       verify: async () => ({
         schema: 2,
         verdict,

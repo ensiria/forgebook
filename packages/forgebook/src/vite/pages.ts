@@ -18,6 +18,7 @@ import { LOAD_RELOADS_KEY } from "../frame/staleModule.ts";
 import type { FramesPlacement } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
+import type { ViewSwitch } from "../switches.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { pluginFrameModule } from "./pluginConfig.ts";
 import {
@@ -39,6 +40,9 @@ export const CONFIG_MODULE = "virtual:forgebook/config";
 
 /** The module the shell reads the design tokens from, imported on first use: a page that shows none never loads it. */
 export const TOKENS_MODULE = "virtual:forgebook/tokens";
+
+/** The previews of the catalogue's galleries, with each picture's address: loaded when a gallery first opens. */
+export const SWITCH_PREVIEWS_MODULE = "virtual:forgebook/switch-previews";
 
 /**
  * The entries the pages load, by page: file names in the configuration's folder, never written to disk. Named as
@@ -227,16 +231,85 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig, placement: Fram
   ].join("\n");
 
 /**
+ * A switch as the pages read it from the configuration's data: without its values' previews and sheets, which the
+ * pages' entries import by themselves, so each first load carries no more than a name for what it may never fetch.
+ *
+ * @param each - the switch.
+ */
+const pageSwitch = (each: ViewSwitch): ViewSwitch => ({
+  ...each,
+  values: each.values.map(({ preview: _preview, sheet: _sheet, ...value }) => value)
+});
+
+/**
+ * An import of a file for its address alone. Never inlined, whatever its size: a small file's bytes would otherwise
+ * land in the page that imports it, in the first load of a catalogue that may never draw it.
+ *
+ * @param name - the imported name.
+ * @param file - the file's path.
+ */
+const addressImport = (name: string, file: string): string =>
+  `import ${name} from ${codeLiteral(`${file}?url&no-inline`)};`;
+
+/**
+ * The module of the galleries' previews: by switch id then value, with each picture's address.
+ *
+ * @param config - the configuration.
+ */
+export const switchPreviewsModule = (config: Pick<ResolvedConfig, "switches">): string => {
+  const imports: string[] = [];
+  const switches = (config.switches ?? []).flatMap((each) => {
+    const values = each.values.flatMap(({ value, preview }) => {
+      if (preview === undefined) return [];
+      if (!("image" in preview)) {
+        // only the checked fields: serialising the object itself would let a `toJSON` write what was not checked
+        const { swatches, font } = preview;
+        return [`${codeLiteral(value)}: ${codeLiteral({ swatches: [...swatches], font })}`];
+      }
+      const name = `picture${imports.length}`;
+      imports.push(addressImport(name, preview.image));
+      return [`${codeLiteral(value)}: { image: ${name} }`];
+    });
+    return values.length === 0 ? [] : [`${codeLiteral(each.id)}: { ${values.join(", ")} }`];
+  });
+  return [...imports, `export default { ${switches.join(", ")} };`, ""].join("\n");
+};
+
+/**
+ * The imports of the switches' values' sheets, and the frame's list of their addresses.
+ *
+ * @param config - the configuration.
+ */
+const valueSheetsCode = (
+  config: Pick<ResolvedConfig, "switches">
+): { readonly imports: readonly string[]; readonly list: readonly string[] } => {
+  const imports: string[] = [];
+  const list = (config.switches ?? []).flatMap((each) =>
+    each.values.flatMap(({ value, sheet }) => {
+      if (sheet === undefined) return [];
+      const name = `valueSheet${imports.length}`;
+      imports.push(addressImport(name, sheet));
+      return [`${codeLiteral(`${each.id}=${value}`)}: ${name}`];
+    })
+  );
+  return { imports, list };
+};
+
+/**
  * The configuration's data, as the pages' module exports it.
  *
  * @param config - the configuration.
  * @param frames - where the frames run: known on the dev server once both of its ports listen.
  */
-export const configModule = (config: ResolvedConfig, frames: FramesPlacement, isServing: boolean): string => {
+export const configModule = (
+  config: Pick<ResolvedConfig, "title" | "heights" | "switches" | "stories" | "languages" | "lists">,
+  frames: FramesPlacement,
+  isServing: boolean
+): string => {
   const data: PageConfig = {
     title: config.title,
     heights: config.heights,
-    switches: config.switches,
+    switches: config.switches?.map(pageSwitch),
     // only a dev server draws a home with no story: a built catalogue carries nothing of the project's layout
     ...(isServing ? { storyGlobs: config.stories } : {}),
     languages: config.languages,
@@ -383,6 +456,12 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.tokens.length === 0 && config.sources.length === 0
       ? []
       : [`    loadTokens: () => import(${codeLiteral(TOKENS_MODULE)}).then((module) => module.default),`]),
+    // only for a catalogue with previews: the others' first load carries not even the way to them
+    ...(config.switches?.some((each) => each.values.some((value) => value.preview !== undefined))
+      ? [
+          `    loadSwitchPreviews: () => import(${codeLiteral(SWITCH_PREVIEWS_MODULE)}).then((module) => module.default),`
+        ]
+      : []),
     "    codeOf",
     "  });",
     ""
@@ -438,6 +517,7 @@ const previewsHot = (previews: readonly string[]): readonly string[] =>
  *   found, which leaves the card to say so.
  */
 export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => {
+  const valueSheets = valueSheetsCode(config);
   const sources = sourcesCode(config);
   const frames = config.plugins.flatMap((plugin) => {
     const frame = pluginFrameModule(plugin, config.framework.name);
@@ -448,6 +528,7 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     `import config from ${codeLiteral(CONFIG_MODULE)};`,
     ...(axe?.imports ?? []),
     ...sources.imports,
+    ...valueSheets.imports,
     ...config.previews.map((file, index) => `import * as preview${index} from ${codeLiteral(file)};`),
     ...frames.map(
       (plugin, index) => `import { frame as pluginFrame${index} } from ${codeLiteral(plugin.frame)};`
@@ -459,6 +540,7 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     ...(axe === undefined ? [] : [`    axeUrl: ${axe.value},`]),
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
+    ...(valueSheets.list.length === 0 ? [] : [`    valueSheets: { ${valueSheets.list.join(", ")} },`]),
     "    lists: config.lists,",
     "    frames: config.frames,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),

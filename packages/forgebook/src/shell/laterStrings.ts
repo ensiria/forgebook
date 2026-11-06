@@ -1,6 +1,6 @@
 /**
  * The texts of the shell's parts that load after the first screen, but for the home and the docs pages
- * (`pageStrings.ts`): a component's page, the panel's tabs but Props, the View menu's panel, the embed panel and page,
+ * (`pageStrings.ts`): a component's page, the panel's tabs but Props, the View menu's panel, a pinned control's menu, the embed panel and page,
  * the comparison, the story clock's bar, the plugins' hosts and the note on args a link dropped. They load with the
  * first of those parts, so a first load carries none of them.
  *
@@ -16,6 +16,10 @@ import { lateStrings } from "./strings.ts";
 /** The later parts' texts, as shown: Forgebook's, with the catalogue's replacements. */
 export const LATER_STRINGS = lateStrings({
   audienceError: "This part of the page could not be loaded",
+  controlMenu: (label: string): string => `${label} on the toolbar`,
+  unpinControl: "Remove from the toolbar",
+  hideInView: "Hide in View",
+  showInView: "Show in View",
   controlKey: (control: string, key: string | undefined): string =>
     key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
   changeKey: "Change the key: press it, then the new key; Backspace takes it away",

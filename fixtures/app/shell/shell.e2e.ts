@@ -45,15 +45,15 @@ const openView = async (page: Page): Promise<void> => {
 };
 
 /**
- * Picks an appearance in the open Appearance menu, and waits until the menu's button shows it.
+ * Picks an appearance in the open Interface menu, and waits until the menu's button shows it.
  *
  * @remarks
  * The menu closes on a choice. `check()` reads the radio again after its click, so on a busy page, where the menu is
  * gone by then, it waits for a radio that never comes back: a click, and the button's name, say the choice was made.
  */
 const chooseAppearance = async (page: Page, name: string): Promise<void> => {
-  await page.getByRole("dialog", { name: "Appearance" }).getByRole("radio", { name, exact: true }).click();
-  await expect(page.getByRole("button", { name: `Appearance: ${name}` })).toBeVisible();
+  await page.getByRole("dialog", { name: "Interface" }).getByRole("radio", { name, exact: true }).click();
+  await expect(page.getByRole("button", { name: `Interface: ${name}` })).toBeVisible();
 };
 
 /** Waits until the shown story's frame says it is ready (or failed). */
@@ -202,7 +202,7 @@ test.describe("the shell following the story", () => {
       page.evaluate(() => document.documentElement.getAttribute("data-forgebook-appearance"));
     await expect.poll(appearance).toBe("light");
 
-    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await page.getByRole("button", { name: /^Interface/ }).click();
     await chooseAppearance(page, "Follow the story");
     await expect.poll(appearance).toBe("dark");
 
@@ -211,7 +211,7 @@ test.describe("the shell following the story", () => {
 
     await page.goto(story("overview", "theme=dark"));
     await expect.poll(appearance).toBe("dark");
-    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await page.getByRole("button", { name: /^Interface/ }).click();
     await chooseAppearance(page, "Light");
     await expect.poll(appearance).toBe("light");
   });
@@ -1694,11 +1694,11 @@ test.describe("the panel", () => {
     await frameStatus(page);
     const root = page.locator("html");
     await expect(root).toHaveAttribute("data-forgebook-appearance", "dark");
-    await page.getByRole("button", { name: "Appearance: System" }).click();
+    await page.getByRole("button", { name: "Interface: System" }).click();
     await popoversSettled(page);
     await chooseAppearance(page, "Light");
     await expect(root).toHaveAttribute("data-forgebook-appearance", "light");
-    await expect(page.getByRole("button", { name: "Appearance: Light" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Interface: Light" })).toBeVisible();
     await page.reload();
     await frameStatus(page);
     await expect(root).toHaveAttribute("data-forgebook-appearance", "light");

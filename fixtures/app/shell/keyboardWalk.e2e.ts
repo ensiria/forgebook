@@ -234,16 +234,16 @@ test.describe("the keyboard alone", () => {
     await expect(page.getByRole("button", { name: "Hide the sidebar" })).toBeFocused();
 
     // the appearance is reached from the sidebar, picked with the arrows: the one before the system's
-    const appearance = page.getByRole("button", { name: /^Appearance/ });
+    const appearance = page.getByRole("button", { name: /^Interface/ });
     await tabTo(page, appearance);
     await page.keyboard.press("Enter");
     await expect(
-      page.getByRole("dialog", { name: "Appearance" }).getByRole("radio", { checked: true })
+      page.getByRole("dialog", { name: "Interface" }).getByRole("radio", { checked: true })
     ).toBeFocused();
     await page.keyboard.press("ArrowUp");
-    await expect(page.getByRole("button", { name: /^Appearance: Dark/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Interface: Dark/ })).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("button", { name: /^Appearance: Dark/ })).toBeFocused();
+    await expect(page.getByRole("button", { name: /^Interface: Dark/ })).toBeFocused();
 
     // the keys of the story list open the next story and come back
     const address = page.url();

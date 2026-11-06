@@ -4,7 +4,7 @@
  *
  * @remarks
  * Pure. A control its toolbar control leaves disabled is left as it is here too: a switch or a background the story
- * fixes (or a width), and a control the compare view draws side by side.
+ * fixes (or a width), a switch another switch's value implies, and a control the compare view draws side by side.
  *
  * @module
  */
@@ -13,6 +13,7 @@ import { AUDIENCE_IDS } from "../audiences.ts";
 import type { CatalogueSettings } from "../catalogue.ts";
 import { cycledValue, switchValues } from "../controlKeys.ts";
 import type { FixedView } from "../storyGlobals.ts";
+import { impliedSwitches } from "../switches.ts";
 import {
   isComparing,
   PLAIN_BACKDROP,
@@ -73,7 +74,8 @@ export const cycledView = (
   if (isStoryPage && (view.compare.includes(id) || (id === "width" && isComparing(view)))) return undefined;
   const each = catalogue.switches.find((candidate) => candidate.id === id);
   if (each !== undefined) {
-    if (fixed.switches[id] !== undefined) return undefined;
+    if (fixed.switches[id] !== undefined || impliedSwitches(view.switches, catalogue.switches).has(id))
+      return undefined;
     const current = view.switches[id] ?? each.default;
     return withSwitch(view, each, cycledValue(switchValues(each), current, step));
   }

@@ -9,7 +9,7 @@
  * @module
  */
 import { APPEARANCES, type Appearance } from "../catalogue.ts";
-import { switchValueOf, switchWithRole, type ViewSwitch } from "../switches.ts";
+import { shownSwitches, switchValueOf, switchWithRole, type ViewSwitch } from "../switches.ts";
 
 /** What decides the shell's palette. */
 export type SchemeQuestion = {
@@ -40,7 +40,7 @@ export const shellIsDark = ({
   if (appearance === "light" || appearance === "dark") return appearance === "dark";
   const scheme = switchWithRole(switches, "colorScheme");
   if (appearance === "system" || isComparing || scheme === undefined) return isSystemDark;
-  const shown = switchValueOf(scheme, values[scheme.id] ?? scheme.default)?.scheme;
+  const shown = switchValueOf(scheme, shownSwitches(values, switches)[scheme.id])?.scheme;
   return shown === undefined || shown === "system" ? isSystemDark : shown === "dark";
 };
 

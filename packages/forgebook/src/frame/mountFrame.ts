@@ -40,7 +40,8 @@ import {
   languageOf,
   liveView,
   type MeasureTool,
-  parseView
+  parseView,
+  type SheetsChoice
 } from "../viewState.ts";
 import { detailOf, previewValue } from "./callValues.ts";
 import { followTouch } from "./followTouch.ts";
@@ -56,6 +57,7 @@ import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import { mergedPreviews, readPreview, readStory, startingGlobals } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
+import type { ValueSheets } from "./valueSheets.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {
@@ -74,6 +76,11 @@ export type FrameConfig = {
   readonly previews?: readonly unknown[];
   /** The switches of the toolbar and the View menu, as the shell's configuration gives them; the theme and contrast by default. */
   readonly switches?: readonly ViewSwitch[];
+  /**
+   * The address of each switch value's own style sheet, by `<switch id>=<value>`; none when no value has one. The
+   * generated frame gives addresses the configuration's check allowed; the page checks nothing itself.
+   */
+  readonly valueSheets?: ValueSheets;
   /** The catalogue's lists (its backgrounds, text sizes, grid step, accessibility rules…); the defaults when none. */
   readonly lists?: CatalogueLists;
   /** Loads the play tools, when the project installs Testing Library (the generated frame passes it then). */
@@ -111,6 +118,30 @@ import.meta.hot?.on("vite:error", ({ err }): void => {
   followServedError?.();
   followServedError = undefined;
 });
+
+/** What shows the sheets of the values drawn, and answers once they have loaded whether it is still the last asked. */
+type ValueSheetsShower = (values: Readonly<Record<string, string>>) => Promise<boolean>;
+
+/**
+ * What shows the sheets of a frame's values; none for a catalogue with none, which so loads no code for them.
+ *
+ * @param valueSheets - each value's sheet, when the catalogue has any.
+ * @param sheets - the frame's Styles setting.
+ * @param switches - the catalogue's switches.
+ * @param onFailed - told a sheet that did not load: the story is drawn without it.
+ */
+const valueSheetsShower = async (
+  valueSheets: ValueSheets | undefined,
+  sheets: SheetsChoice,
+  switches: readonly ViewSwitch[],
+  onFailed: (message: string) => void
+): Promise<ValueSheetsShower | undefined> => {
+  if (valueSheets === undefined) return undefined;
+  const { valueSheetUrls, valueSheetsIn } = await import("./valueSheets.ts");
+  const show = valueSheetsIn(document, onFailed);
+  return (values: Readonly<Record<string, string>>): Promise<boolean> =>
+    show(valueSheetUrls(values, sheets, valueSheets, switches));
+};
 
 /**
  * Fails a frame whose story did not load, with the dev server's reason when the import only says it failed, as soon as
@@ -244,23 +275,38 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       .then(({ applyTools }) => applyTools(document, latestTools, catalogue.gridStep))
       .catch((error: unknown) => reportError(error instanceof Error ? error.message : String(error)));
   };
+  // what shows the sheets of the values drawn, for a catalogue with any; set once the source's are placed
+  let showValueSheets: ValueSheetsShower | undefined;
+  // the view asked for while its sheets load: the next message is compared with it, or going back would stop short of
+  // overtaking it, and the sheets would then draw a view the reader already left
+  let askedView: LiveView | undefined;
   shell.listen((message: ShellMessage): void => {
     if (message.type === "forgebook:tools") showTools(message.tools);
     if (message.type === "forgebook:spills") showSpills(message.isOn);
     if (message.type !== "forgebook:view") return;
     const shown = withFixed(message.view, fixed);
     // the same view again draws nothing: a story's state, and the time its draw takes, are not the shell's to spend
-    if (
-      changeShown !== undefined &&
-      shownView !== undefined &&
-      isSameLiveView(withFixed(shownView, fixed), shown)
-    )
+    const latest = askedView ?? shownView;
+    if (changeShown !== undefined && latest !== undefined && isSameLiveView(withFixed(latest, fixed), shown))
       return;
-    applyView(document.documentElement, shown, catalogue);
-    changeShown?.(message.view);
-    shownView = changeShown === undefined ? undefined : message.view;
-    const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
-    window.history.replaceState(null, "", address);
+    askedView = message.view;
+    const showLive = (): void => {
+      applyView(document.documentElement, shown, catalogue);
+      changeShown?.(message.view);
+      shownView = changeShown === undefined ? undefined : message.view;
+      askedView = undefined;
+      const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
+      window.history.replaceState(null, "", address);
+    };
+    // the root changes with the sheet that draws it; a later view overtakes this one
+    if (showValueSheets === undefined) showLive();
+    else {
+      showValueSheets(shown.switches)
+        .then((isLast) => {
+          if (isLast) showLive();
+        })
+        .catch((error: unknown) => reportError(error instanceof Error ? error.message : String(error)));
+    }
   });
   // until the story runs, or when it cannot, an edit of a file the frame loaded loads the page again: there is no story
   // drawn to renew in place, and a story file that failed to load keeps no other way to show its fix
@@ -289,6 +335,8 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     await source.setup?.();
     await preview.setup?.();
     await loadSheets(document, viewSheets(source.sheets, view));
+    showValueSheets = await valueSheetsShower(config.valueSheets, view.sheets, switches, reportError);
+    await showValueSheets?.(view.switches);
     // the story file's exports: an edit of the file hands them on with its successor's
     let shownFile: unknown = await load();
     const first = readStory(shownFile, location.story.exportName, preview);
@@ -299,6 +347,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     const plugins = startPluginFrames(config.plugins, storyId, tellShell);
     let story = first;
     fixed = fixedViewOf(story.globals, story.parameters, catalogue);
+    await showValueSheets?.(withFixed(view, fixed).switches);
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
     let controls: StoryControls | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));

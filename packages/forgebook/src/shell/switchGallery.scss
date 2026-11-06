@@ -1,0 +1,128 @@
+// A gallery's menu, on the shell's palette, so a catalogue's theme and both appearances reach it. Compiled with the menu,
+// loaded on first use: a reader who never opens a gallery pays nothing for it.
+
+@use "../styles/tokens" as *;
+@use "../styles/mixins";
+
+@layer catalogue {
+  .forgebook-gallery {
+    position: fixed;
+    inset: auto;
+    box-sizing: border-box;
+    width: min(24rem, calc(100vw - #{$space-3}));
+    max-height: min(32rem, calc(100vh - #{$space-3}));
+    margin: 0;
+    padding: $space-2;
+    overflow: auto;
+    border: 0;
+    border-radius: $radius-card;
+    background: $surface;
+    box-shadow: $shadow-popover;
+    color: $text;
+    white-space: normal;
+  }
+
+  .forgebook-gallery__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: $space-1;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .forgebook-gallery__item {
+    // its radio button is placed here: focus brings the item into sight, not the top of the list
+    position: relative;
+    display: grid;
+    gap: $space-1;
+    padding: $space-1;
+    border-radius: $radius-control;
+    cursor: pointer;
+
+    &:hover {
+      background: $hover;
+    }
+
+    &:has(input:checked) .forgebook-gallery__preview {
+      box-shadow: 0 0 0 2px $accent;
+    }
+
+    &:has(input:focus-visible) {
+      outline: 2px solid $accent;
+      outline-offset: 1px;
+    }
+  }
+
+  // the same box whatever a value shows, so the grid keeps its rows and a late picture moves nothing
+  .forgebook-gallery__preview {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    aspect-ratio: 16 / 9;
+    gap: $space-1;
+    padding: $space-2;
+    overflow: hidden;
+    border-radius: $radius-control-small;
+    background: $hover;
+    box-shadow: $ring;
+
+    // the picture fills the box to its edges
+    &:has(.forgebook-gallery__image) {
+      padding: 0;
+    }
+  }
+
+  .forgebook-gallery__image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .forgebook-gallery__swatches {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: $radius-control-small;
+    box-shadow: $ring;
+
+    span {
+      flex: 1;
+    }
+  }
+
+  .forgebook-gallery__font {
+    overflow: hidden;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: $text-secondary;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // a value with no preview: its first letter, quiet, in place of a picture
+  .forgebook-gallery__letter {
+    margin: auto;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: $text-tertiary;
+  }
+
+  .forgebook-gallery__name {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    min-height: 1rem;
+    font: $text-control;
+    color: $text;
+    overflow-wrap: anywhere;
+
+    svg {
+      flex: none;
+      color: $accent-text;
+    }
+  }
+}

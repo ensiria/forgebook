@@ -188,9 +188,9 @@ test.describe("the sidebar on a phone's width", () => {
     await openSidebar(page);
     const menu = page.locator(".forgebook-appearance").getByRole("button");
     await menu.click();
-    await expect(page.getByRole("dialog", { name: "Appearance" })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("dialog", { name: "Interface" })).toBeInViewport({ ratio: 1 });
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Appearance" })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Interface" })).toHaveCount(0);
     await expect(sidebarOf(page)).not.toHaveAttribute("inert");
     await expect(menu).toBeFocused();
     await page.keyboard.press("Escape");
@@ -388,7 +388,7 @@ test.describe("the sidebar across widths", () => {
     // read once it stands still: while it grows in it is narrower, and whole at some moment even when it ends up cut
     const expectWholeMenu = async (): Promise<void> => {
       await page.locator(".forgebook-appearance").getByRole("button").click();
-      const menu = page.getByRole("dialog", { name: "Appearance" });
+      const menu = page.getByRole("dialog", { name: "Interface" });
       await menu.evaluate((panel) =>
         Promise.all(panel.getAnimations().map((animation) => animation.finished))
       );

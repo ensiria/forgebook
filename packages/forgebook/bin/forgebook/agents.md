@@ -22,7 +22,7 @@ and `npx forgebook shot <id> --view "dark 360"`.
 | `npx forgebook story <id> --json` | `requiredProps` (set every name), props, `docs.guidance` (never use a deprecated component), the `links` a person opens |
 | `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw colour or size; only when it says `isClose` or `isExact` |
 | `npx forgebook search onValueChange --json` | A prop or a sentence anywhere in the catalogue |
-| `npx forgebook guide <topic>` | The full text on demand: `stories`, `devices`, `docs-pages`, `links`, `commands`, `setup`, a framework's name, or `all`; with no topic, the list |
+| `npx forgebook guide <topic>` | The full text on demand: `stories`, `devices`, `switches`, `docs-pages`, `links`, `commands`, `setup`, a framework's name, or `all`; with no topic, the list |
 
 `npx forgebook <command> --help` gives the options. With an MCP client, `npx forgebook mcp` offers the same as tools:
 `find_component`, `get_story`, `nearest_token`, `check_story`, `story_shot`, `get_guide`.

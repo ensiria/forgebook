@@ -48,6 +48,8 @@ export const GUIDE_TOPICS = {
   stories: "Writing a story file: its exports, its parameters, the texts, the TSDoc agents read",
   devices: "Touch, phones and tablets: the Touch switch and the drawn devices",
   "docs-pages": "The docs pages and the written home: front matter, live stories, blocks",
+  switches:
+    "The switches, galleries and looks: previews, a value that implies another, a value's own style sheet",
   links: "The links an answer carries for a person, and a page drawn for its audience",
   commands: "Every command an agent uses, and when",
   setup:

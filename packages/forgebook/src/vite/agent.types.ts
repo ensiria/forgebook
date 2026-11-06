@@ -19,6 +19,7 @@ import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
 import type { StoryCheckResult } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
+import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
@@ -544,6 +545,43 @@ export type AgentPlugin = {
   readonly docBlocks: readonly string[];
   /** Whether it runs code around every story. */
   readonly runsInFrames: boolean;
+};
+
+/** A switch's value as the documents give it. */
+export type AgentSwitchValue = {
+  /** The value, as the address writes it. */
+  readonly value: string;
+  /** Its name. */
+  readonly label: string;
+  /** What to write in a view to draw it (`look=night`). */
+  readonly view: string;
+  /** The values it sets on other switches while drawn, by switch id. */
+  readonly implies?: Readonly<Record<string, string>>;
+  /** Its own style sheet, by its path from the configuration's folder. */
+  readonly sheet?: string;
+  /** What a gallery shows of it: a picture by its path from the configuration's folder, or colours and a font's name. */
+  readonly preview?: SwitchPreview;
+};
+
+/** What `forgebook switches` and `list_switches` answer. */
+export type SwitchesDocument = {
+  /** The shape's version. */
+  readonly schema: 1;
+  /** The catalogue's switches, the ready-made ones among them, in their order. */
+  readonly switches: readonly {
+    /** Its id, the address's parameter. */
+    readonly id: string;
+    /** Its name. */
+    readonly label: string;
+    /** The value when a view names none. */
+    readonly default: string;
+    /** How the shell offers it. */
+    readonly control: SwitchControlKind;
+    /** What the catalogue reads of it; none for a switch only the library reads. */
+    readonly role?: SwitchRole;
+    /** Its values, in their order. */
+    readonly values: readonly AgentSwitchValue[];
+  }[];
 };
 
 /** What `forgebook plugins` and `list_plugins` answer. */

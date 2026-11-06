@@ -222,8 +222,8 @@ too, with a warning.
   it by itself.
 - **A toolbar each reader arranges**: whoever uses the catalogue pins the controls they use to the toolbar, orders
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
-- **A light and a dark catalogue**: the reader picks Light, Dark or System at the sidebar's foot (their browser keeps
-  it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
+- **A light and a dark catalogue**: the reader picks Light, Dark or System in the Interface menu at the sidebar's foot
+  (their browser keeps it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
 - **Keys and named views**: a key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
   key of any control (`keys: { width: "w" }`), a reader changes theirs in the View menu. The View menu's values are
   saved under a name and picked again; `views` in the configuration offers some to every reader. A dot marks each
@@ -307,6 +307,64 @@ Without `toolbar`, the colour scheme, the contrast, the width and the device sta
 shows nowhere, not even on the toolbar, and keeps its default (the width can still be dragged on the stage). A preset
 may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
 that is no control at all stops the catalogue with an error saying which.
+
+### Several visual themes
+
+A library with several looks offers them as a switch whose `control` is a gallery: a menu whose items show each look, so a
+reader sees it before applying it.
+
+```ts
+switches: [
+  { ...themeSwitch(), label: "Appearance" },
+  {
+    id: "look",
+    label: "Theme",
+    control: "gallery",
+    apply: { kind: "attribute", name: "data-look" },
+    default: "plain",
+    values: [
+      { value: "plain", label: "Plain", isUnset: true },
+      { value: "paper", label: "Paper", preview: { image: "previews/paper.png" }, sheet: "looks/paper.css" },
+      {
+        value: "night",
+        label: "Night",
+        preview: { swatches: ["#0b1020", "#7c8cff"], font: "Harbor Sans" },
+        implies: { theme: "dark" },
+        sheet: "looks/night.css"
+      }
+    ]
+  }
+]
+```
+
+- **`control: "gallery"`** beside `segments` and `list`. The first load carries only its button: the menu's code, the
+  previews and their pictures load when it first opens. Radio buttons, as the shell's other menus: one tab stop, the arrow
+  keys move and choose, Escape closes. Each item is named by the value's `label`; a value with no preview shows its first
+  letter.
+- **`preview`** is `{ image }`, a file by its path from the configuration's folder (absolute in a preset), or
+  `{ swatches, font }`, 1 to 8 plain colours and a font's name. A font is only a name: drawn in it where the reader has it
+  installed, never fetched. A preview loads nothing from an address: the configuration's check refuses one, and a `url()`.
+- **`implies`** sets other switches while the value is drawn: a look drawn only for dark selects dark by itself. The
+  implied control is off and says what sets it, and its key does nothing. The address keeps the reader's own value, which
+  comes back when the value is left: `?look=night&theme=light` draws dark, and the link stays as written. An implied
+  value wins over the address and over a story's `globals`; between two values that imply different values of one switch,
+  the switch declared first wins; an implied value implies nothing further, which the check enforces. Compare leaves
+  out a cell it contradicts (with `look,theme`, Night only at Dark) and does not offer a switch implied now.
+- **`sheet`** is a style sheet of that value alone, processed by Vite in dev and in a build, and fetched only while
+  the value is drawn. It comes after the source's sheets, the switches' in the order declared, and only with Styles › Full,
+  as the source's theme. Its path may not be an address; its contents are your own CSS, so what it imports is yours to
+  decide, as in a source's sheets. On a change the old sheet stays until the new one has loaded, and the frame's root changes with it,
+  so a story is never drawn with neither.
+
+A source's page colour can follow such a switch, so a story's box waits on the colour it will have:
+`background: { light, dark, bySwitch: { look: { night: { dark: "#0b1020" } } } }`. The first declared switch whose value
+gives the scheme's colour wins; otherwise `light` and `dark`.
+
+The catalogue's own menu, at the sidebar's foot, is named Interface, so it reads apart from a switch named Appearance: it
+colours the catalogue around the stories, never the stories. `strings: { appearance: "…" }` renames it; the
+configuration's `appearance` key and `data-forgebook-appearance` keep their names.
+
+### Backgrounds
 
 The Background control offers Forgebook's five pictures and the catalogue's own:
 `backgrounds: { builtIn: ["checkerboard"], custom: [{ id: "paper", label: "Paper", light: { color: "#fffdf5" } }] }`
@@ -1304,7 +1362,7 @@ Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } f
 `danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
 theme too, and the catalogue's wins role by role.
 
-The reader's Appearance menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
+The reader's Interface menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
 dark shell. It stays on the system's while comparing, since several themes share the stage. `appearance: "story"` makes
 it the catalogue's default; a reader's own choice always wins.
 
@@ -1370,7 +1428,7 @@ answers the links that carry them ([the panel's controls](#the-panels-controls))
 3 KB (renewed in place when it runs again; `--skill` writes the same as an Agent Skill any agent can load): what to run
 before saying a change is done, how to look things up, and how to write a story in this project's framework, read from its
 catalogue or its `package.json` (`--framework` names another). Agents work better with text they ask for than with a long
-file, so the rest waits for them: `forgebook guide` lists the topics (a framework, `stories`, `devices`, `docs-pages`,
+file, so the rest waits for them: `forgebook guide` lists the topics (a framework, `stories`, `devices`, `switches`, `docs-pages`,
 `links`, `commands`, `setup`), `forgebook guide <topic>` prints one and `forgebook guide all` the whole guide.
 
 A coding agent can use the catalogue while it works: find a story's id, read a story's args and its component's
@@ -1381,7 +1439,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers 21 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers 22 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, `list_switches`, its switches and each value's view, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
 `node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
