@@ -1052,6 +1052,7 @@ const ShellPage = ({
         ) : null}
         {shown.kind === "story" ? (
           <Stage
+            loadTokens={loadTokens}
             component={shown.location.component}
             story={shown.location.story}
             view={shownView}

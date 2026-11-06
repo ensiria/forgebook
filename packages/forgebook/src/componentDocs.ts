@@ -11,6 +11,8 @@
  * @module
  */
 
+import type { ValueShape } from "./valueShape.ts";
+
 /** How a prop is set from the panel, and the group it is listed in. */
 export type PropKind = "choice" | "text" | "number" | "toggle" | "event" | "other";
 
@@ -110,6 +112,16 @@ export type PropDocs = {
    * in the order the source declares them: the API reference lists them under the prop, folded. Left out otherwise.
    */
   readonly members?: readonly MemberDocs[];
+  /**
+   * For a prop of kind `other`, what its value looks like when plain JSON can hold it (`readonly string[]`, `{ a; b? }`,
+   * `"sm" | number`): the panel draws fields from it and a link's value is checked against it. Left out otherwise.
+   */
+  readonly shape?: ValueShape;
+  /**
+   * The design tokens its TSDoc asks for (`@token color`): a token's type or a part of its name. Left out when it asks
+   * for none.
+   */
+  readonly token?: string;
 };
 
 /** A part the component is used with, named in the meta's `subcomponents`: listed under it on its page. */
@@ -218,6 +230,10 @@ const isPropDocs = (value: unknown): value is PropDocs =>
   typeof value["isRequired"] === "boolean" &&
   (value["canTakeText"] === undefined || typeof value["canTakeText"] === "boolean") &&
   (value["group"] === undefined || typeof value["group"] === "string") &&
+  (value["token"] === undefined || typeof value["token"] === "string") &&
+  // the plugin's own answer: looked at closer by what reads it, which loads with the first prop that has one
+  (value["shape"] === undefined ||
+    (isRecord(value["shape"]) && typeof value["shape"]["kind"] === "string")) &&
   (value["members"] === undefined ||
     (Array.isArray(value["members"]) && value["members"].every(isMemberDocs)));
 

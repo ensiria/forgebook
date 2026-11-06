@@ -7,7 +7,7 @@
  * failed. The shell asks the frame to
  * replay, sends the props panel's values, names the events to record, and runs, holds, speeds up or restarts the
  * story clock. Every message is checked on arrival
- * (`isFrameMessage`, `isShellMessage`): a page may receive messages from anything it embeds or is embedded in.
+ * (`isFrameMessage`, `frame/shellMessageCheck.ts`): a page may receive messages from anything it embeds or is embedded in.
  *
  * @module
  */
@@ -16,18 +16,34 @@ import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
 import { isViolation, type Violation } from "./a11y.ts";
 import { isPanelArgTypes, type PanelArgTypes } from "./argTypes.ts";
-import { isMatrix, type Matrix } from "./matrix.ts";
+import type { Matrix } from "./matrix.ts";
 import { isPlayTrace, type PlayTrace } from "./playTrace.ts";
 import type { JsonValue } from "./plugin.ts";
-import { type ClockState, isClockRate } from "./storyClock.ts";
+import type { ClockState } from "./storyClock.ts";
 import { type FixedView, isFixedView } from "./storyGlobals.ts";
-import { type LiveView, MEASURE_TOOLS, type MeasureTool } from "./viewState.ts";
+import type { LiveView, MeasureTool } from "./viewState.ts";
 
 /**
- * An arg the props panel can show and set: what crosses between the documents as is. A list of texts or numbers is a
- * multiple choice's (`check`, `multi-select`); a date is a number of ms since the Unix epoch, as Storybook's.
+ * An arg the props panel can show and set: what crosses between the documents as is. Plain JSON, so a link can hold it:
+ * a list and an object nest (`valueShape.ts` says what a prop's look like); a date is a number of ms since the Unix
+ * epoch, as Storybook's. Two objects mean more than their fields: a `NamedArg`, and at the top of the args an `UnsetArg`.
  */
-export type ArgValue = string | number | boolean | null | readonly (string | number)[] | NamedArg;
+export type ArgValue = string | number | boolean | null | readonly ArgValue[] | ArgObject;
+
+/** An object among the args: named fields. */
+export type ArgObject = {
+  /** Each field's value. */
+  readonly [name: string]: ArgValue;
+};
+
+/**
+ * A prop the panel leaves without a value, over what the story's own args give it: the story receives `undefined`, which
+ * neither an empty text nor the panel holding nothing says (the panel holding nothing gives the story's own value).
+ */
+export type UnsetArg = {
+  /** The mark: a name no prop's own object holds. */
+  readonly forgebookUnset: true;
+};
 
 /**
  * A value the panel names instead of sending it: one of the source's `namedValues` (an icon component), which cannot
@@ -220,18 +236,77 @@ export type ShellMessage =
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** The deepest a value nests: a link's `[[[…` must not run the reader out of stack. */
+const MOST_DEPTH = 16;
+
+/** The names a value never holds: a component that merges it would write on every object of the page. */
+const PROTOTYPE_NAMES: readonly string[] = ["__proto__", "constructor", "prototype"];
+
+/** Whether a value, this deep, is one the panel can show. */
+const isArgValueAt = (value: unknown, depth: number): value is ArgValue => {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return true;
+  if (depth >= MOST_DEPTH) return false;
+  if (Array.isArray(value)) return value.every((item) => isArgValueAt(item, depth + 1));
+  return (
+    isRecord(value) &&
+    Object.entries(value).every(
+      ([name, item]) => !PROTOTYPE_NAMES.includes(name) && isArgValueAt(item, depth + 1)
+    )
+  );
+};
+
+/**
+ * Whether a value is a list among the args.
+ *
+ * @param value - an arg's value.
+ */
+export const isArgList = (value: ArgValue): value is readonly ArgValue[] => Array.isArray(value);
+
+/**
+ * Whether a value is an object among the args (a named value is one too).
+ *
+ * @param value - an arg's value.
+ */
+export const isArgObject = (value: ArgValue): value is ArgObject => isRecord(value);
+
+/**
+ * A `Date`, as the address and the messages write it: JSON has none, and the story must receive one. `frame/panelValues.ts`
+ * reads it both ways.
+ */
+export type DateArg = {
+  /** The moment, as `Date.toISOString` writes it. */
+  readonly forgebookDate: string;
+};
+
+/**
+ * Whether a value is a `Date` as the panel writes it.
+ *
+ * @param value - an arg's value.
+ */
+export const isDateArg = (value: unknown): value is DateArg =>
+  isRecord(value) &&
+  typeof value["forgebookDate"] === "string" &&
+  Object.keys(value).length === 1 &&
+  !Number.isNaN(Date.parse(value["forgebookDate"]));
+
+/** The value that says a prop has none, as the address and the messages write it. */
+export const UNSET_ARG: UnsetArg = { forgebookUnset: true };
+
+/**
+ * Whether a value is the panel's "no value".
+ *
+ * @param value - an arg's value.
+ */
+export const isUnsetArg = (value: unknown): value is UnsetArg =>
+  isRecord(value) && value["forgebookUnset"] === true && Object.keys(value).length === 1;
+
 /**
  * Whether a value is one the panel can show.
  *
  * @param value - any value.
  */
-export const isArgValue = (value: unknown): value is ArgValue =>
-  value === null ||
-  typeof value === "string" ||
-  typeof value === "number" ||
-  typeof value === "boolean" ||
-  isChoiceList(value) ||
-  isNamedArg(value);
+export const isArgValue = (value: unknown): value is ArgValue => isArgValueAt(value, 0);
 
 /** Whether a value is a set of args the panel can show. */
 export const isPanelArgs = (value: unknown): value is PanelArgs =>
@@ -251,19 +326,10 @@ export const isChoiceList = (value: unknown): value is readonly (string | number
  * @param value - any value.
  */
 export const isNamedArg = (value: unknown): value is NamedArg =>
-  isRecord(value) && typeof value["of"] === "string" && typeof value["named"] === "string";
-
-/** Whether a value is the view's live part. */
-const isLiveView = (value: unknown): value is LiveView =>
   isRecord(value) &&
-  isRecord(value["switches"]) &&
-  Object.values(value["switches"]).every((switchValue) => typeof switchValue === "string") &&
-  typeof value["backdrop"] === "string" &&
-  typeof value["text"] === "number";
-
-/** Whether a value is a story clock's state. */
-const isClockState = (value: unknown): value is ClockState =>
-  isRecord(value) && typeof value["isRunning"] === "boolean" && isClockRate(value["rate"]);
+  typeof value["of"] === "string" &&
+  typeof value["named"] === "string" &&
+  Object.keys(value).length === 2;
 
 /** Whether a value is a list of strings. */
 const isStringList = (value: unknown): value is readonly string[] =>
@@ -340,79 +406,6 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
     default:
       return false;
   }
-};
-
-/**
- * Whether a received message is one the shell sends.
- *
- * @param value - the message's data.
- */
-export const isShellMessage = (value: unknown): value is ShellMessage => {
-  if (!isRecord(value)) return false;
-  if (
-    value["type"] === "forgebook:replay" ||
-    value["type"] === "forgebook:check" ||
-    value["type"] === "forgebook:play-again" ||
-    value["type"] === "forgebook:clock-restart"
-  ) {
-    return true;
-  }
-  if (value["type"] === "forgebook:args") return isPanelArgs(value["args"]);
-  if (value["type"] === "forgebook:view") return isLiveView(value["view"]);
-  if (value["type"] === "forgebook:clock") return isClockState(value["state"]);
-  if (value["type"] === "forgebook:spills") return typeof value["isOn"] === "boolean";
-  if (value["type"] === "forgebook:tools") {
-    const tools = value["tools"];
-    return Array.isArray(tools) && tools.every((tool) => MEASURE_TOOLS.some((known) => known === tool));
-  }
-  if (value["type"] === "forgebook:matrix") return value["matrix"] === null || isMatrix(value["matrix"]);
-  return value["type"] === "forgebook:events" && isStringList(value["names"]);
-};
-
-/**
- * An event's argument written short for the call log.
- *
- * @param value - anything a callback received.
- */
-export const previewValue = (value: unknown): string => {
-  if (typeof value === "string") return JSON.stringify(value.length > 60 ? `${value.slice(0, 60)}…` : value);
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint")
-    return String(value);
-  if (value === null || value === undefined) return String(value);
-  if (typeof value === "function") return "ƒ";
-  if (typeof Event !== "undefined" && value instanceof Event) return value.constructor.name;
-  if (isRecord(value) && "nativeEvent" in value) return "SyntheticEvent";
-  return Array.isArray(value) ? `[…${value.length}]` : "{…}";
-};
-
-/** The most characters an argument's content keeps in the log. */
-const DETAIL_LENGTH = 2000;
-
-/**
- * An argument's content for the log, when it is an object or a list: JSON, two spaces deep, a function as `ƒ`, an
- * object met again as `[circular]`, cut past `DETAIL_LENGTH`; `null` for anything else (a text, a number, an event).
- *
- * @param value - anything a callback received.
- */
-export const detailOf = (value: unknown): string | null => {
-  if (typeof value !== "object" || value === null) return null;
-  if (typeof Event !== "undefined" && value instanceof Event) return null;
-  if ("nativeEvent" in value) return null;
-  const seen = new WeakSet<object>();
-  const text = JSON.stringify(
-    value,
-    (_key: string, inner: unknown): unknown => {
-      if (typeof inner === "function") return "ƒ";
-      if (typeof inner === "bigint") return `${inner}n`;
-      if (typeof inner === "object" && inner !== null) {
-        if (seen.has(inner)) return "[circular]";
-        seen.add(inner);
-      }
-      return inner;
-    },
-    2
-  );
-  return text.length > DETAIL_LENGTH ? `${text.slice(0, DETAIL_LENGTH)}…` : text;
 };
 
 /**

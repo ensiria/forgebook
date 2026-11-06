@@ -248,7 +248,10 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
   const parts: LoadedStoryParts = {
     module: await settled(files.stories[file]),
     docs: await settled(files.docs[file]),
-    preview: loaded.preview
+    preview: loaded.preview,
+    namedValues: source.namedValues,
+    setArgs: params.get("args") ?? undefined,
+    addressTexts: config.framework.addressTexts
   };
   const index = offersUsedIn(config.lists) ? await sourceUsage(source) : undefined;
   // a usage that cannot be read leaves "Used in" out, never the story
@@ -267,7 +270,7 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
  * @param server - what the answers ask of the dev server.
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
- * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
+ * @param params - the query: `id` for a story, `view` for the links, `args` for the values to set, `category`, `name`, `value` and `type` for the
  *   tokens, `query` and `limit` for a search, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
  * @param origins - where the catalogue is served (`http://localhost:5173`) and where its frames are, for the links.

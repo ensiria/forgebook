@@ -14,6 +14,16 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   names the glob; `forgebook dev` warns, and `list_stories` carries it in `problems` until a file matches. A misspelt
   configuration key, a toolbar naming no control and a file that does not load (`file:line:column` for a syntax error)
   stop every command the same way, so read the message before looking elsewhere.
+- **Setting a story's values without the panel.** `controls` in `forgebook story --json` and `get_story` lists every prop
+  that can be set: `control` says how (`text`, `textarea`, `number`, `boolean`, `select`, `object`, `named`, `token`,
+  `file`…), `shape` what a value of several parts looks like (`object` with `fields`, `list`, `tuple`, `record`, `union`,
+  `named`, `json`). `forgebook story <id> --args '{"tags":["a"],"size":24}'` and `story_address`'s `args` check the values
+  as a link's are and answer `setArgs` (`accepted`, `dropped`) and links that carry those taken; a value left out fails
+  the command. A named value is `{ "of": "<type>", "named": "<name>" }`; `{ "forgebookUnset": true }` leaves a prop with no
+  value over the story's own; an empty text is `""`; a `Date` is `{ "forgebookDate": "<ISO>" }`. Give a person the `address` link to look at them: `forgebook shot` draws
+  a frame alone, with the story's own values.
+- A prop's TSDoc can ask for design tokens (`@token color`, a token's type or a part of its name), a story's arg with
+  `argTypes: { x: { control: { type: "token", of: "space", format: "var(--{name})" } } }`.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
   the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the

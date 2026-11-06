@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { type RefObject, useEffect, useMemo, useRef } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type AcceptedArgs,
@@ -17,7 +17,9 @@ import {
   type CheckedArgs,
   checkedAddressArgs,
   checkedArgsMessage,
-  type DroppedArg
+  type DroppedArg,
+  declaredArgProps,
+  needsShapeChecks
 } from "../addressArgs.ts";
 import type { AddressLink } from "../addressArgsParam.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
@@ -100,6 +102,31 @@ export type AddressArgs = {
    * updates after; none while the docs load.
    */
   readonly acceptedFor: (ready: ReadyDeclaration) => AcceptedArgs | undefined;
+  /** Gives a prop with a shape its worst value, once a prop that has a shape asked for what reads it. */
+  readonly worstOfShape: ShapeValues["worstOfShape"] | undefined;
+};
+
+/** What `shapeValues.ts` gives the stage. */
+export type ShapeValues = typeof import("../shapeValues.ts");
+
+/** The module, once loaded: a story shown later has it at once. */
+let loadedShapes: ShapeValues | undefined;
+
+/**
+ * What reads a value against its shape, loaded when a story first has a prop that needs it.
+ *
+ * @param isNeeded - whether the story has one.
+ */
+const useShapeValues = (isNeeded: boolean): ShapeValues | undefined => {
+  const [shapes, setShapes] = useState(loadedShapes);
+  useEffect(() => {
+    if (!isNeeded || shapes !== undefined) return;
+    void import("../shapeValues.ts").then((module) => {
+      loadedShapes = module;
+      setShapes(module);
+    });
+  }, [isNeeded, shapes]);
+  return shapes;
 };
 
 /**
@@ -111,11 +138,21 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
   const { panelArgs, link, docs, storyArgs, argTypes, controls, frames } = input;
   const typeValue = link?.typeValue;
   const namedValues = input.namedValues ?? NO_NAMED_VALUES;
-  const checked = useMemo((): CheckedArgs | undefined => {
+  const declaration = useMemo(() => {
     const ready = storyArgs === undefined ? undefined : { args: storyArgs, argTypes, controls };
-    const declaration = declarationOf(docs, ready, namedValues);
-    return declaration === undefined ? undefined : checkedAddressArgs(panelArgs, declaration, typeValue);
-  }, [panelArgs, typeValue, docs, storyArgs, argTypes, controls, namedValues]);
+    return declarationOf(docs, ready, namedValues);
+  }, [docs, storyArgs, argTypes, controls, namedValues]);
+  const isNeeded = useMemo(
+    () => declaration !== undefined && declaredArgProps(declaration).some(needsShapeChecks),
+    [declaration]
+  );
+  const shapes = useShapeValues(isNeeded);
+  const checked = useMemo((): CheckedArgs | undefined => {
+    if (declaration === undefined) return undefined;
+    const read = checkedAddressArgs(panelArgs, declaration, typeValue, shapes);
+    // nothing is told of the address until all of it can be: a story must not draw half a link
+    return read.isWaiting ? undefined : read;
+  }, [panelArgs, typeValue, declaration, shapes]);
   const acceptedParam = checked === undefined ? undefined : panelArgsParam(checked.accepted);
   // the values reach the frames from the address, so going back in the history sets them too; compared as text, so a
   // frame is told again only when they change
@@ -133,10 +170,11 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     dropped: checked === undefined ? NOTHING_DROPPED : [...unread, ...checked.dropped],
     acceptedParam,
     acceptedFor: (message: ReadyDeclaration): AcceptedArgs | undefined => {
-      const declaration = declarationOf(docs, message, namedValues);
-      return declaration === undefined
-        ? undefined
-        : checkedAddressArgs(panelArgs, declaration, typeValue).sealed;
-    }
+      const ready = declarationOf(docs, message, namedValues);
+      if (ready === undefined) return undefined;
+      const read = checkedAddressArgs(panelArgs, ready, typeValue, shapes);
+      return read.isWaiting ? undefined : read.sealed;
+    },
+    worstOfShape: shapes?.worstOfShape
   };
 };

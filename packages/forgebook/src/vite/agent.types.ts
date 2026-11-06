@@ -18,6 +18,7 @@ import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
 import type { StoryCheckResult } from "../storyCheck.ts";
+import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
@@ -181,6 +182,14 @@ export type StoryDocument = {
   readonly design?: AgentDesign;
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
+  /**
+   * The props its values can set, as the panel sets them: each one's control and what its value looks like, its
+   * `argTypes` taken into account. Give values through `args` of `forgebook story` or of the tools, or in the address's
+   * `args=` as JSON.
+   */
+  readonly controls: readonly StoryControl[];
+  /** What became of the values asked for (`args`), checked as a link's are; the links carry those it takes. */
+  readonly setArgs?: Pick<SetArgs, "accepted" | "dropped">;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
   readonly problems: readonly string[];
   /**

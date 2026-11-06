@@ -109,7 +109,9 @@ export type ArgControlType =
   | "color"
   | "date"
   | "object"
-  | "file";
+  | "file"
+  | "textarea"
+  | "token";
 
 /** An arg's control: its type, or `false` for none, or the type with its settings. */
 export type ArgControl =
@@ -128,6 +130,17 @@ export type ArgControl =
       readonly step?: number;
       /** Whether the control is off: the arg is shown, not set. */
       readonly disable?: boolean;
+      /**
+       * A `token` control's tokens: a token's type (`color`, `dimension`) or a part of its name (`space`, `radius`).
+       */
+      readonly of?: string;
+      /**
+       * What a `token` control gives the story, with `{name}` for the token's name in CSS's form and `{value}` for its
+       * value (`var(--{name})`); its value by default.
+       */
+      readonly format?: string;
+      /** The files a `file` control takes, as `<input accept>` writes it (`image/*`). */
+      readonly accept?: string;
     };
 
 /**

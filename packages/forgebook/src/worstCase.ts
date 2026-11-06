@@ -18,3 +18,6 @@ export const WORST_SCRIPTS = "Ünïcödé 名前 مرحبا 👩🏽‍💻";
 
 /** A number with more digits than a box usually holds. */
 export const WORST_NUMBER = 123_456_789_012;
+
+/** The worst text: a long one, with a word that cannot break. */
+export const WORST_ARG_TEXT = `${WORST_TEXT} ${WORST_WORD}`;

@@ -1047,6 +1047,11 @@
     }
   }
 
+  // its radio is hidden inside it: when the radio takes the focus, the panel scrolls with it into sight
+  .forgebook-segmented__option {
+    position: relative;
+  }
+
   .forgebook-segmented__face {
     display: inline-flex;
     align-items: center;
@@ -3006,7 +3011,8 @@
     gap: $space-1-5;
 
     select,
-    input {
+    input,
+    textarea {
       box-sizing: border-box;
       height: 1.625rem;
       padding: 0 $space-2;
@@ -3018,16 +3024,81 @@
       color: $text;
       @include mixins.focus-ring($edge: $focus-edge);
     }
+
+    textarea {
+      flex: 1;
+      min-width: 0;
+      height: auto;
+      padding: $space-1 $space-2;
+      resize: vertical;
+    }
+
+    input[type="checkbox"],
+    input[type="radio"] {
+      height: auto;
+      box-shadow: none;
+    }
+
+    // nested fields take the row: they cannot be read in a column of the grid
+    &[data-wide] {
+      grid-column: 1 / -1;
+      max-width: 48rem;
+    }
+  }
+
+  // the two ways back from a value, shown only when each changes something
+  .forgebook-prop__actions {
+    display: inline-flex;
+    flex: none;
+    gap: $space-0-5;
+  }
+
+  .forgebook-prop__action {
+    display: inline-grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: $radius-control-small;
+    background: none;
+    color: $text-secondary;
+    cursor: pointer;
+    @include mixins.focus-ring($edge: $focus-edge);
+
+    &:hover:not([aria-disabled="true"]) {
+      color: $text;
+      background: $hover;
+    }
+
+    &[aria-disabled="true"] {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  .forgebook-prop__state {
+    flex: none;
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  .forgebook-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
   }
 
   .forgebook-prop__head {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: $space-2;
+    min-height: 1.25rem;
   }
 
   .forgebook-prop__name {
+    flex: none;
+    margin-inline-end: auto;
     font: $text-mono;
     font-weight: 500;
   }

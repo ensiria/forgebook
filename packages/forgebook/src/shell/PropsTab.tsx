@@ -1,6 +1,6 @@
 /**
- * The panel's Props tab: the props the story lets the panel set, grouped by control (choices, text and numbers,
- * toggles), each with its description and default, then the props it cannot set. A story of fixed examples sets none:
+ * The panel's Props tab: the props the story lets the panel set, grouped by control (choices, text and numbers, objects
+ * and lists, toggles), each with its description and default, then the props it cannot set. A story of fixed examples sets none:
  * the tab says so and lists every prop for reading. The props come with the story's `argTypes` laid over them
  * (`argTypes.ts`): a control they name (a list, buttons, checkboxes, a range, a colour, a date) wins over the one
  * the prop's type gives.
@@ -39,6 +39,10 @@ export type PropsTabProps = {
   readonly props: readonly PanelProp[];
   /** The values shown: the story's args with the panel's changes. */
   readonly values: PanelArgs;
+  /** The panel's own values, for what can go back to the story's. */
+  readonly panelArgs: PanelArgs;
+  /** Loads the catalogue's design tokens; none when it has none. */
+  readonly loadTokens?: (() => Promise<unknown>) | undefined;
   /** The props the story lets the panel set. */
   readonly controls: StoryControlsSetting;
   /** Called with a changed value; `undefined` removes the panel's value. */
@@ -154,6 +158,8 @@ const WorstCaseControl = ({ worstCase }: { readonly worstCase: WorstCaseState })
 export const PropsTab = ({
   props,
   values,
+  panelArgs,
+  loadTokens,
   controls,
   onValueChange,
   onReset,
@@ -183,7 +189,10 @@ export const PropsTab = ({
       prop={prop}
       showsGroup={showsGroup}
       value={values[prop.name]}
+      panelValue={panelArgs[prop.name]}
       named={isNamed(prop) ? namedValues[prop.type] : undefined}
+      namedValues={namedValues}
+      loadTokens={loadTokens}
       textArg={textArgs[prop.name]}
       onValueChange={onValueChange}
     />
@@ -194,9 +203,11 @@ export const PropsTab = ({
       prop={prop}
       showsGroup={showsGroup}
       value={values[prop.name]}
+      panelValue={panelArgs[prop.name]}
       onValueChange={onValueChange}
     />
   );
+  const isStructured = (prop: PanelProp): boolean => prop.shape !== undefined && !isNamed(prop);
   const groups = [
     {
       title: STRINGS.propGroups.choice,
@@ -204,8 +215,11 @@ export const PropsTab = ({
     },
     {
       title: STRINGS.propGroups.text,
-      props: settable.filter((prop) => ["text", "number", "other"].includes(prop.kind) && !isNamed(prop))
-    }
+      props: settable.filter(
+        (prop) => ["text", "number", "other"].includes(prop.kind) && !isNamed(prop) && !isStructured(prop)
+      )
+    },
+    { title: STRINGS.propGroups.structured, props: settable.filter(isStructured) }
   ].filter((group) => group.props.length > 0);
   const toggles = settable.filter((prop) => prop.kind === "toggle");
   const others = ungrouped.filter((prop) => !isSettable(prop));

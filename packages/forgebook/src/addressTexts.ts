@@ -13,7 +13,7 @@
  *
  * @module
  */
-import { type ArgValue, isNamedArg, type PanelArgs } from "./messages.ts";
+import { type ArgValue, isArgList, isArgObject, isNamedArg, type PanelArgs } from "./messages.ts";
 
 /**
  * How a framework's stories take the texts an address carries: `any` where a text stays text (React, Vue), `plain`
@@ -36,15 +36,17 @@ const PLAIN_NAME = /^[A-Za-z_$][\w$-]*$/;
 export const isPlainText = (text: string): boolean => PLAIN_TEXT.test(text);
 
 /**
- * Whether an address's value can reach a story whose texts may become markup: every text in it plain. A named value is
- * looked up among the source's own values, so its name is never written into the page.
+ * Whether an address's value can reach a story whose texts may become markup: every text and name in it plain. A named
+ * value is looked up among the source's own values, so its name is never written into the page.
  *
  * @param value - the value.
  */
 const isPlainValue = (value: ArgValue): boolean => {
   if (typeof value === "string") return isPlainText(value);
-  if (Array.isArray(value)) return value.every((item) => typeof item !== "string" || isPlainText(item));
-  return value === null || isNamedArg(value) || typeof value !== "object";
+  if (isArgList(value)) return value.every(isPlainValue);
+  if (isNamedArg(value) || !isArgObject(value)) return true;
+  // a name is written too, by a story that spreads the object into attributes
+  return Object.entries(value).every(([name, each]) => PLAIN_NAME.test(name) && isPlainValue(each));
 };
 
 /**

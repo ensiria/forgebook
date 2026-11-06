@@ -98,8 +98,8 @@ test.describe("the panel on an Angular component", () => {
     await page.goto(story("inputs-badge--default"));
     await isReady(page);
     await expect(page.getByLabel("label", { exact: true })).toHaveValue("New");
-    await expect(page.getByLabel("#default")).toBeVisible();
-    await expect(page.getByLabel("#[icon]")).toBeVisible();
+    await expect(page.getByLabel("#default", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("#[icon]", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Events" }).click();
     await expect(page.getByText("removed", { exact: true })).toBeVisible();
     await expect(page.getByText("countChange", { exact: true })).toBeVisible();
@@ -113,7 +113,7 @@ test.describe("the panel on an Angular component", () => {
     await expect(frameOf(page).locator(".badge__label")).toHaveText("Changed");
     await page.getByRole("radio", { name: "danger" }).check({ force: true });
     await expect(frameOf(page).locator(".badge--danger")).toBeVisible();
-    await page.getByLabel("#default").fill("in the content");
+    await page.getByLabel("#default", { exact: true }).fill("in the content");
     await expect(frameOf(page).locator("fb-badge")).toContainText("in the content");
   });
 
@@ -125,7 +125,7 @@ test.describe("the panel on an Angular component", () => {
       await isReady(page);
       await frameOf(page).getByTestId("counter").click();
       await expect(frameOf(page).getByTestId("counter")).toHaveText("Clicks: 1");
-      await page.getByLabel("label").fill("Taps");
+      await page.getByLabel("label", { exact: true }).fill("Taps");
       await expect(frameOf(page).getByTestId("counter")).toHaveText("Taps: 1");
     }
   });
@@ -154,9 +154,9 @@ test.describe("the panel on an Angular component", () => {
   test("shows a story's error, and leaves it when the value changes back", async ({ page }) => {
     await page.goto(story("states-fragile--default"));
     await isReady(page);
-    await page.getByLabel("text").fill("boom");
+    await page.getByLabel("text", { exact: true }).fill("boom");
     await expect(frameOf(page).locator("body")).toContainText("Fragile broke");
-    await page.getByLabel("text").fill("Fine again");
+    await page.getByLabel("text", { exact: true }).fill("Fine again");
     await expect(frameOf(page).getByTestId("fragile")).toHaveText("Fine again");
     await expect(frameOf(page).locator("body")).not.toContainText("Fragile broke");
   });

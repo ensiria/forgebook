@@ -60,6 +60,7 @@ describe("storyText", () => {
       component,
       docs: undefined,
       args: {},
+      controls: [],
       problems: [],
       design: {
         figma: "https://www.figma.com/design/File1",
@@ -84,6 +85,7 @@ describe("storyText", () => {
       component,
       docs: undefined,
       args: {},
+      controls: [],
       problems: []
     };
     const wide: OutputStyle = { ...NARROW, width: 120 };

@@ -14,10 +14,10 @@
 
 import { type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 
-import { actionNames, mappedArgs } from "../argTypes.ts";
 import type { Matrix } from "../matrix.ts";
-import type { PanelArgs } from "../messages.ts";
+import { type PanelArgs, UNSET_ARG } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
+import { actionNames, mappedArgs } from "../storyArgTypes.ts";
 import type { ClockState } from "../storyClock.ts";
 import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
@@ -283,7 +283,12 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     };
     args = { ...story.args, ...ownValues, ...panelValues };
     redraw();
-    options.onArgsChange(options.panelArgsOf(panelValues));
+    // a value the story took away is the panel's "no value": the shell answers with these, over the story's own
+    const unset = Object.keys(panelValues).filter((name) => panelValues[name] === undefined);
+    options.onArgsChange({
+      ...Object.fromEntries(unset.map((name) => [name, UNSET_ARG])),
+      ...options.panelArgsOf(panelValues)
+    });
   };
 
   const clearError = (): void => {

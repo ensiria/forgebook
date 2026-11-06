@@ -7,7 +7,8 @@
 import { describe, expect, it } from "vitest";
 
 import { isArgCondition, isArgShown } from "../src/argConditions.ts";
-import { isPanelArgTypes, panelArgTypesOf } from "../src/argTypes.ts";
+import { isPanelArgTypes } from "../src/argTypes.ts";
+import { panelArgTypesOf } from "../src/storyArgTypes.ts";
 
 describe("isArgShown", () => {
   it.each([

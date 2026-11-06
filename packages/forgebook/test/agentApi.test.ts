@@ -155,6 +155,56 @@ describe("storyDocument", () => {
     expect(document.problems).toEqual([]);
   });
 
+  it("lists what a story's values can set, with its argTypes, and checks values as a link's", () => {
+    const docs = {
+      ...buttonDocs,
+      props: [
+        { name: "label", kind: "text", type: "string", description: "", isRequired: true },
+        {
+          name: "tags",
+          kind: "other",
+          type: "readonly string[]",
+          description: "",
+          isRequired: false,
+          shape: { kind: "list", of: { kind: "text" } }
+        }
+      ]
+    };
+    const module = {
+      default: { title: "Actions/Button", argTypes: { label: { control: "textarea" } } },
+      Primary: { args: { label: "Save" } }
+    };
+    const parts = { module: { value: module }, docs: { value: docs } };
+    const plain = storyDocument(location, parts, PAGES, "");
+    expect(plain.controls.map((each) => [each.name, each.control])).toEqual([
+      ["label", "textarea"],
+      ["tags", "object"]
+    ]);
+    expect(plain.controls[1]?.shape).toEqual({ kind: "list", of: { kind: "text" } });
+    expect(plain).not.toHaveProperty("setArgs");
+
+    const set = storyDocument(
+      location,
+      { ...parts, setArgs: JSON.stringify({ tags: ["ü"], nope: 1, label: 3 }) },
+      PAGES,
+      "theme=dark"
+    );
+    expect(set.setArgs).toEqual({
+      accepted: { tags: ["ü"] },
+      dropped: [
+        { name: "nope", reason: "undeclared" },
+        { name: "label", reason: "type" }
+      ]
+    });
+    expect(set.problems).toHaveLength(2);
+    const address = new URL(set.story.links.address);
+    expect(JSON.parse(address.searchParams.get("args") ?? "")).toEqual({ tags: ["ü"] });
+    expect(address.searchParams.get("theme")).toBe("dark");
+    expect(new URL(set.story.links.embed).searchParams.has("args")).toBe(true);
+    expect(new URL(set.story.links.frame).searchParams.has("args")).toBe(false);
+    expect(new URL(set.story.links.component).searchParams.has("args")).toBe(false);
+  });
+
   it("names the required props first, the docs keeping the source's order whatever the catalogue's layout", () => {
     const prop = (name: string, isRequired: boolean, kind: "text" | "event" = "text"): PropDocs => ({
       name,

@@ -6,16 +6,16 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { panelProps } from "../src/argTypes.ts";
+import type { PropDocs } from "../src/componentDocs.ts";
 import {
   actionNames,
   controlsOfParameter,
   excludedControls,
   mappedArgs,
   mergedArgTypes,
-  panelArgTypesOf,
-  panelProps
-} from "../src/argTypes.ts";
-import type { PropDocs } from "../src/componentDocs.ts";
+  panelArgTypesOf
+} from "../src/storyArgTypes.ts";
 
 /** The props the types of a button give. */
 const PROPS: readonly PropDocs[] = [
@@ -70,15 +70,14 @@ describe("panelProps", () => {
     });
   });
 
-  it("hides what table.disable and controls.exclude name, and lists an object control for reading", () => {
+  it("hides what table.disable and controls.exclude name, and edits an object control as JSON with nothing to read", () => {
     const argTypes = panelArgTypesOf(
       { label: { table: { disable: true } }, icon: { control: "object" } },
       excludedControls({ exclude: ["tone"] })
     );
     const props = panelProps(PROPS, argTypes);
     expect(props.map((prop) => prop.name)).toEqual(["icon", "onPress"]);
-    expect(props[0]).toMatchObject({ kind: "other", control: "none" });
-    expect(props[0]).not.toHaveProperty("canTakeText");
+    expect(props[0]).toMatchObject({ kind: "other", control: "object", shape: { kind: "json" } });
   });
 
   it("adds the args only the argTypes name, as a story without a typed component has", () => {

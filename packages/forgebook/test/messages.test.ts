@@ -5,14 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  detailOf,
-  isFrameMessage,
-  isShellMessage,
-  panelArgsParam,
-  parsePanelArgsParam,
-  previewValue
-} from "../src/messages.ts";
+import { detailOf, previewValue } from "../src/frame/callValues.ts";
+import { isShellMessage } from "../src/frame/shellMessageCheck.ts";
+import { isFrameMessage, panelArgsParam, parsePanelArgsParam } from "../src/messages.ts";
 
 describe("a plugin's report", () => {
   const report = { type: "forgebook:plugin", storyId: "a", plugin: "msw", hint: "2", tab: null };
@@ -49,7 +44,8 @@ describe("messages", () => {
     expect(isFrameMessage({ ...ready, args: { size: "sm" } })).toBe(true);
     expect(isFrameMessage({ ...ready, args: {}, parameters: "msw" })).toBe(false);
     expect(isFrameMessage({ ...ready, args: { sizes: ["sm", 2] } })).toBe(true);
-    expect(isFrameMessage({ ...ready, args: { sizes: ["sm", {}] } })).toBe(false);
+    expect(isFrameMessage({ ...ready, args: { sizes: ["sm", {}] } })).toBe(true);
+    expect(isFrameMessage({ ...ready, args: { sizes: ["sm", (): number => 1] } })).toBe(false);
     expect(
       isFrameMessage({
         ...ready,
@@ -65,7 +61,7 @@ describe("messages", () => {
     expect(isFrameMessage({ ...ready, args: { hint: "Pick one" }, textKeys: { hint: "select.hint" } })).toBe(
       true
     );
-    expect(isFrameMessage({ ...ready, args: { onX: {} } })).toBe(false);
+    expect(isFrameMessage({ ...ready, args: { onX: (): number => 1 } })).toBe(false);
     expect(isFrameMessage({ ...ready, args: {}, textKeys: { hint: 1 } })).toBe(false);
     expect(isFrameMessage({ type: "forgebook:ready", storyId: "a", canReplay: false, args: {} })).toBe(false);
     expect(
@@ -82,7 +78,8 @@ describe("messages", () => {
     expect(
       isShellMessage({ type: "forgebook:args", args: { icon: { of: "IconComponent", named: "IconBell" } } })
     ).toBe(true);
-    expect(isShellMessage({ type: "forgebook:args", args: { icon: { named: "IconBell" } } })).toBe(false);
+    expect(isShellMessage({ type: "forgebook:args", args: { icon: { named: "IconBell" } } })).toBe(true);
+    expect(isShellMessage({ type: "forgebook:args", args: { icon: (): number => 1 } })).toBe(false);
     expect(isShellMessage({ type: "forgebook:events", names: ["onValueChange"] })).toBe(true);
     expect(isShellMessage({ type: "forgebook:events", names: [1] })).toBe(false);
     const view = {
@@ -140,7 +137,12 @@ describe("messages", () => {
     expect(panelArgsParam({})).toBe("");
     expect(parsePanelArgsParam(null)).toEqual({});
     expect(parsePanelArgsParam("{not json")).toEqual({});
-    expect(parsePanelArgsParam('{"onClick":{}}')).toEqual({});
+    expect(parsePanelArgsParam('{"nested":{"list":[1,{"名":"値"}]}}')).toEqual({
+      nested: { list: [1, Object.fromEntries([["名", "値"]])] }
+    });
+    expect(parsePanelArgsParam('{"a":{"__proto__":{"polluted":true}}}')).toEqual({});
+    expect(parsePanelArgsParam('{"a":{"constructor":1}}')).toEqual({});
+    expect(parsePanelArgsParam(`{"a":${"[".repeat(40)}${"]".repeat(40)}}`)).toEqual({});
   });
 
   it("gives an object's or a list's content for the log, and nothing for other values", () => {

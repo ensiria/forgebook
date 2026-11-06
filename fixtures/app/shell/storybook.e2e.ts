@@ -43,6 +43,10 @@ const STORY_IDS = [
   "components-button--untested",
   "storybook-arg-types--controls",
   "storybook-arg-types--conditional",
+  "storybook-value-props--filled",
+  "storybook-value-props--empty",
+  "storybook-value-props--with-tokens",
+  "storybook-value-props--named-controls",
   "storybook-csf-2--primary",
   "storybook-csf-2--large",
   "storybook-meta-render-and-play--from-meta",
@@ -207,7 +211,7 @@ test.describe("arg types and actions", () => {
     await page.goto(story("storybook-arg-types--controls"));
     await isReady(page);
     // a hidden arg has no control; the others have the control their arg type names
-    await expect(page.getByLabel("secret")).toHaveCount(0);
+    await expect(page.getByLabel("secret", { exact: true })).toHaveCount(0);
     await page.getByRole("combobox", { name: "tone" }).selectOption("loud");
     await expect.poll(async () => (await shownArgs(page))["tone"]).toBe("loud");
     await page.getByRole("radio", { name: "Large" }).check({ force: true });
@@ -216,7 +220,7 @@ test.describe("arg types and actions", () => {
     await expect.poll(async () => (await shownArgs(page))["sides"]).toEqual(["top", "end"]);
     await page.getByRole("slider", { name: "volume" }).fill("8");
     await expect.poll(async () => (await shownArgs(page))["volume"]).toBe(8);
-    await expect(page.getByLabel("When")).toHaveAttribute("type", "datetime-local");
+    await expect(page.getByLabel("When", { exact: true })).toHaveAttribute("type", "datetime-local");
     // a mapping's key chosen in the panel reaches the story as its value
     await page.getByRole("combobox", { name: "icon" }).selectOption("heart");
     await expect.poll(async () => (await shownArgs(page))["icon"]).toBe("♥");

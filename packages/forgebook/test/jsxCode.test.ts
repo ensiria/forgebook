@@ -14,6 +14,15 @@ describe("jsxCode", () => {
     );
   });
 
+  it("writes nested values as literals", () => {
+    expect(jsxCode("Box", { style: { top: 1, "z-index": [2, "x"], on: null } })).toBe(
+      '<Box style={{ top: 1, "z-index": [2, "x"], on: null }} />'
+    );
+    expect(jsxCode("Box", { icons: [{ of: "Icon", named: "Star" }], none: {} })).toBe(
+      "<Box icons={[Star]} none={{}} />"
+    );
+  });
+
   it("writes a named value by its name", () => {
     expect(jsxCode("IconTile", { icon: { of: "IconComponent", named: "IconFolder" } })).toBe(
       "<IconTile icon={IconFolder} />"

@@ -14,7 +14,6 @@ import { join } from "node:path";
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
 import type { PluginsDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
-import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
@@ -23,6 +22,7 @@ import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
 import { type Verify, verifyTool } from "./mcpVerify.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
+import { storyAddressTool } from "./setArgsTool.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
 /** The session's folder for pictures; made on the first call. */
@@ -269,7 +269,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -287,29 +287,7 @@ export const catalogueTools = ({
         )
       )
   },
-  {
-    name: "story_address",
-    description:
-      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", description: "The story's id, as list_stories gives it." },
-        view: VIEW
-      },
-      required: ["id"],
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
-      const id = textOf(args, "id") ?? "";
-      const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
-      if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const named = namedStory(answer.body, id);
-      return named === undefined
-        ? { structured: { error: `No story "${id}"` }, isError: true }
-        : { structured: { id: named.story.id, links: named.story.links }, isError: false };
-    }
-  },
+  storyAddressTool(ask),
   {
     name: "new_stories",
     description:

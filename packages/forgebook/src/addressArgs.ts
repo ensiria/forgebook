@@ -10,7 +10,9 @@
  * have set it: a prop the panel lets the person set (the component's props with the story's `argTypes` laid over them,
  * or an arg only the `argTypes` or the story's own args name), with a value of that prop's type. Everything else is
  * left out and reported. A value that is code never comes from an address: a named value is looked up among the
- * source's own entries only, never through an object's prototype (`constructor`). Pure.
+ * source's own entries only, never through an object's prototype (`constructor`). An object's names are checked the
+ * same way, against its type (`valueShape.ts`). The panel's "no value" (`UnsetArg`) passes for any prop the panel sets:
+ * the story receives `undefined`, which any prop may. Pure.
  *
  * A frame takes values from one kind of message only, whichever frame it is (the stage's, an embed's, a plugin's aside),
  * so `checkedArgsMessage` builds it, from nothing but what this check sealed (`AcceptedArgs`): a page that skipped the
@@ -22,7 +24,14 @@ import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
 import { type PanelArgTypes, type PanelProp, panelProps, settableProps } from "./argTypes.ts";
 import type { PropDocs } from "./componentDocs.ts";
-import { type ArgValue, isChoiceList, isNamedArg, type PanelArgs, type ShellMessage } from "./messages.ts";
+import {
+  type ArgValue,
+  isChoiceList,
+  isNamedArg,
+  isUnsetArg,
+  type PanelArgs,
+  type ShellMessage
+} from "./messages.ts";
 import { type NamedValues, namedValueOf } from "./namedValues.ts";
 
 /** What a story declares about the args the panel sets, as the shell knows it once the story's frame is ready. */
@@ -59,6 +68,8 @@ export type CheckedArgs = {
   readonly accepted: PanelArgs;
   /** The values left out, in the address's order. */
   readonly dropped: readonly DroppedArg[];
+  /** Whether a value waits for what checks it against its shape: it is neither taken nor left out yet. */
+  readonly isWaiting: boolean;
   /** The values the story receives, as a frame can be told them. */
   readonly sealed: AcceptedArgs;
 };
@@ -85,8 +96,9 @@ const propOfStoryArg = (name: string, value: ArgValue): PanelProp | undefined =>
   if (typeof value === "boolean") return { ...prop, kind: "toggle" };
   // a named value keeps the type it is offered for, so only another value named for it is taken
   if (isNamedArg(value)) return { ...prop, kind: "other", type: value.of };
-  // a list's options and a `null`'s type are not known: nothing the address names is taken for them
-  return undefined;
+  // a `null`'s type is not known: nothing the address names is taken for it
+  if (value === null) return undefined;
+  return { ...prop, kind: "other", shape: { kind: "like", value } };
 };
 
 /**
@@ -104,7 +116,7 @@ export const declaredArgProps = (declaration: ArgDeclaration): readonly PanelPro
     const prop = propOfStoryArg(name, value);
     return prop === undefined ? [] : [prop];
   });
-  return settableProps([...panelProps(props, argTypes), ...ownProps], controls, namedValues);
+  return settableProps([...panelProps(props, argTypes, storyArgs), ...ownProps], controls, namedValues);
 };
 
 /** Whether a value is a finite number: what a number field sets (an address's JSON has no `NaN` anyway). */
@@ -115,6 +127,19 @@ const isFiniteNumber = (value: ArgValue): value is number =>
 const isOption = (prop: PanelProp, value: ArgValue): boolean =>
   (typeof value === "string" || typeof value === "number") && (prop.choices ?? []).includes(value);
 
+/** What checks a value against a shape: `shapeValues.ts`, which loads with the first prop that has a shape. */
+export type ShapeChecks = Pick<typeof import("./shapeValues.ts"), "isValueOfShape" | "isFileList">;
+
+/**
+ * Whether a prop's values are checked by `shapeValues.ts`.
+ *
+ * @param prop - a prop the panel sets.
+ */
+export const needsShapeChecks = (prop: PanelProp): boolean =>
+  prop.control === "file" ||
+  prop.control === "object" ||
+  (prop.control === undefined && prop.kind === "other" && prop.shape !== undefined);
+
 /**
  * Whether a value is one the panel could set for a prop: of the control the `argTypes` name, otherwise of the prop's
  * kind.
@@ -122,8 +147,14 @@ const isOption = (prop: PanelProp, value: ArgValue): boolean =>
  * @param prop - a prop the panel sets.
  * @param value - the address's value.
  * @param namedValues - the source's named values.
+ * @param shapes - what checks a value against a shape; none refuses a prop that needs it.
  */
-export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: NamedValues): boolean => {
+export const isValueOfProp = (
+  prop: PanelProp,
+  value: ArgValue,
+  namedValues: NamedValues,
+  shapes?: ShapeChecks
+): boolean => {
   switch (prop.control) {
     case "select":
     case "radio":
@@ -140,6 +171,13 @@ export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: Nam
     case "range":
     case "date":
       return isFiniteNumber(value);
+    case "textarea":
+    case "token":
+      return typeof value === "string";
+    case "object":
+      return prop.shape !== undefined && shapes?.isValueOfShape(prop.shape, value, namedValues) === true;
+    case "file":
+      return shapes?.isFileList(value) === true;
     case "none":
       return false;
     case undefined:
@@ -155,9 +193,14 @@ export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: Nam
     case "toggle":
       return typeof value === "boolean";
     case "other":
-      if (isNamedArg(value)) {
-        return value.of === prop.type && namedValueOf(namedValues, value.of, value.named) !== undefined;
-      }
+      if (
+        isNamedArg(value) &&
+        value.of === prop.type &&
+        namedValueOf(namedValues, value.of, value.named) !== undefined
+      )
+        return true;
+      if (prop.shape !== undefined && shapes?.isValueOfShape(prop.shape, value, namedValues) === true)
+        return true;
       return prop.canTakeText === true && typeof value === "string";
     case "event":
       return false;
@@ -171,24 +214,29 @@ export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: Nam
  * @param declaration - what the story declares.
  * @param typeValue - types a value for its prop, for a link whose form does not say (`storybookArgs.ts`); none takes each
  *   as written.
+ * @param shapes - what checks a value against a shape; none leaves such a value waiting.
  */
 export const checkedAddressArgs = (
   args: PanelArgs,
   declaration: ArgDeclaration,
-  typeValue?: (prop: PanelProp, value: ArgValue) => ArgValue
+  typeValue?: (prop: PanelProp, value: ArgValue) => ArgValue,
+  shapes?: ShapeChecks
 ): CheckedArgs => {
   const declared = declaredArgProps(declaration);
   const accepted: [string, ArgValue][] = [];
   const dropped: DroppedArg[] = [];
+  let isWaiting = false;
   for (const [name, written] of Object.entries(args)) {
     const prop = declared.find((each) => each.name === name);
     const value = prop !== undefined && typeValue !== undefined ? typeValue(prop, written) : written;
     if (prop === undefined) dropped.push({ name, reason: "undeclared" });
-    else if (!isValueOfProp(prop, value, declaration.namedValues)) dropped.push({ name, reason: "type" });
-    else accepted.push([name, value]);
+    else if (isUnsetArg(value)) accepted.push([name, value]);
+    else if (shapes === undefined && needsShapeChecks(prop)) isWaiting = true;
+    else if (isValueOfProp(prop, value, declaration.namedValues, shapes)) accepted.push([name, value]);
+    else dropped.push({ name, reason: "type" });
   }
   const values: PanelArgs = Object.fromEntries(accepted);
-  return { accepted: values, dropped, sealed: { values, [ACCEPTED]: true } };
+  return { accepted: values, dropped, isWaiting, sealed: { values, [ACCEPTED]: true } };
 };
 
 /**

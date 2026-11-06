@@ -64,7 +64,7 @@ test("draws the edit in place: the text typed in the story stays, and Code shows
   fileEdits
 }) => {
   await page.goto(story("own", "tab=code"));
-  const field = frameOf(page).getByLabel("Note");
+  const field = frameOf(page).getByLabel("Note", { exact: true });
   await field.fill("typed before the edit");
   await fileEdits.write(OWN_FILE, replacing('"Written here"', '"Edited here"'));
   await expect(frameOf(page).getByText("Edited here")).toBeVisible();
@@ -146,7 +146,7 @@ test("draws an edit of the file its story is re-exported from, and keeps the tex
   fileEdits
 }) => {
   await page.goto(story("behind"));
-  const field = frameOf(page).getByLabel("Note");
+  const field = frameOf(page).getByLabel("Note", { exact: true });
   await field.fill("typed before the edit");
   await fileEdits.write(BEHIND_FILE, replacing('"Written behind a re-export"', '"Edited behind"'));
   await expect(frameOf(page).getByText("Edited behind")).toBeVisible();

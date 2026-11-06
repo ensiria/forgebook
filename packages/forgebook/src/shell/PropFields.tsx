@@ -8,11 +8,11 @@
 import type { ChangeEvent, ReactNode } from "react";
 
 import type { PanelProp } from "../argTypes.ts";
-import { type ArgValue, isChoiceList } from "../messages.ts";
+import { type ArgValue, isChoiceList, UNSET_ARG } from "../messages.ts";
 import { Segmented } from "./Segmented.tsx";
 import { STRINGS } from "./strings.ts";
 
-/** Called with a changed value; `undefined` removes the panel's value. */
+/** Called with a changed value; `undefined` removes the panel's value, `UNSET_ARG` leaves the prop with none. */
 export type OnValueChange = (name: string, value: ArgValue | undefined) => void;
 
 /** A value as a text field shows it: texts and numbers as they are, anything else empty. */
@@ -35,8 +35,11 @@ const dateFieldOf = (value: ArgValue | undefined): string => {
   return local.toISOString().slice(0, 16);
 };
 
-/** The value of the choice that leaves a prop to the story: no choice of a component is an empty text. */
+/** The value of the choice that leaves a prop without one: no choice of a component is an empty text. */
 const UNSET = "";
+
+/** The most options a native list holds before the panel offers a search among them. */
+export const MOST_PLAIN_OPTIONS = 12;
 
 /** The most choices shown as buttons, and the longest label; past either, a list. */
 const FEW_CHOICES = { count: 4, length: 10 } as const;
@@ -144,7 +147,7 @@ export const ChoiceControl = ({
         ]}
         value={choiceOf(value) ?? UNSET}
         onValueChange={(chosen: string | number): void =>
-          onValueChange(prop.name, chosen === UNSET ? undefined : chosen)
+          onValueChange(prop.name, chosen === UNSET ? UNSET_ARG : chosen)
         }
       />
     );
@@ -156,7 +159,7 @@ export const ChoiceControl = ({
       value={textOf(value)}
       onChange={(event: ChangeEvent<HTMLSelectElement>): void => {
         const chosen = choices.find((choice) => String(choice) === event.target.value);
-        onValueChange(prop.name, chosen);
+        onValueChange(prop.name, chosen ?? UNSET_ARG);
       }}
     >
       <option value="">{unsetLabel}</option>
@@ -192,7 +195,7 @@ export const NumberField = ({
         onChange={(event: ChangeEvent<HTMLInputElement>): void => {
           const time = event.target.valueAsNumber;
           // the field's own value is in UTC: read back in the browser's time zone, as it was shown
-          const local = Number.isNaN(time) ? undefined : time + new Date(time).getTimezoneOffset() * 60_000;
+          const local = Number.isNaN(time) ? UNSET_ARG : time + new Date(time).getTimezoneOffset() * 60_000;
           onValueChange(prop.name, local);
         }}
       />
@@ -203,7 +206,8 @@ export const NumberField = ({
     ...(prop.max === undefined ? {} : { max: prop.max }),
     ...(prop.step === undefined ? {} : { step: prop.step })
   };
-  const change = (text: string): void => onValueChange(prop.name, text === "" ? undefined : Number(text));
+  // a number has no empty value, so a cleared field leaves the prop with none
+  const change = (text: string): void => onValueChange(prop.name, text === "" ? UNSET_ARG : Number(text));
   return (
     <>
       {prop.control === "range" ? (
