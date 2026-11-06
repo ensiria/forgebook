@@ -795,6 +795,75 @@ describe("forgebook agents", () => {
   });
 });
 
+describe("forgebook agents, for a framework", () => {
+  it("writes the framework the project lists, and only its words", () => {
+    const project = join(root, "on-vue");
+    mkdirSync(project, { recursive: true });
+    writeFileSync(join(project, "package.json"), '{ "devDependencies": { "@forgebook/vue": "1.0.0" } }\n');
+    const run = spawnSync(process.execPath, [ENTRY, "agents", "--skill"], { cwd: project, encoding: "utf8" });
+    expect(run.status).toBe(0);
+    const text = readFileSync(join(project, "AGENTS.md"), "utf8");
+    expect(text).toContain('"@forgebook/vue"');
+    expect(text).not.toContain("@forgebook/angular");
+    expect(Buffer.byteLength(text)).toBeLessThan(3200);
+    const skill = readFileSync(join(project, ".agents", "skills", "forgebook", "SKILL.md"), "utf8");
+    expect(skill).toContain('"@forgebook/vue"');
+  });
+
+  it("takes the framework it is told, and refuses one it does not know", () => {
+    const told = runScriptProcess(ENTRY, ["agents", "--print", "--framework", "svelte"]);
+    expect(told.exitCode).toBe(0);
+    expect(told.stdout).toContain('"@forgebook/svelte"');
+    expect(runScriptProcess(ENTRY, ["agents", "--print", "--framework", "cobol"]).exitCode).toBe(2);
+  });
+});
+
+describe("forgebook guide", () => {
+  it("lists the topics, and prints one, in text and in JSON", () => {
+    const list = runScriptProcess(ENTRY, ["guide", "--json"]);
+    expect(list.exitCode).toBe(0);
+    expect(list.stdout).toContain('"topic": "docs-pages"');
+    expect(runScriptProcess(ENTRY, ["guide"]).stdout).toContain("docs-pages");
+    const topic = runScriptProcess(ENTRY, ["guide", "vue"]);
+    expect(topic.exitCode).toBe(0);
+    expect(topic.stdout).toContain("Badge.vue");
+    expect(runScriptProcess(ENTRY, ["guide", "vue", "--json"]).stdout).toContain('"topic": "vue"');
+  });
+
+  it("fails on a topic it does not have", () => {
+    expect(runScriptProcess(ENTRY, ["guide", "nope"]).exitCode).not.toBe(0);
+  });
+});
+
+describe("the README's tools", { timeout: SERVER_TIMEOUT }, () => {
+  it("says how many tools a client gets, and names each, as tools/list answers", () => {
+    const fixture = join(import.meta.dirname, "..", "..", "..", "fixtures", "app", "forgebook.config.ts");
+    const message = (id: number, method: string, params: unknown): string =>
+      JSON.stringify({ jsonrpc: "2.0", id, method, params });
+    const input = [
+      message(1, "initialize", {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" }
+      }),
+      JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      message(2, "tools/list", {})
+    ].join("\n");
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", fixture, "--url", NO_SERVER], {
+      input: `${input}\n`,
+      encoding: "utf8"
+    });
+    expect(run.status).toBe(0);
+    const names = [...(run.stdout.trim().split("\n")[1] ?? "").matchAll(/"name":"([a-z_]+)"/g)].map(
+      (match) => match[1] ?? ""
+    );
+    expect(names).not.toContain("story_preview");
+    const readme = readFileSync(join(import.meta.dirname, "..", "README.md"), "utf8");
+    expect(/It offers (\d+) tools/.exec(readme)?.[1]).toBe(String(names.length));
+    for (const name of names) expect(readme).toContain(`\`${name}\``);
+  });
+});
+
 describe("forgebook init", () => {
   it("writes forgebook.config.ts from a project's Storybook files, and refuses to replace it without --force", () => {
     const project = join(root, "on-storybook");

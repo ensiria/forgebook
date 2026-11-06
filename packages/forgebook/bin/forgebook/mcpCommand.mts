@@ -11,6 +11,7 @@ import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 
 import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import { catalogueClient, previewServer } from "./agentClient.ts";
+import { guideTool, isGuideFramework } from "./agentGuide.ts";
 import { pluginsText } from "./agentText.ts";
 import { builtCatalogueServer, serveMcp } from "./builtCatalogue.ts";
 import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
@@ -73,7 +74,7 @@ export const mcpCommands = (
       const preview = previewServer(config, client.runningAt);
       const server = {
         info: { name: "forgebook", version },
-        instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides, search_catalogue finds a prop or a sentence anywhere in it.`,
+        instructions: `The stories of the Forgebook catalogue "${config.title}". list_stories finds a story's id, get_story gives its args and its component's props, story_address gives the links a person opens to see it. list_pages and get_page read its guides, search_catalogue finds a prop or a sentence anywhere in it, get_guide prints how to write a story here.`,
         tools: [
           visualDiffTool((input, outDir) =>
             runStoryDiff(config, options.url, input, {
@@ -81,6 +82,7 @@ export const mcpCommands = (
               outDir
             })
           ),
+          guideTool(isGuideFramework(config.framework.name) ? [config.framework.name] : []),
           ...catalogueTools({
             ask: client.ask,
             writeNew: (file, exportName) =>

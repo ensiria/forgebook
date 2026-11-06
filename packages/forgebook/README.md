@@ -887,7 +887,8 @@ export default defineConfig({
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
-| `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
+| `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
+| `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
@@ -1144,9 +1145,12 @@ missing-story messages, and the box a frame shows when a story fails.
 
 ## For agents
 
-`forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
-and the commands that check one, as a section of `AGENTS.md` (renewed in place when it runs again; `--skill` writes
-the same as an Agent Skill any agent can load).
+`forgebook agents` gives a project's coding agents what they need without being told, as a section of `AGENTS.md` of under
+3 KB (renewed in place when it runs again; `--skill` writes the same as an Agent Skill any agent can load): what to run
+before saying a change is done, how to look things up, and how to write a story in this project's framework, read from its
+catalogue or its `package.json` (`--framework` names another). Agents work better with text they ask for than with a long
+file, so the rest waits for them: `forgebook guide` lists the topics (a framework, `stories`, `devices`, `docs-pages`,
+`links`, `commands`, `setup`), `forgebook guide <topic>` prints one and `forgebook guide all` the whole guide.
 
 A coding agent can use the catalogue while it works: find a story's id, read a story's args and its component's
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for
@@ -1156,7 +1160,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers eighteen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, and `search_catalogue`, the search people use. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers 20 tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
 `node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
