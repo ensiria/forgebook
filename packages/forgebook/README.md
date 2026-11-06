@@ -503,27 +503,6 @@ The buttons read their colours from the page's theme.
 ```story acme:actions-button--primary
 ```
 
-## Search
-
-The field at the top of the sidebar searches the whole catalogue. The tree filters by name as you type, for browsing;
-beside it a list ranks everything the words find, each component or page with what matched inside it and why (a prop,
-an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere (with the sidebar hidden, ⌘K alone,
-which shows it), ↑ and ↓ move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
-
-A prop has an address of its own, so a link to one can be pasted anywhere: `?component=acme:inputs-select#prop.value`,
-and `#prop.Group.label` for a prop of a part named in `subcomponents`. A heading of a component's documentation file
-has one too (`#accessibility`), as a docs page's has.
-
-There is no search server and nothing to set up: the plugin builds the index with the catalogue, and the shell loads it
-the first time someone types, so a reader who never searches pays nothing. A static build searches as the dev server
-does. Only what the page does not already hold goes in the index: under 4 KB gzipped for a small library of ten components
-with their documentation and a few guides. On a dev server, the first search waits for your packages' TypeScript for the props; names and docs
-pages answer first.
-
-Search and `forgebook find` rank alike, with the same synonyms: `modal` finds a `Dialog`, and a name counts more than a
-sentence. A sentence copied from a page finds that page first. Change the words people see with `strings`, as any
-other text of the shell (`"search.kindPage": "Guides"`).
-
 ## The props
 
 ```props acme:actions-button
@@ -686,6 +665,27 @@ itself in backticks; a name that is not a value (`{{name}}`) stays as written an
 page of the catalogue's own `docs`; a library's page is linked by its address (`?page=acme:guides-theming`). Problems in
 the file are listed above the home and by `forgebook pages`, and `forgebook page home` reads it as an agent would. Restart
 `forgebook dev` after adding or removing the file.
+
+## Search
+
+The field at the top of the sidebar searches the whole catalogue. The tree filters by name as you type, for browsing;
+beside it a list ranks everything the words find, each component or page with what matched inside it and why (a prop,
+an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere (with the sidebar hidden, ⌘K alone,
+which shows it), ↑ and ↓ move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
+
+A prop has an address of its own, so a link to one can be pasted anywhere: `?component=acme:inputs-select#prop.value`,
+and `#prop.Group.label` for a prop of a part named in `subcomponents`. A heading of a component's documentation file
+has one too (`#accessibility`), as a docs page's has.
+
+There is no search server and nothing to set up: the plugin builds the index with the catalogue, and the shell loads it
+the first time someone types, so a reader who never searches pays nothing. A static build searches as the dev server
+does. Only what the page does not already hold goes in the index: under 4 KB gzipped for a small library of ten components
+with their documentation and a few guides. On a dev server, the first search waits for your packages' TypeScript for the props; names and docs
+pages answer first.
+
+Search and `forgebook find` rank alike, with the same synonyms: `modal` finds a `Dialog`, and a name counts more than a
+sentence. A sentence copied from a page finds that page first. Change the words people see with `strings`, as any
+other text of the shell (`"search.kindPage": "Guides"`).
 
 ## Design links
 
@@ -961,19 +961,23 @@ say what a catalogue has.
 The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
 
 ## A preview for every pull request
+
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. A host that sets a `Content-Security-Policy` needs `blob:` in `script-src` for
 the Accessibility card: a build keeps axe gzipped, and the frame runs it from a blob once unpacked. It also needs the
 catalogue's own origin in `connect-src` (`'self'`): the page fetches the docs, code, pages and "Used in" a build keeps
 gzipped. This workflow builds on
 every pull request and keeps the result as an artefact; the last step is yours, and any host works:
+
 ```yaml
 # .github/workflows/catalogue-preview.yml
 name: catalogue preview
 on:
   pull_request:
+
 permissions:
   contents: read
+
 jobs:
   preview:
     runs-on: ubuntu-latest
@@ -986,13 +990,17 @@ jobs:
       - run: npm ci
       - run: npx forgebook build --out preview --base "/pr-${{ github.event.number }}/"
       - uses: actions/upload-artifact@v4
+        with:
           name: catalogue-preview
           path: preview
       # then publish the folder, for example:
       # GitHub Pages:  actions/upload-pages-artifact, then actions/deploy-pages (one site, so without --base per PR)
       # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
       # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
+```
+
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+
 ## Stories on an origin of their own
 
 A story's code, or a value a shared link puts in one of its props (an `href`, an `html`), runs in its frame. So that it
@@ -1049,8 +1057,10 @@ A command, an agent or `curl` sends no browser headers: `forgebook mcp`, `forgeb
 network, so use it only on one you trust.
 
 ## Your look in the shell
+
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
 written into the page at build, and the frames are left alone, since they belong to your stories.
+
 ```ts
 // forgebook.config.ts
 shell: {
@@ -1059,16 +1069,31 @@ shell: {
     dark: { accent: "#b28bff" },
     fonts: { sans: "Inter, sans-serif" },
     radius: { control: "4px", card: "8px" }
+  }
 }
+```
+
+A library with design tokens (`tokens` in the configuration) can theme the shell from them in a few lines. Each role takes the
+token's value in both appearances, its `light` and `dark` themes first; colours written by hand win, and a token that
+is not there or is no colour is warned about and leaves the shell's own. The theme is read when the configuration is, so
+restart after editing the tokens.
+
+```ts
+shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.background.card" } } }
+```
+
 Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
 `window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,
 `danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
 theme too, and the catalogue's wins role by role.
+
 The reader's Appearance menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
 dark shell. It stays on the system's while comparing, since several themes share the stage. `appearance: "story"` makes
 it the catalogue's default; a reader's own choice always wins.
+
 When the catalogue starts, a role that does not exist is named, and so is a hex colour that leaves a text or code under
 4.5:1 on its ground, or the accent, which draws the keyboard's focus, under 3:1. Other colour notations are not checked.
+
 Fonts are yours to load: a web font goes in a style sheet of your own, `shell.css`, with `@font-face`. That sheet loads
 after the shell's. It is also an escape hatch, since the shell's class names are not public API and can change in any
 release. Layout is not themable, though a font does change how wide text runs.
@@ -1127,15 +1152,6 @@ A coding agent can use the catalogue while it works: find a story's id, read a s
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for
 example `.mcp.json` for Claude Code:
 
-```
-
-A library with design tokens (`tokens` in the configuration) can theme the shell from them in a few lines. Each role takes the
-token's value in both appearances, its `light` and `dark` themes first; colours written by hand win, and a token that
-is not there or is no colour is warned about and leaves the shell's own. The theme is read when the configuration is, so
-restart after editing the tokens.
-
-```ts
-shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.background.card" } } }
 ```json
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
@@ -1166,27 +1182,35 @@ page's words are replaceable as the shell's are (`strings`): `previewOpen`, `pre
 
 A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
 `@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
+
 The most common mistake of an agent working on a design system is a colour or a size written by hand. Name your
 [DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and each theme in a file of
 its own, and agents can ask what to write instead:
+
 ```ts
 tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
 ```
+
 A library gives its tokens to every catalogue that shows it: the same list on its source, by path from the module that
 declares the source. It is read from that module's text, never by running it, so a broken story cannot hide a token: write
 it in the object of `export const source`, with plain strings and paths inside the package. A source re-exported or
 spread from another module gives no tokens.
+
 ```ts
 export const source: StorySource = { id: "acme-ui", tokens: ["tokens.json"] /* … */ };
 ```
+
 A catalogue reads each source's files in its `sources` order, then its own, so its aliases reach a library's palette. When
 two authors give one token different values in the same theme the last stands, which makes the catalogue's own the final
 word: it is what puts the libraries together. The answer says so in `clashes` (`kept`, `replaced`), the command warns,
 and neither fails: a clash is a choice to review, not a token that cannot be read. A file over another may write only
 `$value`: the token keeps its type, description and deprecation.
+
 ```sh
 npx forgebook tokens --category color --json
 npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whether each is really close
+```
+
 `forgebook mcp` offers the same as `list_tokens`, `get_token` and `nearest_token`. References (`{a.b}`, `$ref`), `$extends`
 and `$root` are followed, and a base alias follows what a theme overrides. Deprecated tokens are never suggested. Colours
 in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed but counted as `uncompared`. A theme can
