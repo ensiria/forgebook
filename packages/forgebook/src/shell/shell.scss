@@ -1047,6 +1047,11 @@
     }
   }
 
+  // its radio is hidden inside it: when the radio takes the focus, the panel scrolls with it into sight
+  .forgebook-segmented__option {
+    position: relative;
+  }
+
   .forgebook-segmented__face {
     display: inline-flex;
     align-items: center;
