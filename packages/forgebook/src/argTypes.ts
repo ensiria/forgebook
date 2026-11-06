@@ -15,6 +15,7 @@
 
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
+import { type ArgCondition, argConditionOf, isArgCondition } from "./argConditions.ts";
 import type { PropDocs } from "./componentDocs.ts";
 import type { NamedValues } from "./namedValues.ts";
 
@@ -52,6 +53,8 @@ export type PanelArgType = {
   readonly max?: number;
   /** A range's or a number's step. */
   readonly step?: number;
+  /** When the panel shows the arg (`if`); none always. */
+  readonly if?: ArgCondition;
 };
 
 /** The panel's arg types, by arg. */
@@ -194,6 +197,7 @@ const panelArgTypeOf = (entry: Readonly<Record<string, unknown>>, isExcluded: bo
   const min = numberOf(settings, "min");
   const max = numberOf(settings, "max");
   const step = numberOf(settings, "step");
+  const condition = argConditionOf(entry["if"]);
   return {
     isHidden: isExcluded || (isRecord(table) && table["disable"] === true),
     ...(typeof name === "string" ? { label: name } : {}),
@@ -203,7 +207,8 @@ const panelArgTypeOf = (entry: Readonly<Record<string, unknown>>, isExcluded: bo
     ...(labels === undefined ? {} : { labels }),
     ...(min === undefined ? {} : { min }),
     ...(max === undefined ? {} : { max }),
-    ...(step === undefined ? {} : { step })
+    ...(step === undefined ? {} : { step }),
+    ...(condition === undefined ? {} : { if: condition })
   };
 };
 
@@ -356,6 +361,7 @@ export const excludedControls = (value: unknown): readonly string[] => {
 const isPanelArgType = (value: unknown): value is PanelArgType =>
   isRecord(value) &&
   typeof value["isHidden"] === "boolean" &&
+  (value["if"] === undefined || isArgCondition(value["if"])) &&
   (value["control"] === undefined || PANEL_CONTROLS.some((control) => control === value["control"])) &&
   (value["options"] === undefined ||
     (Array.isArray(value["options"]) &&

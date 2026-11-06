@@ -18,6 +18,8 @@ export type PageConfig = {
   readonly heights: string | undefined;
   /** The switches, the presets' and the catalogue's merged. */
   readonly switches: readonly ViewSwitch[] | undefined;
+  /** The catalogue's own story patterns, for a dev server's home with no story to say where it looks; none in a build. */
+  readonly storyGlobs?: readonly string[];
   /** The languages, the presets' and the catalogue's merged. */
   readonly languages: readonly StoryLanguage[];
   /** The lists (widths, backgrounds, story groups, texts…), the presets' and the catalogue's merged. */

@@ -42,6 +42,7 @@ const STORY_IDS = [
   "components-button--unlisted",
   "components-button--untested",
   "storybook-arg-types--controls",
+  "storybook-arg-types--conditional",
   "storybook-csf-2--primary",
   "storybook-csf-2--large",
   "storybook-meta-render-and-play--from-meta",
@@ -219,6 +220,78 @@ test.describe("arg types and actions", () => {
     // a mapping's key chosen in the panel reaches the story as its value
     await page.getByRole("combobox", { name: "icon" }).selectOption("heart");
     await expect.poll(async () => (await shownArgs(page))["icon"]).toBe("♥");
+  });
+
+  test("the panel follows an arg's `if`: another arg's value, and a global's", async ({ page }) => {
+    await page.goto(story("storybook-arg-types--conditional", "theme=light"));
+    await isReady(page);
+    await expect(page.getByRole("textbox", { name: "secret" })).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "icon" })).toHaveCount(0);
+    await page.getByRole("combobox", { name: "tone" }).selectOption("loud");
+    await expect(page.getByRole("textbox", { name: "secret" })).toBeVisible();
+    // hiding the control leaves the value alone, as Storybook's does
+    await page.getByRole("combobox", { name: "tone" }).selectOption("calm");
+    await expect(page.getByRole("textbox", { name: "secret" })).toHaveCount(0);
+    await expect.poll(async () => (await shownArgs(page))["secret"]).toBe("hidden");
+    await page.goto(story("storybook-arg-types--conditional", "theme=dark"));
+    await isReady(page);
+    await expect(page.getByRole("combobox", { name: "icon" })).toBeVisible();
+  });
+
+  test("a Storybook link's args are read and typed by the props, and stay in the address", async ({
+    page
+  }) => {
+    const args =
+      "tone:loud;volume:6;sides[0]:end;sides[1]:start;color:!hex(ff0000);size:l;missing:x;style.a:b";
+    await page.goto(story("storybook-arg-types--controls", `args=${args}`));
+    await isReady(page);
+    await expect
+      .poll(async () => shownArgs(page))
+      .toMatchObject({ tone: "loud", volume: 6, sides: ["end", "start"], color: "#ff0000", size: "l" });
+    // what cannot be taken is said, by name and reason, never dropped silently
+    const note = page.locator(".forgebook-dropped-args");
+    await expect(note.getByRole("listitem").filter({ hasText: "style" })).toContainText("could not be read");
+    await expect(note.getByRole("listitem").filter({ hasText: "missing" })).toContainText(
+      "not one of its props"
+    );
+    // the address goes on saying the same, so a reload reads it again
+    await page.reload();
+    await isReady(page);
+    await expect.poll(async () => (await shownArgs(page))["volume"]).toBe(6);
+    // a change starts from what the story takes, typed, in Forgebook's own form
+    await page.getByRole("combobox", { name: "tone" }).selectOption("angry");
+    await expect(page).toHaveURL(/args=%7B/);
+    await expect(note).toHaveCount(0);
+    await page.reload();
+    await isReady(page);
+    await expect
+      .poll(async () => shownArgs(page))
+      .toMatchObject({ tone: "angry", volume: 6, sides: ["end", "start"], color: "#ff0000", size: "l" });
+  });
+
+  test("a link's non-ASCII text and lists reach the story in either form", async ({ page }) => {
+    const text = "Perché 日本語 🎉";
+    await page.goto(
+      story(
+        "storybook-arg-types--controls",
+        `args=${encodeURIComponent(JSON.stringify({ tone: "loud", sides: ["end"], color: text }))}`
+      )
+    );
+    await isReady(page);
+    await expect
+      .poll(async () => shownArgs(page))
+      .toMatchObject({ tone: "loud", sides: ["end"], color: text });
+    await page.goto(
+      story("storybook-arg-types--controls", `args=sides[]:end;color:${encodeURIComponent(text)}`)
+    );
+    await isReady(page);
+    await expect.poll(async () => shownArgs(page)).toMatchObject({ sides: ["end"], color: text });
+  });
+
+  test("a JSON address that cannot be read says so", async ({ page }) => {
+    await page.goto(story("storybook-arg-types--controls", "args=%7Bnot-json"));
+    await isReady(page);
+    await expect(page.locator(".forgebook-dropped-args")).toContainText("could not be read");
   });
 
   test("a story changes its own args with Storybook's useArgs, and the panel and the address follow", async ({

@@ -19,7 +19,7 @@ import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import { AUDIENCE_IDS } from "../audiences.ts";
-import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
+import { type CatalogueLists, catalogueSettings, type TurnedOffControl } from "../catalogue.ts";
 import { deviceSettingProblem } from "../deviceView.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import { REQUIRED_FIRST_LAYOUTS } from "../propGroups.ts";
@@ -30,12 +30,14 @@ import {
   shellThemeProblems,
   themeValueProblem
 } from "../shellTheme.ts";
-import { switchesProblem, type ViewSwitch } from "../switches.ts";
+import { catalogueSwitches, switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
+import { unknownKeysProblem } from "./configKeys.ts";
+import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
-import { patternsProblem } from "./storyPatterns.ts";
+import { patternsProblem, unmatchedPatterns } from "./storyPatterns.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
@@ -275,6 +277,9 @@ const globsProblem = (config: object, key: string): string | undefined => {
 const configProblem = (config: unknown): string | undefined => {
   if (typeof config !== "object" || config === null)
     return "it exports no configuration (`export default defineConfig({ … })`)";
+  // first: a misspelt `title` or `framework` is better named as such than as one left out
+  const keysProblem = unknownKeysProblem(config);
+  if (keysProblem !== undefined) return keysProblem;
   if (!("framework" in config) || typeof config.framework !== "object" || config.framework === null)
     return "it names no framework (`framework: react()`)";
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
@@ -383,6 +388,49 @@ const mergedListsProblem = (lists: CatalogueLists): string | undefined => {
   return undefined;
 };
 
+/**
+ * What the shell would refuse when it starts, refused on Node instead: a toolbar naming no control, a key that cannot be
+ * used, a view that cannot be read. Without this a command or a build succeeds, and the mistake surfaces as a blank page
+ * in a reader's browser. The same call the shell makes (`catalogueContext.ts`), so both refuse the same things.
+ *
+ * @param resolved - the configuration's merged title, switches, languages, lists and plugins, with its folder.
+ * @throws what the shell would, with the configuration's name.
+ */
+const checkSettings = (
+  resolved: Pick<ResolvedConfig, "dir" | "title" | "switches" | "languages" | "lists" | "plugins">
+): void => {
+  const { dir, title, switches, languages, lists, plugins } = resolved;
+  try {
+    catalogueSettings(
+      title,
+      catalogueSwitches(switches, languages, lists.controls),
+      lists,
+      plugins.flatMap((plugin) => (plugin.tabs ?? []).map((tab) => tab.id))
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${resolve(dir, "forgebook.config")}: ${message}`);
+  }
+};
+
+/**
+ * The patterns of a catalogue's own stories that match no story file, each of them a mistake or a first story not yet
+ * written: a `forgebook build` stops on them, a dev server says so and waits. A source's patterns are its own module's,
+ * which only Vite can read.
+ *
+ * @param config - the catalogue's folder and stories.
+ */
+export const emptyStoryGlobs = (config: Pick<ResolvedConfig, "dir" | "stories">): readonly string[] =>
+  unmatchedPatterns(config.dir, config.stories);
+
+/**
+ * What to say of the patterns of `emptyStoryGlobs`.
+ *
+ * @param globs - the patterns, at least one.
+ */
+export const emptyStoryGlobsMessage = (globs: readonly string[]): string =>
+  `No story file matches ${globs.map((glob) => `"${glob}"`).join(", ")} (\`stories\` in the configuration)`;
+
 /** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
 const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "docs" | "sources"> => ({
   stories: config.stories ?? [],
@@ -472,6 +520,8 @@ export const resolveConfig = (
   if (listsProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${listsProblem}`);
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
+  const languages = mergedById([...presets.map((preset) => preset.languages), config.languages]);
+  checkSettings({ dir, title: config.title, switches, languages, lists, plugins });
   const ownPreview =
     config.preview === undefined
       ? PREVIEW_FILES.map((name) => paths.join(dir, name)).find((file) => existsSync(file))
@@ -485,7 +535,7 @@ export const resolveConfig = (
     heights: config.heights,
     ...shownFiles(config),
     switches,
-    languages: mergedById([...presets.map((preset) => preset.languages), config.languages]),
+    languages,
     previews: [
       ...presets.flatMap((preset) => (preset.preview === undefined ? [] : [ownPath(preset.preview)])),
       ...(ownPreview === undefined ? [] : [ownPreview])
@@ -520,7 +570,12 @@ export const resolveConfig = (
  * @throws when the file does not load, or exports no usable configuration.
  */
 export const loadConfigFile = async (file: string): Promise<ResolvedConfig> => {
-  const module: unknown = await import(pathToFileURL(file).href);
+  let module: unknown;
+  try {
+    module = await import(pathToFileURL(file).href);
+  } catch (error) {
+    throw new Error(await configLoadMessage(file, error));
+  }
   const config: unknown =
     typeof module === "object" && module !== null && "default" in module ? module.default : undefined;
   if (!isConfig(config)) throw new Error(`${file}: ${configProblem(config) ?? "it cannot be read"}`);

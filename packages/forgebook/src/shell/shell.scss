@@ -2011,6 +2011,26 @@
     gap: $space-2;
   }
 
+  .forgebook-home__no-story {
+    display: grid;
+    gap: $space-2;
+    min-width: 0;
+
+    p,
+    ul,
+    pre {
+      margin: 0;
+    }
+
+    ul {
+      padding-inline-start: $space-4;
+    }
+
+    code {
+      overflow-wrap: anywhere;
+    }
+  }
+
   .forgebook-home__title {
     margin: 0;
     font-size: 1.75rem;

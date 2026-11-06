@@ -250,7 +250,7 @@ export const Sidebar = ({
         onOpenResult={onOpenResult}
       />
       <nav ref={navRef} className="forgebook-tree" aria-label={STRINGS.componentsNav}>
-        {hasMatches ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}
+        {hasMatches || !isSearching ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}
         <SidebarDocs
           sources={pages}
           currentPageId={currentPageId}

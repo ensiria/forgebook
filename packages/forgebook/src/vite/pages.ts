@@ -232,11 +232,13 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig, placement: Fram
  * @param config - the configuration.
  * @param frames - where the frames run: known on the dev server once both of its ports listen.
  */
-export const configModule = (config: ResolvedConfig, frames: FramesPlacement): string => {
+export const configModule = (config: ResolvedConfig, frames: FramesPlacement, isServing: boolean): string => {
   const data: PageConfig = {
     title: config.title,
     heights: config.heights,
     switches: config.switches,
+    // only a dev server draws a home with no story: a built catalogue carries nothing of the project's layout
+    ...(isServing ? { storyGlobs: config.stories } : {}),
     languages: config.languages,
     lists: config.lists,
     frames
@@ -347,6 +349,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.heights === undefined ? [] : ["    heights: config.heights,"]),
     ...(config.home === undefined ? [] : [`    home: ${writtenHomeCode(config.home)},`]),
     `    sources: ${sources.list},`,
+    ...(config.stories.length === 0 ? [] : ["    storyGlobs: config.storyGlobs,"]),
     '    frameUrl: "frame.html",',
     "    frames: config.frames,",
     "    languages: config.languages,",

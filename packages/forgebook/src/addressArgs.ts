@@ -35,8 +35,11 @@ export type ArgDeclaration = {
   readonly namedValues: NamedValues;
 };
 
-/** Why a value of the address was left out: its name is not one the panel sets, or its value is not of the prop's type. */
-export type DroppedArgReason = "undeclared" | "type";
+/**
+ * Why a value of the address was left out: its name is not one the panel sets, its value is not of the prop's type, or
+ * its text could not be read as a value at all.
+ */
+export type DroppedArgReason = "undeclared" | "type" | "unreadable";
 
 /** A value of the address left out. */
 export type DroppedArg = {
@@ -146,16 +149,48 @@ export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: Nam
  *
  * @param args - the values the address names.
  * @param declaration - what the story declares.
+ * @param typeValue - types a value for its prop, for a link whose form does not say (`storybookArgs.ts`); none takes each
+ *   as written.
  */
-export const checkedAddressArgs = (args: PanelArgs, declaration: ArgDeclaration): CheckedArgs => {
+export const checkedAddressArgs = (
+  args: PanelArgs,
+  declaration: ArgDeclaration,
+  typeValue?: (prop: PanelProp | undefined, value: ArgValue) => ArgValue
+): CheckedArgs => {
   const declared = declaredArgProps(declaration);
   const accepted: [string, ArgValue][] = [];
   const dropped: DroppedArg[] = [];
-  for (const [name, value] of Object.entries(args)) {
+  for (const [name, written] of Object.entries(args)) {
     const prop = declared.find((each) => each.name === name);
+    const value = prop !== undefined && typeValue !== undefined ? typeValue(prop, written) : written;
     if (prop === undefined) dropped.push({ name, reason: "undeclared" });
     else if (!isValueOfProp(prop, value, declaration.namedValues)) dropped.push({ name, reason: "type" });
     else accepted.push([name, value]);
   }
   return { accepted: Object.fromEntries(accepted), dropped };
+};
+
+/**
+ * A link's values typed by what the story's frame says of its args, for a page that does not read the component's docs:
+ * an arg it does not know of is typed as the link's form reads it alone.
+ *
+ * @param args - the values the address names.
+ * @param declaration - what the story declares.
+ * @param typeValue - types a value for its prop.
+ */
+export const typedLinkArgs = (
+  args: PanelArgs,
+  declaration: ArgDeclaration,
+  typeValue: (prop: PanelProp | undefined, value: ArgValue) => ArgValue
+): PanelArgs => {
+  const declared = declaredArgProps(declaration);
+  return Object.fromEntries(
+    Object.entries(args).map(([name, value]): [string, ArgValue] => [
+      name,
+      typeValue(
+        declared.find((each) => each.name === name),
+        value
+      )
+    ])
+  );
 };

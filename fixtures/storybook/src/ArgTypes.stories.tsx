@@ -50,3 +50,11 @@ export default meta;
 
 /** Every control of the panel, drawn from the story's arg types. */
 export const Controls: StoryObj<typeof meta> = {};
+
+/** Args the panel shows only while another arg, or a global, has a value: `if`, as Storybook writes it. */
+export const Conditional: StoryObj<typeof meta> = {
+  argTypes: {
+    secret: { control: "text", table: { disable: false }, if: { arg: "tone", eq: "loud" } },
+    icon: { if: { global: "theme", eq: "dark" } }
+  }
+};

@@ -5,7 +5,16 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -65,6 +74,70 @@ afterAll(() => {
 /** Runs the command with a catalogue's configuration. */
 const forgebook = (config: string, argv: readonly string[]): ScriptProcessRun =>
   runScriptProcess(ENTRY, [...argv, "--config", config, "--url", NO_SERVER]);
+
+describe("a configuration that cannot be used", () => {
+  /** A folder of files, one of them the configuration. */
+  const folderOf = (name: string, files: Readonly<Record<string, string>>): string => {
+    const dir = join(root, name);
+    mkdirSync(join(dir, "src"), { recursive: true });
+    for (const [file, code] of Object.entries(files)) writeFileSync(join(dir, file), code);
+    return dir;
+  };
+  const brokenFile = 'export default {\n  title: "x"\n  framework: 1,\n};\n';
+
+  it.each(["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"])(
+    "names the file, line and column of a syntax error in %s",
+    (file) => {
+      const dir = folderOf(`syntax-${file}`, { "package.json": '{"type":"module"}', [file]: brokenFile });
+      const run = forgebook(join(dir, file), ["stories"]);
+      expect(run.exitCode).toBe(1);
+      expect(run.stderr).toContain(`${join(dir, file)}:3:3: `);
+    }
+  );
+
+  it("names the file at fault when the configuration imports it", () => {
+    const dir = folderOf("syntax-imported", {
+      "forgebook.config.ts": 'import shared from "./shared.ts";\nexport default shared;\n',
+      "shared.ts": brokenFile
+    });
+    const run = forgebook(join(dir, "forgebook.config.ts"), ["stories"]);
+    expect(run.exitCode).toBe(1);
+    // Node resolves an import to its real path, which a temporary folder may not be
+    expect(run.stderr).toContain(`${realpathSync(join(dir, "shared.ts"))}:3:3: `);
+  });
+
+  it("names the configuration when it fails for another reason", () => {
+    const dir = folderOf("throws", { "forgebook.config.ts": 'throw new Error("boom");\n' });
+    const run = forgebook(join(dir, "forgebook.config.ts"), ["stories"]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`${join(dir, "forgebook.config.ts")}: it did not load: boom`);
+  });
+
+  it("stops on a misspelt key before answering", () => {
+    const dir = folderOf("misspelt", {
+      "forgebook.config.ts": `export default ${JSON.stringify({
+        framework: STUB_FRAMEWORK,
+        title: "T",
+        stories: ["src/*.stories.tsx"],
+        toolbr: []
+      })};\n`
+    });
+    const run = forgebook(join(dir, "forgebook.config.ts"), ["stories", "--json"]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toBe("");
+    expect(run.stderr).toContain('it has no key "toolbr". Did you mean toolbar?');
+  });
+
+  it.each(["build", "stories", "check x", "verify"])(
+    "%s stops on a story pattern that matches nothing, naming it",
+    (command) => {
+      const empty = catalogue(root, `empty-${command.split(" ")[0]}`, {});
+      const run = runScriptProcess(ENTRY, [...command.split(" "), "--config", empty]);
+      expect(run.exitCode).toBe(1);
+      expect(run.stderr).toContain('No story file matches "src/*.stories.tsx"');
+    }
+  );
+});
 
 describe("forgebook stories", () => {
   it("lists the stories as JSON from a server of its own, with their links", async () => {
@@ -160,6 +233,37 @@ describe("forgebook mcp", () => {
         }
       }
     ]);
+  }, 60_000);
+
+  it("carries a story pattern that matches nothing in list_stories' problems, for an agent about to write a story", () => {
+    const empty = catalogue(root, "empty-mcp", {});
+    const messages = [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-11-25", capabilities: {} }
+      },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "list_stories", arguments: {} } }
+    ];
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", empty, "--url", NO_SERVER], {
+      input: messages.map((message) => JSON.stringify(message)).join("\n"),
+      encoding: "utf8"
+    });
+    expect(run.status).toBe(0);
+    const answers: unknown[] = run.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(answers[1]).toMatchObject({
+      id: 2,
+      result: {
+        structuredContent: {
+          problems: [expect.stringContaining('No story file matches "src/*.stories.tsx"')]
+        }
+      }
+    });
   }, 60_000);
 });
 

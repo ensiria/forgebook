@@ -292,7 +292,8 @@ const defaultToolbar = (switches: readonly ViewSwitch[], ownControls: readonly O
 const toolbarProblem = (toolbar: readonly string[], switches: readonly ViewSwitch[]): string | undefined => {
   const known = new Set<string>([...switches.map((each) => each.id), ...OWN_CONTROL_IDS]);
   const unknown = toolbar.find((id) => !known.has(id));
-  if (unknown !== undefined) return `The toolbar names "${unknown}", which is no control of the catalogue`;
+  if (unknown !== undefined)
+    return `The toolbar names "${unknown}", which is no control of the catalogue: it has ${[...known].join(", ")}`;
   const twice = toolbar.find((id, index) => toolbar.indexOf(id) !== index);
   if (twice !== undefined) return `The toolbar names "${twice}" twice`;
   return undefined;

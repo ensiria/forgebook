@@ -120,6 +120,13 @@ test.describe("a story alone", () => {
     await expect(page).toHaveURL(/embed/);
   });
 
+  test("reads a Storybook link's args, and says which it could not read", async ({ page }) => {
+    await page.goto(embed("args=hint:From+a+link;style.color:red"));
+    await ready(storyFrame(page));
+    await expect(storyFrame(page).locator("small")).toHaveText("From a link");
+    await expect(page.getByRole("alert")).toContainText("style");
+  });
+
   test("says so when the address names no story, or one that is not there", async ({ page }) => {
     await page.goto("/?embed");
     await expect(page.getByRole("alert")).toHaveText("This address names no story.");

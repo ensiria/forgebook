@@ -43,6 +43,7 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   argTypes: {},
   actions: [],
   values: {},
+  globals: {},
   onValueChange: (): undefined => undefined,
   onReset: (): undefined => undefined,
   worstCase: {

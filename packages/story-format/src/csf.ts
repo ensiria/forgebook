@@ -149,6 +149,32 @@ export type ArgType = {
   readonly table?: { readonly disable?: boolean };
   /** Records the arg's calls in the Events tab, under this name (Storybook's actions); a spy (`fn()`) is recorded too. */
   readonly action?: string;
+  /** When the panel shows the arg, from another arg's value or a global's: always by default. */
+  readonly if?: ArgCondition;
+};
+
+/**
+ * When the panel shows an arg (Storybook's conditional args): it reads one arg or one global, and applies one test,
+ * that it is truthy by default.
+ */
+export type ArgCondition = (
+  | {
+      /** The arg to read. */
+      readonly arg: string;
+    }
+  | {
+      /** The global to read: a switch's id. */
+      readonly global: string;
+    }
+) & {
+  /** Whether the value should be truthy or falsy. */
+  readonly truthy?: boolean;
+  /** Whether the value should be set, or not set. */
+  readonly exists?: boolean;
+  /** What the value should be: a text, a number, a toggle's value, `null`, or a list of texts and numbers. */
+  readonly eq?: unknown;
+  /** What the value should not be, in the same forms. */
+  readonly neq?: unknown;
 };
 
 /** A story's or a meta's `argTypes`, by arg. */

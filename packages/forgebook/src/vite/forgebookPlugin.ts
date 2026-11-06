@@ -34,7 +34,14 @@ import { axeBuildAsset } from "./axeScript.ts";
 import { groupTexts, type TextSources } from "./builtTexts.ts";
 import { catalogueConfig } from "./catalogueConfig.ts";
 import { currentCloseWatch } from "./closeWatch.ts";
-import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
+import {
+  emptyStoryGlobs,
+  emptyStoryGlobsMessage,
+  findConfigFile,
+  loadConfigFile,
+  packageResolver,
+  type ResolvedConfig
+} from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, NO_DOCS_EXTRACTOR } from "./docsExtractor.ts";
 import { devServerAccess, VITEST_HOOKS } from "./fileAccess.ts";
@@ -209,7 +216,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     id: string
   ): Promise<{ code: string; moduleType: "js" } | string | undefined> => {
     if (config === undefined) return undefined;
-    if (id === CONFIG_ID) return { code: configModule(config, await framesPlacement()), moduleType: "js" };
+    if (id === CONFIG_ID)
+      return { code: configModule(config, await framesPlacement(), isServing()), moduleType: "js" };
     return generatedModule(id, config, command);
   };
   /** The files followed one by one, so an edit reaches the dev server at once. */
@@ -458,6 +466,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
       for (const problem of config?.shell.problems ?? [])
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
+      const emptyGlobs = config === undefined || isTestRun ? [] : emptyStoryGlobs(config);
+      if (emptyGlobs.length === 0) return;
+      // a build's reader would find nothing, and whoever runs a dev server may be about to write the first story
+      if (!isServing()) throw new Error(emptyStoryGlobsMessage(emptyGlobs));
+      resolved.logger.warn(
+        `Forgebook: ${emptyStoryGlobsMessage(emptyGlobs)}. The catalogue shows them as soon as a file does.`
+      );
     },
     configureServer: (server: ViteDevServer): void => {
       access.serve(server, config === undefined ? undefined : pageModulePath(config.dir, AGENT_SOURCES_FILE));

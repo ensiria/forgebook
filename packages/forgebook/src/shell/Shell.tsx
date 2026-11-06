@@ -18,10 +18,11 @@ import {
   useState
 } from "react";
 
+import { type AddressLink, readArgsParam, readStorybookLink } from "../addressArgsParam.ts";
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
 import { type DeviceDefault, deviceDefaultOf, pageDeviceDefault } from "../deviceView.ts";
-import { type PanelArgs, panelArgsParam, parsePanelArgsParam } from "../messages.ts";
+import { type PanelArgs, panelArgsParam } from "../messages.ts";
 import { anchorOf } from "../pageAddress.ts";
 import { findPage, type PageLocation } from "../pageTree.ts";
 import type { SearchTarget } from "../search.ts";
@@ -95,6 +96,8 @@ export type ShellConfig = {
   readonly heights?: string;
   /** The sources, in the order the sidebar lists them. */
   readonly sources: readonly StorySource[];
+  /** The catalogue's own story patterns, for a home with no story to say where it looks; none by default. */
+  readonly storyGlobs?: readonly string[];
   /**
    * The frame page's address: relative to the shell's (`frame.html`) when the frames share its origin, on the frames'
    * origin otherwise (`mountShell` makes it).
@@ -233,6 +236,8 @@ type Address = {
   readonly page: Page;
   readonly view: ViewState;
   readonly panelArgs: PanelArgs;
+  /** What else the address says of the values, until the person changes one. */
+  readonly link: AddressLink | undefined;
   readonly matrix: readonly string[];
 };
 
@@ -262,10 +267,12 @@ const pageOf = (search: string, hash: string): Page => {
  */
 const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Address => {
   const params = new URLSearchParams(window.location.search);
+  const read = readArgsParam(params.get("args"));
   return {
     page: pageOf(window.location.search, window.location.hash),
     view: parseView(window.location.search, catalogue),
-    panelArgs: addressArgsFor(parsePanelArgsParam(params.get("args")), addressTexts),
+    panelArgs: addressArgsFor(read.args, addressTexts),
+    link: read.link,
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== "")
   };
 };
@@ -279,12 +286,15 @@ type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience">;
  * @param address - the page, the view, the panel's values and the matrix's axes.
  * @param catalogue - the catalogue's switches and default audience, for the view's values.
  */
-const addressQuery = ({ page, view, panelArgs, matrix }: Address, catalogue: AddressCatalogue): string => {
+const addressQuery = (
+  { page, view, panelArgs, link, matrix }: Address,
+  catalogue: AddressCatalogue
+): string => {
   const params = viewParams(view, catalogue.switches, catalogue.audience);
   if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
   if (page.kind === "page") params.set("page", page.id);
-  const args = page.kind === "story" ? panelArgsParam(panelArgs) : "";
+  const args = page.kind === "story" ? (link?.param ?? panelArgsParam(panelArgs)) : "";
   if (args !== "") params.set("args", args);
   if (page.kind === "story" && matrix.length > 0) params.set("matrix", matrix.join(","));
   const query = params.toString();
@@ -699,11 +709,25 @@ const useAddress = (catalogue: CatalogueSettings, addressTexts: AddressTexts): A
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
   }, [catalogue, addressTexts]);
+  // a link in Storybook's form has its reader loaded for it; a value changed meanwhile, or another page, has the last word
+  const waitingParam = address.link?.isWaiting === true ? address.link.param : undefined;
+  useEffect(() => {
+    if (waitingParam === undefined) return;
+    void readStorybookLink(waitingParam, ({ readStorybookArgs }, param) => readStorybookArgs(param)).then(
+      (read) =>
+        setAddress((current) =>
+          current.link?.isWaiting === true && current.link.param === waitingParam
+            ? { ...current, panelArgs: addressArgsFor(read.args, addressTexts), link: read.link }
+            : current
+        )
+    );
+  }, [waitingParam, addressTexts]);
   // a height set with the foot handle belongs to the story it was set on: another page starts at its own
   const pageAddress = (page: Page): Address => ({
     page,
     view: { ...address.view, height: "auto" },
     panelArgs: {},
+    link: undefined,
     matrix: []
   });
   const open = (page: Page, movesFocus: boolean): void => {
@@ -763,6 +787,7 @@ const ShellPage = ({
   hasBranding,
   heights,
   sources,
+  storyGlobs,
   frameUrl,
   addressTexts = "any",
   plugins = NO_PLUGINS,
@@ -891,6 +916,7 @@ const ShellPage = ({
     title,
     tree,
     sources,
+    storyGlobs,
     recent,
     hrefOf: (page: RecentPage): string => addressQuery(pageAddress(page), catalogue),
     onOpen: (page: RecentPage): void => openPage(page),
@@ -1036,7 +1062,10 @@ const ShellPage = ({
               setFixedViews((current) => new Map(current).set(storyId, fixed))
             }
             panelArgs={address.panelArgs}
-            onPanelArgsChange={(panelArgs: PanelArgs): void => replaceAddress({ ...address, panelArgs })}
+            addressLink={address.link}
+            onPanelArgsChange={(panelArgs: PanelArgs): void =>
+              replaceAddress({ ...address, panelArgs, link: undefined })
+            }
             matrixAxes={address.matrix}
             onMatrixAxesChange={(matrix: readonly string[]): void => replaceAddress({ ...address, matrix })}
             frameUrl={frameUrl}

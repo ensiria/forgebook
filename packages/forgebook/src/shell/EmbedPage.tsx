@@ -24,9 +24,16 @@ import {
   useSyncExternalStore
 } from "react";
 
+import { typedLinkArgs } from "../addressArgs.ts";
+import {
+  type AddressLink,
+  type ArgsParamRead,
+  readArgsParam,
+  readStorybookLink
+} from "../addressArgsParam.ts";
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import { EMBED_SIZE_TYPE, type EmbedSizeMessage } from "../embed.ts";
-import { type PanelArgs, parsePanelArgsParam, type ShellMessage } from "../messages.ts";
+import type { PanelArgs, ShellMessage } from "../messages.ts";
 import { storyBackground } from "../storyBackground.ts";
 import { type FixedView, NOT_FIXED, withFixed } from "../storyGlobals.ts";
 import { findStory, type StoryLocation, storyTree } from "../storyTree.ts";
@@ -134,6 +141,10 @@ type EmbedStoryProps = {
   readonly view: ViewState;
   /** The values the address sets on the story's args. */
   readonly panelArgs: PanelArgs;
+  /** The names of the address's values that could not be read. */
+  readonly unreadArgs: readonly string[];
+  /** Types the values by what the frame says of its args, for a link whose form does not say. */
+  readonly typeValue: AddressLink["typeValue"];
   /** The frame page's address. */
   readonly frameUrl: string;
 };
@@ -143,7 +154,14 @@ type EmbedStoryProps = {
  *
  * @param props - the story, the view, its args and the frame page.
  */
-const EmbedStory = ({ location, view, panelArgs, frameUrl }: EmbedStoryProps): ReactNode => {
+const EmbedStory = ({
+  location,
+  view,
+  panelArgs,
+  unreadArgs,
+  typeValue,
+  frameUrl
+}: EmbedStoryProps): ReactNode => {
   const catalogue = useCatalogue();
   const { story, component, source } = location;
   const [fixed, setFixed] = useState<FixedView>(NOT_FIXED);
@@ -152,7 +170,23 @@ const EmbedStory = ({ location, view, panelArgs, frameUrl }: EmbedStoryProps): R
     onReady: (frame: Window, message: ReadyMessage): void => {
       setFixed(message.fixed);
       setFailure(undefined);
-      const args: ShellMessage = { type: "forgebook:args", args: panelArgs };
+      const args: ShellMessage = {
+        type: "forgebook:args",
+        args:
+          typeValue === undefined
+            ? panelArgs
+            : typedLinkArgs(
+                panelArgs,
+                {
+                  props: [],
+                  argTypes: message.argTypes,
+                  controls: message.controls,
+                  storyArgs: message.args,
+                  namedValues: {}
+                },
+                typeValue
+              )
+      };
       frame.postMessage(args, framesOrigin());
     },
     onCall: (): void => undefined,
@@ -189,6 +223,7 @@ const EmbedStory = ({ location, view, panelArgs, frameUrl }: EmbedStoryProps): R
       {failure === undefined ? null : (
         <EmbedNotice message={STRINGS.embedFailed} detail={failure} isFailure={true} />
       )}
+      {unreadArgs.length === 0 ? null : <EmbedNotice message={STRINGS.embedArgsUnread(unreadArgs)} />}
       {/* kept while it failed: a frame that recovers (an edited story) says so, and takes the page back */}
       <div
         className="forgebook-embed__story"
@@ -229,6 +264,12 @@ const EmbedContent = ({
   const storyId = params.get("story");
   const location = storyId === null ? undefined : findStory(tree, storyId);
   const name = location?.component.name;
+  const [read, setRead] = useState<ArgsParamRead>(() => readArgsParam(params.get("args")));
+  const waiting = read.link?.isWaiting === true ? read.link.param : undefined;
+  useEffect(() => {
+    if (waiting === undefined) return;
+    void readStorybookLink(waiting, ({ readStorybookArgs }, param) => readStorybookArgs(param)).then(setRead);
+  }, [waiting]);
   useEffect(() => {
     document.title = name === undefined ? title : `${name} · ${title}`;
   }, [name, title]);
@@ -241,12 +282,16 @@ const EmbedContent = ({
       </main>
     );
   }
+  // the frame takes its values once, when it is ready: it starts when they are known
+  if (waiting !== undefined) return null;
   return (
     <EmbedStory
       location={location}
       view={parseView(params.toString(), catalogue)}
       // whoever embeds the story writes its address, as whoever shares a link does: the same rule applies
-      panelArgs={addressArgsFor(parsePanelArgsParam(params.get("args")), addressTexts)}
+      panelArgs={addressArgsFor(read.args, addressTexts)}
+      unreadArgs={read.link?.unread ?? []}
+      typeValue={read.link?.typeValue}
       frameUrl={frameUrl}
     />
   );

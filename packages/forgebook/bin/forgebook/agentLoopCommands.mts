@@ -25,7 +25,14 @@ import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
 import { agentsSkill, SKILL_FOLDERS, withAgentsSection } from "./agentsText.ts";
 import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentText.ts";
-import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
+import {
+  askCatalogue,
+  COMMAND,
+  configOf,
+  configWithStoriesOf,
+  type ForgebookOptions,
+  printAnswer
+} from "./catalogueCommands.ts";
 import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { storyCheckCommands } from "./storyCheckCommands.mts";
@@ -156,7 +163,7 @@ export const agentLoopCommands = (
       { command: `${COMMAND} verify --since origin/develop --json`, description: "In a pull request." }
     ],
     run: async ({ options, io, log, isJson, style }): Promise<void> => {
-      const config = await configOf(options.config);
+      const config = await configWithStoriesOf(options.config);
       const { stories, files } = await changedOf(config, options, log);
       const reports: StoryCheckReport[] = [];
       for (const story of stories) {

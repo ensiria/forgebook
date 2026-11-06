@@ -14,6 +14,12 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not
   list is outside the globs, left out by a `!` one, or refused by Vite's `server.fs.deny` (the dev server warns): put it
   where they list it, or change the globs on purpose.
+- A story glob that matches nothing stops `forgebook build`, `stories`, `check` and `verify` with an exit code of 1 and
+  names the glob; `forgebook dev` warns, and `list_stories` carries it in `problems` until a file matches. A misspelt
+  configuration key, a toolbar naming no control and a file that does not load (`file:line:column` for a syntax error)
+  stop every command the same way, so read the message before looking elsewhere.
+- `args=` in a story's address takes Forgebook's JSON or a Storybook link's form (`label:Hello+world;count:5;open:!true`);
+  what a story cannot take or an arg cannot hold is listed above it, by name.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take
   the ids Forgebook gave before (`inputs-read-more--open-by-default`) and answer with the current one.
 - The meta is the default export; the stories are named exports, each with a one-line TSDoc saying what it shows (the

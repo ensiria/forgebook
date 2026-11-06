@@ -43,7 +43,7 @@ import {
   storyLinks
 } from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
-import type { ResolvedConfig } from "./configFile.ts";
+import { emptyStoryGlobs, emptyStoryGlobsMessage, type ResolvedConfig } from "./configFile.ts";
 import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
 import { findAnswer } from "./findRoute.ts";
 import { framesOriginOf } from "./framesConfig.ts";
@@ -236,7 +236,11 @@ export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer>
     offersUsedIn(config.lists) && params.get("usedIn") === "true"
       ? await usageBySource(loaded.sources)
       : undefined;
-  return { status: 200, body: storiesDocument(config.title, tree, pages, view, usage) };
+  // read for each answer: the file an agent has just written ends the problem
+  const globs = emptyStoryGlobs(config);
+  const listed =
+    globs.length === 0 ? tree : { ...tree, problems: [emptyStoryGlobsMessage(globs), ...tree.problems] };
+  return { status: 200, body: storiesDocument(config.title, listed, pages, view, usage) };
 };
 
 /** Whether a value is a list of stories with what they reach. */
