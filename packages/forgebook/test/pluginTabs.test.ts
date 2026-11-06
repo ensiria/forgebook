@@ -3,8 +3,10 @@
  *
  * @module
  */
+
 import { describe, expect, it } from "vitest";
 
+import type { PanelArgs } from "../src/messages.ts";
 import type { PluginStory, PluginTabContext, PluginView } from "../src/plugin.ts";
 import { pluginTabsFor, type ShellPlugin } from "../src/shell/pluginTabs.tsx";
 
@@ -49,7 +51,13 @@ const INPUT = {
   parameters: [],
   reports: new Map(),
   isComparing: false,
-  aside: { address: "/frame.html", width: "fill", background: undefined, args: {}, view: undefined }
+  aside: {
+    address: "/frame.html",
+    width: "fill",
+    background: undefined,
+    args: (): Promise<PanelArgs> => Promise.resolve({}),
+    view: undefined
+  }
 } as const;
 
 /** The ids of the tabs shown. */

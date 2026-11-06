@@ -3,8 +3,10 @@
  *
  * @module
  */
+
 import { type ReactNode, useCallback, useMemo, useRef } from "react";
 
+import type { PanelArgs } from "../messages.ts";
 import type { PluginDocBlockContext, PluginStoryFrame, PluginView } from "../plugin.ts";
 import { findStory, type StoryTree, type TreeSource } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
@@ -71,7 +73,7 @@ export const PluginBlockHost = ({
         address: frameAddress(frameUrl, options.storyId, view, switches),
         width: "fill",
         background: backgroundOf(location.source),
-        args: {},
+        args: (): Promise<PanelArgs> => Promise.resolve({}),
         view: isComparing(view) ? undefined : liveView(view)
       });
     },

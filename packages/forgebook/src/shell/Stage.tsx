@@ -54,7 +54,7 @@ import { StageCompare } from "./StageCompare.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryBar } from "./StoryBar.tsx";
-import { embedHeight, embedQuery, takesArgs, usePanelValues } from "./stageArgs.ts";
+import { embedHeight, embedQuery, takesArgs, useCheckedArgs, usePanelValues } from "./stageArgs.ts";
 import { STRINGS } from "./strings.ts";
 import { useAddressArgs } from "./useAddressArgs.ts";
 import {
@@ -313,6 +313,7 @@ export const Stage = ({
   // the values reach the frames from the address, so going back in the history sets them too; compared as text, so
   // a frame is told again only when they change
   const { acceptedParam } = addressArgs;
+  const checkedArgs = useCheckedArgs(acceptedParam);
   useEffect(() => {
     if (acceptedParam === undefined) return;
     tellFrames(storyRef.current, { type: "forgebook:args", args: parsePanelArgsParam(acceptedParam) });
@@ -356,9 +357,8 @@ export const Stage = ({
       address: deviceAddress(frameAddress(frameUrl, story.id, view, switches), framed),
       width: framed?.area.width ?? view.width,
       background: backgroundOf(view),
-      // a link whose form does not say the types needs the check's values; these are told once, when the aside's frame is
-      // ready, and the check may still be waiting for the docs, so the address's own go for a form that says them
-      args: addressLink?.typeValue === undefined ? panelArgs : acceptedArgs,
+      // as the frames receive them: checked, and typed
+      args: checkedArgs,
       view: liveView(view)
     }
   });

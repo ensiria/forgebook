@@ -21,8 +21,8 @@ export type AsideStory = {
   readonly width: StageWidth;
   /** The colour its page has in the view; none without one. */
   readonly background: string | undefined;
-  /** The values set in the panel, sent once it is ready. */
-  readonly args: PanelArgs;
+  /** The values the frames receive, once checked: a link's wait for the story's docs. */
+  readonly args: () => Promise<PanelArgs>;
   /** The view's live part, sent once it is ready; none when the address already says it all (the compare view). */
   readonly view: LiveView | undefined;
 };
@@ -52,7 +52,8 @@ export const showAsideStory = (target: HTMLElement, title: string, aside: AsideS
     if (!isFromFrames(event) || event.source !== story || story === null) return;
     if (!isFrameMessage(event.data) || event.data.type !== "forgebook:ready") return;
     const send = (message: ShellMessage): void => story.postMessage(message, framesOrigin());
-    send({ type: "forgebook:args", args: aside.args });
+    // the story fills its second frame with what the stage's frames receive: nothing a check has not passed
+    void aside.args().then((args) => send({ type: "forgebook:args", args }));
     if (aside.view !== undefined) send({ type: "forgebook:view", view: aside.view });
   };
   window.addEventListener("message", answer);
