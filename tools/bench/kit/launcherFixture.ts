@@ -339,6 +339,18 @@ const baseEnv = (fixture: Fixture, path: string): NodeJS.ProcessEnv => ({
 });
 
 /**
+ * What `Start-Process` does with its input on Windows, standing in for what it does elsewhere: there the input file
+ * becomes the program's stdin, while PowerShell outside Windows writes a line to a pipe once the program has started, and
+ * throws "Broken pipe" at the launcher when the program has already ended. No program of these flows reads its stdin.
+ */
+const START_PROCESS_STAND_IN = `function Start-Process {
+  [CmdletBinding()]
+  param($FilePath, $ArgumentList, [switch] $NoNewWindow, [switch] $PassThru, $RedirectStandardOutput, $RedirectStandardError, $RedirectStandardInput)
+  [void] $PSBoundParameters.Remove('RedirectStandardInput')
+  Microsoft.PowerShell.Management\\Start-Process @PSBoundParameters
+}`;
+
+/**
  * Runs `start-bench.ps1` in PowerShell 7 with what only Windows has standing in for it.
  *
  * @param fixture - the machine.
@@ -349,6 +361,7 @@ export const launchWindows = (fixture: Fixture, args: readonly string[]): Promis
   write(
     standIn,
     `function Get-CimInstance { [pscustomobject]@{ TotalPhysicalMemory = 17179869184 } }
+${START_PROCESS_STAND_IN}
 & ${JSON.stringify(join(fixture.kitFolder, "start-bench.ps1")).replaceAll('"', "'")} @args
 exit $LASTEXITCODE
 `

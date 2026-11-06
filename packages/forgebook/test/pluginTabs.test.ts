@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { NO_ACCEPTED_ARGS } from "../src/addressArgs.ts";
 import type { PluginStory, PluginTabContext, PluginView } from "../src/plugin.ts";
 import { pluginTabsFor, type ShellPlugin } from "../src/shell/pluginTabs.tsx";
 
@@ -49,7 +50,13 @@ const INPUT = {
   parameters: [],
   reports: new Map(),
   isComparing: false,
-  aside: { address: "/frame.html", width: "fill", background: undefined, args: {}, view: undefined }
+  aside: {
+    address: "/frame.html",
+    width: "fill",
+    background: undefined,
+    args: NO_ACCEPTED_ARGS,
+    view: undefined
+  }
 } as const;
 
 /** The ids of the tabs shown. */

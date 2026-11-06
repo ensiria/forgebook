@@ -1,0 +1,13 @@
+# Links for a person
+
+Every story's `links` hold its page (`address`), its frame (`frame`), its component's page (`component`) and its
+embed (`embed`). A component's
+page can be drawn for who reads it: add an audience to the view, and send that link. `designer` shows usage guidance first
+and no code, `coder` the API first with the code open, `tester` what the stories cover and their accessibility check:
+
+```sh
+npx forgebook story <id> --view audience=designer --json   # links.component opens the page for a designer
+```
+
+Each story also says whether a `play` function acts on it (`hasPlay`), and `tags` holds `!test` when the generated tests
+leave it out.

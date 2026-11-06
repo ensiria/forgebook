@@ -8,6 +8,7 @@
 import type { ReactNode } from "react";
 
 import type { FunctionSignatureDocs } from "../componentDocs.ts";
+import { ApiTableBox } from "./ApiTableBox.tsx";
 import { Code } from "./Code.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { STRINGS } from "./strings.ts";
@@ -56,7 +57,7 @@ export const SignatureReference = ({
     {signature.parameters.length === 0 ? (
       <p className="forgebook-tab-note">{STRINGS.signatureNone}</p>
     ) : (
-      <div className="forgebook-api">
+      <ApiTableBox>
         <table className="forgebook-api__table">
           <thead>
             <tr>
@@ -90,7 +91,7 @@ export const SignatureReference = ({
             ))}
           </tbody>
         </table>
-      </div>
+      </ApiTableBox>
     )}
     <h3 className="forgebook-signature__returns">{STRINGS.signatureReturns}</h3>
     <p>

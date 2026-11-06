@@ -68,6 +68,8 @@ the repository's own commands (`package-build`, `check-commits`).
   `publishConfig` npm installs from them, and the CI checks it is up to date.
 - **Self-contained comments.** A comment says its reason in full: it never points at a decision index, a numbered
   note or another repository a reader cannot open (`pnpm refs:check`, part of `pnpm checks`, fails on them).
+- **Samples that work.** Every fence in a Markdown file closes, a YAML or JSON sample parses and a link to a heading
+  finds it (`pnpm blocks:check`, part of `pnpm checks`).
 - **A public API changes on purpose.** A renamed or removed export, option or behaviour is a breaking change: say so
   in the issue and in the commit (below).
 

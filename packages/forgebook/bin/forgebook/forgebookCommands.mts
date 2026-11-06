@@ -26,6 +26,7 @@ import { settleAgentIndex } from "./builtCatalogue.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
 import { devCommands } from "./devCommands.mts";
+import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
@@ -278,6 +279,7 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...guideCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),
