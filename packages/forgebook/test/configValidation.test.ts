@@ -179,10 +179,10 @@ describe("argControls", () => {
     resolveConfig(withExtra(JSON.stringify({ argControls })), "/catalogue");
 
   it("resolves a path from the configuration's folder, and keeps a package's specifier", () => {
-    expect(withControls({ a: "./a.ts", b: "@acme/b" }).argControls).toEqual({
-      a: "/catalogue/a.ts",
-      b: "@acme/b"
-    });
+    const { a, b } = withControls({ a: "./a.ts", b: "@acme/b" }).argControls;
+    // on Windows, under the drive's letter
+    expect(a).toMatch(/\/catalogue\/a\.ts$/);
+    expect(b).toBe("@acme/b");
   });
 
   it("refuses a name of the panel's, a name no story can write, and no module", () => {
