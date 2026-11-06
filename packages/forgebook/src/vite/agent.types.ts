@@ -441,3 +441,23 @@ export type PluginsDocument = {
   /** The plugins the configuration lists, in order. */
   readonly plugins: readonly AgentPlugin[];
 };
+
+/** The list of the agents' guide, as `forgebook guide --json` and `get_guide` answer with no topic. */
+export type GuideListDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** Each topic: its name, as `forgebook guide <name>` takes it, and what it is about. */
+  readonly topics: ReadonlyArray<{ readonly topic: string; readonly about: string }>;
+  /** The frameworks found in this project, whose topics are the ones to read. */
+  readonly frameworks: readonly string[];
+};
+
+/** One topic of the agents' guide, as `forgebook guide <topic> --json` and `get_guide` answer. */
+export type GuideDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** The topic's name. */
+  readonly topic: string;
+  /** Its Markdown. */
+  readonly text: string;
+};
