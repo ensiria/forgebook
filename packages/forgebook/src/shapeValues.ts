@@ -34,13 +34,21 @@ const isRunnableText = (text: string): boolean =>
   // browsers skip control characters and white space inside a scheme, so a link's `java\tscript:` is the same address
   /^(javascript|vbscript|data:text\/html)/i.test([...text].filter((each) => each > " ").join(""));
 
-/** Whether a free-form value holds anything it may not hold, at any depth. */
-const holdsUnsafePart = (value: ArgValue): boolean => {
+/**
+ * Whether a free-form value holds anything it may not hold, at any depth.
+ *
+ * @param value - the value.
+ * @param allowsNamed - whether a named value may be in it: a schema's author has said what it takes, and the name is looked
+ *   up among the source's own values; `false` by default, where nothing has said.
+ */
+export const holdsUnsafePart = (value: ArgValue, allowsNamed = false): boolean => {
   if (typeof value === "string") return isRunnableText(value);
-  if (isNamedArg(value)) return true;
-  if (isArgList(value)) return value.some(holdsUnsafePart);
+  if (isNamedArg(value)) return !allowsNamed;
+  if (isArgList(value)) return value.some((each) => holdsUnsafePart(each, allowsNamed));
   if (!isArgObject(value)) return false;
-  return Object.entries(value).some(([name, each]) => isUnsafeFreeName(name) || holdsUnsafePart(each));
+  return Object.entries(value).some(
+    ([name, each]) => isUnsafeFreeName(name) || holdsUnsafePart(each, allowsNamed)
+  );
 };
 
 /** Whether a value fits a tuple's items. */

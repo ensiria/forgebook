@@ -523,6 +523,56 @@ A `Date` prop has no control: JSON cannot hold one. The `date` control sets a nu
 
 The editors are one chunk that loads when the first such prop is drawn: a catalogue of plain props never asks for it.
 
+### Controls of your own
+
+A control the panel lacks is a module of yours, registered by name and loaded when a story names it. A catalogue that
+registers none loads nothing for this.
+
+```ts
+// forgebook.config.ts
+export default defineConfig({ /* … */ argControls: { rating: "./controls/rating.tsx" } });
+
+// a story
+argTypes: { score: { control: { type: "rating", settings: { stars: 7 } } } }
+```
+
+```tsx
+// controls/rating.tsx
+import type { ArgControlProps, ValueSchema } from "forgebook/arg-control";
+import { createRoot } from "react-dom/client";
+
+export const schema = { type: "integer", minimum: 0, maximum: 10 } satisfies ValueSchema;
+
+export const mount = (element: HTMLElement, props: ArgControlProps) => {
+  const root = createRoot(element);
+  root.render(<Rating {...props} />);
+  return () => root.unmount();
+};
+```
+
+`mount(element, { value, onChange, argType })` draws in the element and returns what takes it away. It is a function rather
+than a component, so it can be written in any framework, whatever the stories' is: `createApp` in Vue, `mount` in Svelte,
+plain DOM. `argType` holds the arg's `name`, `label` and `description`, and the control's `options`, `min`, `max`, `step`
+and `settings`. The control keeps what it draws: it is mounted again only when the value changes from outside it.
+
+`schema` says what the value looks like, in JSON Schema's words: `type`, `enum`, `const`, `minimum`, `maximum`, `minLength`,
+`maxLength`, `pattern`, `items`, `minItems`, `maxItems`, `properties`, `required`, `additionalProperties`, `anyOf`. Any other
+keyword is refused, since a schema that says less than it seems to would let a link through, as is a keyword holding what it
+cannot use. A `pattern` has the `u` flag, and may not repeat a repeat (`(a+)+`), which could hang the page. The value is
+always JSON, so a link keeps it and an agent sets it with no UI; what JSON cannot hold goes through named values, as
+`{ of, named }`.
+
+A link's value is checked against the schema before it reaches the story, and each `onChange` too. A control no one
+registered, a module that fails to load, a `mount` that throws and a value that does not fit each give a sentence beside the
+field; the other fields go on working. An error the control throws later, in its own event handlers, is out of reach: it is
+the page's.
+
+**A custom control runs in the shell's page, with a plugin's trust.** It can read and do whatever the catalogue's page can;
+unlike a story, it has no origin of its own to keep it apart. Register only code you would run as a plugin. To be read by
+agents its module also loads on the dev server when a command asks about a story that names it, for its `schema`: keep what
+touches the page inside `mount`. A name that no control has (`control: "selct"`) is read as a custom control, and says so
+beside the field.
+
 ## Docs pages
 
 Guides, foundations and recipes are Markdown files with a little front matter, not MDX: a page is read at build time, and

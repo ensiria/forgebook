@@ -76,6 +76,10 @@ export type PanelArgType = {
   readonly tokens?: TokenRequest;
   /** The files a `file` control takes, as `<input accept>` writes it. */
   readonly accept?: string;
+  /** The custom control it names, of those `argControls` registers: any name that is none of the panel's. */
+  readonly customControl?: string;
+  /** The custom control's `settings`. */
+  readonly settings?: ArgValue;
 };
 
 /** The panel's arg types, by arg. */
@@ -99,6 +103,10 @@ export type PanelProp = PropDocs & {
   readonly tokens?: TokenRequest;
   /** The files a `file` control takes. */
   readonly accept?: string;
+  /** The custom control it names. */
+  readonly customControl?: string;
+  /** The custom control's `settings`. */
+  readonly settings?: ArgValue;
 };
 
 /**
@@ -140,6 +148,7 @@ export const settableProps = (
       (prop.kind !== "other" ||
         prop.canTakeText === true ||
         prop.control === "file" ||
+        prop.customControl !== undefined ||
         isNamedProp(prop, namedValues) ||
         (prop.shape !== undefined && canSetShape(prop.shape, namedValues))) &&
       prop.kind !== "event" &&
@@ -196,14 +205,21 @@ const editorFieldsOf = (
   prop: PropDocs,
   argType: PanelArgType,
   own: ArgValue | undefined
-): Pick<PanelProp, "shape" | "tokens" | "accept"> => {
+): Partial<Pick<PanelProp, "kind" | "shape" | "tokens" | "accept" | "customControl" | "settings">> => {
   const shapeOfOwn: ValueShape =
     own === undefined || own === null ? { kind: "json" } : { kind: "like", value: own };
   return {
     ...(argType.control === "object" ? { shape: prop.shape ?? shapeOfOwn } : {}),
     // a `token` control that names no tokens asks for those named after its arg
     ...(argType.control === "token" ? { tokens: argType.tokens ?? { of: prop.name } } : {}),
-    ...(argType.accept === undefined ? {} : { accept: argType.accept })
+    ...(argType.accept === undefined ? {} : { accept: argType.accept }),
+    ...(argType.customControl === undefined
+      ? {}
+      : {
+          kind: "other",
+          customControl: argType.customControl,
+          ...(argType.settings === undefined ? {} : { settings: argType.settings })
+        })
   };
 };
 
@@ -220,9 +236,9 @@ const withArgType = (prop: PropDocs, argType: PanelArgType, own: ArgValue | unde
   const isReadOnly = control === "none";
   const { canTakeText: _canTakeText, ...rest } = prop;
   // a control the story names decides what its value is: the type's shape no longer draws nor checks it
-  const { shape: _shape, ...shapeless } = isReadOnly ? rest : prop;
+  const { shape: _shape, ...shapeless } = isReadOnly || argType.customControl !== undefined ? rest : prop;
   return {
-    ...(control === undefined ? prop : shapeless),
+    ...(control === undefined && argType.customControl === undefined ? prop : shapeless),
     ...(control === undefined ? {} : { kind: KIND_OF_CONTROL[control], control }),
     ...(argType.options === undefined ? {} : { choices: argType.options }),
     ...(argType.description === undefined ? {} : { description: argType.description }),
@@ -277,6 +293,14 @@ export const panelProps = (
   return [...fromTypes, ...fromArgTypes];
 };
 
+/** Whether a control's settings are plain data, as the frame sends them: at most this deep, as a value is. */
+const isSettings = (value: unknown, depth = 0): boolean => {
+  if (value === null || ["string", "number", "boolean"].includes(typeof value)) return true;
+  if (depth > 16) return false;
+  if (Array.isArray(value)) return value.every((each) => isSettings(each, depth + 1));
+  return isRecord(value) && Object.values(value).every((each) => isSettings(each, depth + 1));
+};
+
 /** Whether a value is one arg's panel arg type. */
 const isPanelArgType = (value: unknown): value is PanelArgType =>
   isRecord(value) &&
@@ -286,6 +310,8 @@ const isPanelArgType = (value: unknown): value is PanelArgType =>
   (value["tokens"] === undefined ||
     (isRecord(value["tokens"]) && typeof value["tokens"]["of"] === "string")) &&
   (value["accept"] === undefined || typeof value["accept"] === "string") &&
+  (value["customControl"] === undefined || typeof value["customControl"] === "string") &&
+  (value["settings"] === undefined || isSettings(value["settings"])) &&
   (value["options"] === undefined ||
     (Array.isArray(value["options"]) &&
       value["options"].every((option) => typeof option === "string" || typeof option === "number")));

@@ -173,3 +173,21 @@ describe("the story patterns that match nothing", () => {
     expect(unmatchedPatterns(dir, ["src/**/*.stories.tsx", "!src/old/**"])).toEqual([]);
   });
 });
+
+describe("argControls", () => {
+  const withControls = (argControls: Readonly<Record<string, string>>): ReturnType<typeof resolveConfig> =>
+    resolveConfig(withExtra(JSON.stringify({ argControls })), "/catalogue");
+
+  it("resolves a path from the configuration's folder, and keeps a package's specifier", () => {
+    expect(withControls({ a: "./a.ts", b: "@acme/b" }).argControls).toEqual({
+      a: "/catalogue/a.ts",
+      b: "@acme/b"
+    });
+  });
+
+  it("refuses a name of the panel's, a name no story can write, and no module", () => {
+    expect(() => withControls({ select: "./a.ts" })).toThrow(/control of the panel/);
+    expect(() => withControls({ "a b": "./a.ts" })).toThrow(/no name/);
+    expect(() => withControls({ a: "" })).toThrow(/names no module/);
+  });
+});

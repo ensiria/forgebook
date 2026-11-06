@@ -48,6 +48,7 @@
     "./messages": "./src/messages.ts",
     "./jsx-code": "./src/jsxCode.ts",
     "./arg-expression": "./src/argExpression.ts",
+    "./arg-control": "./src/argControl.ts",
     "./component-docs": "./src/componentDocs.ts",
     "./vite/adapter": "./src/vite/adapter.ts",
     "./vite/docs-program": "./src/vite/docsProgram.ts",
@@ -197,6 +198,10 @@
       "./arg-expression": {
         "types": "./dist/src/argExpression.d.ts",
         "default": "./dist/src/argExpression.js"
+      },
+      "./arg-control": {
+        "types": "./dist/src/argControl.d.ts",
+        "default": "./dist/src/argControl.js"
       },
       "./component-docs": {
         "types": "./dist/src/componentDocs.d.ts",

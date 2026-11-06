@@ -26,6 +26,7 @@ const configIn = (dir: string, tokens: readonly string[]): ResolvedConfig => ({
   dir,
   framework: STUB_FRAMEWORK,
   title: "Acme",
+  argControls: {},
   logo: undefined,
   heights: undefined,
   stories: [],

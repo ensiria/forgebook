@@ -8,12 +8,18 @@
  *
  * @module
  */
-import { type CheckedArgs, checkedAddressArgs } from "../addressArgs.ts";
+import {
+  type ArgDeclaration,
+  type CheckedArgs,
+  checkedAddressArgs,
+  declaredArgProps
+} from "../addressArgs.ts";
 import type { AddressLink } from "../addressArgsParam.ts";
 import { isComponentDocs } from "../componentDocs.ts";
 import type { PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import { isFileList, isValueOfShape } from "../shapeValues.ts";
+import { type ArgControlLoaders, customChecksOf } from "./customControls.ts";
 import type { ReadyMessage } from "./useFrameMessages.ts";
 
 /** What the check on an embed's values reads of the story's source. */
@@ -22,6 +28,8 @@ export type EmbedSource = {
   readonly loadDocs: (() => Promise<unknown>) | undefined;
   /** The source's named values. */
   readonly namedValues: NamedValues;
+  /** The catalogue's custom controls. */
+  readonly argControls: ArgControlLoaders;
 };
 
 /**
@@ -39,16 +47,14 @@ export const checkedEmbedArgs = async (
   source: EmbedSource
 ): Promise<CheckedArgs> => {
   const docs: unknown = await source.loadDocs?.().catch(() => undefined);
-  return checkedAddressArgs(
-    panelArgs,
-    {
-      props: isComponentDocs(docs) ? docs.props : [],
-      argTypes: ready.argTypes,
-      controls: ready.controls,
-      storyArgs: ready.args,
-      namedValues: source.namedValues
-    },
-    typeValue,
-    { isFileList, isValueOfShape }
-  );
+  const declaration: ArgDeclaration = {
+    props: isComponentDocs(docs) ? docs.props : [],
+    argTypes: ready.argTypes,
+    controls: ready.controls,
+    storyArgs: ready.args,
+    namedValues: source.namedValues
+  };
+  const names = declaredArgProps(declaration).flatMap((prop) => prop.customControl ?? []);
+  const custom = names.length === 0 ? {} : await customChecksOf(names, source.argControls);
+  return checkedAddressArgs(panelArgs, declaration, typeValue, { isFileList, isValueOfShape }, custom);
 };

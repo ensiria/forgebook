@@ -22,6 +22,7 @@ import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { TreeStory } from "../storyTree.ts";
 import type { CheckState } from "./A11yTab.tsx";
+import type { ArgControlLoaders } from "./customControls.ts";
 import type { DockTab } from "./Dock.tsx";
 import { lazyModule } from "./lazyModule.tsx";
 import { LazyTab } from "./lazyTab.tsx";
@@ -78,6 +79,8 @@ export type DockTabsInput = {
   readonly storyArgs: PanelArgs;
   /** Loads the catalogue's design tokens; none when it has none. */
   readonly loadTokens: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders | undefined;
   /** The switches' values of the moment, for the args whose `argTypes.if` reads a global. */
   readonly globals: Readonly<Record<string, unknown>>;
   /** Called with a changed value; `undefined` removes the panel's value. */
@@ -139,6 +142,7 @@ const propsTab = (input: DockTabsInput, all: readonly PanelProp[]): DockTab[] =>
               values={input.values}
               panelArgs={input.panelArgs}
               loadTokens={input.loadTokens}
+              argControls={input.argControls}
               controls={input.controls}
               onValueChange={input.onValueChange}
               onReset={input.onReset}

@@ -9,6 +9,7 @@ import { type ChangeEvent, type ReactNode, useId } from "react";
 import { isColorProp, type PanelProp } from "../argTypes.ts";
 import { type ArgValue, isUnsetArg, UNSET_ARG } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
 import { Icon } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { ChoiceControl, MOST_PLAIN_OPTIONS, NumberField, type OnValueChange, textOf } from "./PropFields.tsx";
@@ -185,6 +186,7 @@ const TextArgLine = ({
 const usesEditors = (prop: PanelProp, named: Readonly<Record<string, unknown>> | undefined): boolean =>
   named !== undefined ||
   prop.shape !== undefined ||
+  prop.customControl !== undefined ||
   prop.control === "token" ||
   prop.control === "file" ||
   (prop.kind === "choice" &&
@@ -200,6 +202,7 @@ export const PropControl = ({
   named,
   namedValues,
   loadTokens,
+  argControls,
   textArg,
   onValueChange
 }: {
@@ -215,6 +218,8 @@ export const PropControl = ({
   readonly namedValues: NamedValues;
   /** Loads the catalogue's design tokens; none when it has none. */
   readonly loadTokens: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders | undefined;
   /** Where the story's text for the prop comes from, when the story names one by its key. */
   readonly textArg: TextArgNote | undefined;
   readonly onValueChange: OnValueChange;
@@ -230,9 +235,10 @@ export const PropControl = ({
       descriptionId,
       namedValues,
       loadTokens,
+      argControls,
       onValueChange
     };
-    const isWide = prop.shape !== undefined && named === undefined;
+    const isWide = (prop.shape !== undefined || prop.customControl !== undefined) && named === undefined;
     return (
       <div className="forgebook-prop" data-wide={isWide || undefined}>
         <PropHead prop={prop} showsGroup={showsGroup} state={state} />

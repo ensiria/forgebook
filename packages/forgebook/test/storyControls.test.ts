@@ -96,3 +96,33 @@ describe("checkedSetArgs", () => {
     });
   });
 });
+
+describe("a custom control, as an agent reads and sets it", () => {
+  const declaration: StoryDeclaration = {
+    ...DECLARATION,
+    argTypes: {
+      score: { isHidden: false, customControl: "rating" },
+      lost: { isHidden: false, customControl: "gone" }
+    },
+    customSchemas: { rating: { type: "integer", maximum: 5 } }
+  };
+
+  it("says its name and its schema", () => {
+    const score = storyControlsOf(declaration).find((each) => each.name === "score");
+    expect(score).toMatchObject({
+      control: "custom",
+      custom: "rating",
+      schema: { type: "integer", maximum: 5 }
+    });
+  });
+
+  it("checks a value against the schema, and refuses one whose schema it cannot read", () => {
+    const set = checkedSetArgs(JSON.stringify({ score: 3, lost: 1 }), declaration);
+    expect(set.accepted).toEqual({ score: 3 });
+    expect(set.dropped).toEqual([{ name: "lost", reason: "control" }]);
+    expect(checkedSetArgs('{"score":9}', declaration).dropped).toEqual([
+      { name: "score", reason: "control" }
+    ]);
+    expect(checkedSetArgs('{"score":{"onclick":"x"}}', declaration).accepted).toEqual({});
+  });
+});

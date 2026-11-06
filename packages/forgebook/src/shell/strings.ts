@@ -148,6 +148,7 @@ const shellStrings = {
     choice: "Choices",
     text: "Text and numbers",
     structured: "Objects and lists",
+    custom: "Custom controls",
     toggle: "Toggles"
   },
   otherProps: "Other props",

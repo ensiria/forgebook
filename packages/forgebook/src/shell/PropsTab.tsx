@@ -26,6 +26,7 @@ import type { ArgValue, PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import { canOrderRequired, laidOutProps, propGroupOrder } from "../propGroups.ts";
 import { useCatalogue } from "./catalogueContext.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
 import { Icon } from "./icons.tsx";
 import { PropControl, ReadOnlyProp, type TextArgNote, Toggle } from "./PropRows.tsx";
 import { RequiredFirstSwitch } from "./RequiredFirstSwitch.tsx";
@@ -43,6 +44,8 @@ export type PropsTabProps = {
   readonly panelArgs: PanelArgs;
   /** Loads the catalogue's design tokens; none when it has none. */
   readonly loadTokens?: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders | undefined;
   /** The props the story lets the panel set. */
   readonly controls: StoryControlsSetting;
   /** Called with a changed value; `undefined` removes the panel's value. */
@@ -160,6 +163,7 @@ export const PropsTab = ({
   values,
   panelArgs,
   loadTokens,
+  argControls,
   controls,
   onValueChange,
   onReset,
@@ -193,6 +197,7 @@ export const PropsTab = ({
       named={isNamed(prop) ? namedValues[prop.type] : undefined}
       namedValues={namedValues}
       loadTokens={loadTokens}
+      argControls={argControls}
       textArg={textArgs[prop.name]}
       onValueChange={onValueChange}
     />
@@ -216,10 +221,15 @@ export const PropsTab = ({
     {
       title: STRINGS.propGroups.text,
       props: settable.filter(
-        (prop) => ["text", "number", "other"].includes(prop.kind) && !isNamed(prop) && !isStructured(prop)
+        (prop) =>
+          ["text", "number", "other"].includes(prop.kind) &&
+          !isNamed(prop) &&
+          !isStructured(prop) &&
+          prop.customControl === undefined
       )
     },
-    { title: STRINGS.propGroups.structured, props: settable.filter(isStructured) }
+    { title: STRINGS.propGroups.structured, props: settable.filter(isStructured) },
+    { title: STRINGS.propGroups.custom, props: settable.filter((prop) => prop.customControl !== undefined) }
   ].filter((group) => group.props.length > 0);
   const toggles = settable.filter((prop) => prop.kind === "toggle");
   const others = ungrouped.filter((prop) => !isSettable(prop));

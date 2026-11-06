@@ -40,6 +40,7 @@ const kitConfig = (lists: ResolvedConfig["lists"]): ResolvedConfig => ({
   dir: KIT_DIR,
   framework: STUB_FRAMEWORK,
   title: "Kit",
+  argControls: {},
   logo: undefined,
   heights: undefined,
   stories: ["src/*.stories.tsx"],

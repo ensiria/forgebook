@@ -3045,6 +3045,10 @@
     }
   }
 
+  .forgebook-prop__description.forgebook-prop__problem {
+    color: $danger-text;
+  }
+
   .forgebook-prop__state {
     flex: none;
     font: $text-caption;

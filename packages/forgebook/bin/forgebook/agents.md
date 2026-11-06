@@ -28,6 +28,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   the command. A named value is `{ "of": "<type>", "named": "<name>" }`; `{ "forgebookUnset": true }` leaves a prop with no value
   over the story's own; an empty text is `""`. Give a person the `address` link to look at them: `forgebook shot` draws a
   frame alone, with the story's own values.
+- A custom control (`control: "custom"`, `custom` its name) takes a value that fits `schema`, in `controls`; set it as any
+  other. A new one is a module exporting `mount(el, { value, onChange, argType })`, returning an unmount, and `schema`,
+  registered in `argControls` of `forgebook.config`; keep what touches the page inside `mount`, so the commands can read it.
 - A prop's TSDoc can ask for design tokens (`@token color`, a token's type or a part of its name), a story's arg with
   `argTypes: { x: { control: { type: "token", of: "space", format: "var(--{name})" } } }`.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take

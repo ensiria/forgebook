@@ -249,8 +249,9 @@ const EmbedContent = ({
   title,
   sources,
   frameUrl,
+  argControls,
   addressTexts
-}: Pick<ShellConfig, "title" | "sources" | "frameUrl"> & {
+}: Pick<ShellConfig, "title" | "sources" | "frameUrl" | "argControls"> & {
   readonly addressTexts: AddressTexts;
 }): ReactNode => {
   const catalogue = useCatalogue();
@@ -292,7 +293,8 @@ const EmbedContent = ({
       typeValue={read.link?.typeValue}
       loading={{
         loadDocs: files === undefined ? undefined : files.docs[location.story.file],
-        namedValues: source?.namedValues ?? {}
+        namedValues: source?.namedValues ?? {},
+        argControls: argControls ?? {}
       }}
       frameUrl={frameUrl}
     />
@@ -310,6 +312,7 @@ export const EmbedPage = (props: ShellConfig): ReactNode => (
       title={props.title}
       sources={props.sources}
       frameUrl={props.frameUrl}
+      {...(props.argControls === undefined ? {} : { argControls: props.argControls })}
       addressTexts={props.addressTexts ?? "any"}
     />
   </CatalogueContext.Provider>

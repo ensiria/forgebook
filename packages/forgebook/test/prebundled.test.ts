@@ -28,6 +28,7 @@ const CONFIG: ResolvedConfig = {
   head: "",
   shell: { themeCss: "", frameCss: "", hasBranding: true, styleSheets: [], problems: [] },
   tokens: [],
+  argControls: {},
   watch: [],
   lists: {},
   plugins: [],

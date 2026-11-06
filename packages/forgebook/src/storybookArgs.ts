@@ -59,6 +59,12 @@ const typedText = (prop: PanelProp, text: string): string | number | boolean => 
  */
 const untypedText = (text: string): string | number => (NUMBER_TEXT.test(text) ? Number(text) : text);
 
+/** What a text is for a custom control, whose type only its schema knows: a number or a toggle when it writes one. */
+const customText = (text: string): string | number | boolean => {
+  if (text === "true" || text === "false") return text === "true";
+  return untypedText(text);
+};
+
 /**
  * A value of a link, typed for a prop.
  *
@@ -66,6 +72,7 @@ const untypedText = (text: string): string | number => (NUMBER_TEXT.test(text) ?
  * @param value - the link's value.
  */
 const typedLinkValue = (prop: PanelProp | undefined, value: ArgValue): ArgValue => {
+  if (typeof value === "string" && prop?.customControl !== undefined) return customText(value);
   if (typeof value === "string") return prop === undefined ? untypedText(value) : typedText(prop, value);
   if (!isChoiceList(value)) return value;
   return value.map((item) => {

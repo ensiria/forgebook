@@ -38,10 +38,10 @@ export type ArgDeclaration = {
 };
 
 /**
- * Why a value of the address was left out: its name is not one the panel sets, its value is not of the prop's type, or
- * its text could not be read as a value at all.
+ * Why a value of the address was left out: its name is not one the panel sets, its value is not of the prop's type, its
+ * text could not be read as a value at all, or its custom control refuses it or cannot load.
  */
-export type DroppedArgReason = "undeclared" | "type" | "unreadable";
+export type DroppedArgReason = "undeclared" | "type" | "unreadable" | "control";
 
 /** A value of the address left out. */
 export type DroppedArg = {
@@ -57,7 +57,7 @@ export type CheckedArgs = {
   readonly accepted: PanelArgs;
   /** The values left out, in the address's order. */
   readonly dropped: readonly DroppedArg[];
-  /** Whether a value waits for what checks it against its shape: it is neither taken nor left out yet. */
+  /** Whether a value waits for what checks it: it is neither taken nor left out yet. */
   readonly isWaiting: boolean;
 };
 
@@ -99,6 +99,9 @@ const isFiniteNumber = (value: ArgValue): value is number =>
 /** Whether a value is one of a choice's options. */
 const isOption = (prop: PanelProp, value: ArgValue): boolean =>
   (typeof value === "string" || typeof value === "number") && (prop.choices ?? []).includes(value);
+
+/** What checks a custom control's value, by control: gives what is wrong with it. A control missing here refuses all. */
+export type CustomChecks = Readonly<Record<string, (value: ArgValue) => string | undefined>>;
 
 /** What checks a value against a shape: `shapeValues.ts`, which loads with the first prop that has a shape. */
 export type ShapeChecks = Pick<typeof import("./shapeValues.ts"), "isValueOfShape" | "isFileList">;
@@ -180,6 +183,32 @@ export const isValueOfProp = (
   }
 };
 
+/** Whether a custom control takes a value: it loaded, and its check finds nothing wrong. */
+const fitsControl = (custom: CustomChecks, control: string, value: ArgValue): boolean =>
+  Object.hasOwn(custom, control) && custom[control]?.(value) === undefined;
+
+/** What the check reads besides the value. */
+type CheckReach = {
+  readonly namedValues: NamedValues;
+  readonly shapes: ShapeChecks | undefined;
+  readonly custom: CustomChecks | undefined;
+};
+
+/** What becomes of a value for a prop the panel sets: the story takes it, it waits for its check, or why it is left out. */
+const verdictOf = (
+  prop: PanelProp,
+  value: ArgValue,
+  { namedValues, shapes, custom }: CheckReach
+): "taken" | "waiting" | DroppedArgReason => {
+  if (isUnsetArg(value)) return "taken";
+  if (prop.customControl !== undefined) {
+    if (custom === undefined) return "waiting";
+    return fitsControl(custom, prop.customControl, value) ? "taken" : "control";
+  }
+  if (shapes === undefined && needsShapeChecks(prop)) return "waiting";
+  return isValueOfProp(prop, value, namedValues, shapes) ? "taken" : "type";
+};
+
 /**
  * The address's values the story receives, and those left out with the reason.
  *
@@ -188,12 +217,14 @@ export const isValueOfProp = (
  * @param typeValue - types a value for its prop, for a link whose form does not say (`storybookArgs.ts`); none takes each
  *   as written.
  * @param shapes - what checks a value against a shape; none leaves such a value waiting.
+ * @param custom - what checks a custom control's value; none leaves such a value waiting.
  */
 export const checkedAddressArgs = (
   args: PanelArgs,
   declaration: ArgDeclaration,
   typeValue?: (prop: PanelProp | undefined, value: ArgValue) => ArgValue,
-  shapes?: ShapeChecks
+  shapes?: ShapeChecks,
+  custom?: CustomChecks
 ): CheckedArgs => {
   const declared = declaredArgProps(declaration);
   const accepted: [string, ArgValue][] = [];
@@ -202,11 +233,13 @@ export const checkedAddressArgs = (
   for (const [name, written] of Object.entries(args)) {
     const prop = declared.find((each) => each.name === name);
     const value = prop !== undefined && typeValue !== undefined ? typeValue(prop, written) : written;
-    if (prop === undefined) dropped.push({ name, reason: "undeclared" });
-    else if (isUnsetArg(value)) accepted.push([name, value]);
-    else if (shapes === undefined && needsShapeChecks(prop)) isWaiting = true;
-    else if (isValueOfProp(prop, value, declaration.namedValues, shapes)) accepted.push([name, value]);
-    else dropped.push({ name, reason: "type" });
+    const verdict =
+      prop === undefined
+        ? "undeclared"
+        : verdictOf(prop, value, { namedValues: declaration.namedValues, shapes, custom });
+    if (verdict === "taken") accepted.push([name, value]);
+    else if (verdict === "waiting") isWaiting = true;
+    else dropped.push({ name, reason: verdict });
   }
   return { accepted: Object.fromEntries(accepted), dropped, isWaiting };
 };

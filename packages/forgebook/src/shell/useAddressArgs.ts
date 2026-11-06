@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   type ArgDeclaration,
   type CheckedArgs,
+  type CustomChecks,
   checkedAddressArgs,
   type DroppedArg,
   declaredArgProps,
@@ -23,6 +24,7 @@ import type { AddressLink } from "../addressArgsParam.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
 import { type PanelArgs, panelArgsParam } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
 import type { ReadyMessage } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 
@@ -77,6 +79,8 @@ export type AddressArgsInput = {
   readonly controls: ReadyDeclaration["controls"];
   /** The source's named values; none when it has none. */
   readonly namedValues: NamedValues | undefined;
+  /** The catalogue's custom controls; none when it has none. */
+  readonly argControls: ArgControlLoaders | undefined;
 };
 
 /** The address's values once checked, and how to check them for a frame that has just reported ready. */
@@ -122,6 +126,48 @@ const useShapeValues = (isNeeded: boolean): ShapeValues | undefined => {
   return shapes;
 };
 
+/** No custom control to check. */
+const NO_CUSTOM_CHECKS: CustomChecks = {};
+
+/** No custom control registered. */
+const NO_ARG_CONTROLS: ArgControlLoaders = {};
+
+/**
+ * What checks the values of a story's custom controls, loaded with the first story that names one: their modules, and the
+ * schemas in them. A story with none needs nothing; one whose checks have not arrived has its values wait.
+ *
+ * @param declaration - what the story declares.
+ * @param loaders - the catalogue's custom controls.
+ */
+const useCustomChecks = (
+  declaration: ArgDeclaration | undefined,
+  loaders: ArgControlLoaders | undefined
+): CustomChecks | undefined => {
+  const names = (declaration === undefined ? [] : declaredArgProps(declaration)).flatMap((prop) =>
+    prop.customControl === undefined ? [] : [prop.customControl]
+  );
+  const key = names.join("\n");
+  const [checks, setChecks] = useState<{ readonly key: string; readonly checks: CustomChecks }>();
+  useEffect(() => {
+    if (key === "") return;
+    let isCurrent = true;
+    void import("./customControls.ts")
+      .then(({ customChecksOf }) => customChecksOf(key.split("\n"), loaders ?? NO_ARG_CONTROLS))
+      // a page left open across a new build: a control that cannot load refuses its values, as one that fails does
+      .catch((): CustomChecks => NO_CUSTOM_CHECKS)
+      .then((loaded) => {
+        if (isCurrent) setChecks({ key, checks: loaded });
+      });
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [key, loaders]);
+  // nothing is known of a story's controls before its frame is ready: its values wait with them
+  if (declaration === undefined) return undefined;
+  if (key === "") return NO_CUSTOM_CHECKS;
+  return checks?.key === key ? checks.checks : undefined;
+};
+
 /**
  * The address's values, checked against what the story declares.
  *
@@ -140,12 +186,13 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     [declaration]
   );
   const shapes = useShapeValues(isNeeded);
+  const custom = useCustomChecks(declaration, input.argControls);
   const checked = useMemo((): CheckedArgs | undefined => {
     if (declaration === undefined) return undefined;
-    const read = checkedAddressArgs(panelArgs, declaration, typeValue, shapes);
+    const read = checkedAddressArgs(panelArgs, declaration, typeValue, shapes, custom);
     // nothing is told of the address until all of it can be: a story must not draw half a link
     return read.isWaiting ? undefined : read;
-  }, [panelArgs, typeValue, declaration, shapes]);
+  }, [panelArgs, typeValue, declaration, shapes, custom]);
   // said with the check's: the note's button keeps what the story accepts, which is not known before
   const unread = (link?.unread ?? []).map((name): DroppedArg => ({ name, reason: "unreadable" }));
   return {
@@ -155,7 +202,7 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     acceptedFor: (message: ReadyDeclaration): PanelArgs | undefined => {
       const ready = declarationOf(docs, message, namedValues);
       if (ready === undefined) return undefined;
-      const read = checkedAddressArgs(panelArgs, ready, typeValue, shapes);
+      const read = checkedAddressArgs(panelArgs, ready, typeValue, shapes, custom);
       return read.isWaiting ? undefined : read.accepted;
     },
     worstOfShape: shapes?.worstOfShape

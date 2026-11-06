@@ -50,6 +50,7 @@ import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewPar
 import type { WrittenHomeProps } from "./AuthoredHome.tsx";
 import type { ComponentPageProps } from "./ComponentPage.tsx";
 import { CatalogueContext, NO_PLUGINS, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
 import type { DocPageProps } from "./DocPage.tsx";
 import { filesCodeLoader } from "./filesCode.ts";
 import type { HomePageProps } from "./HomePage.tsx";
@@ -123,6 +124,8 @@ export type ShellConfig = {
   readonly home?: () => Promise<ComponentType<WrittenHomeProps>>;
   /** Loads the catalogue's design tokens, on first use; none when it has none. */
   readonly loadTokens?: () => Promise<unknown>;
+  /** Loads each custom control `argControls` registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders;
   /** The plugins with views (the generated page passes them); none by default. */
   readonly plugins?: readonly ShellPlugin[];
   /**
@@ -792,6 +795,7 @@ const ShellPage = ({
   addressTexts = "any",
   plugins = NO_PLUGINS,
   loadTokens,
+  argControls,
   home
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
@@ -1055,6 +1059,7 @@ const ShellPage = ({
         {shown.kind === "story" ? (
           <Stage
             loadTokens={loadTokens}
+            argControls={argControls}
             component={shown.location.component}
             story={shown.location.story}
             view={shownView}

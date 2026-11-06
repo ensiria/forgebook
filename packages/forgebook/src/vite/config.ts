@@ -82,6 +82,12 @@ export type ForgebookConfig = CatalogueLists & {
    * after each source's: a name given twice takes the catalogue's value, and tools report the clash.
    */
   readonly tokens?: readonly TokensFile[];
+  /**
+   * Custom controls of the props panel, by the name a story's `argTypes` use (`{ rating: "./controls/rating.ts" }`): each a
+   * module, by path from the configuration's folder or a package's specifier, exporting `mount` and `schema`. It loads when
+   * a story names it, and runs in the shell's page with a plugin's trust.
+   */
+  readonly argControls?: Readonly<Record<string, string>>;
   /** Its preview's path from the configuration's folder; `forgebook.preview.ts` (or `.tsx`) beside it when there. */
   readonly preview?: string;
   /** Tags for every frame's `<head>` (a font's link); none by default. */

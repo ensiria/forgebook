@@ -17,7 +17,14 @@ import { type LoadedPreview, type LoadedStory, NO_PREVIEW, readStory } from "../
 import { isLiveErrorReport } from "../liveErrors.ts";
 import type { NamedValues } from "../namedValues.ts";
 import { controlsOfParameter, excludedControls, panelArgTypesOf } from "../storyArgTypes.ts";
-import { checkedSetArgs, type SetArgs, type StoryDeclaration, storyControlsOf } from "../storyControls.ts";
+import {
+  type CustomSchemas,
+  checkedSetArgs,
+  type SetArgs,
+  type StoryControl,
+  type StoryDeclaration,
+  storyControlsOf
+} from "../storyControls.ts";
 import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
 import type { UsageIndex } from "../usedIn.ts";
 import { componentAddressOf, frameAddressOf, storyAddressOf } from "../viewState.ts";
@@ -225,11 +232,20 @@ export const jsonValue = (value: unknown): unknown => {
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** The custom controls as the server read them. */
+export type CustomControlsRead = {
+  /** The schemas, by control. */
+  readonly schemas: CustomSchemas;
+  /** Why a control could not be read, by control. */
+  readonly problems: Readonly<Record<string, string>>;
+};
+
 /** Why a value an agent asked to set was left out, as its answer says it. */
 const DROPPED_REASONS: Readonly<Record<DroppedArgReason, string>> = {
   undeclared: "the story declares no such arg, or does not let it be set",
   type: "it is not of the type its control takes (see `controls`)",
-  unreadable: "it is not plain JSON"
+  unreadable: "it is not plain JSON",
+  control: "its custom control's schema refuses it, or could not be read"
 };
 
 /** What the dev server loaded for one story, for `storyDocument`. */
@@ -244,6 +260,8 @@ export type LoadedStoryParts = {
   readonly namedValues?: NamedValues | undefined;
   /** The values an agent asks to set, as JSON; none reads the story as it is. */
   readonly setArgs?: string | undefined;
+  /** The custom controls' schemas, those whose module could be read, and why the others could not. */
+  readonly customControls?: CustomControlsRead | undefined;
   /** How the framework's stories take a link's texts: what the shell would refuse is said here too. */
   readonly addressTexts?: AddressTexts | undefined;
 };
@@ -276,18 +294,48 @@ const loadedStoryOf = (
   return undefined;
 };
 
+/**
+ * The custom controls a story names, read from its module before its document is made: their modules load for it.
+ *
+ * @param module - the story file's module, as the dev server loaded it.
+ * @param location - the story's place in the tree.
+ */
+export const customControlNames = (
+  module: LoadedStoryParts["module"],
+  location: StoryLocation
+): readonly string[] => {
+  const loaded = loadedStoryOf({ module, docs: { value: undefined } }, location, []);
+  if (loaded === undefined) return [];
+  return Object.values(panelArgTypesOf(loaded.argTypes, [])).flatMap((each) => each.customControl ?? []);
+};
+
 /** What a loaded story declares of its args, as the shell reads it from the story's frame. */
 const declarationOf = (
   loaded: LoadedStory,
   docs: ComponentDocs | undefined,
-  namedValues: NamedValues
+  { namedValues = {}, customControls }: Pick<LoadedStoryParts, "namedValues" | "customControls">
 ): StoryDeclaration => ({
+  customSchemas: customControls?.schemas ?? {},
   props: docs?.props ?? [],
   argTypes: panelArgTypesOf(loaded.argTypes, excludedControls(loaded.parameters["controls"])),
   controls: controlsOfParameter(loaded.parameters["controls"]),
   storyArgs: panelArgsOf(loaded.args, namedValues),
   namedValues
 });
+
+/** What is wrong with the custom controls a story names: one no configuration registers, or whose module did not load. */
+const customControlProblems = (
+  controls: readonly StoryControl[],
+  read: CustomControlsRead | undefined
+): readonly string[] =>
+  controls.flatMap(({ custom, schema }) => {
+    if (custom === undefined || schema !== undefined) return [];
+    const problem =
+      read !== undefined && Object.hasOwn(read.problems, custom) ? read.problems[custom] : undefined;
+    return [
+      `The control "${custom}": ${problem ?? "no control is registered under this name in argControls"}`
+    ];
+  });
 
 /**
  * A story with the links that carry the values it takes, as a person's link would. Its frame's stays as it is: a frame
@@ -332,7 +380,7 @@ export const storyDocument = (
   const args = isRecord(json) ? json : {};
   const { docs, problem } = docsOf(parts.docs);
   if (problem !== undefined) problems.push(problem);
-  const declaration = loaded === undefined ? undefined : declarationOf(loaded, docs, parts.namedValues ?? {});
+  const declaration = loaded === undefined ? undefined : declarationOf(loaded, docs, parts);
   const setArgs =
     declaration === undefined || parts.setArgs === undefined
       ? undefined
@@ -341,6 +389,8 @@ export const storyDocument = (
     problems.push(`The value of "${name}" was left out: ${DROPPED_REASONS[reason]}`);
   }
   const story = withSetArgLinks(listedStory, setArgs, pages, view);
+  const controls = declaration === undefined ? [] : storyControlsOf(declaration);
+  problems.push(...customControlProblems(controls, parts.customControls));
   return {
     schema: 1,
     requiredProps: (docs?.props ?? []).filter((prop) => prop.isRequired).map((prop) => prop.name),
@@ -357,7 +407,7 @@ export const storyDocument = (
     ...agentDesign(location.story, pages, view),
     docs,
     args,
-    controls: declaration === undefined ? [] : storyControlsOf(declaration),
+    controls,
     ...(setArgs === undefined ? {} : { setArgs: { accepted: setArgs.accepted, dropped: setArgs.dropped } }),
     problems
   };
