@@ -130,6 +130,23 @@ test.describe("the Design tab", () => {
     expect(story?.x ?? 0).toBeLessThan(design?.x ?? 0);
   });
 
+  test("gives the compared story only what its panel could set, once the docs say what that is", async ({
+    page
+  }) => {
+    await standInForFigma(page);
+    await page.addInitScript(`addEventListener("message", ({ data }) => {
+      if (data?.type === "forgebook:args")
+        document.documentElement.setAttribute("data-args-heard", JSON.stringify(data.args));
+    });`);
+    const values = { value: "monthly", other: "Not a prop" };
+    await page.goto(`${SMALL}&args=${encodeURIComponent(JSON.stringify(values))}`);
+    await page.getByRole("tab", { name: "Design" }).click();
+    await page.getByRole("button", { name: "Compare with the story" }).click();
+    await expect(comparedStory(page).locator("select")).toHaveValue("monthly");
+    const heard = await comparedStory(page).locator("html").getAttribute("data-args-heard");
+    expect(JSON.parse(heard ?? "null")).toEqual({ value: "monthly" });
+  });
+
   test("keeps the compared frame's reports from the stage, which runs the story at another size", async ({
     page
   }) => {

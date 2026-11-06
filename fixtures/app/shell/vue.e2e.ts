@@ -157,6 +157,16 @@ test.describe("the panel on a Vue component", () => {
   });
 });
 
+test("an embed's address sets a prop, and leaves the component's root as it is", async ({ page }) => {
+  const values = { label: "Declared", title: "Not a prop" };
+  await page.goto(
+    `/?embed&story=vue:inputs-badge--default&args=${encodeURIComponent(JSON.stringify(values))}`
+  );
+  const badge = page.frameLocator("iframe.forgebook-frame-view").locator(".badge");
+  await expect(badge).toContainText("Declared");
+  await expect(badge).not.toHaveAttribute("title");
+});
+
 test("a composable's story shows its signature first", async ({ page }) => {
   await page.goto(story("logic-use-toggle--default"));
   await isReady(page);
