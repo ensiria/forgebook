@@ -19,7 +19,7 @@ import { type ArgCondition, isArgCondition } from "./argConditions.ts";
 import type { PropDocs } from "./componentDocs.ts";
 import type { ArgValue } from "./messages.ts";
 import type { NamedValues } from "./namedValues.ts";
-import { canSetShape, type ValueShape } from "./valueShape.ts";
+import type { ValueShape } from "./valueShape.ts";
 
 /** A control as the panel draws it; `none` for an arg the panel lists without a control. */
 export type PanelControl =
@@ -150,7 +150,7 @@ export const settableProps = (
         prop.control === "file" ||
         prop.customControl !== undefined ||
         isNamedProp(prop, namedValues) ||
-        (prop.shape !== undefined && canSetShape(prop.shape, namedValues))) &&
+        prop.shape !== undefined) &&
       prop.kind !== "event" &&
       (controls === "all" || controls.includes(prop.name))
   );
@@ -158,25 +158,6 @@ export const settableProps = (
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** The panel controls, for the check on arrival. */
-const PANEL_CONTROLS: readonly PanelControl[] = [
-  "select",
-  "radio",
-  "check",
-  "multi-select",
-  "boolean",
-  "text",
-  "number",
-  "range",
-  "color",
-  "date",
-  "object",
-  "textarea",
-  "token",
-  "file",
-  "none"
-];
 
 /** The prop kind a control sets, for the panel's groups. */
 const KIND_OF_CONTROL: Readonly<Record<PanelControl, PropDocs["kind"]>> = {
@@ -293,25 +274,17 @@ export const panelProps = (
   return [...fromTypes, ...fromArgTypes];
 };
 
-/** Whether a control's settings are plain data, as the frame sends them: at most this deep, as a value is. */
-const isSettings = (value: unknown, depth = 0): boolean => {
-  if (value === null || ["string", "number", "boolean"].includes(typeof value)) return true;
-  if (depth > 16) return false;
-  if (Array.isArray(value)) return value.every((each) => isSettings(each, depth + 1));
-  return isRecord(value) && Object.values(value).every((each) => isSettings(each, depth + 1));
-};
-
 /** Whether a value is one arg's panel arg type. */
 const isPanelArgType = (value: unknown): value is PanelArgType =>
   isRecord(value) &&
   typeof value["isHidden"] === "boolean" &&
   (value["if"] === undefined || isArgCondition(value["if"])) &&
-  (value["control"] === undefined || PANEL_CONTROLS.some((control) => control === value["control"])) &&
+  (value["control"] === undefined ||
+    (typeof value["control"] === "string" && Object.hasOwn(KIND_OF_CONTROL, value["control"]))) &&
   (value["tokens"] === undefined ||
     (isRecord(value["tokens"]) && typeof value["tokens"]["of"] === "string")) &&
   (value["accept"] === undefined || typeof value["accept"] === "string") &&
   (value["customControl"] === undefined || typeof value["customControl"] === "string") &&
-  (value["settings"] === undefined || isSettings(value["settings"])) &&
   (value["options"] === undefined ||
     (Array.isArray(value["options"]) &&
       value["options"].every((option) => typeof option === "string" || typeof option === "number")));

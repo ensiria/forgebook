@@ -11,10 +11,13 @@ import type { PanelProp } from "../../argTypes.ts";
 import { type ArgValue, UNSET_ARG } from "../../messages.ts";
 import type { NamedValues } from "../../namedValues.ts";
 import { resolvedShape } from "../../shapeValues.ts";
+import { canSetShape } from "../../valueShape.ts";
 import type { ArgControlLoaders } from "../customControls.ts";
 import { LazyView, lazyModule } from "../lazyModule.tsx";
 import type { OnValueChange } from "../PropFields.tsx";
+import { EDITOR_STRINGS } from "./editorStrings.ts";
 import { FileEditor } from "./FileEditor.tsx";
+import type { FieldProps } from "./fieldTypes.ts";
 import { SearchSelect } from "./SearchSelect.tsx";
 import { TokenEditor } from "./TokenEditor.tsx";
 import { ValueField } from "./ValueField.tsx";
@@ -68,6 +71,14 @@ const CustomField = ({
     )}
   />
 );
+
+/** A prop's fields, or why it has none: a required part only named values can fill, and the source names none. */
+const ShapedField = (props: FieldProps): ReactNode =>
+  canSetShape(props.shape, props.namedValues) ? (
+    <ValueField {...props} />
+  ) : (
+    <p className="forgebook-value-note">{EDITOR_STRINGS.cannotSet}</p>
+  );
 
 /**
  * One prop's editor.
@@ -138,7 +149,7 @@ export const PropEditor = ({
   }
   if (prop.shape !== undefined) {
     return (
-      <ValueField
+      <ShapedField
         shape={resolvedShape(prop.shape)}
         value={value}
         label={label}

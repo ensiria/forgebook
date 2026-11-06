@@ -21,6 +21,7 @@ import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
 import { SidebarDocs, type SidebarPageLinks } from "./SidebarDocs.tsx";
 import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
+import { SidebarHandle } from "./SidebarHandle.tsx";
 import { SidebarSearch } from "./SidebarSearch.tsx";
 import { STRINGS } from "./strings.ts";
 import type { ShownTree, shownTree } from "./treeSearch.ts";
@@ -61,6 +62,8 @@ export type SidebarProps = SidebarPageLinks & {
   readonly onOpenComponent: (sourceId: string, title: string) => void;
   /** The sidebar's width, in CSS px. */
   readonly width: number;
+  /** Sets the sidebar's width, from its handle. */
+  readonly onWidthChange: (width: number) => void;
   /** Whether it is shown: hidden, it slides out and stays mounted, so its search and open families come back with it. */
   readonly isOpen: boolean;
   /** Whether it lies over the page and not beside it, on a narrow window. */
@@ -146,6 +149,7 @@ export const Sidebar = ({
   pageHref,
   onOpenPage,
   width,
+  onWidthChange,
   isOpen,
   isOverlay,
   sidebarRef,
@@ -320,6 +324,7 @@ export const Sidebar = ({
         )}
       </nav>
       <AppearanceMenu {...appearance} />
+      {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}
     </aside>
   );
 };

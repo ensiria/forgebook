@@ -212,7 +212,8 @@ export const PropsTab = ({
       onValueChange={onValueChange}
     />
   );
-  const isStructured = (prop: PanelProp): boolean => prop.shape !== undefined && !isNamed(prop);
+  const isStructured = (prop: PanelProp): boolean =>
+    (prop.shape !== undefined || prop.customControl !== undefined) && !isNamed(prop);
   const groups = [
     {
       title: STRINGS.propGroups.choice,
@@ -228,8 +229,7 @@ export const PropsTab = ({
           prop.customControl === undefined
       )
     },
-    { title: STRINGS.propGroups.structured, props: settable.filter(isStructured) },
-    { title: STRINGS.propGroups.custom, props: settable.filter((prop) => prop.customControl !== undefined) }
+    { title: STRINGS.propGroups.structured, props: settable.filter(isStructured) }
   ].filter((group) => group.props.length > 0);
   const toggles = settable.filter((prop) => prop.kind === "toggle");
   const others = ungrouped.filter((prop) => !isSettable(prop));

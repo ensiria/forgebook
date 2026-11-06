@@ -23,7 +23,7 @@ import { type ArgValue, type PanelArgs, panelArgsParam } from "./messages.ts";
 import type { NamedValues } from "./namedValues.ts";
 import { holdsUnsafePart, isFileList, isValueOfShape, resolvedShape } from "./shapeValues.ts";
 import { schemaProblem } from "./valueSchema.ts";
-import type { ValueShape } from "./valueShape.ts";
+import { canSetShape, type ValueShape } from "./valueShape.ts";
 
 /** How a value of a prop is set: the panel's control, or a choice among the source's named values. */
 export type ControlKind = Exclude<PanelControl, "none"> | "named" | "custom";
@@ -129,9 +129,11 @@ export type StoryDeclaration = {
  */
 export const storyControlsOf = (declaration: StoryDeclaration): readonly StoryControl[] => {
   const argDeclaration: ArgDeclaration = declaration;
-  return declaredArgProps(argDeclaration).map((prop) =>
-    storyControl(prop, declaration.namedValues, declaration.customSchemas ?? {})
-  );
+  const canSet = (prop: PanelProp): boolean =>
+    prop.shape === undefined || canSetShape(prop.shape, declaration.namedValues);
+  return declaredArgProps(argDeclaration)
+    .filter(canSet)
+    .map((prop) => storyControl(prop, declaration.namedValues, declaration.customSchemas ?? {}));
 };
 
 /** What became of the values asked for. */
@@ -162,18 +164,43 @@ export const checkedSetArgs = (
   const notPlain = Object.keys(args)
     .filter((name) => !Object.hasOwn(plain, name))
     .map((name): DroppedArg => ({ name, reason: "type" }));
-  const { accepted, dropped } = checkedAddressArgs(
-    plain,
-    declaration,
-    undefined,
-    { isFileList, isValueOfShape },
-    Object.fromEntries(
+  const { accepted, dropped } = checkedAddressArgs(plain, declaration, undefined, {
+    isFileList,
+    isValueOfShape,
+    custom: Object.fromEntries(
       Object.entries(declaration.customSchemas ?? {}).map(([name, schema]) => [
         name,
         (value: ArgValue): string | undefined =>
           holdsUnsafePart(value, true) ? "not what a link may give" : schemaProblem(schema, value)
       ])
     )
-  );
+  });
   return { accepted, dropped: [...unread, ...notPlain, ...dropped], param: panelArgsParam(accepted) };
 };
+
+/** The custom controls as the server read them. */
+export type CustomControlsRead = {
+  /** The schemas, by control. */
+  readonly schemas: CustomSchemas;
+  /** Why a control could not be read, by control. */
+  readonly problems: Readonly<Record<string, string>>;
+};
+
+/**
+ * What is wrong with the custom controls a story names: one no configuration registers, or whose module did not load.
+ *
+ * @param controls - the story's controls.
+ * @param read - the custom controls as the server read them.
+ */
+export const customControlProblems = (
+  controls: readonly StoryControl[],
+  read: CustomControlsRead | undefined
+): readonly string[] =>
+  controls.flatMap(({ custom, schema }) => {
+    if (custom === undefined || schema !== undefined) return [];
+    const problem =
+      read !== undefined && Object.hasOwn(read.problems, custom) ? read.problems[custom] : undefined;
+    return [
+      `The control "${custom}": ${problem ?? "no control is registered under this name in argControls"}`
+    ];
+  });

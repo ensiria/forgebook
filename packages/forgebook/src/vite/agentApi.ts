@@ -18,10 +18,10 @@ import { isLiveErrorReport } from "../liveErrors.ts";
 import type { NamedValues } from "../namedValues.ts";
 import { controlsOfParameter, excludedControls, panelArgTypesOf } from "../storyArgTypes.ts";
 import {
-  type CustomSchemas,
+  type CustomControlsRead,
   checkedSetArgs,
+  customControlProblems,
   type SetArgs,
-  type StoryControl,
   type StoryDeclaration,
   storyControlsOf
 } from "../storyControls.ts";
@@ -232,14 +232,6 @@ export const jsonValue = (value: unknown): unknown => {
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The custom controls as the server read them. */
-export type CustomControlsRead = {
-  /** The schemas, by control. */
-  readonly schemas: CustomSchemas;
-  /** Why a control could not be read, by control. */
-  readonly problems: Readonly<Record<string, string>>;
-};
-
 /** Why a value an agent asked to set was left out, as its answer says it. */
 const DROPPED_REASONS: Readonly<Record<DroppedArgReason, string>> = {
   undeclared: "the story declares no such arg, or does not let it be set",
@@ -322,20 +314,6 @@ const declarationOf = (
   storyArgs: panelArgsOf(loaded.args, namedValues),
   namedValues
 });
-
-/** What is wrong with the custom controls a story names: one no configuration registers, or whose module did not load. */
-const customControlProblems = (
-  controls: readonly StoryControl[],
-  read: CustomControlsRead | undefined
-): readonly string[] =>
-  controls.flatMap(({ custom, schema }) => {
-    if (custom === undefined || schema !== undefined) return [];
-    const problem =
-      read !== undefined && Object.hasOwn(read.problems, custom) ? read.problems[custom] : undefined;
-    return [
-      `The control "${custom}": ${problem ?? "no control is registered under this name in argControls"}`
-    ];
-  });
 
 /**
  * A story with the links that carry the values it takes, as a person's link would. Its frame's stays as it is: a frame
@@ -555,7 +533,9 @@ export const isChangedStoriesDocument = (value: unknown): value is ChangedStorie
   isRecord(value) &&
   value["schema"] === 1 &&
   Array.isArray(value["stories"]) &&
-  Array.isArray(value["files"]);
+  Array.isArray(value["files"]) &&
+  Array.isArray(value["uiFiles"]) &&
+  Array.isArray(value["outside"]);
 
 /**
  * Whether a value is the code check's document, as a client receives it over HTTP.

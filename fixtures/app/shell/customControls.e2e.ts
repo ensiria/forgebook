@@ -64,7 +64,7 @@ test.describe("custom controls", () => {
       `/?embed&story=sb:storybook-custom-controls--rated&args=${encodeURIComponent('{"rating":99,"title":"kept"}')}`
     );
     await expect.poll(() => received(page)).toMatchObject({ rating: 3, title: "kept" });
-    await expect(page.getByRole("alert")).toContainText("rating");
+    await expect(page.locator(".forgebook-dropped-args")).toContainText("rating");
   });
 
   test("checks a link's value against the schema before it reaches the story", async ({ page }) => {

@@ -3,10 +3,9 @@
  *
  * @module
  */
-
 import { describe, expect, it } from "vitest";
 
-import type { PanelArgs } from "../src/messages.ts";
+import { NO_ACCEPTED_ARGS } from "../src/addressArgs.ts";
 import type { PluginStory, PluginTabContext, PluginView } from "../src/plugin.ts";
 import { pluginTabsFor, type ShellPlugin } from "../src/shell/pluginTabs.tsx";
 
@@ -55,7 +54,7 @@ const INPUT = {
     address: "/frame.html",
     width: "fill",
     background: undefined,
-    args: (): Promise<PanelArgs> => Promise.resolve({}),
+    args: NO_ACCEPTED_ARGS,
     view: undefined
   }
 } as const;

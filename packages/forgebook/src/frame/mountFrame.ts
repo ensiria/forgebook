@@ -16,6 +16,7 @@ import "./frame.scss";
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 
+import { bundlerErrorLines } from "../bundlerErrors.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
@@ -44,7 +45,7 @@ import {
 import { detailOf, previewValue } from "./callValues.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
-import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
+import { ERROR_MESSAGE_CLASS, FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
 import { panelArgsOf, storyArgsOf } from "./panelValues.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
@@ -97,6 +98,31 @@ const tellDevServer = (report: LiveErrorReport): void => {
 import.meta.hot?.on("vite:afterUpdate", (): void => {
   if (document.documentElement.getAttribute(STATUS_ATTRIBUTE) === "error") window.location.reload();
 });
+
+/**
+ * Why the dev server last failed to serve a module, and what to do when it says so: of a module it failed to serve, a
+ * browser says only that the import failed, and the reason reaches the page on the dev server's own channel.
+ */
+let servedError: string | undefined;
+let followServedError: (() => void) | undefined;
+import.meta.hot?.on("vite:error", ({ err }): void => {
+  // the first since this page loaded: what its own import asked for, not what another frame's asked for later
+  servedError ??= bundlerErrorLines(err.message, err)[0];
+  followServedError?.();
+  followServedError = undefined;
+});
+
+/**
+ * Fails a frame whose story did not load, with the dev server's reason when the import only says it failed, as soon as
+ * the reason arrives: it may come after the failed import.
+ *
+ * @param message - the error's message.
+ * @param fail - shows a reason in the frame.
+ */
+const failedToLoad = (message: string, fail: (reason: string) => void): void => {
+  if (isStaleModuleError(message)) followServedError = (): void => fail(servedError ?? message);
+  fail(isStaleModuleError(message) ? (servedError ?? message) : message);
+};
 
 /**
  * Does what a message of the shell asks of the rendered story; the view's live part is applied apart, before the story
@@ -199,7 +225,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     box.className = "forgebook-frame-error";
     box.setAttribute("role", "alert");
     const text = document.createElement("p");
-    text.className = "forgebook-frame-error__message";
+    text.className = ERROR_MESSAGE_CLASS;
     text.textContent = message;
     box.append(text);
     container.replaceChildren(box);
@@ -420,6 +446,6 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       window.location.reload();
       return;
     }
-    fail(message);
+    failedToLoad(message, fail);
   }
 };

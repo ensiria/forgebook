@@ -13,7 +13,7 @@
 import { chromium, type Page } from "@playwright/test";
 import { catalogueSettings } from "forgebook/catalogue";
 import { deviceFrameAddress, deviceViewport, type NamedDevice, namedDevice } from "forgebook/device-picture";
-import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
+import { ERROR_MESSAGE_CLASS, STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryCheckRequest, StoryCheckStory } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
 import { defaultView, frameAddress, parseView, type ViewState } from "forgebook/view-state";
@@ -106,6 +106,27 @@ export const storyPagesOf = (request: StoryCheckRequest): StoryPage[] => {
 };
 
 /**
+ * What a check says of a story its frame could not show: why, as the frame says it, and the story's file. The frame's
+ * stack is left to `errorProblems`: its lines are those of the code the browser ran, not of the file.
+ *
+ * @param reason - what the frame says, when it says something.
+ * @param file - the story's file, when it is known.
+ */
+export const couldNotBeShown = (reason: string | undefined, file: string | undefined): string =>
+  `The story could not be shown${reason === undefined ? "" : `: ${reason}`}${file === undefined ? "" : ` (${file})`}`;
+
+/**
+ * Why a frame says it could not show its story, as the frame shows it.
+ *
+ * @param page - the frame's page.
+ * @returns the text; none when the frame shows none.
+ */
+export const frameErrorOf = async (page: Page): Promise<string | undefined> => {
+  const reason = page.locator(`.${ERROR_MESSAGE_CLASS}`).first();
+  return (await reason.count()) === 0 ? undefined : ((await reason.textContent()) ?? undefined);
+};
+
+/**
  * Opens a story's frame in its window and waits until it says it is ready or that it failed.
  *
  * @param page - a fresh page.
@@ -134,7 +155,7 @@ export const openedStory = async (page: Page, storyPage: StoryPage): Promise<Fra
 
 /**
  * Visits every story page of a request on one browser, each on a page in a context of its own (axe asks for one, and no
- * story's storage reaches the next).
+ * story's storage reaches the next), as many at once as the request says.
  *
  * @param request - the request.
  * @param visit - what to do on each: its answer is collected.
@@ -146,15 +167,28 @@ export const eachStoryPage = async <TResult>(
 ): Promise<TResult[]> => {
   const browser = await chromium.launch();
   try {
+    const pages = storyPagesOf(request);
     const answers: TResult[] = [];
-    for (const storyPage of storyPagesOf(request)) {
-      const context = await browser.newContext();
-      try {
-        answers.push(await visit(await context.newPage(), storyPage));
-      } finally {
-        await context.close();
+    let next = 0;
+    // each page has a context of its own, so nothing is shared but the browser; answers keep the request's order
+    const worker = async (): Promise<void> => {
+      while (next < pages.length) {
+        const index = next;
+        next += 1;
+        const storyPage = pages[index];
+        if (storyPage === undefined) return;
+        const context = await browser.newContext();
+        try {
+          answers[index] = await visit(await context.newPage(), storyPage);
+        } finally {
+          await context.close();
+        }
       }
-    }
+    };
+    const { concurrency = 1 } = request;
+    // a value that is no count must not start no worker: an empty report reads as a pass
+    const workers = Number.isInteger(concurrency) && concurrency > 1 ? concurrency : 1;
+    await Promise.all(Array.from({ length: workers }, worker));
     return answers;
   } finally {
     await browser.close();

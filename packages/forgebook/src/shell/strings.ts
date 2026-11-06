@@ -65,8 +65,6 @@ const shellStrings = {
   copyStoryId: "Copy the story's id",
   embedStory: "Embed this story",
   embedFailed: "This story could not be shown.",
-  embedArgsUnread: (names: readonly string[]): string =>
-    `The address sets values that could not be read, and were left out: ${names.join(", ")}.`,
   embedPanelFailed: "This could not load: reload the page to try again.",
   clearSearch: "Clear the search",
   fromTexts: "From the story's texts:",
@@ -148,7 +146,6 @@ const shellStrings = {
     choice: "Choices",
     text: "Text and numbers",
     structured: "Objects and lists",
-    custom: "Custom controls",
     toggle: "Toggles"
   },
   otherProps: "Other props",
@@ -157,8 +154,6 @@ const shellStrings = {
   resetProp: (prop: string): string => `${prop}: back to the story's value`,
   stateUnset: "no value",
   stateEmpty: "empty text",
-  editorsLoading: "Loading the fields…",
-  editorsFailed: (message: string): string => `The fields could not be loaded: ${message}`,
   unsetDefault: (value: string): string => `— (${value})`,
   defaultIs: "Default:",
   pickColor: (prop: string): string => `${prop}: pick a colour`,
@@ -186,7 +181,7 @@ const shellStrings = {
   tabError: "The tab could not be loaded",
   pageLoadError: "The page could not be loaded",
   docsError: "The component could not be read",
-  indexProblems: "Some story files could not be placed"
+  indexProblems: "Some story files could not be read or placed"
 };
 
 /** The shell's texts. */

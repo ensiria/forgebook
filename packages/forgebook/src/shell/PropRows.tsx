@@ -10,7 +10,7 @@ import { isColorProp, type PanelProp } from "../argTypes.ts";
 import { type ArgValue, isUnsetArg, UNSET_ARG } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { ArgControlLoaders } from "./customControls.ts";
-import { Icon } from "./icons.tsx";
+import { Icon, type IconName } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { ChoiceControl, MOST_PLAIN_OPTIONS, NumberField, type OnValueChange, textOf } from "./PropFields.tsx";
 import { STRINGS } from "./strings.ts";
@@ -66,30 +66,21 @@ const FieldActions = ({
   onValueChange
 }: FieldState & { readonly prop: PanelProp }): ReactNode => {
   const label = prop.label ?? prop.name;
+  const action = (text: string, icon: IconName, next: ArgValue | undefined): ReactNode => (
+    <button
+      type="button"
+      className="forgebook-prop__action"
+      aria-label={text}
+      title={text}
+      onClick={(): void => onValueChange(prop.name, next)}
+    >
+      <Icon name={icon} size={12} />
+    </button>
+  );
   return (
     <span className="forgebook-prop__actions">
-      {value === undefined ? null : (
-        <button
-          type="button"
-          className="forgebook-prop__action"
-          aria-label={STRINGS.unsetProp(label)}
-          title={STRINGS.unsetProp(label)}
-          onClick={(): void => onValueChange(prop.name, UNSET_ARG)}
-        >
-          <Icon name="noValue" size={12} />
-        </button>
-      )}
-      {panelValue === undefined ? null : (
-        <button
-          type="button"
-          className="forgebook-prop__action"
-          aria-label={STRINGS.resetProp(label)}
-          title={STRINGS.resetProp(label)}
-          onClick={(): void => onValueChange(prop.name, undefined)}
-        >
-          <Icon name="replay" size={12} />
-        </button>
-      )}
+      {value === undefined ? null : action(STRINGS.unsetProp(label), "noValue", UNSET_ARG)}
+      {panelValue === undefined ? null : action(STRINGS.resetProp(label), "replay", undefined)}
     </span>
   );
 };
@@ -245,10 +236,10 @@ export const PropControl = ({
         <LazyView
           module={PROP_EDITOR}
           props={editorProps}
-          loading={<p className="forgebook-prop__description">{STRINGS.editorsLoading}</p>}
+          loading={null}
           failed={(message: string): ReactNode => (
             <p className="forgebook-prop__description" role="alert">
-              {STRINGS.editorsFailed(message)}
+              {message}
             </p>
           )}
         />
@@ -288,31 +279,20 @@ export const PropControl = ({
   }
   // a text with a line break keeps it: an `<input>` would drop it, from the field and from the link
   const isMultiline = prop.control === "textarea" || (typeof value === "string" && value.includes("\n"));
+  const TextControl = isMultiline ? "textarea" : "input";
   return (
     <div className="forgebook-prop">
       <PropHead prop={prop} showsGroup={showsGroup} state={state} />
       <div className="forgebook-prop__field">
-        {isMultiline ? (
-          <textarea
-            aria-label={label}
-            aria-describedby={descriptionId}
-            rows={4}
-            value={textOf(value)}
-            onChange={(event: ChangeEvent<HTMLTextAreaElement>): void =>
-              onValueChange(prop.name, event.target.value)
-            }
-          />
-        ) : (
-          <input
-            type="text"
-            aria-label={label}
-            aria-describedby={descriptionId}
-            value={textOf(value)}
-            onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-              onValueChange(prop.name, event.target.value)
-            }
-          />
-        )}
+        <TextControl
+          aria-label={label}
+          aria-describedby={descriptionId}
+          {...(isMultiline ? { rows: 4 } : { type: "text" })}
+          value={textOf(value)}
+          onChange={(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void =>
+            onValueChange(prop.name, event.target.value)
+          }
+        />
         {/* a colour picker beside the text: the field still takes any CSS colour, a token's var() included */}
         {isColorProp(prop) ? (
           <input

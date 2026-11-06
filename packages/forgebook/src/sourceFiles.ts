@@ -26,7 +26,8 @@ export const sourceFiles = (source: StorySource): StoryFiles => {
     stories: Object.assign({}, ...source.files.map((group) => group.stories)),
     docs: Object.assign({}, ...source.files.map((group) => group.docs)),
     code: Object.assign({}, ...source.files.map((group) => group.code)),
-    pages: Object.assign({}, ...source.files.map((group) => group.pages))
+    pages: Object.assign({}, ...source.files.map((group) => group.pages)),
+    problems: source.files.flatMap((group) => group.problems ?? [])
   };
   MERGED.set(source, merged);
   return merged;

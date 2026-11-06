@@ -44,7 +44,8 @@ const argTypeOf = (prop: PanelProp): ControlArgType => ({
   ...(prop.min === undefined ? {} : { min: prop.min }),
   ...(prop.max === undefined ? {} : { max: prop.max }),
   ...(prop.step === undefined ? {} : { step: prop.step }),
-  ...(prop.settings === undefined ? {} : { settings: prop.settings })
+  // the frame's word, read here since only a control needs it: what is no plain data never reaches a control
+  ...(prop.settings === undefined || !isArgValue(prop.settings) ? {} : { settings: prop.settings })
 });
 
 /** The value as text, to tell whether it is still the one the control gave. */

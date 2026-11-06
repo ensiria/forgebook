@@ -24,6 +24,7 @@ import {
   useSyncExternalStore
 } from "react";
 
+import { checkedArgsMessage } from "../addressArgs.ts";
 import {
   type AddressLink,
   type ArgsParamRead,
@@ -32,26 +33,35 @@ import {
 } from "../addressArgsParam.ts";
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import { EMBED_SIZE_TYPE, type EmbedSizeMessage } from "../embed.ts";
-import type { PanelArgs, ShellMessage } from "../messages.ts";
+import type { PanelArgs } from "../messages.ts";
+import type { NamedValues } from "../namedValues.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";
 import { type FixedView, NOT_FIXED, withFixed } from "../storyGlobals.ts";
 import { findStory, type StoryLocation, storyTree } from "../storyTree.ts";
 import { frameAddress, parseView, STAGE_HEIGHT_RANGE, type ViewState } from "../viewState.ts";
 import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
-import type { EmbedSource } from "./embedArgs.ts";
+import { DroppedArgsNote } from "./DroppedArgsNote.tsx";
 import { FrameView } from "./FrameView.tsx";
 import { framesOrigin } from "./framesOrigin.ts";
 import { LATER_STRINGS } from "./laterStrings.ts";
 import type { ShellConfig } from "./Shell.tsx";
 import { shellIsDark } from "./shellScheme.ts";
 import { STRINGS } from "./strings.ts";
+import { useAddressArgs } from "./useAddressArgs.ts";
 import { APPEARANCE_ATTRIBUTE } from "./useAppearance.ts";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
+import { usePanelDocs } from "./usePanelDocs.ts";
 import { useSystemDark } from "./useSystemDark.ts";
 
 /** The height of the frame before its story reports its own, in CSS px, in a page with no height of its own yet. */
 const WAITING_HEIGHT = 240;
+
+/** No actions, before the frame reported its own. */
+const NO_ACTIONS: readonly string[] = [];
+
+/** No `argTypes`, before the frame reported its own. */
+const NO_ARG_TYPES: ReadyMessage["argTypes"] = {};
 
 /**
  * Tells the page around the embed how tall the story is.
@@ -140,14 +150,16 @@ type EmbedStoryProps = {
   readonly location: StoryLocation;
   /** The view the address names. */
   readonly view: ViewState;
-  /** The values the address sets on the story's args. */
+  /** The values the address names, not yet checked against what the story declares. */
   readonly panelArgs: PanelArgs;
-  /** The names of the address's values that could not be read. */
-  readonly unreadArgs: readonly string[];
-  /** Types the values by what the frame says of its args, for a link whose form does not say. */
-  readonly typeValue: AddressLink["typeValue"];
-  /** What the check on the values reads of the story's source. */
-  readonly loading: EmbedSource;
+  /** What else the address says of them: how to type them, and which could not be read. */
+  readonly link: AddressLink | undefined;
+  /** Loads the component's docs, which the check reads; `undefined` when the source has none for the file. */
+  readonly loadDocs: (() => Promise<unknown>) | undefined;
+  /** The source's named values; none when it has none. */
+  readonly namedValues: NamedValues | undefined;
+  /** The catalogue's custom controls, whose schemas the check reads; none when it has none. */
+  readonly argControls: ShellConfig["argControls"];
   /** The frame page's address. */
   readonly frameUrl: string;
 };
@@ -161,29 +173,46 @@ const EmbedStory = ({
   location,
   view,
   panelArgs,
-  unreadArgs,
-  typeValue,
-  loading,
+  link,
+  loadDocs,
+  namedValues,
+  argControls,
   frameUrl
 }: EmbedStoryProps): ReactNode => {
   const catalogue = useCatalogue();
   const { story, component, source } = location;
   const [fixed, setFixed] = useState<FixedView>(NOT_FIXED);
   const [failure, setFailure] = useState<string | undefined>(undefined);
-  const [dropped, setDropped] = useState<readonly string[]>([]);
-  const shownUnread = [...unreadArgs, ...dropped];
+  const [ready, setReady] = useState<ReadyMessage | undefined>(undefined);
+  const storyRef = useRef<HTMLDivElement>(null);
+  const note = useRef<HTMLDivElement>(null);
+  // the docs only serve the check: an embed whose address names no value does not load them
+  const hasValues = Object.keys(panelArgs).length > 0;
+  const docs = usePanelDocs(
+    hasValues ? loadDocs : undefined,
+    component.name,
+    ready?.args,
+    ready?.actions ?? NO_ACTIONS
+  );
+  // whoever embeds the story writes its address, as whoever shares a link does: the same check applies
+  const addressArgs = useAddressArgs({
+    panelArgs,
+    link,
+    docs,
+    storyArgs: ready?.args,
+    argTypes: ready?.argTypes ?? NO_ARG_TYPES,
+    controls: ready?.controls ?? "all",
+    namedValues,
+    argControls,
+    frames: storyRef
+  });
   const { heights, settled } = useFrameMessages({
     onReady: (frame: Window, message: ReadyMessage): void => {
       setFixed(message.fixed);
       setFailure(undefined);
-      if (Object.keys(panelArgs).length === 0) return;
-      void import("./embedArgs.ts")
-        .then(({ checkedEmbedArgs }) => checkedEmbedArgs(panelArgs, message, typeValue, loading))
-        .then(({ accepted, dropped }) => {
-          const args: ShellMessage = { type: "forgebook:args", args: accepted };
-          setDropped(dropped.map((each) => each.name));
-          frame.postMessage(args, framesOrigin());
-        });
+      setReady(message);
+      const accepted = addressArgs.acceptedFor(message);
+      if (accepted !== undefined) frame.postMessage(checkedArgsMessage(accepted), framesOrigin());
     },
     onCall: (): void => undefined,
     onFailed: (_storyId: string, message: string): void => setFailure(message)
@@ -208,7 +237,9 @@ const EmbedStory = ({
   const fixedHeight = heightSet(shownView, reported);
   const ownHeight =
     fixedHeight ?? (reported === undefined ? undefined : Math.max(reported, story.height ?? 0));
-  useHostHeight(failure === undefined ? ownHeight : undefined);
+  // the note sits above the frame and takes nothing from it: the page around the embed grows by the note
+  const noteHeight = useElementHeight(note) ?? 0;
+  useHostHeight(failure === undefined && ownHeight !== undefined ? ownHeight + noteHeight : undefined);
   return (
     <main
       className="forgebook-embed"
@@ -219,9 +250,12 @@ const EmbedStory = ({
       {failure === undefined ? null : (
         <EmbedNotice message={STRINGS.embedFailed} detail={failure} isFailure={true} />
       )}
-      {shownUnread.length === 0 ? null : <EmbedNotice message={STRINGS.embedArgsUnread(shownUnread)} />}
+      <div ref={note}>
+        <DroppedArgsNote dropped={addressArgs.dropped} />
+      </div>
       {/* kept while it failed: a frame that recovers (an edited story) says so, and takes the page back */}
       <div
+        ref={storyRef}
         className="forgebook-embed__story"
         hidden={failure !== undefined}
         style={{ width: shownView.width === "fill" ? undefined : shownView.width }}
@@ -232,7 +266,8 @@ const EmbedStory = ({
           heights={heights}
           settled={settled}
           fallbackHeight={WAITING_HEIGHT}
-          sceneHeight={Math.max(story.height ?? 0, windowHeight)}
+          // the window follows the page's height, note included: counted here, the frame would grow with each answer
+          sceneHeight={Math.max(story.height ?? 0, windowHeight - noteHeight)}
           fixedHeight={fixedHeight}
         />
       </div>
@@ -267,6 +302,8 @@ const EmbedContent = ({
     if (waiting === undefined) return;
     void readStorybookLink(waiting, ({ readStorybookArgs }, param) => readStorybookArgs(param)).then(setRead);
   }, [waiting]);
+  // one object for as long as the address is read: the check is not run again for each render
+  const panelArgs = useMemo(() => addressArgsFor(read.args, addressTexts), [read, addressTexts]);
   useEffect(() => {
     document.title = name === undefined ? title : `${name} · ${title}`;
   }, [name, title]);
@@ -279,23 +316,18 @@ const EmbedContent = ({
       </main>
     );
   }
-  // the frame takes its values once, when it is ready: it starts when they are known
+  // the values are known before the frame starts, so it is told them once
   if (waiting !== undefined) return null;
   const source = sources.find((each) => each.id === location.source.id);
-  const files = source === undefined ? undefined : sourceFiles(source);
   return (
     <EmbedStory
       location={location}
       view={parseView(params.toString(), catalogue)}
-      // whoever embeds the story writes its address, as whoever shares a link does: the same rule applies
-      panelArgs={addressArgsFor(read.args, addressTexts)}
-      unreadArgs={read.link?.unread ?? []}
-      typeValue={read.link?.typeValue}
-      loading={{
-        loadDocs: files === undefined ? undefined : files.docs[location.story.file],
-        namedValues: source?.namedValues ?? {},
-        argControls: argControls ?? {}
-      }}
+      link={read.link}
+      panelArgs={panelArgs}
+      loadDocs={source === undefined ? undefined : sourceFiles(source).docs[location.story.file]}
+      namedValues={source?.namedValues}
+      argControls={argControls}
       frameUrl={frameUrl}
     />
   );

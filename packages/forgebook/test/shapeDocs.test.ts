@@ -114,7 +114,7 @@ describe("shapeOfProp", () => {
       };
     `);
     expect(shapes["icon"]).toBeUndefined();
-    expect(shapes["when"]).toBeUndefined();
+    expect(shapes["when"]).toEqual({ kind: "date" });
     expect(shapes["map"]).toBeUndefined();
     expect(shapes["thing"]).toBeUndefined();
     expect(shapes["node"]).toBeUndefined();

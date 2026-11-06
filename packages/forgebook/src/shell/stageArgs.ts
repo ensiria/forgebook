@@ -8,15 +8,7 @@
  *
  * @module
  */
-import { useCallback, useEffect, useRef } from "react";
-
-import {
-  type ArgValue,
-  isUnsetArg,
-  type PanelArgs,
-  panelArgsParam,
-  parsePanelArgsParam
-} from "../messages.ts";
+import { type ArgValue, isUnsetArg, type PanelArgs, panelArgsParam } from "../messages.ts";
 import type { TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
 import { type ViewState, viewParams } from "../viewState.ts";
@@ -53,30 +45,6 @@ export const usePanelValues = (
       onChange(isNothing ? rest : { ...rest, [name]: value });
     }
   };
-};
-
-/**
- * The address's values once checked, for a frame told them once, when it is ready: a plugin's second frame may be ready
- * while the check still waits for the story's docs, and must neither draw without the values nor receive them unchecked.
- *
- * @param acceptedParam - the values as the address writes them; none before they are known.
- * @returns what gives them when they are known.
- */
-export const useCheckedArgs = (acceptedParam: string | undefined): (() => Promise<PanelArgs>) => {
-  const param = useRef(acceptedParam);
-  param.current = acceptedParam;
-  const waiting = useRef<((args: PanelArgs) => void)[]>([]);
-  useEffect(() => {
-    if (acceptedParam === undefined) return;
-    for (const resolve of waiting.current.splice(0)) resolve(parsePanelArgsParam(acceptedParam));
-  }, [acceptedParam]);
-  return useCallback(
-    () =>
-      param.current === undefined
-        ? new Promise((resolve) => waiting.current.push(resolve))
-        : Promise.resolve(parsePanelArgsParam(param.current)),
-    []
-  );
 };
 
 /**

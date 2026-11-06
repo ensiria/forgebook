@@ -13,7 +13,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type ArgValue, isArgList } from "../../messages.ts";
 import { startValueOf } from "../../shapeValues.ts";
 import type { ValueShape } from "../../valueShape.ts";
-import { Icon, type IconName } from "../icons.tsx";
+import { Icon } from "../icons.tsx";
 import { EDITOR_STRINGS } from "./editorStrings.ts";
 import type { DrawField, FieldProps } from "./fieldTypes.ts";
 
@@ -23,12 +23,8 @@ type ItemAction = "up" | "down" | "remove";
 /** The focus to set once the list has drawn. */
 type PendingFocus = { readonly index: number; readonly action: ItemAction | "add" };
 
-/** Each button's icon. */
-const ACTION_ICONS: Readonly<Record<ItemAction, IconName>> = {
-  up: "arrowUp",
-  down: "arrowDown",
-  remove: "close"
-};
+/** The arrows, drawn as text: the first screen's icons stay what the first screen uses. */
+const ARROWS = { up: "↑", down: "↓" } as const;
 
 /** One small button of an item; at an end of the list it does nothing, but keeps the focus it was given. */
 const ItemButton = ({
@@ -51,7 +47,7 @@ const ItemButton = ({
     aria-disabled={isOff || undefined}
     onClick={isOff ? undefined : onPress}
   >
-    <Icon name={ACTION_ICONS[action]} size={12} />
+    {action === "remove" ? <Icon name="close" size={12} /> : ARROWS[action]}
   </button>
 );
 

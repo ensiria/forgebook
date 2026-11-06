@@ -53,30 +53,23 @@ const typedText = (prop: PanelProp, text: string): string | number | boolean => 
 };
 
 /**
- * What a text is with no prop to type it: a number when it writes one, as Storybook reads it before it knows the props.
- *
- * @param text - the link's text.
- */
-const untypedText = (text: string): string | number => (NUMBER_TEXT.test(text) ? Number(text) : text);
-
 /** What a text is for a custom control, whose type only its schema knows: a number or a toggle when it writes one. */
 const customText = (text: string): string | number | boolean => {
   if (text === "true" || text === "false") return text === "true";
-  return untypedText(text);
+  return NUMBER_TEXT.test(text) ? Number(text) : text;
 };
 
 /**
  * A value of a link, typed for a prop.
  *
- * @param prop - the prop that receives it; none for an arg a page knows nothing of.
+ * @param prop - the prop that receives it.
  * @param value - the link's value.
  */
-const typedLinkValue = (prop: PanelProp | undefined, value: ArgValue): ArgValue => {
-  if (typeof value === "string" && prop?.customControl !== undefined) return customText(value);
-  if (typeof value === "string") return prop === undefined ? untypedText(value) : typedText(prop, value);
+const typedLinkValue = (prop: PanelProp, value: ArgValue): ArgValue => {
+  if (typeof value === "string" && prop.customControl !== undefined) return customText(value);
+  if (typeof value === "string") return typedText(prop, value);
   if (!isChoiceList(value)) return value;
   return value.map((item) => {
-    if (prop === undefined) return typeof item === "string" ? untypedText(item) : item;
     const typed = typeof item === "string" ? typedText(prop, item) : item;
     return typeof typed === "boolean" ? String(typed) : typed;
   });

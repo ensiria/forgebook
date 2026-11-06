@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { type ArgValue, isArgList, isArgObject, isNamedArg, type NamedArg } from "./messages.ts";
+import { type ArgValue, isArgList, isArgObject, isDateArg, isNamedArg, type NamedArg } from "./messages.ts";
 
 /** How a framework writes the leaves of a literal. */
 export type ExpressionWriter = {
@@ -27,6 +27,7 @@ const fieldName = (name: string, writer: ExpressionWriter): string =>
 export const argExpression = (value: ArgValue, writer: ExpressionWriter): string => {
   if (typeof value === "string") return writer.text(value);
   if (isNamedArg(value)) return writer.named(value);
+  if (isDateArg(value)) return `new Date(${writer.text(value.forgebookDate)})`;
   if (isArgList(value)) return `[${value.map((item) => argExpression(item, writer)).join(", ")}]`;
   if (isArgObject(value)) {
     const fields = Object.entries(value).map(

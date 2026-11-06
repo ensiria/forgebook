@@ -18,8 +18,8 @@ import { LATER_STRINGS } from "./laterStrings.ts";
 export type DroppedArgsListProps = {
   /** The values left out. */
   readonly dropped: readonly DroppedArg[];
-  /** Removes them from the address. */
-  readonly onRemove: () => void;
+  /** Removes them from the address; none where nothing can rewrite it (an embed's is its author's). */
+  readonly onRemove?: () => void;
 };
 
 /**
@@ -37,8 +37,10 @@ export const DroppedArgsList = ({ dropped, onRemove }: DroppedArgsListProps): Re
         </li>
       ))}
     </ul>
-    <button type="button" className="forgebook-text-button" onClick={onRemove}>
-      {LATER_STRINGS.removeDroppedArgs}
-    </button>
+    {onRemove === undefined ? null : (
+      <button type="button" className="forgebook-text-button" onClick={onRemove}>
+        {LATER_STRINGS.removeDroppedArgs}
+      </button>
+    )}
   </div>
 );

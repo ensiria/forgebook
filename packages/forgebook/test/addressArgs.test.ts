@@ -4,9 +4,17 @@
  *
  * @module
  */
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { type ArgDeclaration, checkedAddressArgs, declaredArgProps } from "../src/addressArgs.ts";
+import {
+  type ArgDeclaration,
+  checkedAddressArgs,
+  checkedArgsMessage,
+  declaredArgProps
+} from "../src/addressArgs.ts";
 import type { PropDocs } from "../src/componentDocs.ts";
 import { type PanelArgs, UNSET_ARG } from "../src/messages.ts";
 import { isFileList, isValueOfShape } from "../src/shapeValues.ts";
@@ -88,7 +96,7 @@ describe("the panel's values an address names", () => {
       isDense: true,
       sideIcon: { of: "IconComponent", named: "IconBell" }
     };
-    expect(checkedAddressArgs(args, DECLARATION)).toEqual({ accepted: args, dropped: [], isWaiting: false });
+    expect(checkedAddressArgs(args, DECLARATION)).toMatchObject({ accepted: args, dropped: [] });
   });
 
   it("leaves out a name the story does not declare: an element's handlers, its HTML, a prototype's keys", () => {
@@ -194,7 +202,7 @@ describe("the panel's values an address names", () => {
     ]);
     expect(droppedNames({ picks: ["b", "c"], config: { depth: 2 } }, declaration)).toEqual([]);
     // until what checks a shape has loaded, such a value is neither taken nor left out
-    expect(checkedAddressArgs({ title: "y", picks: ["b"] }, declaration)).toEqual({
+    expect(checkedAddressArgs({ title: "y", picks: ["b"] }, declaration)).toMatchObject({
       isWaiting: true,
       accepted: { title: "y" },
       dropped: []
@@ -204,5 +212,29 @@ describe("the panel's values an address names", () => {
   it('takes the panel\'s "no value" for any prop it sets, and nothing else under that name', () => {
     expect(droppedNames({ label: UNSET_ARG }, DECLARATION)).toEqual([]);
     expect(droppedNames({ undeclared: UNSET_ARG }, DECLARATION)).toEqual(["undeclared"]);
+  });
+});
+
+describe("the message that gives a frame its values", () => {
+  it("takes only what the check accepted", () => {
+    const raw: PanelArgs = { label: "x" };
+    // @ts-expect-error an address's own values are not the check's, which the type checker holds every page to
+    expect(checkedArgsMessage({ values: raw })).toEqual({ type: "forgebook:args", args: raw });
+  });
+
+  it("is written only where the check's values go in", () => {
+    const sources = join(import.meta.dirname, "..", "src");
+    const writers = readdirSync(sources, { recursive: true, encoding: "utf8" })
+      .filter((file) => /\.tsx?$/.test(file))
+      .filter((file) => readFileSync(join(sources, file), "utf8").includes('"forgebook:args"'))
+      .map((file) => file.replaceAll("\\", "/"))
+      .sort();
+    // the check's, the message's type, and the frame that hears it and its guard
+    expect(writers).toEqual([
+      "addressArgs.ts",
+      "frame/mountFrame.ts",
+      "frame/shellMessageCheck.ts",
+      "messages.ts"
+    ]);
   });
 });
