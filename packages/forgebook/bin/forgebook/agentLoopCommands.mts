@@ -5,7 +5,7 @@
  *
  * @remarks
  * Defined here, on the scope `forgebookCommands.mts` hands them, so the commands module stays a list of commands; their work lives in
- * their own modules (`agentsText.ts`, `storyCheckRun.ts`, `errorsRun.ts`).
+ * their own modules (`agentGuide.ts`, `agentsText.ts`, `storyCheckRun.ts`, `errorsRun.ts`).
  *
  * @module
  */
@@ -23,9 +23,17 @@ import type { ChangedStoriesDocument } from "../../src/vite/agent.types.ts";
 import { isChangedStoriesDocument, isFoundComponentsDocument } from "../../src/vite/agentApi.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { type CatalogueClient, catalogueClient } from "./agentClient.ts";
+import { agentsSection, GUIDE_FRAMEWORKS, projectFrameworks } from "./agentGuide.ts";
 import { agentsSkill, SKILL_FOLDERS, withAgentsSection } from "./agentsText.ts";
 import { checkText, errorsOutput, foundComponentsText, shotText } from "./agentText.ts";
-import { askCatalogue, COMMAND, configOf, type ForgebookOptions, printAnswer } from "./catalogueCommands.ts";
+import {
+  askCatalogue,
+  COMMAND,
+  configOf,
+  configPathOf,
+  type ForgebookOptions,
+  printAnswer
+} from "./catalogueCommands.ts";
 import { runCheckCode } from "./checkCodeRun.ts";
 import { askErrors, followErrors, sinceOf } from "./errorsRun.ts";
 import { storyCheckCommands } from "./storyCheckCommands.mts";
@@ -355,6 +363,12 @@ export const agentLoopCommands = (
         type: "boolean",
         description: `Also write them as an Agent Skill, SKILL.md in ${SKILL_FOLDERS.join(" and ")}.`
       },
+      framework: {
+        type: "string",
+        choices: GUIDE_FRAMEWORKS,
+        valueName: "name",
+        description: "The framework whose essentials to include, when not the one found in this project."
+      },
       print: { type: "boolean", description: "Print the instructions instead of writing them." }
     },
     examples: [
@@ -362,7 +376,11 @@ export const agentLoopCommands = (
       { command: `${COMMAND} agents --skill`, description: "And the skill, for any agent." }
     ],
     run: ({ options, io, log }): void => {
-      const section = readFileSync(new URL("./agents.md", import.meta.url), "utf8");
+      const frameworks =
+        options.framework === undefined
+          ? projectFrameworks(configPathOf(options.config), process.cwd())
+          : [options.framework];
+      const section = agentsSection(frameworks);
       if (options.print) {
         io.stdout.write(section);
         return;
@@ -371,6 +389,8 @@ export const agentLoopCommands = (
       const isNew = !existsSync(file);
       writeFileSync(file, withAgentsSection(isNew ? undefined : readFileSync(file, "utf8"), section));
       log.success(`${relative(process.cwd(), file)}: Forgebook's section ${isNew ? "written" : "renewed"}`);
+      // said aloud: from a monorepo's root the framework found may not be the catalogue's, and --framework corrects it
+      log.info(`Framework: ${frameworks.join(", ") || "none found; --framework names one"}`);
       if (options.skill !== true) return;
       for (const folder of SKILL_FOLDERS) {
         const skill = resolve(folder, "SKILL.md");

@@ -4,10 +4,10 @@
  *
  * @module
  */
-import { type ReactNode, useCallback, useMemo, useRef } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { JsonValue, PluginStory, PluginStoryFrame, PluginTabContext, PluginView } from "../plugin.ts";
-import { type AsideStory, showAsideStory } from "./asideStory.ts";
+import { type AsideFrame, type AsideStory, showAsideStory } from "./asideStory.ts";
 import { PluginViewHost, pluginText, useShellAppearance } from "./PluginViewHost.tsx";
 
 /** The host's props. */
@@ -43,11 +43,25 @@ export const PluginTabHost = ({
   // read when the view asks: the stage of that moment, without a new context for every change of the stage
   const asideRef = useRef(aside);
   asideRef.current = aside;
+  const asideFrames = useRef(new Set<AsideFrame>());
   const showStory = useCallback(
-    (target: HTMLElement, { title }: { readonly title: string }): PluginStoryFrame =>
-      showAsideStory(target, title, asideRef.current),
+    (target: HTMLElement, { title }: { readonly title: string }): PluginStoryFrame => {
+      const frame = showAsideStory(target, title, asideRef.current);
+      asideFrames.current.add(frame);
+      return {
+        remove: (): void => {
+          asideFrames.current.delete(frame);
+          frame.remove();
+        }
+      };
+    },
     []
   );
+  const { args } = aside;
+  useEffect(() => {
+    if (args === undefined) return;
+    for (const frame of asideFrames.current) frame.settle(args);
+  }, [args]);
   const text = useMemo(() => pluginText(strings, pluginId), [strings, pluginId]);
   const context = useMemo(
     (): PluginTabContext => ({ appearance, text, story, report, showStory }),

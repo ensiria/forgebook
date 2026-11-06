@@ -1,3 +1,17 @@
+## 0.3.3 (2026-11-06)
+
+### 🩹 Fixes
+
+- **forgebook:** give every frame the values the panel could set ([dd8e389](https://github.com/ensiria/forgebook/commit/dd8e389))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.2.4
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.3.2 (2026-11-05)
 
 ### 🩹 Fixes

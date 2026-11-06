@@ -1622,6 +1622,9 @@ importers:
       sass-embedded:
         specifier: 1.106.1
         version: 1.106.1
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
     devDependencies:
       '@forgebook/typescript-config':
         specifier: workspace:*

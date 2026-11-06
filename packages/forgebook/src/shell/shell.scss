@@ -1092,12 +1092,29 @@
     transform-origin: top left;
   }
 
-  // a popover at the window's foot opens above its button
+  // a popover at the window's foot opens above its button; it lies inside the sidebar, which clips what passes its edge,
+  // so it keeps the sidebar's margin on the right as on the left, however narrow the sidebar was dragged
   .forgebook-popover.forgebook-popover--up {
     top: auto;
     bottom: calc(100% - $space-1);
     left: $space-3;
+    box-sizing: border-box;
+    width: min(13rem + 2 * $space-3-5, 100% - 2 * $space-3);
+    white-space: normal;
     transform-origin: bottom left;
+
+    .forgebook-choices {
+      min-width: 0;
+    }
+
+    // a long name breaks beside its icon, not under it
+    .forgebook-choice {
+      flex-wrap: nowrap;
+
+      svg {
+        flex: none;
+      }
+    }
   }
 
   .forgebook-popover.forgebook-popover--end {
