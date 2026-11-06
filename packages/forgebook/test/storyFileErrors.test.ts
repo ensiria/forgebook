@@ -25,6 +25,7 @@ import {
   storyFilesCode,
   storyFilesGroupText
 } from "../src/vite/storyFilesModule.ts";
+import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 
 const GOOD = 'export default { title: "Good" };\nexport const Main = {};\n';
 const BAD = 'export default { title: "Bad" };\nexport const Main = { args: { a: 1 };\n';
@@ -35,13 +36,15 @@ let goodFile = "";
 let badFile = "";
 
 /** A pattern's module id, for the story files of the test's folder. */
-const moduleId = (): string => `${FILES_PREFIX}${storyFilesGroupText(dir, ["./*.stories.tsx"])}`;
+const moduleId = (): string =>
+  `${FILES_PREFIX}${storyFilesGroupText(VITE_PATHS.normalize(dir), ["./*.stories.tsx"])}`;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "forgebook-story-errors-"));
   mkdirSync(dir, { recursive: true });
-  goodFile = join(dir, "good.stories.tsx");
-  badFile = join(dir, "bad.stories.tsx");
+  // in Vite's form, as the plugin keeps and names them
+  goodFile = VITE_PATHS.normalize(join(dir, "good.stories.tsx"));
+  badFile = VITE_PATHS.normalize(join(dir, "bad.stories.tsx"));
   writeFileSync(goodFile, GOOD);
   writeFileSync(badFile, BAD);
 });
@@ -105,7 +108,7 @@ describe("a group with a file that cannot be read", () => {
   it("leaves it out of the group's Used in", async () => {
     const asked: string[] = [];
     await usageModule(
-      `\0virtual:forgebook-usage:${storyFilesGroupText(dir, ["./*.stories.tsx"])}`,
+      `\0virtual:forgebook-usage:${storyFilesGroupText(VITE_PATHS.normalize(dir), ["./*.stories.tsx"])}`,
       () => undefined,
       async (stories) => {
         asked.push(...stories.map(({ storyFile }) => storyFile));
