@@ -20,7 +20,7 @@ import { compiledDocPage } from "./docPageMarkdown.ts";
 import { indexedDocPages } from "./docPagesModule.ts";
 import type { DocsResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
-import { EVERY_FILE, type IndexedStoryFile, type IsFileKept, indexedStoryFiles } from "./storyFilesModule.ts";
+import { EVERY_FILE, type IndexedStoryFile, type IsFileKept, readStoryFiles } from "./storyFilesModule.ts";
 
 /** A heading of the pages' HTML: its anchor, and what is inside it. */
 const HEADING = /<h[1-6] id="doc-([^"]*)"[^>]*>([\s\S]*?)<\/h[1-6]>/g;
@@ -218,7 +218,8 @@ export const storySearchModule = async (
   pack: PackJson,
   isKept: IsFileKept = EVERY_FILE
 ): Promise<string> => {
-  const files = indexedStoryFiles(root, patterns, watch, undefined, isKept);
+  // a file that cannot be indexed has nothing to find: the group's own module names it
+  const { files } = readStoryFiles(root, patterns, watch, undefined, isKept);
   const entries = await Promise.all(
     files.map(async (file) => ({ file, ...entryOf(file, await extract(file.file), watch) }))
   );

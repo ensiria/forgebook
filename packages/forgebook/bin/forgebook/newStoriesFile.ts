@@ -73,7 +73,7 @@ export const newStoriesFile = async (
   const importPath = `./${basename(componentFile).replace(/\.[cm]?[jt]sx?$/, "")}`;
   const shape = docsModule.storyFileShape?.(name, componentFile) ?? {
     extension: ".stories.tsx",
-    importStatement: `import { ${name} } from ${JSON.stringify(importPath)};`
+    importStatement: `import ${component.isDefaultExport === true ? name : `{ ${name} }`} from ${JSON.stringify(importPath)};`
   };
   const file = join(dirname(componentFile), `${name}${shape.extension}`);
   // the title is read by `/`, so the path is written with them on Windows too

@@ -9,3 +9,6 @@ export const STATUS_ATTRIBUTE = "data-forgebook-status";
 
 /** The root's attribute set once the frame's code runs; the page's guard against code that fails earlier reads it. */
 export const FRAME_STARTED_ATTRIBUTE = "data-forgebook-started";
+
+/** The class of the text saying why a frame's story could not be drawn: what a check reports as the reason. */
+export const ERROR_MESSAGE_CLASS = "forgebook-frame-error__message";
