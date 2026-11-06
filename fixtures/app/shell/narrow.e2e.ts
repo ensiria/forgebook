@@ -384,6 +384,34 @@ test.describe("the sidebar across widths", () => {
     await expect(mainOf(page)).not.toHaveAttribute("inert");
   });
 
+  test("the appearance menu is whole inside the sidebar, however narrow the sidebar is", async ({ page }) => {
+    // read once it stands still: while it grows in it is narrower, and whole at some moment even when it ends up cut
+    const expectWholeMenu = async (): Promise<void> => {
+      await page.locator(".forgebook-appearance").getByRole("button").click();
+      const menu = page.getByRole("dialog", { name: "Appearance" });
+      await menu.evaluate((panel) =>
+        Promise.all(panel.getAnimations().map((animation) => animation.finished))
+      );
+      await expect(menu).toBeInViewport({ ratio: 1 });
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+    };
+
+    await page.setViewportSize(PHONE);
+    await page.goto(STORY);
+    await openSidebar(page);
+    await expectWholeMenu();
+
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await page.goto(STORY);
+    await expectWholeMenu();
+    const handle = page.getByRole("separator", { name: "Sidebar width" });
+    await handle.focus();
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press("ArrowLeft");
+    await expect(sidebarOf(page)).toHaveCSS("width", "192px");
+    await expectWholeMenu();
+  });
+
   test("a wide window keeps it beside the page: no shade, nothing inert, a pick leaves it open", async ({
     page
   }) => {
