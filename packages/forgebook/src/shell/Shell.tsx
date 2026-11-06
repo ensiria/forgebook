@@ -67,6 +67,7 @@ import { STRINGS } from "./strings.ts";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
 import type { UsedInProps } from "./UsedIn.tsx";
 import { useAppearance } from "./useAppearance.ts";
+import { useEditedProblems } from "./useEditedProblems.ts";
 import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
 import { useShownView } from "./useShownView.ts";
@@ -771,6 +772,7 @@ const ShellPage = ({
   home
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
+  const problems = useEditedProblems(tree.problems);
   // the written home's module, loaded when the home is first opened
   const writtenHome = useMemo(() => (home === undefined ? undefined : lazyModule(home)), [home]);
   const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
@@ -863,7 +865,7 @@ const ShellPage = ({
     knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH));
   const header = (
     <ShellHeader
-      problems={tree.problems}
+      problems={problems}
       location={location}
       page={shownPageLocation}
       isLogic={isLogicPage(shown)}

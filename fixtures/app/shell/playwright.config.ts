@@ -14,8 +14,8 @@
  * `FORGEBOOK_SHELL_GROUP=<index>/<count>` runs one group of catalogues and their specs instead of all of them at once
  * (`catalogueGroups.ts`), for a machine whose memory does not hold every dev server together.
  *
- * The specs that edit fixture files run in a project of their own, `story file edits`, on one worker; every other spec
- * runs in `catalogues`, in parallel.
+ * The specs that edit fixture files run in a project of their own, `story file edits`, on one worker, once the other
+ * specs are over; every other spec runs in `catalogues`, in parallel.
  *
  * @module
  */
@@ -93,7 +93,18 @@ export default defineConfig({
   testDir: import.meta.dirname,
   projects: [
     ...(otherSpecs.length === 0 ? [] : [{ name: "catalogues", testMatch: otherSpecs }]),
-    ...(editingSpecs.length === 0 ? [] : [{ name: "story file edits", testMatch: editingSpecs, workers: 1 }])
+    ...(editingSpecs.length === 0
+      ? []
+      : [
+          {
+            name: "story file edits",
+            testMatch: editingSpecs,
+            workers: 1,
+            // after the others: a story file left broken shows Vite's overlay on every open page of the catalogue, and
+            // its fix reloads the pages opened meanwhile, which another spec's test may be reading
+            ...(otherSpecs.length === 0 ? {} : { dependencies: ["catalogues"] })
+          }
+        ])
   ],
   // a group keeps its results apart, so the next group's run does not clear a failure before it
   ...(group.place === undefined

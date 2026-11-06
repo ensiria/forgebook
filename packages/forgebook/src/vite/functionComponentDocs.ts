@@ -38,6 +38,20 @@ const componentSignatures = (type: ts.Type): readonly ts.Signature[] => [
     .filter((signature) => signature.getReturnType().getProperty("render") !== undefined)
 ];
 
+/**
+ * The name an export's component is written by: a default export's symbol is named `default`, its declaration by what
+ * the file calls it (`export default function Card`).
+ *
+ * @param symbol - the declared symbol.
+ */
+const writtenName = (symbol: ts.Symbol): string => {
+  const [declaration] = symbol.declarations ?? [];
+  const name = declaration === undefined ? undefined : ts.getNameOfDeclaration(declaration);
+  return symbol.getName() === "default" && name !== undefined && ts.isIdentifier(name)
+    ? name.text
+    : symbol.getName();
+};
+
 /** A component's props, as its call signature takes them. */
 type ComponentProps = {
   /** The type of its props, all of them; none when it takes none. */
@@ -141,7 +155,7 @@ const componentOf = (
   const signature = signatureDocs(symbol, expression, checker);
   return {
     docs: {
-      name: symbol.getName(),
+      name: writtenName(symbol),
       description: summaryOf(symbol, checker),
       summary: declarationFile === undefined ? "" : moduleSummaryOf(declarationFile.text),
       props,
@@ -191,7 +205,7 @@ export const functionComponentDocs = (storyFile: string): ComponentDocs | NoComp
 
 /** Whether an export is a component: a name in PascalCase whose value can be called or constructed. */
 const isComponentExport = (symbol: ts.Symbol, checker: ts.TypeChecker, node: ts.Node): boolean =>
-  /^[A-Z]/.test(symbol.getName()) &&
+  /^[A-Z]/.test(writtenName(symbol)) &&
   componentSignatures(checker.getTypeOfSymbolAtLocation(symbol, node)).length > 0;
 
 /**
@@ -212,9 +226,17 @@ export const functionFileComponent: ExtractFileComponent = (
   if (source === undefined) return `${file} is not in its program`;
   const moduleSymbol = checker.getSymbolAtLocation(source);
   if (moduleSymbol === undefined) return `${file} exports nothing`;
-  const components = checker
+  const exported = checker
     .getExportsOfModule(moduleSymbol)
     .filter((each) => isComponentExport(declaredSymbol(each, checker) ?? each, checker, source));
+  // a component exported both by name and as the default is one component, imported by its name unless asked otherwise
+  const named = new Set(
+    exported.filter((each) => each.getName() !== "default").map((each) => declaredSymbol(each, checker))
+  );
+  const components = exported.filter(
+    (each) =>
+      each.getName() !== "default" || exportName === "default" || !named.has(declaredSymbol(each, checker))
+  );
   const chosen = chosenExport(
     components.map((each) => each.getName()),
     exportName,
@@ -228,5 +250,8 @@ export const functionFileComponent: ExtractFileComponent = (
   const name = declaration === undefined ? undefined : ts.getNameOfDeclaration(declaration);
   if (name === undefined || !ts.isIdentifier(name))
     return `${file}: ${export_.getName()} has no name to read it at`;
-  return componentOf(symbol, name, checker, file, { docs: [], sources: [] });
+  const component = componentOf(symbol, name, checker, file, { docs: [], sources: [] });
+  return typeof component === "string" || export_.getName() !== "default"
+    ? component
+    : { ...component, isDefaultExport: true };
 };

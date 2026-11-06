@@ -867,7 +867,7 @@ export default defineConfig({
 
 | Command | What it does |
 |---|---|
-| `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files |
+| `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files; see [a story file that cannot be read](#a-story-file-that-cannot-be-read) |
 | `forgebook prebundle` | Pre-bundles the catalogue's dependencies, as `dev` does on a first start: before it, in CI or an image |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
@@ -893,6 +893,17 @@ export default defineConfig({
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
+
+### A story file that cannot be read
+
+On a dev server, a story file that does not parse, or that has no meta, is one problem and the rest of the catalogue
+keeps drawing. The problem names the file with its line and column, on the page, in `forgebook stories`, `forgebook
+errors` and their MCP tools. Saving the fix is enough, with no restart: a story already drawn stays drawn while its file
+is broken, and redraws in place. `forgebook build` and a test run still fail on it: a build ends with
+`src/Bad.stories.tsx:4:45 does not parse: …` and a non-zero exit, and only `--verbose` adds the bundler's stack.
+
+A story that loads but cannot be drawn says why in its frame and in `forgebook check`. A frame's stack gives the lines of
+the code the browser runs, not those of the file; the browser's console maps them.
 
 `forgebook build` names each script it writes by its hash alone (`assets/3f9a1c2b.js`): a catalogue names every story
 file's scripts once per loader, so shorter names make a smaller build. To read what a build holds, name each script after
@@ -1254,7 +1265,7 @@ package's `package.json`:
 { "forgebook": { "catalog": { "file": "CATALOG.md", "sections": ["components", "pages", "modules"], "exclude": ["./internal/*"] } } }
 ```
 
-`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed) or a
+`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed, a file that does not parse) or a
 docs page that names what is not there, and its JSON lists every story for a script.
 
 ## Packages

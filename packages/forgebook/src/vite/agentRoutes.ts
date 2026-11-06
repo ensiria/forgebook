@@ -287,7 +287,15 @@ const changedAnswer = async ({
           ? "No story is found through the imports: the catalogue turns Used in off (usedIn: false), whose import graph this reads"
           : "No story is found through the imports: the catalogue reads no component docs (componentDocs: false), whose programs read the import graph"
       ];
-  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems };
+  const unread = loaded.sources.flatMap((source) => sourceFiles(source).problems ?? []);
+  const body: ChangedStoriesDocument = {
+    schema: 1,
+    since,
+    files,
+    stories,
+    problems: [...unread, ...problems],
+    ...(unread.length === 0 ? {} : { unread })
+  };
   return { status: 200, body };
 };
 

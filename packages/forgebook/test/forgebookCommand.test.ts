@@ -5,7 +5,16 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -89,6 +98,78 @@ describe("forgebook stories", () => {
     const run = forgebook(broken, ["stories"]);
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain("again.stories.tsx");
+  }, 60_000);
+
+  it("keeps the good stories of a catalogue with a story file that does not parse, and names its place", () => {
+    const config = catalogue(root, "Unparsed", {
+      "good.stories.tsx": 'export default { title: "Good" };\nexport const Main = {};\n',
+      "bad.stories.tsx": 'export default { title: "Bad" };\nexport const Main = { args: { a: 1 };\n'
+    });
+    const run = forgebook(config, ["stories", "--json"]);
+    // a CI step still fails on it
+    expect(run.exitCode).toBe(1);
+    const document: unknown = JSON.parse(run.stdout);
+    expect(document).toMatchObject({ components: [{ title: "Good" }] });
+    expect(document).toMatchObject({
+      problems: [expect.stringMatching(/bad\.stories\.tsx:2:\d+ does not parse: /)]
+    });
+  }, 60_000);
+
+  it("gives an agent the same problem through forgebook mcp", () => {
+    const config = join(root, "Unparsed", "forgebook.config.ts");
+    const message = (id: number, method: string, params: unknown): string =>
+      JSON.stringify({ jsonrpc: "2.0", id, method, params });
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", config, "--url", NO_SERVER], {
+      input: [
+        message(0, "initialize", {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "test", version: "1" }
+        }),
+        message(1, "tools/call", { name: "list_stories", arguments: {} })
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: SERVER_TIMEOUT
+    });
+    expect(run.stdout).toMatch(/bad\.stories\.tsx:2:\d+ does not parse/);
+    expect(run.stdout).toContain("Good");
+  }, 60_000);
+});
+
+describe("forgebook build", () => {
+  it("ends on a story file that does not parse with its place, without a stack", () => {
+    // a real framework, for a build's pages: the fixture app's packages under a catalogue of its own
+    const project = join(root, "unparsed-build");
+    mkdirSync(join(project, "src"), { recursive: true });
+    symlinkSync(
+      join(import.meta.dirname, "..", "..", "..", "fixtures", "app", "node_modules"),
+      join(project, "node_modules"),
+      "junction"
+    );
+    writeFileSync(join(project, "package.json"), '{ "type": "module" }\n');
+    const config = join(project, "forgebook.config.ts");
+    writeFileSync(
+      config,
+      [
+        'import { react } from "@forgebook/react/vite";',
+        'import { defineConfig } from "forgebook";',
+        'export default defineConfig({ framework: react(), title: "Unparsed", stories: ["src/*.stories.tsx"] });',
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      join(project, "src", "bad.stories.tsx"),
+      'export default { title: "Bad" };\nexport const Main = { args: { a: 1 };\n'
+    );
+    const build = (...flags: readonly string[]): ScriptProcessRun =>
+      runScriptProcess(ENTRY, ["build", "--config", config, "--out", join(root, "unparsed-site"), ...flags]);
+    const run = build();
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toMatch(/bad\.stories\.tsx:2:\d+ does not parse: /);
+    expect(run.stderr).not.toMatch(/\bat .+:\d+:\d+/);
+    const verbose = build("--verbose");
+    expect(verbose.exitCode).toBe(1);
+    expect(verbose.stdout).toMatch(/\bat .+:\d+:\d+/);
   }, 60_000);
 });
 
@@ -179,6 +260,47 @@ describe("forgebook new", () => {
     expect(run.stdout).toContain('import { Select } from "./Select";');
     expect(run.stdout).toContain("args: { options: [] },");
     expect(run.stdout).toContain("export const SizeLg: Story<typeof Select>");
+  }, 60_000);
+
+  it("imports a default export without braces, and one exported both ways by its name", () => {
+    const project = join(root, "default-export");
+    mkdirSync(join(project, "src"), { recursive: true });
+    writeFileSync(join(project, "package.json"), "{}\n");
+    // the framework's docs are found from the component's package
+    symlinkSync(join(KIT_DIR, "node_modules"), join(project, "node_modules"), "junction");
+    writeFileSync(
+      join(project, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: { jsx: "preserve", strict: true, skipLibCheck: true, module: "esnext" },
+        include: ["src"]
+      })
+    );
+    writeFileSync(
+      join(project, "src", "App.tsx"),
+      "function App(props: { title: string }) {\n  return props.title;\n}\nexport default App;\n"
+    );
+    writeFileSync(
+      join(project, "src", "Both.tsx"),
+      "export const Both = (props: { title: string }) => props.title;\nexport default Both;\n"
+    );
+    writeFileSync(
+      join(project, "src", "Card.tsx"),
+      "export default function Card(props: { title: string }) {\n  return props.title;\n}\n"
+    );
+    const newStories = (file: string, ...flags: readonly string[]): ScriptProcessRun =>
+      runScriptProcess(ENTRY, [
+        "new",
+        join(project, "src", file),
+        "--framework",
+        "react",
+        "--print",
+        ...flags
+      ]);
+    const app = newStories("App.tsx");
+    expect(app.stdout).toContain('import App from "./App";');
+    expect(newStories("Both.tsx").stdout).toContain('import { Both } from "./Both";');
+    expect(newStories("Both.tsx", "--export", "default").stdout).toContain('import Both from "./Both";');
+    expect(newStories("Card.tsx").stdout).toContain('import Card from "./Card";');
   }, 60_000);
 
   it("refuses to replace a stories file that exists", () => {
@@ -648,6 +770,13 @@ describe("forgebook changed", { timeout: 60_000 }, () => {
     expect(refused.exitCode).not.toBe(0);
     expect(refused.stderr).toContain("names no commit");
     expect(readFileSync(precious, "utf8")).toBe("keep\n");
+
+    // a change whose only story file does not parse touches no story that can be read, and still fails
+    git("checkout", "--", "src/helper.ts");
+    writeFileSync(join(project, "src", "broken.stories.tsx"), "export const = ;\n");
+    const verify = runScriptProcess(ENTRY, ["verify", "--config", config, "--url", NO_SERVER, "--json"]);
+    expect(verify.exitCode).toBe(1);
+    expect(verify.stderr).toMatch(/broken\.stories\.tsx:1:\d+ does not parse/);
   });
 });
 

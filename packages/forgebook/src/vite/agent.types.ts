@@ -381,8 +381,10 @@ export type ChangedStoriesDocument = {
   readonly files: readonly string[];
   /** The stories that reach them. */
   readonly stories: readonly AgentChangedStory[];
-  /** What could not be read: a group whose usage failed. */
+  /** What could not be read: a group whose usage failed, a story file (`unread`). */
   readonly problems: readonly string[];
+  /** The story files that cannot be read, whose stories no change can reach: a check of a change fails on them. */
+  readonly unread?: readonly string[];
 };
 
 /** What a change adds that breaks the design system. */

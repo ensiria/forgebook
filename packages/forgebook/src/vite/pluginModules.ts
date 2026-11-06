@@ -20,10 +20,12 @@ import {
   type GroupLoaders,
   type IndexedStoryFile,
   type IsFileKept,
-  indexedStoryFiles,
   type KeptIndex,
   PAGES_SEARCH_PREFIX,
   REACH_PREFIX,
+  type RefusedStoryFile,
+  readStoryFiles,
+  refusalError,
   SEARCH_PREFIX,
   storyFileKeys,
   storyFilesCode,
@@ -97,7 +99,9 @@ export const docsModule = (
  * @param startTexts - a build's: starts reading the files' docs, code and pages, which the module imports from the
  * group's texts module (`builtTexts.ts`); none imports each from its query.
  * @param isKept - whether a listed file may be read; every one by default.
- * @throws when a story file cannot be indexed.
+ * @param isForgiving - whether a file that cannot be indexed is named among the catalogue's problems while the others
+ * draw (a person at a dev server), rather than failing the module (a build, a test run).
+ * @throws when a story file cannot be indexed, unless it is forgiven.
  */
 export const patternModule = (
   id: string,
@@ -106,15 +110,22 @@ export const patternModule = (
   cache: DiskCache<KeptIndex> | undefined,
   warm: ((storyFile: string) => void) | undefined,
   startTexts?: (files: readonly IndexedStoryFile[]) => void,
-  isKept: IsFileKept = EVERY_FILE
-): { code: string; moduleType: "js"; files: readonly IndexedStoryFile[] } => {
+  isKept: IsFileKept = EVERY_FILE,
+  isForgiving = false
+): {
+  code: string;
+  moduleType: "js";
+  files: readonly IndexedStoryFile[];
+  refused: readonly RefusedStoryFile[];
+} => {
   const { root, patterns } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  const files = indexedStoryFiles(root, patterns, watch, cache, isKept);
+  const { files, refused } = readStoryFiles(root, patterns, watch, cache, isKept);
+  if (refused.length > 0 && !isForgiving) throw refusalError(refused);
   const [first] = files;
   if (first !== undefined) warm?.(first.file);
   startTexts?.(files);
-  const code = storyFilesCode(root, patterns, files, loaders, startTexts !== undefined);
-  return { code, moduleType: "js", files };
+  const code = storyFilesCode(root, patterns, files, loaders, startTexts !== undefined, refused);
+  return { code, moduleType: "js", files, refused };
 };
 
 /**
@@ -169,7 +180,8 @@ type GroupUsage = {
 };
 
 /**
- * A group's facts: its story files indexed, what their stories render read in the docs worker.
+ * A group's facts: its story files indexed, what their stories render read in the docs worker. A file that cannot be
+ * indexed adds nothing here: the group's own module names it.
  *
  * @param group - the group (`storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
@@ -185,7 +197,7 @@ const groupUsage = async (
   isKept: IsFileKept
 ): Promise<GroupUsage> => {
   const { root, patterns } = storyFilesGroupOf(group);
-  const files = indexedStoryFiles(root, patterns, watch, cache, isKept);
+  const { files } = readStoryFiles(root, patterns, watch, cache, isKept);
   const graph = await usage(
     files.map((file) => ({
       storyFile: file.file,

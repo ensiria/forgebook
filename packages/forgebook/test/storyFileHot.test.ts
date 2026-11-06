@@ -148,7 +148,7 @@ describe("a story file's edit on a dev server", () => {
     const { declaring } = catalogue();
     const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }), fakeEnvironment().environment);
     const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", declaring));
-    expect(codeOf(await hooks.load(id))).toContain("if (import.meta.hot) import.meta.hot.accept();");
+    expect(codeOf(await hooks.load(id))).toContain("import.meta.hot.accept();");
   });
 
   it("reloads the pages when it changes a pattern's list, and leaves one that does not to the modules", async () => {
@@ -209,7 +209,7 @@ describe("a story file's edit followed closely", () => {
     const { followed, watching } = watchingOf("");
     const { transform } = storyFileHotHooks(
       () => true,
-      () => [],
+      { edited: () => ({ changed: [], renewed: [] }), listing: () => [] },
       watching
     );
     if (typeof transform !== "object") throw new Error("missing hook");
@@ -224,7 +224,7 @@ describe("a story file's edit followed closely", () => {
     const fake = fakeEnvironment();
     const { hotUpdate } = storyFileHotHooks(
       () => true,
-      () => ["never"],
+      { edited: () => ({ changed: ["never"], renewed: [] }), listing: () => [] },
       watching
     );
     if (typeof hotUpdate !== "function") throw new Error("missing hook");

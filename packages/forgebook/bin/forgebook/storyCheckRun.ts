@@ -69,6 +69,7 @@ const checkedStory = (
   const formerId = formerIdOf(component, story);
   return {
     id: story.id,
+    file: story.file,
     ...(formerId === undefined ? {} : { formerId }),
     ...(story.height === undefined ? {} : { height: story.height }),
     ...(story.isLogic ? { isLogic: true } : {}),

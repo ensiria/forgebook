@@ -165,7 +165,7 @@ export const agentLoopCommands = (
     ],
     run: async ({ options, io, log, isJson, style }): Promise<void> => {
       const config = await configOf(options.config);
-      const { stories, files } = await changedOf(config, options, log);
+      const { stories, files, unread = [] } = await changedOf(config, options, log);
       const reports: StoryCheckReport[] = [];
       for (const story of stories) {
         const report = await runStoryCheck(config, options.url, {
@@ -176,9 +176,10 @@ export const agentLoopCommands = (
         if (typeof report === "string") throw new ScriptError(report);
         reports.push(report);
       }
+      // a story file that cannot be read may be the change: "no story touched" must not pass it
       const problems = reports
         .flatMap((report) => report.results)
-        .reduce((sum, each) => sum + each.problems.length, 0);
+        .reduce((sum, each) => sum + each.problems.length, unread.length);
       const text =
         reports.length === 0 ? "No story touched." : reports.map((each) => checkText(each, style)).join("\n");
       io.stdout.write(isJson ? formatJson({ schema: 1, files, stories, reports, problems }) : `${text}\n`);
