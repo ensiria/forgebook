@@ -25,6 +25,8 @@ import type { AddressLink } from "../addressArgsParam.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
 import { type PanelArgs, panelArgsParam } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
+import type { LoadedChecks } from "./argChecks.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
 import { tellFrames } from "./FrameView.tsx";
 import type { ReadyMessage } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
@@ -80,6 +82,8 @@ export type AddressArgsInput = {
   readonly controls: ReadyDeclaration["controls"];
   /** The source's named values; none when it has none. */
   readonly namedValues: NamedValues | undefined;
+  /** The catalogue's custom controls; none when it has none. */
+  readonly argControls: ArgControlLoaders | undefined;
   /** The element that holds the story's frames, which hear each change of the checked values. */
   readonly frames: RefObject<HTMLElement | null>;
 };
@@ -102,31 +106,43 @@ export type AddressArgs = {
    * updates after; none while the docs load.
    */
   readonly acceptedFor: (ready: ReadyDeclaration) => AcceptedArgs | undefined;
-  /** Gives a prop with a shape its worst value, once a prop that has a shape asked for what reads it. */
-  readonly worstOfShape: ShapeValues["worstOfShape"] | undefined;
+  /** Gives a prop with a shape its worst value, once a prop that needs the checks asked for them. */
+  readonly worstOfShape: LoadedChecks["worstOfShape"] | undefined;
 };
 
-/** What `shapeValues.ts` gives the stage. */
-export type ShapeValues = typeof import("../shapeValues.ts");
-
-/** The module, once loaded: a story shown later has it at once. */
-let loadedShapes: ShapeValues | undefined;
+/** No custom control registered. */
+const NO_ARG_CONTROLS: ArgControlLoaders = {};
 
 /**
- * What reads a value against its shape, loaded when a story first has a prop that needs it.
+ * What checks a story's structured values, loaded when a story first has a prop that needs it. Until it arrives such a
+ * prop's value waits, whichever its story.
  *
- * @param isNeeded - whether the story has one.
+ * @param declaration - what the story declares.
+ * @param loaders - the catalogue's custom controls.
  */
-const useShapeValues = (isNeeded: boolean): ShapeValues | undefined => {
-  const [shapes, setShapes] = useState(loadedShapes);
+const useArgChecks = (
+  declaration: ArgDeclaration | undefined,
+  loaders: ArgControlLoaders | undefined
+): LoadedChecks | undefined => {
+  const props = declaration === undefined ? [] : declaredArgProps(declaration);
+  const names = props.flatMap((prop) => prop.customControl ?? []).join("\n");
+  const isNeeded = props.some(needsShapeChecks);
+  const [loaded, setLoaded] = useState<{ readonly names: string; readonly checks: LoadedChecks }>();
   useEffect(() => {
-    if (!isNeeded || shapes !== undefined) return;
-    void import("../shapeValues.ts").then((module) => {
-      loadedShapes = module;
-      setShapes(module);
-    });
-  }, [isNeeded, shapes]);
-  return shapes;
+    if (!isNeeded) return;
+    let isCurrent = true;
+    void import("./argChecks.ts")
+      .then(({ loadedChecks }) =>
+        loadedChecks(names === "" ? [] : names.split("\n"), loaders ?? NO_ARG_CONTROLS)
+      )
+      .then((checks) => {
+        if (isCurrent) setLoaded({ names, checks });
+      });
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [isNeeded, names, loaders]);
+  return loaded?.names === names ? loaded.checks : undefined;
 };
 
 /**
@@ -142,17 +158,13 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     const ready = storyArgs === undefined ? undefined : { args: storyArgs, argTypes, controls };
     return declarationOf(docs, ready, namedValues);
   }, [docs, storyArgs, argTypes, controls, namedValues]);
-  const isNeeded = useMemo(
-    () => declaration !== undefined && declaredArgProps(declaration).some(needsShapeChecks),
-    [declaration]
-  );
-  const shapes = useShapeValues(isNeeded);
+  const checks = useArgChecks(declaration, input.argControls);
   const checked = useMemo((): CheckedArgs | undefined => {
     if (declaration === undefined) return undefined;
-    const read = checkedAddressArgs(panelArgs, declaration, typeValue, shapes);
+    const read = checkedAddressArgs(panelArgs, declaration, typeValue, checks);
     // nothing is told of the address until all of it can be: a story must not draw half a link
     return read.isWaiting ? undefined : read;
-  }, [panelArgs, typeValue, declaration, shapes]);
+  }, [panelArgs, typeValue, declaration, checks]);
   const acceptedParam = checked === undefined ? undefined : panelArgsParam(checked.accepted);
   // the values reach the frames from the address, so going back in the history sets them too; compared as text, so a
   // frame is told again only when they change
@@ -172,9 +184,9 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     acceptedFor: (message: ReadyDeclaration): AcceptedArgs | undefined => {
       const ready = declarationOf(docs, message, namedValues);
       if (ready === undefined) return undefined;
-      const read = checkedAddressArgs(panelArgs, ready, typeValue, shapes);
+      const read = checkedAddressArgs(panelArgs, ready, typeValue, checks);
       return read.isWaiting ? undefined : read.sealed;
     },
-    worstOfShape: shapes?.worstOfShape
+    worstOfShape: checks?.worstOfShape
   };
 };

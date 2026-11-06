@@ -21,6 +21,7 @@ export const EDITOR_STRINGS = lateStrings({
     `${label}: now ${position} of ${count}`,
   itemRemoved: (label: string, count: number): string => `${label} removed, ${count} left`,
   emptyList: "No items",
+  cannotSet: "It needs what only the source's named values can give, and they name none",
   clearField: (label: string): string => `${label}: no value`,
   fieldName: (label: string): string => `${label}: name`,
   fieldValue: (label: string, name: string): string => `${label} ${name}`,

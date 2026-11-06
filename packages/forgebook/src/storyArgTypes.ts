@@ -12,13 +12,14 @@ import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
 import { argConditionOf } from "./argConditions.ts";
 import type { PanelArgType, PanelArgTypes, PanelControl } from "./argTypes.ts";
+import { isArgValue } from "./messages.ts";
 
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** Storybook's control names, as the panel draws them (the inline variants look the same here). */
-const CONTROLS: Readonly<Record<string, PanelControl>> = {
+export const CONTROLS: Readonly<Record<string, PanelControl>> = {
   select: "select",
   radio: "radio",
   "inline-radio": "radio",
@@ -56,10 +57,11 @@ const labelsOf = (value: unknown): Readonly<Record<string, string>> | undefined 
 const controlOf = (entry: Readonly<Record<string, unknown>>): PanelControl | undefined => {
   const control = entry["control"];
   if (control === false) return "none";
-  if (typeof control === "string") return CONTROLS[control];
+  if (typeof control === "string") return Object.hasOwn(CONTROLS, control) ? CONTROLS[control] : undefined;
   if (isRecord(control)) {
     if (control["disable"] === true) return "none";
-    if (typeof control["type"] === "string") return CONTROLS[control["type"]];
+    const type = control["type"];
+    if (typeof type === "string") return Object.hasOwn(CONTROLS, type) ? CONTROLS[type] : undefined;
   }
   return Array.isArray(entry["options"]) ? "select" : undefined;
 };
@@ -76,12 +78,21 @@ const optionsOf = (entry: Readonly<Record<string, unknown>>): readonly (string |
   );
 };
 
-/** What a `token` and a `file` control say of themselves. */
+/** A name among the controls an entry writes that is none of the panel's: a custom control's. */
+const customControlOf = (control: unknown): string | undefined => {
+  if (isRecord(control) && control["disable"] === true) return undefined;
+  const name = isRecord(control) ? control["type"] : control;
+  return typeof name === "string" && !Object.hasOwn(CONTROLS, name) ? name : undefined;
+};
+
+/** What a `token`, a `file` and a custom control say of themselves. */
 const editorSettingsOf = (
   settings: Readonly<Record<string, unknown>>
-): Pick<PanelArgType, "tokens" | "accept"> => {
+): Pick<PanelArgType, "tokens" | "accept" | "settings"> => {
   const { of, format, accept } = settings;
+  const own = settings["settings"];
   return {
+    ...(own !== undefined && isArgValue(own) ? { settings: own } : {}),
     ...(typeof of === "string" ? { tokens: { of, ...(typeof format === "string" ? { format } : {}) } } : {}),
     ...(typeof accept === "string" ? { accept } : {})
   };
@@ -105,6 +116,7 @@ const panelArgTypeOf = (entry: Readonly<Record<string, unknown>>, isExcluded: bo
   const max = numberOf(settings, "max");
   const step = numberOf(settings, "step");
   const condition = argConditionOf(entry["if"]);
+  const customControl = customControlOf(entry["control"]);
   return {
     isHidden: isExcluded || (isRecord(table) && table["disable"] === true),
     ...(typeof name === "string" ? { label: name } : {}),
@@ -116,7 +128,8 @@ const panelArgTypeOf = (entry: Readonly<Record<string, unknown>>, isExcluded: bo
     ...(max === undefined ? {} : { max }),
     ...(step === undefined ? {} : { step }),
     ...(condition === undefined ? {} : { if: condition }),
-    ...editorSettingsOf(settings)
+    ...editorSettingsOf(settings),
+    ...(customControl === undefined ? {} : { customControl })
   };
 };
 

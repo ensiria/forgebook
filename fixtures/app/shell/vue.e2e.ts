@@ -18,6 +18,7 @@ const STORY_IDS = [
   "inputs-badge--from-template",
   "inputs-badge--removable",
   "inputs-counter--default",
+  "inputs-stepped--default",
   "states-awaited--default",
   "states-fragile--default",
   "states-greeting--live",
@@ -172,4 +173,19 @@ test("a composable's story shows its signature first", async ({ page }) => {
   await isReady(page);
   await expect(page.getByRole("tab", { name: "Signature" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("Ref<boolean>").first()).toBeVisible();
+});
+
+test("a custom control written in Vue sets a prop, and its value comes back from the link", async ({
+  page
+}) => {
+  await page.goto(story("inputs-stepped--default"));
+  await isReady(page);
+  const control = page.locator('[data-control="stepper"]');
+  await expect(control.getByTestId("stepper")).toHaveText("2");
+  await control.getByRole("button", { name: "One more" }).click();
+  await expect(frameOf(page).locator(".badge, [class*=badge]").first()).toBeAttached();
+  await expect.poll(() => new URL(page.url()).searchParams.get("args")).toBe('{"count":3}');
+  await page.reload();
+  await isReady(page);
+  await expect(page.locator('[data-control="stepper"]').getByTestId("stepper")).toHaveText("3");
 });

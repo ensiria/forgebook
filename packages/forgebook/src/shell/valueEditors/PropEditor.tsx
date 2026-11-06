@@ -11,8 +11,13 @@ import type { PanelProp } from "../../argTypes.ts";
 import { type ArgValue, UNSET_ARG } from "../../messages.ts";
 import type { NamedValues } from "../../namedValues.ts";
 import { resolvedShape } from "../../shapeValues.ts";
+import { canSetShape } from "../../valueShape.ts";
+import type { ArgControlLoaders } from "../customControls.ts";
+import { LazyView, lazyModule } from "../lazyModule.tsx";
 import type { OnValueChange } from "../PropFields.tsx";
+import { EDITOR_STRINGS } from "./editorStrings.ts";
 import { FileEditor } from "./FileEditor.tsx";
+import type { FieldProps } from "./fieldTypes.ts";
 import { SearchSelect } from "./SearchSelect.tsx";
 import { TokenEditor } from "./TokenEditor.tsx";
 import { ValueField } from "./ValueField.tsx";
@@ -31,9 +36,49 @@ export type PropEditorProps = {
   readonly namedValues: NamedValues;
   /** Loads the catalogue's design tokens; none when it has none. */
   readonly loadTokens: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls: ArgControlLoaders | undefined;
   /** Called with a changed value. */
   readonly onValueChange: OnValueChange;
 };
+
+/** The host of the custom controls, which a catalogue with none never loads. */
+const CUSTOM_CONTROL = lazyModule(() =>
+  import("../CustomControl.tsx").then((module) => module.CustomControl)
+);
+
+/** No custom control registered. */
+const NO_ARG_CONTROLS: ArgControlLoaders = {};
+
+/** A custom control's field: its host loads with the first, so an editor of any other kind pays nothing for it. */
+const CustomField = ({
+  prop,
+  name,
+  value,
+  argControls,
+  onValueChange
+}: Pick<PropEditorProps, "prop" | "value" | "argControls" | "onValueChange"> & {
+  readonly name: string;
+}): ReactNode => (
+  <LazyView
+    module={CUSTOM_CONTROL}
+    props={{ prop, name, value, loaders: argControls ?? NO_ARG_CONTROLS, onValueChange }}
+    loading={null}
+    failed={(message: string): ReactNode => (
+      <p className="forgebook-prop__description forgebook-prop__problem" role="alert">
+        {message}
+      </p>
+    )}
+  />
+);
+
+/** A prop's fields, or why it has none: a required part only named values can fill, and the source names none. */
+const ShapedField = (props: FieldProps): ReactNode =>
+  canSetShape(props.shape, props.namedValues) ? (
+    <ValueField {...props} />
+  ) : (
+    <p className="forgebook-value-note">{EDITOR_STRINGS.cannotSet}</p>
+  );
 
 /**
  * One prop's editor.
@@ -46,10 +91,22 @@ export const PropEditor = ({
   descriptionId,
   namedValues,
   loadTokens,
+  argControls,
   onValueChange
 }: PropEditorProps): ReactNode => {
   const label = prop.label ?? prop.name;
   const change = (next: ArgValue | undefined): void => onValueChange(prop.name, next ?? UNSET_ARG);
+  if (prop.customControl !== undefined) {
+    return (
+      <CustomField
+        prop={prop}
+        name={prop.customControl}
+        value={value}
+        argControls={argControls}
+        onValueChange={onValueChange}
+      />
+    );
+  }
   if (prop.control === "file") {
     return (
       <FileEditor
@@ -92,7 +149,7 @@ export const PropEditor = ({
   }
   if (prop.shape !== undefined) {
     return (
-      <ValueField
+      <ShapedField
         shape={resolvedShape(prop.shape)}
         value={value}
         label={label}

@@ -327,6 +327,25 @@ const pluginViewLines = (config: ResolvedConfig): string[] => {
 };
 
 /**
+ * The shell's list of the custom controls, each with the import that loads it when a story names it; nothing for a
+ * catalogue without any, whose entry is then what it would be with no such feature.
+ *
+ * @param config - the configuration.
+ */
+const argControlLines = (config: ResolvedConfig): string[] => {
+  const controls = Object.entries(config.argControls);
+  return controls.length === 0
+    ? []
+    : [
+        "    argControls: {",
+        ...controls.map(
+          ([name, module]) => `      ${codeLiteral(name)}: () => import(${codeLiteral(module)}),`
+        ),
+        "    },"
+      ];
+};
+
+/**
  * The shell's entry: the shell mounted with the configuration's data, the logo, the sources and the code writer.
  *
  * @param config - the configuration.
@@ -356,6 +375,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
     ...pluginViewLines(config),
+    ...argControlLines(config),
     ...(config.framework.addressTexts === undefined
       ? []
       : [`    addressTexts: ${codeLiteral(config.framework.addressTexts)},`]),

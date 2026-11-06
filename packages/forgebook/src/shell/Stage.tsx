@@ -36,6 +36,7 @@ import {
 } from "../viewState.ts";
 import { useStoryClockControls } from "./ClockControls.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
 import {
   DeviceSlot,
   deviceAddress,
@@ -107,6 +108,8 @@ export type StageProps = {
   readonly onFixedChange: (storyId: string, fixed: FixedView) => void;
   /** Loads the catalogue's design tokens; none when it has none. */
   readonly loadTokens?: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders | undefined;
   /**
    * The values set in the Props tab, over the story's own args (kept in the address): as the address names them, so
    * unchecked; the stage hands the frames only those the story declares.
@@ -164,6 +167,7 @@ export const Stage = ({
   onViewChange: onOwnViewChange,
   onFixedChange,
   loadTokens,
+  argControls,
   panelArgs,
   addressLink,
   onPanelArgsChange,
@@ -227,6 +231,7 @@ export const Stage = ({
 
   // the address's values reach the frames only once checked against what the story declares
   const addressArgs = useAddressArgs({
+    argControls,
     panelArgs,
     link: addressLink,
     docs,
@@ -370,6 +375,7 @@ export const Stage = ({
     panelArgs: acceptedArgs,
     storyArgs: ownArgs,
     loadTokens,
+    argControls,
     globals: view.switches,
     onValueChange: panelValues.change,
     onReset: (): void => onPanelArgsChange({}),

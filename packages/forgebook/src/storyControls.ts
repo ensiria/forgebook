@@ -9,6 +9,7 @@ import type { StoryControlsSetting } from "@forgebook/story-format/source";
 import { type ArgDeclaration, checkedAddressArgs, type DroppedArg, declaredArgProps } from "./addressArgs.ts";
 import { readArgsParam } from "./addressArgsParam.ts";
 import { type AddressTexts, addressArgsFor } from "./addressTexts.ts";
+import type { ValueSchema } from "./argControl.ts";
 import {
   isColorProp,
   isNamedProp,
@@ -20,11 +21,12 @@ import {
 import type { PropDocs } from "./componentDocs.ts";
 import { type ArgValue, type PanelArgs, panelArgsParam } from "./messages.ts";
 import type { NamedValues } from "./namedValues.ts";
-import { isFileList, isValueOfShape, resolvedShape } from "./shapeValues.ts";
-import type { ValueShape } from "./valueShape.ts";
+import { holdsUnsafePart, isFileList, isValueOfShape, resolvedShape } from "./shapeValues.ts";
+import { schemaProblem } from "./valueSchema.ts";
+import { canSetShape, type ValueShape } from "./valueShape.ts";
 
 /** How a value of a prop is set: the panel's control, or a choice among the source's named values. */
-export type ControlKind = Exclude<PanelControl, "none"> | "named";
+export type ControlKind = Exclude<PanelControl, "none"> | "named" | "custom";
 
 /** One prop a story's values can set. */
 export type StoryControl = {
@@ -46,9 +48,18 @@ export type StoryControl = {
   readonly max?: number;
   /** The names a `named` control takes, as `{ of: type, named: name }`. */
   readonly named?: readonly string[];
+  /** A `custom` control's name, of those `argControls` registers. */
+  readonly custom?: string;
+  /** A `custom` control's `settings`, as the story writes them. */
+  readonly settings?: ArgValue;
+  /** A `custom` control's schema: what its value must fit. Left out when its module cannot be read. */
+  readonly schema?: ValueSchema;
   /** A `token` control's tokens, and what the story receives for one (`forgebook tokens` lists them). */
   readonly tokens?: TokenRequest;
 };
+
+/** The custom controls' schemas, by name. */
+export type CustomSchemas = Readonly<Record<string, ValueSchema>>;
 
 /** A prop's control when no `argTypes` names one: from its kind. */
 const controlOfKind = (prop: PanelProp, namedValues: NamedValues): ControlKind => {
@@ -65,10 +76,19 @@ const controlOfKind = (prop: PanelProp, namedValues: NamedValues): ControlKind =
  *
  * @param prop - the prop.
  * @param namedValues - the source's named values.
+ * @param customSchemas - the custom controls' schemas.
  */
-const storyControl = (prop: PanelProp, namedValues: NamedValues): StoryControl => {
-  const control =
+const storyControl = (
+  prop: PanelProp,
+  namedValues: NamedValues,
+  customSchemas: CustomSchemas
+): StoryControl => {
+  const custom = prop.customControl;
+  const schema =
+    custom !== undefined && Object.hasOwn(customSchemas, custom) ? customSchemas[custom] : undefined;
+  const own =
     prop.control === undefined || prop.control === "none" ? controlOfKind(prop, namedValues) : prop.control;
+  const control = custom === undefined ? own : "custom";
   return {
     name: prop.name,
     control,
@@ -79,7 +99,10 @@ const storyControl = (prop: PanelProp, namedValues: NamedValues): StoryControl =
     ...(prop.min === undefined ? {} : { min: prop.min }),
     ...(prop.max === undefined ? {} : { max: prop.max }),
     ...(control === "named" ? { named: Object.keys(namedValues[prop.type] ?? {}) } : {}),
-    ...(prop.tokens === undefined ? {} : { tokens: prop.tokens })
+    ...(prop.tokens === undefined ? {} : { tokens: prop.tokens }),
+    ...(custom === undefined ? {} : { custom }),
+    ...(prop.settings === undefined ? {} : { settings: prop.settings }),
+    ...(schema === undefined ? {} : { schema })
   };
 };
 
@@ -95,6 +118,8 @@ export type StoryDeclaration = {
   readonly storyArgs: PanelArgs;
   /** The source's named values. */
   readonly namedValues: NamedValues;
+  /** The custom controls' schemas, by name, those whose module could be read. */
+  readonly customSchemas?: CustomSchemas;
 };
 
 /**
@@ -104,7 +129,11 @@ export type StoryDeclaration = {
  */
 export const storyControlsOf = (declaration: StoryDeclaration): readonly StoryControl[] => {
   const argDeclaration: ArgDeclaration = declaration;
-  return declaredArgProps(argDeclaration).map((prop) => storyControl(prop, declaration.namedValues));
+  const canSet = (prop: PanelProp): boolean =>
+    prop.shape === undefined || canSetShape(prop.shape, declaration.namedValues);
+  return declaredArgProps(argDeclaration)
+    .filter(canSet)
+    .map((prop) => storyControl(prop, declaration.namedValues, declaration.customSchemas ?? {}));
 };
 
 /** What became of the values asked for. */
@@ -137,7 +166,41 @@ export const checkedSetArgs = (
     .map((name): DroppedArg => ({ name, reason: "type" }));
   const { accepted, dropped } = checkedAddressArgs(plain, declaration, undefined, {
     isFileList,
-    isValueOfShape
+    isValueOfShape,
+    custom: Object.fromEntries(
+      Object.entries(declaration.customSchemas ?? {}).map(([name, schema]) => [
+        name,
+        (value: ArgValue): string | undefined =>
+          holdsUnsafePart(value, true) ? "not what a link may give" : schemaProblem(schema, value)
+      ])
+    )
   });
   return { accepted, dropped: [...unread, ...notPlain, ...dropped], param: panelArgsParam(accepted) };
 };
+
+/** The custom controls as the server read them. */
+export type CustomControlsRead = {
+  /** The schemas, by control. */
+  readonly schemas: CustomSchemas;
+  /** Why a control could not be read, by control. */
+  readonly problems: Readonly<Record<string, string>>;
+};
+
+/**
+ * What is wrong with the custom controls a story names: one no configuration registers, or whose module did not load.
+ *
+ * @param controls - the story's controls.
+ * @param read - the custom controls as the server read them.
+ */
+export const customControlProblems = (
+  controls: readonly StoryControl[],
+  read: CustomControlsRead | undefined
+): readonly string[] =>
+  controls.flatMap(({ custom, schema }) => {
+    if (custom === undefined || schema !== undefined) return [];
+    const problem =
+      read !== undefined && Object.hasOwn(read.problems, custom) ? read.problems[custom] : undefined;
+    return [
+      `The control "${custom}": ${problem ?? "no control is registered under this name in argControls"}`
+    ];
+  });

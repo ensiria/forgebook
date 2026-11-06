@@ -97,7 +97,8 @@ export const LATER_STRINGS = lateStrings({
   droppedArgReasons: {
     undeclared: "not one of its props",
     type: "not of the prop's type",
-    unreadable: "its value could not be read"
+    unreadable: "its value could not be read",
+    control: "its control refuses it, or could not be loaded"
   },
   removeDroppedArgs: "Remove them from the address",
   events: "Events",

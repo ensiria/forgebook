@@ -20,16 +20,25 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { StorySource } from "@forgebook/story-format/source";
 import { createIdResolver, type ViteDevServer } from "vite";
 
+import type { ValueSchema } from "../argControl.ts";
 import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
+import type { CustomControlsRead } from "../storyControls.ts";
 import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
+import { isValueSchema } from "../valueSchema.ts";
 import { frameAddressOf } from "../viewState.ts";
 import type { ErrorsDocument, StoryDocument } from "./agent.types.ts";
-import { type CataloguePages, type LoadedStoryParts, storiesDocument, storyDocument } from "./agentApi.ts";
+import {
+  type CataloguePages,
+  customControlNames,
+  type LoadedStoryParts,
+  storiesDocument,
+  storyDocument
+} from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
 import { changedAnswer } from "./changedRoute.ts";
 import { emptyStoryGlobs, emptyStoryGlobsMessage, type ResolvedConfig } from "./configFile.ts";
@@ -181,6 +190,8 @@ export const rootHeaderValue = (dir: string): string => encodeURIComponent(dir);
 
 /** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
 export type RouteContext = {
+  /** What the answers ask of the dev server; none reads no custom control. */
+  readonly server?: AgentServer;
   /** The sources and the preview, as the dev server loaded them. */
   readonly loaded: AgentModule;
   /** The sources' story tree. */
@@ -245,12 +256,17 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
   const files = sourceFiles(source);
   // the story's own file: its module, and the docs of the component its meta names, which its args are for
   const file = location.story.file;
+  const storyModule = await settled(files.stories[file]);
   const parts: LoadedStoryParts = {
-    module: await settled(files.stories[file]),
+    module: storyModule,
     docs: await settled(files.docs[file]),
     preview: loaded.preview,
     namedValues: source.namedValues,
     setArgs: params.get("args") ?? undefined,
+    customControls:
+      context.server === undefined
+        ? undefined
+        : await customControlsRead(customControlNames(storyModule, location), config, context.server),
     addressTexts: config.framework.addressTexts
   };
   const index = offersUsedIn(config.lists) ? await sourceUsage(source) : undefined;
@@ -262,6 +278,53 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
     ? document
     : { ...document, componentDocs: "off" };
   return { status: 200, body };
+};
+
+/** How long a control's module may take to load for an answer: one that hangs must not hold every answer with it. */
+const CONTROL_LOAD_MS = 5000;
+
+/** A control's schema, loaded on the server; a text says why there is none. */
+const controlSchemaOf = async (module: string, server: AgentServer): Promise<ValueSchema | string> => {
+  try {
+    const id = await server.resolveSource(module);
+    const timeout = new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`no answer in ${CONTROL_LOAD_MS} ms`)), CONTROL_LOAD_MS).unref();
+    });
+    const loaded = await Promise.race([server.load(id ?? module), timeout]);
+    const schema =
+      typeof loaded === "object" && loaded !== null && "schema" in loaded ? loaded.schema : undefined;
+    return isValueSchema(schema) ? schema : "its module exports no schema Forgebook can read";
+  } catch (error) {
+    return `its module cannot be read on the server: ${error instanceof Error ? error.message : String(error)}`;
+  }
+};
+
+/**
+ * The custom controls a story names, as an agent reads them: only those, each module loaded on the server for its schema.
+ * A module that cannot load there (it touches the page as it is imported) has no schema to say, and no value of it can be
+ * checked. Its import runs on the dev server, as a story file's does.
+ *
+ * @param names - the controls the story names.
+ * @param config - the catalogue's configuration.
+ * @param server - what the answers ask of the dev server.
+ */
+const customControlsRead = async (
+  names: readonly string[],
+  config: ResolvedConfig,
+  server: AgentServer
+): Promise<CustomControlsRead> => {
+  const known = names.filter((name) => Object.hasOwn(config.argControls, name));
+  const read = await Promise.all(
+    known.map(async (name) => [name, await controlSchemaOf(config.argControls[name] ?? "", server)] as const)
+  );
+  return {
+    schemas: Object.fromEntries(
+      read.flatMap(([name, each]) => (typeof each === "string" ? [] : [[name, each]]))
+    ),
+    problems: Object.fromEntries(
+      read.flatMap(([name, each]) => (typeof each === "string" ? [[name, each]] : []))
+    )
+  };
 };
 
 /**
@@ -299,7 +362,8 @@ export const agentAnswer = async (
       config,
       params,
       pages: { page: `${origins.catalogue}/`, frame: `${origins.frames}/frame.html` },
-      view: params.get("view") ?? ""
+      view: params.get("view") ?? "",
+      server
     };
     if (route === "errors") return errorsAnswer(context, live);
     if (route === "stories") return await storiesAnswer(context);

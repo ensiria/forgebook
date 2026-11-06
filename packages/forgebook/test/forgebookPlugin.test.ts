@@ -190,6 +190,7 @@ describe("forgebookPlugin's pages", () => {
     dir: "C:/Users/ada/app",
     framework: STUB_FRAMEWORK,
     title: "Catalogue",
+    argControls: {},
     logo: undefined,
     heights: undefined,
     stories: ["src/**/*.stories.tsx"],

@@ -40,6 +40,14 @@ export default defineConfig({
   },
   // invented tokens, so a designer's page has some to show
   tokens: ["tokens.json", { file: "tokens.dark.json", mode: "dark" }],
+  // custom controls, one that works and one for each way one can fail, so the shell's tests see them all
+  argControls: {
+    rating: "./controls/rating.tsx",
+    failing: "./controls/failing.ts",
+    gone: "./controls/gone.ts",
+    unschemed: "./controls/unschemed.ts",
+    wrongValue: "./controls/wrongValue.ts"
+  },
   // a view offered to every reader, so the shell's tests pick one the catalogue declares
   views: [{ name: "Dark phone", view: "theme=dark&width=360" }]
 });

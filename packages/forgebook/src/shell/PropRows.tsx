@@ -9,7 +9,8 @@ import { type ChangeEvent, type ReactNode, useId } from "react";
 import { isColorProp, type PanelProp } from "../argTypes.ts";
 import { type ArgValue, isUnsetArg, UNSET_ARG } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
-import { Icon } from "./icons.tsx";
+import type { ArgControlLoaders } from "./customControls.ts";
+import { Icon, type IconName } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { ChoiceControl, MOST_PLAIN_OPTIONS, NumberField, type OnValueChange, textOf } from "./PropFields.tsx";
 import { STRINGS } from "./strings.ts";
@@ -65,30 +66,21 @@ const FieldActions = ({
   onValueChange
 }: FieldState & { readonly prop: PanelProp }): ReactNode => {
   const label = prop.label ?? prop.name;
+  const action = (text: string, icon: IconName, next: ArgValue | undefined): ReactNode => (
+    <button
+      type="button"
+      className="forgebook-prop__action"
+      aria-label={text}
+      title={text}
+      onClick={(): void => onValueChange(prop.name, next)}
+    >
+      <Icon name={icon} size={12} />
+    </button>
+  );
   return (
     <span className="forgebook-prop__actions">
-      {value === undefined ? null : (
-        <button
-          type="button"
-          className="forgebook-prop__action"
-          aria-label={STRINGS.unsetProp(label)}
-          title={STRINGS.unsetProp(label)}
-          onClick={(): void => onValueChange(prop.name, UNSET_ARG)}
-        >
-          <Icon name="noValue" size={12} />
-        </button>
-      )}
-      {panelValue === undefined ? null : (
-        <button
-          type="button"
-          className="forgebook-prop__action"
-          aria-label={STRINGS.resetProp(label)}
-          title={STRINGS.resetProp(label)}
-          onClick={(): void => onValueChange(prop.name, undefined)}
-        >
-          <Icon name="replay" size={12} />
-        </button>
-      )}
+      {value === undefined ? null : action(STRINGS.unsetProp(label), "noValue", UNSET_ARG)}
+      {panelValue === undefined ? null : action(STRINGS.resetProp(label), "replay", undefined)}
     </span>
   );
 };
@@ -185,6 +177,7 @@ const TextArgLine = ({
 const usesEditors = (prop: PanelProp, named: Readonly<Record<string, unknown>> | undefined): boolean =>
   named !== undefined ||
   prop.shape !== undefined ||
+  prop.customControl !== undefined ||
   prop.control === "token" ||
   prop.control === "file" ||
   (prop.kind === "choice" &&
@@ -200,6 +193,7 @@ export const PropControl = ({
   named,
   namedValues,
   loadTokens,
+  argControls,
   textArg,
   onValueChange
 }: {
@@ -215,6 +209,8 @@ export const PropControl = ({
   readonly namedValues: NamedValues;
   /** Loads the catalogue's design tokens; none when it has none. */
   readonly loadTokens: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders | undefined;
   /** Where the story's text for the prop comes from, when the story names one by its key. */
   readonly textArg: TextArgNote | undefined;
   readonly onValueChange: OnValueChange;
@@ -230,19 +226,20 @@ export const PropControl = ({
       descriptionId,
       namedValues,
       loadTokens,
+      argControls,
       onValueChange
     };
-    const isWide = prop.shape !== undefined && named === undefined;
+    const isWide = (prop.shape !== undefined || prop.customControl !== undefined) && named === undefined;
     return (
       <div className="forgebook-prop" data-wide={isWide || undefined}>
         <PropHead prop={prop} showsGroup={showsGroup} state={state} />
         <LazyView
           module={PROP_EDITOR}
           props={editorProps}
-          loading={<p className="forgebook-prop__description">{STRINGS.editorsLoading}</p>}
+          loading={null}
           failed={(message: string): ReactNode => (
             <p className="forgebook-prop__description" role="alert">
-              {STRINGS.editorsFailed(message)}
+              {message}
             </p>
           )}
         />
@@ -282,31 +279,20 @@ export const PropControl = ({
   }
   // a text with a line break keeps it: an `<input>` would drop it, from the field and from the link
   const isMultiline = prop.control === "textarea" || (typeof value === "string" && value.includes("\n"));
+  const TextControl = isMultiline ? "textarea" : "input";
   return (
     <div className="forgebook-prop">
       <PropHead prop={prop} showsGroup={showsGroup} state={state} />
       <div className="forgebook-prop__field">
-        {isMultiline ? (
-          <textarea
-            aria-label={label}
-            aria-describedby={descriptionId}
-            rows={4}
-            value={textOf(value)}
-            onChange={(event: ChangeEvent<HTMLTextAreaElement>): void =>
-              onValueChange(prop.name, event.target.value)
-            }
-          />
-        ) : (
-          <input
-            type="text"
-            aria-label={label}
-            aria-describedby={descriptionId}
-            value={textOf(value)}
-            onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-              onValueChange(prop.name, event.target.value)
-            }
-          />
-        )}
+        <TextControl
+          aria-label={label}
+          aria-describedby={descriptionId}
+          {...(isMultiline ? { rows: 4 } : { type: "text" })}
+          value={textOf(value)}
+          onChange={(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void =>
+            onValueChange(prop.name, event.target.value)
+          }
+        />
         {/* a colour picker beside the text: the field still takes any CSS colour, a token's var() included */}
         {isColorProp(prop) ? (
           <input

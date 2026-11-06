@@ -43,6 +43,7 @@ const STORY_IDS = [
   "components-button--untested",
   "storybook-arg-types--controls",
   "storybook-arg-types--conditional",
+  "storybook-custom-controls--rated",
   "storybook-value-props--filled",
   "storybook-value-props--empty",
   "storybook-value-props--with-tokens",

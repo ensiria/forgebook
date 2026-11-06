@@ -158,6 +158,8 @@ type EmbedStoryProps = {
   readonly loadDocs: (() => Promise<unknown>) | undefined;
   /** The source's named values; none when it has none. */
   readonly namedValues: NamedValues | undefined;
+  /** The catalogue's custom controls, whose schemas the check reads; none when it has none. */
+  readonly argControls: ShellConfig["argControls"];
   /** The frame page's address. */
   readonly frameUrl: string;
 };
@@ -174,6 +176,7 @@ const EmbedStory = ({
   link,
   loadDocs,
   namedValues,
+  argControls,
   frameUrl
 }: EmbedStoryProps): ReactNode => {
   const catalogue = useCatalogue();
@@ -200,6 +203,7 @@ const EmbedStory = ({
     argTypes: ready?.argTypes ?? NO_ARG_TYPES,
     controls: ready?.controls ?? "all",
     namedValues,
+    argControls,
     frames: storyRef
   });
   const { heights, settled } = useFrameMessages({
@@ -280,8 +284,9 @@ const EmbedContent = ({
   title,
   sources,
   frameUrl,
+  argControls,
   addressTexts
-}: Pick<ShellConfig, "title" | "sources" | "frameUrl"> & {
+}: Pick<ShellConfig, "title" | "sources" | "frameUrl" | "argControls"> & {
   readonly addressTexts: AddressTexts;
 }): ReactNode => {
   const catalogue = useCatalogue();
@@ -322,6 +327,7 @@ const EmbedContent = ({
       panelArgs={panelArgs}
       loadDocs={source === undefined ? undefined : sourceFiles(source).docs[location.story.file]}
       namedValues={source?.namedValues}
+      argControls={argControls}
       frameUrl={frameUrl}
     />
   );
@@ -338,6 +344,7 @@ export const EmbedPage = (props: ShellConfig): ReactNode => (
       title={props.title}
       sources={props.sources}
       frameUrl={props.frameUrl}
+      {...(props.argControls === undefined ? {} : { argControls: props.argControls })}
       addressTexts={props.addressTexts ?? "any"}
     />
   </CatalogueContext.Provider>

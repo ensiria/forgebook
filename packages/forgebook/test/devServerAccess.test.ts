@@ -64,6 +64,7 @@ describe("a dev server's two ports", () => {
     writeFileSync(join(named, "named.stories.tsx"), "export default {}; export const Two = {};\n");
     const config: ResolvedConfig = {
       title: "Access",
+      argControls: {},
       logo: undefined,
       heights: undefined,
       dir: project,

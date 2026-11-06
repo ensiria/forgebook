@@ -154,8 +154,6 @@ const shellStrings = {
   resetProp: (prop: string): string => `${prop}: back to the story's value`,
   stateUnset: "no value",
   stateEmpty: "empty text",
-  editorsLoading: "Loading the fields…",
-  editorsFailed: (message: string): string => `The fields could not be loaded: ${message}`,
   unsetDefault: (value: string): string => `— (${value})`,
   defaultIs: "Default:",
   pickColor: (prop: string): string => `${prop}: pick a colour`,

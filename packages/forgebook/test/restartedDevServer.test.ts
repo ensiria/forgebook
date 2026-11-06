@@ -56,6 +56,7 @@ describe("a dev server's first clients", () => {
     head: "",
     shell: { themeCss: "", frameCss: "", hasBranding: true, styleSheets: [], problems: [] },
     tokens: [],
+    argControls: {},
     watch: [],
     lists: { usedIn: false, componentDocs: false },
     plugins: [],

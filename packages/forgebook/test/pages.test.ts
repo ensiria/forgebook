@@ -33,6 +33,7 @@ const CONFIG: ResolvedConfig = {
   dir: "/catalogue",
   framework: STUB_FRAMEWORK,
   title: "Acme <UI>",
+  argControls: {},
   logo: "/catalogue/logo.svg",
   heights: "story-heights.json",
   stories: ["src/**/*.stories.tsx"],
@@ -392,5 +393,13 @@ describe("the generated modules' paths on Windows", () => {
   it("imports the project's own stories by their module's path in Vite's form", () => {
     const own = { ...CONFIG, dir: "C:/Users/ada/app" };
     expect(shellEntry(own)).toContain(`from ${codeLiteral("C:/Users/ada/app/.forgebook-stories.ts")};`);
+  });
+});
+
+describe("the custom controls in the shell's entry", () => {
+  it("are imported on use, and are nothing for a catalogue with none", () => {
+    expect(shellEntry(CONFIG)).not.toContain("argControls");
+    const entry = shellEntry({ ...CONFIG, argControls: { rating: "/catalogue/controls/rating.tsx" } });
+    expect(entry).toContain('"rating": () => import("\\u002fcatalogue\\u002fcontrols\\u002frating.tsx")');
   });
 });

@@ -116,10 +116,12 @@ export type ArgControlType =
 /** An arg's control: its type, or `false` for none, or the type with its settings. */
 export type ArgControl =
   | ArgControlType
+  // a custom control's name, of those `argControls` registers in `forgebook.config`
+  | (string & {})
   | false
   | {
-      /** The control; from the arg's type when left out. */
-      readonly type?: ArgControlType;
+      /** The control, or a custom control's name; from the arg's type when left out. */
+      readonly type?: ArgControlType | (string & {});
       /** The names the panel shows for the options, by option. */
       readonly labels?: Readonly<Record<string, string>>;
       /** A range's or a number's lowest value. */
@@ -141,6 +143,8 @@ export type ArgControl =
       readonly format?: string;
       /** The files a `file` control takes, as `<input accept>` writes it (`image/*`). */
       readonly accept?: string;
+      /** A custom control's own settings, as JSON: its `mount` reads them in `argType.settings`. */
+      readonly settings?: unknown;
     };
 
 /**

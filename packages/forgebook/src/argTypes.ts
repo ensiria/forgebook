@@ -19,7 +19,7 @@ import { type ArgCondition, isArgCondition } from "./argConditions.ts";
 import type { PropDocs } from "./componentDocs.ts";
 import type { ArgValue } from "./messages.ts";
 import type { NamedValues } from "./namedValues.ts";
-import { canSetShape, type ValueShape } from "./valueShape.ts";
+import type { ValueShape } from "./valueShape.ts";
 
 /** A control as the panel draws it; `none` for an arg the panel lists without a control. */
 export type PanelControl =
@@ -76,6 +76,10 @@ export type PanelArgType = {
   readonly tokens?: TokenRequest;
   /** The files a `file` control takes, as `<input accept>` writes it. */
   readonly accept?: string;
+  /** The custom control it names, of those `argControls` registers: any name that is none of the panel's. */
+  readonly customControl?: string;
+  /** The custom control's `settings`. */
+  readonly settings?: ArgValue;
 };
 
 /** The panel's arg types, by arg. */
@@ -99,6 +103,10 @@ export type PanelProp = PropDocs & {
   readonly tokens?: TokenRequest;
   /** The files a `file` control takes. */
   readonly accept?: string;
+  /** The custom control it names. */
+  readonly customControl?: string;
+  /** The custom control's `settings`. */
+  readonly settings?: ArgValue;
 };
 
 /**
@@ -140,8 +148,9 @@ export const settableProps = (
       (prop.kind !== "other" ||
         prop.canTakeText === true ||
         prop.control === "file" ||
+        prop.customControl !== undefined ||
         isNamedProp(prop, namedValues) ||
-        (prop.shape !== undefined && canSetShape(prop.shape, namedValues))) &&
+        prop.shape !== undefined) &&
       prop.kind !== "event" &&
       (controls === "all" || controls.includes(prop.name))
   );
@@ -149,25 +158,6 @@ export const settableProps = (
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** The panel controls, for the check on arrival. */
-const PANEL_CONTROLS: readonly PanelControl[] = [
-  "select",
-  "radio",
-  "check",
-  "multi-select",
-  "boolean",
-  "text",
-  "number",
-  "range",
-  "color",
-  "date",
-  "object",
-  "textarea",
-  "token",
-  "file",
-  "none"
-];
 
 /** The prop kind a control sets, for the panel's groups. */
 const KIND_OF_CONTROL: Readonly<Record<PanelControl, PropDocs["kind"]>> = {
@@ -196,14 +186,21 @@ const editorFieldsOf = (
   prop: PropDocs,
   argType: PanelArgType,
   own: ArgValue | undefined
-): Pick<PanelProp, "shape" | "tokens" | "accept"> => {
+): Partial<Pick<PanelProp, "kind" | "shape" | "tokens" | "accept" | "customControl" | "settings">> => {
   const shapeOfOwn: ValueShape =
     own === undefined || own === null ? { kind: "json" } : { kind: "like", value: own };
   return {
     ...(argType.control === "object" ? { shape: prop.shape ?? shapeOfOwn } : {}),
     // a `token` control that names no tokens asks for those named after its arg
     ...(argType.control === "token" ? { tokens: argType.tokens ?? { of: prop.name } } : {}),
-    ...(argType.accept === undefined ? {} : { accept: argType.accept })
+    ...(argType.accept === undefined ? {} : { accept: argType.accept }),
+    ...(argType.customControl === undefined
+      ? {}
+      : {
+          kind: "other",
+          customControl: argType.customControl,
+          ...(argType.settings === undefined ? {} : { settings: argType.settings })
+        })
   };
 };
 
@@ -220,9 +217,9 @@ const withArgType = (prop: PropDocs, argType: PanelArgType, own: ArgValue | unde
   const isReadOnly = control === "none";
   const { canTakeText: _canTakeText, ...rest } = prop;
   // a control the story names decides what its value is: the type's shape no longer draws nor checks it
-  const { shape: _shape, ...shapeless } = isReadOnly ? rest : prop;
+  const { shape: _shape, ...shapeless } = isReadOnly || argType.customControl !== undefined ? rest : prop;
   return {
-    ...(control === undefined ? prop : shapeless),
+    ...(control === undefined && argType.customControl === undefined ? prop : shapeless),
     ...(control === undefined ? {} : { kind: KIND_OF_CONTROL[control], control }),
     ...(argType.options === undefined ? {} : { choices: argType.options }),
     ...(argType.description === undefined ? {} : { description: argType.description }),
@@ -282,10 +279,12 @@ const isPanelArgType = (value: unknown): value is PanelArgType =>
   isRecord(value) &&
   typeof value["isHidden"] === "boolean" &&
   (value["if"] === undefined || isArgCondition(value["if"])) &&
-  (value["control"] === undefined || PANEL_CONTROLS.some((control) => control === value["control"])) &&
+  (value["control"] === undefined ||
+    (typeof value["control"] === "string" && Object.hasOwn(KIND_OF_CONTROL, value["control"]))) &&
   (value["tokens"] === undefined ||
     (isRecord(value["tokens"]) && typeof value["tokens"]["of"] === "string")) &&
   (value["accept"] === undefined || typeof value["accept"] === "string") &&
+  (value["customControl"] === undefined || typeof value["customControl"] === "string") &&
   (value["options"] === undefined ||
     (Array.isArray(value["options"]) &&
       value["options"].every((option) => typeof option === "string" || typeof option === "number")));

@@ -64,6 +64,7 @@ const CONFIG_KEYS: KeysOf<ForgebookConfig> = {
   languages: true,
   shell: true,
   tokens: true,
+  argControls: true,
   preview: true,
   head: true,
   watch: true,
