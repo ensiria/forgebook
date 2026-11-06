@@ -42,6 +42,12 @@ const test = base.extend<{ serveHost: ServeHost }>({
   }
 });
 
+/** Runs in every frame: writes on its page the values the last message gave it, as the story would receive them. */
+const HEAR_ARGS = `addEventListener("message", ({ data }) => {
+  if (data?.type === "forgebook:args")
+    document.documentElement.setAttribute("data-args-heard", JSON.stringify(data.args));
+});`;
+
 /** The address of a story of the fixture's Select, alone. */
 const embed = (query = ""): string => `/?embed&story=${STORY}${query === "" ? "" : `&${query}`}`;
 
@@ -118,6 +124,16 @@ test.describe("a story alone", () => {
     await expect(storyFrame(page).locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.locator("html")).toHaveAttribute("data-forgebook-appearance", "dark");
     await expect(page).toHaveURL(/embed/);
+  });
+
+  test("hands the story only what its panel could set", async ({ page }) => {
+    const values = { hint: "Declared", other: "Not a prop", size: 5 };
+    await page.addInitScript(HEAR_ARGS);
+    await page.goto(embed(`args=${encodeURIComponent(JSON.stringify(values))}`));
+    await ready(storyFrame(page));
+    await expect(storyFrame(page).locator("small")).toHaveText("Declared");
+    const heard = await storyFrame(page).locator("html").getAttribute("data-args-heard");
+    expect(JSON.parse(heard ?? "null")).toEqual({ hint: "Declared" });
   });
 
   test("says so when the address names no story, or one that is not there", async ({ page }) => {

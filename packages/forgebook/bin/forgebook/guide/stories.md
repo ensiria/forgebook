@@ -29,9 +29,9 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
 - `parameters.group` puts a story under a heading of the page (`"states"`, `"worst-case"`); keep one story per
   meaningful state, not one per prop value.
 - Add a worst case: very long text, words without spaces, huge numbers (`forgebook new` writes one).
-- A link may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the props the
-  story's panel can set, with a value of their type; to show a story with other values, write a story with those
-  args rather than a link.
+- A link or an embed may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the
+  props the story's panel can set, with a value of their type; to show a story with other values, write a story with
+  those args rather than a link.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
 - A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook
   (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`
