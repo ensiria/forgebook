@@ -84,9 +84,9 @@ in JSON with `--json`, and every answer about a story carries the links that ope
   the window (`style={{ flex: 1 }}`) needs `parameters.layout: "fullscreen"`; the app's root providers
   (`SafeAreaProvider`, a theme) go in the preview's decorators. A component that calls a native module or a gesture
   of native code does not draw in a browser: give it a `.web.tsx` file, or mock what it calls in the preview.
-- A link may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the props the
-  story's panel can set, with a value of their type; to show a story with other values, write a story with those
-  args rather than a link.
+- A link or an embed may carry the Props tab's values (`args=` in the address, JSON). The catalogue applies only the
+  props the story's panel can set, with a value of their type; to show a story with other values, write a story with
+  those args rather than a link.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
 - A screen meant for a phone or a tablet can be shown in a drawn device by default:
   `parameters: { device: { frame: true, model: "iphone-16" } }` (on the meta for every story; `orientation:

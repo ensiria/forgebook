@@ -1095,8 +1095,9 @@ it, and the Embed button's **Follow the story's height** adds the few lines that
 iframe, since its modules are loaded as those of its own origin.
 
 An embed sends nothing but the height and listens to nothing from the page around it, and it keeps working where a browser
-denies a third-party frame its storage. What it does take from outside is its address: like the catalogue's own `args`, the
-address reaches the story's props, so a story that renders a prop as raw HTML should not be published for anyone to frame.
+denies a third-party frame its storage. What it does take from outside is its address, checked as the catalogue's own
+`args` are: a story receives only the props its panel can set, with a value of their type. A prop the story does declare
+still reaches it, so a story that renders a prop as raw HTML should not be published for anyone to frame.
 And a height says something: a page that can reach your catalogue can tell whether a story exists.
 
 Forgebook sets no framing headers, on the dev server or in a build, so what you host keeps the rules it has. To choose who may
