@@ -24,6 +24,11 @@ export type Popover = {
    *   focus back to the button without its ring.
    */
   readonly setIsOpen: (isOpen: boolean, press?: { readonly detail: number }) => void;
+  /**
+   * Closes the panel after a choice in it was taken by the pointer. The arrow keys choose as they move: a panel that
+   * closed on the first would keep every choice past the next one out of reach, so with the keys Escape closes it.
+   */
+  readonly closeAfterChoice: () => void;
   /** The button. */
   readonly buttonRef: RefObject<HTMLButtonElement | null>;
   /** The panel. */
@@ -55,6 +60,7 @@ export const usePopover = (): Popover => {
   const panelRef = useRef<HTMLDivElement>(null);
   const closing = useRef<Animation | undefined>(undefined);
   const isByPointer = useRef(false);
+  const isLastInputKey = useRef(false);
   const panelId = useId();
 
   const setIsOpen = (isOpening: boolean, press?: { readonly detail: number }): void => {
@@ -89,6 +95,10 @@ export const usePopover = (): Popover => {
       .catch(() => undefined);
   };
 
+  const closeAfterChoice = (): void => {
+    if (!isLastInputKey.current) setIsOpen(false);
+  };
+
   // it grows in from its button's corner as it is drawn
   useLayoutEffect(() => {
     const panel = panelRef.current;
@@ -104,6 +114,7 @@ export const usePopover = (): Popover => {
     if (!isOpen) return;
     panelRef.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
     const close = (event: PointerEvent | KeyboardEvent): void => {
+      isLastInputKey.current = event instanceof KeyboardEvent;
       const target = event.target instanceof Node ? event.target : null;
       const isOutside =
         event instanceof PointerEvent &&
@@ -123,5 +134,5 @@ export const usePopover = (): Popover => {
     };
   }, [isOpen]);
 
-  return { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId };
+  return { isOpen, isDrawn, setIsOpen, closeAfterChoice, buttonRef, panelRef, panelId };
 };

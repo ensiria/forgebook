@@ -18,7 +18,7 @@ test.describe("the written home", () => {
     await expect(page.locator(".forgebook-home--written .forgebook-prose").first()).toContainText(
       "written by its authors"
     );
-    await expect(page.getByRole("complementary", { name: "Start here" })).toContainText("New to the kit?");
+    await expect(page.getByRole("note", { name: "Start here" })).toContainText("New to the kit?");
     // a file with no problem lists none
     await expect(page.getByText("The home's file has problems")).toHaveCount(0);
   });

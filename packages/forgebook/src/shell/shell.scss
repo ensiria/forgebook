@@ -120,18 +120,23 @@
   }
 
   // the sidebar's right edge: dragged to set its width
+  // on the sidebar's own edge, inside it: it belongs to the sidebar's landmark, and the sidebar clips what leaves it
   .forgebook-sidebar-handle {
-    flex: none;
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
     width: 5px;
-    margin-inline-start: -3px;
     cursor: ew-resize;
     touch-action: none;
     z-index: 1;
 
     &:hover,
-    &:active,
-    &:focus-visible {
+    &:active {
       background: color-mix(in srgb, $accent 35%, transparent);
+    }
+
+    &:focus-visible {
+      background: $accent;
       outline: none;
     }
   }
@@ -835,8 +840,9 @@
     color: inherit;
     text-align: end;
 
+    // the presets' ground under it is darker than the surface the tertiary text is made for
     &::placeholder {
-      color: $text-tertiary;
+      color: $text-secondary;
     }
 
     &:focus-visible {
@@ -846,7 +852,6 @@
 
   .forgebook-width-field__unit {
     font: $text-mono-small;
-    color: $text-tertiary;
   }
 
   // the zoom and the tools float in the story pane's lower end corner while the story scrolls under them
@@ -1610,6 +1615,7 @@
 
   .forgebook-empty {
     margin: $space-8;
+    font: inherit;
     color: $text-secondary;
   }
 
@@ -2593,6 +2599,7 @@
       overflow-x: auto;
       font: $text-mono;
       line-height: 1.6;
+      @include mixins.focus-ring($shadow: $shadow-card);
 
       code {
         padding: 0;
@@ -2628,6 +2635,7 @@
   // the API reference: the names in the code face, the types coloured without a tint, a row lit under the pointer
   .forgebook-api {
     overflow-x: auto;
+    @include mixins.focus-ring(inside);
   }
 
   .forgebook-api__table {
@@ -2936,8 +2944,10 @@
     background: $surface;
   }
 
+  // on a ground of its own: the cell under it has the story's background, whatever the shell's palette
   .forgebook-compare__label {
     padding: $space-2 $space-3;
+    background: $surface;
     font: $text-caption;
     color: $text-secondary;
   }

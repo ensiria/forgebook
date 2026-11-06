@@ -397,6 +397,7 @@ export const ComponentPage = ({
                       {...context}
                       story={story}
                       isDemo={false}
+                      titleTag={section.group === undefined ? "h3" : "h4"}
                       isMounted={queue.mounted.has(story.id)}
                       observe={queue.observerOf(story.id)}
                     />
