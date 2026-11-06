@@ -40,6 +40,7 @@ import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
 import { patternsProblem, unmatchedPatterns } from "./storyPatterns.ts";
+import { switchValuesProblem, withAbsoluteValueFiles } from "./switchValuesCheck.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
@@ -405,9 +406,12 @@ const checkSettings = (
 ): void => {
   const { dir, title, switches, languages, lists, plugins } = resolved;
   try {
+    const shown = catalogueSwitches(switches, languages, lists.controls);
+    const problem = switchValuesProblem(shown, dir);
+    if (problem !== undefined) throw new Error(problem);
     catalogueSettings(
       title,
-      catalogueSwitches(switches, languages, lists.controls),
+      shown,
       lists,
       plugins.flatMap((plugin) => (plugin.tabs ?? []).map((tab) => tab.id))
     );
@@ -560,7 +564,7 @@ export const resolveConfig = (
     logo: config.logo === undefined ? undefined : absolute(config.logo),
     heights: config.heights,
     ...shownFiles(config),
-    switches,
+    switches: switches === undefined ? undefined : withAbsoluteValueFiles(switches, dir, paths),
     languages,
     previews: [
       ...presets.flatMap((preset) => (preset.preview === undefined ? [] : [ownPath(preset.preview)])),

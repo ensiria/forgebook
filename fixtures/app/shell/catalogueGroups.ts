@@ -22,8 +22,10 @@ import { CATALOGUES, type Catalogue } from "./ports";
 
 /** The catalogues a spec opens, when not only the fixture app's: the first decides its group. */
 const SPEC_CATALOGUES: Readonly<Record<string, readonly Catalogue[]>> = {
+  "a11y.e2e.ts": ["app", "themes"],
   "angular.e2e.ts": ["angular"],
   "embed.e2e.ts": ["white-label", "app"],
+  "gallery.e2e.ts": ["themes"],
   "home.e2e.ts": ["app", "generated-home"],
   "html.e2e.ts": ["html"],
   "nextjs.e2e.ts": ["nextjs"],

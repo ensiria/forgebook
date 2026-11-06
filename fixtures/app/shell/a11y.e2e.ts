@@ -10,6 +10,7 @@
  */
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { catalogueUrl } from "./ports";
 import { type AxeException, animationsDone, scanShell, unexcused } from "./shellAxe";
 
 /** How long a page waits for what the docs worker or the search index answers on a cold dev server. */
@@ -163,7 +164,17 @@ const STATES: readonly ShellState[] = [
   { name: "View menu", open: popover(/^View/, "View") },
   { name: "Compare menu", open: popover("Compare", "Compare") },
   { name: "Embed dialog", open: popover("Embed this story", "Embed this story") },
-  { name: "Appearance menu", open: popover(/^Appearance/, "Appearance") },
+  { name: "Interface menu", open: popover(/^Interface/, "Interface") },
+  {
+    name: "a gallery's menu",
+    open: async (page) => {
+      await storyPage(page, `${catalogueUrl("themes")}?story=kit:inputs-selection-select--overview`);
+      await page.getByRole("button", { name: "Theme: Plain" }).click();
+      await expect(
+        page.getByRole("dialog", { name: "Theme" }).getByRole("radio", { checked: true })
+      ).toBeFocused();
+    }
+  },
   {
     name: "a control's menu",
     open: async (page) => {

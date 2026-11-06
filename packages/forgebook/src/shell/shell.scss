@@ -1434,6 +1434,25 @@
     gap: $space-2;
   }
 
+  // a gallery's button: its names in one cell, the one shown visible, at the longest's width up to a limit
+  .forgebook-gallery-names {
+    display: inline-grid;
+    max-width: 10rem;
+    text-align: start;
+
+    span {
+      grid-area: 1 / 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      visibility: hidden;
+      white-space: nowrap;
+    }
+
+    [data-shown] {
+      visibility: visible;
+    }
+  }
+
   .forgebook-toolbar__label {
     font: $text-caption;
     color: $text-secondary;

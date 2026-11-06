@@ -23,7 +23,13 @@ import {
   ORIENTATION_PARAMETER,
   type OrientationChoice
 } from "./deviceView.ts";
-import { switchValueOf, switchWithRole, type TouchChoice, type ViewSwitch } from "./switches.ts";
+import {
+  shownSwitches,
+  switchValueOf,
+  switchWithRole,
+  type TouchChoice,
+  type ViewSwitch
+} from "./switches.ts";
 
 /**
  * What Forgebook draws behind the story, in place of its page's colour: `plain`, the page's colour itself,
@@ -413,7 +419,7 @@ export const schemeOf = (
 ): "light" | "dark" | "system" => {
   const scheme = switchWithRole(switches, "colorScheme");
   if (scheme === undefined) return "light";
-  return switchValueOf(scheme, view.switches[scheme.id])?.scheme ?? "light";
+  return switchValueOf(scheme, shownSwitches(view.switches, switches)[scheme.id])?.scheme ?? "light";
 };
 
 /**
@@ -428,7 +434,7 @@ export const isMoreContrastOf = (
 ): boolean => {
   const contrast = switchWithRole(switches, "contrast");
   if (contrast === undefined) return false;
-  return switchValueOf(contrast, view.switches[contrast.id])?.isMore === true;
+  return switchValueOf(contrast, shownSwitches(view.switches, switches)[contrast.id])?.isMore === true;
 };
 
 /**
@@ -439,7 +445,9 @@ export const isMoreContrastOf = (
  */
 export const languageOf = (view: Pick<ViewState, "switches">, switches: readonly ViewSwitch[]): string => {
   const language = switchWithRole(switches, "language");
-  return language === undefined ? "" : (view.switches[language.id] ?? language.default);
+  return language === undefined
+    ? ""
+    : (shownSwitches(view.switches, switches)[language.id] ?? language.default);
 };
 
 /**
@@ -496,12 +504,14 @@ export const withTouchOf = <View extends Pick<ViewState, "switches">>(
 export const codeGlobalsOf = (
   view: Pick<ViewState, "switches">,
   switches: readonly ViewSwitch[]
-): Readonly<Record<string, string>> =>
-  Object.fromEntries(
+): Readonly<Record<string, string>> => {
+  const shown = shownSwitches(view.switches, switches);
+  return Object.fromEntries(
     switches
       .filter((each) => each.apply.kind === "code" || each.role === "touch")
-      .map((each) => [each.id, view.switches[each.id] ?? each.default])
+      .map((each) => [each.id, shown[each.id] ?? each.default])
   );
+};
 
 /** The parameters only the shell reads: a frame's address leaves them out. */
 const SHELL_PARAMETERS: readonly string[] = [

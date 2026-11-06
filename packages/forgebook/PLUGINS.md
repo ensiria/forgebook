@@ -168,6 +168,7 @@ belongs to the catalogue whose stories name it.
 - **The docs pages' notes.** A block cannot report a problem to `forgebook pages`, and a plugin fence inside a list or a quote
   stays code, without a word.
 - **Plugins from presets.** A catalogue lists its own; a preset cannot. It can be added.
-- **Roles on switches.** The colour scheme, the contrast, the language stay the catalogue's to declare.
+- **Roles on switches, and what a value brings.** The colour scheme, the contrast, the language stay the catalogue's to
+  declare; so do a value's `implies`, `preview` and `sheet`.
 - **The server tests.** `prepare` and `decorators` run in frames, so in the browser tests; a story rendered to a string
   has neither.

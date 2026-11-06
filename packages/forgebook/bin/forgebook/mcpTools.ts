@@ -1,7 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `verify`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
+ * `nearest_token`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
  * for a client that renders apps. `visual_diff` and `get_guide` join them in `mcpCommand.mts`.
  *
  * @module
@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
-import type { PluginsDocument } from "../../src/vite/agent.types.ts";
+import type { PluginsDocument, SwitchesDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
@@ -65,6 +65,8 @@ const problemsResult = (answer: AgentAnswer): McpToolResult => {
 export type CatalogueReach = {
   /** The plugins the configuration lists. */
   readonly plugins: PluginsDocument;
+  /** The switches the configuration declares, the ready-made ones among them. */
+  readonly switches: SwitchesDocument;
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
   readonly ask: Ask;
   /** Writes a component's first stories, the file relative to the catalogue's folder. */
@@ -94,7 +96,8 @@ export const catalogueTools = ({
   verify,
   checkPage,
   servePreview,
-  plugins
+  plugins,
+  switches
 }: CatalogueReach): readonly McpTool[] => [
   ...pageTools(ask),
   {
@@ -103,6 +106,13 @@ export const catalogueTools = ({
       "The plugins this catalogue lists and what each adds: panel tabs (open one with tab=<id> in a view), switches, docs blocks. A tab needs its plugin: a story's parameter does nothing without it.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     call: async (): Promise<McpToolResult> => ({ structured: plugins, isError: false })
+  },
+  {
+    name: "list_switches",
+    description:
+      "The switches this catalogue offers and their values, each with the view that draws it (look=night), what it implies on other switches, its style sheet and its gallery preview. get_guide with topic switches explains them.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    call: async (): Promise<McpToolResult> => ({ structured: switches, isError: false })
   },
   {
     name: "check_page",

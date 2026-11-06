@@ -20,7 +20,7 @@
 import type { FigmaLink } from "@forgebook/story-format/source";
 
 import type { LoadedBeforeEach, LoadedDecorator } from "./frame/storyModule.ts";
-import type { ViewSwitch } from "./switches.ts";
+import type { SwitchValue, ViewSwitch } from "./switches.ts";
 
 /**
  * A version of this contract. A plugin writes the number itself, not a constant of this package: a constant would read
@@ -75,8 +75,15 @@ export type PluginDocBlock = {
   readonly view: string;
 };
 
-/** A switch a plugin adds: a catalogue's, without the roles the catalogue itself reads, which stay the catalogue's. */
-export type PluginSwitch = Omit<ViewSwitch, "role">;
+/**
+ * A switch a plugin adds: a catalogue's, without the roles the catalogue itself reads, which stay the catalogue's. So do a
+ * value's `implies`, which would take another switch from the catalogue, and its `preview` and `sheet`, whose paths are read
+ * from the catalogue's folder.
+ */
+export type PluginSwitch = Omit<ViewSwitch, "role" | "values"> & {
+  /** Its values, in their order. */
+  readonly values: readonly Omit<SwitchValue, "implies" | "preview" | "sheet">[];
+};
 
 /** What a package gives a catalogue. */
 export type ForgebookPlugin = {

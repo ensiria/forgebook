@@ -14,13 +14,14 @@ import { type MouseEvent, type ReactNode, type Ref, useId, useRef } from "react"
 import type { CatalogueSettings } from "../catalogue.ts";
 import { type DeviceDefault, NO_DEVICE } from "../deviceView.ts";
 import { type FixedView, NOT_FIXED, withFixed, withOwnFixed } from "../storyGlobals.ts";
-import { switchWithRole } from "../switches.ts";
+import { impliedSwitches, switchWithRole } from "../switches.ts";
 import { hasViewChanges, isComparing, type ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
 import { isLookControl } from "./logicView.ts";
 import { PinnedControl } from "./PinnedControl.tsx";
 import { STRINGS } from "./strings.ts";
+import type { ControlContext } from "./ToolbarControl.tsx";
 import { useControlKeys } from "./useControlKeys.ts";
 import { usePopover } from "./usePopover.ts";
 import { useToolbarLayout } from "./useToolbarLayout.ts";
@@ -49,6 +50,8 @@ export type ToolbarProps = {
   readonly isLogic?: boolean;
   /** The page's default device: the shown story's, or the catalogue's on a component's page; none by default. */
   readonly deviceDefault?: DeviceDefault;
+  /** Loads the catalogue's previews for a gallery; none when it gives none. */
+  readonly loadSwitchPreviews?: ControlContext["loadSwitchPreviews"];
 };
 
 /** One choice of the Compare menu: what it sets side by side, and its name. */
@@ -134,8 +137,12 @@ const CompareMenu = ({
                 <input
                   type="radio"
                   name={name}
-                  // a switch the story fixes would draw the same story in every cell
-                  disabled={choice.axes.some((axis) => fixed.switches[axis] !== undefined)}
+                  // a switch the story fixes, or another switch's value implies, would draw the same in every cell
+                  disabled={choice.axes.some(
+                    (axis) =>
+                      fixed.switches[axis] !== undefined ||
+                      impliedSwitches(view.switches, catalogue.switches).has(axis)
+                  )}
                   checked={view.compare.join(",") === choice.axes.join(",")}
                   onChange={(): void => {
                     onViewChange({ ...view, compare: choice.axes });
@@ -188,14 +195,24 @@ export const Toolbar = ({
   shownWidth,
   fixed = NOT_FIXED,
   isLogic = false,
-  deviceDefault = NO_DEVICE
+  deviceDefault = NO_DEVICE,
+  loadSwitchPreviews
 }: ToolbarProps): ReactNode => {
   const layout = useToolbarLayout();
   const catalogue = useCatalogue();
   // the story's fixed values are shown, and a change of anything else keeps the user's own in the address
   const view = withFixed(ownView, fixed);
   const onViewChange = (changed: ViewState): void => onOwnViewChange(withOwnFixed(changed, ownView, fixed));
-  const context = { view, onViewChange, isStoryPage, isComponentPage, fixed, shownWidth, deviceDefault };
+  const context = {
+    view,
+    onViewChange,
+    isStoryPage,
+    isComponentPage,
+    fixed,
+    shownWidth,
+    deviceDefault,
+    loadSwitchPreviews
+  };
   useControlKeys({ keys: layout.keys, view, onViewChange, fixed, isStoryPage, isComponentPage });
   const pinnedRef = useRef<HTMLDivElement>(null);
   // a page about logic puts away the pinned controls that only change looks: the View menu then counts them

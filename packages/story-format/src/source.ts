@@ -216,12 +216,8 @@ export type StoryFiles = {
   readonly problems?: readonly string[];
 };
 
-/**
- * The colour of the page a source's stories open on, by theme and contrast: the catalogue paints a story's box with it
- * while the story loads, so the box is not white before a dark story and does not change colour when the story shows.
- * A CSS colour each; the more-contrast ones fall back to their scheme's.
- */
-export type StoryBackground = {
+/** A page's colours by theme and contrast: a CSS colour each; the more-contrast ones fall back to their scheme's. */
+export type StoryBackgroundColours = {
   /** The light theme's. */
   readonly light: string;
   /** The dark theme's. */
@@ -230,6 +226,19 @@ export type StoryBackground = {
   readonly lightMore?: string;
   /** The dark theme's with more contrast; `dark` when left out. */
   readonly darkMore?: string;
+};
+
+/**
+ * The colour of the page a source's stories open on, by theme and contrast: the catalogue paints a story's box with it
+ * while the story loads, so the box is not white before a dark story and does not change colour when the story shows.
+ */
+export type StoryBackground = StoryBackgroundColours & {
+  /**
+   * The colours of a switch's values, by switch id then value, for a page whose colour follows another switch than the
+   * theme (`{ brand: { night: { dark: "#0b1020" } } }`). The first declared switch whose value gives the scheme's colour
+   * wins; a value that gives none leaves it to the next switch, then to the colours above. None by default.
+   */
+  readonly bySwitch?: Readonly<Record<string, Readonly<Record<string, Partial<StoryBackgroundColours>>>>>;
 };
 
 /** A Markdown file as the catalogue's plugin answers a `?forgebook-markdown` import: its text as HTML. */

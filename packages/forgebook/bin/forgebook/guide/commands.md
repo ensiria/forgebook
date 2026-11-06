@@ -14,6 +14,7 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook page <id> --json` | One docs page: its Markdown, its headings, the address that opens it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
 | `npx forgebook plugins --json` | The plugins the catalogue lists: their tabs (`tab=<id>` in a view opens one), switches and docs fences |
+| `npx forgebook switches --json` | The catalogue's switches and values, each with its `view`, what it `implies`, its `sheet` and its gallery `preview` |
 | `npx forgebook tokens --category color --json` | The design tokens, of the catalogue and of the libraries it shows; `clashes` says whose value stands where two disagree |
 | `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw value; the type comes from the value, or `--type padding` |
 | `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |

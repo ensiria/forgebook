@@ -5,10 +5,11 @@
  *
  * @module
  */
-import type { StoryBackground } from "@forgebook/story-format/source";
+import type { StoryBackground, StoryBackgroundColours } from "@forgebook/story-format/source";
 
 import { backdropColor } from "./backdrops.ts";
 import type { CatalogueSettings } from "./catalogue.ts";
+import { shownSwitches } from "./switches.ts";
 import { isMoreContrastOf, schemeOf, type ViewState } from "./viewState.ts";
 
 /**
@@ -34,6 +35,15 @@ export const storyBackground = (
   const backdrop = backdropColor(shown, isDark);
   if (backdrop !== undefined) return backdrop;
   if (background === undefined) return undefined;
-  if (isDark) return isMoreContrast ? (background.darkMore ?? background.dark) : background.dark;
-  return isMoreContrast ? (background.lightMore ?? background.light) : background.light;
+  const colourIn = (colours: Partial<StoryBackgroundColours> | undefined): string | undefined => {
+    if (isDark) return (isMoreContrast ? colours?.darkMore : undefined) ?? colours?.dark;
+    return (isMoreContrast ? colours?.lightMore : undefined) ?? colours?.light;
+  };
+  const values = shownSwitches(view.switches, switches);
+  // the first switch whose value gives this scheme's colour: a value that gives only `dark` leaves `light` to the next
+  for (const each of switches) {
+    const colour = colourIn(background.bySwitch?.[each.id]?.[values[each.id] ?? each.default]);
+    if (colour !== undefined) return colour;
+  }
+  return colourIn(background);
 };

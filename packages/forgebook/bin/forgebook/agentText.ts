@@ -29,6 +29,7 @@ import type {
   SearchDocument,
   StoriesDocument,
   StoryDocument,
+  SwitchesDocument,
   TokensDocument,
   VerifyDocument
 } from "../../src/vite/agent.types.ts";
@@ -390,3 +391,19 @@ export const searchText = (document: SearchDocument): string =>
           ])
         ])
         .join("\n");
+
+/**
+ * The catalogue's switches, one per line, each with its values and what they bring with them.
+ *
+ * @param document - the answer.
+ */
+export const switchesText = (document: SwitchesDocument): string =>
+  document.switches
+    .map((each) => {
+      const values = each.values.map(({ value, implies }) => {
+        const implied = Object.entries(implies ?? {}).map(([id, other]) => `${id}=${other}`);
+        return implied.length === 0 ? value : `${value} (implies ${implied.join(", ")})`;
+      });
+      return `${each.id} (${each.control}): ${values.join(", ")}`;
+    })
+    .join("\n");

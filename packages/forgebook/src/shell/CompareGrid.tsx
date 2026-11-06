@@ -57,7 +57,7 @@ export const CompareGrid = ({
   const isSystemDark = useSystemDark();
   return (
     <div className="forgebook-compare" {...framed?.parts.compareGridProps(framed.drawing)}>
-      {compareVariants(view.compare, catalogue).map((variant) => {
+      {compareVariants(view.compare, catalogue, view).map((variant) => {
         const cellView = variant.viewOf(view);
         // the label (the shell's text) reads on the page's colour, or on the shell's around a device, whose screen
         // has it; the frame draws the backdrop

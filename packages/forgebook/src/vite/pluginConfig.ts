@@ -121,6 +121,12 @@ const shapeProblem = (plugin: ForgebookPlugin): string | undefined => {
   ];
   if (named.some((name) => typeof name !== "string"))
     return `the plugin "${plugin.id}" adds something with no id`;
+  // a configuration is not type-checked: what a value brings stays the catalogue's to declare
+  const isOverreaching = (plugin.switches ?? []).some((each) =>
+    (each.values ?? []).some((value) => ["implies", "preview", "sheet"].some((key) => key in value))
+  );
+  if (isOverreaching)
+    return `the plugin "${plugin.id}" gives a switch's value implies, preview or sheet: those are the catalogue's`;
   const { frame } = plugin;
   const isFrame =
     frame === undefined || typeof frame === "string" || (typeof frame === "object" && frame !== null);

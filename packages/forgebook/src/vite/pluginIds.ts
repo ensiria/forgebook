@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { CONFIG_MODULE, TOKENS_MODULE } from "./pages.ts";
+import { CONFIG_MODULE, SWITCH_PREVIEWS_MODULE, TOKENS_MODULE } from "./pages.ts";
 import { FILES_PREFIX } from "./pluginModules.ts";
 import {
   DOCS_PAGES_SPECIFIER_PREFIX,
@@ -74,6 +74,7 @@ const VIRTUAL_PREFIXES: readonly string[] = [
 export const virtualId = (source: string): string | undefined => {
   if (source === CONFIG_MODULE) return CONFIG_ID;
   if (source === TOKENS_MODULE) return TOKENS_ID;
+  if (source === SWITCH_PREVIEWS_MODULE) return SWITCH_PREVIEWS_ID;
   return VIRTUAL_PREFIXES.some((prefix) => source.startsWith(prefix)) ? `\0${source}` : undefined;
 };
 
@@ -117,3 +118,6 @@ export const CONFIG_ID = `\0${CONFIG_MODULE}`;
 
 /** The resolved id of the design tokens' module. */
 export const TOKENS_ID = `\0${TOKENS_MODULE}`;
+
+/** The resolved id of the galleries' previews. */
+export const SWITCH_PREVIEWS_ID = `\0${SWITCH_PREVIEWS_MODULE}`;

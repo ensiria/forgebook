@@ -8,7 +8,7 @@
 import type { StorySheets } from "@forgebook/story-format/source";
 
 import type { CatalogueSettings } from "../catalogue.ts";
-import { switchValueOf, switchWithRole, type ViewSwitch } from "../switches.ts";
+import { shownSwitches, switchValueOf, switchWithRole, type ViewSwitch } from "../switches.ts";
 import { type LiveView, schemeOf, type ViewState } from "../viewState.ts";
 import { backdropSheet } from "./backdropPictures.ts";
 
@@ -101,12 +101,13 @@ export const applyView = (
   view: LiveView,
   catalogue: Pick<CatalogueSettings, "switches" | "backdrops">
 ): void => {
-  for (const each of catalogue.switches) applySwitch(root, each, view.switches[each.id]);
+  const shown = shownSwitches(view.switches, catalogue.switches);
+  for (const each of catalogue.switches) applySwitch(root, each, shown[each.id]);
   // a language read right to left draws the story right to left; leaving it gives the root its own direction back,
   // unless a switch writes `dir` itself (the direction switch, applied above)
   const language = switchWithRole(catalogue.switches, "language");
   const isRightToLeft =
-    language !== undefined && switchValueOf(language, view.switches[language.id])?.isRightToLeft === true;
+    language !== undefined && switchValueOf(language, shown[language.id])?.isRightToLeft === true;
   const isDirWritten = catalogue.switches.some(
     (each) => each.apply.kind === "attribute" && each.apply.name === "dir"
   );

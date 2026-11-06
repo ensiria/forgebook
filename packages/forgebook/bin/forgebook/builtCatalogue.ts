@@ -81,8 +81,9 @@ export const builtCatalogueServer = async (from: string, version: string): Promi
     shot: unreachable,
     verify: unreachable,
     servePreview: unreachable,
-    // a built index keeps no configuration, so it lists no plugins; list_plugins is not among its tools
-    plugins: pluginsDocument([])
+    // a built index keeps no configuration, so it lists no plugins or switches; neither tool is among its tools
+    plugins: pluginsDocument([]),
+    switches: { schema: 1, switches: [] }
   }).filter((tool) => READ_ONLY_TOOLS.has(tool.name));
   return {
     info: { name: "forgebook", version },

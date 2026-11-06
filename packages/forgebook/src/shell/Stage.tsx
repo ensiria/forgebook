@@ -22,6 +22,7 @@ import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, withFixed, withOwnFixed } from "../storyGlobals.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
+import { shownSwitches } from "../switches.ts";
 import {
   frameAddress,
   isComparing,
@@ -376,7 +377,7 @@ export const Stage = ({
     storyArgs: ownArgs,
     loadTokens,
     argControls,
-    globals: view.switches,
+    globals: shownSwitches(view.switches, switches),
     onValueChange: panelValues.change,
     onReset: (): void => onPanelArgsChange({}),
     worstCase: worstCase.state,

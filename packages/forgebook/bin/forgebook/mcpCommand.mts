@@ -9,10 +9,14 @@ import { resolve } from "node:path";
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
 import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 
+import { catalogueSwitches } from "../../src/switches.ts";
+import type { SwitchesDocument } from "../../src/vite/agent.types.ts";
+import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
+import { switchesDocument } from "../../src/vite/switchesDocument.ts";
 import { catalogueClient, previewServer } from "./agentClient.ts";
 import { guideTool, isGuideFramework } from "./agentGuide.ts";
-import { pluginsText } from "./agentText.ts";
+import { pluginsText, switchesText } from "./agentText.ts";
 import { builtCatalogueServer, serveMcp } from "./builtCatalogue.ts";
 import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { previewResource } from "./mcpPreview.ts";
@@ -22,6 +26,14 @@ import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoriesCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
 import { runVerify } from "./verifyRun.ts";
 import { baselinesOf, visualDiffTool } from "./visualCommands.mts";
+
+/**
+ * The document of a configuration's switches.
+ *
+ * @param config - the configuration.
+ */
+const switchesOf = (config: ResolvedConfig): SwitchesDocument =>
+  switchesDocument(catalogueSwitches(config.switches, config.languages, config.lists.controls), config.dir);
 
 /**
  * The commands.
@@ -101,7 +113,8 @@ export const mcpCommands = (
               ),
             checkPage: (address) => runPageCheck(config, [address]),
             servePreview: preview.serve,
-            plugins: pluginsDocument(config.plugins)
+            plugins: pluginsDocument(config.plugins),
+            switches: switchesOf(config)
           })
         ],
         apps: [previewResource({ origin: preview.origin, strings: config.lists.strings ?? {}, version })]
@@ -118,6 +131,15 @@ export const mcpCommands = (
     run: async ({ options, io, isJson }): Promise<void> => {
       const document = pluginsDocument((await configOf(options.config)).plugins);
       io.stdout.write(isJson ? formatJson(document) : `${pluginsText(document)}\n`);
+    }
+  }),
+  switches: forgebook.command({
+    summary: "List the switches the catalogue offers, their values and what each brings with it.",
+    json: true,
+    examples: [{ command: `${COMMAND} switches --json`, description: "As an agent reads them." }],
+    run: async ({ options, io, isJson }): Promise<void> => {
+      const document = switchesOf(await configOf(options.config));
+      io.stdout.write(isJson ? formatJson(document) : `${switchesText(document)}\n`);
     }
   })
 });

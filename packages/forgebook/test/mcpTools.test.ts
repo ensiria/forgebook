@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { catalogueTools } from "../bin/forgebook/mcpTools.ts";
 import type { AgentAnswer } from "../src/vite/agentRoutes.ts";
 import { pluginsDocument } from "../src/vite/pluginConfig.ts";
+import { switchesDocument } from "../src/vite/switchesDocument.ts";
 
 /** The questions the tools asked. */
 const asked: string[] = [];
@@ -24,7 +25,29 @@ const TOOLS = catalogueTools({
   servePreview: async () => "unused",
   shot: async () => "unused",
   verify: async () => "unused",
-  plugins: pluginsDocument([{ apiVersion: 1, id: "acme", tabs: [{ id: "a", label: "A", view: "@acme/a" }] }])
+  plugins: pluginsDocument([{ apiVersion: 1, id: "acme", tabs: [{ id: "a", label: "A", view: "@acme/a" }] }]),
+  switches: switchesDocument(
+    [
+      {
+        id: "look",
+        label: "Theme",
+        control: "gallery",
+        default: "plain",
+        apply: { kind: "code" },
+        values: [
+          { value: "plain", label: "Plain" },
+          {
+            value: "night",
+            label: "Night",
+            implies: { theme: "dark" },
+            sheet: "/project/looks/night.css",
+            preview: { image: "/project/looks/night.png" }
+          }
+        ]
+      }
+    ],
+    "/project"
+  )
 });
 
 const tool = (name: string): (typeof TOOLS)[number] => {
@@ -32,6 +55,37 @@ const tool = (name: string): (typeof TOOLS)[number] => {
   if (found === undefined) throw new Error(`no tool ${name}`);
   return found;
 };
+
+describe("list_switches", () => {
+  it("answers each value's view and what it brings, from the configuration, its files from the project", async () => {
+    const count = asked.length;
+    const result = await tool("list_switches").call({});
+    expect(result.isError).toBe(false);
+    expect(result.structured).toEqual({
+      schema: 1,
+      switches: [
+        {
+          id: "look",
+          label: "Theme",
+          default: "plain",
+          control: "gallery",
+          values: [
+            { value: "plain", label: "Plain", view: "look=plain" },
+            {
+              value: "night",
+              label: "Night",
+              view: "look=night",
+              implies: { theme: "dark" },
+              sheet: "looks/night.css",
+              preview: { image: "looks/night.png" }
+            }
+          ]
+        }
+      ]
+    });
+    expect(asked.length).toBe(count);
+  });
+});
 
 describe("list_plugins", () => {
   it("answers from the configuration, without asking the catalogue", async () => {
