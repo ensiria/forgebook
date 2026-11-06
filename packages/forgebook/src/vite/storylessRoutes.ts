@@ -135,8 +135,8 @@ const checkCodeAnswer = async (
       ? ["raw-color", "raw-size", "suppression", "deleted-test"]
       : ["suppression", "deleted-test"],
     skipped: [
-      ...(hasTokens ? [] : ["Colours and sizes: this catalogue names no tokens file."]),
-      ...unread.map((source) => `Tokens of a source: ${source}`)
+      ...(hasTokens ? [] : ["colours and sizes not checked: no tokens file"]),
+      ...unread.map((source) => `tokens of a source not checked: ${source}`)
     ],
     problems: [
       ...checkedCode([...addedLines(change.diff), ...fresh.flat()], tokens),

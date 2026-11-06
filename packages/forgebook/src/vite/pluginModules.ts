@@ -262,9 +262,10 @@ export const reachModule = async (
   isKept: IsFileKept = EVERY_FILE
 ): Promise<{ code: string; moduleType: "js" }> => {
   const { files, graph } = await groupUsage(id.slice(REACH_ID_PREFIX.length), watch, usage, cache, isKept);
+  // the reason, not an empty list: no story reached and no story found are different answers
   const reach =
     typeof graph === "string"
-      ? []
+      ? graph
       : storyReach(
           graph,
           files.map((file) => ({ storyFile: file.file, title: file.index.title }))

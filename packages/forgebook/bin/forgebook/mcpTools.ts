@@ -1,6 +1,6 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `verify`, `list_tokens`, `get_token`,
  * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
  * for a client that renders apps. `visual_diff` and `get_guide` join them in `mcpCommand.mts`.
  *
@@ -20,6 +20,7 @@ import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
 import { previewTool } from "./mcpPreview.ts";
 import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
+import { type Verify, verifyTool } from "./mcpVerify.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
@@ -72,6 +73,8 @@ export type CatalogueReach = {
   readonly check: Check;
   /** Takes a story's pictures. */
   readonly shot: Shot;
+  /** Answers whether a change is verified. */
+  readonly verify: Verify;
   /** Runs the checks on a page of the application. */
   readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
   /** Serves the catalogue where a browser can open a preview, and answers where. */
@@ -88,6 +91,7 @@ export const catalogueTools = ({
   writeNew,
   check,
   shot,
+  verify,
   checkPage,
   servePreview,
   plugins
@@ -122,7 +126,7 @@ export const catalogueTools = ({
   {
     name: "changed_stories",
     description:
-      "The stories a change touches: every story that reaches a file git says changed, through the imports. Call it after editing, then run check_story on what it lists.",
+      "The stories a change touches: every story that reaches a file git says changed, through the imports, and each changed UI file with its stories. To check them, call verify.",
     inputSchema: {
       type: "object",
       properties: {
@@ -166,6 +170,7 @@ export const catalogueTools = ({
     call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
       problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
   },
+  verifyTool(verify),
   {
     name: "list_tokens",
     description:

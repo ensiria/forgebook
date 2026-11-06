@@ -882,7 +882,7 @@ export default defineConfig({
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
-| `forgebook verify` | Runs the checks on every story a change touches, with one exit code |
+| `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
@@ -1172,7 +1172,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers 20 tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers 21 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
 `node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
@@ -1253,7 +1253,45 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
-code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
+code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI. A catalogue
+with no tokens file gets no check of values, which `skipped` and the line say: `colours and sizes not checked: no tokens file`.
+
+`forgebook verify` and `verify` are what an agent runs before saying a change is done, and what a pull request's workflow
+runs. A change cannot pass on nothing:
+
+```sh
+$ npx forgebook verify --since origin/develop
+src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Badge.tsx
+2 changed UI files, 1 with stories: not verified; colours and sizes not checked: no tokens file
+```
+
+- **Every changed UI file is covered or fails.** A UI file is a component or a style sheet by its extension (`.tsx`, `.jsx`,
+  `.vue`, `.svelte`, `.astro`, `.component.ts`, `.component.html`, `.css`, `.scss`, `.sass`, `.less`), a story file, or a
+  script whose text defines or draws a component (`customElements.define`, `LitElement`, `@Component`, `defineComponent`,
+  JSX in a `.js` file). Tests, type declarations and generated files are not, and neither is any other script: a helper
+  or a hook does not fail, and the stories it reaches still run. What `check-code` finds in a file no one sees (a turned-off
+  check, a deleted test) is a note in the answer; `check-code` itself still fails on it.
+- **A file used through another component counts, and says so.** Stories reach a file through what they render and what
+  those files import, by the file that declares each imported name, so being exported from a barrel covers nothing. A
+  sheet counts through whatever imports it, `@use` and `@import` followed; a preview and the sheets it names are shown by
+  every story. Only stories that ran count: a project with no browser gets `not-verified`, and the reason.
+- **What was not checked is never reported as passed.** `skipped` is in the verdict (`partly-verified`) and in the line:
+  colours and sizes without a tokens file or with one that cannot be read, accessibility with `a11y: false`, a UI file only
+  another catalogue of the repository can answer for. None of these fails. A UI file nothing reaches in a package with no
+  catalogue of its own does: it is this catalogue's to show. So does a package whose types point at its build, since
+  imports stop there.
+- **It compares from where the branch left.** `--since <ref>` starts from the merge base, so what the base gained since is
+  not read as your change; with no `--since`, from the default branch (`origin/HEAD`, then `main` or `master`), so what you
+  committed counts. A branch cut from another, as `develop`, gives it with `--since`. With no `--since`, an empty change
+  is `not-verified`: the work may be committed where this cannot see, as in a shallow clone. CI gives `--since` and the
+  history: `fetch-depth: 0`.
+- **Every variant by default**, each story in light, dark, both at more contrast, the structure only, and narrow, on one
+  browser, four pages at once. `--quick` runs the default view, and the verdict says so.
+
+The exit is non-zero on `failed` and `not-verified`, zero on `verified`, `partly-verified` and `nothing-to-verify`. The
+JSON answer is schema 2: `verdict`, `summary`, `skipped`, `since`, `base`, `variants`, `files`, `uiFiles` (each with its
+`coverage`, and its `reason` and `fix` when not covered), `storyCount`, `stories` (the first twenty, with their links),
+`ran`, `failures` (only what found something), `code` (`checked`, `problems`, `notes`) and `problems`.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
 component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),

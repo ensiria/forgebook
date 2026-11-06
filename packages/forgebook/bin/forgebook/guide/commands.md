@@ -17,11 +17,21 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw value; the type comes from the value, or `--type padding` |
 | `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |
 | `npx forgebook changed --json` | The stories your change touches, through what they import |
-| `npx forgebook verify --json` | The checks on all of them, with one exit code: run it before you say a change is done |
+| `npx forgebook verify --json` | Whether your change is done, with one exit code: run it before you say so. Every changed UI file must reach a story that ran; those stories run in every variant, with `check-code`. Compares from where your branch left the default branch; in a pull request give `--since origin/develop`. `--quick` runs the default view only, and says so |
 | `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`); a model's id in the view (`iphone-16`) frames it in that device |
 | `npx forgebook shot <id> --update` then `npx forgebook diff <id> --json` | Baselines, then what changed against them: the region, the percentage, a marked picture |
+
+`verify` answers one `verdict`: `verified`; `partly-verified`, when `skipped` names what was not checked (colours and
+sizes with no tokens file, accessibility with `a11y: false`, a UI file of another catalogue); `nothing-to-verify`, when no
+UI file changed (read `skipped` and `code.notes` there too); `not-verified`, when a changed UI file has no story that ran,
+a story file cannot be read, the catalogue has a problem that stops it telling, or nothing changed and no `--since` was
+given; `failed`, when a check found a problem. The last two exit non-zero. Do not say a change is done on either, and do
+not report `partly-verified` as verified: say what `skipped` says. A file in `uiFiles` with `coverage: "none"` says why in
+`reason`; when no story reaches it, `fix` names what to do, usually `npx forgebook new <file>`: write the story, then run
+`verify` again. `coverage: "through"` means it ran in another component's stories. A UI file is a component or a style
+sheet by its extension, a story file, or a script that defines or draws a component; anything else does not fail.
 
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.

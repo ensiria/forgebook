@@ -6,11 +6,12 @@ A component you add or change gets its stories added or changed in the same chan
 ### Before you say a change is done
 
 ```sh
-npx forgebook verify --json       # the checks on every story the change touches, with one exit code
+npx forgebook verify --json       # every changed UI file in stories that ran, every variant, and check-code
 npx forgebook check-code --json   # what the change adds against the design system
 ```
 
-A non-zero exit means not done: read what it reports, fix it, run it again. To look at one story, `npx forgebook check <id> --json`
+A non-zero exit (`not-verified`, `failed`) means not done, and a UI file with no stories is `not-verified`: `fix` names the
+next step, usually writing them; do it and run it again. Report `partly-verified` with what `skipped` says, never as verified. To look at one story, `npx forgebook check <id> --json`
 and `npx forgebook shot <id> --view "dark 360"`.
 
 ### Look it up when you need it
