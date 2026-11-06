@@ -34,6 +34,8 @@ export type StoryProblem = {
 export type StoryCheckStory = {
   /** The story's id. */
   readonly id: string;
+  /** Its file, as the catalogue lists it: what a report names when the story cannot be shown. */
+  readonly file?: string;
   /**
    * The id an earlier rule gave it, when it differs from `id`: a baseline stored under that id is still its baseline
    * until `forgebook shot --update` stores one under its id.

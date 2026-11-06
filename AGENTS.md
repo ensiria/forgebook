@@ -34,6 +34,10 @@ pnpm --filter @fixture/app test:shell                      # when the shell, the
 FORGEBOOK_SHELL_GROUP=1/3 pnpm --filter @fixture/app test:shell  # the same, a third of the catalogues at a time, short of memory
 ```
 
+A new screen, panel or menu of the shell gets its state in `fixtures/app/shell/a11y.e2e.ts`, which runs axe over the
+shell in both appearances (the stories in their frames are left out), and its stops in `keyboardWalk.e2e.ts` when the
+main flow crosses it.
+
 Both must pass. A rule is never silenced to get a green run: an ignore comment only where the rule is wrong for that
 case, with the reason (`// biome-ignore lint/…: the protocol names this field`).
 

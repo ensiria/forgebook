@@ -10,7 +10,7 @@ import type { UserConfig } from "vite";
 
 import { packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { pageModulePath } from "./pages.ts";
-import { prebundled, scannedEntries } from "./prebundled.ts";
+import { prebundled, scannedEntries, scanOptions } from "./prebundled.ts";
 
 /**
  * A file's text, or none when it cannot be read.
@@ -47,7 +47,8 @@ export const catalogueConfig = (config: ResolvedConfig, userConfig: UserConfig):
   // story files (the project's and the sources') are scanned for what their components import
   optimizeDeps: {
     include: prebundled(config, packageResolver(config.dir)),
-    entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
+    entries: scannedEntries(config, packageResolver(config.dir), readTextFile),
+    rolldownOptions: scanOptions()
   },
   build: {
     rolldownOptions: {

@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 
 import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
+import { sourceFiles } from "../sourceFiles.ts";
 import { findComponentByTitle } from "../storyTree.ts";
 import type { AgentChangedStory, ChangedStoriesDocument } from "./agent.types.ts";
 import { storyLinks } from "./agentApi.ts";
@@ -153,11 +154,24 @@ export const changedAnswer = async (
       ),
     readText: (file: string): string => textOf(VITE_PATHS.join(root, file))
   });
+  const unread = loaded.sources.flatMap((source) => sourceFiles(source).problems ?? []);
   const problems = [
-    ...graphProblems(config),
-    ...groups.flatMap(({ reach }) => failureOf(reach) ?? []),
-    ...tree.problems
+    ...new Set([
+      ...unread,
+      ...graphProblems(config),
+      ...groups.flatMap(({ reach }) => failureOf(reach) ?? []),
+      ...tree.problems
+    ])
   ];
-  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, uiFiles, outside, problems };
+  const body: ChangedStoriesDocument = {
+    schema: 1,
+    since,
+    files,
+    stories,
+    uiFiles,
+    outside,
+    problems,
+    ...(unread.length === 0 ? {} : { unread })
+  };
   return { status: 200, body };
 };

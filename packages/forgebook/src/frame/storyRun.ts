@@ -21,6 +21,7 @@ import type { PlayTrace } from "../playTrace.ts";
 import type { ClockState } from "../storyClock.ts";
 import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
+import { ERROR_MESSAGE_CLASS } from "./frameStatus.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
 import type { ArgsChange, FrameRenderer, MountedStory, StoryDrawing, StoryIdentity } from "./renderer.ts";
@@ -105,7 +106,7 @@ const errorElement = (document: Document, error: Error): HTMLElement => {
   box.className = "forgebook-frame-error";
   box.setAttribute("role", "alert");
   const message = document.createElement("p");
-  message.className = "forgebook-frame-error__message";
+  message.className = ERROR_MESSAGE_CLASS;
   message.textContent = error.message;
   box.append(message);
   if (error.stack !== undefined) {

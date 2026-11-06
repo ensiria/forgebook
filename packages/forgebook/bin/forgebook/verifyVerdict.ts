@@ -92,7 +92,7 @@ const verdictOf = (
 ): VerifyVerdict => {
   if (problems > 0) return "failed";
   if (files.some((each) => each.coverage === "none")) return "not-verified";
-  if (isBlind || (files.length > 0 && catalogueProblems.length > 0)) return "not-verified";
+  if (isBlind || catalogueProblems.length > 0) return "not-verified";
   if (files.length === 0) return "nothing-to-verify";
   return skipped.length > 0 ? "partly-verified" : "verified";
 };
@@ -110,7 +110,7 @@ const skippedOf = (input: VerifyFindings, notRun: string | undefined): readonly 
       : []),
     ...(isQuick && hasStories ? ["only the default view checked: --quick"] : []),
     ...(!hasUi && hasStories && notRun !== undefined ? [`stories not run: ${notRun}`] : []),
-    ...(!hasUi ? changed.problems : []),
+    ...(!hasUi ? changed.problems.filter((problem) => !changed.unread?.includes(problem)) : []),
     // committed work on a branch would not show: compared with the commit itself, only what is not committed does
     ...(!isSinceNamed && since === "HEAD" && changed.files.length > 0
       ? ["committed work not compared: no default branch found here, give --since"]
@@ -187,7 +187,10 @@ const summaryOf = (
         : "nothing to verify";
     return `Nothing changed since ${since}: ${ending}${tail}`;
   }
-  if (uiFiles.length === 0) return `${noUiWords(document)}${tail}`;
+  if (uiFiles.length === 0) {
+    const ending = catalogueProblems.length === 0 ? "" : ": not verified";
+    return `${noUiWords(document)}${ending}${tail}`;
+  }
   return `${coverageWords(uiFiles)}: ${outcomeWords(document, catalogueProblems)}${tail}`;
 };
 
@@ -215,7 +218,8 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const notes = code.problems.filter((problem) => !seen.has(problem.file) && !outside.has(problem.file));
   const problems = failures.reduce((sum, each) => sum + each.problems.length, codeProblems.length);
   const skipped = skippedOf(input, notRun);
-  const catalogueProblems = changed.uiFiles.length > 0 ? changed.problems : [];
+  // a story file that cannot be read may be the change, whatever else changed
+  const catalogueProblems = changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []);
   const isBlind = changed.files.length === 0 && !isSinceNamed;
   const verdict = verdictOf(uiFiles, problems, skipped, catalogueProblems, isBlind);
   const allSkipped = [...skipped, ...catalogueProblems];

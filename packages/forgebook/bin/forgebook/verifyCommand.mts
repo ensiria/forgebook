@@ -49,7 +49,7 @@ export const verifyCommands = (
       { command: `${COMMAND} verify --since origin/develop --json`, description: "In a pull request." },
       { command: `${COMMAND} verify --quick`, description: "While you work: the default view of each story." }
     ],
-    run: async ({ options, io, isJson, style }): Promise<void> => {
+    run: async ({ options, io, log, isJson, style }): Promise<void> => {
       const config = await configOf(options.config);
       const client = await catalogueClient(config, options.url);
       try {
@@ -63,6 +63,8 @@ export const verifyCommands = (
         );
         if (typeof document === "string") throw new ScriptError(document);
         io.stdout.write(isJson ? formatJson(document) : `${verifyText(document, style)}\n`);
+        // the line says them to a person; a pipeline reading the JSON still shows them in its log
+        if (isJson) for (const each of document.skipped) log.warn(each);
         if (isVerifyFailure(document))
           throw new ScriptError(document.summary, { exitCode: EXIT.failure, isReported: true });
       } finally {

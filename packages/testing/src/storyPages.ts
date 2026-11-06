@@ -13,7 +13,7 @@
 import { chromium, type Page } from "@playwright/test";
 import { catalogueSettings } from "forgebook/catalogue";
 import { deviceFrameAddress, deviceViewport, type NamedDevice, namedDevice } from "forgebook/device-picture";
-import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
+import { ERROR_MESSAGE_CLASS, STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryCheckRequest, StoryCheckStory } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
 import { defaultView, frameAddress, parseView, type ViewState } from "forgebook/view-state";
@@ -103,6 +103,27 @@ export const storyPagesOf = (request: StoryCheckRequest): StoryPage[] => {
       };
     })
   );
+};
+
+/**
+ * What a check says of a story its frame could not show: why, as the frame says it, and the story's file. The frame's
+ * stack is left to `errorProblems`: its lines are those of the code the browser ran, not of the file.
+ *
+ * @param reason - what the frame says, when it says something.
+ * @param file - the story's file, when it is known.
+ */
+export const couldNotBeShown = (reason: string | undefined, file: string | undefined): string =>
+  `The story could not be shown${reason === undefined ? "" : `: ${reason}`}${file === undefined ? "" : ` (${file})`}`;
+
+/**
+ * Why a frame says it could not show its story, as the frame shows it.
+ *
+ * @param page - the frame's page.
+ * @returns the text; none when the frame shows none.
+ */
+export const frameErrorOf = async (page: Page): Promise<string | undefined> => {
+  const reason = page.locator(`.${ERROR_MESSAGE_CLASS}`).first();
+  return (await reason.count()) === 0 ? undefined : ((await reason.textContent()) ?? undefined);
 };
 
 /**

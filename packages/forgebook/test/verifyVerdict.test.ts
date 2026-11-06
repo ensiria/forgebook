@@ -148,6 +148,18 @@ const NOT_DONE: readonly { readonly name: string; readonly seed: VerifyFindings;
     says: "If your work is committed, give --since"
   },
   {
+    name: "a story file that cannot be read, with no UI file changed",
+    seed: findings({
+      changed: changedOf([], {
+        files: ["src/format.ts"],
+        unread: ["src/A.stories.tsx:1:1: broken"],
+        problems: ["src/A.stories.tsx:1:1: broken"]
+      }),
+      report: undefined
+    }),
+    says: "not verified"
+  },
+  {
     name: "a catalogue whose import graph cannot be read",
     seed: findings({ changed: changedOf([covered("src/Badge.tsx")], { problems: ["no graph"] }) }),
     says: "not verified"

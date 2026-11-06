@@ -12,13 +12,17 @@
  * left out and reported. A value that is code never comes from an address: a named value is looked up among the
  * source's own entries only, never through an object's prototype (`constructor`). Pure.
  *
+ * A frame takes values from one kind of message only, whichever frame it is (the stage's, an embed's, a plugin's aside),
+ * so `checkedArgsMessage` builds it, from nothing but what this check sealed (`AcceptedArgs`): a page that skipped the
+ * check has no value of that type to give it. A test holds every other module to not writing the message itself.
+ *
  * @module
  */
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
 import { type PanelArgTypes, type PanelProp, panelProps, settableProps } from "./argTypes.ts";
 import type { PropDocs } from "./componentDocs.ts";
-import { type ArgValue, isChoiceList, isNamedArg, type PanelArgs } from "./messages.ts";
+import { type ArgValue, isChoiceList, isNamedArg, type PanelArgs, type ShellMessage } from "./messages.ts";
 import { type NamedValues, namedValueOf } from "./namedValues.ts";
 
 /** What a story declares about the args the panel sets, as the shell knows it once the story's frame is ready. */
@@ -52,7 +56,23 @@ export type CheckedArgs = {
   readonly accepted: PanelArgs;
   /** The values left out, in the address's order. */
   readonly dropped: readonly DroppedArg[];
+  /** The values the story receives, as a frame can be told them. */
+  readonly sealed: AcceptedArgs;
 };
+
+/** What only this module can write on values: the type system's proof that they went through the check. */
+const ACCEPTED: unique symbol = Symbol("accepted");
+
+/** Values the check accepted, the only ones a frame can be told. */
+export type AcceptedArgs = {
+  /** The values. */
+  readonly values: PanelArgs;
+  /** Marks them as the check's. */
+  readonly [ACCEPTED]: true;
+};
+
+/** No values: what a frame the address has no say in receives (a story on a docs page). */
+export const NO_ACCEPTED_ARGS: AcceptedArgs = { values: {}, [ACCEPTED]: true };
 
 /** A prop made from one of the story's own args, for an arg neither the types nor the `argTypes` name. */
 const propOfStoryArg = (name: string, value: ArgValue): PanelProp | undefined => {
@@ -157,5 +177,16 @@ export const checkedAddressArgs = (args: PanelArgs, declaration: ArgDeclaration)
     else if (!isValueOfProp(prop, value, declaration.namedValues)) dropped.push({ name, reason: "type" });
     else accepted.push([name, value]);
   }
-  return { accepted: Object.fromEntries(accepted), dropped };
+  const values: PanelArgs = Object.fromEntries(accepted);
+  return { accepted: values, dropped, sealed: { values, [ACCEPTED]: true } };
 };
+
+/**
+ * The message that gives a frame its values.
+ *
+ * @param accepted - the values `checkedAddressArgs` accepted.
+ */
+export const checkedArgsMessage = (accepted: AcceptedArgs): ShellMessage => ({
+  type: "forgebook:args",
+  args: accepted.values
+});

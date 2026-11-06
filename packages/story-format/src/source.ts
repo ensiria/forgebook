@@ -209,6 +209,11 @@ export type StoryFiles = {
    * for files indexed before it existed: the search then finds them by their names.
    */
   readonly search?: () => Promise<unknown>;
+  /**
+   * The story files of the group that cannot be read, each named with why (and its line and column when they are
+   * known): on a dev server the others still draw, and the catalogue lists these. None when every file was read.
+   */
+  readonly problems?: readonly string[];
 };
 
 /**

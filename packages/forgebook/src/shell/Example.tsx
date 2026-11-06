@@ -57,6 +57,9 @@ export type ExampleReading = {
   readonly isDemoLarge: boolean;
 };
 
+/** The heading an example's title is: the level under the heading above it, so no level is skipped. */
+type ExampleTitleTag = "h3" | "h4";
+
 /** What every example of the page shares: the frames' address, view and reports, the code, how to open a story. */
 export type ExampleContext = {
   /** The component. */
@@ -175,17 +178,19 @@ const sceneHeightOf = (story: TreeStory, stageHeight: number | undefined): numbe
  */
 const ExampleHead = ({
   story,
+  titleTag: Title,
   context
 }: {
   readonly story: TreeStory;
+  readonly titleTag: ExampleTitleTag;
   readonly context: Pick<ExampleContext, "hrefOf" | "onOpen">;
 }): ReactNode => (
   <header className="forgebook-example__head">
-    <h4 className="forgebook-example__title">
+    <Title className="forgebook-example__title">
       <StoryLink story={story} hrefOf={context.hrefOf} onOpen={context.onOpen} className="forgebook-link">
         {story.name}
       </StoryLink>
-    </h4>
+    </Title>
     {story.description === undefined ? null : (
       <p className="forgebook-example__description">
         <CodeText text={story.description} />
@@ -401,12 +406,14 @@ const exampleHeights = (
 export const Example = ({
   story,
   isDemo,
+  titleTag = "h3",
   isMounted,
   observe,
   ...context
 }: ExampleContext & {
   readonly story: TreeStory;
   readonly isDemo: boolean;
+  readonly titleTag?: ExampleTitleTag;
   readonly isMounted: boolean;
   readonly observe?: (element: HTMLElement | null) => void;
 }): ReactNode => {
@@ -429,7 +436,7 @@ export const Example = ({
       data-demo={isDemo ? "" : undefined}
       aria-label={isDemo ? STRINGS.frameTitle(context.component.name, story.name) : story.name}
     >
-      {isDemo ? null : <ExampleHead story={story} context={context} />}
+      {isDemo ? null : <ExampleHead story={story} titleTag={titleTag} context={context} />}
       {full.isOver ? <FullPageSlot full={full} /> : null}
       <div
         ref={full.boxRef}

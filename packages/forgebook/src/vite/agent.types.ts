@@ -401,8 +401,10 @@ export type ChangedStoriesDocument = {
   readonly uiFiles: readonly ChangedUiFile[];
   /** The changed files a person sees that no story reaches and another catalogue of the repository answers for. */
   readonly outside: readonly string[];
-  /** What could not be read: a group whose usage failed, a story file the index could not load. */
+  /** What could not be read: a group whose usage failed, a story file (`unread`). */
   readonly problems: readonly string[];
+  /** The story files that cannot be read, whose stories no change can reach: a check of a change fails on them. */
+  readonly unread?: readonly string[];
 };
 
 /** How `verify` ended. */
@@ -543,4 +545,24 @@ export type PluginsDocument = {
   readonly apiVersions: readonly number[];
   /** The plugins the configuration lists, in order. */
   readonly plugins: readonly AgentPlugin[];
+};
+
+/** The list of the agents' guide, as `forgebook guide --json` and `get_guide` answer with no topic. */
+export type GuideListDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** Each topic: its name, as `forgebook guide <name>` takes it, and what it is about. */
+  readonly topics: ReadonlyArray<{ readonly topic: string; readonly about: string }>;
+  /** The frameworks found in this project, whose topics are the ones to read. */
+  readonly frameworks: readonly string[];
+};
+
+/** One topic of the agents' guide, as `forgebook guide <topic> --json` and `get_guide` answer. */
+export type GuideDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** The topic's name. */
+  readonly topic: string;
+  /** Its Markdown. */
+  readonly text: string;
 };

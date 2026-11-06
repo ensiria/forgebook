@@ -21,10 +21,12 @@ import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/v
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
+import { buildFailureText } from "./buildFailure.ts";
 import { settleAgentIndex } from "./builtCatalogue.ts";
 import { askCatalogue, COMMAND, configOf, FORGEBOOK_OPTIONS, printAnswer } from "./catalogueCommands.ts";
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
 import { devCommands } from "./devCommands.mts";
+import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
@@ -70,12 +72,16 @@ await defineCommands({
       run: async ({ options, log }): Promise<void> => {
         const config = withReadableNames(await configOf(options.config), options["readable-names"]);
         const outDir = resolve(config.dir, options.out ?? "dist");
-        await build(
-          await catalogueVite(config, {
-            ...(options.base === undefined ? {} : { base: options.base }),
-            build: { outDir }
-          })
-        );
+        const vite = await catalogueVite(config, {
+          ...(options.base === undefined ? {} : { base: options.base }),
+          build: { outDir }
+        });
+        try {
+          await build(vite);
+        } catch (error) {
+          if (error instanceof Error && error.stack !== undefined) log.debug(error.stack);
+          throw new ScriptError(buildFailureText(error));
+        }
         await settleAgentIndex(config, outDir, options["agent-index"] === true, log);
         log.success(`${config.title} built`);
       }
@@ -273,6 +279,7 @@ await defineCommands({
       }
     }),
     ...agentLoopCommands(forgebook),
+    ...guideCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),

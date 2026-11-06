@@ -18,6 +18,7 @@ import { type ReactNode, useState } from "react";
 
 import type { ComponentDocs, MemberDocs, PropDocs, SubcomponentDocs } from "../componentDocs.ts";
 import { canOrderRequired, laidOutProps, type PropGroup, propGroupOrder } from "../propGroups.ts";
+import { ApiTableBox } from "./ApiTableBox.tsx";
 import { Code } from "./Code.tsx";
 import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
@@ -157,7 +158,7 @@ const PropTable = ({
 }): ReactNode => {
   const hasDefaults = kind !== "events" && rows.some((row) => row.defaultValue !== undefined);
   return (
-    <div className="forgebook-api">
+    <ApiTableBox>
       <table className="forgebook-api__table" aria-label={label}>
         <thead>
           <tr>
@@ -180,7 +181,7 @@ const PropTable = ({
           ))}
         </tbody>
       </table>
-    </div>
+    </ApiTableBox>
   );
 };
 

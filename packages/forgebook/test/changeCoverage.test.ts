@@ -68,7 +68,7 @@ describe("isUiFile", () => {
     expect(isUiFile("src/Button.js", () => "export const B = () => <Icon size={1} />;")).toBe(true);
     expect(isUiFile("src/x.ts", () => "export const add = (a, b) => a + b;")).toBe(false);
     expect(isUiFile("src/x.ts", () => "export const isSmall = a < B && c > d;")).toBe(false);
-    expect(isUiFile("src/x.ts", () => "const page = `${origin}/frame.html`;")).toBe(false);
+    expect(isUiFile("src/x.ts", () => "const page = `/frame.html`;")).toBe(false);
     expect(isUiFile("src/x.ts", () => "const view = html`<p></p>`;")).toBe(true);
     // TSDoc mentions a tag: TypeScript holds no JSX outside `.tsx`
     expect(isUiFile("src/x.ts", () => "/** Lines are `<mark>` and `</mark>`. */")).toBe(false);

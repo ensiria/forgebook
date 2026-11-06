@@ -169,6 +169,26 @@ export type IndexedStoryFile = {
   readonly index: StoryFileIndex;
 };
 
+/** A story file a group lists whose index cannot be read: the others still draw. */
+export type RefusedStoryFile = {
+  /** Its path relative to the declaring module. */
+  readonly key: string;
+  /** The group's first pattern that lists it. */
+  readonly pattern: string;
+  /** Its absolute path. */
+  readonly file: string;
+  /** Why, naming the file (with its line and column when they are known). */
+  readonly problem: string;
+};
+
+/** A group's story files read: those indexed, and those that cannot be. */
+export type StoryFilesRead = {
+  /** The story files indexed. */
+  readonly files: readonly IndexedStoryFile[];
+  /** The story files that cannot be. */
+  readonly refused: readonly RefusedStoryFile[];
+};
+
 /** A group's index as it is kept between starts, by file key. */
 export type KeptIndex = Readonly<Record<string, StoryFileIndex>>;
 
@@ -192,14 +212,61 @@ export const storyFileIndex = (root: string, pattern: string, key: string): Stor
 };
 
 /**
- * Every story file a group's patterns list, indexed.
+ * Every story file a group's patterns list, indexed, and those that cannot be. Only the former are kept between starts:
+ * the stamps of the others would only say what is already known, and their next read costs one file.
+ *
+ * @param root - the declaring module's folder.
+ * @param patterns - the patterns (`storyFileKeys`).
+ * @param watch - adds a file whose edit renews the module that read it: a refused one too, as its fix must.
+ * @param cache - the index kept between starts, which holds while the files it came from do; none reads them all.
+ * @param isKept - whether a listed file may be read; every one by default.
+ */
+export const readStoryFiles = (
+  root: string,
+  patterns: readonly string[],
+  watch: (file: string) => void,
+  cache?: DiskCache<KeptIndex>,
+  isKept: IsFileKept = EVERY_FILE
+): StoryFilesRead => {
+  const name = storyFilesGroupText(VITE_PATHS.normalize(root), patterns);
+  const since = nowNs();
+  const kept = cache?.read(name);
+  const listed = listedFiles(root, patterns).filter(({ key }) => isKept(VITE_PATHS.resolve(root, key)));
+  const files: IndexedStoryFile[] = [];
+  const refused: RefusedStoryFile[] = [];
+  for (const { key, pattern } of listed) {
+    const file = VITE_PATHS.resolve(root, key);
+    watch(file);
+    const index = kept?.[key] ?? storyFileIndex(root, pattern, key);
+    if (typeof index === "string") refused.push({ key, pattern, file, problem: index });
+    else files.push({ key, pattern, file, index });
+  }
+  // kept again when anything was read anew: a file added, or the kept index out of date
+  if (cache !== undefined && files.some(({ key }) => kept?.[key] === undefined)) {
+    const stamps = stampPaths(files.map((each) => each.file));
+    const index = Object.fromEntries(files.map((each) => [each.key, each.index]));
+    if (isSettledSince(stamps, since)) cache.write(name, index, stamps);
+  }
+  return { files, refused };
+};
+
+/**
+ * What fails a module that cannot go on without its files: every file refused, a line each.
+ *
+ * @param refused - the files, at least one.
+ */
+export const refusalError = (refused: readonly RefusedStoryFile[]): Error =>
+  new Error(refused.map(({ problem }) => problem).join("\n"));
+
+/**
+ * Every story file a group's patterns list, indexed, for those who cannot go on without one: a build, a test.
  *
  * @param root - the declaring module's folder.
  * @param patterns - the patterns (`storyFileKeys`).
  * @param watch - adds a file whose edit renews the module that read it.
  * @param cache - the index kept between starts, which holds while the files it came from do; none reads them all.
  * @param isKept - whether a listed file may be read; every one by default.
- * @throws when a story file cannot be indexed.
+ * @throws when a story file cannot be indexed, naming every one that cannot.
  */
 export const indexedStoryFiles = (
   root: string,
@@ -208,26 +275,9 @@ export const indexedStoryFiles = (
   cache?: DiskCache<KeptIndex>,
   isKept: IsFileKept = EVERY_FILE
 ): IndexedStoryFile[] => {
-  const name = storyFilesGroupText(VITE_PATHS.normalize(root), patterns);
-  const since = nowNs();
-  const kept = cache?.read(name);
-  const listed = listedFiles(root, patterns).filter(({ key }) => isKept(VITE_PATHS.resolve(root, key)));
-  const files = listed.map(({ key, pattern }) => {
-    const file = VITE_PATHS.resolve(root, key);
-    watch(file);
-    const known = kept?.[key];
-    if (known !== undefined) return { key, pattern, file, index: known };
-    const index = storyFileIndex(root, pattern, key);
-    if (typeof index === "string") throw new Error(index);
-    return { key, pattern, file, index };
-  });
-  // kept again when anything was read anew: a file added, or the kept index out of date
-  if (cache !== undefined && files.some(({ key }) => kept?.[key] === undefined)) {
-    const stamps = stampPaths(files.map((each) => each.file));
-    const index = Object.fromEntries(files.map((each) => [each.key, each.index]));
-    if (isSettledSince(stamps, since)) cache.write(name, index, stamps);
-  }
-  return files;
+  const { files, refused } = readStoryFiles(root, patterns, watch, cache, isKept);
+  if (refused.length > 0) throw refusalError(refused);
+  return [...files];
 };
 
 /** The loaders a group offers besides its story files'. */
@@ -268,13 +318,15 @@ export const storyFilesModule = (
  * @param loaders - the group's loaders besides its story files'.
  * @param hasTexts - a build's: whether each file's docs, code and page come from the group's texts module, in the
  * rows' order (`TEXTS_PREFIX`), and not each from its query.
+ * @param refused - the story files it lists that cannot be indexed, which the catalogue names among its problems.
  */
 export const storyFilesCode = (
   root: string,
   patterns: readonly string[],
   files: readonly IndexedStoryFile[],
   loaders: GroupLoaders,
-  hasTexts = false
+  hasTexts = false,
+  refused: readonly RefusedStoryFile[] = []
 ): string => {
   const { hasDocs = true, hasUsage, hasReach } = loaders;
   // the group's id in Vite's form, as the plugin names the declaring module's folder
@@ -315,6 +367,7 @@ export const storyFilesCode = (
     hasDocs ? "docs: column(3)," : "docs: {},",
     "code: column(4),",
     "pages: column(5),",
+    ...(refused.length === 0 ? [] : [`problems: ${codeLiteral(refused.map(({ problem }) => problem))},`]),
     `search: () => import(${search}).then((module) => module.default),`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasReach ? [`reach: () => import(${reach}).then((module) => module.default),`] : []),

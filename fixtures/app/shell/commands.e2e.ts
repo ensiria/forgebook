@@ -200,7 +200,14 @@ test.describe("forgebook check", () => {
     expect(results).toContainEqual(
       expect.objectContaining({
         storyId: "kit:inputs-selection-select--throws",
-        problems: expect.arrayContaining([{ kind: "frame", message: "The story could not be shown" }])
+        problems: expect.arrayContaining([
+          {
+            kind: "frame",
+            message: expect.stringMatching(
+              /^The story could not be shown: The fixture story threw \(.*Select\.stories\.tsx\)$/
+            )
+          }
+        ])
       })
     );
   });
