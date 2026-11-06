@@ -4,8 +4,10 @@
  * @remarks
  * Pure, on the same graph "Used in" reads (`usageGraph.ts`), so what cannot be followed there cannot be followed here: a
  * computed lazy import, a component handed in as a prop. A story file reaches its meta's component whatever its stories
- * render, since a story with no JSX draws that component. Style sheets and other files outside the graph are not known
- * to reach anything: `verify` says so by checking the stories it can name, not by claiming the rest are safe.
+ * render, since a story with no JSX draws that component. A file no edge reaches is not known to reach anything:
+ * `verify` lists it as not verified rather than claim it is safe. A deleted file has no node, only the edge of whatever
+ * still imports it, written without its extension when the import was: the stories behind that edge are the ones it
+ * breaks.
  *
  * @module
  */
@@ -27,6 +29,10 @@ export type ReachedStory = {
   readonly exportName: string;
   /** Every file it reaches, its own story file included, absolute. */
   readonly files: readonly string[];
+  /** Its story file, the components it draws and what the story file imports itself: the rest it reaches through them. */
+  readonly own: readonly string[];
+  /** Its story file, absolute. */
+  readonly storyFile: string;
 };
 
 /** The files a module reaches, itself included, through the graph's imports. */
@@ -51,17 +57,20 @@ const reachedFrom = (imports: UsageGraph["imports"], starts: readonly string[]):
 export const storyReach = (graph: UsageGraph, files: readonly ReachFile[]): ReachedStory[] => {
   const titles = new Map(files.map((file) => [file.storyFile, file.title]));
   return graph.files.flatMap((file) =>
-    file.stories.map((story) => ({
-      title: titles.get(file.storyFile) ?? "",
-      exportName: story.exportName,
-      files: [
-        ...reachedFrom(graph.imports, [
-          file.storyFile,
-          ...(file.component === undefined ? [] : [file.component.file]),
-          ...story.renders.map((ref) => ref.file)
-        ])
-      ]
-    }))
+    file.stories.map((story) => {
+      const starts = [
+        file.storyFile,
+        ...(file.component === undefined ? [] : [file.component.file]),
+        ...story.renders.map((ref) => ref.file)
+      ];
+      return {
+        title: titles.get(file.storyFile) ?? "",
+        exportName: story.exportName,
+        storyFile: file.storyFile,
+        files: [...reachedFrom(graph.imports, starts)],
+        own: [...new Set([...starts, ...(graph.imports[file.storyFile] ?? [])])]
+      };
+    })
   );
 };
 

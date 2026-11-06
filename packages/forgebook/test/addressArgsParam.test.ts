@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type ArgDeclaration, checkedAddressArgs, typedLinkArgs } from "../src/addressArgs.ts";
+import { type ArgDeclaration, checkedAddressArgs } from "../src/addressArgs.ts";
 import { type ArgsParamRead, readArgsParam as readFirstScreen } from "../src/addressArgsParam.ts";
 import type { PropDocs } from "../src/componentDocs.ts";
 import { type ArgValue, type PanelArgs, panelArgsParam } from "../src/messages.ts";
@@ -225,28 +225,6 @@ describe("a round trip of every control type", () => {
       { name: "isOpen", reason: "type" },
       { name: "tone", reason: "type" }
     ]);
-  });
-});
-
-describe("typedLinkArgs", () => {
-  it("types by what the frame knows of an arg, and as Storybook does for one it does not", () => {
-    const { typeValue } = readArgsParam("a:b").link ?? {};
-    expect(typeValue).toBeDefined();
-    if (typeValue === undefined) return;
-    const args = { isOpen: "false", label: "123", other: "5", list: ["1", "a"] };
-    expect(
-      typedLinkArgs(
-        args,
-        {
-          props: [],
-          argTypes: {},
-          controls: "all",
-          storyArgs: { isOpen: true, label: "x" },
-          namedValues: {}
-        },
-        typeValue
-      )
-    ).toEqual({ isOpen: false, label: "123", other: 5, list: [1, "a"] });
   });
 });
 

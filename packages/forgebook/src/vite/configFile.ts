@@ -17,6 +17,7 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
+import type { Logger } from "vite";
 
 import { AUDIENCE_IDS } from "../audiences.ts";
 import { type CatalogueLists, catalogueSettings, type TurnedOffControl } from "../catalogue.ts";
@@ -430,6 +431,28 @@ export const emptyStoryGlobs = (config: Pick<ResolvedConfig, "dir" | "stories">)
  */
 export const emptyStoryGlobsMessage = (globs: readonly string[]): string =>
   `No story file matches ${globs.map((glob) => `"${glob}"`).join(", ")} (\`stories\` in the configuration)`;
+
+/**
+ * Says what the plugin has to say of the patterns of `emptyStoryGlobs`.
+ *
+ * @param config - the catalogue's folder and stories.
+ * @param isServing - whether a dev server runs: whoever runs one may be about to write the first story, while a build's
+ *   reader would find nothing.
+ * @param logger - where a dev server's warning goes.
+ * @throws in a build, when a pattern matches nothing.
+ */
+export const sayEmptyStoryGlobs = (
+  config: Pick<ResolvedConfig, "dir" | "stories">,
+  isServing: boolean,
+  logger: Pick<Logger, "warn">
+): void => {
+  const globs = emptyStoryGlobs(config);
+  if (globs.length === 0) return;
+  if (!isServing) throw new Error(emptyStoryGlobsMessage(globs));
+  logger.warn(
+    `Forgebook: ${emptyStoryGlobsMessage(globs)}. The catalogue shows them as soon as a file does.`
+  );
+};
 
 /** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
 const shownFiles = (config: ForgebookConfig): Pick<ResolvedConfig, "stories" | "docs" | "sources"> => ({

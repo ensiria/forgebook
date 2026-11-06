@@ -17,6 +17,7 @@ import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
+import type { StoryCheckResult } from "../storyCheck.ts";
 import type { CodeProblem, CodeRule } from "./checkCode.ts";
 import type { DesignToken } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
@@ -371,6 +372,21 @@ export type AgentChangedStory = {
   readonly links: StoryLinks;
 };
 
+/** How a changed UI file is covered: by stories of its own, only through another component's, or by none. */
+export type UiFileCoverage = "own" | "through" | "none";
+
+/** A changed file a person sees (`changeCoverage.ts`), and the stories that show it. */
+export type ChangedUiFile = {
+  /** The file, relative to the repository. */
+  readonly file: string;
+  /** The same file, relative to the catalogue's folder: what a command run there names. */
+  readonly path: string;
+  /** How it is covered. */
+  readonly coverage: UiFileCoverage;
+  /** The ids of the stories that reach it. */
+  readonly stories: readonly string[];
+};
+
 /** The stories a change touches. */
 export type ChangedStoriesDocument = {
   /** The shape's version. */
@@ -381,8 +397,97 @@ export type ChangedStoriesDocument = {
   readonly files: readonly string[];
   /** The stories that reach them. */
   readonly stories: readonly AgentChangedStory[];
-  /** What could not be read: a group whose usage failed. */
+  /** The changed files a person sees and that this catalogue can show, each with its stories. */
+  readonly uiFiles: readonly ChangedUiFile[];
+  /** The changed files a person sees that no story reaches and another catalogue of the repository answers for. */
+  readonly outside: readonly string[];
+  /** What could not be read: a group whose usage failed, a story file (`unread`). */
   readonly problems: readonly string[];
+  /** The story files that cannot be read, whose stories no change can reach: a check of a change fails on them. */
+  readonly unread?: readonly string[];
+};
+
+/** How `verify` ended. */
+export type VerifyVerdict =
+  /** Every changed UI file ran in stories, every check ran, and nothing was found. */
+  | "verified"
+  /** Nothing was found, but `skipped` names what was not checked. */
+  | "partly-verified"
+  /**
+   * A changed UI file has no story that ran, the catalogue has a problem that stops it telling, or nothing changed since
+   * a start nobody named: the work may be committed where this cannot see it.
+   */
+  | "not-verified"
+  /** A check found a problem. */
+  | "failed"
+  /** No UI file changed; `skipped` names what was not checked. */
+  | "nothing-to-verify";
+
+/** A changed UI file, as `verify` ends up with it. */
+export type VerifiedUiFile = {
+  /** The file, relative to the repository. */
+  readonly file: string;
+  /** How it is covered by stories that ran; `none` when none of those that reach it ran. */
+  readonly coverage: UiFileCoverage;
+  /** How many stories that ran reach it. */
+  readonly stories: number;
+  /** Why it is not verified. */
+  readonly reason?: string;
+  /** What to do about it: the command to run, when there is one. */
+  readonly fix?: string;
+};
+
+/** A story and view that found something. */
+export type VerifyFailure = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view, in the address's form; empty for the default. */
+  readonly view: string;
+  /** What it found. */
+  readonly problems: StoryCheckResult["problems"];
+  /** The links that open the story; those of a server started for the run would be dead by now. */
+  readonly links?: StoryLinks;
+};
+
+/** The one answer to whether a change is verified. */
+export type VerifyDocument = {
+  /** The shape's version: this shape is not the first `verify` answered. */
+  readonly schema: 2;
+  /** How it ended; `not-verified` and `failed` exit non-zero. */
+  readonly verdict: VerifyVerdict;
+  /** The verdict in one line, what was not checked included. */
+  readonly summary: string;
+  /** What was not checked: never read an empty list of problems as all clear when these are named. */
+  readonly skipped: readonly string[];
+  /** What the change is measured from, as named. */
+  readonly since: string;
+  /** The commit that is: where the branch left `since`. */
+  readonly base: string;
+  /** The views the stories ran in: every variant the browser tests check, or `quick`'s default view. */
+  readonly variants: "all" | "default";
+  /** The files changed, relative to the repository. */
+  readonly files: readonly string[];
+  /** The changed UI files. */
+  readonly uiFiles: readonly VerifiedUiFile[];
+  /** How many stories reach the change. */
+  readonly storyCount: number;
+  /** The first of them, with the links that open them: a shared sheet reaches every story, and an answer stays short. */
+  readonly stories: readonly AgentChangedStory[];
+  /** How many story and view pairs ran. */
+  readonly ran: number;
+  /** The pairs that found something, with the links that open the story; those that pass are only counted. */
+  readonly failures: readonly VerifyFailure[];
+  /** What the change adds, by `check-code`. */
+  readonly code: {
+    /** What was checked. */
+    readonly checked: readonly CodeRule[];
+    /** What breaks the design system in a changed UI file: these fail. */
+    readonly problems: readonly CodeProblem[];
+    /** What it found in a file no one sees: a turned-off check, a deleted test. Said, and not a failure. */
+    readonly notes: readonly CodeProblem[];
+  };
+  /** How many problems there are, in `failures` and `code.problems` together. */
+  readonly problems: number;
 };
 
 /** What a change adds that breaks the design system. */
@@ -440,4 +545,24 @@ export type PluginsDocument = {
   readonly apiVersions: readonly number[];
   /** The plugins the configuration lists, in order. */
   readonly plugins: readonly AgentPlugin[];
+};
+
+/** The list of the agents' guide, as `forgebook guide --json` and `get_guide` answer with no topic. */
+export type GuideListDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** Each topic: its name, as `forgebook guide <name>` takes it, and what it is about. */
+  readonly topics: ReadonlyArray<{ readonly topic: string; readonly about: string }>;
+  /** The frameworks found in this project, whose topics are the ones to read. */
+  readonly frameworks: readonly string[];
+};
+
+/** One topic of the agents' guide, as `forgebook guide <topic> --json` and `get_guide` answer. */
+export type GuideDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** The topic's name. */
+  readonly topic: string;
+  /** Its Markdown. */
+  readonly text: string;
 };

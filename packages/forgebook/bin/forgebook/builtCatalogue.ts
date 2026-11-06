@@ -79,6 +79,7 @@ export const builtCatalogueServer = async (from: string, version: string): Promi
     check: unreachable,
     checkPage: unreachable,
     shot: unreachable,
+    verify: unreachable,
     servePreview: unreachable,
     // a built index keeps no configuration, so it lists no plugins; list_plugins is not among its tools
     plugins: pluginsDocument([])

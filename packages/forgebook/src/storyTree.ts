@@ -317,7 +317,8 @@ const startedComponent = (
 const placedComponents = (source: StorySource, problems: string[]): PlacedComponent[] => {
   const byTitle = new Map<string, GatheredComponent>();
   const titlesById = new Map<string, string>();
-  const index = sourceFiles(source).index;
+  const { index, problems: unread = [] } = sourceFiles(source);
+  problems.push(...unread);
   // sorted, so a component's files, and so its stories, its docs and a clash's winner, never depend on the groups' order
   for (const file of Object.keys(index).sort()) {
     const entry = index[file];

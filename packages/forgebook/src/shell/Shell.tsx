@@ -60,7 +60,7 @@ import { type LazyModule, lazyModule } from "./lazyModule.tsx";
 import { type LoadPluginHosts, PluginHostsContext } from "./pluginHostsContext.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
-import { SidebarEdge } from "./SidebarHandle.tsx";
+import { SidebarShade } from "./SidebarHandle.tsx";
 import { Stage } from "./Stage.tsx";
 import { StoryPicker } from "./StoryPicker.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
@@ -68,6 +68,7 @@ import { STRINGS } from "./strings.ts";
 import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
 import type { UsedInProps } from "./UsedIn.tsx";
 import { useAppearance } from "./useAppearance.ts";
+import { useEditedProblems } from "./useEditedProblems.ts";
 import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
 import { useShownView } from "./useShownView.ts";
@@ -609,9 +610,10 @@ const ShellHeader = ({
       </div>
     ) : null}
     {message === undefined ? null : (
-      <p className="forgebook-empty" role="alert">
-        {message}
-      </p>
+      // the message is all the page has: a heading of its own names the page, inside the alert that announces it
+      <div role="alert">
+        <h1 className="forgebook-empty">{message}</h1>
+      </div>
     )}
     {location === undefined ? null : (
       <header className="forgebook-header">
@@ -795,6 +797,7 @@ const ShellPage = ({
   home
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
+  const problems = useEditedProblems(tree.problems);
   // the written home's module, loaded when the home is first opened
   const writtenHome = useMemo(() => (home === undefined ? undefined : lazyModule(home)), [home]);
   const idsByTitle = useMemo(() => componentIdsByTitle(tree), [tree]);
@@ -887,7 +890,7 @@ const ShellPage = ({
     knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH));
   const header = (
     <ShellHeader
-      problems={tree.problems}
+      problems={problems}
       location={location}
       page={shownPageLocation}
       isLogic={isLogicPage(shown)}
@@ -947,6 +950,7 @@ const ShellPage = ({
     <div className="catalogue">
       <Sidebar
         width={sidebarWidth}
+        onWidthChange={setSidebarWidth}
         isOpen={isSidebarOpen}
         isOverlay={isSidebarOverlay}
         sidebarRef={sidebarRef}
@@ -975,13 +979,7 @@ const ShellPage = ({
           openPage(titledPage(idsByTitle, sourceId, componentTitle))
         }
       />
-      <SidebarEdge
-        isOverlay={isSidebarOverlay}
-        isOpen={isSidebarOpen}
-        width={sidebarWidth}
-        onWidthChange={setSidebarWidth}
-        onHide={hideSidebar}
-      />
+      <SidebarShade isOverlay={isSidebarOverlay} isOpen={isSidebarOpen} onHide={hideSidebar} />
       {/* under a sidebar lying over it, the page leaves Tab, screen readers and the pointer */}
       <main className="forgebook-main" inert={isSidebarOver}>
         <ShellBar

@@ -15,7 +15,6 @@
  *
  * @module
  */
-import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { StorySource } from "@forgebook/story-format/source";
@@ -26,35 +25,23 @@ import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { findComponentByTitle, findStory, type StoryTree, storyTree } from "../storyTree.ts";
+import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
 import { frameAddressOf } from "../viewState.ts";
-import type {
-  AgentChangedStory,
-  ChangedStoriesDocument,
-  ErrorsDocument,
-  StoryDocument
-} from "./agent.types.ts";
-import {
-  type CataloguePages,
-  type LoadedStoryParts,
-  storiesDocument,
-  storyDocument,
-  storyLinks
-} from "./agentApi.ts";
+import type { ErrorsDocument, StoryDocument } from "./agent.types.ts";
+import { type CataloguePages, type LoadedStoryParts, storiesDocument, storyDocument } from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
+import { changedAnswer } from "./changedRoute.ts";
 import { emptyStoryGlobs, emptyStoryGlobsMessage, type ResolvedConfig } from "./configFile.ts";
 import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
 import { findAnswer } from "./findRoute.ts";
 import { framesOriginOf } from "./framesConfig.ts";
 import { hostOf } from "./framesServer.ts";
-import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts";
 import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { PREVIEW_ROUTE } from "./previewRoute.ts";
 import { loadPreview } from "./previewRunner.ts";
 import { searchAnswer } from "./searchRoute.ts";
 import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
-import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
 /** The path the answers live under. */
 export const AGENT_API = "/__forgebook/api/";
@@ -243,58 +230,6 @@ export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer>
   return { status: 200, body: storiesDocument(config.title, listed, pages, view, usage) };
 };
 
-/** Whether a value is a list of stories with what they reach. */
-const isReach = (value: unknown): value is readonly ReachedStory[] => Array.isArray(value);
-
-/**
- * The stories a change touches, read from the files git names and the import graph "Used in" reads.
- *
- * @param context - what the routes read.
- */
-const changedAnswer = async ({
-  config,
-  loaded,
-  tree,
-  params,
-  pages,
-  view
-}: RouteContext): Promise<AgentAnswer> => {
-  const since = params.get("since") || "HEAD";
-  const base = await changeBase(config.dir, since);
-  if (base === undefined) return { status: 400, body: { error: `"${since}" names no commit here` } };
-  const { root, files } = await changedFiles(config.dir, base);
-  const reaches = await Promise.all(
-    loaded.sources.flatMap((source) =>
-      source.files.map(async (group) => {
-        const reach = await group.reach?.();
-        return { source: source.id, reach: isReach(reach) ? reach : [] };
-      })
-    )
-  );
-  const changed = catalogueChangedFiles(config.dir, await realpath(config.dir), root, files);
-  const stories = reaches.flatMap(({ source, reach }) =>
-    affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
-      const component = findComponentByTitle(tree, source, story.title)?.component;
-      const found = [...(component?.stories ?? []), ...(component?.unlisted ?? [])].find(
-        (each) => each.exportName === story.exportName
-      );
-      return found === undefined
-        ? []
-        : [{ id: found.id, title: story.title, links: storyLinks(pages, found.id, view) }];
-    })
-  );
-  // without the import graph no story is found, which must not read as a change that touches none
-  const problems = offersUsedIn(config.lists)
-    ? []
-    : [
-        readsComponentDocs(config.lists)
-          ? "No story is found through the imports: the catalogue turns Used in off (usedIn: false), whose import graph this reads"
-          : "No story is found through the imports: the catalogue reads no component docs (componentDocs: false), whose programs read the import graph"
-      ];
-  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems };
-  return { status: 200, body };
-};
-
 /**
  * One story in detail, its component's "Used in" when offered.
  *
@@ -370,7 +305,7 @@ export const agentAnswer = async (
     if (route === "search") return await searchAnswer(context);
     if (route === "pages") return await pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
-    if (route === "changed") return await changedAnswer(context);
+    if (route === "changed") return await changedAnswer(context, server.resolveSource);
     if (route === "agent-index")
       return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };

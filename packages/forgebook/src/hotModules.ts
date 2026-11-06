@@ -26,6 +26,36 @@ export const RENEWED_MODULE_EVENT = "forgebook:module-renewed";
  */
 export const PREVIEWS_EVENT = "forgebook:previews";
 
+/**
+ * The event an edit of a story file sends when it changes whether the file can be read: from the dev server to the
+ * group's module, which hands it on to the page in a `CustomEvent` whose detail is `StoryFileRead`, for the shell to
+ * name the file at once. The file stays in the list a page read: its frame keeps what it drew, and its fix draws in
+ * place.
+ */
+export const STORY_FILE_READ_EVENT = "forgebook:story-file-read";
+
+/** Whether an edited story file can be read now. */
+export type StoryFileRead = {
+  /** The file, absolute in Vite's form. */
+  readonly file: string;
+  /** Why it cannot, naming it with its line and column when they are known; none when it can. */
+  readonly problem?: string;
+};
+
+/**
+ * What an event says of an edited story file, when it is that event.
+ *
+ * @param event - the event.
+ */
+export const storyFileReadOf = (event: Event): StoryFileRead | undefined => {
+  if (!(event instanceof CustomEvent)) return undefined;
+  const detail: unknown = event.detail;
+  if (typeof detail !== "object" || detail === null || !("file" in detail)) return undefined;
+  if (typeof detail.file !== "string") return undefined;
+  const problem = "problem" in detail && typeof detail.problem === "string" ? detail.problem : undefined;
+  return { file: detail.file, ...(problem === undefined ? {} : { problem }) };
+};
+
 /** The previews an edit renewed: each one's new module, or `undefined` for one it did not change. */
 export type PreviewsRenewal = {
   /** The previews' modules, in the catalogue's order. */

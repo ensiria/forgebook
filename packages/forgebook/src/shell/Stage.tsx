@@ -13,16 +13,11 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { checkedArgsMessage } from "../addressArgs.ts";
 import type { AddressLink } from "../addressArgsParam.ts";
 import { panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import {
-  type ArgValue,
-  type PanelArgs,
-  panelArgsParam,
-  parsePanelArgsParam,
-  type ShellMessage
-} from "../messages.ts";
+import { type ArgValue, type PanelArgs, panelArgsParam, type ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, withFixed, withOwnFixed } from "../storyGlobals.ts";
@@ -263,7 +258,8 @@ export const Stage = ({
     storyArgs: storyArgs.get(story.id),
     argTypes: panel.argTypes,
     controls: panel.controls,
-    namedValues
+    namedValues,
+    frames: storyRef
   });
   const acceptedArgs = addressArgs.accepted;
   const values = { ...storyArgs.get(story.id), ...acceptedArgs };
@@ -302,7 +298,7 @@ export const Stage = ({
       send({ type: "forgebook:events", names: eventNames });
       // checked against the shown story's declaration only: a late message of the story shown before sends nothing
       const accepted = message.storyId === story.id ? addressArgs.acceptedFor(message) : undefined;
-      if (accepted !== undefined) send({ type: "forgebook:args", args: accepted });
+      if (accepted !== undefined) send(checkedArgsMessage(accepted));
       send({ type: "forgebook:matrix", matrix });
       // the view may have changed while the frame loaded
       if (!isComparing(view)) send({ type: "forgebook:view", view: liveView(view) });
@@ -333,13 +329,6 @@ export const Stage = ({
     [eventNames]
   );
   useEffect(() => tellFrames(storyRef.current, { type: "forgebook:matrix", matrix }), [matrix]);
-  // the values reach the frames from the address, so going back in the history sets them too; compared as text, so
-  // a frame is told again only when they change
-  const { acceptedParam } = addressArgs;
-  useEffect(() => {
-    if (acceptedParam === undefined) return;
-    tellFrames(storyRef.current, { type: "forgebook:args", args: parsePanelArgsParam(acceptedParam) });
-  }, [acceptedParam]);
   // a change starts from the values the story takes: one the address named and the story does not is let go
   const changeValue = (name: string, value: ArgValue | undefined): void => {
     const { [name]: _removed, ...rest } = acceptedArgs;
@@ -385,9 +374,8 @@ export const Stage = ({
       address: deviceAddress(frameAddress(frameUrl, story.id, view, switches), framed),
       width: framed?.area.width ?? view.width,
       background: backgroundOf(view),
-      // a link whose form does not say the types needs the check's values; these are told once, when the aside's frame is
-      // ready, and the check may still be waiting for the docs, so the address's own go for a form that says them
-      args: addressLink?.typeValue === undefined ? panelArgs : acceptedArgs,
+      // as the stage's frames receive them: an aside asked for while the check waits for the docs is told when it ends
+      args: addressArgs.checked,
       view: liveView(view)
     }
   });
