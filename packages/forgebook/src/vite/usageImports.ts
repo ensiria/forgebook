@@ -62,7 +62,7 @@ const aliased = (specifier: string, options: ts.CompilerOptions): string | undef
     if (specifier.startsWith(prefix) && specifier.endsWith(suffix))
       return VITE_PATHS.resolve(
         base,
-        target.replace("*", specifier.slice(prefix.length, specifier.length - suffix.length))
+        target.split("*").join(specifier.slice(prefix.length, specifier.length - suffix.length))
       );
   }
   return undefined;
