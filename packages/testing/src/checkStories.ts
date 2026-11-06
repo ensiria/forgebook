@@ -29,7 +29,14 @@ import {
   spillProblems,
   watchedErrors
 } from "./storyCheck.ts";
-import { eachStoryPage, openedStory, READY_MS, type StoryPage } from "./storyPages.ts";
+import {
+  couldNotBeShown,
+  eachStoryPage,
+  frameErrorOf,
+  openedStory,
+  READY_MS,
+  type StoryPage
+} from "./storyPages.ts";
 import { hasLookChecks } from "./storyTestPlan.ts";
 
 /**
@@ -59,7 +66,10 @@ const checkedPage = async (
       ...errorProblems(errors)
     ]);
   if (status === "error")
-    return result([{ kind: "frame", message: "The story could not be shown" }, ...errorProblems(errors)]);
+    return result([
+      { kind: "frame", message: couldNotBeShown(await frameErrorOf(page), storyPage.story.file) },
+      ...errorProblems(errors)
+    ]);
   // a story about logic gets the suite's checks of a scene, not those about looks (`storyTestPlan.ts`)
   const lookProblems = hasLookChecks(storyPage.story)
     ? [

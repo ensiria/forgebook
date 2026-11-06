@@ -90,7 +90,7 @@ export const LATER_STRINGS = lateStrings({
   fillPage: "Fill the page",
   fillPageNamed: (name: string): string => `Fill the page with ${name}`,
   backToPlace: "Back to its place",
-  backToPlaceNamed: (name: string): string => `Put ${name} back in its place`,
+  backToPlaceNamed: (name: string): string => `Back to its place: ${name}`,
   examples: "Examples",
   pageError: "The component's page could not be read",
   droppedArgs: "The link sets values this story does not take; they were left out:",

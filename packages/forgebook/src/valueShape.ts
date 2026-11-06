@@ -83,6 +83,10 @@ export type ValueShape =
       readonly canTakeText?: true;
     }
   | {
+      /** A moment: a `Date`, which the story receives as one (`DateArg`). */
+      readonly kind: "date";
+    }
+  | {
       /** Any JSON: what fields cannot show. */
       readonly kind: "json";
     }

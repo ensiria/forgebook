@@ -32,6 +32,7 @@ export const EDITOR_STRINGS = lateStrings({
   memberKinds: {
     text: "Text",
     number: "Number",
+    date: "Date",
     boolean: "On or off",
     choice: "Choice",
     list: "List",

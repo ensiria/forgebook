@@ -23,6 +23,7 @@ const TOOLS = catalogueTools({
   checkPage: async () => "unused",
   servePreview: async () => "unused",
   shot: async () => "unused",
+  verify: async () => "unused",
   plugins: pluginsDocument([{ apiVersion: 1, id: "acme", tabs: [{ id: "a", label: "A", view: "@acme/a" }] }])
 });
 

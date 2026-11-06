@@ -8,7 +8,7 @@ import type { StoryCheckRequest } from "forgebook/story-check";
 import { DEFAULT_SWITCHES } from "forgebook/switches";
 import { describe, expect, it } from "vitest";
 
-import { storyPagesOf } from "../src/storyPages.ts";
+import { couldNotBeShown, storyPagesOf } from "../src/storyPages.ts";
 
 /** A check of every variant of two stories, one about logic. */
 const REQUEST: StoryCheckRequest = {
@@ -49,5 +49,14 @@ describe("the pages a run opens", () => {
       undefined
     ]);
     expect(pages[0]?.frame).not.toContain("device");
+  });
+});
+
+describe("what a check says of a story its frame could not show", () => {
+  it("gives the frame's reason and the story's file", () => {
+    expect(couldNotBeShown("It threw", "./src/A.stories.tsx")).toBe(
+      "The story could not be shown: It threw (./src/A.stories.tsx)"
+    );
+    expect(couldNotBeShown(undefined, undefined)).toBe("The story could not be shown");
   });
 });

@@ -1,8 +1,8 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `verify`, `list_tokens`, `get_token`,
  * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
- * for a client that renders apps.
+ * for a client that renders apps. `visual_diff` and `get_guide` join them in `mcpCommand.mts`.
  *
  * @module
  */
@@ -14,15 +14,15 @@ import { join } from "node:path";
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
 import type { PluginsDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
-import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
 import { previewTool } from "./mcpPreview.ts";
 import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
+import { type Verify, verifyTool } from "./mcpVerify.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
-import { SET_ARGS_PROPERTY, setArgsResult } from "./setArgsTool.ts";
+import { storyAddressTool } from "./setArgsTool.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
 /** The session's folder for pictures; made on the first call. */
@@ -73,6 +73,8 @@ export type CatalogueReach = {
   readonly check: Check;
   /** Takes a story's pictures. */
   readonly shot: Shot;
+  /** Answers whether a change is verified. */
+  readonly verify: Verify;
   /** Runs the checks on a page of the application. */
   readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
   /** Serves the catalogue where a browser can open a preview, and answers where. */
@@ -89,6 +91,7 @@ export const catalogueTools = ({
   writeNew,
   check,
   shot,
+  verify,
   checkPage,
   servePreview,
   plugins
@@ -123,7 +126,7 @@ export const catalogueTools = ({
   {
     name: "changed_stories",
     description:
-      "The stories a change touches: every story that reaches a file git says changed, through the imports. Call it after editing, then run check_story on what it lists.",
+      "The stories a change touches: every story that reaches a file git says changed, through the imports, and each changed UI file with its stories. To check them, call verify.",
     inputSchema: {
       type: "object",
       properties: {
@@ -167,6 +170,7 @@ export const catalogueTools = ({
     call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
       problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
   },
+  verifyTool(verify),
   {
     name: "list_tokens",
     description:
@@ -283,31 +287,7 @@ export const catalogueTools = ({
         )
       )
   },
-  {
-    name: "story_address",
-    description:
-      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe. With args, the links open the story with those values, once checked as a link's are against the controls get_story lists; what it takes and what it leaves out are in the answer.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", description: "The story's id, as list_stories gives it." },
-        view: VIEW,
-        args: SET_ARGS_PROPERTY
-      },
-      required: ["id"],
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
-      const id = textOf(args, "id") ?? "";
-      if (args["args"] !== undefined) return setArgsResult(ask, id, textOf(args, "view"), args["args"]);
-      const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
-      if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const named = namedStory(answer.body, id);
-      return named === undefined
-        ? { structured: { error: `No story "${id}"` }, isError: true }
-        : { structured: { id: named.story.id, links: named.story.links }, isError: false };
-    }
-  },
+  storyAddressTool(ask),
   {
     name: "new_stories",
     description:

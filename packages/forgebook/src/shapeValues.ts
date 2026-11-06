@@ -11,7 +11,7 @@
  *
  * @module
  */
-import { type ArgValue, isArgList, isArgObject, isArgValue, isNamedArg } from "./messages.ts";
+import { type ArgValue, isArgList, isArgObject, isArgValue, isDateArg, isNamedArg } from "./messages.ts";
 import { type NamedValues, namedValueOf } from "./namedValues.ts";
 import type { ShapeField, ValueShape } from "./valueShape.ts";
 import { WORST_ARG_TEXT, WORST_NUMBER } from "./worstCase.ts";
@@ -92,6 +92,8 @@ export const isValueOfShape = (shape: ValueShape, value: ArgValue, namedValues: 
   switch (shape.kind) {
     case "text":
       return typeof value === "string";
+    case "date":
+      return isDateArg(value);
     case "number":
       return typeof value === "number" && Number.isFinite(value);
     case "boolean":
@@ -135,6 +137,8 @@ export const startValueOf = (shape: ValueShape, namedValues: NamedValues): ArgVa
   switch (shape.kind) {
     case "text":
       return "";
+    case "date":
+      return { forgebookDate: new Date().toISOString() };
     case "number":
       return 0;
     case "boolean":
@@ -186,6 +190,7 @@ export const shapeOfValue = (value: ArgValue): ValueShape => {
   if (typeof value === "number") return { kind: "number" };
   if (typeof value === "boolean") return { kind: "boolean" };
   if (isNamedArg(value)) return { kind: "named", type: value.of };
+  if (isDateArg(value)) return { kind: "date" };
   if (isArgList(value)) {
     const shapes = [...new Set(value.map((item) => JSON.stringify(shapeOfValue(item))))];
     const [first] = value;

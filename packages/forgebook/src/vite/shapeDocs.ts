@@ -114,9 +114,18 @@ const isTextType = (type: ts.Type): boolean =>
   (type.flags & (ts.TypeFlags.String | ts.TypeFlags.TemplateLiteral | ts.TypeFlags.StringMapping)) !== 0 ||
   (type.isIntersection() && type.types.some(isTextType));
 
+/** Whether a type is the global `Date`, declared by TypeScript's own library, not one of the source's by that name. */
+const isGlobalDate = (type: ts.Type): boolean => {
+  const symbol = type.getSymbol();
+  const file = symbol?.declarations?.[0]?.getSourceFile().fileName ?? "";
+  return symbol?.getName() === "Date" && /[\\/]lib\.[^\\/]*\.d\.ts$/.test(file);
+};
+
 /** An object type's shape: its fields, or any names, or JSON when it is too wide or already being read. */
 const objectShape = (type: ts.Type, walk: Walk, depth: number, text: string | undefined): ValueShape => {
   const { checker } = walk;
+  // the global `Date`: declared by TypeScript's own library, whatever the source names otherwise
+  if (isGlobalDate(type)) return { kind: "date" };
   // a thing with behaviour is not data (`Date`, `Map`, a class's instance): no value of JSON stands for it
   const hasBehaviour = type
     .getProperties()

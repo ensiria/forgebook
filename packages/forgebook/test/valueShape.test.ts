@@ -187,6 +187,16 @@ describe("what a link may not give through what no type describes", () => {
   });
 });
 
+describe("a date", () => {
+  it("is a moment that reads as one, and nothing else", () => {
+    const date: ValueShape = { kind: "date" };
+    expect(fits(date, { forgebookDate: "2026-03-04T05:06:00.000Z" })).toBe(true);
+    expect(fits(date, { forgebookDate: "soon" })).toBe(false);
+    expect(fits(date, "2026-03-04")).toBe(false);
+    expect(fits(date, { forgebookDate: "2026-03-04", extra: 1 })).toBe(false);
+  });
+});
+
 describe("isFileList", () => {
   it("keeps small files of the types no browser runs as a page", () => {
     expect(

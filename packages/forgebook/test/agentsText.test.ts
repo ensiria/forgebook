@@ -5,10 +5,9 @@
  * @module
  */
 
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
+import { agentsSection, guideTopic } from "../bin/forgebook/agentGuide.ts";
 import {
   AGENTS_END,
   AGENTS_START,
@@ -45,8 +44,7 @@ describe("agentsSkill", () => {
   });
 
   it("meets the Agent Skills standard, on the real text", () => {
-    const text = readFileSync(new URL("../bin/forgebook/agents.md", import.meta.url), "utf8");
-    const skill = agentsSkill(text);
+    const skill = agentsSkill(agentsSection(["react"]));
     const [, frontmatter = ""] = /^---\n(.*?)\n---\n/s.exec(skill) ?? [];
     const fields = new Map(
       frontmatter.split("\n").map((line) => {
@@ -71,9 +69,9 @@ describe("SKILL_FOLDERS", () => {
   });
 });
 
-describe("the agents' section on devices", () => {
+describe("the agents' guide on devices", () => {
   it("names every device model, so an agent can write any of them", () => {
-    const section = readFileSync(new URL("../bin/forgebook/agents.md", import.meta.url), "utf8");
-    for (const id of DEVICE_IDS) expect(section).toContain(`\`${id}\``);
+    const guide = guideTopic("devices")?.text;
+    for (const id of DEVICE_IDS) expect(guide).toContain(`\`${id}\``);
   });
 });

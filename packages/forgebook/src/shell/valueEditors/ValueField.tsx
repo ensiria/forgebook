@@ -7,7 +7,7 @@
  */
 import { type ChangeEvent, type ReactNode, useState } from "react";
 
-import { type ArgValue, isArgList, isArgObject, isNamedArg } from "../../messages.ts";
+import { type ArgValue, isArgList, isArgObject, isDateArg, isNamedArg } from "../../messages.ts";
 import { isValueOfShape } from "../../shapeValues.ts";
 import type { ValueShape } from "../../valueShape.ts";
 import { MOST_PLAIN_OPTIONS } from "../PropFields.tsx";
@@ -164,6 +164,27 @@ const TextLeaf = ({ value, label, describedBy, onChange }: FieldProps): ReactNod
   );
 };
 
+/** A moment's field, in the browser's time zone; what is left empty has no value. */
+const DateLeaf = ({ value, label, describedBy, onChange }: FieldProps): ReactNode => {
+  const time = value !== undefined && isDateArg(value) ? Date.parse(value.forgebookDate) : undefined;
+  const shown =
+    time === undefined
+      ? ""
+      : new Date(time - new Date(time).getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  return (
+    <input
+      type="datetime-local"
+      aria-label={label}
+      aria-describedby={describedBy}
+      value={shown}
+      onChange={(event: ChangeEvent<HTMLInputElement>): void => {
+        const read = new Date(event.target.value);
+        onChange(Number.isNaN(read.getTime()) ? undefined : { forgebookDate: read.toISOString() });
+      }}
+    />
+  );
+};
+
 /** A value's fields, or its JSON when a reader asks for it. */
 const StructuredField = (props: FieldProps): ReactNode => {
   const { shape, value, label, namedValues, depth } = props;
@@ -226,6 +247,8 @@ export const ValueField = (props: FieldProps): ReactNode => {
       return <TextLeaf {...props} />;
     case "number":
       return <NumberLeaf {...props} />;
+    case "date":
+      return <DateLeaf {...props} />;
     case "boolean":
       return (
         <input

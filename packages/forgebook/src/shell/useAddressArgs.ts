@@ -1,6 +1,6 @@
 /**
- * The props panel's values an address names, as the stage hands them to the story's frames: only those the story
- * declares, with a value of the declared type, once the story's frame and its component's docs say what that is.
+ * The props panel's values an address names, as a page hands them to the story's frames: only those the story declares,
+ * with a value of the declared type, once the story's frame and its component's docs say what that is.
  *
  * @remarks
  * The address is written by whoever shares the link, so its values are checked here, in the core, before any frame
@@ -9,12 +9,14 @@
  *
  * @module
  */
-import { useEffect, useMemo, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  type AcceptedArgs,
   type ArgDeclaration,
   type CheckedArgs,
   checkedAddressArgs,
+  checkedArgsMessage,
   type DroppedArg,
   declaredArgProps,
   needsShapeChecks
@@ -23,6 +25,7 @@ import type { AddressLink } from "../addressArgsParam.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
 import { type PanelArgs, panelArgsParam } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
+import { tellFrames } from "./FrameView.tsx";
 import type { ReadyMessage } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 
@@ -77,12 +80,16 @@ export type AddressArgsInput = {
   readonly controls: ReadyDeclaration["controls"];
   /** The source's named values; none when it has none. */
   readonly namedValues: NamedValues | undefined;
+  /** The element that holds the story's frames, which hear each change of the checked values. */
+  readonly frames: RefObject<HTMLElement | null>;
 };
 
 /** The address's values once checked, and how to check them for a frame that has just reported ready. */
 export type AddressArgs = {
   /** The values the story receives; none before its declaration is known. */
   readonly accepted: PanelArgs;
+  /** The same values for a frame that waits for the check; `undefined` until the declaration is known. */
+  readonly checked: AcceptedArgs | undefined;
   /** The values left out, with the reason. */
   readonly dropped: readonly DroppedArg[];
   /**
@@ -94,7 +101,7 @@ export type AddressArgs = {
    * The values to send a frame that has just reported ready, from its own message, since the state that holds it
    * updates after; none while the docs load.
    */
-  readonly acceptedFor: (ready: ReadyDeclaration) => PanelArgs | undefined;
+  readonly acceptedFor: (ready: ReadyDeclaration) => AcceptedArgs | undefined;
   /** Gives a prop with a shape its worst value, once a prop that has a shape asked for what reads it. */
   readonly worstOfShape: ShapeValues["worstOfShape"] | undefined;
 };
@@ -128,7 +135,7 @@ const useShapeValues = (isNeeded: boolean): ShapeValues | undefined => {
  * @param input - the address's values and what the stage knows of the story.
  */
 export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
-  const { panelArgs, link, docs, storyArgs, argTypes, controls } = input;
+  const { panelArgs, link, docs, storyArgs, argTypes, controls, frames } = input;
   const typeValue = link?.typeValue;
   const namedValues = input.namedValues ?? NO_NAMED_VALUES;
   const declaration = useMemo(() => {
@@ -146,17 +153,27 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     // nothing is told of the address until all of it can be: a story must not draw half a link
     return read.isWaiting ? undefined : read;
   }, [panelArgs, typeValue, declaration, shapes]);
+  const acceptedParam = checked === undefined ? undefined : panelArgsParam(checked.accepted);
+  // the values reach the frames from the address, so going back in the history sets them too; compared as text, so a
+  // frame is told again only when they change
+  const sealedRef = useRef(checked?.sealed);
+  sealedRef.current = checked?.sealed;
+  useEffect(() => {
+    if (acceptedParam === undefined || sealedRef.current === undefined) return;
+    tellFrames(frames.current, checkedArgsMessage(sealedRef.current));
+  }, [acceptedParam, frames]);
   // said with the check's: the note's button keeps what the story accepts, which is not known before
   const unread = (link?.unread ?? []).map((name): DroppedArg => ({ name, reason: "unreadable" }));
   return {
     accepted: checked?.accepted ?? NO_ARGS,
+    checked: checked?.sealed,
     dropped: checked === undefined ? NOTHING_DROPPED : [...unread, ...checked.dropped],
-    acceptedParam: checked === undefined ? undefined : panelArgsParam(checked.accepted),
-    acceptedFor: (message: ReadyDeclaration): PanelArgs | undefined => {
+    acceptedParam,
+    acceptedFor: (message: ReadyDeclaration): AcceptedArgs | undefined => {
       const ready = declarationOf(docs, message, namedValues);
       if (ready === undefined) return undefined;
       const read = checkedAddressArgs(panelArgs, ready, typeValue, shapes);
-      return read.isWaiting ? undefined : read.accepted;
+      return read.isWaiting ? undefined : read.sealed;
     },
     worstOfShape: shapes?.worstOfShape
   };

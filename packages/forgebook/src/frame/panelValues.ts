@@ -13,6 +13,7 @@ import {
   isArgList,
   isArgObject,
   isArgValue,
+  isDateArg,
   isNamedArg,
   isUnsetArg,
   type NamedArg,
@@ -67,6 +68,14 @@ const panelObjectOf = (value: object, walk: PanelWalk, depth: number): ArgValue 
   return Object.fromEntries(fields);
 };
 
+/** Whether a value crosses as it is. */
+const isPlainLeaf = (value: unknown): value is string | boolean | null =>
+  value === null || typeof value === "string" || typeof value === "boolean";
+
+/** A `Date` as the panel can show it: its moment, when it has one. */
+const dateValueOf = (date: Date): ArgValue | undefined =>
+  Number.isNaN(date.getTime()) ? undefined : { forgebookDate: date.toISOString() };
+
 /**
  * A story's value as the panel can show it, or none when any part of it is not plain data.
  *
@@ -77,10 +86,11 @@ const panelObjectOf = (value: object, walk: PanelWalk, depth: number): ArgValue 
 const panelValueOf = (value: unknown, walk: PanelWalk, depth: number): ArgValue | undefined => {
   walk.parts -= 1;
   if (walk.parts < 0 || depth > MOST_DEPTH) return undefined;
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (isPlainLeaf(value)) return value;
   if (typeof value === "number") return depth === 0 || Number.isFinite(value) ? value : undefined;
   const named = nameOf(value, walk.namedValues);
   if (named !== undefined) return named;
+  if (value instanceof Date) return dateValueOf(value);
   if (Array.isArray(value)) return panelListOf(value, walk, depth);
   if (typeof value !== "object") return undefined;
   const prototype: unknown = Object.getPrototypeOf(value);
@@ -116,6 +126,7 @@ export const panelArgsOf = (
  */
 const storyValueOf = (value: ArgValue, namedValues: NamedValues): unknown => {
   if (isNamedArg(value)) return namedValueOf(namedValues, value.of, value.named);
+  if (isDateArg(value)) return new Date(value.forgebookDate);
   if (isArgList(value))
     return value.map((item) => storyValueOf(item, namedValues)).filter((item) => item !== undefined);
   if (!isArgObject(value)) return value;

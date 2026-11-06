@@ -54,6 +54,8 @@ export type ValuePropsProps = {
   readonly scores?: Readonly<Record<string, number>>;
   /** Whatever it is given. */
   readonly payload?: unknown;
+  /** When it starts. */
+  readonly startsAt?: Date;
   /** A single line. */
   readonly title?: string;
   /** How many. */
@@ -84,6 +86,7 @@ export type ValuePropsProps = {
 export const ValueProps = ({ icon, slot, renderRow: _renderRow, ...rest }: ValuePropsProps): ReactNode => (
   <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
     <output data-testid="value-props">{JSON.stringify(rest)}</output>
+    <div data-testid="value-date">{rest.startsAt instanceof Date ? "a Date" : "no Date"}</div>
     <div data-testid="value-icon">{icon === undefined ? "no icon" : icon()}</div>
     <div data-testid="value-slot">{slot ?? "no slot"}</div>
   </div>

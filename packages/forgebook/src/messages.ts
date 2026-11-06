@@ -270,6 +270,26 @@ export const isArgList = (value: ArgValue): value is readonly ArgValue[] => Arra
  */
 export const isArgObject = (value: ArgValue): value is ArgObject => isRecord(value);
 
+/**
+ * A `Date`, as the address and the messages write it: JSON has none, and the story must receive one. `frame/panelValues.ts`
+ * reads it both ways.
+ */
+export type DateArg = {
+  /** The moment, as `Date.toISOString` writes it. */
+  readonly forgebookDate: string;
+};
+
+/**
+ * Whether a value is a `Date` as the panel writes it.
+ *
+ * @param value - an arg's value.
+ */
+export const isDateArg = (value: unknown): value is DateArg =>
+  isRecord(value) &&
+  typeof value["forgebookDate"] === "string" &&
+  Object.keys(value).length === 1 &&
+  !Number.isNaN(Date.parse(value["forgebookDate"]));
+
 /** The value that says a prop has none, as the address and the messages write it. */
 export const UNSET_ARG: UnsetArg = { forgebookUnset: true };
 

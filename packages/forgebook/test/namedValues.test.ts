@@ -35,6 +35,7 @@ describe("named values", () => {
           sides: ["top", 2],
           items: [{ id: 1, icon: IconBell, skipped: undefined }],
           when: new Date(0),
+          lost: new Date(Number.NaN),
           mixed: [{ id: 1 }, (): number => 1],
           element: Object.fromEntries([["$$typeof", Symbol.for("react.element")]]),
           nan: [Number.NaN],
@@ -49,6 +50,7 @@ describe("named values", () => {
       none: null,
       sides: ["top", 2],
       items: [{ id: 1, icon: { of: "IconComponent", named: "IconBell" } }],
+      when: { forgebookDate: "1970-01-01T00:00:00.000Z" },
       icon: { of: "IconComponent", named: "IconBell" }
     });
   });
@@ -87,5 +89,6 @@ describe("named values", () => {
     const args = storyArgsOf({ tile: { icon: named, label: "x" }, icons: [named], gone: UNSET_ARG }, NAMED);
     expect(args).toEqual({ tile: { icon: IconBell, label: "x" }, icons: [IconBell], gone: undefined });
     expect(Object.keys(args)).toContain("gone");
+    expect(storyArgsOf({ when: { forgebookDate: "1970-01-01T00:00:00.000Z" } })["when"]).toEqual(new Date(0));
   });
 });

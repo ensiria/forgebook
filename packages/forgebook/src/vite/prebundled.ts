@@ -13,9 +13,15 @@
  *
  * @module
  */
+import { existsSync, readFileSync } from "node:fs";
+
+import type { UserConfig } from "vite";
+
+import { STORY_FILE } from "./autoTitle.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { hasPluginViews, PLUGIN_HOSTS_MODULE, WRITTEN_HOME_MODULE } from "./pages.ts";
 import { pluginModules } from "./pluginConfig.ts";
+import { parseStoryFile } from "./storyParse.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
@@ -108,3 +114,30 @@ export const scannedEntries = (
   // `!` patterns stay as they are, which Vite's scanner reads as fast-glob does, from the same folder
   return [...config.stories, ...fromSources, ...config.previews];
 };
+
+/** Vite's options of its dependency scan. */
+type ScanOptions = NonNullable<NonNullable<UserConfig["optimizeDeps"]>["rolldownOptions"]>;
+
+/**
+ * Keeps Vite's dependency scan going past a story file that does not parse, which adds nothing to what it finds. One
+ * such file otherwise stops the scan, and with it the pre-bundling of every other story's packages, and fills the log
+ * with the scanner's stack. The catalogue names the file itself (`storyFilesModule.ts`). Its text is read here on the
+ * scan only: a start that keeps its pre-bundled packages does not scan.
+ */
+export const scanOptions = (): ScanOptions => ({
+  plugins: [
+    {
+      name: "forgebook:scan-story-files",
+      load: {
+        filter: { id: STORY_FILE },
+        handler: (id: string): { code: string; moduleType: "js" } | null => {
+          // an id that names no file (a plugin's own module) is not this hook's to answer
+          if (!existsSync(id)) return null;
+          return parseStoryFile(id, readFileSync(id, "utf8")).errors.length > 0
+            ? { code: "", moduleType: "js" }
+            : null;
+        }
+      }
+    }
+  ]
+});

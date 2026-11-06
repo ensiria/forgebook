@@ -99,7 +99,7 @@ const CompareMenu = ({
   isDisabled,
   fixed = NOT_FIXED
 }: ToolbarProps & { readonly isDisabled: boolean }): ReactNode => {
-  const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
+  const { isOpen, isDrawn, setIsOpen, closeAfterChoice, buttonRef, panelRef, panelId } = usePopover();
   const catalogue = useCatalogue();
   const name = useId();
   return (
@@ -139,7 +139,7 @@ const CompareMenu = ({
                   checked={view.compare.join(",") === choice.axes.join(",")}
                   onChange={(): void => {
                     onViewChange({ ...view, compare: choice.axes });
-                    setIsOpen(false);
+                    closeAfterChoice();
                   }}
                 />
                 {choice.label}

@@ -13,10 +13,11 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { checkedArgsMessage } from "../addressArgs.ts";
 import type { AddressLink } from "../addressArgsParam.ts";
 import { panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import { type PanelArgs, parsePanelArgsParam, type ShellMessage } from "../messages.ts";
+import type { PanelArgs, ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, withFixed, withOwnFixed } from "../storyGlobals.ts";
@@ -54,7 +55,7 @@ import { StageCompare } from "./StageCompare.tsx";
 import { StageTools } from "./StageTools.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryBar } from "./StoryBar.tsx";
-import { embedHeight, embedQuery, takesArgs, useCheckedArgs, usePanelValues } from "./stageArgs.ts";
+import { embedHeight, embedQuery, takesArgs, usePanelValues } from "./stageArgs.ts";
 import { STRINGS } from "./strings.ts";
 import { useAddressArgs } from "./useAddressArgs.ts";
 import {
@@ -232,7 +233,8 @@ export const Stage = ({
     storyArgs: storyArgs.get(story.id),
     argTypes: panel.argTypes,
     controls: panel.controls,
-    namedValues
+    namedValues,
+    frames: storyRef
   });
   const acceptedArgs = addressArgs.accepted;
   const ownArgs = ownArgsOf(storyArgs, story.id);
@@ -279,7 +281,7 @@ export const Stage = ({
       send({ type: "forgebook:events", names: eventNames });
       // checked against the shown story's declaration only: a late message of the story shown before sends nothing
       const accepted = message.storyId === story.id ? addressArgs.acceptedFor(message) : undefined;
-      if (accepted !== undefined) send({ type: "forgebook:args", args: accepted });
+      if (accepted !== undefined) send(checkedArgsMessage(accepted));
       send({ type: "forgebook:matrix", matrix });
       // the view may have changed while the frame loaded
       if (!isComparing(view)) send({ type: "forgebook:view", view: liveView(view) });
@@ -310,14 +312,6 @@ export const Stage = ({
     [eventNames]
   );
   useEffect(() => tellFrames(storyRef.current, { type: "forgebook:matrix", matrix }), [matrix]);
-  // the values reach the frames from the address, so going back in the history sets them too; compared as text, so
-  // a frame is told again only when they change
-  const { acceptedParam } = addressArgs;
-  const checkedArgs = useCheckedArgs(acceptedParam);
-  useEffect(() => {
-    if (acceptedParam === undefined) return;
-    tellFrames(storyRef.current, { type: "forgebook:args", args: parsePanelArgsParam(acceptedParam) });
-  }, [acceptedParam]);
   const replay = (): void => {
     const message: ShellMessage = { type: "forgebook:replay" };
     frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
@@ -357,8 +351,8 @@ export const Stage = ({
       address: deviceAddress(frameAddress(frameUrl, story.id, view, switches), framed),
       width: framed?.area.width ?? view.width,
       background: backgroundOf(view),
-      // as the frames receive them: checked, and typed
-      args: checkedArgs,
+      // as the stage's frames receive them: an aside asked for while the check waits for the docs is told when it ends
+      args: addressArgs.checked,
       view: liveView(view)
     }
   });

@@ -25,11 +25,8 @@ export type AddressLink = {
   readonly param: string;
   /** Whether it is Storybook's form and its reader has not loaded yet: its values are still to come. */
   readonly isWaiting: boolean;
-  /**
-   * Types one of its values for the prop that receives it, or for none where a page knows of no such prop, for a form
-   * that does not say; none for JSON, which does.
-   */
-  readonly typeValue?: (prop: PanelProp | undefined, value: ArgValue) => ArgValue;
+  /** Types one of its values for the prop that receives it, for a form that does not say; none for JSON, which does. */
+  readonly typeValue?: (prop: PanelProp, value: ArgValue) => ArgValue;
   /** The names of the values that could not be read; `args` for a parameter that could not be read at all. */
   readonly unread: readonly string[];
 };

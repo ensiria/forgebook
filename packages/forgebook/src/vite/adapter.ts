@@ -29,6 +29,8 @@ export type StoryComponent = {
    * can renew the docs.
    */
   readonly sources: readonly string[];
+  /** Whether its file exports it as its default, which an import then writes without braces; read for `forgebook new`. */
+  readonly isDefaultExport?: boolean;
 };
 
 /** What a framework reads of a story file: its component, `{ docs: { name: null } }` without one, or why it cannot. */

@@ -35,12 +35,11 @@ import { groupTexts, type TextSources } from "./builtTexts.ts";
 import { catalogueConfig } from "./catalogueConfig.ts";
 import { currentCloseWatch } from "./closeWatch.ts";
 import {
-  emptyStoryGlobs,
-  emptyStoryGlobsMessage,
   findConfigFile,
   loadConfigFile,
   packageResolver,
-  type ResolvedConfig
+  type ResolvedConfig,
+  sayEmptyStoryGlobs
 } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, NO_DOCS_EXTRACTOR } from "./docsExtractor.ts";
@@ -50,7 +49,7 @@ import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
 import { generatedId, generatedModule } from "./generatedModules.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
-import { FILES_MODULE_HOT, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
+import { filesModuleHot, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
 import { type EmitAsset, inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
@@ -234,6 +233,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   });
   // a build's docs, code and pages of each group's story files, read while the build loads the stories
   const texts = groupTexts();
+  // whether a story file that cannot be read is named while the rest draws: a build must fail on it, and a test run has
+  // no page to name it on
+  const isForgiving = (): boolean => isServing() && !isTestRun;
   // whether an edited story file is drawn anew in its open frames: a dev server's, unless the framework cannot
   const isRedrawing = (): boolean =>
     isServing() && (config?.framework ?? options.framework)?.redrawsEditedStories !== false;
@@ -299,7 +301,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * @param pack - writes a module's JSON as its value: as it is, or kept out of a build's JavaScript.
    * @param startTexts - a build's browser files': starts reading a pattern's docs, code and pages, which its module
    * imports from the group's texts module; none imports each from its query.
-   * @throws when a story file cannot be indexed.
+   * @throws when a story file cannot be indexed, and no person at a dev server is told instead (a build, a test run).
    */
   const storiesModule = async (
     id: string,
@@ -323,19 +325,20 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     const lists = config?.lists ?? {};
     const hasUsage = offersUsedIn(lists);
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
-    const { files, code } = patternModule(
+    const { files, refused, code } = patternModule(
       id,
       watch,
       { hasDocs: readsComponentDocs(lists), hasUsage, hasReach: hasUsage && isServing() },
       indexCache(),
       isTestRun ? undefined : extractor().warm,
       startTexts,
-      access.isKept
+      access.isKept,
+      isForgiving()
     );
-    filesModules.set(id, new Set(files.map((file) => file.file)));
+    filesModules.set(id, new Set([...files, ...refused].map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
-    served.keep(id, files);
-    return { code: `${code}\n${FILES_MODULE_HOT}`, moduleType: "js" };
+    served.keep(id, { files, refused });
+    return { code: `${code}\n${filesModuleHot(refused)}`, moduleType: "js" };
   };
   /**
    * Tells the docs a source file was added or removed: it may be what an import now finds, so no kept docs are read
@@ -424,6 +427,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       null
     );
   };
+  // whatever its mode: a run of Vitest has no page to name a file on, and must fail on it
+  const vitestHooks = {
+    configureVitest: (context: Parameters<typeof VITEST_HOOKS.configureVitest>[0]): void => {
+      isTestRun = true;
+      VITEST_HOOKS.configureVitest(context);
+    }
+  };
   return {
     name: "forgebook",
     enforce: "pre",
@@ -466,13 +476,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
       for (const problem of config?.shell.problems ?? [])
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
-      const emptyGlobs = config === undefined || isTestRun ? [] : emptyStoryGlobs(config);
-      if (emptyGlobs.length === 0) return;
-      // a build's reader would find nothing, and whoever runs a dev server may be about to write the first story
-      if (!isServing()) throw new Error(emptyStoryGlobsMessage(emptyGlobs));
-      resolved.logger.warn(
-        `Forgebook: ${emptyStoryGlobsMessage(emptyGlobs)}. The catalogue shows them as soon as a file does.`
-      );
+      if (config !== undefined && !isTestRun) sayEmptyStoryGlobs(config, isServing(), resolved.logger);
     },
     configureServer: (server: ViteDevServer): void => {
       access.serve(server, config === undefined ? undefined : pageModulePath(config.dir, AGENT_SOURCES_FILE));
@@ -547,8 +551,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
-    ...storyFileHotHooks(isRedrawing, served.changedBy, watching),
-    ...VITEST_HOOKS,
+    ...storyFileHotHooks(isRedrawing, served, watching),
+    ...vitestHooks,
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = await pagesModule(id);
       if (generated !== undefined) return generated;

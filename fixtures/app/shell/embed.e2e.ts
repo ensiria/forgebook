@@ -42,6 +42,12 @@ const test = base.extend<{ serveHost: ServeHost }>({
   }
 });
 
+/** Runs in every frame: writes on its page the values the last message gave it, as the story would receive them. */
+const HEAR_ARGS = `addEventListener("message", ({ data }) => {
+  if (data?.type === "forgebook:args")
+    document.documentElement.setAttribute("data-args-heard", JSON.stringify(data.args));
+});`;
+
 /** The address of a story of the fixture's Select, alone. */
 const embed = (query = ""): string => `/?embed&story=${STORY}${query === "" ? "" : `&${query}`}`;
 
@@ -120,11 +126,32 @@ test.describe("a story alone", () => {
     await expect(page).toHaveURL(/embed/);
   });
 
-  test("reads a Storybook link's args, and says which it could not read", async ({ page }) => {
-    await page.goto(embed("args=hint:From+a+link;style.color:red"));
+  test("hands the story only what its panel could set", async ({ page }) => {
+    const values = { hint: "Declared", other: "Not a prop", size: 5 };
+    await page.addInitScript(HEAR_ARGS);
+    await page.goto(embed(`args=${encodeURIComponent(JSON.stringify(values))}`));
+    await ready(storyFrame(page));
+    await expect(storyFrame(page).locator("small")).toHaveText("Declared");
+    const heard = await storyFrame(page).locator("html").getAttribute("data-args-heard");
+    expect(JSON.parse(heard ?? "null")).toEqual({ hint: "Declared" });
+  });
+
+  test("reads a Storybook link's args through the same check, and says what it left out", async ({
+    page
+  }) => {
+    await page.addInitScript(HEAR_ARGS);
+    await page.goto(embed("args=hint:From+a+link;other:x;style.color:red"));
     await ready(storyFrame(page));
     await expect(storyFrame(page).locator("small")).toHaveText("From a link");
-    await expect(page.getByRole("alert")).toContainText("style");
+    const heard = await storyFrame(page).locator("html").getAttribute("data-args-heard");
+    expect(JSON.parse(heard ?? "null")).toEqual({ hint: "From a link" });
+    const note = page.locator(".forgebook-dropped-args");
+    await expect(note.getByRole("listitem").filter({ hasText: "other" })).toContainText(
+      "not one of its props"
+    );
+    await expect(note.getByRole("listitem").filter({ hasText: "style" })).toContainText("could not be read");
+    // an embed's address is its author's: nothing here can rewrite it
+    await expect(note.getByRole("button")).toHaveCount(0);
   });
 
   test("says so when the address names no story, or one that is not there", async ({ page }) => {
@@ -179,6 +206,44 @@ test.describe("in a page of another origin", () => {
       (message) => (message as { type?: string }).type?.startsWith("forgebook:embed") === true
     );
     expect(Object.keys(fromEmbed[0] as object).sort()).toEqual(["height", "type"]);
+  });
+
+  test("keeps the frame's height with a note above it, and tells the page the note's too", async ({
+    page,
+    baseURL,
+    serveHost
+  }) => {
+    const frameHeight = (): Promise<number> =>
+      page
+        .frameLocator("#story")
+        .locator("iframe.forgebook-frame-view")
+        .evaluate((frame) => frame.getBoundingClientRect().height);
+    await openHost(page, serveHost, `${baseURL}${embed().slice(1)}`);
+    // a page that follows what it is told, as the embed code does: the window then grows with the note
+    await page.evaluate(() => {
+      addEventListener("message", ({ data }) => {
+        const story = document.querySelector<HTMLIFrameElement>("#story");
+        if (data?.type === "forgebook:embed-size" && story !== null) story.height = String(data.height);
+      });
+    });
+    await ready(hostedStory(page));
+    await expect.poll(() => postedHeights(page)).not.toEqual([]);
+    const alone = await frameHeight();
+    const dropped = encodeURIComponent(JSON.stringify({ other: "Not a prop" }));
+    await page.evaluate(
+      (src) => document.querySelector<HTMLIFrameElement>("#story")?.setAttribute("src", src),
+      `${baseURL}${embed(`args=${dropped}`).slice(1)}`
+    );
+    const note = page.frameLocator("#story").locator(".forgebook-dropped-args");
+    await expect(note).toBeVisible();
+    const noteHeight = await note.evaluate((element) => element.getBoundingClientRect().height);
+    expect(noteHeight).toBeGreaterThan(0);
+    const told = (): Promise<number | undefined> => postedHeights(page).then((heights) => heights.at(-1));
+    await expect.poll(told).toBeGreaterThanOrEqual(alone + Math.floor(noteHeight));
+    // and it stays there: a window that grows with the note must not grow the frame in turn
+    await page.waitForTimeout(500);
+    expect(Math.abs((await frameHeight()) - alone)).toBeLessThanOrEqual(1);
+    expect(Math.abs(((await told()) ?? 0) - alone - noteHeight)).toBeLessThanOrEqual(2);
   });
 
   test("follows the width it is given: a narrower page, a taller story", async ({

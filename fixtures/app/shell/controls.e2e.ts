@@ -49,8 +49,9 @@ test.describe("the panel's controls for values of any shape", () => {
     await expectReceived(page, { address: { street: "Via Roma", city: "Roma", floor: 2 } });
     // an optional field can go away again
     await page.getByRole("button", { name: "address city: no value" }).click();
-    await expect.poll(() => received(page)).toMatchObject({ address: { street: "Via Roma", floor: 2 } });
-    expect((await received(page))["address"]).not.toHaveProperty("city");
+    await expect
+      .poll(() => received(page))
+      .toEqual(expect.objectContaining({ address: { street: "Via Roma", floor: 2 } }));
   });
 
   test("adds, removes and moves a list's items with the keyboard, the focus following", async ({ page }) => {
@@ -281,13 +282,25 @@ test.describe("the panel's controls for values of any shape", () => {
     await expect(page.getByRole("button", { name: "Worst case" })).toBeEnabled();
   });
 
+  test("a Date prop is set as a moment, reaches the story as a Date, and comes back from the link", async ({
+    page
+  }) => {
+    await open(page, story("empty"));
+    await page.getByRole("textbox", { name: "startsAt" }).fill("2026-03-04T05:06");
+    await expect(frameOf(page).getByTestId("value-date")).toHaveText("a Date");
+    await expect.poll(() => addressArgs(page)).toHaveProperty("startsAt.forgebookDate");
+    await page.reload();
+    await expect(frameOf(page).getByTestId("value-date")).toHaveText("a Date");
+    await expect(page.getByRole("textbox", { name: "startsAt" })).toHaveValue("2026-03-04T05:06");
+  });
+
   test("an embed checks a link's values as the page does", async ({ page }) => {
     const args = JSON.stringify({ tags: ["ü"], address: { street: "x", onclick: "y" }, innerHTML: "<b>" });
     await page.goto(`/?embed&story=sb:storybook-value-props--filled&args=${encodeURIComponent(args)}`);
     await expect.poll(() => received(page)).toMatchObject({ tags: ["ü"], address: { street: "Via Roma" } });
     expect(await received(page)).not.toHaveProperty("innerHTML");
-    await expect(page.getByRole("alert")).toContainText("innerHTML");
-    await expect(page.getByRole("alert")).toContainText("address");
+    await expect(page.locator(".forgebook-dropped-args")).toContainText("innerHTML");
+    await expect(page.locator(".forgebook-dropped-args")).toContainText("address");
   });
 
   test("a plain catalogue page loads no editor", async ({ page }) => {
