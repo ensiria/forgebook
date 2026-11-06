@@ -29,7 +29,8 @@ import type {
   SearchDocument,
   StoriesDocument,
   StoryDocument,
-  TokensDocument
+  TokensDocument,
+  VerifyDocument
 } from "../../src/vite/agent.types.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
 import type { TokenClash } from "../../src/vite/tokenClashes.ts";
@@ -289,9 +290,36 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
   );
   return [
-    ...(lines.length === 0 ? ["Nothing to report."] : lines),
-    ...document.skipped.map((each) => `Not checked: ${each}`)
+    ...(lines.length > 0
+      ? lines
+      : [document.skipped.length > 0 ? "Nothing to report in what was checked." : "Nothing to report."]),
+    ...document.skipped
   ].join("\n");
+};
+
+/**
+ * What `verify` found, each with its fix, and the verdict in one line, last: what a person reads first at a prompt.
+ *
+ * @param document - the answer.
+ * @param style - colours, glyphs and width.
+ */
+export const verifyText = (document: VerifyDocument, style: OutputStyle): string => {
+  const uncovered = document.uiFiles.flatMap((each) =>
+    each.coverage === "none"
+      ? [
+          `${each.file}  not verified: ${each.reason ?? ""}${each.fix === undefined ? "" : ` Fix: ${each.fix}`}`
+        ]
+      : []
+  );
+  const code = document.code.problems.map(
+    (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
+  );
+  const notes = document.code.notes.map(
+    (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
+  );
+  const results = document.failures.map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
+  const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
+  return [...uncovered, ...code, ...notes, ...stories, document.summary].join("\n");
 };
 
 /**

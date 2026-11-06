@@ -110,7 +110,7 @@ describe("storiesNamed", () => {
       ]
     };
     expect(storiesNamed(renamed, "kit:data-read-more--open")).toEqual([
-      { id: "kit:data-readmore--open", formerId: "kit:data-read-more--open" }
+      { id: "kit:data-readmore--open", file: "./read-more.stories.tsx", formerId: "kit:data-read-more--open" }
     ]);
     expect(storiesNamed(renamed, "kit:data-read-more").map((story) => story.id)).toEqual([
       "kit:data-readmore--open"

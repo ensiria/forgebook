@@ -24,9 +24,12 @@ import {
   useSyncExternalStore
 } from "react";
 
+import { checkedArgsMessage } from "../addressArgs.ts";
 import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
 import { EMBED_SIZE_TYPE, type EmbedSizeMessage } from "../embed.ts";
-import { type PanelArgs, parsePanelArgsParam, type ShellMessage } from "../messages.ts";
+import { type PanelArgs, parsePanelArgsParam } from "../messages.ts";
+import type { NamedValues } from "../namedValues.ts";
+import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";
 import { type FixedView, NOT_FIXED, withFixed } from "../storyGlobals.ts";
 import { findStory, type StoryLocation, storyTree } from "../storyTree.ts";
@@ -38,12 +41,20 @@ import { LATER_STRINGS } from "./laterStrings.ts";
 import type { ShellConfig } from "./Shell.tsx";
 import { shellIsDark } from "./shellScheme.ts";
 import { STRINGS } from "./strings.ts";
+import { useAddressArgs } from "./useAddressArgs.ts";
 import { APPEARANCE_ATTRIBUTE } from "./useAppearance.ts";
 import { type ReadyMessage, useFrameMessages } from "./useFrameMessages.ts";
+import { usePanelDocs } from "./usePanelDocs.ts";
 import { useSystemDark } from "./useSystemDark.ts";
 
 /** The height of the frame before its story reports its own, in CSS px, in a page with no height of its own yet. */
 const WAITING_HEIGHT = 240;
+
+/** No actions, before the frame reported its own. */
+const NO_ACTIONS: readonly string[] = [];
+
+/** No `argTypes`, before the frame reported its own. */
+const NO_ARG_TYPES: ReadyMessage["argTypes"] = {};
 
 /**
  * Tells the page around the embed how tall the story is.
@@ -132,8 +143,12 @@ type EmbedStoryProps = {
   readonly location: StoryLocation;
   /** The view the address names. */
   readonly view: ViewState;
-  /** The values the address sets on the story's args. */
+  /** The values the address names, not yet checked against what the story declares. */
   readonly panelArgs: PanelArgs;
+  /** Loads the component's docs, which the check reads; `undefined` when the source has none for the file. */
+  readonly loadDocs: (() => Promise<unknown>) | undefined;
+  /** The source's named values; none when it has none. */
+  readonly namedValues: NamedValues | undefined;
   /** The frame page's address. */
   readonly frameUrl: string;
 };
@@ -143,17 +158,45 @@ type EmbedStoryProps = {
  *
  * @param props - the story, the view, its args and the frame page.
  */
-const EmbedStory = ({ location, view, panelArgs, frameUrl }: EmbedStoryProps): ReactNode => {
+const EmbedStory = ({
+  location,
+  view,
+  panelArgs,
+  loadDocs,
+  namedValues,
+  frameUrl
+}: EmbedStoryProps): ReactNode => {
   const catalogue = useCatalogue();
   const { story, component, source } = location;
   const [fixed, setFixed] = useState<FixedView>(NOT_FIXED);
   const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [ready, setReady] = useState<ReadyMessage | undefined>(undefined);
+  const storyRef = useRef<HTMLDivElement>(null);
+  // the docs only serve the check: an embed whose address names no value does not load them
+  const hasValues = Object.keys(panelArgs).length > 0;
+  const docs = usePanelDocs(
+    hasValues ? loadDocs : undefined,
+    component.name,
+    ready?.args,
+    ready?.actions ?? NO_ACTIONS
+  );
+  // whoever embeds the story writes its address, as whoever shares a link does: the same check applies
+  const addressArgs = useAddressArgs({
+    panelArgs,
+    docs,
+    storyArgs: ready?.args,
+    argTypes: ready?.argTypes ?? NO_ARG_TYPES,
+    controls: ready?.controls ?? "all",
+    namedValues,
+    frames: storyRef
+  });
   const { heights, settled } = useFrameMessages({
     onReady: (frame: Window, message: ReadyMessage): void => {
       setFixed(message.fixed);
       setFailure(undefined);
-      const args: ShellMessage = { type: "forgebook:args", args: panelArgs };
-      frame.postMessage(args, framesOrigin());
+      setReady(message);
+      const accepted = addressArgs.acceptedFor(message);
+      if (accepted !== undefined) frame.postMessage(checkedArgsMessage(accepted), framesOrigin());
     },
     onCall: (): void => undefined,
     onFailed: (_storyId: string, message: string): void => setFailure(message)
@@ -191,6 +234,7 @@ const EmbedStory = ({ location, view, panelArgs, frameUrl }: EmbedStoryProps): R
       )}
       {/* kept while it failed: a frame that recovers (an edited story) says so, and takes the page back */}
       <div
+        ref={storyRef}
         className="forgebook-embed__story"
         hidden={failure !== undefined}
         style={{ width: shownView.width === "fill" ? undefined : shownView.width }}
@@ -229,6 +273,11 @@ const EmbedContent = ({
   const storyId = params.get("story");
   const location = storyId === null ? undefined : findStory(tree, storyId);
   const name = location?.component.name;
+  // one object for as long as the address is read: the check is not run again for each render
+  const panelArgs = useMemo(
+    () => addressArgsFor(parsePanelArgsParam(params.get("args")), addressTexts),
+    [params, addressTexts]
+  );
   useEffect(() => {
     document.title = name === undefined ? title : `${name} · ${title}`;
   }, [name, title]);
@@ -241,12 +290,14 @@ const EmbedContent = ({
       </main>
     );
   }
+  const source = sources.find((each) => each.id === location.source.id);
   return (
     <EmbedStory
       location={location}
       view={parseView(params.toString(), catalogue)}
-      // whoever embeds the story writes its address, as whoever shares a link does: the same rule applies
-      panelArgs={addressArgsFor(parsePanelArgsParam(params.get("args")), addressTexts)}
+      panelArgs={panelArgs}
+      loadDocs={source === undefined ? undefined : sourceFiles(source).docs[location.story.file]}
+      namedValues={source?.namedValues}
       frameUrl={frameUrl}
     />
   );

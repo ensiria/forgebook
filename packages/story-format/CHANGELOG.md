@@ -1,3 +1,7 @@
+## 0.2.4 (2026-11-06)
+
+This was a version bump only for @forgebook/story-format to align it with other projects, there were no code changes.
+
 ## 0.2.3 (2026-11-05)
 
 This was a version bump only for @forgebook/story-format to align it with other projects, there were no code changes.

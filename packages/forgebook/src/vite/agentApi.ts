@@ -436,7 +436,9 @@ export const isChangedStoriesDocument = (value: unknown): value is ChangedStorie
   isRecord(value) &&
   value["schema"] === 1 &&
   Array.isArray(value["stories"]) &&
-  Array.isArray(value["files"]);
+  Array.isArray(value["files"]) &&
+  Array.isArray(value["uiFiles"]) &&
+  Array.isArray(value["outside"]);
 
 /**
  * Whether a value is the code check's document, as a client receives it over HTTP.

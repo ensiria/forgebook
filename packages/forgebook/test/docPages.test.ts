@@ -401,6 +401,7 @@ describe("agents", () => {
       check: async () => "unused",
       checkPage: async () => "unused",
       shot: async () => "unused",
+      verify: async () => "unused",
       servePreview: async () => "unused",
       plugins: pluginsDocument([])
     });

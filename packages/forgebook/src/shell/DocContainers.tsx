@@ -33,7 +33,8 @@ export const AsideBlock = ({
 }): ReactNode => {
   const id = useId();
   return (
-    <aside className="forgebook-aside" data-tone={tone} aria-labelledby={id}>
+    // a note in the text, never a landmark of the page: a page repeats "Tip", and landmarks must differ by name
+    <aside className="forgebook-aside" role="note" data-tone={tone} aria-labelledby={id}>
       <p id={id} className="forgebook-aside__title">
         {title ?? PAGE_STRINGS.asides[tone]}
       </p>

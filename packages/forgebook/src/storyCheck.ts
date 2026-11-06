@@ -34,6 +34,8 @@ export type StoryProblem = {
 export type StoryCheckStory = {
   /** The story's id. */
   readonly id: string;
+  /** Its file, as the catalogue lists it: what a report names when the story cannot be shown. */
+  readonly file?: string;
   /**
    * The id an earlier rule gave it, when it differs from `id`: a baseline stored under that id is still its baseline
    * until `forgebook shot --update` stores one under its id.
@@ -61,6 +63,8 @@ export type StoryCheckRequest = {
   readonly views: readonly string[];
   /** Check every variant the catalogue's browser tests check instead of the views given. */
   readonly isAllVariants: boolean;
+  /** How many pages to open at once; one by default. */
+  readonly concurrency?: number;
   /** The model that judges what axe cannot see; none leaves the pages on this machine. */
   readonly semantic?: SemanticModel;
 };
