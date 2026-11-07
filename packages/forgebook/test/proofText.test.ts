@@ -153,7 +153,8 @@ describe("the comment the posting job writes", () => {
       { input: JSON.stringify(proof), encoding: "utf8" }
     );
     expect(run.stderr).toBe("");
-    return run.stdout;
+    // jq on Windows ends its lines with CR LF; the posting job runs on Linux
+    return run.stdout.replaceAll("\r\n", "\n");
   };
 
   it("leaves a forged proof no mention, link or image", () => {
