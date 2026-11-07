@@ -56,7 +56,11 @@ export const catalogueConfig = (
   optimizeDeps: {
     include: prebundled(config, packageResolver(config.dir)),
     entries: scannedEntries(config, packageResolver(config.dir), readTextFile),
-    rolldownOptions: scanOptions({ root: config.dir, ...findings })
+    rolldownOptions: scanOptions({
+      root: config.dir,
+      isJsxInScripts: config.framework.compilesJsxInScripts === true,
+      ...findings
+    })
   },
   build: {
     rolldownOptions: {

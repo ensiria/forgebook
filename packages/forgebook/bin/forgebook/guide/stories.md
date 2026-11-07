@@ -5,6 +5,10 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
 - One file per component, beside it: `Badge.tsx` and `Badge.stories.tsx`, in CSF 3 (Storybook's format; Forgebook
   reads it, never MDX or addons). Files with the same title are one component, as in Storybook: each story keeps its
   own file (`file` in `forgebook stories --json`), and the component lists them all (`files`).
+- With React, Preact or Next.js, JSX in `.js` files (stories and components, as a library on Storybook's webpack
+  builder may write them) draws with no configuration: Forgebook compiles the catalogue's own `.js` files that hold
+  JSX, not installed or other workspace packages, and leaves `?raw`, `?url` and `?worker` imports alone. Other
+  frameworks need `.jsx`.
 - Every named export of a story file is a story; leave helpers and data out with the meta's `excludeStories`.
 - The catalogue lists the files its `stories` globs name in `forgebook.config.ts`; a glob that starts with `!` leaves
   files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not

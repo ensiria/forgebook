@@ -130,6 +130,8 @@ export const preact = (): FrameworkAdapter => ({
   // beside this module, with its extension: `.ts` in the sources, `.js` once built for npm
   docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
   pages: { frame: "@forgebook/preact/frame", code: "@forgebook/preact/code" },
+  // the JSX of `.js` files compiles with Preact's import source, which this adapter gives Vite's compiler
+  compilesJsxInScripts: true,
   // the server render is named too: the page never runs it, but Vite meets its import in the renderer and would reload
   browserDependencies: [
     "preact",
