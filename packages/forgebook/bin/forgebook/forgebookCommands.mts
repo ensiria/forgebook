@@ -10,8 +10,7 @@
  *
  * @module
  */
-import { existsSync, writeFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
 import { formatJson } from "@ensiria/cli-kit/files";
@@ -19,7 +18,6 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 import { build } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
-import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { agentSetupCommands } from "./agentSetupCommands.mts";
@@ -42,7 +40,6 @@ import { graphCommands } from "./graphCommand.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
-import { newStoriesFile } from "./newStoriesFile.ts";
 import { pagesCommands } from "./pagesCommands.mts";
 import { runTokens } from "./tokensRun.ts";
 import { visualCommands } from "./visualCommands.mts";
@@ -286,7 +283,12 @@ await defineCommands({
             "The framework the stories are written for: its package, @forgebook/<name>, reads the props. The catalogue's by default, else react."
         },
         print: { type: "boolean", description: "Print the file instead of writing it." },
-        force: { type: "boolean", description: "Replace a stories file that exists." }
+        force: { type: "boolean", description: "Replace a stories file that exists." },
+        repair: {
+          type: "boolean",
+          description:
+            "Draw the stories in a browser, and draw them inside the components their errors name (a provider), at most twice. It serves the catalogue for the run, which runs the project's Vite configuration and the stories' code, as check does. JSX frameworks only."
+        }
       },
       positionals: [{ name: "file", description: "The component's file.", required: true }],
       examples: [
@@ -294,25 +296,22 @@ await defineCommands({
         {
           command: `${COMMAND} new src/menu.tsx --export Menu --print`,
           description: "One of several, printed."
+        },
+        {
+          command: `${COMMAND} new src/Sidebar.tsx --repair`,
+          description: "Drawn, and given the providers it needs."
         }
       ],
       run: async ({ args, options, io, log, isJson }): Promise<void> => {
-        const written = await newStoriesFile(resolve(args.file), options.export, options.framework);
-        if (options.print) {
-          io.stdout.write(written.text);
+        // the repair round reads programs with the compiler: loaded when the command runs, not when the CLI starts
+        const { runNew } = await import("./newRepairRun.ts");
+        const outcome = await runNew(resolve(args.file), options);
+        if (outcome.printed !== undefined) {
+          io.stdout.write(outcome.printed);
           return;
         }
-        const shown = relative(process.cwd(), written.file);
-        if (existsSync(written.file) && options.force !== true)
-          throw new ScriptError(`${shown} exists`, {
-            hint: "Give --force to replace it, or --print to see it"
-          });
-        writeFileSync(written.file, written.text);
-        if (isJson) io.stdout.write(formatJson({ schema: 1, file: VITE_PATHS.normalize(shown) }));
-        log.success(`${shown} written`);
-        log.info(
-          `${COMMAND} stories --component ${written.text.match(/title: "([^"]*)"/)?.[1] ?? ""} lists them`
-        );
+        if (isJson) io.stdout.write(formatJson(outcome.document));
+        for (const [tone, line] of outcome.lines) log[tone](line);
       }
     }),
     ...agentLoopCommands(forgebook),

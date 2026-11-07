@@ -247,7 +247,7 @@ export const catalogueTools = ({
   {
     name: "new_stories",
     description:
-      "Write a component's first stories from its typed props (the main story with its required props, one story per value of its first choice prop, the worst case) and answer the file's text and where it would go; writes nothing.",
+      "Write a component's first stories from its typed props (the main story with its required props, one story per value of its first choice prop, the worst case) and answer the file's text and where it would go; writes nothing, so it does not draw them: forgebook new <file> --repair writes and draws them, inside the providers their errors name.",
     inputSchema: {
       type: "object",
       properties: {
