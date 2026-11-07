@@ -73,6 +73,17 @@ describe("a corpus's definition", () => {
     expect(corpusProblems({ ...VALID, edits }).join()).toContain("{edit}");
   });
 
+  it("takes the stories that fail in Storybook too, each with its id and why", () => {
+    const failsInStorybook = [{ story: "stories:a--c", reason: "throws there too" }];
+    expect(corpusProblems({ ...VALID, failsInStorybook })).toEqual([]);
+    expect(corpusProblems({ ...VALID, failsInStorybook: [{ story: "stories:a--c" }] })).toEqual([
+      "failsInStorybook[0].reason is missing"
+    ]);
+    expect(corpusProblems({ ...VALID, failsInStorybook: "stories:a--c" })).toEqual([
+      "corpus.failsInStorybook must be a list"
+    ]);
+  });
+
   it("names every problem of a file at once", () => {
     expect(() => parseCorpus("{}", "corpus.json")).toThrow(/corpus\.name.*corpus\.commit/);
   });
