@@ -138,12 +138,6 @@ const shellStrings = {
   unknownComponent: (id: string): string =>
     `No component "${id}": it may have been renamed. Pick one in the sidebar.`,
   props: "Props",
-  propGroups: {
-    choice: "Choices",
-    text: "Text and numbers",
-    structured: "Objects and lists",
-    toggle: "Toggles"
-  },
   otherProps: "Other props",
   unset: "—",
   unsetProp: (prop: string): string => `${prop}: leave without a value`,
