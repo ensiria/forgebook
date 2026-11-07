@@ -46,6 +46,7 @@ const configIn = (dir: string, tokens: readonly string[]): ResolvedConfig => ({
   home: undefined,
   frames: ISOLATED_FRAMES,
   build: { readableNames: false },
+  refs: [],
   appBuild: resolvedAppBuild(false)
 });
 

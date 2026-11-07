@@ -7,8 +7,9 @@
  * one's `SHELL_PORT + 2` and `SHELL_PORT + 3`, and so on. Pairs cannot overlap however many catalogues there are, so a
  * new catalogue is a name added at the end, with no offset to choose and none of the others moved. The frames take the
  * port after their catalogue's, the one `forgebook dev` gives them when none is set, so a catalogue started by hand
- * with the same `--port` serves its frames where the tests expect them. Two worktrees run the tests at once with
- * `FORGEBOOK_SHELL_PORT`s at least twice the number of catalogues apart.
+ * with the same `--port` serves its frames where the tests expect them. The port after every pair is the static host of
+ * a built catalogue another one composes (`REF_HOST_PORT`). Two worktrees run the tests at once with
+ * `FORGEBOOK_SHELL_PORT`s at least twice the number of catalogues, plus one, apart.
  *
  * @module
  */
@@ -36,7 +37,8 @@ export const CATALOGUES = [
   "react-native",
   "generated-home",
   "parity",
-  "themes"
+  "themes",
+  "refs"
 ] as const;
 
 /** A catalogue the suite runs. */
@@ -55,6 +57,12 @@ export const portOf = (catalogue: Catalogue): number => SHELL_PORT + 2 * CATALOG
  * @param catalogue - the catalogue.
  */
 export const framesPortOf = (catalogue: Catalogue): number => portOf(catalogue) + 1;
+
+/**
+ * The port of the static host that serves a built catalogue, for the catalogue that composes it (`refs.e2e.ts`): the
+ * one after every catalogue's pair, so no catalogue's port moves.
+ */
+export const REF_HOST_PORT = SHELL_PORT + 2 * CATALOGUES.length;
 
 /**
  * The address of a catalogue's page.

@@ -41,6 +41,7 @@ import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
 import { realFolder } from "./realFolder.ts";
+import { type ResolvedRefs, refsProblem, resolvedRefs } from "./refsConfig.ts";
 import { filesProblem } from "./storyPatterns.ts";
 import { switchValuesProblem, withAbsoluteValueFiles } from "./switchValuesCheck.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
@@ -129,6 +130,8 @@ export type ResolvedConfig = {
   readonly plugins: readonly ForgebookPlugin[];
   /** Where the stories' frames run. */
   readonly frames: ResolvedFrames;
+  /** The catalogues shown in the sidebar after this one's stories, in the configuration's order. */
+  readonly refs: ResolvedRefs;
   /** How `forgebook build` writes the catalogue, every option given its default. */
   readonly build: Required<BuildOptions>;
   /** How much of the app's own build its stories are drawn with. */
@@ -322,7 +325,7 @@ const configProblem = (config: unknown): string | undefined => {
     typeof config.home !== "string"
   )
     return 'its home is neither a path (`home: "docs/home.md"`) nor false';
-  return filesProblem(config) ?? placementProblem(config);
+  return filesProblem(config) ?? placementProblem(config) ?? refsProblem(config);
 };
 
 /**
@@ -573,6 +576,7 @@ export const resolveConfig = (
     hasPlayTools: hasPlayToolsIn(dir),
     plugins,
     frames: resolvedFrames(config.frames),
+    refs: resolvedRefs(config.refs),
     build: { readableNames: config.build?.readableNames === true },
     appBuild: resolvedAppBuild(config.appBuild)
   };

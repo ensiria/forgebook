@@ -185,7 +185,8 @@
         "packages/**",
         "tools/**",
         "fixtures/app/src/vite.config.ts",
-        "fixtures/app/forgebook.generated.config.ts"
+        "fixtures/app/forgebook.generated.config.ts",
+        "fixtures/app/refs/forgebook.config.ts"
       ],
       "linter": {
         "rules": {

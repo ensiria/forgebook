@@ -130,7 +130,8 @@ const RESERVED_IDS: readonly string[] = [
   "args",
   "matrix",
   "clock",
-  "audience"
+  "audience",
+  "ref"
 ];
 
 /**

@@ -60,6 +60,7 @@ const kitConfig = (lists: ResolvedConfig["lists"]): ResolvedConfig => ({
   hasPlayTools: false,
   frames: ISOLATED_FRAMES,
   build: { readableNames: false },
+  refs: [],
   appBuild: resolvedAppBuild(false)
 });
 

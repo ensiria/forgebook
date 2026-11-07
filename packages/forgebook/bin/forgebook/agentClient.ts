@@ -17,7 +17,8 @@ import { resolve } from "node:path";
 
 import { createServer, type ViteDevServer } from "vite";
 
-import { AGENT_INDEX_FILE, indexAnswer, isAgentIndex } from "../../src/vite/agentIndex.ts";
+import { AGENT_INDEX_FILE } from "../../src/agentIndexFile.ts";
+import { indexAnswer, isAgentIndex } from "../../src/vite/agentIndex.ts";
 import {
   AGENT_API,
   type AgentAnswer,

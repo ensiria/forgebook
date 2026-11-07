@@ -6,7 +6,8 @@
  * component by its
  * name, its place, its meta's search words or its stories' names and descriptions. A component listed in other places too (`alsoIn`) has an
  * alias entry in each, beside the components that live there, which says where it lives and opens its page. Docs pages
- * come first, in a section of their own (`SidebarDocs.tsx`).
+ * come first, in a section of their own (`SidebarDocs.tsx`); other catalogues composed with `refs` come last
+ * (`SidebarRefs.tsx`).
  *
  * @module
  */
@@ -119,6 +120,8 @@ export type SidebarProps = SidebarPageLinks & {
   readonly appearance: AppearanceState;
   /** Opens the list of the shell's keys. */
   readonly onShowKeys: () => void;
+  /** What is listed after this catalogue's stories when no search or tag narrows them: the composed catalogues. */
+  readonly composed: ReactNode;
 };
 
 /** A family's key, unique across sources. */
@@ -387,6 +390,7 @@ export const Sidebar = ({
   onShow,
   appearance,
   onShowKeys,
+  composed,
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
@@ -480,6 +484,8 @@ export const Sidebar = ({
             links={links}
           />
         ))}
+        {/* the search and the tag filter read this catalogue only: another's list is not fetched to search it */}
+        {isNarrowed ? null : composed}
       </nav>
       <AppearanceMenu {...appearance} onShowKeys={onShowKeys} />
       {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}

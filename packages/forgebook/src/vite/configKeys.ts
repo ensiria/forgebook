@@ -9,7 +9,7 @@
  * to a type without being added here does not compile.
  *
  * The objects read here by key (`build`, `appBuild`, `shell`, `a11y`, `backgrounds`, `widthRange`, `controls`) are checked one level
- * down. `tabs` is not, since a plugin adds to its names; a device's fields have their own check (`configFile.ts`), and a
+ * down, and each of `refs` by its id. `tabs` is not, since a plugin adds to its names; a device's fields have their own check (`configFile.ts`), and a
  * theme's values theirs (`shellTheme.ts`).
  *
  * @module
@@ -19,7 +19,7 @@ import { didYouMean } from "@ensiria/cli-kit/suggest";
 import { type CatalogueLists, OWN_CONTROL_IDS, type TurnedOffControl } from "../catalogue.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { AppBuildOption } from "./appBuildOption.ts";
-import type { BuildOptions, ForgebookConfig, ForgebookPreset } from "./config.ts";
+import type { BuildOptions, ForgebookConfig, ForgebookPreset, RefOption } from "./config.ts";
 
 /** A type's keys, as a record so that the compiler keeps it complete. */
 type KeysOf<TType> = Readonly<Record<keyof Required<TType>, true>>;
@@ -75,7 +75,8 @@ const CONFIG_KEYS: KeysOf<ForgebookConfig> = {
   plugins: true,
   frames: true,
   build: true,
-  appBuild: true
+  appBuild: true,
+  refs: true
 };
 
 /** A preset's keys. */
@@ -100,6 +101,8 @@ const APP_BUILD_KEYS: KeysOf<Exclude<AppBuildOption, false>> = {
 };
 
 const SHELL_KEYS: KeysOf<ShellOptions> = { theme: true, css: true, branding: true };
+
+const REF_KEYS: KeysOf<RefOption> = { title: true, url: true };
 
 const A11Y_KEYS: KeysOf<Exclude<NonNullable<CatalogueLists["a11y"]>, false>> = {
   tags: true,
@@ -139,6 +142,22 @@ const unknownKeys = (value: object, known: readonly string[], prefix: string): s
       return `it has no key "${prefix}${key}". ${named === "" ? `It takes ${known.join(", ")}.` : named}`;
     });
 
+/** Whether a value is an object that is not a list. */
+const isObject = (value: unknown): value is object =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * What to say of the keys of each composed catalogue, which `refs` holds by id.
+ *
+ * @param refs - the configuration's `refs`.
+ */
+const refsKeysProblems = (refs: unknown): string[] =>
+  isObject(refs)
+    ? Object.entries(refs).flatMap(([id, ref]: [string, unknown]) =>
+        isObject(ref) ? unknownKeys(ref, Object.keys(REF_KEYS), `refs.${id}.`) : []
+      )
+    : [];
+
 /**
  * What to say of the keys of a configuration or a preset, one level down included.
  *
@@ -149,10 +168,9 @@ const keysProblems = (value: object, known: readonly string[]): string[] => [
   ...unknownKeys(value, known, ""),
   ...Object.entries(NESTED_KEYS).flatMap(([key, keys]) => {
     const nested: unknown = Reflect.get(value, key);
-    return typeof nested === "object" && nested !== null && !Array.isArray(nested)
-      ? unknownKeys(nested, keys, `${key}.`)
-      : [];
-  })
+    return isObject(nested) ? unknownKeys(nested, keys, `${key}.`) : [];
+  }),
+  ...refsKeysProblems(Reflect.get(value, "refs"))
 ];
 
 /**

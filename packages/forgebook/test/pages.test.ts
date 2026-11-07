@@ -53,6 +53,7 @@ const CONFIG: ResolvedConfig = {
   plugins: [],
   frames: ISOLATED_FRAMES,
   build: { readableNames: false },
+  refs: [],
   appBuild: resolvedAppBuild(false)
 };
 
@@ -117,6 +118,24 @@ describe("the generated pages", () => {
     );
     expect(source).toContain("  docs: [docs],");
     expect(storiesSourceModule(CONFIG)).not.toContain("docs:");
+  });
+
+  it("hands the shell the composed catalogues and the way to their code only when there are some", () => {
+    expect(shellEntry(CONFIG)).not.toContain("refs");
+    const entry = shellEntry({
+      ...CONFIG,
+      refs: [{ id: "ds", title: "</script>", url: "https://ds.example.com/" }]
+    });
+    expect(entry).toContain(
+      'catalogues: [{"id":"ds","title":"\\u003c\\u002fscript\\u003e","url":"https:\\u002f\\u002fds.example.com\\u002f"}],'
+    );
+    expect(entry).toContain(
+      `load: () => import(${codeLiteral("forgebook/shell/refs")}).then((module) => module.RefPart)`
+    );
+    // loaded on first use: no static import, so a catalogue's first load carries none of it
+    expect(entry.split("\n").filter((line) => line.startsWith("import ") && line.includes("refs"))).toEqual(
+      []
+    );
   });
 
   it("hands the shell how the framework's stories take an address's texts, when it says", () => {

@@ -86,6 +86,7 @@ describe("a dev server's two ports", () => {
       hasPlayTools: false,
       frames: ISOLATED_FRAMES,
       build: { readableNames: false },
+      refs: [],
       appBuild: resolvedAppBuild(false)
     };
     server = await createServer({
