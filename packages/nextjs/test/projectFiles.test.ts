@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { imageSize } from "../src/vite/imageSize.ts";
 import { loadNextConfig, nextConfigFile, readNextConfig } from "../src/vite/nextConfig.ts";
 import { imageSettings, pageScript, sassPreprocessorOptions } from "../src/vite/nextPlugin.ts";
-import { configuredPlugins, postcssConfigFile, watchedFiles } from "../src/vite/postcss.ts";
+import { configuredPlugins, postcssConfigFile, watchedFiles } from "forgebook/vite/project-postcss";
 
 /** The Next.js fixture app. */
 const FIXTURE = join(import.meta.dirname, "..", "..", "..", "fixtures", "nextjs");

@@ -82,10 +82,14 @@ await defineCommands({
           options["readable-names"]
         );
         const outDir = resolve(config.dir, options.out ?? "dist");
-        const vite = await catalogueVite(config, {
-          ...(options.base === undefined ? {} : { base: options.base }),
-          build: { outDir }
-        });
+        const vite = await catalogueVite(
+          config,
+          {
+            ...(options.base === undefined ? {} : { base: options.base }),
+            build: { outDir }
+          },
+          "build"
+        );
         try {
           await build(vite);
         } catch (error) {

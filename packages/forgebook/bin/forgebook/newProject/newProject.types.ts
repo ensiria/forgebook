@@ -4,6 +4,8 @@
  *
  * @module
  */
+
+import type { AppBuildPlan } from "../appBuild/appBuild.ts";
 import type { ImportedFramework } from "../importers/storybookFrameworks.ts";
 
 /** The way a catalogue's files were made: from the project's dependencies, or from its Storybook. */
@@ -19,8 +21,6 @@ export type NextStepKind =
   | "portal"
   | "head"
   | "font"
-  | "alias"
-  | "vite-plugin"
   | "postcss"
   | "setup"
   | "version"
@@ -84,6 +84,8 @@ export type InitDocument = {
   readonly stories: readonly string[];
   /** What the configuration needs installed. */
   readonly install: InitInstall;
+  /** What the catalogue will read of the app's build when it starts; `init` itself runs none of it. */
+  readonly appBuild: AppBuildPlan;
   /** What was left to do, each named. */
   readonly nextSteps: readonly NextStep[];
   /** The commands to run next, in order. */

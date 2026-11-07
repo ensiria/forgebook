@@ -34,12 +34,13 @@ import {
 import { CONTROLS } from "../storyArgTypes.ts";
 import { catalogueSwitches, switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
+import { appBuildProblem, type ResolvedAppBuild, resolvedAppBuild } from "./appBuildOption.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
 import { unknownKeysProblem } from "./configKeys.ts";
 import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
-import { patternsProblem, unmatchedPatterns } from "./storyPatterns.ts";
+import { filesProblem, unmatchedPatterns } from "./storyPatterns.ts";
 import { switchValuesProblem, withAbsoluteValueFiles } from "./switchValuesCheck.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
@@ -127,6 +128,8 @@ export type ResolvedConfig = {
   readonly frames: ResolvedFrames;
   /** How `forgebook build` writes the catalogue, every option given its default. */
   readonly build: Required<BuildOptions>;
+  /** How much of the app's own build its stories are drawn with. */
+  readonly appBuild: ResolvedAppBuild;
 };
 
 /** The packages of the play tools: both installed, or the plays get neither. */
@@ -255,24 +258,10 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   };
 };
 
-/** Whether a configuration's list has something in it. */
-const isListed = (config: object, key: string): boolean => {
-  const list: unknown = Reflect.get(config, key);
-  return Array.isArray(list) && list.length > 0;
-};
-
-/**
- * Why a configuration's list of globs lists nothing by construction (only `!` patterns), or none.
- *
- * @param config - what the file exports by default.
- * @param key - the list's key.
- */
-const globsProblem = (config: object, key: string): string | undefined => {
-  const list: unknown = Reflect.get(config, key);
-  return Array.isArray(list)
-    ? patternsProblem(list.filter((item: unknown): item is string => typeof item === "string"))
-    : undefined;
-};
+/** Why where its frames run or what it reads of the app's build cannot be used, or none. */
+const placementProblem = (config: object): string | undefined =>
+  framesProblem("frames" in config ? config.frames : undefined) ??
+  appBuildProblem("appBuild" in config ? config.appBuild : undefined);
 
 /**
  * Why a loaded configuration cannot be used, or none.
@@ -295,13 +284,7 @@ const configProblem = (config: unknown): string | undefined => {
     typeof config.home !== "string"
   )
     return 'its home is neither a path (`home: "docs/home.md"`) nor false';
-  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
-    return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
-  for (const key of ["stories", "docs"]) {
-    const problem = globsProblem(config, key);
-    if (problem !== undefined) return `its ${key} list nothing: ${problem}`;
-  }
-  return framesProblem("frames" in config ? config.frames : undefined);
+  return filesProblem(config) ?? placementProblem(config);
 };
 
 /**
@@ -590,7 +573,8 @@ export const resolveConfig = (
     hasPlayTools: hasPlayToolsIn(dir),
     plugins,
     frames: resolvedFrames(config.frames),
-    build: { readableNames: config.build?.readableNames === true }
+    build: { readableNames: config.build?.readableNames === true },
+    appBuild: resolvedAppBuild(config.appBuild)
   };
 };
 

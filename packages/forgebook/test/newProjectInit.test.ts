@@ -134,25 +134,15 @@ describe("forgebook init in a new project", () => {
       "postcss.config.js": "export default {};\n"
     });
     const { document } = initJson(dir);
-    expect(stepKinds(document)).toEqual([
-      "style-sheet",
-      "provider",
-      "portal",
-      "head",
-      "vite-plugin",
-      "alias",
-      "alias",
-      "postcss"
-    ]);
+    expect(stepKinds(document)).toEqual(["style-sheet", "provider", "portal", "head"]);
+    expect(document["appBuild"]).toEqual({
+      viteConfig: "vite.config.ts",
+      tsconfigPaths: true,
+      postcss: "postcss.config.js",
+      runsCode: ["vite.config.ts", "postcss.config.js"]
+    });
     const text = JSON.stringify(document["nextSteps"]);
-    for (const name of [
-      "~/theme.css",
-      "QueryProvider",
-      "#modal-root",
-      "fonts.example",
-      "@tailwindcss/vite",
-      "@/*"
-    ])
+    for (const name of ["~/theme.css", "QueryProvider", "#modal-root", "fonts.example"])
       expect(text).toContain(name);
     expect(text).not.toContain("StrictMode");
     expect(text).not.toContain("@vitejs/plugin-react");
