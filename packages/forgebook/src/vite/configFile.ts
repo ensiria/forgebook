@@ -17,7 +17,6 @@ import { pathToFileURL } from "node:url";
 
 import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
-import type { Logger } from "vite";
 
 import { AUDIENCE_IDS } from "../audiences.ts";
 import { type CatalogueLists, catalogueSettings, type TurnedOffControl } from "../catalogue.ts";
@@ -40,7 +39,7 @@ import { saysNoTokens, unknownKeysProblem } from "./configKeys.ts";
 import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
-import { filesProblem, unmatchedPatterns } from "./storyPatterns.ts";
+import { filesProblem } from "./storyPatterns.ts";
 import { switchValuesProblem, withAbsoluteValueFiles } from "./switchValuesCheck.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
@@ -425,46 +424,6 @@ const checkSettings = (
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`${resolve(dir, "forgebook.config")}: ${message}`);
   }
-};
-
-/**
- * The patterns of a catalogue's own stories that match no story file, each of them a mistake or a first story not yet
- * written: a `forgebook build` stops on them, a dev server says so and waits. A source's patterns are its own module's,
- * which only Vite can read.
- *
- * @param config - the catalogue's folder and stories.
- */
-export const emptyStoryGlobs = (config: Pick<ResolvedConfig, "dir" | "stories">): readonly string[] =>
-  unmatchedPatterns(config.dir, config.stories);
-
-/**
- * What to say of the patterns of `emptyStoryGlobs`.
- *
- * @param globs - the patterns, at least one.
- */
-export const emptyStoryGlobsMessage = (globs: readonly string[]): string =>
-  `No story file matches ${globs.map((glob) => `"${glob}"`).join(", ")} (\`stories\` in the configuration)`;
-
-/**
- * Says what the plugin has to say of the patterns of `emptyStoryGlobs`.
- *
- * @param config - the catalogue's folder and stories.
- * @param isServing - whether a dev server runs: whoever runs one may be about to write the first story, while a build's
- *   reader would find nothing.
- * @param logger - where a dev server's warning goes.
- * @throws in a build, when a pattern matches nothing.
- */
-export const sayEmptyStoryGlobs = (
-  config: Pick<ResolvedConfig, "dir" | "stories">,
-  isServing: boolean,
-  logger: Pick<Logger, "warn">
-): void => {
-  const globs = emptyStoryGlobs(config);
-  if (globs.length === 0) return;
-  if (!isServing) throw new Error(emptyStoryGlobsMessage(globs));
-  logger.warn(
-    `Forgebook: ${emptyStoryGlobsMessage(globs)}. The catalogue shows them as soon as a file does.`
-  );
 };
 
 /** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */

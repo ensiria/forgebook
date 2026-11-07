@@ -1,0 +1,50 @@
+/**
+ * The patterns of a catalogue's own stories that match no story file, and what the plugin, the commands and the agent API
+ * say of them.
+ *
+ * @module
+ */
+import type { Logger } from "vite";
+
+import type { ResolvedConfig } from "./configFile.ts";
+import { unmatchedPatterns } from "./storyPatterns.ts";
+
+/**
+ * The patterns of a catalogue's own stories that match no story file, each of them a mistake or a first story not yet
+ * written: a `forgebook build` stops on them, a dev server says so and waits. A source's patterns are its own module's,
+ * which only Vite can read.
+ *
+ * @param config - the catalogue's folder and stories.
+ */
+export const emptyStoryGlobs = (config: Pick<ResolvedConfig, "dir" | "stories">): readonly string[] =>
+  unmatchedPatterns(config.dir, config.stories);
+
+/**
+ * What to say of the patterns of `emptyStoryGlobs`.
+ *
+ * @param globs - the patterns, at least one.
+ */
+export const emptyStoryGlobsMessage = (globs: readonly string[]): string =>
+  `No story file matches ${globs.map((glob) => `"${glob}"`).join(", ")} (\`stories\` in the configuration)`;
+
+/**
+ * Says what the plugin has to say of the patterns of `emptyStoryGlobs`.
+ *
+ * @param config - the catalogue's folder and stories.
+ * @param isServing - whether a dev server runs: whoever runs one may be about to write the first story, while a build's
+ *   reader would find nothing.
+ * @param logger - where a dev server's warning goes.
+ * @throws in a build, when a pattern matches nothing.
+ */
+export const sayEmptyStoryGlobs = (
+  config: Pick<ResolvedConfig, "dir" | "stories">,
+  isServing: boolean,
+  logger: Pick<Logger, "warn">
+): void => {
+  const globs = emptyStoryGlobs(config);
+  if (globs.length === 0) return;
+  if (!isServing) throw new Error(emptyStoryGlobsMessage(globs));
+  logger.warn(
+    `Forgebook: ${emptyStoryGlobsMessage(globs)}. The catalogue shows them as soon as a file does.`
+  );
+};
