@@ -52,7 +52,8 @@ export const catalogueVite = async (
     configFile: false,
     plugins: [
       forgebookPlugin({ config }),
-      ...((await config.framework.vitePlugins?.()) ?? []),
+      ...((await config.framework.vitePlugins?.({ readsAppBuild: config.appBuild.viteConfig !== false })) ??
+        []),
       ...app.plugins,
       ...(overrides.plugins ?? []),
       // the server loads the stories and previews for tools: it resolves them as the pages do

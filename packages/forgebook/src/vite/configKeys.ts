@@ -41,6 +41,7 @@ const LIST_KEYS: KeysOf<CatalogueLists> = {
   controls: true,
   toolbar: true,
   usedIn: true,
+  play: true,
   componentDocs: true,
   audience: true,
   appearance: true,

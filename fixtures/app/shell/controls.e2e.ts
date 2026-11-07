@@ -312,3 +312,18 @@ test.describe("the panel's controls for values of any shape", () => {
     expect(requests.filter((url) => /valueEditors|shapeValues/.test(url))).toEqual([]);
   });
 });
+
+test.describe("the panel's order", () => {
+  test("lists the props as the source declares them, whatever their control", async ({ page }) => {
+    await page.goto("/?story=sb:components-button--primary&tab=props");
+    const tab = page.locator(".forgebook-tab-props");
+    await tab.getByRole("switch", { name: "Required first" }).uncheck();
+    // a text, two choices, a text: grouped by control, the choices would lead
+    await expect(tab.locator(".forgebook-prop__name")).toHaveText([
+      "label*",
+      "variant",
+      "size",
+      "backgroundColor"
+    ]);
+  });
+});

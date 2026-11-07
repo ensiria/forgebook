@@ -66,9 +66,9 @@ export const usePageFrames = ({
 }: PageFramesInput): PageFrames => {
   // each story's own args, as its frame reports them: the code of a story drawn from its args is written from them
   const [storyArgs, setStoryArgs] = useState<ReadonlyMap<string, PanelArgs>>(new Map());
-  // the frames keep the view they loaded with; only the style sheets load them again, the rest of the view (the
+  // the frames keep the view they loaded with; only the style sheets and the play switch load them again, the rest of the view (the
   // switches, the language among them) is sent to them live
-  const frameView = useLoadedView(view.sheets, view);
+  const frameView = useLoadedView(`${view.sheets}|${view.play}`, view);
   const catalogue = useCatalogue();
   // each story meant for a phone (marked so, or shown in a device touched with a finger) with its own finger: its frame
   // gets it in place of the toolbar's Touch

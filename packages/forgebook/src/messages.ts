@@ -182,6 +182,9 @@ export type FrameMessage =
       readonly tab: string | null;
     };
 
+/** What the Interactions tab asks of a play: to run again, to step through from the start, to do its next action, to run on. */
+export type PlayStepCommand = "again" | "start" | "next" | "continue";
+
 /** From the shell to a frame. */
 export type ShellMessage =
   | {
@@ -214,7 +217,10 @@ export type ShellMessage =
     }
   | {
       /** Mount the story again, so its play function runs again. */
-      readonly type: "forgebook:play-again";
+      /** Runs the play again on a fresh mount, or steps through it. */
+      readonly type: "forgebook:play-step";
+      /** What to do. */
+      readonly command: PlayStepCommand;
     }
   | {
       /** Run the accessibility check on the story as it is now. */

@@ -95,6 +95,30 @@ const popover =
 const STATES: readonly ShellState[] = [
   { name: "home", open: pageWith("/", (page) => page.locator(".forgebook-home__families").last()) },
   {
+    name: "play stepped through",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/?story=sb:storybook-play--with-context&tab=play");
+      await page.getByRole("button", { name: "Step through" }).click();
+      await page.getByRole("button", { name: "Continue" }).waitFor();
+    }
+  },
+  {
+    name: "list of keys",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/");
+      await page.locator("body").press("?");
+      await page.getByRole("dialog", { name: "Keyboard keys" }).waitFor();
+    }
+  },
+  {
+    name: "tag filter",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/?tag=beta&tag=%21wip");
+      await page.getByRole("button", { name: /^Filter by tag/ }).click();
+      await page.getByRole("dialog", { name: "Tags" }).getByRole("checkbox").first().waitFor();
+    }
+  },
+  {
     name: "component page",
     open: pageWith("/?component=kit:inputs-selection-select", (page) =>
       page.locator(".forgebook-api__subcomponent").first()
