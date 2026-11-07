@@ -118,7 +118,7 @@ export const newStories = (input: NewStoriesInput): string => {
     return [];
   });
   const worstArgs = [...args.filter(([prop]) => !worst.some(([each]) => each === prop)), ...worst];
-  return [
+  const parts = [
     "/**",
     ` * The stories of ${name}, written by \`forgebook new\` from its props: complete them by hand.`,
     " *",
@@ -138,7 +138,6 @@ export const newStories = (input: NewStoriesInput): string => {
       worstArgs,
       '{ group: "worst-case" }'
     )
-  ]
-    .join("\n")
-    .replace(/\n+$/, "\n");
+  ];
+  return `${parts.join("\n").trimEnd()}\n`;
 };

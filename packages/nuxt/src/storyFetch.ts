@@ -66,6 +66,17 @@ export type StoryFetch = <TResult = unknown>(
 ) => Promise<TResult>;
 
 /**
+ * An address without its trailing slashes. A loop, as a pattern anchored at the end backtracks on a long run of slashes.
+ *
+ * @param address - the address.
+ */
+const withoutTrailingSlashes = (address: string): string => {
+  let end = address.length;
+  while (end > 0 && address[end - 1] === "/") end -= 1;
+  return address.slice(0, end);
+};
+
+/**
  * An address with its base and query: a relative one resolved against the base, as ofetch does.
  *
  * @param address - the address.
@@ -74,7 +85,7 @@ export type StoryFetch = <TResult = unknown>(
  */
 export const fetchAddress = (address: string, baseURL: string, query: FetchQuery): string => {
   const isAbsolute = /^[a-z][a-z\d+.-]*:/i.test(address) || address.startsWith("//");
-  const joined = isAbsolute ? address : `${baseURL.replace(/\/+$/, "")}/${address.replace(/^\/+/, "")}`;
+  const joined = isAbsolute ? address : `${withoutTrailingSlashes(baseURL)}/${address.replace(/^\/+/, "")}`;
   return withSearch(joined, query);
 };
 
