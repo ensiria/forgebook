@@ -160,4 +160,10 @@ export type BenchReport = {
   readonly tools: Readonly<Partial<Record<ToolName, ToolResult>>>;
   /** What became of every story, with the `sweep` group. */
   readonly sweep?: SweepResult;
+  /**
+   * What went wrong, one line each, empty for a clean run: a metric that failed, a time that did not reproduce, a limit
+   * passed, stories not listed or not drawn. The command exits non-zero when it holds any. Absent from a report written
+   * before the bench listed them, and from the report `runBench` returns, before the checks.
+   */
+  readonly problems?: readonly string[];
 };

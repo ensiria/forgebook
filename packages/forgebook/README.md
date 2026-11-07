@@ -143,7 +143,8 @@ export default defineConfig({
 
 A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
 says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
-Sass file goes through its own compiler alone.
+Sass file goes through its own compiler alone. When a framework plugin or the app's `vite.config` sets
+`css.transformer: "postcss"`, Vite runs the project's PostCSS itself and the catalogue does not run it a second time.
 
 ## A first catalogue
 
@@ -270,6 +271,14 @@ too, with a warning.
   the fields its type declares; anything else (`onclick`, `innerHTML`, a text for a number) is left out and listed above
   the story, with a button that removes it from the address, as is one that cannot be read at all. A value that is code
   never comes from a link.
+- **Code as you wrote it**: the Code tab and Show code give a story's `render` as written in its file (its own, else
+  the meta's; one kept in a constant or a function of the file shows as that code), with its hooks and compound
+  components as they are. A story drawn from its args shows its component with each arg the file writes as code
+  (`onClick: fn()`, `icon: <IconStar />`, a constant of the file) as written, spreads of the file's objects and of
+  another story's args followed, and the plain values as they are now. A value set in the Props tab is written from
+  that value. `forgebook story --json` gives the same text as `code`. Vue and Svelte bind such an arg as written
+  (`:on-close="fn()"`); Angular, HTML and Web Components still write the plain values only. A story made by a
+  helper, imported from another file or written in CSF 4 (`meta.story(…)`) is written from its values.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break, every number a huge one and every list many items, nested ones too, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
@@ -605,6 +614,33 @@ export type FinderProps = {
   level, and only once unfolded, so large text types cost the page nothing until read.
 - With `eslint-plugin-tsdoc`, declare the tag in your `tsdoc.json`:
   `{ "tagName": "@group", "syntaxKind": "block", "allowMultiple": false }`.
+
+## Props a type cannot list plainly
+
+Some props types say more than a list of props. The API reference reads them as TypeScript does, and says what it
+could not read:
+
+```tsx
+export type ActionProps<TItem> = (
+  | { readonly kind: "link"; readonly href: string }
+  | { readonly kind: "button"; readonly onClick: () => void }
+) & { readonly label: string; readonly items?: readonly TItem[] };
+```
+
+- **A union of variants** lists every variant's props, not only the ones they share. A prop only some variants declare
+  is never marked required, and says when it applies: `href` reads "Only when `kind` is `"link"`". The discriminant is
+  the shared prop each variant gives one literal value (or leaves out), the one with the most values when several do.
+  A prop of a variant that takes the discriminant left out (`mode?: "single"`) says "or left out".
+  A prop the variants type differently shows all their types (`Date | Date[] | DateRange`).
+- **A generic component** writes each type parameter it leaves open as the component's constraint, else its default,
+  else `unknown`, and says which under the prop: `items` is `readonly unknown[]`, "`TItem` is generic, with no
+  constraint". A props type the component fills in (`BaseProps<string>`) is read with what it was given.
+- **A type it cannot read** says so instead of showing nothing: a name the checker cannot find (a missing import), a
+  prop typed `any`, props typed `any`, or a component whose props all come from outside its package (an element's
+  attributes, which the reference leaves out).
+- `forgebook story --json` and `get_story` carry the same as `onlyWhen`, `notes` on a prop and `propsNote` on the
+  component; `forgebook story` writes `href (when kind is link)`, and `CATALOG.md` `href:string[kind=link]` (`[mode?=single]`
+  when it also applies with `mode` left out).
 
 ## Required props first
 
@@ -1230,8 +1266,9 @@ is a state of the component: the same).
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
-| `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case. `--repair` draws them in a browser and, when an error says a story must be drawn inside a component the application exports (`useSidebar must be used within a SidebarProvider`), draws them inside it, at most twice |
+| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change. `--repair` draws them in a browser and, when an error says a story must be drawn inside a component the application exports (`useSidebar must be used within a SidebarProvider`), draws them inside it, at most twice |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
+| `forgebook check <id> --stress` | Draws the story in the states nobody wrote: long text, unbreakable words, huge numbers, empty, right to left, 200 % zoom, narrow, dark, more contrast, and reports what each breaks |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height (framed in a device a view names); with `@forgebook/testing` |
 | `forgebook pages` | Lists the docs pages with their ids and addresses; fails when the index has problems |
@@ -1241,6 +1278,7 @@ is a state of the component: the same).
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
+| `forgebook proof` | Compares a change's states with where it started, both drawn in one run, for a pull request's comment |
 | `forgebook visibility` | Lists the published components an agent cannot see, with the fix for each |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
@@ -1250,7 +1288,7 @@ is a state of the component: the same).
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
 | `forgebook init --agents` | What a project's coding agents need too: `.mcp.json`, instructions and skill, CI, a hook running `verify`; `--browser` installs the testing package and its browser, `--draw` draws a story ([more](#set-a-project-up-in-one-prompt)) |
 | `forgebook hook <assistant>` | What an assistant's hook runs when it is about to finish: `verify` on the change, sending the agent back on red |
-| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; `--with-deps` also installs what it needs of the system |
+| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; it adds that one build and never removes another project's; `--with-deps` also installs what it needs of the system |
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
@@ -1266,8 +1304,19 @@ errors` and their MCP tools. Saving the fix is enough, with no restart: a story 
 is broken, and redraws in place. `forgebook build` and a test run still fail on it: a build ends with
 `src/Bad.stories.tsx:4:45 does not parse: …` and a non-zero exit, and only `--verbose` adds the bundler's stack.
 
-A story that loads but cannot be drawn says why in its frame and in `forgebook check`. A frame's stack gives the lines of
-the code the browser runs, not those of the file; the browser's console maps them.
+A component, or any other of the project's scripts, that does not parse is one problem too, named with its line and
+column on the page, in `forgebook stories`, `forgebook errors` and their MCP tools, before any frame loads it; the
+stories that import it say why in their frame and in `forgebook check`, and the others draw. Saving the fix takes the
+problem away. Neither it nor a story file stops Vite's dependency scan on a first start: the packages it imports are
+still pre-bundled with the others', and `forgebook prebundle` prints one line per such script
+(`The dependency scan skipped src/Broken.tsx:3:24 does not parse: Unexpected token`). What a scan found is kept for
+later starts; a script broken while no server ran is named once it is edited, or by the frames that import it.
+
+A story that loads but cannot be drawn says why in its frame and in `forgebook check`. On the dev server, the stack under
+the reason gives the lines of the files as written: the frame sends it, and the server maps it through the source maps of
+the modules it served, so the frame loads no map. `forgebook errors` and `recent_errors` give the error's `place`, the
+first of those lines outside `node_modules` (`src/Button.stories.tsx:3:11`). A static build's stack keeps the lines of the
+built code.
 
 `forgebook build` names each script it writes by its hash alone (`assets/3f9a1c2b.js`): a catalogue names every story
 file's scripts once per loader, so shorter names make a smaller build. To read what a build holds, name each script after
@@ -1278,9 +1327,10 @@ the configuration:
 export default defineConfig({ /* … */ build: { readableNames: true } });
 ```
 
-A component's docs, a story file's code and a component's page are data, not scripts: a build writes each as a gzipped
-`.bin` file, which the page unpacks when it shows it, or in the story index itself when it is shorter than that file
-(a story file whose stories are all args has no code).
+A component's docs, a story file's code and a component's page are data, not scripts: a build writes them gzipped in
+`.bin` files, neighbouring texts together up to 64 KB of JSON each so they compress as one, which the page unpacks when
+it shows one; a text no longer than its loader goes in the story index itself (a story file whose stories are all args
+has no code).
 
 ## Mocking an API
 
@@ -1336,6 +1386,29 @@ say what a catalogue has.
 
 The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
 
+## The states nobody wrote a story for
+
+`forgebook check <id> --stress` draws a story, then draws it again in each case below, with no story written and nothing
+saved to the project. Each case lists only what it finds that the plain story does not, so a problem the story already
+has is not blamed on the case. `check_story` with `stress: true` does the same for an agent.
+
+| Case | What it gives the story |
+|---|---|
+| `long-text`, `unbreakable`, `empty` | every text prop: a long text, a word with no place to break, nothing |
+| `huge-number` | every number prop: its highest value, or 123,456,789,012 |
+| `rtl` | text in a right-to-left script, drawn right to left |
+| `zoom-200` | the story laid out at half the window's width, as a browser at 200 % lays it out |
+| `narrow` | long text at 320 px |
+| `dark`, `contrast` | the catalogue's dark scheme and more contrast, when it has them |
+
+Values reach the story from a page on the catalogue's origin, as the props panel gives them, since a frame takes no values
+from its address. A case with nothing to set (no text prop, no dark scheme) is in `skipped`, never counted as passed.
+Overlays and focus order are left to `forgebook check`: no case changes them. A text prop that names something rather
+than shows it (an id, a class, an address, an icon's slot) is left alone, and in `empty` a missing accessible name is the
+value's doing and not reported. A frame that does not answer the page (its catalogue set on another origin with
+`frames.origins`) is reported as not judged, never as passed. It exits non-zero when a case adds a problem or cannot be
+judged; `--stress` takes no `--view`, `--all-variants` or `--semantic`.
+
 ## Building on every change
 
 `forgebook build --watch` stays running and builds again when a file the catalogue reads changes, a new story file or
@@ -1384,6 +1457,37 @@ jobs:
 ```
 
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+
+## Proof in the pull request, made by CI
+
+`forgebook proof --base origin/main` draws the states a change touches twice in one run, from the commit it is compared with and
+with the change, and writes `comment.md`, `proof.json`, `index.html` and the pictures. `forgebook proof
+--write-workflow` writes a GitHub workflow that posts that comment, one per pull request, replaced on each push. Nothing runs
+outside GitHub, and the pictures are the run's artefact.
+
+- **No baseline, so nothing for an agent to approve.** The "before" is drawn in this run from where the change left the base (on a pull request's run, the base's tip), in a checkout
+  with its own install and server, and thrown away. `forgebook-baselines` is never read, and `proof` has no `--update`.
+- **What differs is pictured again.** A state that also differs between two pictures of the same code is `unstable`, and its
+  difference proves nothing. `forgebook proof --base HEAD --all` shows whether a project's pictures hold still between two
+  builds of one commit.
+- **It says what it did not check:** what `verify` skipped, UI files no story reaches, stories past `--max-stories`, a state
+  that did not draw, and real pages, which no story shows.
+- **A changed picture is for a person to judge.** The command exits zero once it has a proof, unless `--fail-on-verdict`
+  holds it to `verify`'s verdict, as the workflow does.
+- **It cannot defend against the code it runs.** The branch's code runs in the comparing job, and a `postinstall` before it,
+  so a hostile branch can forge the result or edit the workflow: no baseline can be approved, but a result can be faked. So
+  that job holds no write token and keeps no credential. The posting job runs nothing of the branch, writes the comment
+  itself from `proof.json` with every name in a code span or a fence, and lists from GitHub which files shape the run
+  (`.github/`, `patches/`, `package.json`, lockfiles, `.npmrc`, the catalogue's configuration and preview). The comment says
+  this at its top. Protect `.github/` with code owners if agents push to your repository, and treat `index.html` in a
+  stranger's artefact as any download.
+- **A fork's pull request gets no comment.** GitHub gives its run a read-only token, so posting fails and the job goes on:
+  the proof stays in the run's summary and its artefact. Never run this on `pull_request_target`, which would hand a fork's
+  code a write token.
+- **A picture needs a download.** GitHub cannot show an artefact's picture in a comment, so the comment links the artefact:
+  open `index.html` in it.
+- **A picture with something from the network proves little.** A story loading a random image reads as `unstable`, or as
+  changed when it differs only between the two sides. Mock what a story fetches.
 
 ## Stories on an origin of their own
 
@@ -1676,7 +1780,10 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 `judgements`, apart from the problems, as an opinion: it does not fail the check.
 
 `forgebook check-code` and `check_code` read what a change adds, new files included, from where it left `--since`: a colour
-written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
+written by hand, with the token to use when one clearly fits; a size that equals a token, in a sheet, a class's brackets
+or a React style object, where a bare number is pixels (`style={{ padding: 16 }}`, a `CSSProperties`, `styled.div({ … })`).
+A bare number on a line that does not say its object is a style is only `advice`, since an option has the same keys
+(`fitView({ padding: 16 })`). Then a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
 code to paste. It does not check props, which the type checker does. It exits non-zero on a problem, for CI.
@@ -1775,6 +1882,10 @@ src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Bad
   another catalogue of the repository can answer for. None of these fails. A UI file nothing reaches in a package with no
   catalogue of its own does: it is this catalogue's to show. So does a package whose types point at its build, since
   imports stop there.
+- **Stories written for other props fail.** A story file `forgebook new` wrote says which props it was written for
+  (`// forgebook-props: 1a2b3c4d`). When a change reaches it and the component's props no longer match, `verify` lists the
+  file in `outdated` and fails, since a framework ignores a prop that is gone and never shows one that is new: check the
+  args, then set the line to the signature it names, or write the file again with `forgebook new <component file> --force`, which replaces any edit.
 - **It compares from where the branch left.** `--since <ref>` starts from the merge base, so what the base gained since is
   not read as your change; with no `--since`, from the default branch (`origin/HEAD`, then `main` or `master`), so what you
   committed counts. A branch cut from another, as `develop`, gives it with `--since`. With no `--since`, an empty change

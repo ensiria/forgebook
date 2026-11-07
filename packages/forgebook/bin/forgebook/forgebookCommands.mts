@@ -18,6 +18,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 import { build } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
+import { realFolder } from "../../src/vite/realFolder.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { agentSetupCommands } from "./agentSetupCommands.mts";
@@ -41,6 +42,7 @@ import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { pagesCommands } from "./pagesCommands.mts";
+import { proofCommands } from "./proofCommand.mts";
 import { runTokens } from "./tokensRun.ts";
 import { visualCommands } from "./visualCommands.mts";
 
@@ -92,7 +94,8 @@ await defineCommands({
           await configWithStoriesOf(options.config),
           options["readable-names"]
         );
-        const outDir = resolve(config.dir, options.out ?? "dist");
+        // in the form of Vite's root, which empties an output it sees inside it
+        const outDir = realFolder(resolve(config.dir, options.out ?? "dist"));
         const vite = await catalogueVite(
           config,
           {
@@ -337,6 +340,7 @@ await defineCommands({
     ...graphCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
+    ...proofCommands(forgebook),
     ...initCommands(forgebook),
     ...agentSetupCommands(forgebook),
     ...mcpCommands(forgebook),

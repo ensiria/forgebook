@@ -1,0 +1,156 @@
+{
+  "id": "account-delete",
+  "app": "shadcn-admin",
+  "prompt": "On Settings › Account (src/features/settings/account/), add a \"Danger zone\" section below the form with a \"Delete account\" button. It opens a confirmation dialog that explains the deletion cannot be undone and asks the user to type DELETE in a field labelled \"Type DELETE to confirm\"; its \"Delete permanently\" button stays disabled until the field says exactly DELETE. Confirming closes the dialog and shows the toast \"Account deleted\" (no real deletion).",
+  "scope": ["src/features/settings/account/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built on the app's existing ConfirmDialog (src/components/confirm-dialog.tsx), Button and Input, not a new dialog."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "The section, the dialog open, the button disabled then enabled, in the dark theme and in a narrow window."
+    },
+    {
+      "id": "a11y",
+      "text": "The dialog has a title and a description, focus moves into it and back, the field has its label, the destructive action is a real button."
+    },
+    {
+      "id": "scope",
+      "text": "Only the account settings change; the dialog component itself keeps its props, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "section",
+      "description": "Settings › Account with the new section.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/account"
+        }
+      ]
+    },
+    {
+      "name": "dialog",
+      "description": "The confirmation dialog, nothing typed.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/account"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Delete account"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dialog-typed-dark",
+      "description": "DELETE typed, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/settings/account"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Delete account"
+          }
+        },
+        {
+          "fill": {
+            "label": "Type DELETE to confirm"
+          },
+          "value": "DELETE"
+        }
+      ]
+    },
+    {
+      "name": "dialog-narrow",
+      "description": "The dialog in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/account"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Delete account"
+          }
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "typing DELETE and confirming shows the toast",
+      "steps": [
+        {
+          "goto": "/settings/account"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Delete account"
+          }
+        },
+        {
+          "fill": {
+            "label": "Type DELETE to confirm"
+          },
+          "value": "DELETE"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Delete permanently"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Account deleted"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the dialog opens with its field",
+      "steps": [
+        {
+          "goto": "/settings/account"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Delete account"
+          }
+        },
+        {
+          "expectVisible": {
+            "role": "alertdialog"
+          }
+        },
+        {
+          "expectVisible": {
+            "label": "Type DELETE to confirm"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

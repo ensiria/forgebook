@@ -1,0 +1,179 @@
+{
+  "id": "register-terms",
+  "app": "next-shadcn-admin-dashboard",
+  "prompt": "Add a required checkbox to the registration form (src/app/(main)/auth/_components/register-form.tsx), labelled \"I agree to the Terms of Service\", above the Register button. Submitting without it checked shows \"Please accept the terms to continue.\" under the checkbox, as the other fields show their errors; checking it removes the error.",
+  "scope": ["src/app/(main)/auth/_components/register-form.tsx"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built on the app's Checkbox and Field components, validated with the form's existing schema, as the other fields are."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Unchecked, the error shown, checked, in the dark theme and in a narrow window."
+    },
+    {
+      "id": "a11y",
+      "text": "The checkbox has its label, the error is tied to it and announced, and it works with the keyboard."
+    },
+    {
+      "id": "scope",
+      "text": "Only the registration form changes; the login form is unchanged, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "The registration form as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/auth/v1/register"
+        }
+      ]
+    },
+    {
+      "name": "error",
+      "description": "Submitted without accepting the terms.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/auth/v1/register"
+        },
+        {
+          "fill": {
+            "label": "Email Address"
+          },
+          "value": "ada@example.com"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "Secret123!"
+        },
+        {
+          "fill": {
+            "label": "Confirm Password"
+          },
+          "value": "Secret123!"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Register"
+          }
+        }
+      ]
+    },
+    {
+      "name": "error-dark",
+      "description": "The same, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/auth/v1/register"
+        },
+        {
+          "fill": {
+            "label": "Email Address"
+          },
+          "value": "ada@example.com"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "Secret123!"
+        },
+        {
+          "fill": {
+            "label": "Confirm Password"
+          },
+          "value": "Secret123!"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Register"
+          }
+        }
+      ]
+    },
+    {
+      "name": "narrow",
+      "description": "The form in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/auth/v1/register"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "the terms are required, and accepting them clears the error",
+      "steps": [
+        {
+          "goto": "/auth/v1/register"
+        },
+        {
+          "fill": {
+            "label": "Email Address"
+          },
+          "value": "ada@example.com"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "Secret123!"
+        },
+        {
+          "fill": {
+            "label": "Confirm Password"
+          },
+          "value": "Secret123!"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Register"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Please accept the terms to continue."
+          }
+        },
+        {
+          "click": {
+            "role": "checkbox",
+            "name": "I agree to the Terms of Service"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Register"
+          }
+        },
+        {
+          "expectHidden": {
+            "text": "Please accept the terms to continue."
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

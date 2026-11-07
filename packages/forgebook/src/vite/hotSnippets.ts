@@ -22,6 +22,7 @@ import {
 import { STORY_FILE } from "./autoTitle.ts";
 import type { CloseWatch } from "./closeWatch.ts";
 import { FILES_PREFIX } from "./pluginModules.ts";
+import type { ScriptProblems } from "./scriptProblems.ts";
 import {
   type RefusedStoryFile,
   type StoryFilesRead,
@@ -297,6 +298,24 @@ const invalidated = (environment: Pick<DevEnvironment, "moduleGraph">, ids: read
 };
 
 /**
+ * Tells the environments a script now parses or no longer does: every pattern's module, which names it among the
+ * catalogue's problems, is renewed for the next page and the next answer to a tool, and the open pages name it or stop.
+ *
+ * @param environments - the dev server's environments.
+ * @param read - whether the script parses now.
+ */
+const scriptRead = (environments: readonly DevEnvironment[], read: StoryFileRead): void => {
+  for (const environment of environments) {
+    const patterns = [...environment.moduleGraph.idToModuleMap.keys()].filter((id) =>
+      id.startsWith(FILES_PREFIX)
+    );
+    invalidated(environment, patterns);
+    if (environment.name === "client")
+      environment.hot.send({ type: "custom", event: STORY_FILE_READ_EVENT, data: read });
+  }
+};
+
+/**
  * The plugin's hooks for a story file's edit: the file accepts it on a dev server, an edit that changes a pattern's
  * list (a story added, renamed, a title) reloads the pages, which read the list once, and one that changes whether the
  * file can be read tells them. A story file a frame loads is
@@ -306,11 +325,14 @@ const invalidated = (environment: Pick<DevEnvironment, "moduleGraph">, ids: read
  * @param isServing - whether a dev server runs whose framework draws an edited story file in place.
  * @param served - what the edit changed, and the modules that list the file.
  * @param watching - the dev server's close watch.
+ * @param scripts - the project's other scripts that do not parse: an edit that breaks or fixes one renews every
+ * pattern's module, which names them, and tells the pages as a story file's does.
  */
 export const storyFileHotHooks = (
   isServing: () => boolean,
   served: Pick<ServedPatterns, "edited" | "listing">,
-  watching: Pick<CloseWatch, "follow" | "isLateReport">
+  watching: Pick<CloseWatch, "follow" | "isLateReport">,
+  scripts?: Pick<ScriptProblems, "edited">
 ): Pick<Plugin, "transform" | "hotUpdate"> => ({
   transform: {
     // a pattern's module is named after its pattern, which may end like a story file
@@ -326,7 +348,12 @@ export const storyFileHotHooks = (
     if (options.type !== "update") return undefined;
     // the system's late report of an edit the close watch handed on already
     if (watching.isLateReport(this.environment.name, options.file)) return [];
-    if (!STORY_FILE.test(options.file)) return undefined;
+    if (!STORY_FILE.test(options.file)) {
+      // read once for every environment: the first to hear of the edit renews them all
+      const read = scripts?.edited(options.file);
+      if (read !== undefined) scriptRead(Object.values(options.server.environments), read);
+      return undefined;
+    }
     if (this.environment.name !== "client") {
       // the server's modules answer tools and agents, each answer anew: they have no page to keep
       invalidated(this.environment, served.listing(options.file));

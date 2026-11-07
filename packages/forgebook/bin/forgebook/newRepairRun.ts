@@ -15,7 +15,7 @@ import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import { configOf } from "./catalogueCommands.ts";
 import { type RepairOutcome, repairRounds } from "./newRepair.ts";
 import type { StoryWrapper } from "./newStories.ts";
-import { type NewStoriesFile, newStoriesFile } from "./newStoriesFile.ts";
+import { type NewStoriesFile, newStoriesDocument, newStoriesFile, usesWords } from "./newStoriesFile.ts";
 import { runStoriesCheck } from "./storyCheckRun.ts";
 
 /**
@@ -85,17 +85,18 @@ export const repairNew = async (
 };
 
 /**
- * What `new --json` answers: the file, and with `--repair` what the round added and found.
+ * What `new --json` answers: the file and its uses, and with `--repair` what the round added and found.
  *
+ * @param written - the stories written.
  * @param shown - the file as the command names it.
  * @param repaired - the round's outcome, when one ran.
  */
 export const newDocument = (
+  written: NewStoriesFile,
   shown: string,
   repaired: RepairOutcome | undefined
 ): Readonly<Record<string, unknown>> => ({
-  schema: 1,
-  file: VITE_PATHS.normalize(shown),
+  ...newStoriesDocument(written, shown),
   ...(repaired === undefined
     ? {}
     : {
@@ -185,11 +186,14 @@ export const runNew = async (componentFile: string, options: NewOptions): Promis
       : await repairNew(written.file, componentFile, config, (wrappers) =>
           newStoriesFile(componentFile, options.export, options.framework, wrappers)
         );
+  const problemLines: NewOutcome["lines"] =
+    written.usesProblem === undefined ? [] : [["warn", `Its uses were not read: ${written.usesProblem}`]];
   const title = written.text.match(/title: "([^"]*)"/)?.[1] ?? "";
   return {
-    document: newDocument(shown, repaired),
+    document: newDocument(written, shown, repaired),
     lines: [
-      ["success", `${shown} written`],
+      ["success", `${shown} written${usesWords(written.uses)}`],
+      ...problemLines,
       ...(repaired === undefined
         ? []
         : repairLines(repaired).map((line): ["info", string] => ["info", line])),

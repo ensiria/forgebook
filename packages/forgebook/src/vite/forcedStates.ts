@@ -83,11 +83,24 @@ export const forcedSelector = (selector: Selector): Selector =>
       : withNested(component)
   );
 
+/** The prefix of every class of the catalogue's own interface, in the shell and in the frame. */
+const CATALOGUE_CLASS = "forgebook-";
+
 /**
- * The Lightning CSS visitor that applies the rewrite to every style sheet the catalogue builds, with the touch
- * simulation's (`touchMedia.ts`): the media rules that ask about the pointer follow the simulated touch.
+ * Whether a selector styles the catalogue's own interface: a story never forces a state on it, and nothing simulates
+ * touch on the shell's page, so the rewrite would only add to the catalogue's CSS.
+ *
+ * @param selector - a selector, as Lightning CSS parses it.
+ */
+export const isCatalogueSelector = (selector: Selector): boolean =>
+  selector.some((component) => component.type === "class" && component.name.startsWith(CATALOGUE_CLASS));
+
+/**
+ * The Lightning CSS visitor that applies the rewrite to every style sheet the catalogue builds but its own, with the
+ * touch simulation's (`touchMedia.ts`): the media rules that ask about the pointer follow the simulated touch.
  */
 export const FORCED_STATES_VISITOR: Visitor<CustomAtRules> = {
-  Selector: forcedSelector,
+  Selector: (selector: Selector): Selector =>
+    isCatalogueSelector(selector) ? selector : forcedSelector(selector),
   Rule: { media: touchMediaRules }
 };

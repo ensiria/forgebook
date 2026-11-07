@@ -190,6 +190,7 @@ const outcomeWords = (
     variants,
     ran,
     notVerified: unseen,
+    outdated,
     unseen: cannotBeSeen
   }: Omit<VerifyDocument, "summary" | "schema">,
   catalogueProblems: readonly string[]
@@ -207,6 +208,7 @@ const outcomeWords = (
       ? [`${counted(cannotBeSeen.length, "published component")} agents cannot see`]
       : []),
     ...(problems > 0 ? [counted(problems, "problem")] : []),
+    ...(outdated === undefined ? [] : [`${counted(outdated.length, "story file")} written for other props`]),
     ...(verdict === "verified" || verdict === "partly-verified"
       ? [`verified ${where} (${counted(ran, "check")})`]
       : [])
@@ -274,7 +276,12 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const codeProblems = code.problems.filter((problem) => seen.has(problem.file));
   const outside = new Set(changed.outside);
   const notes = code.problems.filter((problem) => !seen.has(problem.file) && !outside.has(problem.file));
-  const problems = failures.reduce((sum, each) => sum + each.problems.length, codeProblems.length);
+  // stories written for props the component no longer has pass a check they no longer mean: each is a problem
+  const outdated = changed.outdated ?? [];
+  const problems = failures.reduce(
+    (sum, each) => sum + each.problems.length,
+    codeProblems.length + outdated.length
+  );
   const skipped = skippedOf(input, notRun);
   // a story file that cannot be read may be the change, whatever else changed
   const catalogueProblems = [
@@ -313,6 +320,7 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
       ...(code.excused === undefined ? {} : { excused: code.excused }),
       ...(code.advice === undefined ? {} : { advice: code.advice })
     },
+    ...(outdated.length === 0 ? {} : { outdated }),
     problems,
     unseen
   };

@@ -178,8 +178,21 @@ export type StoryCode = {
   readonly html: string;
 };
 
-/** Each story's `render` as written in its file, by export name; a story without one is left out. */
-export type StoryFileCode = Readonly<Record<string, StoryCode>>;
+/**
+ * A story drawn from its args: each arg its file writes as code (a function, an element, a constant), as written, by
+ * name, the meta's under the story's. The catalogue writes the component with them in the framework's code, and with
+ * the values of the moment for the rest, which are plain data and read the same.
+ */
+export type StoryArgsCode = {
+  /** Each arg's expression as written (`<IconStar />`, `fn()`), by name, in the order the file sets them. */
+  readonly args: Readonly<Record<string, string>>;
+};
+
+/**
+ * Each story's code as written in its file, by export name: its `render`, or for a story drawn from its args the args
+ * it writes as code; a story with neither is left out.
+ */
+export type StoryFileCode = Readonly<Record<string, StoryCode | StoryArgsCode>>;
 
 /**
  * A group of story files, as the catalogue's plugin answers a `?forgebook-files` import: each file's index, and the
@@ -193,7 +206,7 @@ export type StoryFiles = {
   readonly stories: Readonly<Record<string, () => Promise<unknown>>>;
   /** Each file's component docs, for the props panel (`{ error }` when they cannot be read, `{ name: null }` for none). */
   readonly docs: Readonly<Record<string, () => Promise<unknown>>>;
-  /** Each file's code: each story's `render` as written, for the Code tab. */
+  /** Each file's code: each story's `render`, or the args it writes as code, as written, for the Code tab. */
   readonly code: Readonly<Record<string, () => Promise<unknown>>>;
   /** Each file's component page: its Markdown documentation, beside the story file, as HTML (`{ none: true }` without). */
   readonly pages: Readonly<Record<string, () => Promise<unknown>>>;
