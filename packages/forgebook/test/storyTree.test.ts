@@ -19,6 +19,7 @@ import {
   sidebarStoryIds,
   storyId,
   storyName,
+  storyOfAddress,
   storyTree,
   type TreeFamily,
   testedStoryLocations
@@ -124,6 +125,9 @@ describe("storyTree", () => {
   it("names stories from the index, with a written name winning", () => {
     expect(findStory(tree, "kit:inputs-text-text-field--long")?.story.name).toBe("Long label");
     expect(findStory(tree, "kit:inputs-selection-select--overview")?.group.name).toBe("Selection");
+    expect(findStory(tree, "inputs-selection-select--overview")?.story.id).toBe(
+      "kit:inputs-selection-select--overview"
+    );
     expect(componentId("kit", "Inputs/Selection/Select")).toBe("kit:inputs-selection-select");
     expect(findComponent(tree, "kit:inputs-selection-select")?.component.name).toBe("Select");
     expect(findComponent(tree, "kit:inputs-selection")).toBeUndefined();
@@ -627,5 +631,23 @@ describe("a story's device", () => {
       ["Phone", { frame: true, model: "iphone-16" }],
       ["Pixel", { frame: true, model: "pixel-9" }]
     ]);
+  });
+});
+
+describe("storyOfAddress", () => {
+  const storyOf = (query: string): string | null => storyOfAddress(new URLSearchParams(query));
+
+  it("reads `story`, and Storybook's path when there is none", () => {
+    expect(storyOf("story=kit:a--b")).toBe("kit:a--b");
+    expect(storyOf("path=/story/a--b")).toBe("a--b");
+    expect(storyOf("path=/story/a--b&story=kit:c--d")).toBe("kit:c--d");
+    expect(storyOf("path=%2Fstory%2Fa--b&args=x:1")).toBe("a--b");
+  });
+
+  it("reads no other path", () => {
+    expect(storyOf("")).toBeNull();
+    expect(storyOf("path=/docs/a--docs")).toBeNull();
+    expect(storyOf("path=/story/")).toBeNull();
+    expect(storyOf("path=/story/a/b")).toBeNull();
   });
 });

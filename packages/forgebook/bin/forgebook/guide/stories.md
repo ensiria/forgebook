@@ -47,7 +47,7 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   meaningful state, not one per prop value.
 - Add a worst case: very long text, words without spaces, huge numbers (`forgebook new` writes one).
 - A link or an embed may carry the Props tab's values (`args=` in the address, as JSON or in a Storybook link's form,
-  `label:Hello+world;count:5;open:!true`; what a story cannot take is listed above it, by name). The catalogue applies only the
+  `label:Hello+world;count:5;open:!true`; what a story cannot take is listed above it, by name; `?path=/story/<id>`, Storybook's address, opens that story). The catalogue applies only the
   props the story's panel can set, with a value of their type; to show a story with other values, write a story with
   those args rather than a link.
 - `parameters.suspense` says how the frame waits for a `Suspense` boundary: `{ expected: true }` for a story meant to stay

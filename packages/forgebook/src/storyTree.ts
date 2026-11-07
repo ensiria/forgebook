@@ -596,9 +596,24 @@ export const findStory = (tree: StoryTree, id: string): StoryLocation | undefine
     locations.find((location) => location.story.id === id) ??
     locations.find(
       ({ source, component, story }) => formerStoryId(source.id, component.title, story.exportName) === id
-    )
+    ) ??
+    // a Storybook link names no source: the first in the catalogue's order that has a story of that id
+    locations.find(({ source, story }) => story.id === `${source.id}:${id}`)
   );
 };
+
+/** Storybook's address of a story: `?path=/story/<id>`. */
+const STORYBOOK_STORY_PATH = /^\/story\/([^/]+)$/;
+
+/**
+ * The story an address names: its `story`, or the one of a link written for Storybook. Either is only a name: it opens
+ * a page by `findStory`, or says that no such story is there.
+ *
+ * @param params - the address's query.
+ * @returns the story's id; none when the address names none.
+ */
+export const storyOfAddress = (params: URLSearchParams): string | null =>
+  params.get("story") ?? STORYBOOK_STORY_PATH.exec(params.get("path") ?? "")?.[1] ?? null;
 
 /** Where a component sits: its source, family and group. */
 export type ComponentLocation = Omit<StoryLocation, "story">;

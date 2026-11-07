@@ -1898,10 +1898,13 @@
     }
   }
 
+  // the scheme of a document that declares none, until the frame says which it draws in: a frame element in the shell's
+  // dark over such a document would get an opaque white canvas, which hides the story's page colour
   .forgebook-frame-view {
     display: block;
     width: 100%;
     border: 0;
+    color-scheme: light;
   }
 
   // the story's room, as a browser's device mode: the width above, the story centred between two handles
