@@ -17,7 +17,7 @@ import {
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { runScriptProcess } from "@ensiria/cli-kit/testing";
 import type { ScriptProcessRun } from "@ensiria/cli-kit/testing.types";
@@ -130,7 +130,7 @@ describe("a configuration that cannot be used", () => {
     expect(run.stderr).toContain('it has no key "toolbr". Did you mean toolbar?');
   });
 
-  it.each(["build", "stories", "check x", "verify"])(
+  it.each(["build", "stories", "check x"])(
     "%s stops on a story pattern that matches nothing, naming it",
     (command) => {
       const empty = catalogue(root, `empty-${command.split(" ")[0]}`, {});
@@ -138,6 +138,45 @@ describe("a configuration that cannot be used", () => {
       expect(run.exitCode).toBe(1);
       expect(run.stderr).toContain('No story file matches "src/*.stories.tsx"');
     }
+  );
+});
+
+describe("forgebook verify with a story pattern that matches nothing", () => {
+  it(
+    "answers not verified, naming the pattern, and still gives the rest of its answer",
+    () => {
+      const empty = catalogue(root, "empty-verify-answer", {});
+      const dir = dirname(empty);
+      const git = (...args: readonly string[]): void => {
+        spawnSync(
+          "git",
+          ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args],
+          { cwd: dir }
+        );
+      };
+      git("init", "-q");
+      git("add", "-A");
+      git("commit", "-q", "-m", "first");
+      const run = runScriptProcess(ENTRY, [
+        "verify",
+        "--since",
+        "HEAD",
+        "--json",
+        "--config",
+        empty,
+        "--url",
+        NO_SERVER
+      ]);
+      expect(run.exitCode).toBe(1);
+      const document: unknown = JSON.parse(run.stdout);
+      expect(document).toMatchObject({
+        verdict: "not-verified",
+        skipped: expect.arrayContaining([
+          expect.stringContaining('No story file matches "src/*.stories.tsx"')
+        ])
+      });
+    },
+    SERVER_TIMEOUT
   );
 });
 

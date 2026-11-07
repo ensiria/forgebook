@@ -7,6 +7,7 @@
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { emptyStoryGlobsProblems } from "../../src/vite/emptyStoryGlobs.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { ASSISTANT_NAMES, type AssistantName } from "./agentSetup/assistantHooks.ts";
 import {
@@ -19,7 +20,7 @@ import {
   touchesUi
 } from "./agentSetup/stopHook.ts";
 import { verifyText } from "./agentText.ts";
-import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { COMMAND, configOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { runStoriesCheck } from "./storyCheckRun.ts";
 import { runVerify } from "./verifyRun.ts";
 
@@ -42,13 +43,14 @@ const hookAnswer = async (
 ): Promise<HookAnswer> => {
   if (isTurnAborted(input)) return allowed();
   try {
-    const config = await configWithStoriesOf(configFile);
+    // a pattern that matches nothing leaves the verdict not verified, with the rest of it: never no verdict at all
+    const config = await configOf(configFile);
     if (!(await touchesUi(config.dir))) return allowed();
     const client = await catalogueClient(config, url);
     try {
       const document = await runVerify(
         { dir: config.dir, ask: client.ask, check: (each) => runStoriesCheck(config, url, each) },
-        { since: undefined, isQuick: false }
+        { since: undefined, isQuick: false, configProblems: emptyStoryGlobsProblems(config) }
       );
       if (typeof document === "string") return allowed(`forgebook verify could not run: ${document}\n`);
       const text = verifyText(document, style);
