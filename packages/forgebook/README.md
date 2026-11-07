@@ -1048,7 +1048,42 @@ hold it, press its other button to leave them out. A story stays when it holds a
 filter lives in the address (`?tag=beta&tag=!wip`), so a link keeps it, and it holds from page to page; a page opened by
 its address shows even if the filter leaves it out. `dev`, `test`, `autodocs`, `play-fn` and `test-fn` say what a tool
 does with a story, and are not offered. Agents ask the same way: `forgebook stories --tag beta --tag '!wip'`, or `tags`
-on `list_stories`.
+on `list_stories`. A tag can also be a [status](#statuses), shown as a badge.
+
+## Statuses
+
+A component's status (waiting for review, experimental, deprecated) is a tag the catalogue declares as a status. Write
+it on the file's meta for the component, or on a story for that story alone:
+
+```ts
+export default { component: Card, tags: ["review"] } satisfies Meta<typeof Card>;
+
+export const Flipped: StoryObj = { tags: ["experimental"] };
+```
+
+`review`, `experimental` and `deprecated` are declared by default. A catalogue restyles or renames one, declares its
+own, or turns one off with `false`; `tone` is `neutral`, `info`, `positive`, `caution` or `critical`:
+
+```ts
+export default defineConfig({
+  statuses: { review: { label: "In review" }, beta: { label: "Beta", tone: "positive" }, experimental: false }
+});
+```
+
+Once any story has a tag, a status shows as a badge in the component's sidebar entry and at the top of its page, and a
+story's own beside its example; a page without one looks as before, and a catalogue with no tags loads nothing for them.
+A component written in several files takes its first file's meta, as its docs do. The [tag filter](#tags) filters by a
+status as by any tag (`?tag=review`), and shows it as its badge. The default labels are shell texts
+(`strings: { "statuses.review": "In revisione" }`), and the `caution-text` and `positive-text` theme roles colour their
+tones. Storybook's status addons write `parameters.status` (`"beta"`, `{ type: "beta" }`): it is read as tags, so declare
+those statuses to show them.
+
+In a catalogue with tags, a component deprecated in its TSDoc (`@deprecated`) shows the `deprecated` badge on its page,
+with the reason in its tooltip, even without the tag. The sidebar reads tags only, so `forgebook story` and `get_story`
+name the component whose TSDoc and meta disagree: tag the meta so the sidebar and the filter say it, or write
+`@deprecated` so `check-code` warns where it is imported. Agents read `statuses` on each component and story of
+`forgebook stories --json`, `list_stories`, `forgebook story --json` and `get_story`, and filter with `--tag review` or
+`tags`.
 
 ## Coming from Storybook
 
@@ -1574,7 +1609,7 @@ shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.b
 
 Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
 `window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,
-`danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
+`danger-text`, `caution-text`, `positive-text` (the last two colour the [status badges](#statuses)); `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
 theme too, and the catalogue's wins role by role.
 
 The reader's Interface menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a

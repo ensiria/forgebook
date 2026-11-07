@@ -48,7 +48,8 @@ const LIST_KEYS: KeysOf<CatalogueLists> = {
   propGroups: true,
   requiredFirst: true,
   views: true,
-  device: true
+  device: true,
+  statuses: true
 };
 
 /** A configuration's keys. */

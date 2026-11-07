@@ -31,6 +31,7 @@ import {
   themeValueProblem
 } from "../shellTheme.ts";
 import { CONTROLS } from "../storyArgTypes.ts";
+import { mergedStatuses, statusesProblem } from "../storyStatuses.ts";
 import { catalogueSwitches, switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { appBuildProblem, type ResolvedAppBuild, resolvedAppBuild } from "./appBuildOption.ts";
@@ -229,10 +230,22 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
 });
 
 /**
+ * Checks a list's statuses, which a configuration writes by JavaScript too, where no type stops a mistake.
+ *
+ * @param statuses - the statuses written.
+ * @param dir - the configuration's folder, for the message.
+ * @throws when a status cannot be used.
+ */
+const checkStatuses = (statuses: unknown, dir: string): void => {
+  const problem = statusesProblem(statuses);
+  if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
+};
+
+/**
  * The lists of the presets and the catalogue, in that order, merged: a single value (a width range, the grid's step)
  * the last that gives one; the backgrounds, the story groups and the texts entry by entry, a later one replacing an
  * earlier one with the same id or name; the tabs, the controls and the rules turned off by any, and the accessibility
- * check too (`a11y: false`); the toolbar, the prop groups' order, where the required props go and whether the
+ * check too (`a11y: false`); the statuses status by status and field by field; the toolbar, the prop groups' order, where the required props go and whether the
  * component docs are read the last that names one; the device field by field.
  *
  * @param all - the presets' lists, then the catalogue's.
@@ -277,6 +290,7 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
         },
     strings,
     keys,
+    ...mergedStatuses(all.map((lists) => lists.statuses)),
     // a later list's view of the same name replaces an earlier one's, where it was
     views: [...new Map(all.flatMap((lists) => lists.views ?? []).map((view) => [view.name, view])).values()]
   };
@@ -355,18 +369,19 @@ const deviceProblem = (device: unknown): string | undefined => {
 /**
  * The configuration's and the presets' lists, once checked where the shell would leave a mistake out: a device that
  * cannot be used, a place for the required props that is none, an accessibility setting that is neither rules nor
- * `false`.
+ * `false`, a status that is no tag of the catalogue's or reads wrongly.
  *
  * @param all - the presets' lists, then the configuration's.
  * @param dir - the configuration's folder, for the message.
- * @throws when a device cannot be used, `requiredFirst` is none of its layouts, or `a11y` is neither rules nor
- *   `false`.
+ * @throws when a device cannot be used, `requiredFirst` is none of its layouts, `a11y` is neither rules nor
+ *   `false`, or a status cannot be used.
  */
 const checkedLists = (all: readonly CatalogueLists[], dir: string): readonly CatalogueLists[] => {
   for (const lists of all) {
     const problem = lists.device === undefined ? undefined : deviceProblem(lists.device);
     if (problem !== undefined)
       throw new Error(`${resolve(dir, "forgebook.config")}: Forgebook's device: ${problem}`);
+    checkStatuses(lists.statuses, dir);
     // a configuration is written by JavaScript too, which no type stops
     if (lists.requiredFirst !== undefined && !REQUIRED_FIRST_LAYOUTS.includes(lists.requiredFirst))
       throw new Error(

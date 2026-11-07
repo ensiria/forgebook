@@ -19,7 +19,7 @@ test.describe("the tag filter", () => {
   test("asks for a tag, keeps it in the address and in a link's page", async ({ page }) => {
     await page.goto("/");
     await filterButton(page).click();
-    await expect(panel(page).getByRole("checkbox")).toHaveCount(3);
+    await expect(panel(page).getByRole("checkbox")).toHaveCount(6);
     await expect(panel(page).getByRole("checkbox", { name: /autodocs|dev|test/ })).toHaveCount(0);
     await panel(page).getByRole("checkbox", { name: /beta/ }).check();
     await expect(page).toHaveURL(/[?&]tag=beta/);

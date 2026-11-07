@@ -69,7 +69,9 @@ const STORY_IDS = [
   "storybook-merged--wrapping",
   "storybook-merged--reexported",
   "storybook-plain-javascript--untyped",
-  "storybook-preview-hooks--synced"
+  "storybook-preview-hooks--synced",
+  "storybook-status-addon--plain",
+  "storybook-status-addon--in-review"
 ];
 
 test("every story written the Storybook way is ready in its frame, without a page error", async ({

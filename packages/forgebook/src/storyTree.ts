@@ -117,6 +117,11 @@ export type TreeComponent = {
    * none, for the catalogue's.
    */
   readonly requiredFirst: RequiredFirst | undefined;
+  /**
+   * Its first file's meta's tags, the previews' under them: what is said of the component as a whole, its status
+   * among them (`storyStatuses.ts`), whatever a story adds or takes away. Empty when none.
+   */
+  readonly tags: readonly string[];
 };
 
 /** A group's entry for a component that lives elsewhere and is listed here too (the meta's `alsoIn`). */
@@ -460,7 +465,8 @@ const sourceFamilies = (source: StorySource, problems: string[]): TreeFamily[] =
       design: componentDesign(component),
       // its first file's, as its docs are
       propGroups: component.files[0]?.entry.propGroups ?? [],
-      requiredFirst: component.files[0]?.entry.requiredFirst
+      requiredFirst: component.files[0]?.entry.requiredFirst,
+      tags: component.files[0]?.entry.tags ?? []
     });
   }
   placeAliases(source, placed, families, problems);

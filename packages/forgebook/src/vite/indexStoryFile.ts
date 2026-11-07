@@ -6,7 +6,8 @@
  * The sidebar lists every story before any is loaded, so the index comes from the code itself, parsed with Vite's
  * parser (the same files Vite compiles). It reads a meta written inline or as a constant (`export default meta`,
  * `export { meta as default }`), `includeStories`, `excludeStories`, `__namedExportsOrder`, the meta's and the
- * stories' `tags`, the TSDoc above a story, and `parameters.docs.description`.
+ * stories' `tags` (with `parameters.status`, the status addons' way of writing one), the TSDoc above a story, and
+ * `parameters.docs.description`.
  *
  * Every named export the meta lets in is a story, as Storybook's indexer has it, whatever writes its value: an object
  * (CSF 3), a function with its properties assigned after it (CSF 2: `A.storyName`, `A.parameters`), a template bound
@@ -42,6 +43,7 @@ import {
   parameter,
   propertyValue,
   propGroupsOf,
+  statusTagsOf,
   stringField,
   stringListOf
 } from "./indexFields.ts";
@@ -115,6 +117,14 @@ export const combinedTags = (lists: readonly (readonly string[] | undefined)[]):
   return [...tags];
 };
 
+/** What a meta writes that its stories' tags start from: its `tags` and its `parameters.status`. */
+type MetaTags = {
+  /** Its `tags`, as written. */
+  readonly tags: readonly string[] | undefined;
+  /** Its `parameters.status`, as tags. */
+  readonly status: readonly string[] | undefined;
+};
+
 /** What the index reads of one story besides its export. */
 type StoryFields = Pick<
   StoryIndexEntry,
@@ -160,15 +170,16 @@ const identityOf = (own: Fields): Pick<StoryIndexEntry, "id" | "name"> => {
 
 /**
  * What the index reads of one story: its own id (`parameters.__id`), its name (`name`, or CSF 2's `storyName`),
- * controls, group, height, design, whether it is the demo, and its tags under the meta's.
+ * controls, group, height, design, whether it is the demo, and its tags under the meta's. A story's
+ * `parameters.status` replaces the meta's, as a story's parameter does.
  *
  * @param fields - the story's fields: its own, for its name and id, and all it has, for the rest.
- * @param metaTags - the meta's tags.
+ * @param meta - the meta's tags and its `parameters.status`, as written.
  * @param notes - the file's notes, which a design left out adds to.
  */
 const storyFields = (
   { own, fields }: StoryFieldSources,
-  metaTags: readonly string[] | undefined,
+  meta: MetaTags,
   notes: string[]
 ): StoryFields | Error => {
   const controls = controlsOf(fields);
@@ -182,7 +193,7 @@ const storyFields = (
   if (typeof design === "string") notes.push(design);
   const ownTags = stringListOf(fields, "tags");
   if (ownTags instanceof Error) return ownTags;
-  const tags = combinedTags([metaTags, ownTags]);
+  const tags = combinedTags([meta.tags, statusTagsOf(fields) ?? meta.status, ownTags]);
   const main = parameter(fields, "main");
   const flags = indexedParameters(fields);
   if (flags instanceof Error) return flags;
@@ -373,8 +384,9 @@ export const indexStoryFile = (
   const meta = objectFields(metaNode);
   const title = titleOf(meta, options);
   if (typeof title === "string") return `${file}: ${title}`;
-  const metaTags = stringListOf(meta, "tags");
-  if (metaTags instanceof Error) return `${file}: the meta's ${metaTags.message}`;
+  const writtenTags = stringListOf(meta, "tags");
+  if (writtenTags instanceof Error) return `${file}: the meta's ${writtenTags.message}`;
+  const metaTags: MetaTags = { tags: writtenTags, status: statusTagsOf(meta) };
   const stories: StoryIndexEntry[] = [];
   const storyNotes: string[] = [];
   for (const named of storyExports(program, top, meta)) {
@@ -392,10 +404,12 @@ export const indexStoryFile = (
   const metaFields = metaFieldsOf(meta, metaNotes);
   if (metaFields instanceof Error) return `${file}: the meta's ${metaFields.message}`;
   const notes = [...title.notes, ...metaNotes, ...storyNotes];
+  const tags = combinedTags([metaTags.tags, metaTags.status]);
   return {
     title: title.title,
     stories,
     ...metaFields,
+    ...(tags.length > 0 ? { tags } : {}),
     ...(notes.length > 0 ? { notes } : {})
   };
 };

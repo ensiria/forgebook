@@ -32,6 +32,8 @@ export const LIGHT_PALETTE: Palette = {
   "accent-text": "#0059d2",
   "on-accent": "#fff",
   "danger-text": "#bc1f16",
+  "caution-text": "#935200",
+  "positive-text": "#077229",
   "code-keyword": "#7036c4",
   "code-type": "#0059d2",
   "code-string": "#077229",
@@ -65,6 +67,8 @@ export const DARK_PALETTE: Palette = {
   "accent-text": "#7ab3ff",
   "on-accent": "#fff",
   "danger-text": "#ff8a80",
+  "caution-text": "#f2b46b",
+  "positive-text": "#7fdc8f",
   "code-keyword": "#c9a8ff",
   "code-type": "#7ab3ff",
   "code-string": "#7fdc8f",
@@ -95,6 +99,8 @@ const THEME_ROLES: readonly (keyof ShellPalette)[] = [
   "accent",
   "accent-text",
   "danger-text",
+  "caution-text",
+  "positive-text",
   "code-keyword",
   "code-type",
   "code-string",
@@ -110,7 +116,15 @@ const TEXT_CONTRAST = 4.5;
 const FOCUS_CONTRAST = 3;
 
 /** The text roles, each read on every ground. */
-export const TEXT_ROLES = ["text", "text-secondary", "text-tertiary", "accent-text", "danger-text"] as const;
+export const TEXT_ROLES = [
+  "text",
+  "text-secondary",
+  "text-tertiary",
+  "accent-text",
+  "danger-text",
+  "caution-text",
+  "positive-text"
+] as const;
 
 /** The grounds text is read on. */
 export const GROUND_ROLES = ["window", "sidebar", "surface"] as const;
