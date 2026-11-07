@@ -458,7 +458,7 @@ export const Stage = ({
                   <DeviceSlot framed={framed} scheme={ink} background={backgroundOf(view)}>
                     {isWaitingForDevice(shown, framed) ? null : (
                       <FrameView
-                        ref={frameRef}
+                        frameRef={frameRef}
                         key={story.id}
                         title={title}
                         address={address}
