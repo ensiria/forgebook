@@ -122,9 +122,12 @@ type ScanOptions = NonNullable<NonNullable<UserConfig["optimizeDeps"]>["rolldown
  * Keeps Vite's dependency scan going past a story file that does not parse, which adds nothing to what it finds. One
  * such file otherwise stops the scan, and with it the pre-bundling of every other story's packages, and fills the log
  * with the scanner's stack. The catalogue names the file itself (`storyFilesModule.ts`). Its text is read here on the
- * scan only: a start that keeps its pre-bundled packages does not scan.
+ * scan only: a start that keeps its pre-bundled packages does not scan. A `.js` file is read as JSX.
  */
 export const scanOptions = (): ScanOptions => ({
+  // a `.js` file holding JSX, as libraries that write in JavaScript have, would stop the scan: JSX is a superset of
+  // what such a file may hold, so reading every one as JSX finds the same imports in the others (`jsxInScripts.ts`)
+  moduleTypes: { ".js": "jsx", ".mjs": "jsx" },
   plugins: [
     {
       name: "forgebook:scan-story-files",

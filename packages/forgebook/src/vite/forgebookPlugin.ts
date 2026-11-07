@@ -22,7 +22,7 @@
  */
 import { extname, join, resolve } from "node:path";
 
-import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from "vite";
+import type { ConfigEnv, Plugin, UserConfig, ResolvedConfig as ViteConfig, ViteDevServer } from "vite";
 
 import { checksA11y, offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
@@ -45,6 +45,7 @@ import { serveFrames } from "./framesServer.ts";
 import { generatedId, generatedModule } from "./generatedModules.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { filesModuleHot, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
+import { type CompiledScript, jsxInScripts } from "./jsxInScripts.ts";
 import { type EmitAsset, inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
@@ -67,7 +68,7 @@ import {
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
-import { checkAtStart, type ResolvedVite } from "./runningVersions.ts";
+import { checkAtStart } from "./runningVersions.ts";
 import {
   type IndexedStoryFile,
   type IsFileKept,
@@ -242,6 +243,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   let isTestRun = false;
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
+  const jsxScripts = jsxInScripts(() => config?.framework.compilesJsxInScripts === true);
   /** The stamp of the plugin's own code, which makes the kept indexes and code: another version is a miss. */
   let pluginCode: string | undefined;
   const keptCache = <TValue>(
@@ -466,7 +468,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (pattern !== null) access.noteImported(pattern);
       return pattern;
     },
-    configResolved: (resolved: ResolvedVite): void => {
+    configResolved: (resolved: ViteConfig): void => {
+      jsxScripts.remember(resolved);
       checkAtStart(resolved, config?.shell.problems ?? []);
       // a dev server's answers only: a build reads everything once, and stamping each answer's files costs it more than
       // a later build would save
@@ -548,11 +551,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     },
     ...storyFileHotHooks(isRedrawing, served, watching),
     ...vitestHooks,
-    async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
-      const generated = await pagesModule(id);
-      if (generated !== undefined) return generated;
-      const refusal = access.refusal(id);
-      if (refusal !== undefined) return refusal;
+    async load(id: string): Promise<{ code: string; moduleType: "js" } | CompiledScript | string | null> {
+      // a generated module, a file the server refuses, or a `.js` file whose JSX is compiled as it loads
+      const early = (await pagesModule(id)) ?? access.refusal(id) ?? (await jsxScripts.load(id));
+      if (early !== null) return early;
       // in Vite's form, the text Vite's module graph knows a file by: a Node path on Windows (`C:\app\x.md`) is another
       const watch = (file: string): void => this.addWatchFile(VITE_PATHS.normalize(file));
       const resolveImport = async (specifier: string, importer: string): Promise<string | undefined> => {
