@@ -104,6 +104,8 @@ describe("messages", () => {
     expect(isShellMessage({ type: "forgebook:spills" })).toBe(false);
     expect(isFrameMessage({ type: "forgebook:spills", storyId: "a", count: 2 })).toBe(true);
     expect(isFrameMessage({ type: "forgebook:spills", storyId: "a", count: "2" })).toBe(false);
+    expect(isFrameMessage({ type: "forgebook:scheme", storyId: "a", scheme: "dark" })).toBe(true);
+    expect(isFrameMessage({ type: "forgebook:scheme", storyId: "a", scheme: "blue" })).toBe(false);
     const trace = {
       status: "failed",
       steps: [{ label: "open", status: "failed", ms: 3, error: "x" }],

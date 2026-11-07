@@ -76,12 +76,12 @@ const isLeftOut = (key: string, left: ReadonlySet<string>): boolean => {
 };
 
 /**
- * A pattern without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them. A loop,
- * not a regular expression, whose backtracking a long run of slashes would make quadratic.
+ * A pattern or an address without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them.
+ * A loop, not a regular expression, whose backtracking a long run of slashes would make quadratic.
  *
- * @param pattern - the pattern.
+ * @param pattern - the pattern or the address.
  */
-const withoutTrailingSlashes = (pattern: string): string => {
+export const withoutTrailingSlashes = (pattern: string): string => {
   let end = pattern.length;
   while (end > 0 && pattern[end - 1] === "/") end -= 1;
   return pattern.slice(0, end);

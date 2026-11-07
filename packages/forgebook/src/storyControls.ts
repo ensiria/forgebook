@@ -163,7 +163,7 @@ export const checkedSetArgs = (
   const plain = addressArgsFor(args, addressTexts);
   const notPlain = Object.keys(args)
     .filter((name) => !Object.hasOwn(plain, name))
-    .map((name): DroppedArg => ({ name, reason: "type" }));
+    .map((name): DroppedArg => ({ name, reason: "markup" }));
   const { accepted, dropped } = checkedAddressArgs(plain, declaration, undefined, {
     isFileList,
     isValueOfShape,

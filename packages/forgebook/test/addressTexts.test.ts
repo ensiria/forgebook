@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { addressArgsFor, isPlainText } from "../src/addressTexts.ts";
+import { addressArgsFor, addressArgsRead, isPlainText } from "../src/addressTexts.ts";
 
 describe("isPlainText", () => {
   it("takes words of any script, digits, spaces and the marks that close nothing", () => {
@@ -76,5 +76,32 @@ describe("addressArgsFor", () => {
       icon: { of: "Icon", named: "starIcon" },
       onclick: "alert"
     });
+  });
+});
+
+describe("addressArgsRead", () => {
+  const read = { args: { label: "<b>x</b>", size: "large" }, link: undefined };
+
+  it("says nothing more for a framework that takes any text, or when nothing was left out", () => {
+    expect(addressArgsRead(read, "{}", "any")).toEqual({ panelArgs: read.args, link: undefined });
+    const plain = { args: { size: "large" }, link: undefined };
+    expect(addressArgsRead(plain, "{}", "plain")).toEqual({ panelArgs: plain.args, link: undefined });
+  });
+
+  it("names what the rule took out, and keeps the parameter the address goes on saying", () => {
+    const { panelArgs, link } = addressArgsRead(read, '{"label":"<b>x</b>"}', "plain");
+    expect(panelArgs).toEqual({ size: "large" });
+    expect(link).toEqual({
+      param: '{"label":"<b>x</b>"}',
+      isWaiting: false,
+      unread: [],
+      refused: ["label"]
+    });
+  });
+
+  it("keeps what a link already says", () => {
+    const link = { param: "label:x", isWaiting: false, unread: ["style"] };
+    const result = addressArgsRead({ args: { "a b": "x" }, link }, "label:x", "plain");
+    expect(result.link).toEqual({ ...link, refused: ["a b"] });
   });
 });
