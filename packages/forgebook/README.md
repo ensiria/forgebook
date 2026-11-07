@@ -1329,6 +1329,7 @@ is a state of the component: the same).
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
+| `forgebook migrate` | Rewrites a project for a breaking change: lists the changes, writes them with `--write` ([more](#upgrading)) |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
@@ -1959,6 +1960,34 @@ package's `package.json`:
 
 `forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed, a file that does not parse) or a
 docs page that names what is not there, and its JSON lists every story for a script.
+
+## Upgrading
+
+While Forgebook is 0.x, a minor version (0.3 to 0.4) may break, and a patch never does. Every breaking change is in the
+package's changelog with what to do, and where the rewrite is mechanical, `forgebook migrate` makes it:
+
+```sh
+npx forgebook migrate --from 0.3.3          # lists what changes since 0.3.3, writes nothing; exit 1 when there is work
+npx forgebook migrate --from 0.3.3 --write  # makes the changes
+npx forgebook migrate src/preset.ts         # a library's preset module too, beside the configuration
+```
+
+It reads the configuration and the files given as text, runs none of their code, and keeps their formatting: only what a
+codemod rewrites moves. Run twice, it finds nothing the second time. `--json` answers `changes`, `manual` (what it could
+not rewrite, with what to do), `skipped` and `notes`, the breaking changes no codemod can make, for the versions crossed.
+With no `--from` it runs only the rewrites of what no longer works; a codemod that keeps an old behaviour (`play: "on"`)
+runs when `--from` says the project comes from before it, or by name with `--only`.
+
+| From 0.3 to 0.4 | `forgebook migrate` |
+|---|---|
+| The strings `propGroups.choice`, `.text`, `.structured` and `.toggle` are gone: the Props tab lists props in their source's order | removes them from `strings` (`prop-group-strings`) |
+| A built catalogue no longer runs a story's play when it opens | writes `play: "on"` to keep it (`play-on-in-builds`); leave it out for the new default |
+| A configuration key nothing reads stops every command, which names it | listed in `notes`; fix the key by hand |
+| `verify` fails on a changed UI file with no story that ran, its JSON is schema 2, and it fails on a published component agents cannot see | listed in `notes` |
+| `check-code` reads the application's design system with no tokens file, and fails on duplicate and deprecated components | listed in `notes`; `tokens: []` says there is no system |
+
+What counts as breaking, how long a deprecation lasts and what must be true before 1.0:
+[the version policy](https://github.com/ensiria/forgebook/blob/develop/CONTRIBUTING.md#version-policy).
 
 ## Packages
 
