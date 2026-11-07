@@ -86,44 +86,64 @@ It writes nothing and exits with an error when:
 `init` runs no code of the project unless `--from storybook` or `--install` asks it to; `--install` is an install like
 any other, with the project's package manager settings and the packages' scripts. `--json` prints the result as a document, a refusal
 too (`refused`, `message`, `hint`, `supported`, exit code 1; a wrong command line is exit code 2, with no document), with `nextSteps` as `{ kind, file, message }`: `kind` is `style-sheet`,
-`provider`, `portal`, `head`, `font`, `alias`, `vite-plugin`, `postcss`, `setup`, `version` or `storybook`.
+`provider`, `portal`, `head`, `font`, `postcss`, `setup`, `version` or `storybook`.
 
 ### What init cannot work out
 
-A catalogue runs no entry of the app and reads no `vite.config`, so what those do for the app does not happen for a
-story. Each of these is reported with the file it was read from:
+A catalogue runs no entry of the app, so what one does for the app does not happen for a story. Each of these is
+reported with the file it was read from:
 
 - **Providers**, the components that wrap the app, and what it installs (`app.use(router)`, `provideRouter()`): a decorator
   in the preview gives them to the stories that need them.
 - **Portals**: an element beside the app's root in its page (`#modal-root`). A decorator adds it.
 - **The page's head**: a font's or a CDN's `<link>` goes to `head` in the configuration.
-- **Vite plugins and aliases**: Tailwind's plugin, `resolve.alias`, `tsconfig.json`'s `paths`. Without its alias, a story
-  whose component imports through one does not draw. They go through the adapter:
 
-  ```ts
-  // forgebook.config.ts
-  import { react } from "@forgebook/react/vite";
-  import tailwindcss from "@tailwindcss/vite";
-  import { defineConfig } from "forgebook";
+### The app's build
 
-  const adapter = react();
+A catalogue draws your components with your app's build, with nothing to write:
 
-  export default defineConfig({
-    framework: {
-      ...adapter,
-      vitePlugins: async () => [
-        ...((await adapter.vitePlugins?.()) ?? []),
-        tailwindcss(),
-        { name: "project-aliases", config: () => ({ resolve: { tsconfigPaths: true } }) }
-      ]
-    },
-    title: "My components",
-    stories: ["src/**/*.stories.tsx"]
-  });
-  ```
+| What | Where it is read from | Runs your code? |
+|---|---|---|
+| Aliases | `tsconfig.json`'s `paths` and `baseUrl` (through `extends` and `references`) | No: read as text, Vite resolves them |
+| Aliases, `define`, Sass options, `.env` settings, your Vite plugins (Tailwind's, SVGR…) | `vite.config.*` beside the catalogue's configuration | **Yes**, as `vite dev` does |
+| Tailwind before 4, Autoprefixer, any PostCSS plugin | `postcss.config.*`, `.postcssrc*`, `package.json`'s `postcss`, up to the repository's root | **Yes**: a script, and the plugins any of them names |
 
-- **PostCSS**: a `postcss.config` is run by the Next.js and React Native Web adapters only; the others compile style
-  sheets with Lightning CSS, so Tailwind goes through its Vite plugin, as above.
+So every command that starts the catalogue runs those files, on purpose: `forgebook stories` and `check` as well as `dev`.
+The catalogue's own configuration and your components already run there, and this is the build you run every day. A first
+`dev` start loads a `vite.config` twice, as its pre-bundling runs in a process of its own. `forgebook init` never runs them:
+it reads their names and reports them (`appBuild` in `--json`, with `runsCode`). `forgebook dev` prints what it read; what
+could not be read is said on stderr by every command.
+
+From a `vite.config`, a catalogue takes how modules and style sheets resolve and compile, and never the app's page,
+server or output (`root`, `base`, `build`, `server`), from the file and from what its plugins' `config` hooks return; a
+plugin that changes the configuration in place is not stopped. A plugin's `configureServer`, where one starts a backend or a
+watcher, runs on `forgebook dev` and not on a command's own server (`stories`, `check`, `verify`, `mcp`). Its plugins go in, apart from
+two kinds: the framework's own, which the adapter brings, and those known to build an app rather than draw a component
+(routers, service workers, source-map uploads, type checkers). That second list is names, so an upload plugin it does not
+know runs on `forgebook build`: name it in `skipPlugins`. A plugin's `transformIndexHtml` reaches the frames, not the
+catalogue's page. A `define` that writes out a whole `process.env` is left out, since a catalogue bundles code the app does
+not. A file that fails to load is said with what to do; stories that do not need it still draw.
+
+Not read: the options of the framework's own plugin (`react({ jsxImportSource })` goes to the adapter), and `css.modules`
+(Lightning CSS has `css.lightningcss.cssModules`, and no `localsConvention`); both are said. A workspace's other packages'
+`tsconfig` paths are not looked for, only the catalogue's own folder's, as `extends` and `references` lead on from it.
+
+A `vite.config` holding only Vite's import and the framework's plugin is not loaded at all, so a new project pays for
+none of this. Next.js, Nuxt, SvelteKit, Angular and React Native read what is theirs themselves, as their own sections say.
+
+To turn it off:
+
+```ts
+export default defineConfig({
+  // …
+  appBuild: false // or each part:
+  // appBuild: { viteConfig: false, postcss: false, tsconfigPaths: false, skipPlugins: ["some-plugin"], keepPlugins: ["react-router"] }
+});
+```
+
+A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
+says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
+Sass file goes through its own compiler alone.
 
 ## A first catalogue
 

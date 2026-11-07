@@ -23,6 +23,7 @@ import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { CONFIG_FILES, PREVIEW_FILES } from "../../src/vite/configFile.ts";
+import { appBuildPlan } from "./appBuild/appBuild.ts";
 import {
   findStorybookDir,
   type ImportedConfig,
@@ -31,10 +32,10 @@ import {
 } from "./importers/storybook.ts";
 import { frameworkPeers, type ImportedFramework } from "./importers/storybookFrameworks.ts";
 import { CONFIG_FILE, initConfigText } from "./initConfig.ts";
+import { printInit } from "./initPrint.ts";
 import { planNewProject } from "./newProject/newProject.ts";
 import type {
   InitCommand,
-  InitDocument,
   InitInstall,
   InitRefusal,
   InitRoute,
@@ -233,24 +234,6 @@ const runInstall = async (
     if (error instanceof ScriptError) return error.message;
     throw error;
   }
-};
-
-/** Prints the outcome: the document under `--json`, sentences for a person otherwise. */
-const print = (document: InitDocument, { io, log, isJson }: InitContext): void => {
-  if (isJson) {
-    io.stdout.write(formatJson(document));
-    return;
-  }
-  const { detectedFrom, name } = document.packageManager;
-  if (document.route === "new-project") {
-    const from = detectedFrom === undefined ? "no lock file: assumed" : detectedFrom;
-    log.success(`${PROJECT_FRAMEWORKS[document.framework].label} project, ${name} (${from})`);
-  }
-  const count = document.stories.length;
-  log.success(`${CONFIG_FILE} written: ${count} story ${count === 1 ? "glob" : "globs"}`);
-  for (const file of document.written.slice(1)) log.success(`${file} written`);
-  for (const step of document.nextSteps) log.warn(step.message);
-  for (const { command, description } of document.commands) log.info(`${command}: ${description}`);
 };
 
 /**
@@ -469,7 +452,7 @@ const initProject = async (request: InitRequest, context: InitContext): Promise<
   ].map((step) => ({ ...step, message: printable(step.message) }));
   const manager = detectPackageManager(projectDir);
   const install = await settleInstall(projectDir, manager, state, declared, request.shouldInstall, io);
-  print(
+  printInit(
     {
       schema: 1,
       route: plan.route,
@@ -479,6 +462,7 @@ const initProject = async (request: InitRequest, context: InitContext): Promise<
       replaced,
       stories: plan.config.stories,
       install,
+      appBuild: appBuildPlan(projectDir, framework),
       nextSteps,
       commands: nextCommands(forgebookRunner(manager.name), install, framework)
     },
