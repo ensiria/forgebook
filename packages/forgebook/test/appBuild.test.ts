@@ -499,6 +499,10 @@ describe("on a real Vite server", () => {
       const look = await server.transformRequest("/src/look.css");
       expect(look?.code).toContain("red");
       expect(look?.code).not.toContain("RAWCOLOR");
+      // on the server, which only reads a preview's args, a global sheet is not run through PostCSS
+      const onServer = await server.environments.ssr.transformRequest("/src/look.css");
+      expect(onServer?.code).not.toContain("RAWCOLOR");
+      expect(onServer?.code).not.toContain("red");
     } finally {
       await server.close();
     }

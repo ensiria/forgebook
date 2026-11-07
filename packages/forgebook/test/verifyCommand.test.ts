@@ -332,7 +332,8 @@ describe("the verify tool", () => {
         failures: [],
         notVerified: [],
         code: { checked: [], problems: [], notes: [] },
-        problems: 0
+        problems: 0,
+        unseen: []
       })
     }).find((tool) => tool.name === "verify");
 
@@ -368,6 +369,9 @@ describe("runVerify", () => {
           : {
               schema: 1,
               since: "HEAD",
+              packages: [],
+              unseen: [],
+              skipped: [],
               files: ["src/Icon.tsx"],
               stories: [{ id: "a" }, { id: "b" }],
               uiFiles: [],
