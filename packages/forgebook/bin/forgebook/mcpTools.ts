@@ -18,7 +18,7 @@ import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
 import { previewTool } from "./mcpPreview.ts";
-import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
+import { type Ask, resultOf, textOf, textsOf, VIEW } from "./mcpToolParts.ts";
 import { type Verify, verifyTool } from "./mcpVerify.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
@@ -257,6 +257,11 @@ export const catalogueTools = ({
       properties: {
         source: { type: "string", description: "Only this source's stories (its id)." },
         component: { type: "string", description: "Only components whose title holds this text, any case." },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: 'Only stories with any of these tags; "!name" leaves a tag\'s out.'
+        },
         usedIn: {
           type: "boolean",
           description:
@@ -272,7 +277,11 @@ export const catalogueTools = ({
         new URLSearchParams({ view: textOf(args, "view") ?? "", usedIn: String(args["usedIn"] === true) })
       );
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const filter = { source: textOf(args, "source"), component: textOf(args, "component") };
+      const filter = {
+        source: textOf(args, "source"),
+        component: textOf(args, "component"),
+        tags: textsOf(args, "tags")
+      };
       return { structured: filteredStories(answer.body, filter), isError: false };
     }
   },

@@ -332,6 +332,47 @@ describe("filteredStories", () => {
     expect(kept.problems).toEqual(document.problems);
   });
 
+  it("keeps the listed stories a tag filter passes, and the components left with one", () => {
+    const tagged = storiesDocument(
+      "Tags",
+      storyTree([
+        {
+          id: "kit",
+          name: "Kit",
+          sheets: { required: [], theme: [], restyled: [] },
+          files: [
+            {
+              index: {
+                "./a.stories.tsx": {
+                  title: "A",
+                  stories: [
+                    { exportName: "Beta", tags: ["beta"] },
+                    { exportName: "Wip", tags: ["beta", "wip"] },
+                    { exportName: "Hidden", tags: ["beta", "!dev"] }
+                  ]
+                },
+                "./b.stories.tsx": { title: "B", stories: [{ exportName: "Plain" }] }
+              },
+              stories: {},
+              docs: {},
+              code: {},
+              pages: {}
+            }
+          ]
+        }
+      ]),
+      PAGES,
+      ""
+    );
+    const namesOf = (tags: readonly string[]): readonly (readonly string[])[] =>
+      filteredStories(tagged, { tags }).components.map((component) =>
+        component.stories.map((each) => each.name)
+      );
+    expect(namesOf(["beta"])).toEqual([["Beta", "Wip"]]);
+    expect(namesOf(["beta", "!wip"])).toEqual([["Beta"]]);
+    expect(namesOf(["!beta"])).toEqual([["Plain"]]);
+  });
+
   it("keeps one source's components", () => {
     expect(filteredStories(document, { source: "other" }).components).toEqual([]);
     expect(filteredStories(document, { source: "kit" }).components).toHaveLength(document.components.length);

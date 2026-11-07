@@ -333,7 +333,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       isTestRun ? undefined : extractor().warm,
       startTexts,
       access.isKept,
-      isForgiving()
+      isForgiving(),
+      config
     );
     filesModules.set(id, new Set([...files, ...refused].map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
