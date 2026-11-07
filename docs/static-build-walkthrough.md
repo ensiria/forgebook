@@ -30,7 +30,7 @@ screenshot was read. The build took 3.2 s and weighs 1.4 MB.
 | Finding | Done |
 |---|---|
 | A family holding only aliases (Forms) showed **0** beside an expandable entry, which reads as empty | Fixed: no count where a family or group holds none of its own; aliases are still not counted |
-| A page whose code cannot be fetched showed "The page could not be loaded: Unable to preload CSS for …/assets/….css" and nothing to do. It happened once here under load; on a real host it happens to every reader whose tab stayed open across a new deployment | Fixed: the message has a "Reload the page" button |
+| A page whose code cannot be fetched showed "The page could not be loaded: Unable to preload CSS for …/assets/….css" and nothing to do. It happened once here under load; on a real host it happens to every reader whose tab stayed open across a new deployment | Fixed: the message now says "Reload to try again" before the reason. A button did not fit the shell's first-load budget (25 bytes of room) |
 | The README's home example writes `{{libraries}} libraries`, which a catalogue of one library shows as "in 1 libraries" (seen here) | Fixed: the example no longer counts libraries |
 | The sidebar says "No name matches" while the search lists a result found by text | Not changed: it is true (no name matches), and changing the sidebar's filter is not a small thing |
 | On a docs page, the stories' toolbar and the greyed Panel and Compare are unexplained | Not changed: noted for the shell's reader mode |
@@ -39,5 +39,5 @@ screenshot was read. The build took 3.2 s and weighs 1.4 MB.
 
 ## Numbers
 
-- First-load JavaScript referenced by `index.html`, gzipped: 122 049 B before, 122 092 B after the fixes (+43 B).
+- The shell's first-load JavaScript, gzipped: 120 502 B before, 120 517 B after the fixes (+15 B), by the bench's `shellJs` on its generated library (limit 120 527 B).
 - Screenshots: 33 across three passes (home, docs, component, story, search; light and dark at 1440 px, light at 360 px).

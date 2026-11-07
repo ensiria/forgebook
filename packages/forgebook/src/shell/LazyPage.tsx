@@ -1,7 +1,7 @@
 /**
  * A page of the shell other than a story's (the home, a component's page, a docs page), loaded the first time it is
  * opened (`lazyModule.tsx`): most visits open a story, so their first load leaves these pages out. The workspace and
- * its header show while the page's code arrives, and the reason when it cannot, with a way to load the page again.
+ * its header show while the page's code arrives, and the reason when it cannot.
  *
  * @module
  */
@@ -42,11 +42,8 @@ export const LazyPage = <TProps extends object>({
       <div className="forgebook-workspace">
         {header}
         <p className="forgebook-problems" role="alert">
-          {STRINGS.pageLoadError}: {message}{" "}
           {/* a page left open across a new build asks for code the host no longer has: a reload gets the new one */}
-          <button type="button" className="forgebook-text-button" onClick={(): void => location.reload()}>
-            {STRINGS.pageReload}
-          </button>
+          {STRINGS.pageLoadError}. {message}
         </p>
       </div>
     )}
