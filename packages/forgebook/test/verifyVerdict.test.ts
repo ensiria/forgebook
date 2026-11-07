@@ -10,7 +10,12 @@ import { verifyText } from "../bin/forgebook/agentText.ts";
 import { isVerifyFailure } from "../bin/forgebook/verifyRun.ts";
 import { type VerifyFindings, verifyDocument } from "../bin/forgebook/verifyVerdict.ts";
 import type { StoryCheckReport } from "../src/storyCheck.ts";
-import type { ChangedStoriesDocument, ChangedUiFile, CheckedCodeDocument } from "../src/vite/agent.types.ts";
+import type {
+  ChangedStoriesDocument,
+  ChangedUiFile,
+  CheckedCodeDocument,
+  VisibilityDocument
+} from "../src/vite/agent.types.ts";
 
 const STORY = "kit:badge--plain";
 
@@ -56,11 +61,21 @@ const PASSING: StoryCheckReport = {
   results: [{ storyId: STORY, view: "light", frame: "f", problems: [] }]
 };
 
+const NOTHING_UNSEEN: VisibilityDocument = {
+  schema: 1,
+  since: "HEAD",
+  packages: [],
+  checked: 0,
+  unseen: [],
+  skipped: []
+};
+
 const findings = (extra: Partial<VerifyFindings>): VerifyFindings => ({
   since: "HEAD",
   base: "abc",
   changed: changedOf([covered("src/Badge.tsx")]),
   code: CLEAN_CODE,
+  visibility: NOTHING_UNSEEN,
   report: PASSING,
   notRun: undefined,
   isQuick: false,
@@ -70,6 +85,24 @@ const findings = (extra: Partial<VerifyFindings>): VerifyFindings => ({
 
 /** Seeded changes that are not done, each of which must exit non-zero. */
 const NOT_DONE: readonly { readonly name: string; readonly seed: VerifyFindings; readonly says: string }[] = [
+  {
+    name: "a changed published component an agent cannot see",
+    seed: findings({
+      visibility: {
+        ...NOTHING_UNSEEN,
+        packages: ["kit"],
+        checked: 1,
+        unseen: [
+          {
+            file: "src/Badge.tsx",
+            component: "Badge",
+            reasons: [{ missing: "tsdoc", reason: "Badge has no TSDoc", fix: "write one" }]
+          }
+        ]
+      }
+    }),
+    says: "1 published component agents cannot see"
+  },
   {
     name: "a raw value, with tokens",
     seed: findings({
@@ -409,6 +442,15 @@ describe("verifyDocument", () => {
     );
     expect(document.verdict).toBe("partly-verified");
     expect(document.skipped[0]).toContain("parameters.suspense.expected");
+  });
+
+  it("never reads what it could not tell of agents as verified", () => {
+    const skipped = [
+      "what agents see not checked: the catalogue turns off the component docs or Used in, which it reads"
+    ];
+    const document = verifyDocument(findings({ visibility: { ...NOTHING_UNSEEN, skipped } }));
+    expect(document.verdict).toBe("partly-verified");
+    expect(document.skipped).toContain(skipped[0]);
   });
 
   it("fails rather than not verifies when something was found as well", () => {

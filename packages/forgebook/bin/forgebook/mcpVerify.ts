@@ -19,7 +19,7 @@ export type Verify = (input: VerifyInput) => Promise<VerifyDocument | string>;
 export const verifyTool = (verify: Verify): McpTool => ({
   name: "verify",
   description:
-    "Whether a change is done: call it before saying so. Every changed UI file must reach a story that ran; those stories run in every variant, with check_code on what the change adds. `verdict` is verified, partly-verified (`skipped` names what was not checked), nothing-to-verify (no UI file changed), not-verified (a UI file has no story that ran, with its `reason` and its `fix` when there is one, `notVerified` names a story still loading when its frame gave up, or `skipped` names a story pattern of the configuration that matches nothing) or failed; the last two are errors. Needs @forgebook/testing and Playwright in the project.",
+    "Whether a change is done: call it before saying so. Every changed UI file must reach a story that ran; those stories run in every variant, with check_code on what the change adds. `verdict` is verified, partly-verified (`skipped` names what was not checked), nothing-to-verify (no UI file changed), not-verified (a UI file has no story that ran, with its `reason` and its `fix` when there is one, `notVerified` names a story still loading when its frame gave up, `unseen` names a changed published component an agent cannot find or read, with its `fix`, or `skipped` names a story pattern of the configuration that matches nothing) or failed; the last two are errors. Needs @forgebook/testing and Playwright in the project.",
   inputSchema: {
     type: "object",
     properties: {
