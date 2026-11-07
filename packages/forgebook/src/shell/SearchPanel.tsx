@@ -132,6 +132,8 @@ const HIT_NAMES: Readonly<Record<SearchHitKind, string>> = {
 type Row = {
   /** Its element id. */
   readonly id: string;
+  /** What it is, wherever the answer places it: a result and its hit may go to the same page. */
+  readonly key: string;
   /** Where it goes. */
   readonly target: SearchTarget;
 };
@@ -292,19 +294,26 @@ const ResultNote = ({
 };
 
 /** The answer's rows, for the keys and the list. */
-const useResultRows = (answer: SearchAnswer): readonly ResultRows[] => {
+const useResultRows = (
+  answer: SearchAnswer,
+  hrefOf: (target: SearchTarget) => string
+): readonly ResultRows[] => {
   const baseId = useId();
   return useMemo(
     () =>
       answer.results.map((result, place) => ({
         result,
-        own: { id: `${baseId}-${place}`, target: result.target },
+        own: { id: `${baseId}-${place}`, key: hrefOf(result.target), target: result.target },
         hits: result.hits.map((hit, hitPlace) => ({
           hit,
-          row: { id: `${baseId}-${place}-${hitPlace}`, target: hit.target }
+          row: {
+            id: `${baseId}-${place}-${hitPlace}`,
+            key: `${hrefOf(result.target)} ${hitPlace}`,
+            target: hit.target
+          }
         }))
       })),
-    [answer, baseId]
+    [answer, baseId, hrefOf]
   );
 };
 
@@ -314,12 +323,26 @@ type ActiveRowInput = Pick<SearchPanelProps, "hrefOf" | "onOpen" | "onActiveChan
   readonly rows: readonly Row[];
   /** Whether the list shows. */
   readonly isShown: boolean;
+  /** The words the rows answer. */
+  readonly words: string;
+  /** Whether the words typed are newer than the rows, which are drawn after the field. */
+  readonly isBehind: boolean;
+};
+
+/** A key the list acts on. */
+type ListKey = {
+  /** Its name. */
+  readonly key: string;
+  /** Whether it is pressed with Command or Control. */
+  readonly hasModifier: boolean;
 };
 
 /** The highlighted row: moved by the keys and the pointer, kept in view, named to the field. */
 const useActiveRow = ({
   rows,
   isShown,
+  words,
+  isBehind,
   hrefOf,
   onOpen,
   onActiveChange,
@@ -329,11 +352,13 @@ const useActiveRow = ({
   readonly setActive: (row: Row) => void;
   readonly listRef: RefObject<HTMLDivElement | null>;
 } => {
-  const [place, setPlace] = useState(0);
-  // new words, or an index that arrived, change what each place holds: Enter must not open what the reader never saw
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the rows are what resets it
-  useEffect(() => setPlace(0), [rows]);
-  const active = rows[Math.min(place, rows.length - 1)];
+  // what a person chose is a row, not a place: an index that arrives moves the rows, and Enter must open the one chosen.
+  // Until they choose, and for new words, it is the first
+  const [chosen, setChosen] = useState<{ readonly words: string; readonly key: string }>();
+  const chosenPlace = chosen?.words === words ? rows.findIndex((row) => row.key === chosen.key) : -1;
+  const place = Math.max(chosenPlace, 0);
+  const active = rows[place];
+  const setActive = (row: Row): void => setChosen({ words, key: row.key });
   const activeId = isShown ? active?.id : undefined;
   useEffect(() => onActiveChange(activeId), [activeId, onActiveChange]);
   const listRef = useRef<HTMLDivElement>(null);
@@ -341,18 +366,35 @@ const useActiveRow = ({
     if (activeId === undefined) return;
     listRef.current?.querySelector(`[id="${CSS.escape(activeId)}"]`)?.scrollIntoView({ block: "nearest" });
   }, [activeId]);
+  const act = ({ key, hasModifier }: ListKey): boolean => {
+    if (activeId === undefined || active === undefined) return false;
+    const step = KEY_STEPS[key];
+    const next = step === undefined ? undefined : rows[(place + step + rows.length) % rows.length];
+    if (next !== undefined) setActive(next);
+    else if (key !== "Enter") return false;
+    else if (hasModifier) window.open(hrefOf(active.target), "_blank", "noopener");
+    else onOpen(active.target);
+    return true;
+  };
+  // a key pressed while the list is behind the words is meant for the list of those words, and waits for it
+  const waitingKeys = useRef<ListKey[]>([]);
+  useEffect(() => {
+    if (isBehind) return;
+    const next = waitingKeys.current.shift();
+    // one at a time: the next key acts on the row this one moved to, which the next render gives
+    if (next !== undefined && !act(next)) waitingKeys.current = [];
+  });
   useImperativeHandle(keysRef, () => ({
     press: (key: string, hasModifier: boolean): boolean => {
-      if (activeId === undefined || active === undefined) return false;
-      const step = KEY_STEPS[key];
-      if (step !== undefined) setPlace((row) => (row + step + rows.length) % rows.length);
-      else if (key !== "Enter") return false;
-      else if (hasModifier) window.open(hrefOf(active.target), "_blank", "noopener");
-      else onOpen(active.target);
-      return true;
+      const isListKey = key === "Enter" || KEY_STEPS[key] !== undefined;
+      if (isListKey && (isBehind || waitingKeys.current.length > 0)) {
+        waitingKeys.current.push({ key, hasModifier });
+        return true;
+      }
+      return act({ key, hasModifier });
     }
   }));
-  return { active, setActive: (row: Row): void => setPlace(rows.indexOf(row)), listRef };
+  return { active, setActive, listRef };
 };
 
 /** The answer's state, in a line: how many results, what is still coming, what could not be read. */
@@ -404,7 +446,7 @@ export const SearchPanel = ({
   // the field never waits for a long list
   const words = useDeferredValue(query);
   const answer = useMemo(() => searchCatalogue(all, words, LIMITS), [all, words]);
-  const results = useResultRows(answer);
+  const results = useResultRows(answer, hrefOf);
   const rows = useMemo(
     () => results.flatMap(({ own, hits }) => [own, ...hits.map(({ row }) => row)]),
     [results]
@@ -419,6 +461,8 @@ export const SearchPanel = ({
   const { active, setActive, listRef } = useActiveRow({
     rows,
     isShown,
+    words,
+    isBehind: words !== query,
     hrefOf,
     onOpen,
     onActiveChange,
