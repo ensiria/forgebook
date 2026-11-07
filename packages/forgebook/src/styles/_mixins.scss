@@ -1,5 +1,6 @@
 // The catalogue's own helpers for its shell.
 
+@use "sass:map";
 @use "sass:meta";
 @use "tokens" as *;
 
@@ -40,7 +41,7 @@
 
 /// What a catalogue's theme can replace, as custom properties: fonts and corners, the same in both appearances.
 @mixin look {
-  @each $name, $value in $look {
+  @each $name, $value in map.merge($look, $repeated) {
     --forgebook-#{$name}: #{meta.inspect($value)};
   }
 }
