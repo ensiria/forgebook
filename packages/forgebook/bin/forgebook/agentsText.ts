@@ -32,7 +32,8 @@ export const withAgentsSection = (existing: string | undefined, section: string)
     const after = existing.slice(end + AGENTS_END.length).replace(/^\n/, "");
     return `${existing.slice(0, start)}${block}${after}`;
   }
-  return `${existing.replace(/\n*$/, "")}\n\n${block}`;
+  // not a pattern anchored at the end, which backtracks on a long run of blank lines
+  return `${existing.trimEnd()}\n\n${block}`;
 };
 
 /**
