@@ -42,10 +42,36 @@ export const companionVersion = (version: string, published: RegistryPackage | u
 /** The exact version of each of a tool's packages for one version of the tool. */
 const packageVersions = (
   host: HostDefinition,
+  line: string,
   version: string,
   registry: ReadonlyMap<string, RegistryPackage>
-): Record<string, string> =>
-  Object.fromEntries(host.packages.map((name) => [name, companionVersion(version, registry.get(name))]));
+): Record<string, string> => ({
+  ...Object.fromEntries(host.packages.map((name) => [name, companionVersion(version, registry.get(name))])),
+  ...Object.fromEntries(
+    Object.entries(host.companions?.[line] ?? {}).map(([name, wanted]) => {
+      const found = newestInLine(registry.get(name)?.versions ?? [], wanted);
+      if (found === undefined) throw new Error(`${name} has no release in its line ${wanted}`);
+      return [name, found];
+    })
+  )
+});
+
+/** The newest release of a line written `major` or `major.minor`. */
+export const newestInLine = (versions: readonly string[], line: string): string | undefined => {
+  const [major, minor] = line.split(".").map(Number);
+  return versions
+    .filter((candidate) => {
+      const parsed = parseVersion(candidate);
+      return (
+        parsed !== undefined &&
+        parsed.prerelease.length === 0 &&
+        parsed.major === major &&
+        (minor === undefined || parsed.minor === minor)
+      );
+    })
+    .sort(compareVersions)
+    .at(-1);
+};
 
 /** The manifest of a folder, by its path from the repository's root. */
 export type ReadManifest = (folder: string) => Manifest;
@@ -143,7 +169,7 @@ export const planCells = (
           range,
           line: clause.line,
           version,
-          packages: packageVersions(host, version, registry)
+          packages: packageVersions(host, clause.line, version, registry)
         };
       });
       const prerelease = pickPrerelease(host, published);
@@ -157,7 +183,7 @@ export const planCells = (
           range,
           line: "next",
           version: prerelease.version,
-          packages: packageVersions(host, prerelease.version, registry),
+          packages: packageVersions(host, "next", prerelease.version, registry),
           tag: prerelease.tag
         }
       ];
@@ -168,7 +194,13 @@ export const planCells = (
 export const packagesToRead = (matrix: CompatMatrix): string[] => [
   ...new Set(
     matrix.adapters.flatMap((adapter) =>
-      adapter.hosts.flatMap((entry) => hostOf(matrix, entry.host).packages)
+      adapter.hosts.flatMap((entry) => {
+        const host = hostOf(matrix, entry.host);
+        return [
+          ...host.packages,
+          ...Object.values(host.companions ?? {}).flatMap((pins) => Object.keys(pins))
+        ];
+      })
     )
   )
 ];

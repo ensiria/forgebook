@@ -17,7 +17,9 @@ for:
   the dist-tag the matrix names for a tool whose prereleases carry a lower number (React's `canary`).
 
 A tool made of several packages (React and React DOM, Angular's seven) installs the same version of each, or, for a
-package that ships patches of its own, its newest release of that minor.
+package that ships patches of its own, its newest release of that minor. A line whose own peer range excludes what the fixtures pin
+gets that package at a line it accepts, named in the matrix and shown beside the version on the page (Angular 20 with
+TypeScript 5.9, since the fixtures pin TypeScript 6).
 
 A range with anything but carets joined by `||` stops the plan instead of being guessed. A line nobody has released
 stops it too.

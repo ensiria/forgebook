@@ -78,6 +78,12 @@ describe("renderTable", () => {
       "| React | `^18.2.0 \\|\\| ^19.0.0` | next (canary) | `19.3.0-canary-a` | ✗ fails (failed: pnpm test) |"
     ]);
     expect(page).toContain("Not tested yet: Vite.");
+    expect(
+      renderTable(MATRIX, {
+        date: "2026-11-09",
+        cells: [cell({ packages: { react: "19.3.1", typescript: "5.9.3" } })]
+      })
+    ).toContain("| `19.3.1` with `typescript 5.9.3` |");
     expect(page).toContain("Each cell runs `pnpm --filter @x/react test`.");
     expect(page).toContain(
       "Results of 2026-11-09, on Node 24.11.0, [the run](https://github.com/o/r/actions/runs/1)."

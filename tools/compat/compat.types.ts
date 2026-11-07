@@ -36,6 +36,11 @@ export type HostDefinition = {
   readonly range?: RangeSource;
   /** Which prerelease is tested; `newest` when left out. */
   readonly prerelease?: PrereleasePolicy;
+  /**
+   * Packages a line of the tool needs at another version than the workspace's, by line: each package and the line of
+   * it to install (`"5.9"`, its newest 5.9 release). For a line whose own peer range excludes what the fixtures pin.
+   */
+  readonly companions?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 };
 
 /** One tool one package is tested against. */

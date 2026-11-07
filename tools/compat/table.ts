@@ -5,6 +5,7 @@
  * @module
  */
 import { codeSpan, formatTable, markdownText } from "@ensiria/cli-kit/markdown";
+import type { MarkdownText } from "@ensiria/cli-kit/markdown.types";
 
 import type { CellResult, CompatMatrix, CompatReport, PlannedCell } from "./compat.types.ts";
 import { hostOf } from "./plan.ts";
@@ -17,6 +18,14 @@ const resultText = (cell: CellResult): string => {
   if (cell.status === "passed") return "✓ passes";
   if (cell.status === "failed") return `✗ fails (${cell.reason ?? "a command failed"})`;
   return `– not run (${cell.reason ?? "unknown"})`;
+};
+
+/** The version a cell tested, with the other packages it pinned beside the tool's own (`with typescript 5.9.3`). */
+const versionText = (matrix: CompatMatrix, cell: CellResult): MarkdownText => {
+  const own = hostOf(matrix, cell.host).packages;
+  const beside = Object.entries(cell.packages).filter(([name]) => !own.includes(name));
+  const extra = beside.map(([name, version]) => ` with ${codeSpan(`${name} ${version}`).markdown}`).join("");
+  return markdownText(`${codeSpan(cell.version).markdown}${extra}`);
 };
 
 /** The order of a package's cells: as the matrix lists its tools, released lines before the prerelease. */
@@ -35,7 +44,7 @@ const adapterSection = (matrix: CompatMatrix, report: CompatReport, name: string
     tool: hostOf(matrix, cell.host).label,
     range: codeSpan(cell.range),
     line: cell.line === "next" ? `next (${cell.tag ?? "prerelease"})` : cell.line,
-    version: codeSpan(cell.version),
+    version: versionText(matrix, cell),
     result: resultText(cell)
   }));
   const untested = hosts.filter((host) => !cells.some((cell) => cell.host === host));

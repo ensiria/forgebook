@@ -141,7 +141,7 @@ export const runCell = async (
 
   const folders = [join(root, adapter.folder), join(root, adapter.fixture)];
   const installed = Object.fromEntries(
-    host.packages.flatMap((name) => {
+    Object.keys(asked).flatMap((name) => {
       const version = installedVersion(name, folders);
       return version === undefined ? [] : [[name, version]];
     })

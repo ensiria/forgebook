@@ -17,6 +17,7 @@ import {
   claimedRange,
   companionVersion,
   hostOf,
+  newestInLine,
   packagesToRead,
   pickPrerelease,
   planCells
@@ -171,6 +172,15 @@ describe("companionVersion", () => {
     expect(companionVersion("22.2.5", published)).toBe("22.2.6");
     expect(companionVersion("23.0.0", published)).toBe("23.0.0");
     expect(companionVersion("22.3.0-next.1", published)).toBe("22.3.0-next.1");
+  });
+});
+
+describe("newestInLine", () => {
+  it("takes the newest release of a major or of a minor", () => {
+    const versions = ["5.8.3", "5.9.2", "5.9.3", "6.0.3", "5.10.0-beta"];
+    expect(newestInLine(versions, "5.9")).toBe("5.9.3");
+    expect(newestInLine(versions, "5")).toBe("5.9.3");
+    expect(newestInLine(versions, "7")).toBeUndefined();
   });
 });
 

@@ -34,7 +34,9 @@ export const COMPAT_MATRIX: CompatMatrix = {
         "@angular/platform-browser",
         "@angular/platform-server",
         "@angular/build"
-      ]
+      ],
+      // Angular 20's compiler refuses TypeScript 6, which the fixtures pin; a project on Angular 20 has its 5.9
+      companions: { "20": { typescript: "5.9" } }
     },
     next: { label: "Next.js", packages: ["next"] },
     sveltekit: { label: "SvelteKit", packages: ["@sveltejs/kit"] },
