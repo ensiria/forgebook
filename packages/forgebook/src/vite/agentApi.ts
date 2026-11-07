@@ -536,7 +536,8 @@ export const isChangedStoriesDocument = (value: unknown): value is ChangedStorie
   Array.isArray(value["stories"]) &&
   Array.isArray(value["files"]) &&
   Array.isArray(value["uiFiles"]) &&
-  Array.isArray(value["outside"]);
+  Array.isArray(value["outside"]) &&
+  (value["outdated"] === undefined || Array.isArray(value["outdated"]));
 
 /**
  * Whether a value is the code check's document, as a client receives it over HTTP.
