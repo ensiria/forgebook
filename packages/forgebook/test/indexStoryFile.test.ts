@@ -227,16 +227,46 @@ describe("indexStoryFile", () => {
     ]);
   });
 
-  it("combines the meta's tags with each story's, a !tag taking one away", () => {
+  it("combines the meta's tags with each story's, a !tag taking one away, and keeps the meta's own", () => {
     const text = `export default { title: "A/B", tags: ["autodocs", "beta"] };
       export const X = { tags: ["!beta", "new"] };
       export const Y = {};`;
     expect(indexStoryFile("A.stories.tsx", text)).toEqual({
       title: "A/B",
+      tags: ["autodocs", "beta"],
       stories: [
         { exportName: "X", tags: ["autodocs", "!beta", "new"] },
         { exportName: "Y", tags: ["autodocs", "beta"] }
       ]
+    });
+  });
+
+  it("reads parameters.status as the status addons write it, as tags, a story's replacing the meta's", () => {
+    const text = `export default { title: "A/B", tags: ["autodocs"], parameters: { status: { type: "beta" } } };
+      export const X = { parameters: { status: "stable" } };
+      export const Y = { tags: ["!beta"] };
+      export const Z = { parameters: { status: { type: ["deprecated", "review"] } } };
+      export const W = {};`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      tags: ["autodocs", "beta"],
+      stories: [
+        { exportName: "X", tags: ["autodocs", "stable"] },
+        { exportName: "Y", tags: ["autodocs", "!beta"] },
+        { exportName: "Z", tags: ["autodocs", "deprecated", "review"] },
+        { exportName: "W", tags: ["autodocs", "beta"] }
+      ]
+    });
+  });
+
+  it("leaves a status written by code, otherwise or as a tool's tag alone, never refusing the file", () => {
+    const text = `export default { title: "A/B", parameters: { status: { type: STATUS.beta, url: "x" } } };
+      export const X = { parameters: { status: 3 } };
+      export const Y = { parameters: { status: { type: ["ok", name] } } };
+      export const Z = { tags: ["!dev"], parameters: { status: "dev" } };`;
+    expect(indexStoryFile("A.stories.tsx", text)).toEqual({
+      title: "A/B",
+      stories: [{ exportName: "X" }, { exportName: "Y" }, { exportName: "Z", tags: ["!dev"] }]
     });
   });
 

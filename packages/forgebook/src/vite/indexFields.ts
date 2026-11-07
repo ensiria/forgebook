@@ -10,6 +10,7 @@ import type { StoryGroup } from "@forgebook/story-format/csf";
 import type { FigmaLink, StoryControlsSetting } from "@forgebook/story-format/source";
 import type { ESTree } from "vite";
 
+import { TOOL_TAGS } from "../storyTagNames.ts";
 import { figmaLink } from "./figmaLink.ts";
 
 /** A story's or a meta's fields by name: an object's properties, or a function story's assigned properties. */
@@ -171,4 +172,27 @@ export const docsDescription = (fields: Fields, kind: "story" | "component"): st
   if (description?.type !== "ObjectExpression") return undefined;
   const text = propertyValue(description, kind);
   return text?.type === "Literal" && typeof text.value === "string" ? text.value : undefined;
+};
+
+/** The strings an expression writes plainly: a string, or a list of strings; none for anything else. */
+const plainStrings = (expression: ESTree.Expression | undefined): readonly string[] | undefined => {
+  if (expression?.type === "Literal")
+    return typeof expression.value === "string" ? [expression.value] : undefined;
+  if (expression?.type !== "ArrayExpression") return undefined;
+  const strings = expression.elements.flatMap((element) =>
+    element?.type === "Literal" && typeof element.value === "string" ? [element.value] : []
+  );
+  return strings.length === expression.elements.length ? strings : undefined;
+};
+
+/**
+ * `parameters.status`, as the status addons of Storybook write it (`"beta"`, `{ type: "beta" }`, `{ type: ["beta"] }`),
+ * read as tags so a catalogue moved from Storybook keeps its statuses: `undefined` when none. Never a problem: the
+ * parameter is another tool's, so a value written otherwise or by code is left alone.
+ */
+export const statusTagsOf = (fields: Fields): readonly string[] | undefined => {
+  const status = parameter(fields, "status");
+  const written = status?.type === "ObjectExpression" ? propertyValue(status, "type") : status;
+  // a status names what a component is: never a tool's tag, which would list or test a story its meta left out
+  return plainStrings(written)?.filter((tag) => tag !== "" && !tag.startsWith("!") && !TOOL_TAGS.has(tag));
 };

@@ -46,7 +46,8 @@ export const previewTagsOf = (
   );
 
 /**
- * Story files with a preview's tags under each story's own.
+ * Story files with a preview's tags under each story's own, and under the meta's: a preview that marks every story
+ * marks every component.
  *
  * @param files - the story files, indexed.
  * @param tags - the previews' tags.
@@ -61,6 +62,7 @@ export const withPreviewTags = (
         ...file,
         index: {
           ...file.index,
+          tags: combinedTags([tags, file.index.tags]),
           stories: file.index.stories.map((story) => ({
             ...story,
             tags: combinedTags([tags, story.tags])

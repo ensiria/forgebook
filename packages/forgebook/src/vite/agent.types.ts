@@ -79,6 +79,11 @@ export type AgentStory = {
   readonly description: string | undefined;
   /** Its tags, the meta's and its own. */
   readonly tags: readonly string[];
+  /**
+   * The tags among them the catalogue declares as statuses (`review`, `experimental`, `deprecated`), in its order;
+   * only when it holds one. Filter by one as by any tag.
+   */
+  readonly statuses?: readonly string[];
   /** Whether it is listed nowhere (`!dev`), opened only by its address. */
   readonly isUnlisted: boolean;
   /** The height its scene declares (`parameters.height`), in CSS px, when it declares one. */
@@ -123,6 +128,11 @@ export type AgentComponent = {
   readonly file: string;
   /** Every story file with its title, `file` first: one, unless the title is written in several files. */
   readonly files: readonly string[];
+  /**
+   * Its statuses: those its meta's tags hold, in the catalogue's order; in a story's answer also `deprecated`
+   * when its TSDoc says `@deprecated`. Only when it has one. A story may add or take one away (`AgentStory.statuses`).
+   */
+  readonly statuses?: readonly string[];
   /** Its stories: the listed ones in the catalogue's order, then the unlisted ones. */
   readonly stories: readonly AgentStory[];
   /** Its design (the meta's `parameters.design.figma`), when it has one. */
@@ -172,7 +182,7 @@ export type StoryDocument = {
   /** Its component's id and title, and its "Used in" when the catalogue offers it. */
   readonly component: Pick<
     AgentComponent,
-    "id" | "title" | "source" | "file" | "files" | "design" | "usedIn"
+    "id" | "title" | "source" | "file" | "files" | "statuses" | "design" | "usedIn"
   >;
   /**
    * The component's docs as the props panel reads them (its props, their types, defaults and TSDoc); none when the

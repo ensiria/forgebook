@@ -149,6 +149,12 @@ export type ScanFindings = {
   readonly warn?: (line: string) => void;
   /** Keeps what the scan found of each of the project's scripts, other than story files (`scriptProblems.ts`). */
   readonly scanned?: ScriptProblems["scanned"];
+  /**
+   * Whether every `.js` file is read as JSX, for a framework whose adapter compiles their JSX (`compilesJsxInScripts`):
+   * JSX is a superset of what such a file may hold, so the others give the same imports. Without it, only a file that
+   * parses as nothing else is.
+   */
+  readonly isJsxInScripts?: boolean;
 };
 
 /**
@@ -166,13 +172,14 @@ const WARNED = new Set<string>();
  * named by one warning with its place. The texts are read here on the scan only: a start that keeps its pre-bundled
  * packages does not scan.
  *
- * @param findings - the catalogue's folder, and where warnings and problems go.
+ * @param findings - the catalogue's folder, where warnings and problems go, and whether `.js` is read as JSX.
  */
 export const scanOptions = (findings: ScanFindings = {}): ScanOptions => {
   // the scan names files by their real path: a folder reached through a link (`/tmp` on macOS) would not prefix them
   const root =
     findings.root === undefined || !existsSync(findings.root) ? undefined : realpathSync(findings.root);
   return {
+    ...(findings.isJsxInScripts === true ? { moduleTypes: { ".js": "jsx", ".mjs": "jsx" } } : {}),
     plugins: [
       {
         name: "forgebook:scan-scripts",

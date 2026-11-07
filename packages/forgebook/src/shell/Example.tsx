@@ -10,6 +10,7 @@ import { type ChangeEvent, type MouseEvent, type ReactNode, useId, useState } fr
 import { deviceDefaultOf, type StoryDevice, shownDevice } from "../deviceView.ts";
 import type { PanelArgs } from "../messages.ts";
 import { type StoryCodeSource, storyCodeText } from "../storyCodeText.ts";
+import { isFilterTag } from "../storyTagNames.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
 import { frameAddress, schemeOf, type ViewState } from "../viewState.ts";
@@ -29,6 +30,7 @@ import {
 import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { LATER_STRINGS } from "./laterStrings.ts";
+import { PageTagView } from "./pageTagView.tsx";
 import { StageViewport } from "./StageViewport.tsx";
 import { StoryCodeBlock } from "./StoryCodeBlock.tsx";
 import { type StoryTouches, touchedView } from "./storyTouch.ts";
@@ -173,7 +175,7 @@ const sceneHeightOf = (story: TreeStory, stageHeight: number | undefined): numbe
   stageHeight === undefined ? story.height : Math.max(story.height ?? 0, stageHeight);
 
 /**
- * An example's title, a link to its story's page, and its description.
+ * An example's title, a link to its story's page with the statuses the story holds of its own, and its description.
  *
  * @param props - the story and how its link opens it.
  */
@@ -184,13 +186,16 @@ const ExampleHead = ({
 }: {
   readonly story: TreeStory;
   readonly titleTag: ExampleTitleTag;
-  readonly context: Pick<ExampleContext, "hrefOf" | "onOpen">;
+  readonly context: Pick<ExampleContext, "hrefOf" | "onOpen" | "component">;
 }): ReactNode => (
   <header className="forgebook-example__head">
     <Title className="forgebook-example__title">
       <StoryLink story={story} hrefOf={context.hrefOf} onOpen={context.onOpen} className="forgebook-link">
         {story.name}
       </StoryLink>
+      {story.tags.some(isFilterTag) ? (
+        <PageTagView place="story" story={story} component={context.component} />
+      ) : null}
     </Title>
     {story.description === undefined ? null : (
       <p className="forgebook-example__description">

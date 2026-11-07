@@ -24,14 +24,8 @@ import {
 } from "react";
 
 import type { SearchTarget } from "../search.ts";
-import { isFilterTag } from "../storyTagNames.ts";
-import {
-  type StoryTree,
-  storyLocations,
-  type TreeFamily,
-  type TreeGroup,
-  type TreeSource
-} from "../storyTree.ts";
+import { hasFilterTags } from "../storyTagNames.ts";
+import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
@@ -42,6 +36,7 @@ import { SidebarHandle } from "./SidebarHandle.tsx";
 import { SidebarSearch } from "./SidebarSearch.tsx";
 import { STRINGS } from "./strings.ts";
 import type { TagFilterProps } from "./TagFilter.tsx";
+import { TagViewSlot } from "./tagView.tsx";
 import type { ShownTree, shownTree } from "./treeSearch.ts";
 import type { AppearanceState } from "./useAppearance.ts";
 
@@ -64,14 +59,6 @@ const LoadedDocs = (props: SidebarDocsProps): ReactNode =>
       failed={(message: string): ReactNode => <p className="forgebook-tree__empty">{message}</p>}
     />
   );
-
-/**
- * The tag filter, loaded only for a catalogue whose stories have tags; not through `Suspense`, which would hold it back
- * 300 ms after it arrived (`lazyModule.tsx`). A chunk gone after a new deployment leaves the tree as it is.
- */
-const TAG_FILTER = lazyModule<TagFilterProps>(() =>
-  import("./TagFilter.tsx").then((module) => module.TagFilter)
-);
 
 /** The sidebar's props. */
 export type SidebarProps = SidebarPageLinks & {
@@ -182,10 +169,6 @@ const unsearchedTree = (tree: StoryTree): ShownTree => ({
 const componentCount = (family: TreeFamily): number =>
   family.groups.reduce((count, group) => count + group.components.length, 0);
 
-/** Whether any listed story holds a tag a person can filter by. */
-const hasFilterTags = (tree: StoryTree): boolean =>
-  storyLocations(tree).some(({ story }) => story.tags.some(isFilterTag));
-
 /**
  * The families and groups the user opened or closed, and the ones a shown component opened: once open, one stays open
  * until the user closes it, so opening a component elsewhere never folds the list under the pointer.
@@ -229,9 +212,7 @@ const useFoldChoices = (
  */
 const TagFilterSlot = (props: TagFilterProps): ReactNode => {
   const hasTags = useMemo(() => hasFilterTags(props.tree), [props.tree]);
-  return hasTags || props.tags.length > 0 ? (
-    <LazyView module={TAG_FILTER} props={props} loading={null} failed={(): ReactNode => null} />
-  ) : null;
+  return hasTags || props.tags.length > 0 ? <TagViewSlot place="filter" {...props} /> : null;
 };
 
 /** What a family's entry reads. */

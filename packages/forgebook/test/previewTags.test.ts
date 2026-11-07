@@ -39,6 +39,15 @@ describe("withPreviewTags", () => {
     expect(joined?.index.stories.map((story) => story.tags)).toEqual([["stable"], ["!stable", "new"]]);
   });
 
+  it("puts them under the meta's too, so a preview's status is every component's", () => {
+    const [joined] = withPreviewTags(
+      [{ ...file, index: { ...file.index, tags: ["!stable", "kit"] } }],
+      ["stable"]
+    );
+    expect(joined?.index.tags).toEqual(["!stable", "kit"]);
+    expect(withPreviewTags([file], ["review"])[0]?.index.tags).toEqual(["review"]);
+  });
+
   it("leaves the files as they are with none", () => {
     expect(withPreviewTags([file], [])[0]).toBe(file);
   });
