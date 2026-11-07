@@ -263,6 +263,9 @@ test.describe("the sidebar on a phone's width", () => {
 
   test("the search key opens it with the focus on the field", async ({ page }) => {
     await page.goto(STORY);
+    // the load event comes before the shell's first render: a key sent then has no listener yet, and a person presses
+    // only once there is a catalogue to see
+    await expect(toggleOf(page)).toBeVisible();
     await page.keyboard.press("ControlOrMeta+k");
     await expect(sidebarOf(page)).toBeInViewport({ ratio: 1 });
     await expect(page.getByRole("searchbox")).toBeFocused();

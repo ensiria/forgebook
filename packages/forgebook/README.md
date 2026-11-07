@@ -143,7 +143,8 @@ export default defineConfig({
 
 A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
 says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
-Sass file goes through its own compiler alone.
+Sass file goes through its own compiler alone. When a framework plugin or the app's `vite.config` sets
+`css.transformer: "postcss"`, Vite runs the project's PostCSS itself and the catalogue does not run it a second time.
 
 ## A first catalogue
 
@@ -1317,9 +1318,10 @@ the configuration:
 export default defineConfig({ /* … */ build: { readableNames: true } });
 ```
 
-A component's docs, a story file's code and a component's page are data, not scripts: a build writes each as a gzipped
-`.bin` file, which the page unpacks when it shows it, or in the story index itself when it is shorter than that file
-(a story file whose stories are all args has no code).
+A component's docs, a story file's code and a component's page are data, not scripts: a build writes them gzipped in
+`.bin` files, neighbouring texts together up to 64 KB of JSON each so they compress as one, which the page unpacks when
+it shows one; a text no longer than its loader goes in the story index itself (a story file whose stories are all args
+has no code).
 
 ## Mocking an API
 
