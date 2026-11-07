@@ -90,6 +90,21 @@ export const LATER_STRINGS = lateStrings({
   apiMember: "Member",
   memberCount: (count: number): string => `${count} ${count === 1 ? "member" : "members"}`,
   membersOf: (type: string): string => `Members of ${type}`,
+  // the names and types below come written as code spans (`codeSpans.ts`), since a type may hold backticks
+  propOnlyWhen: (prop: string, values: readonly string[], orOmitted: boolean): string => {
+    if (values.length === 0) return `Only when ${prop} is left out.`;
+    return `Only when ${prop} is ${values.join(" or ")}${orOmitted ? ", or left out" : ""}.`;
+  },
+  propGeneric: (parameter: string, type: string, shownAs: "constraint" | "default" | "unknown"): string =>
+    shownAs === "unknown"
+      ? `${parameter} is generic, with no constraint: shown as \`unknown\`.`
+      : `${parameter} is generic: shown as its ${shownAs}, ${type}.`,
+  propUnresolved: (name: string): string => `${name} cannot be found, so this type is read as \`any\`.`,
+  propAny: "Typed `any`: nothing is known of its values.",
+  propsUntyped: "Its props are typed `any`, so none can be listed.",
+  propsNoSignature: "Its type cannot be called with props, so none can be listed.",
+  propsOutsidePackage: (count: number): string =>
+    `${count === 1 ? "Its one prop comes" : `All ${count} of its props come`} from outside its package (an element's attributes), which the reference leaves out.`,
   showCode: "Show code",
   hideCode: "Hide code",
   openStory: "Open the story",

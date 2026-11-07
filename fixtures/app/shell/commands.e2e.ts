@@ -69,6 +69,29 @@ test.describe("forgebook story", () => {
     });
   });
 
+  test("gives an agent a variant's props with when they apply, and what a type parameter is shown as", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const run = forgebook(baseURL, ["story", "sb:storybook-prop-types--link", "--json"]);
+    expect(run.status).toBe(0);
+    const answer = JSON.parse(run.stdout);
+    const byName = new Map(
+      answer.docs.props.map((prop: { readonly name: string }): [string, unknown] => [prop.name, prop])
+    );
+    expect(answer.requiredProps).toEqual(["kind", "label"]);
+    expect(byName.get("href")).toMatchObject({
+      isRequired: false,
+      onlyWhen: { prop: "kind", values: ["link"] }
+    });
+    expect(byName.get("items")).toMatchObject({
+      type: "readonly unknown[]",
+      notes: [{ reason: "generic", parameter: "TItem", shownAs: "unknown", type: "unknown" }]
+    });
+    const text = forgebook(baseURL, ["story", "sb:storybook-prop-types--link"]);
+    expect(text.stdout).toContain("href (when kind is link)");
+  });
+
   test("gives an agent each prop's group, and the members of a prop typed with a documented object", ({
     baseURL
   }) => {

@@ -24,13 +24,14 @@ import { CodeText } from "./CodeText.tsx";
 import { useCatalogue } from "./catalogueContext.ts";
 import { Icon } from "./icons.tsx";
 import { LATER_STRINGS } from "./laterStrings.ts";
+import { propNoteTexts, propsNoteText } from "./propNotes.ts";
 import { RequiredFirstSwitch } from "./RequiredFirstSwitch.tsx";
 import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 import { useRequiredFirst } from "./useRequiredFirst.ts";
 
 /** A row of a table: a prop, an event, or a member of a prop's object type. */
-type RowDocs = MemberDocs & Partial<Pick<PropDocs, "signature" | "members" | "group">>;
+type RowDocs = MemberDocs & Partial<Pick<PropDocs, "signature" | "members" | "group" | "onlyWhen" | "notes">>;
 
 /** What a table lists, which names its first two columns. */
 type TableKind = "props" | "events" | "members";
@@ -119,6 +120,11 @@ const Row = ({
         ) : null}
         <td>
           <CodeText text={row.description} />
+          {propNoteTexts(row).map((note) => (
+            <span key={note} className="forgebook-api__note">
+              <CodeText text={note} />
+            </span>
+          ))}
         </td>
       </tr>
       {members !== undefined && isOpen ? (
@@ -318,6 +324,7 @@ export const ApiReference = ({
     ...(isSignature ? [] : docs.props),
     ...docs.subcomponents.flatMap((subcomponent) => subcomponent.props)
   ];
+  const propsNote = isSignature ? undefined : propsNoteText(docs);
   return (
     <section className="forgebook-doc__section" aria-labelledby="forgebook-api">
       <div className="forgebook-api__head">
@@ -328,6 +335,11 @@ export const ApiReference = ({
         <SignatureReference name={docs.name} signature={docs.signature} />
       ) : (
         <PropsAndEvents props={docs.props} groupOrder={groupOrder} layout={ordering.layout} level={3} />
+      )}
+      {propsNote === undefined ? null : (
+        <p className="forgebook-api__note">
+          <CodeText text={propsNote} />
+        </p>
       )}
       {docs.subcomponents.map((subcomponent) => (
         <SubcomponentReference
