@@ -614,6 +614,33 @@ export type FinderProps = {
 - With `eslint-plugin-tsdoc`, declare the tag in your `tsdoc.json`:
   `{ "tagName": "@group", "syntaxKind": "block", "allowMultiple": false }`.
 
+## Props a type cannot list plainly
+
+Some props types say more than a list of props. The API reference reads them as TypeScript does, and says what it
+could not read:
+
+```tsx
+export type ActionProps<TItem> = (
+  | { readonly kind: "link"; readonly href: string }
+  | { readonly kind: "button"; readonly onClick: () => void }
+) & { readonly label: string; readonly items?: readonly TItem[] };
+```
+
+- **A union of variants** lists every variant's props, not only the ones they share. A prop only some variants declare
+  is never marked required, and says when it applies: `href` reads "Only when `kind` is `"link"`". The discriminant is
+  the shared prop each variant gives one literal value (or leaves out), the one with the most values when several do.
+  A prop of a variant that takes the discriminant left out (`mode?: "single"`) says "or left out".
+  A prop the variants type differently shows all their types (`Date | Date[] | DateRange`).
+- **A generic component** writes each type parameter it leaves open as the component's constraint, else its default,
+  else `unknown`, and says which under the prop: `items` is `readonly unknown[]`, "`TItem` is generic, with no
+  constraint". A props type the component fills in (`BaseProps<string>`) is read with what it was given.
+- **A type it cannot read** says so instead of showing nothing: a name the checker cannot find (a missing import), a
+  prop typed `any`, props typed `any`, or a component whose props all come from outside its package (an element's
+  attributes, which the reference leaves out).
+- `forgebook story --json` and `get_story` carry the same as `onlyWhen`, `notes` on a prop and `propsNote` on the
+  component; `forgebook story` writes `href (when kind is link)`, and `CATALOG.md` `href:string[kind=link]` (`[mode?=single]`
+  when it also applies with `mode` left out).
+
 ## Required props first
 
 The API reference and the Props tab list a component's required props before the others, so a reader sees at once
@@ -1284,6 +1311,7 @@ is a state of the component: the same).
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
+| `forgebook proof` | Compares a change's states with where it started, both drawn in one run, for a pull request's comment |
 | `forgebook visibility` | Lists the published components an agent cannot see, with the fix for each |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
@@ -1430,6 +1458,37 @@ jobs:
 ```
 
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+
+## Proof in the pull request, made by CI
+
+`forgebook proof --base origin/main` draws the states a change touches twice in one run, from the commit it is compared with and
+with the change, and writes `comment.md`, `proof.json`, `index.html` and the pictures. `forgebook proof
+--write-workflow` writes a GitHub workflow that posts that comment, one per pull request, replaced on each push. Nothing runs
+outside GitHub, and the pictures are the run's artefact.
+
+- **No baseline, so nothing for an agent to approve.** The "before" is drawn in this run from where the change left the base (on a pull request's run, the base's tip), in a checkout
+  with its own install and server, and thrown away. `forgebook-baselines` is never read, and `proof` has no `--update`.
+- **What differs is pictured again.** A state that also differs between two pictures of the same code is `unstable`, and its
+  difference proves nothing. `forgebook proof --base HEAD --all` shows whether a project's pictures hold still between two
+  builds of one commit.
+- **It says what it did not check:** what `verify` skipped, UI files no story reaches, stories past `--max-stories`, a state
+  that did not draw, and real pages, which no story shows.
+- **A changed picture is for a person to judge.** The command exits zero once it has a proof, unless `--fail-on-verdict`
+  holds it to `verify`'s verdict, as the workflow does.
+- **It cannot defend against the code it runs.** The branch's code runs in the comparing job, and a `postinstall` before it,
+  so a hostile branch can forge the result or edit the workflow: no baseline can be approved, but a result can be faked. So
+  that job holds no write token and keeps no credential. The posting job runs nothing of the branch, writes the comment
+  itself from `proof.json` with every name in a code span or a fence, and lists from GitHub which files shape the run
+  (`.github/`, `patches/`, `package.json`, lockfiles, `.npmrc`, the catalogue's configuration and preview). The comment says
+  this at its top. Protect `.github/` with code owners if agents push to your repository, and treat `index.html` in a
+  stranger's artefact as any download.
+- **A fork's pull request gets no comment.** GitHub gives its run a read-only token, so posting fails and the job goes on:
+  the proof stays in the run's summary and its artefact. Never run this on `pull_request_target`, which would hand a fork's
+  code a write token.
+- **A picture needs a download.** GitHub cannot show an artefact's picture in a comment, so the comment links the artefact:
+  open `index.html` in it.
+- **A picture with something from the network proves little.** A story loading a random image reads as `unstable`, or as
+  changed when it differs only between the two sides. Mock what a story fetches.
 
 ## Stories on an origin of their own
 
