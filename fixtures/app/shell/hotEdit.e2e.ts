@@ -141,6 +141,24 @@ test("a frame says why a module it imports could not be served, with its place",
   await expect(page.locator(".forgebook-frame-error__message")).toContainText(/NoteField\.tsx:\d+:\d+: /);
 });
 
+test("names a component an edit leaves unparsable once, to people and tools, and no longer once it is fixed", async ({
+  page,
+  fileEdits
+}) => {
+  await page.goto(story("own"));
+  await expect(frameOf(page).getByLabel("Note")).toBeVisible();
+  await fileEdits.write(NOTE_FIELD_FILE, (original) => `${original}\nexport const = ;\n`);
+  const problems = page.locator(".forgebook-problems");
+  await expect(problems).toContainText(/NoteField\.tsx:\d+:\d+ does not parse/);
+  // tools read the same, once, with no frame needed
+  const broken = await (await page.request.get("/__forgebook/api/errors")).json();
+  expect(broken.problems).toEqual([expect.stringMatching(/NoteField\.tsx:\d+:\d+ does not parse/)]);
+  await fileEdits.write(NOTE_FIELD_FILE, (original) => original);
+  await expect(problems).toHaveCount(0);
+  const fixed = await (await page.request.get("/__forgebook/api/errors")).json();
+  expect(fixed.problems).toEqual([]);
+});
+
 test("draws an edit of the file its story is re-exported from, and keeps the text typed in it", async ({
   page,
   fileEdits

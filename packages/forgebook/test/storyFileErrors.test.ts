@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,6 +19,7 @@ import { filesModuleHot, servedPatterns, storyFileHotHooks } from "../src/vite/h
 import { indexStoryFile } from "../src/vite/indexStoryFile.ts";
 import { FILES_PREFIX, patternModule, usageModule } from "../src/vite/pluginModules.ts";
 import { scanOptions } from "../src/vite/prebundled.ts";
+import { scriptProblems } from "../src/vite/scriptProblems.ts";
 import {
   indexedStoryFiles,
   readStoryFiles,
@@ -320,10 +321,61 @@ describe("what a bundler's error says", () => {
 });
 
 describe("Vite's dependency scan", () => {
+  /** The scan plugin's `load`, with the warnings it wrote. */
+  const scanLoad = (): {
+    load: (id: string) => unknown;
+    warnings: string[];
+    problems: ReturnType<typeof scriptProblems>;
+  } => {
+    const warnings: string[] = [];
+    const problems = scriptProblems();
+    const [plugin] = scanOptions({
+      root: dir,
+      warn: (line: string) => warnings.push(line),
+      scanned: problems.scanned
+    }).plugins as readonly {
+      load: { handler: (id: string) => unknown };
+    }[];
+    return { load: (id: string) => plugin?.load.handler(id), warnings, problems };
+  };
+
   it("goes past a story file that does not parse, and reads any other as it is", () => {
-    const [plugin] = scanOptions().plugins as readonly { load: { handler: (id: string) => unknown } }[];
-    expect(plugin?.load.handler(badFile)).toEqual({ code: "", moduleType: "js" });
-    expect(plugin?.load.handler(goodFile)).toBeNull();
-    expect(plugin?.load.handler(join(dir, "virtual.stories.ts"))).toBeNull();
+    const { load, warnings, problems } = scanLoad();
+    expect(load(badFile)).toEqual({ code: "", moduleType: "js" });
+    expect(load(goodFile)).toBeNull();
+    expect(load(join(dir, "virtual.stories.ts"))).toBeNull();
+    // the catalogue names a story file itself
+    expect(warnings).toEqual([]);
+    expect(problems.list()).toEqual([]);
+  });
+
+  it("goes past a component that does not parse, keeping its imports, with one problem and one warning", () => {
+    // the scan names files by their real path
+    const component = join(realpathSync(dir), "Broken.tsx");
+    writeFileSync(
+      component,
+      'import { x } from "dep";\nexport const Broken = () => <p>{x}</p>;\nconst a = ( => 1;\n'
+    );
+    const { load, warnings, problems } = scanLoad();
+    expect(load(component)).toEqual({ code: 'import "dep";', moduleType: "js" });
+    // scanned again, as a first start's pre-bundling does after an import it could not resolve
+    load(component);
+    expect(warnings).toEqual([
+      "The dependency scan skipped Broken.tsx:3:13 does not parse: Unexpected token"
+    ]);
+    expect(problems.list()).toEqual([`${component}:3:13 does not parse: Unexpected token`]);
+  });
+
+  it("reads a .js file holding JSX as JSX, so its imports still count", () => {
+    const stories = join(dir, "Jsx.stories.js");
+    const text =
+      'import { Good } from "./Good";\nexport default {};\nexport const Main = { render: () => <Good /> };\n';
+    writeFileSync(stories, text);
+    const plain = join(dir, "plain.js");
+    writeFileSync(plain, "export const a = 1;\n");
+    const { load, warnings } = scanLoad();
+    expect(load(stories)).toEqual({ code: text, moduleType: "jsx" });
+    expect(load(plain)).toBeNull();
+    expect(warnings).toEqual([]);
   });
 });

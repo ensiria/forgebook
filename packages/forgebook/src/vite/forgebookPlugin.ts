@@ -69,6 +69,7 @@ import {
   usageModule
 } from "./pluginModules.ts";
 import { checkAtStart, type ResolvedVite } from "./runningVersions.ts";
+import { scriptProblems } from "./scriptProblems.ts";
 import {
   type IndexedStoryFile,
   type IsFileKept,
@@ -241,6 +242,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
    */
   let isTestRun = false;
+  const scripts = scriptProblems();
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
   /** The stamp of the plugin's own code, which makes the kept indexes and code: another version is a miss. */
@@ -331,7 +333,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       startTexts,
       access.isKept,
       isForgiving(),
-      config
+      config,
+      scripts.list()
     );
     filesModules.set(id, new Set([...files, ...refused].map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
@@ -442,7 +445,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
       }
-      const pages = config === undefined ? {} : catalogueConfig(config, userConfig);
+      const pages = config === undefined ? {} : catalogueConfig(config, userConfig, scripts);
       return {
         ...pages,
         css: {
@@ -472,6 +475,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       // a dev server's answers only: a build reads everything once, and stamping each answer's files costs it more than
       // a later build would save
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
+      scripts.start(resolved.logger, cacheFolder);
       if (config !== undefined && !isTestRun) sayEmptyStoryGlobs(config, isServing(), resolved.logger);
     },
     configureServer: (server: ViteDevServer): void => {
@@ -545,7 +549,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
-    ...storyFileHotHooks(isRedrawing, served, watching),
+    ...storyFileHotHooks(isRedrawing, served, watching, scripts),
     ...vitestHooks,
     async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
       const generated = await pagesModule(id);
