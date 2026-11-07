@@ -42,6 +42,7 @@ import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { SidebarSearch } from "./SidebarSearch.tsx";
 import { STRINGS } from "./strings.ts";
+import type { TagFilterProps } from "./TagFilter.tsx";
 import type { ShownTree, shownTree } from "./treeSearch.ts";
 import type { AppearanceState } from "./useAppearance.ts";
 
@@ -198,6 +199,21 @@ const useFoldChoices = (
     setFoldOpen: (key: string, isOpen: boolean): void =>
       setFoldChoices((choices) => new Map(choices).set(key, isOpen))
   };
+};
+
+/**
+ * The tag filter, where there is something to filter by, or on an address that names a tag: it is the way out of a list
+ * that tag emptied.
+ *
+ * @param props - the filter's props.
+ */
+const TagFilterSlot = (props: TagFilterProps): ReactNode => {
+  const hasTags = useMemo(() => hasFilterTags(props.tree), [props.tree]);
+  return hasTags || props.tags.length > 0 ? (
+    <Suspense fallback={null}>
+      <TagFilter {...props} />
+    </Suspense>
+  ) : null;
 };
 
 /** What a family's entry reads. */
@@ -390,7 +406,6 @@ export const Sidebar = ({
   const isFiltered = tags.length > 0;
   const isSearching = query.trim() !== "";
   const isNarrowed = isSearching || isFiltered;
-  const hasTags = useMemo(() => hasFilterTags(wholeTree), [wholeTree]);
 
   // the filter comes with the search's list; a moment before it, or with no words, the tree shows whole
   const { sources, pages } =
@@ -440,11 +455,7 @@ export const Sidebar = ({
           searchHref={searchHref}
           onOpenResult={onOpenResult}
         />
-        {hasTags ? (
-          <Suspense fallback={null}>
-            <TagFilter tree={wholeTree} tags={tags} onTagsChange={onTagsChange} />
-          </Suspense>
-        ) : null}
+        <TagFilterSlot tree={wholeTree} tags={tags} onTagsChange={onTagsChange} />
       </div>
       <nav ref={navRef} className="forgebook-tree" aria-label={STRINGS.componentsNav}>
         {hasMatches || !isNarrowed ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}

@@ -286,7 +286,7 @@ const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Addr
     panelArgs: addressArgsFor(read.args, addressTexts),
     link: read.link,
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== ""),
-    tags: params.getAll("tag")
+    tags: params.getAll("tag").filter((tag) => tag !== "" && tag !== "!")
   };
 };
 

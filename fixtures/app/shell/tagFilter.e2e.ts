@@ -47,6 +47,14 @@ test.describe("the tag filter", () => {
     await expect(tree(page).getByRole("link")).not.toHaveCount(1);
   });
 
+  test("a tag nobody has empties the list, with the way out still there", async ({ page }) => {
+    await page.goto("/?tag=nothing-holds-this");
+    await expect(tree(page).getByRole("link")).toHaveCount(0);
+    await filterButton(page).click();
+    await panel(page).getByRole("button", { name: "Clear the filter" }).click();
+    await expect(tree(page).getByRole("link")).not.toHaveCount(0);
+  });
+
   test("a story the filter leaves out still opens by its address", async ({ page }) => {
     await page.goto("/?tag=stable&story=sb:components-button--primary");
     await expect(page.getByRole("heading", { name: "Button", level: 1 })).toBeVisible();
