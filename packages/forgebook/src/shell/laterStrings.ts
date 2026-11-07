@@ -102,6 +102,7 @@ export const LATER_STRINGS = lateStrings({
     undeclared: "not one of its props",
     type: "not of the prop's type",
     unreadable: "its value could not be read",
+    markup: "this framework writes it into HTML, so a link may give only plain text",
     control: "its control refuses it, or could not be loaded"
   },
   removeDroppedArgs: "Remove them from the address",
