@@ -41,9 +41,13 @@ import type { TokenClash } from "../../src/vite/tokenClashes.ts";
 /** The style with no width to fit, so no cell is cut. */
 const uncut = (style: OutputStyle): OutputStyle => ({ ...style, width: Number.POSITIVE_INFINITY });
 
+/** Statuses in brackets after a name (` [review]`); nothing for none. */
+const statusMark = (status: readonly string[] | undefined): string =>
+  status === undefined ? "" : ` [${status.join(", ")}]`;
+
 /**
  * The stories as a table: one row per story, its id first (what `forgebook story` takes, never cut), then its
- * component's title and its name.
+ * component's title and its name, with its statuses in brackets.
  *
  * @param document - the stories document.
  * @param style - colours, glyphs and width.
@@ -53,7 +57,7 @@ export const storiesText = (document: StoriesDocument, style: OutputStyle): stri
     document.components.flatMap((component) =>
       component.stories.map((story) => [
         story.id,
-        `${component.title} › ${story.name}${story.isUnlisted ? " (unlisted)" : ""}`
+        `${component.title} › ${story.name}${story.isUnlisted ? " (unlisted)" : ""}${statusMark(story.statuses)}`
       ])
     ),
     { columns: [{ header: "Id" }, { header: "Story", tone: "muted" }] },
@@ -80,6 +84,10 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["Required", document.requiredProps.length === 0 ? "none" : document.requiredProps.join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
+  // the story's own, which may take its meta's away, and the deprecation its component's TSDoc adds
+  const fromDocs = document.component.statuses?.includes("deprecated") ? ["deprecated"] : [];
+  const statuses = [...new Set([...(document.story.statuses ?? []), ...fromDocs])];
+  if (statuses.length > 0) entries.push(["Status", statuses.join(", ")]);
   if (document.design !== undefined) entries.push(["Design", document.design.figma]);
   const fields = keyValue(entries, uncut(style));
   // the code spans lines: under the fields, as it is copied

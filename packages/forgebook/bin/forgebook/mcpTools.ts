@@ -188,7 +188,7 @@ export const catalogueTools = ({
   {
     name: "list_stories",
     description:
-      "List the catalogue's components and stories, with each story's id and the links that open it, and the problems the story index found. Filter by source id or by text in a component's title.",
+      "List the catalogue's components and stories, with each story's id and the links that open it, each component's and story's statuses when they have any (review, experimental, deprecated…), and the problems the story index found. Filter by source id, by text in a component's title, or by tags (a status is a tag).",
     inputSchema: {
       type: "object",
       properties: {
@@ -225,7 +225,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, its code as the Code tab shows it (code: the render or the args as written), the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, its code as the Code tab shows it (code: the render or the args as written), the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, its and its component's statuses (statuses; never use a deprecated component), and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {

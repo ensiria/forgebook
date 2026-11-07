@@ -71,6 +71,8 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
 - Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
   `@replacedBy`. `forgebook story` returns them as `docs.guidance`: read them before using a component, and never use a
   deprecated one.
+- A component's status is a tag on its meta (`tags: ["review"]`, `["experimental"]`, `["deprecated"]`; a story's own on
+  the story): the catalogue shows it as a badge. Deprecate in both places, the meta's tag and `@deprecated` in the TSDoc.
 - A component with many props names their groups in its TSDoc (`@group Paging`): `forgebook story` returns each
   prop's `group`, and a prop typed with a documented object (`texts?: FinderTexts`) its `members`, each with its type,
   default and TSDoc: read them to know every text a component takes before passing one.

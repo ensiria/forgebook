@@ -1,6 +1,6 @@
 /**
  * The sidebar's tag filter: a button beside the search, with how many tags are on, which opens the catalogue's tags to
- * ask for or to leave out. Loaded only for a catalogue whose stories have tags.
+ * ask for or to leave out, a status shown as its badge. Loaded only for a catalogue whose stories have tags.
  *
  * @module
  */
@@ -8,6 +8,7 @@ import { type ChangeEvent, type MouseEvent, type ReactNode, useMemo } from "reac
 
 import { catalogueTags } from "../storyTags.ts";
 import type { StoryTree } from "../storyTree.ts";
+import { StatusBadge, useStatuses } from "./StatusBadges.tsx";
 import "./tagFilter.scss";
 import { textsOfGroup } from "./strings.ts";
 import { usePopover } from "./usePopover.ts";
@@ -39,6 +40,7 @@ export type TagFilterProps = {
 export const TagFilter = ({ tree, tags, onTagsChange }: TagFilterProps): ReactNode => {
   const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
   const offered = useMemo(() => catalogueTags(tree), [tree]);
+  const statuses = useStatuses();
   const set = (tag: string, written: string | undefined): void =>
     onTagsChange([
       ...tags.filter((each) => each !== tag && each !== `!${tag}`),
@@ -72,34 +74,40 @@ export const TagFilter = ({ tree, tags, onTagsChange }: TagFilterProps): ReactNo
           aria-label={TAG_STRINGS.title}
         >
           <ul className="forgebook-tag-filter__list">
-            {offered.map(({ tag, stories }) => (
-              <li key={tag} className="forgebook-tag-filter__row">
-                <label className="forgebook-tag-filter__tag">
-                  <input
-                    type="checkbox"
-                    checked={tags.includes(tag)}
-                    onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-                      set(tag, event.target.checked ? tag : undefined)
-                    }
-                  />
-                  <span className="forgebook-tag-filter__name">{tag}</span>
-                  <span className="forgebook-tree__count">{stories}</span>
-                </label>
-                <button
-                  type="button"
-                  className="forgebook-icon-button"
-                  title={TAG_STRINGS.leaveOut(tag)}
-                  aria-label={TAG_STRINGS.leaveOut(tag)}
-                  aria-pressed={tags.includes(`!${tag}`)}
-                  onClick={(): void => set(tag, tags.includes(`!${tag}`) ? undefined : `!${tag}`)}
-                >
-                  <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden="true">
-                    <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="m4 12 8-8" stroke="currentColor" strokeWidth="1.5" />
-                  </svg>
-                </button>
-              </li>
-            ))}
+            {offered.map(({ tag, stories }) => {
+              const status = statuses.find((each) => each.id === tag);
+              return (
+                <li key={tag} className="forgebook-tag-filter__row">
+                  <label className="forgebook-tag-filter__tag">
+                    <input
+                      type="checkbox"
+                      checked={tags.includes(tag)}
+                      onChange={(event: ChangeEvent<HTMLInputElement>): void =>
+                        set(tag, event.target.checked ? tag : undefined)
+                      }
+                    />
+                    {/* a status reads as its badge, as in the sidebar; the tag stays in the address */}
+                    <span className="forgebook-tag-filter__name">
+                      {status === undefined ? tag : <StatusBadge status={status} />}
+                    </span>
+                    <span className="forgebook-tree__count">{stories}</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="forgebook-icon-button"
+                    title={TAG_STRINGS.leaveOut(tag)}
+                    aria-label={TAG_STRINGS.leaveOut(tag)}
+                    aria-pressed={tags.includes(`!${tag}`)}
+                    onClick={(): void => set(tag, tags.includes(`!${tag}`) ? undefined : `!${tag}`)}
+                  >
+                    <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden="true">
+                      <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="m4 12 8-8" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           <button
             type="button"

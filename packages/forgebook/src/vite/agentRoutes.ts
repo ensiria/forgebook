@@ -28,6 +28,7 @@ import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import type { CustomControlsRead } from "../storyControls.ts";
+import { catalogueStatuses } from "../storyStatuses.ts";
 import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
 import { isValueSchema } from "../valueSchema.ts";
@@ -41,6 +42,7 @@ import {
   storyDocument
 } from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
+import { storiesWithStatus, storyWithStatus } from "./agentStatuses.ts";
 import { type AgentCodeParts, withStoryCode } from "./agentStoryCode.ts";
 import { changedAnswer } from "./changedRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
@@ -246,7 +248,11 @@ export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer>
     ...(hidden.length === 0 ? [] : [hiddenStoryFoldersMessage(hidden)])
   ];
   const listed = said.length === 0 ? tree : { ...tree, problems: [...said, ...tree.problems] };
-  return { status: 200, body: storiesDocument(config.title, listed, pages, view, usage) };
+  const statuses = catalogueStatuses(config.lists.statuses);
+  return {
+    status: 200,
+    body: storiesWithStatus(storiesDocument(config.title, listed, pages, view, usage), listed, statuses)
+  };
 };
 
 /**
@@ -289,11 +295,15 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
   // a usage that cannot be read leaves "Used in" out, never the story
   const usage = index === undefined || typeof index === "string" ? undefined : { tree, index };
   const module = "value" in storyModule ? storyModule.value : undefined;
-  const document = withStoryCode(storyDocument(location, parts, pages, view, usage), code, {
-    location,
-    module,
-    preview: loaded.preview
-  });
+  const document = storyWithStatus(
+    withStoryCode(storyDocument(location, parts, pages, view, usage), code, {
+      location,
+      module,
+      preview: loaded.preview
+    }),
+    location.component,
+    catalogueStatuses(config.lists.statuses)
+  );
   // an agent must tell docs turned off from a story file that names no component
   const body: StoryDocument = readsComponentDocs(config.lists)
     ? document

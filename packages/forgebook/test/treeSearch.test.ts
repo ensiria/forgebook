@@ -78,6 +78,7 @@ const BUTTON: TreeComponent = {
   keywords: ["Pressable", "CTA"],
   design: undefined,
   propGroups: [],
+  tags: [],
   requiredFirst: undefined
 };
 

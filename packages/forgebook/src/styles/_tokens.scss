@@ -20,6 +20,8 @@ $light: (
   accent-text: #0059d2,
   on-accent: #fff,
   danger-text: #bc1f16,
+  caution-text: #935200,
+  positive-text: #077229,
   code-keyword: #7036c4,
   code-type: #0059d2,
   code-string: #077229,
@@ -53,6 +55,8 @@ $dark: (
   accent-text: #7ab3ff,
   on-accent: #fff,
   danger-text: #ff8a80,
+  caution-text: #f2b46b,
+  positive-text: #7fdc8f,
   code-keyword: #c9a8ff,
   code-type: #7ab3ff,
   code-string: #7fdc8f,
@@ -85,6 +89,8 @@ $accent: var(--forgebook-accent);
 $accent-text: var(--forgebook-accent-text);
 $on-accent: var(--forgebook-on-accent);
 $danger-text: var(--forgebook-danger-text);
+$caution-text: var(--forgebook-caution-text);
+$positive-text: var(--forgebook-positive-text);
 $shade: var(--forgebook-shade);
 $selected: color-mix(in srgb, $accent 12%, transparent);
 $disabled-opacity: 0.45;

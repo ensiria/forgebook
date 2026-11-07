@@ -119,6 +119,12 @@ const STATES: readonly ShellState[] = [
     }
   },
   {
+    name: "statuses",
+    open: pageWith("/?component=kit:touch-demos-swipe-list", (page) =>
+      page.locator(".forgebook-status-badges--story")
+    )
+  },
+  {
     name: "component page",
     open: pageWith("/?component=kit:inputs-selection-select", (page) =>
       page.locator(".forgebook-api__subcomponent").first()

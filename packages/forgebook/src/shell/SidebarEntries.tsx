@@ -6,9 +6,11 @@
  */
 import type { MouseEvent, ReactNode } from "react";
 
+import { isFilterTag } from "../storyTagNames.ts";
 import { isLogicComponent, type TreeAlias, type TreeComponent, type TreeGroup } from "../storyTree.ts";
 import { Icon } from "./icons.tsx";
 import { STRINGS } from "./strings.ts";
+import { TagViewSlot } from "./tagView.tsx";
 import { useFold } from "./useFold.ts";
 
 /** The shown component: its source and title, to mark it and keep its family open, and the shown story's id. */
@@ -148,7 +150,7 @@ export const FamilyGroup = ({
   );
 };
 
-/** A component's link: its page, where its stories are picked from the header. */
+/** A component's link: its page, where its stories are picked from the header, with its status's badges. */
 const ComponentEntry = ({
   sourceId,
   component,
@@ -178,6 +180,7 @@ const ComponentEntry = ({
             <span className="forgebook-visually-hidden">{STRINGS.logic}</span>
           </span>
         ) : null}
+        {component.tags.some(isFilterTag) ? <TagViewSlot place="entry" component={component} /> : null}
         <span className="forgebook-tree__count">{component.stories.length}</span>
       </PageLink>
     </div>
