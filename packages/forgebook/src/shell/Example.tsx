@@ -9,6 +9,7 @@ import { type ChangeEvent, type MouseEvent, type ReactNode, useId, useState } fr
 
 import { deviceDefaultOf, type StoryDevice, shownDevice } from "../deviceView.ts";
 import type { PanelArgs } from "../messages.ts";
+import { type StoryCodeSource, storyCodeText } from "../storyCodeText.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
 import { frameAddress, schemeOf, type ViewState } from "../viewState.ts";
@@ -29,7 +30,7 @@ import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { StageViewport } from "./StageViewport.tsx";
-import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
+import { StoryCodeBlock } from "./StoryCodeBlock.tsx";
 import { type StoryTouches, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { useCopy } from "./useCopy.ts";
@@ -424,7 +425,7 @@ export const Example = ({
   const { shown, framed, scheme } = useExampleDevice(story, context);
   // the frame loads with the story's finger as it is then; a change after reaches it live, keeping the story's state
   const loadedView = useLoadedView(
-    context.frameView.sheets,
+    `${context.frameView.sheets}|${context.frameView.play}`,
     touchedView(context.frameView, story.id, context.touches, touch)
   );
   const boxWidth = useBoxWidth(full.isOver, context.view.width);

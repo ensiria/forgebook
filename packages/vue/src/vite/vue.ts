@@ -41,7 +41,8 @@ export const vue = (): FrameworkAdapter => ({
   docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
   pages: { frame: "@forgebook/vue/frame", code: "@forgebook/vue/code" },
   // the server render is named too: the page never runs it, but Vite meets its import in the renderer and would reload
-  browserDependencies: [FULL_BUILD, "vue/server-renderer"],
+  // the preview's set-up module too, so the preview and the renderer share one list whatever Vite's scan finds
+  browserDependencies: [FULL_BUILD, "vue/server-renderer", "@forgebook/vue/setup"],
   componentFiles: { extension: ".vue", scriptOf },
   // single-file components, and their hot updates: an edited component updates in its frame, keeping its state
   vitePlugins: async (): Promise<readonly PluginOption[]> => {

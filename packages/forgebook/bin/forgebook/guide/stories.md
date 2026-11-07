@@ -10,8 +10,8 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not
   list is outside the globs, left out by a `!` one, or refused by Vite's `server.fs.deny` (the dev server warns): put it
   where they list it, or change the globs on purpose.
-- A story glob that matches nothing stops `forgebook build`, `stories`, `check` and `verify` with an exit code of 1 and
-  names the glob; `forgebook dev` warns, and `list_stories` carries it in `problems` until a file matches. A misspelt
+- A story glob that matches nothing stops `forgebook build`, `stories` and `check` with an exit code of 1 and names the
+  glob; `verify` answers `not-verified` with the glob in `skipped`, and the rest of its answer; `forgebook dev` warns, and `list_stories` carries it in `problems` until a file matches. A misspelt
   configuration key, a toolbar naming no control and a file that does not load (`file:line:column` for a syntax error)
   stop every command the same way, so read the message before looking elsewhere.
 - **Setting a story's values without the panel.** `controls` in `forgebook story --json` and `get_story` lists every prop

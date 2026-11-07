@@ -5,11 +5,14 @@
  *
  * @module
  */
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 
 import type { PlayStepCommand } from "../messages.ts";
 import type { PlayAction, PlayStatus, PlayTrace } from "../playTrace.ts";
+import type { ViewState } from "../viewState.ts";
+import { useCatalogue } from "./catalogueContext.ts";
 import { LATER_STRINGS } from "./laterStrings.ts";
+import { rememberPlay } from "./playMemory.ts";
 import { STRINGS } from "./strings.ts";
 
 /** The tab's props. */
@@ -18,6 +21,10 @@ export type InteractionsTabProps = {
   readonly trace: PlayTrace;
   /** Runs the play again on a fresh mount, or steps through it. */
   readonly onPlayStep: (command: PlayStepCommand) => void;
+  /** The view, whose play switch it shows. */
+  readonly view: ViewState;
+  /** Changes the view. */
+  readonly onViewChange: (view: ViewState) => void;
 };
 
 /** A status with its time, as a line ends. */
@@ -68,7 +75,7 @@ const PlayButtons = ({ trace, onPlayStep }: InteractionsTabProps): ReactNode =>
         disabled={trace.status === "running"}
         onClick={(): void => onPlayStep("again")}
       >
-        {LATER_STRINGS.playAgain}
+        {trace.status === "off" ? LATER_STRINGS.playRun : LATER_STRINGS.playAgain}
       </button>
     </>
   ) : (
@@ -88,7 +95,8 @@ const PlayButtons = ({ trace, onPlayStep }: InteractionsTabProps): ReactNode =>
  * @param props - the trace and how to run the play again.
  */
 export const InteractionsTab = (props: InteractionsTabProps): ReactNode => {
-  const { trace } = props;
+  const { trace, view, onViewChange } = props;
+  const catalogue = useCatalogue();
   const actions = trace.actions ?? [];
   const outside = actions.filter((action) => action.step === undefined);
   return (
@@ -101,6 +109,18 @@ export const InteractionsTab = (props: InteractionsTabProps): ReactNode => {
           <PlayButtons {...props} />
         </div>
       </div>
+      <label className="forgebook-play__switch">
+        <input
+          type="checkbox"
+          checked={view.play === "on"}
+          onChange={(event: ChangeEvent<HTMLInputElement>): void => {
+            const play = event.target.checked ? "on" : "off";
+            rememberPlay(catalogue, play);
+            onViewChange({ ...view, play });
+          }}
+        />
+        {LATER_STRINGS.playOnOpen}
+      </label>
       {trace.pausedAt === undefined ? null : (
         <p className="forgebook-play__paused" role="status">
           {LATER_STRINGS.playPaused(trace.pausedAt)}
@@ -112,7 +132,9 @@ export const InteractionsTab = (props: InteractionsTabProps): ReactNode => {
         </p>
       )}
       {trace.steps.length === 0 && actions.length === 0 ? (
-        <p className="forgebook-prop__description">{LATER_STRINGS.playNoSteps}</p>
+        <p className="forgebook-prop__description">
+          {trace.status === "off" ? LATER_STRINGS.playOff : LATER_STRINGS.playNoSteps}
+        </p>
       ) : null}
       {trace.steps.length === 0 ? null : (
         <ol className="forgebook-play__steps">

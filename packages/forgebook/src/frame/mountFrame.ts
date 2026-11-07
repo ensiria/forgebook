@@ -21,7 +21,12 @@ import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../ca
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
 import { shownLanguage } from "../languages.ts";
-import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
+import {
+  isMappedStackAnswer,
+  LIVE_ERROR_EVENT,
+  type LiveErrorReport,
+  MAPPED_STACK_EVENT
+} from "../liveErrors.ts";
 import type { PanelArgs, ShellMessage } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { applySafeArea } from "../safeAreaParameter.ts";
@@ -49,6 +54,7 @@ import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
 import {
   ERROR_MESSAGE_CLASS,
+  ERROR_STACK_CLASS,
   FRAME_STARTED_ATTRIBUTE,
   NOT_AWAITED_ATTRIBUTE,
   PENDING_REASON_ATTRIBUTE,
@@ -109,6 +115,13 @@ export type FrameConfig = {
 const tellDevServer = (report: LiveErrorReport): void => {
   import.meta.hot?.send(LIVE_ERROR_EVENT, report);
 };
+
+// the browser writes a stack in the lines of the code Vite served, and the dev server answers with the lines as written
+import.meta.hot?.on(MAPPED_STACK_EVENT, (answer: unknown): void => {
+  if (!isMappedStackAnswer(answer)) return;
+  for (const shown of document.querySelectorAll(`.${ERROR_STACK_CLASS}`))
+    if (shown.textContent === answer.sent) shown.textContent = answer.stack;
+});
 
 // a story that threw is gone from its frame, so a hot update has nothing to update: the fix shows only in a new page; a
 // story the frame gave up on keeps saying so until a new page waits for it again
@@ -232,9 +245,9 @@ const showOutcome = (outcome: StoryOutcome, storyId: string, isNotAwaited: boole
   return outcome.reason;
 };
 
-/** The play tools a project installed, for a story that uses them. */
-const playToolsOf = ({ playTools }: FrameConfig): Pick<StoryRunOptions, "playTools"> =>
-  playTools === undefined ? {} : { playTools };
+/** The play tools a project installed, and whether the frame's address lets its story play when it opens. */
+const playOptions = ({ playTools }: FrameConfig, playsOnOpen: boolean): Partial<StoryRunOptions> =>
+  playTools === undefined ? { playsOnOpen } : { playTools, playsOnOpen };
 
 /**
  * Shows the story the address names in the given element.
@@ -253,7 +266,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   // the previews' modules: an edit of one (or of what it imports) brings its successor
   let previews: readonly unknown[] = config.previews ?? [];
   let preview = mergedPreviews(previews.map(readPreview));
-  const view = parseView(window.location.search, catalogue);
+  // a frame runs its play unless its own address says otherwise, whatever the catalogue's readers start with: tests and
+  // tools open frames with no word, and a new address written below must not add one
+  const view = parseView(window.location.search, { ...catalogue, readerPlay: "on" });
   const shell = shellChannel(config.frames ?? SAME_ORIGIN, window);
   const tellShell = shell.tell;
   applyView(document.documentElement, view, catalogue);
@@ -279,10 +294,11 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   };
   new ResizeObserver(reportSize).observe(document.body);
   const reportScheme = followCanvasScheme(document, window, storyId, tellShell);
-  const reportError = (message: string): void => {
+  const reportError = (message: string, stack?: string): void => {
     document.documentElement.setAttribute(STATUS_ATTRIBUTE, "error");
     tellShell({ type: "forgebook:error", storyId, message });
-    tellDevServer({ kind: "render", storyId, view: window.location.search, message });
+    const report: LiveErrorReport = { kind: "render", storyId, view: window.location.search, message };
+    tellDevServer(stack === undefined ? report : { ...report, stack });
   };
   const fail = (message: string): void => {
     const box = document.createElement("div");
@@ -427,7 +443,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       container,
       story,
       identity: { id: storyId, name: location.story.name, title: location.component.title },
-      ...playToolsOf(config),
+      ...playOptions(config, view.play === "on"),
       pluginSetups: plugins.setups,
       renderer: config.renderer,
       clock,
@@ -462,7 +478,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
             });
         };
       },
-      onError: reportError,
+      onError: (message: string, stack: string | undefined): void => reportError(message, stack),
       onTrace: (trace: PlayTrace): void => {
         tellShell({ type: "forgebook:play", storyId, trace });
         if (trace.status === "failed")

@@ -6,6 +6,10 @@
  * its `node_modules`, so `playwright install` from the project can fetch a browser the checks never find. The one that
  * counts is the one `@forgebook/testing` loads, found from that package.
  *
+ * Playwright's install also deletes every build in the shared browser folder that no project it still knows of uses, so
+ * a plain `playwright install` here can remove the browsers of other projects on the machine. `--no-remove` keeps the
+ * install to adding the one build the checks need: Forgebook never deletes what it did not install.
+ *
  * @module
  */
 import { existsSync, realpathSync } from "node:fs";
@@ -59,7 +63,7 @@ export const installBrowser = async (
     });
   await exec(
     process.execPath,
-    [command, "install", "chromium", ...(shouldInstallSystemPackages ? ["--with-deps"] : [])],
+    [command, "install", "--no-remove", "chromium", ...(shouldInstallSystemPackages ? ["--with-deps"] : [])],
     { cwd: dir, output: "prefix", prefix: "playwright", io }
   );
 };

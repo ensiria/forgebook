@@ -45,6 +45,7 @@ import {
   shallowRef
 } from "vue";
 
+import { setUpApp } from "./appSetups.ts";
 import { STORY_CLOCK } from "./clock.ts";
 import { storyVNode } from "./storyVnode.ts";
 import { STORY_TEXTS } from "./texts.ts";
@@ -227,6 +228,7 @@ export const createVueRenderer = (options: VueRendererOptions = {}): StoryRender
       computed(() => view.clock)
     );
     options.prepareApp?.(app, first, "page");
+    setUpApp(app);
     app.mount(canvas);
     // a story meant to stay in its fallback is drawn as it is: what it awaits is not coming
     if (first.story.suspense.isExpected) markWhenFlushed();
@@ -259,6 +261,7 @@ export const createVueRenderer = (options: VueRendererOptions = {}): StoryRender
     const app = createSSRApp({ render: () => storyVNode(drawing.story, context, drawing.decorators) });
     provideDrawing(app, shallowRef(drawing.texts), shallowRef(drawing.clock));
     options.prepareApp?.(app, drawing, "server");
+    setUpApp(app);
     // the server keeps going after a render error, with an empty comment in its place: without this it would not fail
     const failures: unknown[] = [];
     app.config.errorHandler = (error: unknown): void => {

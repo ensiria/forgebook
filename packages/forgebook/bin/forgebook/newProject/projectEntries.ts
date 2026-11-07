@@ -13,9 +13,6 @@
 /** The extensions of a style sheet Vite compiles. */
 const STYLE_SHEET = /\.(?:css|scss|sass|less|styl|stylus|pcss|postcss)$/;
 
-/** The longest text taken from a project into a report, so a planted file cannot flood an agent's context. */
-const PRINTABLE_LENGTH = 500;
-
 /**
  * Whether a path or a specifier names a style sheet: what a page or `angular.json` says is one is not taken on trust, as
  * a preview's import of it would run a script.
@@ -23,22 +20,6 @@ const PRINTABLE_LENGTH = 500;
  * @param specifier - the path or the specifier.
  */
 export const isStyleSheet = (specifier: string): boolean => STYLE_SHEET.test(specifier);
-
-/**
- * A text from a project's files made safe to print: no control characters, which could rewrite a terminal's lines, and
- * of a bounded length.
- *
- * @param text - the text.
- */
-export const printable = (text: string): string => {
-  const kept = [...text]
-    .filter((character) => {
-      const code = character.codePointAt(0) ?? 0;
-      return code >= 32 && (code < 127 || code > 159);
-    })
-    .join("");
-  return kept.length > PRINTABLE_LENGTH ? `${kept.slice(0, PRINTABLE_LENGTH)}…` : kept;
-};
 
 /**
  * A script's lines outside block comments that start their line, so a commented-out import is not read as a live one. A

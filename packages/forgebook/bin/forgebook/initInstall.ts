@@ -8,6 +8,7 @@ import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { printable } from "../../src/printable.ts";
 import type { InitInstall } from "./newProject/newProject.types.ts";
 import {
   type DetectedPackageManager,
@@ -15,7 +16,6 @@ import {
   spawnedCommand,
   workspaceRootFlags
 } from "./newProject/packageManagers.ts";
-import { printable } from "./newProject/projectEntries.ts";
 import { installSpecifier, type PackageState } from "./newProject/projectPackages.ts";
 
 /** How much of a failed install's end is kept: enough for its reason, not to flood an agent's context. */

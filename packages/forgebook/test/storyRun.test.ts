@@ -110,6 +110,43 @@ const controlsOf = (reports: Reports): StoryControls => {
   return reports.controls;
 };
 
+describe("the play switch", () => {
+  it("keeps a play from running on a mount, says so, and runs it when asked, once", async () => {
+    let played = 0;
+    const statuses: string[] = [];
+    const { reports } = await run(
+      badge({
+        play: (): void => {
+          played += 1;
+        }
+      }),
+      undefined,
+      undefined,
+      [],
+      { playsOnOpen: false, onTrace: (trace: PlayTrace): void => void statuses.push(trace.status) }
+    );
+    expect(played).toBe(0);
+    expect(statuses).toEqual(["off"]);
+    expect(reports.controls).toBeDefined();
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(1);
+    expect(statuses.at(-1)).toBe("passed");
+    controlsOf(reports).restartClock();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(1);
+  });
+
+  it("says nothing of a story with no play", async () => {
+    const statuses: string[] = [];
+    await run(badge({}), undefined, undefined, [], {
+      playsOnOpen: false,
+      onTrace: (trace: PlayTrace): void => void statuses.push(trace.status)
+    });
+    expect(statuses).toEqual([]);
+  });
+});
+
 describe("stepping through a play", () => {
   it("pauses only the mount it was asked for: Replay's next mount runs on its own", async () => {
     let played = 0;
