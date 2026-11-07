@@ -21,6 +21,7 @@ import type { ArgValue, PanelArgs, PlayStepCommand } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { TreeStory } from "../storyTree.ts";
+import type { ViewState } from "../viewState.ts";
 import type { CheckState } from "./A11yTab.tsx";
 import type { ArgControlLoaders } from "./customControls.ts";
 import type { DockTab } from "./Dock.tsx";
@@ -107,6 +108,10 @@ export type DockTabsInput = {
   readonly trace: PlayTrace | undefined;
   /** Runs the play again, or steps through it. */
   readonly onPlayStep: (command: PlayStepCommand) => void;
+  /** The view, whose play switch the Interactions tab shows. */
+  readonly view: ViewState;
+  /** Changes the view. */
+  readonly onViewChange: (view: ViewState) => void;
   /** The accessibility check. */
   readonly check: CheckState;
   /** Runs it; none when it cannot run. */
@@ -272,11 +277,14 @@ const logicTabs = (input: DockTabsInput, component: ComponentDocs): DockTab[] =>
 };
 
 /** The Interactions tab of a story whose play ran. */
-const interactionsTab = (trace: PlayTrace, { onPlayStep }: Pick<DockTabsInput, "onPlayStep">): DockTab => ({
+const interactionsTab = (
+  trace: PlayTrace,
+  { onPlayStep, view, onViewChange }: Pick<DockTabsInput, "onPlayStep" | "view" | "onViewChange">
+): DockTab => ({
   id: "play",
   label: STRINGS.tabs.play,
   hint: interactionsHint(trace),
-  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayStep }} />
+  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayStep, view, onViewChange }} />
 });
 
 /** The Code tab, when the story file has code: loading, loaded, or failed to load. */

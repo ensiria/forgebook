@@ -196,6 +196,13 @@ describe("the generated pages", () => {
     expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, false)).not.toContain(
       "storyGlobs"
     );
+    // a reader of published docs did not ask for a story to play; a dev server's author did
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, false)).toContain(
+      '"play":"off"'
+    );
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, true)).not.toContain(
+      '"play"'
+    );
     const source = storiesSourceModule(CONFIG);
     expect(source).toContain(
       `import files from ${codeLiteral("virtual:forgebook-files:/catalogue::0::src/**/*.stories.tsx")};`

@@ -78,6 +78,7 @@ import { useShortcutHelp } from "./useShortcutHelp.tsx";
 import { useShownView } from "./useShownView.ts";
 import { useSidebarLayout } from "./useSidebarLayout.ts";
 import { useSidebarOverlay } from "./useSidebarOverlay.ts";
+import { readStored } from "./useStored.ts";
 import { useStoryHeights } from "./useStoryHeights.ts";
 import { useStoryIdsElement } from "./useStoryIdsElement.ts";
 import { useStoryKeys } from "./useStoryKeys.ts";
@@ -292,7 +293,7 @@ const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Addr
 };
 
 /** What an address's query reads of the catalogue. */
-type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience">;
+type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience" | "play">;
 
 /**
  * The query of an address.
@@ -304,7 +305,7 @@ const addressQuery = (
   { page, view, panelArgs, link, matrix, tags }: Address,
   catalogue: AddressCatalogue
 ): string => {
-  const params = viewParams(view, catalogue.switches, catalogue.audience);
+  const params = viewParams(view, catalogue.switches, catalogue.audience, catalogue.play);
   if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
   if (page.kind === "page") params.set("page", page.id);
@@ -1125,7 +1126,7 @@ const ShellPage = ({
  * @param props - the configuration.
  */
 export const Shell = (props: ShellConfig): ReactNode => (
-  <CatalogueContext.Provider value={useConfiguredCatalogue(props)}>
+  <CatalogueContext.Provider value={useConfiguredCatalogue(props, readStored)}>
     <PluginHostsContext.Provider value={props.pluginHosts}>
       <ShellPage {...props} />
     </PluginHostsContext.Provider>
