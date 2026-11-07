@@ -1145,6 +1145,11 @@ the plugin too, since each would otherwise give a catalogue that looks right and
   `forgebook dev` warns instead and opens a home that says where it looks, since you may be about to write the first story;
   saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
   may match nothing.
+- **Story files in a hidden folder**: a pattern's `**` does not enter a folder whose name starts with a dot
+  (`docs/.vitepress`). Files a pattern would match there are named, with the pattern that lists them
+  (`docs/.vitepress/**/*.stories.ts`): a warning from `forgebook dev`, a problem in `stories`, and the hint when a pattern
+  matches nothing. Nothing stops on them; a `!` pattern for the folder (`!docs/.vitepress/**`) says it is left out on
+  purpose and ends the notice.
 
 ## Stories that load
 

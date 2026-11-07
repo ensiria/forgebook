@@ -31,6 +31,7 @@ import {
   type ResolvedConfig
 } from "../../src/vite/configFile.ts";
 import { emptyStoryGlobs, emptyStoryGlobsMessage } from "../../src/vite/emptyStoryGlobs.ts";
+import { hiddenStoryFolders, hiddenStoryFoldersMessage } from "../../src/vite/hiddenStoryFiles.ts";
 import { catalogueClient } from "./agentClient.ts";
 
 /** The options every `forgebook` command takes: the configuration file. */
@@ -90,10 +91,15 @@ export const configOf = async (file: string | undefined): Promise<ResolvedConfig
 export const configWithStoriesOf = async (file: string | undefined): Promise<ResolvedConfig> => {
   const config = await configOf(file);
   const globs = emptyStoryGlobs(config);
-  if (globs.length > 0)
+  if (globs.length > 0) {
+    const hidden = hiddenStoryFolders(config);
     throw new ScriptError(emptyStoryGlobsMessage(globs), {
-      hint: `Correct the pattern, or write the first story: ${COMMAND} new <component file>`
+      hint:
+        hidden.length > 0
+          ? hiddenStoryFoldersMessage(hidden)
+          : `Correct the pattern, or write the first story: ${COMMAND} new <component file>`
     });
+  }
   return config;
 };
 
