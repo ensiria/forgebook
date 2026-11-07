@@ -6,7 +6,7 @@
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { createServer, type Plugin } from "vite";
 import { afterEach, describe, expect, it } from "vitest";
@@ -31,7 +31,7 @@ const made: string[] = [];
 
 /** A folder holding these files, removed after the test. */
 const projectWith = (files: Readonly<Record<string, string>>): string => {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "forgebook-app-build-")));
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), "forgebook-app-build-")));
   made.push(dir);
   for (const [name, text] of Object.entries(files)) {
     mkdirSync(dirname(join(dir, name)), { recursive: true });
@@ -191,8 +191,8 @@ describe("what is taken of a vite.config", () => {
       resolve: { alias: { "@": "/src" }, dedupe: ["react"] },
       css: { preprocessorOptions: { scss: { additionalData: "$a: 1;" } } },
       define: { A: "1" },
-      publicDir: "/project/web/static",
-      envDir: "/project/web/env"
+      publicDir: resolve("/project", "web", "static"),
+      envDir: resolve("/project", "web", "env")
     });
   });
 
