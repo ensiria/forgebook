@@ -17,7 +17,7 @@ import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
-import type { StoryCheckResult } from "../storyCheck.ts";
+import type { StoryCheckResult, StoryDiffStatus } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
 import type { CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
@@ -184,6 +184,13 @@ export type StoryDocument = {
   readonly design?: AgentDesign;
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
+  /**
+   * The story's code, as its Code tab shows and copies it: its `render` as written, or the component in the
+   * framework's code with the args its file writes as code (functions, elements) as written and the rest from their
+   * values, those set through `args` from theirs. None when it cannot be written: the story file did not load, or
+   * the framework's code writer does not load on the server.
+   */
+  readonly code?: string;
   /**
    * The props its values can set, as the panel sets them: each one's control and what its value looks like, its
    * `argTypes` taken into account. Give values through `args` of `forgebook story` or of the tools, or in the address's
@@ -555,6 +562,52 @@ export type VisibilityDocument = {
   readonly unseen: readonly UnseenComponent[];
   /** What could not be looked at: an entry not led back to a source, docs turned off. */
   readonly skipped: readonly string[];
+};
+
+/** One state a change touches, as `proof` compares it with where the change started. */
+export type ProofState = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view's name; empty for the default. */
+  readonly view: string;
+  /**
+   * How it compares: as a comparison says, or `unstable` when two pictures of the same code differ here too, so the
+   * difference proves nothing.
+   */
+  readonly status: Exclude<StoryDiffStatus, "same"> | "unstable";
+  /** The share of the picture that changed, 0 to 100. */
+  readonly percent: number;
+  /** The pictures, relative to the proof's folder; those a state has. */
+  readonly pictures: {
+    /** Where the change started. */
+    readonly before?: string;
+    /** With the change. */
+    readonly after?: string;
+    /** With the change, what moved marked. */
+    readonly marked?: string;
+  };
+};
+
+/** What `forgebook proof` answers and what a pull request's comment is written from. */
+export type ProofDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The commit compared with: where the checked-out commit left the ref named. */
+  readonly base: string;
+  /** The commit shown: on a pull request's run, the commit that merges it. */
+  readonly head: string;
+  /** `verify`'s verdict on the change. */
+  readonly verdict: VerifyVerdict;
+  /** `verify`'s line. */
+  readonly summary: string;
+  /** The states that differ, are new, were removed or did not draw. */
+  readonly states: readonly ProofState[];
+  /** How many states were compared and are the same. */
+  readonly same: number;
+  /** What was checked, in words. */
+  readonly checked: readonly string[];
+  /** What was not, in words: never read an empty list of states as all clear when these are named. */
+  readonly notChecked: readonly string[];
 };
 
 /** A story and view whose checks did not run, since its frame gave up on what the story loads. */

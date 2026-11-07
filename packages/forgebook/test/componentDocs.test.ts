@@ -51,3 +51,21 @@ describe("a prop's group and members", () => {
     expect(isComponentDocs(withProp({ members: "empty" }))).toBe(false);
   });
 });
+
+describe("a prop's condition and notes, and a component's props note", () => {
+  /** A prop, with what a test lays over it. */
+  const withProp = (extra: Readonly<Record<string, unknown>>): unknown => ({
+    ...DOCS,
+    props: [{ name: "href", kind: "text", type: "string", description: "", isRequired: false, ...extra }]
+  });
+
+  it("are checked on arrival, so the reference never reads a note that is not one", () => {
+    expect(
+      isComponentDocs(withProp({ onlyWhen: { prop: "kind", values: ["link"] }, notes: [{ reason: "any" }] }))
+    ).toBe(true);
+    expect(isComponentDocs(withProp({ notes: [null] }))).toBe(false);
+    expect(isComponentDocs(withProp({ onlyWhen: { values: ["link"] } }))).toBe(false);
+    expect(isComponentDocs({ ...DOCS, propsNote: { reason: "untyped" } })).toBe(true);
+    expect(isComponentDocs({ ...DOCS, propsNote: "untyped" })).toBe(false);
+  });
+});

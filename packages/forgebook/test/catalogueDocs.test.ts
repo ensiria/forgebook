@@ -61,4 +61,63 @@ describe("catalogueMarkdown", () => {
     );
     expect(text).toContain(" · design: https://www.figma.com/design/File1/Kit?node-id=1-2");
   });
+
+  it("writes when a variant's prop can be passed after it", () => {
+    const component: CatalogueComponent = {
+      title: "Actions/Action",
+      subpath: "./action",
+      docs: {
+        name: "Action",
+        description: "A link or a button.",
+        summary: "",
+        props: [
+          {
+            name: "kind",
+            kind: "choice",
+            type: '"link" | "button"',
+            description: "",
+            isRequired: true,
+            choices: ["link", "button"]
+          },
+          {
+            name: "href",
+            kind: "text",
+            type: "string",
+            description: "",
+            isRequired: false,
+            onlyWhen: { prop: "kind", values: ["link"] }
+          },
+          {
+            name: "onPick",
+            kind: "text",
+            type: "string",
+            description: "",
+            isRequired: false,
+            onlyWhen: { prop: "mode", values: ["single"], orOmitted: true }
+          }
+        ],
+        parts: [],
+        subcomponents: []
+      },
+      stories: ["Overview"],
+      mainStory: "Overview",
+      mainStoryId: undefined,
+      isLogic: false,
+      design: undefined
+    };
+    const text = catalogueMarkdown(
+      {
+        packageName: "@acme/ui",
+        description: undefined,
+        sourceId: undefined,
+        components: [component],
+        modules: [],
+        sassModules: [],
+        styleSheets: [],
+        tokens: []
+      },
+      ["components"]
+    );
+    expect(text).toContain("kind!=link|button href:string[kind=link] onPick:string[mode?=single]");
+  });
 });

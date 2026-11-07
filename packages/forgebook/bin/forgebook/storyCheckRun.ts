@@ -185,6 +185,8 @@ const runOnStories = async (
     readonly specifier: string;
     readonly name: string;
     readonly extra: (document: StoriesDocument) => Readonly<Record<string, unknown>>;
+    /** The server to use and no other: a comparison must not draw one side from a server of its own. */
+    readonly exactOrigin?: string;
   }
 ): Promise<unknown> => {
   const call = await testingFunction(config.dir, run.specifier, run.name);
@@ -192,7 +194,10 @@ const runOnStories = async (
   const switches = catalogueSwitches(config.switches, config.languages, config.lists.controls);
   const views = queriesOf(input.views ?? [], switches);
   if (typeof views === "string") return views;
-  const served = await servedCatalogue(config, url);
+  const served =
+    run.exactOrigin === undefined
+      ? await servedCatalogue(config, url)
+      : { origin: run.exactOrigin, close: async (): Promise<void> => undefined };
   try {
     const document = await storiesAt(served.origin);
     if (typeof document === "string") return document;
@@ -327,6 +332,57 @@ export const runStoryDiff = async (
     specifier: "@forgebook/testing/diff",
     name: "diffStories",
     extra: (document: StoriesDocument) => ({ ...folders, ...diffedComponent(document, input.id) })
+  });
+  if (typeof answer === "string" || isStoryDiffReport(answer)) return answer;
+  return "@forgebook/testing/diff answered something that is not a comparison's report";
+};
+
+/**
+ * Takes several stories' pictures from one server and no other: what `proof` asks of each side.
+ *
+ * @param config - the catalogue's configuration, whose testing package and switches both sides are drawn with.
+ * @param origin - the server.
+ * @param input - the stories, and whether to picture every variant.
+ * @param outDir - the folder the pictures go in, absolute.
+ * @returns the pictures, or why they could not be taken.
+ */
+export const runStoriesShot = async (
+  config: ResolvedConfig,
+  origin: string,
+  input: StoriesCheckInput,
+  outDir: string
+): Promise<StoryShotReport | string> => {
+  const answer = await runOnStories(config, origin, input, {
+    specifier: "@forgebook/testing/shot",
+    name: "shotStories",
+    exactOrigin: origin,
+    extra: () => ({ outDir })
+  });
+  if (typeof answer === "string" || isStoryShotReport(answer)) return answer;
+  return "@forgebook/testing/shot answered something that is not a picture run's report";
+};
+
+/**
+ * Compares several stories' pictures with a folder of pictures, from one server and no other: what `proof` asks of the
+ * change.
+ *
+ * @param config - the catalogue's configuration.
+ * @param origin - the server.
+ * @param input - the stories, and whether to compare every variant.
+ * @param folders - the pictures to compare with and the folder the new ones go in, absolute.
+ * @returns the results, or why they could not be had.
+ */
+export const runStoriesDiff = async (
+  config: ResolvedConfig,
+  origin: string,
+  input: StoriesCheckInput,
+  folders: { readonly baselines: string; readonly outDir: string }
+): Promise<StoryDiffReport | string> => {
+  const answer = await runOnStories(config, origin, input, {
+    specifier: "@forgebook/testing/diff",
+    name: "diffStories",
+    exactOrigin: origin,
+    extra: () => folders
   });
   if (typeof answer === "string" || isStoryDiffReport(answer)) return answer;
   return "@forgebook/testing/diff answered something that is not a comparison's report";
