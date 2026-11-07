@@ -36,6 +36,7 @@ import { isStoriesDocument } from "../../src/vite/agentApi.ts";
 import { formerIdOf, namedComponent, namedStory } from "../../src/vite/agentIds.ts";
 import { AGENT_API } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
+import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import { servedCatalogue } from "./agentClient.ts";
 
 /** What the project installs to run the stories in a browser, and how. */
@@ -49,6 +50,10 @@ const STORIES_AT_ONCE = 4;
 export type StoriesCheckInput = {
   /** The stories' ids. */
   readonly ids: readonly string[];
+  /** Story files, absolute, whose stories run too: a file just written has no id a caller knows yet. */
+  readonly files?: readonly string[];
+  /** Serve the catalogue for the run even when a dev server runs: a file just written must be read as it is now. */
+  readonly isOwnServer?: boolean;
   /** Run every variant the catalogue's browser tests check; else the default view. */
   readonly isAllVariants: boolean;
 };
@@ -192,11 +197,12 @@ const runOnStories = async (
   const switches = catalogueSwitches(config.switches, config.languages, config.lists.controls);
   const views = queriesOf(input.views ?? [], switches);
   if (typeof views === "string") return views;
-  const served = await servedCatalogue(config, url);
+  const served = await servedCatalogue(config, url, "ids" in input && input.isOwnServer === true);
   try {
     const document = await storiesAt(served.origin);
     if (typeof document === "string") return document;
-    const ids = "ids" in input ? input.ids : [input.id];
+    const ids =
+      "ids" in input ? [...input.ids, ...idsOfFiles(document, config.dir, input.files ?? [])] : [input.id];
     const stories = ids.flatMap((id) =>
       storiesNamed(document, id, deviceDefaultOf(NO_DEVICE, config.lists.device))
     );
@@ -217,6 +223,22 @@ const runOnStories = async (
   } finally {
     await served.close();
   }
+};
+
+/**
+ * The ids of the listed stories of some story files.
+ *
+ * @param document - the catalogue's stories.
+ * @param dir - the catalogue's folder, which the document's files are relative to.
+ * @param files - the files, absolute.
+ */
+const idsOfFiles = (document: StoriesDocument, dir: string, files: readonly string[]): string[] => {
+  const wanted = new Set(files.map((file) => VITE_PATHS.normalize(file)));
+  return document.components.flatMap((component) =>
+    component.stories
+      .filter((story) => story.file !== undefined && wanted.has(VITE_PATHS.resolve(dir, story.file)))
+      .map((story) => story.id)
+  );
 };
 
 /**

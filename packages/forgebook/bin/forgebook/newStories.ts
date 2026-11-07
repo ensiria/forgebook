@@ -18,6 +18,30 @@ export type NewStoriesInput = {
   readonly title: string;
   /** The module the story types come from (`@forgebook/react`). */
   readonly typesModule: string;
+  /**
+   * Components every story is drawn inside, outermost first, each with its import: the providers a first draw said the
+   * component needs (`forgebook new --repair`); none by default. Written as JSX, for a JSX framework's story file.
+   */
+  readonly wrappers?: readonly StoryWrapper[];
+};
+
+/** A component a story is drawn inside, and the statement that imports it. */
+export type StoryWrapper = {
+  /** The component's name in the file (`SidebarProvider`). */
+  readonly name: string;
+  /** The statement that imports it (`import { SidebarProvider } from "./sidebar";`). */
+  readonly importStatement: string;
+};
+
+/** The meta's decorators that draw every story inside the wrappers, outermost first; empty with none. */
+const decoratorsCode = (wrappers: readonly StoryWrapper[]): string => {
+  if (wrappers.length === 0) return "";
+  const open = wrappers.map((wrapper) => `<${wrapper.name}>`).join("");
+  const close = [...wrappers]
+    .reverse()
+    .map((wrapper) => `</${wrapper.name}>`)
+    .join("");
+  return `, decorators: [(Story) => ${open}<Story />${close}]`;
 };
 
 /** A prop's name in words, for a text's value (`helperText` → `Helper text`). */
@@ -127,8 +151,9 @@ export const newStories = (input: NewStoriesInput): string => {
     `import type { Meta, Story } from ${JSON.stringify(input.typesModule)};`,
     "",
     input.importStatement,
+    ...(input.wrappers ?? []).map((wrapper) => wrapper.importStatement),
     "",
-    `export default { title: ${JSON.stringify(input.title)}, component: ${name} } satisfies Meta<typeof ${name}>;`,
+    `export default { title: ${JSON.stringify(input.title)}, component: ${name}${decoratorsCode(input.wrappers ?? [])} } satisfies Meta<typeof ${name}>;`,
     "",
     ...story("Default", `${name} as most pages use it.`, args, "{ main: true }"),
     ...choiceStories,

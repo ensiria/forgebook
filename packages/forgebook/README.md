@@ -1188,7 +1188,7 @@ is a state of the component: the same).
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
-| `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
+| `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case. `--repair` draws them in a browser and, when an error says a story must be drawn inside a component the application exports (`useSidebar must be used within a SidebarProvider`), draws them inside it, at most twice |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height (framed in a device a view names); with `@forgebook/testing` |

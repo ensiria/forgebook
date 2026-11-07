@@ -15,7 +15,7 @@ import { findConfigFile, loadConfigFile } from "../../src/vite/configFile.ts";
 import { isNegated } from "../../src/vite/storyPatterns.ts";
 import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import { frameworkDocsModule } from "../frameworkDocs.ts";
-import { newStories } from "./newStories.ts";
+import { newStories, type StoryWrapper } from "./newStories.ts";
 
 /** A component's first stories, ready to write. */
 export type NewStoriesFile = {
@@ -49,13 +49,15 @@ const catalogueFramework = async (packageDir: string): Promise<string> => {
  * @param componentFile - the component's file, absolute.
  * @param exportName - the export to read; the file's only component when none.
  * @param framework - the framework the stories are written for (`react`); the catalogue's when none.
+ * @param wrappers - components every story is drawn inside (`--repair`); none by default.
  * @throws a `ScriptError` when the file is in no package, the framework cannot read it, or it exports no single
  *   component.
  */
 export const newStoriesFile = async (
   componentFile: string,
   exportName: string | undefined,
-  framework: string | undefined
+  framework: string | undefined,
+  wrappers: readonly StoryWrapper[] = []
 ): Promise<NewStoriesFile> => {
   const manifest = findUp("package.json", dirname(componentFile));
   if (manifest === undefined) throw new ScriptError(`${componentFile} is in no package`);
@@ -82,7 +84,8 @@ export const newStoriesFile = async (
     docs: component.docs,
     importStatement: shape.importStatement,
     title,
-    typesModule: docsModule.storyTypesModule ?? `@forgebook/${frameworkName}`
+    typesModule: docsModule.storyTypesModule ?? `@forgebook/${frameworkName}`,
+    wrappers
   });
   return { file, text };
 };
