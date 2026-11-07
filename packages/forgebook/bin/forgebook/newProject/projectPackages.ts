@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 
 import { isRecord, projectManifest } from "../importers/storybook.ts";
 import type { ImportedFramework } from "../importers/storybookFrameworks.ts";
-import { PROJECT_FRAMEWORKS } from "./projectFrameworks.ts";
+import { FORGEBOOK_PEERS, PROJECT_FRAMEWORKS } from "./projectFrameworks.ts";
 
 /** The longest range read, so a planted one costs nothing. */
 const MAX_RANGE_LENGTH = 256;
@@ -164,9 +164,9 @@ export const installedVersion = (dir: string, name: string): string | undefined 
 };
 
 /**
- * The packages a configuration needs with the lowest version of each: `forgebook`, the adapter, what the adapter asks the
- * project for, and what the adapter's options add (no floor, written as `0.0.0`). Forgebook's own React and Vite are its
- * dependencies, so a project's versions of them are no concern here.
+ * The packages a configuration needs with the lowest version of each: `forgebook`, the adapter, what either asks the
+ * project for, and what the adapter's options add (no floor, written as `0.0.0`). Forgebook's own Vite is its dependency,
+ * so a project's is no concern here.
  *
  * @param framework - the framework.
  * @param extraPeers - what its options add.
@@ -179,7 +179,12 @@ export const requiredPackages = (
     ["forgebook", "0.0.0"],
     [`@forgebook/${framework}`, "0.0.0"]
   ]);
-  for (const [name, floor] of Object.entries(PROJECT_FRAMEWORKS[framework].peers)) required.set(name, floor);
+  for (const peers of [FORGEBOOK_PEERS, PROJECT_FRAMEWORKS[framework].peers]) {
+    for (const [name, floor] of Object.entries(peers)) {
+      const known = required.get(name);
+      if (known === undefined || isBelowFloor(known, floor)) required.set(name, floor);
+    }
+  }
   for (const name of extraPeers) if (!required.has(name)) required.set(name, "0.0.0");
   return required;
 };

@@ -72,7 +72,7 @@ import {
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
-import { checkAtStart, type RunningVite } from "./runningVersions.ts";
+import { checkAtStart, type ResolvedVite } from "./runningVersions.ts";
 import {
   type IndexedStoryFile,
   type IsFileKept,
@@ -470,8 +470,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (pattern !== null) access.noteImported(pattern);
       return pattern;
     },
-    configResolved: (resolved: RunningVite & { readonly cacheDir: string }): void => {
-      checkAtStart(resolved, config);
+    configResolved: (resolved: ResolvedVite): void => {
+      checkAtStart(resolved, config?.shell.problems ?? []);
       // a dev server's answers only: a build reads everything once, and stamping each answer's files costs it more than
       // a later build would save
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");

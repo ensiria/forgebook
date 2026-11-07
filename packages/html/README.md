@@ -4,10 +4,11 @@ Plain HTML for [Forgebook](https://www.npmjs.com/package/forgebook): stories tha
 written in JavaScript or TypeScript with no framework, as Storybook's `@storybook/html-vite` stories are. The story
 types, the renderer the frame draws them with, and the adapter that reads a story's args from its types and TSDoc.
 
-**Requirements:** `forgebook` · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/html/LICENSE)
+**Requirements:** `forgebook` · React 18.2 or 19 in the project, for the catalogue's own interface (the frames that draw
+your stories load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/html/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/html
+npm install --save-dev forgebook @forgebook/html react react-dom
 ```
 
 The catalogue's configuration names it as its framework:

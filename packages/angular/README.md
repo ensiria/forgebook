@@ -5,11 +5,11 @@ helpers, the renderer the frame draws a story with, and the adapter that compile
 plugin and reads their inputs, outputs and projected content.
 
 **Requirements:** Angular 20, 21 or 22 with `@angular/build` (any Angular CLI or Analog project has it) · `forgebook` ·
-Vite 8.3.4+ ·
+React 18.2 or 19 in the project, for the catalogue's own interface (the frames that draw your components load none) ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/angular/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/angular
+npm install --save-dev forgebook @forgebook/angular react react-dom
 ```
 
 The catalogue's configuration names it as its framework:

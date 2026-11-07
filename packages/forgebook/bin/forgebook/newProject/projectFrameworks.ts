@@ -29,6 +29,12 @@ export type ProjectFramework = {
   readonly sourceFolders: readonly string[];
 };
 
+/** The packages `forgebook` itself asks the project for: its shell is React. Vite is its own. */
+export const FORGEBOOK_PEERS: Readonly<Record<string, string>> = {
+  react: "18.2.0",
+  "react-dom": "18.2.0"
+};
+
 /** The names `--framework` takes, the order of the supported list. */
 export const FRAMEWORK_NAMES: readonly ImportedFramework[] = [
   "react",

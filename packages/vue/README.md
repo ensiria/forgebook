@@ -3,10 +3,11 @@
 Vue 3 for [Forgebook](https://www.npmjs.com/package/forgebook): the story types, the composables, the renderer the frame
 mounts a story with, and the adapter that reads a component's props, events and slots, single-file components included.
 
-**Requirements:** Vue 3.5 · `forgebook` · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/vue/LICENSE)
+**Requirements:** Vue 3.5 · `forgebook` · React 18.2 or 19 in the project, for the catalogue's own interface (the frames that
+draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/vue/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/vue
+npm install --save-dev forgebook @forgebook/vue react react-dom
 ```
 
 The catalogue's configuration names it as its framework:

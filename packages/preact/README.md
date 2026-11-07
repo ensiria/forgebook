@@ -3,10 +3,11 @@
 Preact for [Forgebook](https://www.npmjs.com/package/forgebook): the story types, the hooks, the renderer the frame mounts
 a story with, on Preact itself, and the adapter that reads a component's props from its TypeScript types.
 
-**Requirements:** Preact 10.19 or 11 · `forgebook` · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/preact/LICENSE)
+**Requirements:** Preact 10.19 or 11 · `forgebook` · React 18.2 or 19 in the project, for the catalogue's own interface (the
+frames that draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/preact/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/preact
+npm install --save-dev forgebook @forgebook/preact react react-dom
 ```
 
 The catalogue's configuration names it as its framework:

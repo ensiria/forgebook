@@ -163,8 +163,8 @@ describe("forgebook init in a new project", () => {
     const { document } = initJson(pnpm);
     expect(document["packageManager"]).toEqual({ name: "pnpm", detectedFrom: "pnpm-lock.yaml" });
     expect(document["install"]).toEqual({
-      missing: ["forgebook", "@forgebook/vue"],
-      command: "pnpm add --save-dev forgebook @forgebook/vue",
+      missing: ["forgebook", "@forgebook/vue", "react", "react-dom"],
+      command: "pnpm add --save-dev forgebook @forgebook/vue react react-dom",
       status: "to-run"
     });
     expect(document["replaced"]).toEqual([]);
@@ -172,7 +172,7 @@ describe("forgebook init in a new project", () => {
     expect(JSON.stringify(document["commands"])).toContain('"placeholder":"<component file>"');
     const person = forgebook(projectWith(NEW_PROJECTS["vue"] ?? {}), ["init"]);
     expect(person.status).toBe(0);
-    expect(person.stdout).toContain("npm install --save-dev forgebook @forgebook/vue");
+    expect(person.stdout).toContain("npm install --save-dev forgebook @forgebook/vue react react-dom");
     expect(person.stdout).toContain("npx forgebook dev");
   }, 30_000);
 

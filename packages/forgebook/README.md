@@ -63,8 +63,8 @@ from the project's files, and writes:
   stories look wrong without them. Nuxt's adapter reads `css` from `nuxt.config` itself, so it needs none.
 
 Then it prints what is left, each thing named, and the next commands. The packages to add are in the exact command of
-the project's package manager; `--install` runs it. Forgebook's shell is React, on Vite, and both are its own dependencies:
-a project on Vue, on React 18 or on an older Vite installs them beside its own, and its own stay as they are.
+the project's package manager; `--install` runs it. It lists React even on Vue, say, because Forgebook's shell needs it and not every package manager installs a peer by
+itself. Vite is Forgebook's own dependency: a project on an older one installs it beside its own, which stays as it is.
 
 ```sh
 npx forgebook new src/Badge.tsx   # a component's first stories

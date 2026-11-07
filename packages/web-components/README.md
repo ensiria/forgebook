@@ -5,11 +5,12 @@ frame draws a custom element story with, and the adapter that reads an element's
 and CSS parts from its [Custom Elements Manifest](https://github.com/webcomponents/custom-elements-manifest), or from a
 Lit element's TypeScript where there is none.
 
-**Requirements:** Lit 3.2 · `forgebook` · `@lit-labs/ssr` only for the generated server tests ·
+**Requirements:** Lit 3.2 · `forgebook` · React 18.2 or 19 in the project, for the catalogue's own interface (the frames
+that draw your elements load none) · `@lit-labs/ssr` only for the generated server tests ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/web-components/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/web-components lit
+npm install --save-dev forgebook @forgebook/web-components lit react react-dom
 ```
 
 The catalogue's configuration names it as its framework:

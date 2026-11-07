@@ -29,6 +29,7 @@ import {
 } from "../bin/forgebook/newProject/projectEntries.ts";
 import {
   detectFramework,
+  FORGEBOOK_PEERS,
   FRAMEWORK_NAMES,
   PROJECT_FRAMEWORKS
 } from "../bin/forgebook/newProject/projectFrameworks.ts";
@@ -110,8 +111,7 @@ describe("the framework a project says", () => {
 describe("the floors", () => {
   it("are the adapters' own required peers", () => {
     for (const name of FRAMEWORK_NAMES) expect(PROJECT_FRAMEWORKS[name].peers).toEqual(requiredPeers(name));
-    // its React and its Vite are its own, so a project on older ones still installs it, beside them
-    expect(requiredPeers("forgebook")).toEqual({});
+    expect(FORGEBOOK_PEERS).toEqual({ react: "18.2.0", "react-dom": "18.2.0" });
   });
 
   it.each([
@@ -158,9 +158,17 @@ describe("the floors", () => {
     mkdirSync(join(dir, "node_modules", "lit"), { recursive: true });
     writeFileSync(join(dir, "node_modules", "vite", "package.json"), '{ "version": "5.0.0" }');
     writeFileSync(join(dir, "node_modules", "lit", "package.json"), '{ "version": "2.0.0" }');
-    const state = packageState(dir, new Map([["lit", "^2.0.0"]]), requiredPackages("web-components", []));
+    const state = packageState(
+      dir,
+      new Map([
+        ["lit", "^2.0.0"],
+        ["react", "^19.0.0"]
+      ]),
+      requiredPackages("web-components", [])
+    );
     expect(state.tooOld).toEqual([{ name: "lit", found: "2.0.0", floor: "3.2.0" }]);
-    expect(state.missing).toEqual(["forgebook", "@forgebook/web-components"]);
+    expect(state.missing).toEqual(["forgebook", "@forgebook/web-components", "react-dom"]);
+    expect(state.hasUninstalled).toBe(true);
   });
 });
 

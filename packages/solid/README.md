@@ -3,10 +3,11 @@
 Solid for [Forgebook](https://www.npmjs.com/package/forgebook): the story types, the primitives, the renderer the frame
 mounts a story with, and the adapter that reads a component's props from its TypeScript types.
 
-**Requirements:** Solid 1.9 · `forgebook` · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/solid/LICENSE)
+**Requirements:** Solid 1.9 · `forgebook` · React 18.2 or 19 in the project, for the catalogue's own interface (the frames
+that draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/solid/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/solid
+npm install --save-dev forgebook @forgebook/solid react react-dom
 ```
 
 The catalogue's configuration names it as its framework:

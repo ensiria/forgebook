@@ -1,13 +1,10 @@
 /**
- * What a catalogue says of the versions it finds itself running with: Forgebook brings its own Vite and React, so an older
- * one of the project's can meet it in two places only, each said where it is met.
+ * What a catalogue says when Vite's configuration is read: what is wrong with its theme, and of the Vite it finds itself running on: the command brings its own, and an app that puts the plugin
+ * in its own `vite.config` runs it on the app's.
  *
  * @module
  */
 import type { Logger } from "vite";
-
-import type { ResolvedConfig } from "./configFile.ts";
-import { pluginViewsNeedReact } from "./pages.ts";
 
 /**
  * Stops on a Vite older than the one this runs on, for an app that puts this plugin in its own `vite.config`: the command
@@ -23,29 +20,25 @@ export const assertViteEight = (build: object | undefined): void => {
   );
 };
 
-/** What is read of the resolved configuration. */
-export type RunningVite = {
+/** What is read of Vite's resolved configuration. */
+export type ResolvedVite = {
   /** Vite's logger. */
   readonly logger: Logger;
+  /** Its cache folder. */
+  readonly cacheDir: string;
   /** Its `build`; none in a test's stand-in. */
   readonly build?: object;
 };
 
 /**
- * Stops on a Vite too old, and says what is wrong in a shell's theme and that a plugin's panels cannot draw on the
- * project's React.
+ * Stops on a Vite too old, and warns of what will not work in the shell's theme: a warning, since a theme a reader can still
+ * use must not stop a catalogue from building.
  *
  * @param resolved - Vite's resolved configuration.
- * @param config - the catalogue's configuration; none when the plugin was given no catalogue.
+ * @param themeProblems - what will not work in the theme.
  * @throws when Vite is too old.
  */
-export const checkAtStart = (resolved: RunningVite, config: ResolvedConfig | undefined): void => {
+export const checkAtStart = (resolved: ResolvedVite, themeProblems: readonly string[]): void => {
   assertViteEight(resolved.build);
-  // a warning and not a failure: a theme a reader can still use must not stop a catalogue from building
-  for (const problem of config?.shell.problems ?? [])
-    resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
-  if (config !== undefined && pluginViewsNeedReact(config))
-    resolved.logger.error(
-      "[forgebook] A plugin's panel draws with React 19, and this project has an older React, whose hooks the panel would call: those panels fail. Upgrade React, or leave the plugin out"
-    );
+  for (const problem of themeProblems) resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
 };

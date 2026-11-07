@@ -68,7 +68,7 @@ export const view: PluginView<PluginTabContext> = (target, context) => {
 };
 ```
 
-In React, `forgebook/plugin-react` is those lines (a view draws with the shell's React 19 and its hooks read the project's, so a project on an older React cannot show one, which the catalogue says when it starts):
+In React, `forgebook/plugin-react` is those lines:
 
 ```tsx
 import type { PluginTabContext } from "forgebook/plugin";
