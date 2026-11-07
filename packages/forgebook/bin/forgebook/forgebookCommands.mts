@@ -45,6 +45,7 @@ import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { pagesCommands } from "./pagesCommands.mts";
+import { proofCommands } from "./proofCommand.mts";
 import { runTokens } from "./tokensRun.ts";
 import { visualCommands } from "./visualCommands.mts";
 
@@ -340,6 +341,7 @@ await defineCommands({
     ...graphCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
+    ...proofCommands(forgebook),
     ...initCommands(forgebook),
     ...agentSetupCommands(forgebook),
     ...mcpCommands(forgebook),
