@@ -1,0 +1,32 @@
+{
+  "name": "@fixture/sveltekit2",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The SvelteKit 2 fixture catalogue: a small SvelteKit 2 app, its options in svelte.config.js, whose components read $app/stores, $app/state, $app/paths, $app/environment, $env/static/public, $env/dynamic/public and a page's load, drawn by Forgebook.",
+  "type": "module",
+  "scripts": {
+    "prepare": "svelte-kit sync",
+    "dev": "forgebook dev",
+    "build": "forgebook build",
+    "test": "vitest run",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig tsconfig.json --fail-on-warnings"
+  },
+  "devDependencies": {
+    "@forgebook/plugin-msw": "workspace:*",
+    "@forgebook/story-format": "workspace:*",
+    "@forgebook/sveltekit": "workspace:*",
+    "@forgebook/testing": "workspace:*",
+    "@sveltejs/kit": "2.70.4",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@types/node": "24.19.2",
+    "forgebook": "workspace:*",
+    "msw": "3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "typescript": "npm:typescript@6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
