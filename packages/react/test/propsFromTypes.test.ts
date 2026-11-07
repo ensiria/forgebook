@@ -106,9 +106,9 @@ describe("a union whose variants type one prop each their way, and one leaves th
     expect(byName["selected"]?.shape).toBeUndefined();
   });
 
-  it("gives no condition to a prop the variant without a discriminant declares", () => {
+  it("says a prop of the variant without a discriminant applies when it is left out", () => {
     expect(byName["loose"]).toMatchObject({ kind: "toggle", isRequired: false });
-    expect(byName["loose"]?.onlyWhen).toBeUndefined();
+    expect(byName["loose"]?.onlyWhen).toEqual({ prop: "mode", values: [], orOmitted: true });
   });
 });
 
@@ -253,5 +253,78 @@ describe("props that cannot be read", () => {
     );
     expect(docs.propsNote).toBeUndefined();
     expect(docs.props[0]?.notes).toBeUndefined();
+  });
+});
+
+describe("what a review found", () => {
+  it("shows a type parameter as the component's constraint, not the props type's", () => {
+    const docs = docsOf(
+      "Pick",
+      [
+        "type P<T> = { readonly value: T; readonly items: readonly T[] };",
+        "export const Pick = <T extends string>(props: P<T>) => null;",
+        ""
+      ].join("\n")
+    );
+    const byName = Object.fromEntries(docs.props.map((prop) => [prop.name, prop]));
+    expect(byName["value"]).toMatchObject({ kind: "text", type: "string" });
+    expect(byName["items"]?.type).toBe("readonly string[]");
+    expect(byName["items"]?.notes).toEqual([
+      { reason: "generic", parameter: "T", shownAs: "constraint", type: "string" }
+    ]);
+  });
+
+  it("keeps the signature of an event two variants type alike", () => {
+    const docs = docsOf(
+      "Press",
+      [
+        "export type PressProps =",
+        '  | { readonly kind: "a"; readonly onPress: () => void }',
+        '  | { readonly kind: "b"; readonly onPress: () => void }',
+        '  | { readonly kind: "c" };',
+        "export const Press = (props: PressProps) => null;",
+        ""
+      ].join("\n")
+    );
+    const onPress = docs.props.find((prop) => prop.name === "onPress");
+    expect(onPress).toMatchObject({ kind: "event", signature: { parameters: [], returns: "void" } });
+    expect(onPress?.onlyWhen).toEqual({ prop: "kind", values: ["a", "b"] });
+  });
+
+  it("says a prop also applies when an optional discriminant is left out", () => {
+    const docs = docsOf(
+      "Range",
+      [
+        "export type RangeProps =",
+        '  | { readonly mode?: "single"; readonly onPick?: () => void }',
+        '  | { readonly mode: "range"; readonly onRange: () => void }',
+        "  | { readonly mode?: undefined; readonly bare?: boolean };",
+        "export const Range = (props: RangeProps) => null;",
+        ""
+      ].join("\n")
+    );
+    const byName = Object.fromEntries(docs.props.map((prop) => [prop.name, prop]));
+    expect(byName["onPick"]?.onlyWhen).toEqual({ prop: "mode", values: ["single"], orOmitted: true });
+    expect(byName["onRange"]?.onlyWhen).toEqual({ prop: "mode", values: ["range"] });
+    expect(byName["bare"]?.onlyWhen).toEqual({ prop: "mode", values: [], orOmitted: true });
+  });
+
+  it("reads a generic union in the source's order, its discriminant's values as written", () => {
+    const docs = docsOf(
+      "Value",
+      [
+        'export type ValueProps<T> = { readonly kind: "a"; readonly v: T } | { readonly kind: "b"; readonly v: T } | { readonly kind: "c" };',
+        "export const Value = <T extends number>(props: ValueProps<T>) => null;",
+        ""
+      ].join("\n")
+    );
+    expect(docs.props.map((prop) => prop.name)).toEqual(["kind", "v"]);
+    const [kind, v] = docs.props;
+    expect(kind).toMatchObject({ type: '"a" | "b" | "c"', choices: ["a", "b", "c"] });
+    expect(v).toMatchObject({
+      kind: "number",
+      type: "number",
+      onlyWhen: { prop: "kind", values: ["a", "b"] }
+    });
   });
 });

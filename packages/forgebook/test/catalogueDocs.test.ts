@@ -86,6 +86,14 @@ describe("catalogueMarkdown", () => {
             description: "",
             isRequired: false,
             onlyWhen: { prop: "kind", values: ["link"] }
+          },
+          {
+            name: "onPick",
+            kind: "text",
+            type: "string",
+            description: "",
+            isRequired: false,
+            onlyWhen: { prop: "mode", values: ["single"], orOmitted: true }
           }
         ],
         parts: [],
@@ -110,6 +118,6 @@ describe("catalogueMarkdown", () => {
       },
       ["components"]
     );
-    expect(text).toContain("kind!=link|button href:string[kind=link]");
+    expect(text).toContain("kind!=link|button href:string[kind=link] onPick:string[mode?=single]");
   });
 });

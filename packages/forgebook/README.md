@@ -621,14 +621,17 @@ export type ActionProps<TItem> = (
 - **A union of variants** lists every variant's props, not only the ones they share. A prop only some variants declare
   is never marked required, and says when it applies: `href` reads "Only when `kind` is `"link"`". The discriminant is
   the shared prop each variant gives one literal value (or leaves out), the one with the most values when several do.
+  A prop of a variant that takes the discriminant left out (`mode?: "single"`) says "or left out".
   A prop the variants type differently shows all their types (`Date | Date[] | DateRange`).
-- **A generic component** writes each type parameter as its constraint, else its default, else `unknown`, and says
-  which under the prop: `items` is `readonly unknown[]`, "`TItem` is generic, with no constraint".
+- **A generic component** writes each type parameter it leaves open as the component's constraint, else its default,
+  else `unknown`, and says which under the prop: `items` is `readonly unknown[]`, "`TItem` is generic, with no
+  constraint". A props type the component fills in (`BaseProps<string>`) is read with what it was given.
 - **A type it cannot read** says so instead of showing nothing: a name the checker cannot find (a missing import), a
   prop typed `any`, props typed `any`, or a component whose props all come from outside its package (an element's
   attributes, which the reference leaves out).
 - `forgebook story --json` and `get_story` carry the same as `onlyWhen`, `notes` on a prop and `propsNote` on the
-  component; `forgebook story` writes `href (when kind is link)`, and `CATALOG.md` `href:string[kind=link]`.
+  component; `forgebook story` writes `href (when kind is link)`, and `CATALOG.md` `href:string[kind=link]` (`[mode?=single]`
+  when it also applies with `mode` left out).
 
 ## Required props first
 

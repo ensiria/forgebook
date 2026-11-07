@@ -29,6 +29,7 @@ import { moduleSummaryOf } from "./moduleSummary.ts";
 import { declarationOrder, declaredSymbol, isForeign, partsOf, propDocs } from "./propDocs.ts";
 import { signatureDocs } from "./signatureDocs.ts";
 import { metaComponent, metaSubcomponents } from "./storyMeta.ts";
+import { type Bindings, bindingsOf } from "./typeParameters.ts";
 import { propsOfType, type VariantProp } from "./unionProps.ts";
 import { guidanceOf } from "./usageGuidance.ts";
 
@@ -67,6 +68,8 @@ type ComponentProps = {
   readonly ownProps: readonly ts.Symbol[];
   /** The props only some variants of a union of props declare, with when they can be passed. */
   readonly variantOnly: ReadonlyMap<ts.Symbol, VariantProp>;
+  /** What its props type's type parameters stand for, so a generic component's are shown by its own constraints. */
+  readonly bindings: Bindings;
   /** Why it lists no props although it takes some; none when its props are read, or it takes none. */
   readonly propsNote: PropsNote | undefined;
 };
@@ -123,6 +126,7 @@ const componentProps = (
     propsType,
     ownProps,
     variantOnly,
+    bindings: propsType === undefined ? new Map() : bindingsOf(propsType, checker),
     propsNote: propsNoteOf(signature, propsType, ownProps.length, props.length)
   };
 };
@@ -138,11 +142,12 @@ const componentProps = (
 const listedProps = (props: ComponentProps, checker: ts.TypeChecker, expression: ts.Expression): PropDocs[] =>
   props.ownProps.map((prop) => {
     const variant = props.variantOnly.get(prop);
-    if (variant === undefined) return propDocs(prop, checker, expression);
+    const { bindings } = props;
+    if (variant === undefined) return propDocs(prop, checker, expression, { bindings });
     const variants = variant.declarations.filter((declaration) => declaration !== prop);
     const { onlyWhen } = variant;
     return {
-      ...propDocs(prop, checker, expression, { variants }),
+      ...propDocs(prop, checker, expression, { variants, bindings }),
       isRequired: false,
       ...(onlyWhen === undefined ? {} : { onlyWhen })
     };

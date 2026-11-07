@@ -110,6 +110,11 @@ export type PropCondition = {
   readonly prop: string;
   /** Its values in the variants that declare the prop, in the order the variants come. */
   readonly values: readonly (string | number | boolean)[];
+  /**
+   * Whether the prop also applies with the discriminant left out, since a variant that declares it takes it so
+   * (`mode?: "single"`). Left out when `false`.
+   */
+  readonly orOmitted?: boolean;
 };
 
 /** Why a component lists no props although it takes some. */
@@ -284,6 +289,9 @@ const isMemberDocs = (value: unknown): value is MemberDocs =>
   typeof value["isRequired"] === "boolean" &&
   (value["defaultValue"] === undefined || typeof value["defaultValue"] === "string");
 
+/** Whether a value is a note with a reason: what the reference reads first. */
+const isNote = (value: unknown): boolean => isRecord(value) && typeof value["reason"] === "string";
+
 /** Whether a value is one prop's docs. */
 const isPropDocs = (value: unknown): value is PropDocs =>
   isRecord(value) &&
@@ -301,8 +309,11 @@ const isPropDocs = (value: unknown): value is PropDocs =>
   (value["members"] === undefined ||
     (Array.isArray(value["members"]) && value["members"].every(isMemberDocs))) &&
   // the plugin's own answers, read by the reference, which loads later and draws only the reasons it knows
-  (value["onlyWhen"] === undefined || isRecord(value["onlyWhen"])) &&
-  (value["notes"] === undefined || Array.isArray(value["notes"]));
+  (value["onlyWhen"] === undefined ||
+    (isRecord(value["onlyWhen"]) &&
+      typeof value["onlyWhen"]["prop"] === "string" &&
+      Array.isArray(value["onlyWhen"]["values"]))) &&
+  (value["notes"] === undefined || (Array.isArray(value["notes"]) && value["notes"].every(isNote)));
 
 /** Whether a value is a subcomponent's docs. */
 const isSubcomponentDocs = (value: unknown): value is SubcomponentDocs =>
@@ -346,4 +357,4 @@ export const isComponentDocs = (value: unknown): value is ComponentDocs =>
   value["subcomponents"].every(isSubcomponentDocs) &&
   (value["signature"] === undefined || isFunctionSignatureDocs(value["signature"])) &&
   (value["selector"] === undefined || typeof value["selector"] === "string") &&
-  (value["propsNote"] === undefined || isRecord(value["propsNote"]));
+  (value["propsNote"] === undefined || isNote(value["propsNote"]));

@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { sentencePieces } from "../src/shell/codeSpans.ts";
 import { propNoteTexts, propsNoteText } from "../src/shell/propNotes.ts";
 
 describe("propNoteTexts", () => {
@@ -29,6 +30,28 @@ describe("propNoteTexts", () => {
       "`TItem` is generic, with no constraint: shown as `unknown`.",
       "`Missing` cannot be found, so this type is read as `any`.",
       "Typed `any`: nothing is known of its values."
+    ]);
+  });
+
+  it("says a prop also applies with the discriminant left out", () => {
+    expect(propNoteTexts({ onlyWhen: { prop: "mode", values: ["single"], orOmitted: true } })).toEqual([
+      'Only when `mode` is `"single"`, or left out.'
+    ]);
+    expect(propNoteTexts({ onlyWhen: { prop: "mode", values: [], orOmitted: true } })).toEqual([
+      "Only when `mode` is left out."
+    ]);
+  });
+
+  it("writes a type holding backticks as one code span", () => {
+    const [text] = propNoteTexts({
+      notes: [{ reason: "generic", parameter: "TName", shownAs: "constraint", type: "`on-click`" }]
+    });
+    expect(text).toBe("`TName` is generic: shown as its constraint, `` `on-click` ``.");
+    expect(sentencePieces(text ?? "")).toEqual([
+      { text: "TName", isCode: true },
+      { text: " is generic: shown as its constraint, ", isCode: false },
+      { text: "`on-click`", isCode: true },
+      { text: ".", isCode: false }
     ]);
   });
 

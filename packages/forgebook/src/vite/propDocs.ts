@@ -16,9 +16,16 @@ import ts from "typescript-6";
 import type { EventSignature, MemberDocs, PropDocs, PropKind } from "../componentDocs.ts";
 import { summaryOf, tagOf } from "./docsProgram.ts";
 import { literalValues, typeAndKind } from "./propKind.ts";
-import { type DeclaredType, genericFreeText, propTypeNotes, usesTypeParameter } from "./propTypeNotes.ts";
+import { propTypeNotes } from "./propTypeNotes.ts";
 import { shapeOfProp } from "./shapeDocs.ts";
 import { unwrapped } from "./storyMeta.ts";
+import {
+  type Bindings,
+  type DeclaredType,
+  type Generics,
+  genericFreeText,
+  usesTypeParameter
+} from "./typeParameters.ts";
 
 /** A literal value an expression writes (`"md"`, `3`, `-1`), or none for anything else. */
 const literalOfExpression = (expression: ts.Expression): string | number | undefined => {
@@ -170,6 +177,19 @@ const choiceTypeText = (values: readonly (string | number)[]): string =>
   values.map((value) => (typeof value === "string" ? JSON.stringify(value) : String(value))).join(" | ");
 
 /**
+ * Declarations by file and position: a prop several variants declare comes with them in the order the checker met
+ * the variants, which a program kept between reads changes.
+ *
+ * @param declarations - the declarations.
+ */
+const byPosition = (declarations: readonly ts.Declaration[]): ts.Declaration[] =>
+  [...declarations].sort(
+    (left, right) =>
+      left.getSourceFile().fileName.localeCompare(right.getSourceFile().fileName) ||
+      left.getStart() - right.getStart()
+  );
+
+/**
  * The props in the order the source declares them: those declared in the component's own folder first, then the
  * ones it takes from elsewhere, each by file and position. The checker's order follows the types it met first (an
  * `Omit`'s keys are a union), so a program kept between reads changed it from one read to the next.
@@ -179,7 +199,7 @@ const choiceTypeText = (values: readonly (string | number)[]): string =>
  */
 export const declarationOrder = (props: readonly ts.Symbol[], componentFolder: string): ts.Symbol[] => {
   const keyOf = (prop: ts.Symbol): [number, string, number] => {
-    const [declaration] = prop.declarations ?? [];
+    const [declaration] = byPosition(prop.declarations ?? []);
     if (declaration === undefined) return [2, "", 0];
     const file = declaration.getSourceFile().fileName;
     return [dirname(file) === componentFolder ? 0 : 1, file, declaration.getStart()];
@@ -193,9 +213,9 @@ export const declarationOrder = (props: readonly ts.Symbol[], componentFolder: s
 
 /**
  * A type node's text as the source writes it, on one line; given a checker, each generic type parameter it uses
- * replaced by what it is shown as (`propTypeNotes.ts`).
+ * replaced by what it is shown as (`typeParameters.ts`).
  */
-const nodeText = (node: ts.Node, generic: ts.TypeChecker | undefined): string =>
+const nodeText = (node: ts.Node, generic: Generics | undefined): string =>
   (generic === undefined ? node.getText() : genericFreeText(node, generic))
     // an inline object's TSDoc is the docs' to read, not part of its type
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -234,7 +254,7 @@ const declaredMembers = (node: ts.TypeNode): ts.TypeNode[] => {
  * @param symbol - the prop.
  */
 const declaredTypesOf = (symbol: ts.Symbol): DeclaredType[] =>
-  (symbol.declarations ?? []).flatMap((declaration): DeclaredType[] => {
+  byPosition(symbol.declarations ?? []).flatMap((declaration): DeclaredType[] => {
     if (ts.isMethodSignature(declaration)) return [declaration];
     return (ts.isPropertySignature(declaration) || ts.isPropertyDeclaration(declaration)) &&
       declaration.type !== undefined
@@ -248,14 +268,11 @@ const declaredTypesOf = (symbol: ts.Symbol): DeclaredType[] =>
  * between reads changes from one read to the next.
  *
  * @param declaredTypes - the prop's declared type nodes.
- * @param generic - the program's checker when the prop's type is still generic, to replace the type parameters its text
- * uses; none to write it as it is.
+ * @param generic - the checker and the bindings when the prop's type is still generic, to replace the type parameters
+ * its text uses; none to write it as it is.
  * @returns the text, or none when the prop writes no type (the caller falls back to the checker's).
  */
-const writtenTypeText = (
-  declaredTypes: readonly DeclaredType[],
-  generic?: ts.TypeChecker
-): string | undefined => {
+const writtenTypeText = (declaredTypes: readonly DeclaredType[], generic?: Generics): string | undefined => {
   const text = (node: ts.Node): string => nodeText(node, generic);
   const texts = declaredTypes.flatMap((declared): string[] => {
     if (!ts.isMethodSignature(declared)) return declaredMembers(declared).map(text);
@@ -272,12 +289,12 @@ const writtenTypeText = (
  * instantiates (`value: TValue` in `BaseProps<string>`) says less than the checker's `string`.
  *
  * @param declared - the prop's declared types.
- * @param generic - the program's checker when the prop's type is still generic.
+ * @param generic - the checker and the bindings when the prop's type is still generic.
  * @param checker - the program's checker.
  */
 const writtenText = (
   declared: readonly DeclaredType[],
-  generic: ts.TypeChecker | undefined,
+  generic: Generics | undefined,
   checker: ts.TypeChecker
 ): string | undefined =>
   generic === undefined && usesTypeParameter(declared, checker)
@@ -288,12 +305,12 @@ const writtenText = (
  * An event's signature as the source writes it: a function type among the prop's declared members, or a method.
  *
  * @param declaredTypes - the event prop's declared type nodes.
- * @param generic - the program's checker when the event's type is still generic, as `writtenTypeText` takes it.
+ * @param generic - the checker and the bindings when the event's type is still generic, as `writtenTypeText` takes them.
  * @returns the signature, or none when the source writes none in place (a named handler type).
  */
 const writtenSignature = (
   declaredTypes: readonly DeclaredType[],
-  generic: ts.TypeChecker | undefined
+  generic: Generics | undefined
 ): EventSignature | undefined => {
   const nodes = declaredTypes.flatMap((declared): DeclaredType[] =>
     ts.isMethodSignature(declared) ? [declared] : declaredMembers(declared)
@@ -428,6 +445,11 @@ export type PropReading = {
    * a value's shape, an object's members) is left out, and its kind is `other` unless all share one.
    */
   readonly variants?: readonly ts.Symbol[] | undefined;
+  /**
+   * What the props type's type parameters stand for in the component (`typeParameters.ts`), so a type parameter left
+   * open is shown by the component's constraint; none reads each by its own.
+   */
+  readonly bindings?: Bindings | undefined;
 };
 
 /**
@@ -468,15 +490,7 @@ export const propDocs = (
   const { taken, variants = [] } = reading;
   const takenNodes = taken?.typeNode === undefined ? [] : [taken.typeNode];
   const declared = taken === undefined ? [symbol, ...variants].flatMap(declaredTypesOf) : takenNodes;
-  const { type, variantTypes, isMixed, kind, isGeneric } = typeAndKind(
-    symbol,
-    declared,
-    reading,
-    checker,
-    node
-  );
-  // a type parameter is replaced only where the component leaves it open: a props type it instantiates is read as is
-  const generic = isGeneric ? checker : undefined;
+  const { type, variantTypes, isMixed, kind, generic } = typeAndKind(symbol, reading, checker, node);
   const name = symbol.getName();
   const defaultValue = tagOf(symbol, checker, "defaultValue");
   const choices = choicesOf(kind, [type, ...variantTypes], declared, checker);
@@ -489,7 +503,7 @@ export const propDocs = (
   const canTakeText =
     kind === "other" &&
     [type, ...variantTypes].every((each) => checker.isTypeAssignableTo(checker.getStringType(), each));
-  const notes = propTypeNotes(declared, type, checker, generic !== undefined);
+  const notes = propTypeNotes(declared, type, checker, generic);
   return {
     name,
     kind,

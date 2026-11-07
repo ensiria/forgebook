@@ -6,8 +6,9 @@
  * @remarks
  * The checker lists a union's properties as those every member has, so a variant's own props vanished from the docs
  * with no sign. A prop only some variants declare is never required: whether it must be passed depends on the variant.
- * The discriminant is a prop every variant declares with one literal value (`kind: "link"`) or leaves out; a union
- * without one lists its variants' props with no condition. A prop declared by several variants takes all their types.
+ * The discriminant is a prop every variant declares with one literal value (`kind: "link"`) or leaves out; a prop of a
+ * variant that takes it left out (`mode?: "single"`) applies then too. A union without one lists its variants' props
+ * with no condition. A prop declared by several variants takes all their types.
  *
  * @module
  */
@@ -17,7 +18,7 @@ import type { PropCondition } from "../componentDocs.ts";
 
 /** A prop only some variants of a union of props declare. */
 export type VariantProp = {
-  /** When it can be passed; none when the union has no discriminant, or a variant without one declares it. */
+  /** When it can be passed; none when the union has no discriminant. */
   readonly onlyWhen: PropCondition | undefined;
   /** The same prop as each variant that declares it has it, the first included: their types together are its type. */
   readonly declarations: readonly ts.Symbol[];
@@ -44,8 +45,39 @@ const literalOf = (type: ts.Type, checker: ts.TypeChecker): Value | null | undef
   return type.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Never) ? null : undefined;
 };
 
-/** A union's discriminant: its name, and its value in each variant, `null` where the variant leaves it out. */
-type Discriminant = { readonly name: string; readonly values: readonly (Value | null)[] };
+/** A discriminant in one variant: its literal value, `null` when the variant only leaves it out. */
+type VariantValue = {
+  /** The literal the variant gives it; `null` for `mode?: undefined`. */
+  readonly value: Value | null;
+  /** Whether the variant also takes it left out (`mode?: "single"`, `multi?: false`). */
+  readonly canBeOmitted: boolean;
+};
+
+/** A union's discriminant: its name, and what it is in each variant. */
+type Discriminant = { readonly name: string; readonly variants: readonly VariantValue[] };
+
+/**
+ * A prop's value in one variant, when it can discriminate: one literal, or left out.
+ *
+ * @param variant - the variant.
+ * @param name - the prop.
+ * @param checker - the program's checker.
+ */
+const variantValueOf = (
+  variant: ts.Type,
+  name: string,
+  checker: ts.TypeChecker
+): VariantValue | undefined => {
+  const member = checker.getPropertyOfType(variant, name);
+  if (member === undefined) return undefined;
+  const type = checker.getTypeOfSymbol(member);
+  const value = literalOf(checker.getNonNullableType(type), checker);
+  if (value === undefined) return undefined;
+  const canBeOmitted =
+    (member.flags & ts.SymbolFlags.Optional) !== 0 ||
+    (type.isUnion() && type.types.some((each) => (each.flags & ts.TypeFlags.Undefined) !== 0));
+  return { value, canBeOmitted };
+};
 
 /**
  * The discriminant of a union of props: among the shared props each variant declares with one literal value or leaves
@@ -64,16 +96,12 @@ const discriminantOf = (
   let best: { readonly discriminant: Discriminant; readonly count: number } | undefined;
   for (const prop of shared) {
     const name = prop.getName();
-    const values = variants.map((variant) => {
-      const member = checker.getPropertyOfType(variant, name);
-      return member === undefined
-        ? undefined
-        : literalOf(checker.getNonNullableType(checker.getTypeOfSymbol(member)), checker);
-    });
+    const values = variants.map((variant) => variantValueOf(variant, name, checker));
     if (!values.every((value) => value !== undefined)) continue;
-    const count = new Set(values.filter((value) => value !== null)).size;
-    if (count > 1 && (best === undefined || count > best.count))
-      best = { discriminant: { name, values }, count };
+    const count = new Set(values.flatMap(({ value }) => (value === null ? [] : [value]))).size;
+    if (count > 1 && (best === undefined || count > best.count)) {
+      best = { discriminant: { name, variants: values }, count };
+    }
   }
   return best?.discriminant;
 };
@@ -82,8 +110,22 @@ const discriminantOf = (
 type VariantEntry = {
   readonly declarations: ts.Symbol[];
   readonly values: Value[];
-  /** Whether a variant that leaves the discriminant out declares it: no condition can then say when it applies. */
-  isUnconditioned: boolean;
+  /** Whether a variant that declares it takes the discriminant left out. */
+  canBeOmitted: boolean;
+};
+
+/**
+ * Notes one variant's declaration of a prop: its symbol, and the discriminant's value there.
+ *
+ * @param entry - the prop, as read so far.
+ * @param prop - its symbol in this variant.
+ * @param at - the discriminant in this variant; none when the union has none.
+ */
+const record = (entry: VariantEntry, prop: ts.Symbol, at: VariantValue | undefined): void => {
+  entry.declarations.push(prop);
+  if (at === undefined) return;
+  if (at.canBeOmitted || at.value === null) entry.canBeOmitted = true;
+  if (at.value !== null && !entry.values.includes(at.value)) entry.values.push(at.value);
 };
 
 /**
@@ -100,23 +142,23 @@ export const propsOfType = (propsType: ts.Type, checker: ts.TypeChecker): TypePr
   const discriminant = discriminantOf(shared, variants, checker);
   const own = new Map<string, VariantEntry>();
   variants.forEach((variant, index) => {
-    const value = discriminant?.values[index] ?? null;
+    const at = discriminant?.variants[index];
     for (const prop of variant.getProperties()) {
       const name = prop.getName();
       if (sharedNames.has(name)) continue;
-      const entry = own.get(name) ?? { declarations: [], values: [], isUnconditioned: false };
+      const entry = own.get(name) ?? { declarations: [], values: [], canBeOmitted: false };
       own.set(name, entry);
-      entry.declarations.push(prop);
-      if (value === null) entry.isUnconditioned = true;
-      else if (!entry.values.includes(value)) entry.values.push(value);
+      record(entry, prop, at);
     }
   });
   const variantOnly = new Map<ts.Symbol, VariantProp>();
-  for (const { declarations, values, isUnconditioned } of own.values()) {
+  for (const { declarations, values, canBeOmitted } of own.values()) {
     const [first] = declarations;
     if (first === undefined) continue;
     const onlyWhen =
-      discriminant === undefined || isUnconditioned ? undefined : { prop: discriminant.name, values };
+      discriminant === undefined
+        ? undefined
+        : { prop: discriminant.name, values, ...(canBeOmitted ? { orOmitted: true } : {}) };
     variantOnly.set(first, { onlyWhen, declarations });
   }
   return { props: [...shared, ...variantOnly.keys()], variantOnly };

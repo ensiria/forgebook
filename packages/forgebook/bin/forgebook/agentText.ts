@@ -11,7 +11,7 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
-import type { ComponentDocs, PropsNote } from "../../src/componentDocs.ts";
+import type { ComponentDocs, PropCondition, PropsNote } from "../../src/componentDocs.ts";
 import type {
   StoryCheckReport,
   StoryCheckResult,
@@ -66,6 +66,12 @@ const PROPS_NOTES: Readonly<Record<PropsNote["reason"], (count: number) => strin
   "outside-package": (count: number): string => `none: all ${count} come from outside the package`
 };
 
+/** When a variant's prop applies, as the `Props` line says it (`mode is single, or left out`). */
+const conditionText = ({ prop, values, orOmitted }: PropCondition): string => {
+  if (values.length === 0) return `${prop} is left out`;
+  return `${prop} is ${values.map(String).join(" or ")}${orOmitted === true ? ", or left out" : ""}`;
+};
+
 /**
  * A component's props in one line: each name, a variant's with when it can be passed, or why there are none.
  *
@@ -78,9 +84,7 @@ const propsLine = (docs: ComponentDocs): string => {
   }
   return docs.props
     .map((prop) =>
-      prop.onlyWhen === undefined
-        ? prop.name
-        : `${prop.name} (when ${prop.onlyWhen.prop} is ${prop.onlyWhen.values.map(String).join(" or ")})`
+      prop.onlyWhen === undefined ? prop.name : `${prop.name} (when ${conditionText(prop.onlyWhen)})`
     )
     .join(", ");
 };

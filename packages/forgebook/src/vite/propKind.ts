@@ -9,7 +9,10 @@ import ts from "typescript-6";
 
 import type { PropKind } from "../componentDocs.ts";
 import type { PropReading } from "./propDocs.ts";
-import { type DeclaredType, genericShownType, hasTypeParameter } from "./propTypeNotes.ts";
+import { type Bindings, type Generics, genericShownType, hasTypeParameter } from "./typeParameters.ts";
+
+/** No bindings: each type parameter is shown by its own constraint. */
+const NO_BINDINGS: Bindings = new Map();
 
 /** An event: a function prop named `on` and a capital (React's `onPress`). */
 const EVENT_NAME = /^on[A-Z]/;
@@ -58,37 +61,42 @@ export type TypeAndKind = {
   readonly isMixed: boolean;
   /** Its kind, shared by every variant's type. */
   readonly kind: PropKind;
-  /** Whether its type, as the component takes it, still holds a type parameter (`readonly TItem[]`). */
-  readonly isGeneric: boolean;
+  /**
+   * The checker and the bindings when its type, as the component takes it, still holds a type parameter
+   * (`readonly TItem[]`): its text then replaces them. None otherwise.
+   */
+  readonly generic: Generics | undefined;
 };
 
 /**
  * A prop's type and kind.
  *
  * @param symbol - the prop.
- * @param declared - its declared types, in every variant.
  * @param reading - how the framework's props differ, and the other variants'.
  * @param checker - the program's checker.
  * @param node - where the code names the component.
  */
 export const typeAndKind = (
   symbol: ts.Symbol,
-  declared: readonly DeclaredType[],
-  { taken, eventName = EVENT_NAME, variants = [] }: PropReading,
+  { taken, eventName = EVENT_NAME, variants = [], bindings }: PropReading,
   checker: ts.TypeChecker,
   node: ts.Node
 ): TypeAndKind => {
   const ownType = taken?.type ?? checker.getTypeOfSymbolAtLocation(symbol, node);
   const isGeneric = hasTypeParameter(ownType, checker);
   // a prop typed by a type parameter takes what that parameter is shown as: its kind and control follow from it
-  const type = checker.getNonNullableType(
-    (isGeneric ? genericShownType(declared, checker) : undefined) ?? ownType
+  const shown = (each: ts.Type): ts.Type =>
+    checker.getNonNullableType(genericShownType(each, checker) ?? each);
+  const type = shown(ownType);
+  const variantTypes = variants.map((variant) => shown(checker.getTypeOfSymbolAtLocation(variant, node)));
+  // two variants that write the same type have two of it: alike is what each accepts of the other
+  const isMixed = variantTypes.some(
+    (variantType) =>
+      !checker.isTypeAssignableTo(variantType, type) || !checker.isTypeAssignableTo(type, variantType)
   );
-  const variantTypes = variants.map((variant) =>
-    checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(variant, node))
-  );
-  const isMixed = variantTypes.some((variantType) => variantType !== type);
   const name = symbol.getName();
   const kind = isMixed ? sharedKind(name, [type, ...variantTypes], eventName) : kindOf(name, type, eventName);
-  return { type, variantTypes, isMixed, kind, isGeneric };
+  // a type parameter is replaced only where the component leaves it open: a props type it instantiates is read as is
+  const generic = isGeneric ? { checker, bindings: bindings ?? NO_BINDINGS } : undefined;
+  return { type, variantTypes, isMixed, kind, generic };
 };

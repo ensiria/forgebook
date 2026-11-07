@@ -9,6 +9,7 @@
  * @module
  */
 import type { ComponentDocs, PropDocs } from "../componentDocs.ts";
+import { codeSpan } from "./codeSpans.ts";
 import { LATER_STRINGS } from "./laterStrings.ts";
 
 /**
@@ -17,21 +18,24 @@ import { LATER_STRINGS } from "./laterStrings.ts";
  * @param prop - the prop's condition and notes.
  */
 export const propNoteTexts = (prop: Pick<PropDocs, "onlyWhen" | "notes">): string[] => {
+  const { onlyWhen } = prop;
   const condition =
-    prop.onlyWhen === undefined
+    onlyWhen === undefined
       ? []
       : [
           LATER_STRINGS.propOnlyWhen(
-            prop.onlyWhen.prop,
-            prop.onlyWhen.values.map((value) =>
-              typeof value === "string" ? JSON.stringify(value) : String(value)
-            )
+            codeSpan(onlyWhen.prop),
+            onlyWhen.values.map((value) =>
+              codeSpan(typeof value === "string" ? JSON.stringify(value) : String(value))
+            ),
+            onlyWhen.orOmitted === true
           )
         ];
   const types = (prop.notes ?? []).flatMap((note): string[] => {
-    if (note.reason === "generic")
-      return [LATER_STRINGS.propGeneric(note.parameter, note.type, note.shownAs)];
-    if (note.reason === "unresolved") return [LATER_STRINGS.propUnresolved(note.name)];
+    if (note.reason === "generic") {
+      return [LATER_STRINGS.propGeneric(codeSpan(note.parameter), codeSpan(note.type), note.shownAs)];
+    }
+    if (note.reason === "unresolved") return [LATER_STRINGS.propUnresolved(codeSpan(note.name))];
     return note.reason === "any" ? [LATER_STRINGS.propAny] : [];
   });
   return [...condition, ...types];

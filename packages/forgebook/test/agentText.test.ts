@@ -113,6 +113,13 @@ describe("storyText", () => {
     const href = { name: "href", kind: "text", type: "string", description: "", isRequired: false } as const;
     const variant = { ...docs, props: [{ ...href, onlyWhen: { prop: "kind", values: ["link"] } }] };
     expect(storyText({ ...document, docs: variant }, wide)).toMatch(/Props\s+href \(when kind is link\)/);
+    const optional = {
+      ...docs,
+      props: [{ ...href, onlyWhen: { prop: "mode", values: ["one"], orOmitted: true } }]
+    };
+    expect(storyText({ ...document, docs: optional }, wide)).toContain(
+      "href (when mode is one, or left out)"
+    );
   });
 });
 
