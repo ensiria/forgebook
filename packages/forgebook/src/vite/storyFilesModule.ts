@@ -308,6 +308,57 @@ export const storyFilesModule = (
   cache?: DiskCache<KeptIndex>
 ): string => storyFilesCode(root, patterns, indexedStoryFiles(root, patterns, watch, cache), loaders);
 
+/** The function the generated module rebuilds each file's stories with, from their rows. */
+const STORY_TABLE = "storyTable";
+
+/**
+ * The keys of a group's stories, each once, in the order the first story to have each writes it.
+ *
+ * @param files - the group's story files, indexed.
+ */
+const storyKeysOf = (files: readonly IndexedStoryFile[]): readonly string[] => [
+  ...new Set(
+    files.flatMap(({ index }) =>
+      index.stories.flatMap((story) =>
+        Object.keys(story).filter((key) => Reflect.get(story, key) !== undefined)
+      )
+    )
+  )
+];
+
+/**
+ * A story file's index as code: its stories as rows of values in the group's key order, which the module turns back
+ * into the same objects (`STORY_TABLE`).
+ *
+ * @remarks
+ * A catalogue's first load fetches every group's index, and an object per story writes its keys again for every
+ * story: on a library of 500 stories, a quarter of the index was the words `exportName` and `description`. A row
+ * writes each value once and leaves a key a story does not have as a hole, which the module leaves out of its object
+ * as the literal did.
+ *
+ * @param index - the file's index.
+ * @param keys - the group's keys (`storyKeysOf`).
+ */
+const indexCode = (index: StoryFileIndex, keys: readonly string[]): string => {
+  const rows = index.stories.map((story) => {
+    const values = keys.map((key) => {
+      const value: unknown = Reflect.get(story, key);
+      return value === undefined ? "" : codeLiteral(value);
+    });
+    // a story's last keys it does not have are left out: a row ends with its last value, never with a hole
+    while (values.at(-1) === "") values.pop();
+    return `[${values.join(",")}]`;
+  });
+  const fields = Object.entries(index)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) =>
+      key === "stories"
+        ? `${codeLiteral(key)}:${STORY_TABLE}([${rows.join(",")}])`
+        : `${codeLiteral(key)}:${codeLiteral(value)}`
+    );
+  return `{${fields.join(",")}}`;
+};
+
 /**
  * The code of the module for one group, from its story files indexed.
  *
@@ -354,12 +405,21 @@ export const storyFilesCode = (
         ];
   // a row per file, its name written once and not once per column (its index, each loader): a large catalogue's
   // names are a tenth of its index
+  const keys = storyKeysOf(files);
   const rows = files.map(({ key, index }) =>
-    [codeLiteral(key), codeLiteral(index), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")
+    [codeLiteral(key), indexCode(index, keys), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")
   );
   const written = `[${rows.map((row) => `[${row}]`).join(",\n")}]`;
   return [
     ...(hasTexts ? [`import texts from ${texts};`] : []),
+    `const storyKeys = ${codeLiteral(keys)};`,
+    `const ${STORY_TABLE} = (rows) => rows.map((row) => {`,
+    "  const story = {};",
+    "  row.forEach((value, at) => {",
+    "    story[storyKeys[at]] = value;",
+    "  });",
+    "  return story;",
+    "});",
     // a build's texts are their module's rows, in the same order: each joins its file's
     `const rows = ${hasTexts ? `${written}.map((row, at) => row.concat(texts[at]))` : written};`,
     "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
