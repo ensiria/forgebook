@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { newStories } from "../bin/forgebook/newStories.ts";
 import type { ComponentDocs, PropDocs } from "../src/componentDocs.ts";
+import { propsSignature, writtenSignature } from "../src/propsSignature.ts";
 import { WORST_NUMBER, WORST_TEXT } from "../src/worstCase.ts";
 
 /** A prop, required unless said. */
@@ -46,6 +47,55 @@ const TEXT = newStories({
   typesModule: "@forgebook/react"
 });
 
+describe("newStories with the application's uses", () => {
+  const text = newStories({
+    docs: BADGE,
+    importStatement: 'import { Badge } from "./Badge";',
+    title: "Actions/Badge",
+    typesModule: "@forgebook/react",
+    uses: [
+      {
+        file: "src/pages/Inbox.tsx",
+        args: { label: '"Unread"', tone: '"danger"', icon: '"mail"', key: '"x"' }
+      },
+      { file: "src/pages/Archive.tsx", args: { label: '"Archived"', icon: '"box"' } },
+      { file: "src/pages/Inbox2.tsx", args: { label: '"Unread"', tone: '"danger"', icon: '"mail"' } }
+    ]
+  });
+
+  it("fills the main story with the values the application gives most, and no TODO for a prop it gives", () => {
+    expect(text).toContain('args: { label: "Unread", tone: "danger", icon: "mail", tags: [] },');
+    expect(text).not.toContain("TODO");
+    expect(text).toContain("from its props and from where the application draws it");
+  });
+
+  it("writes a story per other way it is drawn, named after the file, and leaves out what it does not declare", () => {
+    expect(text).toContain('/** As "src/pages/Archive.tsx" draws it. */\nexport const InArchive');
+    expect(text).toContain('args: { tags: [], label: "Archived", icon: "box" }');
+    expect(text).not.toContain("key:");
+    // the second Inbox use is the main story's args again, so it adds no story
+    expect(text).not.toContain("InInbox2");
+  });
+});
+
+describe("newStories with a hostile file name", () => {
+  it("keeps the name a quoted string in the summary, so it cannot close the comment", () => {
+    const text = newStories({
+      docs: BADGE,
+      importStatement: 'import { Badge } from "./Badge";',
+      title: "Actions/Badge",
+      typesModule: "@forgebook/react",
+      uses: [
+        { file: "src/a*/ ;evil();/*\n.tsx", args: { label: '"Odd"' } },
+        { file: "src/One.tsx", args: { label: '"Usual"' } },
+        { file: "src/Two.tsx", args: { label: '"Usual"' } }
+      ]
+    });
+    expect(text).toContain('/** As "src/a*\\/ ;evil();/*\\n.tsx" draws it. */');
+    expect(text.split("\n").filter((line) => line.includes("evil"))).toHaveLength(1);
+  });
+});
+
 describe("newStories", () => {
   it("writes the meta with the framework's types and the component's import", () => {
     expect(TEXT).toContain('import type { Meta, Story } from "@forgebook/react";');
@@ -53,6 +103,10 @@ describe("newStories", () => {
     expect(TEXT).toContain(
       'export default { title: "Actions/Badge", component: Badge } satisfies Meta<typeof Badge>;'
     );
+  });
+
+  it("says which props it was written for, so verify can tell when they change", () => {
+    expect(writtenSignature(TEXT)).toBe(propsSignature(BADGE.props));
   });
 
   it("fills the required props from their kind, a list with nothing, and leaves a TODO where only a person knows", () => {

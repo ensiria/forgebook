@@ -127,12 +127,34 @@ export type StoryFileShape = {
 /** Reads the component a file exports (`forgebook new`): the export named, or the file's only component. */
 export type ExtractFileComponent = (file: string, exportName?: string) => StoryComponentResult;
 
+/**
+ * One place the application draws a component, as `forgebook new` reads it: the props it gives with a value code can
+ * hold as it is (a literal, or a list or an object of literals), each written as source code.
+ */
+export type CallSite = {
+  /** The file that draws it, absolute. */
+  readonly file: string;
+  /** Each prop given a literal value, by name, as code (`"danger"`, `3`, `true`, `["a", "b"]`). */
+  readonly args: Readonly<Record<string, string>>;
+};
+
+/**
+ * Finds where an application draws a component.
+ *
+ * @param file - the component's file, absolute.
+ * @param name - the name the component is exported by (`default` for a default export).
+ * @returns the call sites, in the order of their files; a message when they cannot be read.
+ */
+export type ExtractCallSites = (file: string, name: string) => readonly CallSite[] | string;
+
 /** A framework's docs module, as the plugin and the commands load it. */
 export type DocsModule = {
   /** Reads a story file's component. */
   readonly extractStoryComponent: ExtractStoryComponent;
   /** Reads a component a file exports; none in a framework package that does not offer it yet. */
   readonly extractFileComponent?: ExtractFileComponent;
+  /** Finds where the application draws a component, for the values `forgebook new` writes; none when not offered. */
+  readonly extractCallSites?: ExtractCallSites;
   /** The module a story file imports its types from (`@forgebook/react`); none when not given. */
   readonly storyTypesModule?: string;
   /**
@@ -160,6 +182,7 @@ export const isDocsModule = (module: unknown): module is DocsModule =>
   "extractStoryComponent" in module &&
   typeof module.extractStoryComponent === "function" &&
   (!("extractFileComponent" in module) || typeof module.extractFileComponent === "function") &&
+  (!("extractCallSites" in module) || typeof module.extractCallSites === "function") &&
   (!("storyTypesModule" in module) || typeof module.storyTypesModule === "string") &&
   (!("storyFileShape" in module) || typeof module.storyFileShape === "function") &&
   (!("sourcesChanged" in module) || typeof module.sourcesChanged === "function");

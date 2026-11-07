@@ -396,6 +396,27 @@ export type AgentChangedStory = {
 /** How a changed UI file is covered: by stories of its own, only through another component's, or by none. */
 export type UiFileCoverage = "own" | "through" | "none";
 
+/**
+ * A story file `forgebook new` wrote for props its component no longer has: its args may pass a prop that is gone or miss
+ * one that is now required, which neither the frame nor a check would say.
+ */
+export type OutdatedStoryFile = {
+  /** The story file, relative to the repository. */
+  readonly file: string;
+  /** The same file, relative to the catalogue's folder: what a command run there names. */
+  readonly path: string;
+  /** One of its stories' ids, whose `story` answer lists the component's props. */
+  readonly story: string;
+  /** Its component's name. */
+  readonly component: string;
+  /** The props' signature the file says it was written for. */
+  readonly written: string;
+  /** The props' signature now. */
+  readonly current: string;
+  /** What to do. */
+  readonly fix: string;
+};
+
 /** A changed file a person sees (`changeCoverage.ts`), and the stories that show it. */
 export type ChangedUiFile = {
   /** The file, relative to the repository. */
@@ -426,6 +447,8 @@ export type ChangedStoriesDocument = {
   readonly problems: readonly string[];
   /** The story files that cannot be read, whose stories no change can reach: a check of a change fails on them. */
   readonly unread?: readonly string[];
+  /** The story files the change reaches that were written for other props; absent when there are none. */
+  readonly outdated?: readonly OutdatedStoryFile[];
 };
 
 /** How `verify` ended. */
@@ -518,7 +541,9 @@ export type VerifyDocument = {
     /** What it found to weigh and not to fail on. */
     readonly advice?: readonly CodeAdvice[];
   };
-  /** How many problems there are, in `failures` and `code.problems` together. */
+  /** The story files the change reaches that were written for other props, each with its fix; absent when none. */
+  readonly outdated?: readonly OutdatedStoryFile[];
+  /** How many problems there are, in `failures`, `code.problems` and `outdated` together. */
   readonly problems: number;
   /** The changed published components an agent cannot see: these leave the change not verified. */
   readonly unseen: readonly UnseenComponent[];

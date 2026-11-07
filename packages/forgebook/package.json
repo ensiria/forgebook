@@ -58,6 +58,7 @@
     "./vite/signature-docs": "./src/vite/signatureDocs.ts",
     "./vite/usage-guidance": "./src/vite/usageGuidance.ts",
     "./vite/function-component-docs": "./src/vite/functionComponentDocs.ts",
+    "./vite/jsx-call-sites": "./src/vite/jsxCallSites.ts",
     "./catalogue-docs": "./bin/forgebook-docs/collectDocs.ts",
     "./catalogue-markdown": "./bin/forgebook-docs/catalogueMarkdown.ts",
     "./catalogue-options": "./bin/forgebook-docs/catalogueOptions.ts",
@@ -239,6 +240,10 @@
       "./vite/function-component-docs": {
         "types": "./dist/src/vite/functionComponentDocs.d.ts",
         "default": "./dist/src/vite/functionComponentDocs.js"
+      },
+      "./vite/jsx-call-sites": {
+        "types": "./dist/src/vite/jsxCallSites.d.ts",
+        "default": "./dist/src/vite/jsxCallSites.js"
       },
       "./catalogue-docs": {
         "types": "./dist/bin/forgebook-docs/collectDocs.d.ts",

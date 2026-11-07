@@ -125,6 +125,90 @@ export type StoryCheckReport = {
   readonly a11y?: "off";
 };
 
+/** One case of a stress run: the values given, the window, the view, and what it found that the plain story does not. */
+export type StressCase = {
+  /** Its name: `long-text`, `unbreakable`, `huge-number`, `empty`, `rtl`, `zoom-200`, `narrow`, `dark`, `contrast`. */
+  readonly name: string;
+  /** The story's id. */
+  readonly storyId: string;
+  /** The values given over the story's own, by prop. */
+  readonly args: Readonly<Record<string, unknown>>;
+  /** The frame, in its view. */
+  readonly frame: string;
+  /** The problems the plain story does not have; none when it holds. */
+  readonly problems: readonly StoryProblem[];
+  /** Why it could not be judged: the story did not draw in it, or not in the plain case. */
+  readonly notVerified?: string;
+};
+
+/** One case to run, as the command builds it from the story's props and the catalogue's switches. */
+export type StressCaseRequest = {
+  /** Its name. */
+  readonly name: string;
+  /** The values to give, as the props panel gives them. */
+  readonly args: Readonly<Record<string, unknown>>;
+  /** The view, in the address's form (`theme=dark`); empty for the default. */
+  readonly view: string;
+  /** The window's width, in CSS px; the default window's when none. */
+  readonly width?: number;
+  /** Whether the frame's document reads right to left. */
+  readonly isRtl?: boolean;
+  /** The axe rules whose finding the case's own values cause, which say nothing of the component. */
+  readonly expectedRules?: readonly string[];
+};
+
+/** What a stress run is asked. */
+export type StressRequest = {
+  /** The catalogue's frame page, absolute. */
+  readonly frameUrl: string;
+  /** The stories, each with its cases. */
+  readonly stories: readonly {
+    readonly story: StoryCheckStory;
+    readonly cases: readonly StressCaseRequest[];
+  }[];
+  /** The catalogue's switches. */
+  readonly switches: readonly ViewSwitch[];
+  /** The catalogue's lists: its accessibility rules. */
+  readonly lists: CatalogueLists;
+};
+
+/** What a stress run found. */
+export type StressReport = {
+  /** The shape's version. */
+  readonly schema: 1;
+  /** One result per story and case. */
+  readonly cases: readonly StressCase[];
+  /** The cases not run, each with its story and why: a case with nothing to set is never counted as passed. */
+  readonly skipped: readonly string[];
+  /** `"off"` when the catalogue checks no accessibility (`a11y: false`): no case ran axe. Absent when it does. */
+  readonly a11y?: "off";
+};
+
+/**
+ * Whether what the testing package answered is a stress run's report.
+ *
+ * @param value - the answer.
+ */
+export const isStressReport = (value: unknown): value is StressReport =>
+  typeof value === "object" &&
+  value !== null &&
+  "schema" in value &&
+  value.schema === 1 &&
+  "cases" in value &&
+  Array.isArray(value.cases) &&
+  value.cases.every(
+    (each: unknown) =>
+      typeof each === "object" &&
+      each !== null &&
+      "name" in each &&
+      typeof each.name === "string" &&
+      "storyId" in each &&
+      typeof each.storyId === "string" &&
+      "problems" in each &&
+      Array.isArray(each.problems) &&
+      each.problems.every(isProblem)
+  );
+
 /** Every kind, for reading a report back. */
 const KINDS: readonly StoryProblemKind[] = ["frame", "axe", "spill", "overlay", "focus", "error"];
 

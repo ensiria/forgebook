@@ -399,6 +399,7 @@ describe("agents", () => {
       },
       writeNew: () => Promise.reject(new Error("not asked in these tests")),
       check: async () => "unused",
+      stress: async () => "unused",
       checkPage: async () => "unused",
       shot: async () => "unused",
       verify: async () => "unused",
