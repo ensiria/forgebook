@@ -10,7 +10,7 @@ import type { UserConfig } from "vite";
 
 import { packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { pageModulePath } from "./pages.ts";
-import { prebundled, scannedEntries, scanOptions } from "./prebundled.ts";
+import { prebundled, type ScanFindings, scannedEntries, scanOptions } from "./prebundled.ts";
 
 /**
  * A file's text, or none when it cannot be read.
@@ -40,12 +40,12 @@ const hasOwnOutput = (userConfig: UserConfig): boolean =>
  *
  * @param config - the catalogue's configuration.
  * @param userConfig - the configuration so far, whose own `server.cors` and build output the plugin leaves alone.
- * @param warn - writes a warning line of the dependency scan.
+ * @param findings - where the dependency scan's warnings and problems go.
  */
 export const catalogueConfig = (
   config: ResolvedConfig,
   userConfig: UserConfig,
-  warn?: (line: string) => void
+  findings: Omit<ScanFindings, "root"> = {}
 ): UserConfig => ({
   root: config.dir,
   // a hoisted workspace can keep a package's React in its folder while the adapter, at the root, reads another copy, and
@@ -56,7 +56,7 @@ export const catalogueConfig = (
   optimizeDeps: {
     include: prebundled(config, packageResolver(config.dir)),
     entries: scannedEntries(config, packageResolver(config.dir), readTextFile),
-    rolldownOptions: scanOptions({ root: config.dir, ...(warn === undefined ? {} : { warn }) })
+    rolldownOptions: scanOptions({ root: config.dir, ...findings })
   },
   build: {
     rolldownOptions: {

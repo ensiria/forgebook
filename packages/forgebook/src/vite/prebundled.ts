@@ -15,13 +15,13 @@
  */
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 
-import { parseSync, type UserConfig } from "vite";
+import type { UserConfig } from "vite";
 
 import { STORY_FILE } from "./autoTitle.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
-import { lineAndColumn } from "./lineAndColumn.ts";
 import { hasPluginViews, PLUGIN_HOSTS_MODULE, WRITTEN_HOME_MODULE } from "./pages.ts";
 import { pluginModules } from "./pluginConfig.ts";
+import { INSTALLED, parsedScript, SCRIPT, type ScriptProblems } from "./scriptProblems.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
@@ -121,63 +121,57 @@ type ScanOptions = NonNullable<NonNullable<UserConfig["optimizeDeps"]>["rolldown
 /** A module the scan reads in place of a file's own text. */
 type ScanModule = { code: string; moduleType: "js" | "jsx" };
 
-/** Where the scan's warnings go. */
-export type ScanWarnings = {
-  /** The catalogue's folder: a warning names a file relative to it; absolute without it. */
-  readonly root?: string;
-  /** Writes one warning line; none are written without it. */
-  readonly warn?: (line: string) => void;
-};
-
-/** A project's script: JavaScript or TypeScript, with or without JSX. */
-const SCRIPT = /\.[cm]?[jt]sx?$/;
-
-/** A file of an installed package, which the scan does not read past its imports. */
-const INSTALLED = /[\\/]node_modules[\\/]/;
-
-/** A script whose extension says nothing about JSX. */
-const PLAIN_SCRIPT = /\.[cm]?js$/;
-
 /**
  * What the scan reads for one of the project's scripts: nothing in its place when it parses (the scan reads it), the
- * same text read as JSX when only JSX makes it parse, and an empty module when it does not parse at all.
+ * same text read as JSX when only JSX makes a `.js` file parse, and its imports alone when it does not parse at all,
+ * which the parser still finds, so their packages are pre-bundled with the rest.
  *
- * @param file - the script's path as a message names it; its extension decides TypeScript and JSX.
+ * @param file - the script's path; its extension decides TypeScript and JSX.
  * @param text - its source.
- * @returns the module to scan, or none to let the scan read the file, and the parse error of a file that does not parse.
+ * @returns the module to scan, or none to let the scan read the file, and why the file does not parse.
  */
 export const scannedScript = (
   file: string,
   text: string
-): { module: ScanModule | undefined; error: string | undefined } => {
-  const { errors } = parseSync(file, text);
-  const [error] = errors;
-  if (error === undefined) return { module: undefined, error: undefined };
-  // a `.js` file holding JSX, as libraries that write their stories in JavaScript do: its imports still count
-  if (PLAIN_SCRIPT.test(file) && parseSync(file, text, { lang: "jsx" }).errors.length === 0) {
-    return { module: { code: text, moduleType: "jsx" }, error: undefined };
-  }
-  const [label] = error.labels;
-  const place = label === undefined ? file : `${file}:${lineAndColumn(text, label.start)}`;
-  return { module: { code: "", moduleType: "js" }, error: `${place}: ${error.message}` };
+): { module: ScanModule | undefined; problem: string | undefined } => {
+  const { imports, isJsx, problem } = parsedScript(file, text);
+  if (isJsx) return { module: { code: text, moduleType: "jsx" }, problem };
+  if (problem === undefined) return { module: undefined, problem };
+  const code = imports.map((name) => `import ${JSON.stringify(name)};`).join("\n");
+  return { module: { code, moduleType: "js" }, problem };
 };
+
+/** Where the scan's findings go. */
+export type ScanFindings = {
+  /** The catalogue's folder: a warning names a file relative to it; absolute without it. */
+  readonly root?: string;
+  /** Writes one warning line; none are written without it. */
+  readonly warn?: (line: string) => void;
+  /** Keeps what the scan found of each of the project's scripts, other than story files (`scriptProblems.ts`). */
+  readonly scanned?: ScriptProblems["scanned"];
+};
+
+/**
+ * The warnings this process wrote: a first start's pre-bundling scans again after leaving out an import it could not
+ * resolve (`prebundleRun.ts`), and a file is named once.
+ */
+const WARNED = new Set<string>();
 
 /**
  * Keeps Vite's dependency scan going past one of the project's scripts that does not parse, a story file or a
  * component, and reads a `.js` file holding JSX as JSX. One such file otherwise stops the scan, and with it the
  * pre-bundling of every other story's packages, and fills the log with the scanner's stack; the pages then reload as
- * each package is found. A script that does not parse adds nothing to what the scan finds: a story file is named by
- * the catalogue itself (`storyFilesModule.ts`), any other by one warning with its place, and by the frame of each
- * story that imports it. The texts are read here on the scan only: a start that keeps its pre-bundled packages does
- * not scan.
+ * each package is found. A script that does not parse is read as its imports alone: a story file is named by the
+ * catalogue itself (`storyFilesModule.ts`), any other is kept among the index's problems (`scriptProblems.ts`) and
+ * named by one warning with its place. The texts are read here on the scan only: a start that keeps its pre-bundled
+ * packages does not scan.
  *
- * @param options - the catalogue's folder, which the warnings' places are relative to, and what writes a warning line
- * for a script, other than a story file, that does not parse.
+ * @param findings - the catalogue's folder, and where warnings and problems go.
  */
-export const scanOptions = (options: ScanWarnings = {}): ScanOptions => {
+export const scanOptions = (findings: ScanFindings = {}): ScanOptions => {
   // the scan names files by their real path: a folder reached through a link (`/tmp` on macOS) would not prefix them
   const root =
-    options.root === undefined || !existsSync(options.root) ? undefined : realpathSync(options.root);
+    findings.root === undefined || !existsSync(findings.root) ? undefined : realpathSync(findings.root);
   return {
     plugins: [
       {
@@ -187,10 +181,15 @@ export const scanOptions = (options: ScanWarnings = {}): ScanOptions => {
           handler: (id: string): ScanModule | null => {
             // an id that names no file (a plugin's own module) is not this hook's to answer
             if (!existsSync(id)) return null;
-            const shown = root === undefined ? id : VITE_PATHS.relative(root, id);
-            const { module, error } = scannedScript(shown, readFileSync(id, "utf8"));
-            if (error !== undefined && !STORY_FILE.test(id)) {
-              options.warn?.(`The dependency scan skipped ${error}`);
+            const file = VITE_PATHS.normalize(id);
+            const { module, problem } = scannedScript(file, readFileSync(id, "utf8"));
+            if (STORY_FILE.test(id)) return module ?? null;
+            findings.scanned?.(file, problem);
+            if (problem !== undefined) {
+              const shown = root === undefined ? file : VITE_PATHS.relative(root, file);
+              const line = `The dependency scan skipped ${problem.replace(file, shown)}`;
+              if (!WARNED.has(line)) findings.warn?.(line);
+              WARNED.add(line);
             }
             return module ?? null;
           }

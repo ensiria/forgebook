@@ -47,8 +47,10 @@ describe("Vite's dependency scan", () => {
     const metadata = await optimizeDeps(config, true);
     const optimized = Object.keys(metadata.optimized);
     expect(optimized).toEqual(expect.arrayContaining(["axe-core", "marked"]));
-    // what only the broken component imports is not found
-    expect(optimized).not.toContain("lightningcss");
-    expect(warnings).toEqual(["The dependency scan skipped src/Broken.tsx:2:25: Unexpected token"]);
+    // what the broken component imports is found too: the parser reads its imports
+    expect(optimized).toContain("lightningcss");
+    expect(warnings).toEqual([
+      "The dependency scan skipped src/Broken.tsx:2:25 does not parse: Unexpected token"
+    ]);
   });
 });
