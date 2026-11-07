@@ -164,6 +164,8 @@ export type VerifyFindings = {
   readonly isQuick: boolean;
   /** Whether a commit was named: with none, an empty change may only mean the work is where this cannot look. */
   readonly isSinceNamed: boolean;
+  /** What is wrong with the catalogue's configuration: the answer is not verified, whatever else it found. */
+  readonly configProblems?: readonly string[];
 };
 
 /** What a line says of a change with no UI file. */
@@ -217,14 +219,15 @@ const summaryOf = (
   catalogueProblems: readonly string[]
 ): string => {
   const { verdict, uiFiles, files, since, code, skipped } = document;
+  const isBlind = files.length === 0 && catalogueProblems.length === 0;
   const notes = code.notes.length === 0 ? [] : [`${counted(code.notes.length, "note")} from check-code`];
   const said = [...skipped, ...notes];
   const tail = said.length === 0 ? "" : `; ${said.join("; ")}`;
   if (files.length === 0) {
-    const ending =
-      verdict === "not-verified"
-        ? "not verified. If your work is committed, give --since <ref>"
-        : "nothing to verify";
+    const notVerified = isBlind
+      ? "not verified. If your work is committed, give --since <ref>"
+      : "not verified";
+    const ending = verdict === "not-verified" ? notVerified : "nothing to verify";
     return `Nothing changed since ${since}: ${ending}${tail}`;
   }
   if (uiFiles.length === 0) {
@@ -269,7 +272,10 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const problems = failures.reduce((sum, each) => sum + each.problems.length, codeProblems.length);
   const skipped = skippedOf(input, notRun);
   // a story file that cannot be read may be the change, whatever else changed
-  const catalogueProblems = changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []);
+  const catalogueProblems = [
+    ...(input.configProblems ?? []),
+    ...(changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []))
+  ];
   const isBlind = changed.files.length === 0 && !isSinceNamed;
   const verdict = verdictOf(uiFiles, problems, skipped, catalogueProblems, isBlind, notVerified.length);
   const allSkipped = [...skipped, ...catalogueProblems];
