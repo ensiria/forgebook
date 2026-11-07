@@ -37,6 +37,20 @@ const commandCache = (): Plugin => ({
   }
 });
 
+/** Whether this process started a server for a command. */
+let hasStartedServer = false;
+
+/**
+ * Ends a command that started a server, once its answer is out: a plugin of the app's build may leave a watcher or a timer
+ * behind, which would keep the process, and whoever waits for it, waiting for ever. A command that started none, or a dev
+ * server, ends as it would.
+ *
+ * @param code - the code the command ended with.
+ */
+export const leaveAfterCommand = (code: number): void => {
+  if (hasStartedServer) process.stdout.write("", () => process.exit(code));
+};
+
 /**
  * Sends what plugins log to stderr: a command's stdout is its answer (`--json`, the MCP protocol), and a plugin of the app's
  * build that says what it fetches would break it. Nothing of the commands' own goes through `console`.
@@ -53,6 +67,7 @@ const keepPluginsOffStdout = (): void => {
  * @param overrides - what the command sets (the port, middleware mode).
  */
 export const commandServerVite = (config: ResolvedConfig, overrides: InlineConfig): Promise<InlineConfig> => {
+  hasStartedServer = true;
   keepPluginsOffStdout();
   return catalogueVite(config, { ...overrides, plugins: [...(overrides.plugins ?? []), commandCache()] });
 };

@@ -32,6 +32,7 @@ import {
   printAnswer
 } from "./catalogueCommands.ts";
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
+import { leaveAfterCommand } from "./commandServer.ts";
 import { devCommands } from "./devCommands.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
@@ -348,4 +349,6 @@ await defineCommands({
       }
     })
   })
-}).run();
+})
+  .run()
+  .then(leaveAfterCommand);
