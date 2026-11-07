@@ -24,8 +24,8 @@ import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
 import { ERROR_MESSAGE_CLASS, ERROR_STACK_CLASS } from "./frameStatus.ts";
 import { matrixLayout } from "./matrixLayout.ts";
-import { type HeldStepper, heldStepper } from "./playStepper.ts";
-import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
+import { type HeldStepper, heldStepper, runPlay } from "./playStepper.ts";
+import type { PlayTools, PlayToolsLoader } from "./playStory.ts";
 import type {
   ArgsChange,
   ContentState,
@@ -423,7 +423,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
         options.onControlsReady(controls, outcome);
       };
       // a failed play still ends the wait; its rejection reaches the page as an error the tests record
-      void playStory(
+      void runPlay(
         play,
         {
           ...options.identity,
