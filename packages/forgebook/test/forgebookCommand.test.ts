@@ -17,7 +17,7 @@ import {
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { runScriptProcess } from "@ensiria/cli-kit/testing";
 import type { ScriptProcessRun } from "@ensiria/cli-kit/testing.types";
@@ -130,7 +130,7 @@ describe("a configuration that cannot be used", () => {
     expect(run.stderr).toContain('it has no key "toolbr". Did you mean toolbar?');
   });
 
-  it.each(["build", "stories", "check x", "verify"])(
+  it.each(["build", "stories", "check x"])(
     "%s stops on a story pattern that matches nothing, naming it",
     (command) => {
       const empty = catalogue(root, `empty-${command.split(" ")[0]}`, {});
@@ -138,6 +138,45 @@ describe("a configuration that cannot be used", () => {
       expect(run.exitCode).toBe(1);
       expect(run.stderr).toContain('No story file matches "src/*.stories.tsx"');
     }
+  );
+});
+
+describe("forgebook verify with a story pattern that matches nothing", () => {
+  it(
+    "answers not verified, naming the pattern, and still gives the rest of its answer",
+    () => {
+      const empty = catalogue(root, "empty-verify-answer", {});
+      const dir = dirname(empty);
+      const git = (...args: readonly string[]): void => {
+        spawnSync(
+          "git",
+          ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args],
+          { cwd: dir }
+        );
+      };
+      git("init", "-q");
+      git("add", "-A");
+      git("commit", "-q", "-m", "first");
+      const run = runScriptProcess(ENTRY, [
+        "verify",
+        "--since",
+        "HEAD",
+        "--json",
+        "--config",
+        empty,
+        "--url",
+        NO_SERVER
+      ]);
+      expect(run.exitCode).toBe(1);
+      const document: unknown = JSON.parse(run.stdout);
+      expect(document).toMatchObject({
+        verdict: "not-verified",
+        skipped: expect.arrayContaining([
+          expect.stringContaining('No story file matches "src/*.stories.tsx"')
+        ])
+      });
+    },
+    SERVER_TIMEOUT
   );
 });
 
@@ -923,6 +962,18 @@ describe("forgebook check-code", { timeout: SERVER_TIMEOUT }, () => {
     expect(JSON.parse(check().stdout).problems).toContainEqual(
       expect.objectContaining({ rule: "raw-color", file: "src/New.tsx", line: 1 })
     );
+
+    // a bare number in a style object is pixels: a failure in a style, advice where the object may be an option
+    writeFileSync(
+      join(project, "src", "Sized.tsx"),
+      "export const Sized = () => <p style={{ padding: 24 }} />;\nexport const fit = { margin: 8 };\n"
+    );
+    const sized = JSON.parse(check().stdout);
+    expect(sized.problems).toContainEqual(
+      expect.objectContaining({ rule: "raw-size", file: "src/Sized.tsx", line: 1, fix: "space.large" })
+    );
+    expect(sized.advice).toContainEqual(expect.objectContaining({ file: "src/Sized.tsx", line: 2 }));
+    rmSync(join(project, "src", "Sized.tsx"));
 
     // an option in the place of a commit reaches git as nothing, and a file stays as it is
     const precious = join(project, "precious.txt");

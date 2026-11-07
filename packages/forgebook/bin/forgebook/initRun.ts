@@ -18,6 +18,7 @@ import { basename, join } from "node:path";
 import { EXIT } from "@ensiria/cli-kit/constants";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { printable } from "../../src/printable.ts";
 import { CONFIG_FILES, PREVIEW_FILES } from "../../src/vite/configFile.ts";
 import { projectFrameworks } from "./agentGuide.ts";
 import { HOOK_NAMES } from "./agentSetup/hookNames.ts";
@@ -40,7 +41,6 @@ import {
 import { planNewProject } from "./newProject/newProject.ts";
 import type { InitCommand, InitInstall, InitRoute, NextStep } from "./newProject/newProject.types.ts";
 import { detectPackageManager, forgebookRunner } from "./newProject/packageManagers.ts";
-import { printable } from "./newProject/projectEntries.ts";
 import { detectFramework, FRAMEWORK_NAMES, PROJECT_FRAMEWORKS } from "./newProject/projectFrameworks.ts";
 import { declaredPackages, packageState, requiredPackages } from "./newProject/projectPackages.ts";
 

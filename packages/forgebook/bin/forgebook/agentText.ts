@@ -11,6 +11,7 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
+import type { ComponentDocs, PropCondition, PropsNote } from "../../src/componentDocs.ts";
 import type {
   StoryCheckReport,
   StoryCheckResult,
@@ -31,7 +32,9 @@ import type {
   StoryDocument,
   SwitchesDocument,
   TokensDocument,
-  VerifyDocument
+  UnseenComponent,
+  VerifyDocument,
+  VisibilityDocument
 } from "../../src/vite/agent.types.ts";
 import type { DesignToken, TokenSource } from "../../src/vite/designTokens.ts";
 import type { TokenClash } from "../../src/vite/tokenClashes.ts";
@@ -58,8 +61,39 @@ export const storiesText = (document: StoriesDocument, style: OutputStyle): stri
     uncut(style)
   );
 
+/** Why a component lists no props, as the `Props` line says it. */
+const PROPS_NOTES: Readonly<Record<PropsNote["reason"], (count: number) => string>> = {
+  untyped: (): string => "none: its props are typed any",
+  "no-signature": (): string => "none: its type cannot be called with props",
+  "outside-package": (count: number): string => `none: all ${count} come from outside the package`
+};
+
+/** When a variant's prop applies, as the `Props` line says it (`mode is single, or left out`). */
+const conditionText = ({ prop, values, orOmitted }: PropCondition): string => {
+  if (values.length === 0) return `${prop} is left out`;
+  return `${prop} is ${values.map(String).join(" or ")}${orOmitted === true ? ", or left out" : ""}`;
+};
+
 /**
- * One story's facts: where it is, where it opens, its args, its component's props and those every use must set.
+ * A component's props in one line: each name, a variant's with when it can be passed, or why there are none.
+ *
+ * @param docs - the component's docs.
+ */
+const propsLine = (docs: ComponentDocs): string => {
+  const { propsNote } = docs;
+  if (docs.props.length === 0 && propsNote !== undefined) {
+    return PROPS_NOTES[propsNote.reason](propsNote.reason === "outside-package" ? propsNote.count : 0);
+  }
+  return docs.props
+    .map((prop) =>
+      prop.onlyWhen === undefined ? prop.name : `${prop.name} (when ${conditionText(prop.onlyWhen)})`
+    )
+    .join(", ");
+};
+
+/**
+ * One story's facts: where it is, where it opens, its args, its component's props and those every use must set, then
+ * its code.
  *
  * @param document - the story document.
  * @param style - colours, glyphs and width.
@@ -73,12 +107,14 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["Frame", document.story.links.frame],
     ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
-    ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")],
+    ["Props", document.docs === undefined ? "none" : propsLine(document.docs)],
     ["Required", document.requiredProps.length === 0 ? "none" : document.requiredProps.join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
   if (document.design !== undefined) entries.push(["Design", document.design.figma]);
-  return keyValue(entries, uncut(style));
+  const fields = keyValue(entries, uncut(style));
+  // the code spans lines: under the fields, as it is copied
+  return document.code === undefined ? fields : `${fields}\n\n${document.code}`;
 };
 
 /** What a model judged, each line saying it is an opinion. */
@@ -139,7 +175,11 @@ export const errorsText = (document: ErrorsDocument, style: OutputStyle): string
   document.errors.length === 0
     ? ""
     : table(
-        document.errors.map((error) => [String(error.n), error.storyId, `${error.kind}: ${error.message}`]),
+        document.errors.map((error) => [
+          String(error.n),
+          error.storyId,
+          `${error.kind}: ${error.place === undefined ? "" : `${error.place}: `}${error.message}`
+        ]),
         { columns: [{ header: "#", tone: "muted" }, { header: "Story" }, { header: "Error" }] },
         uncut(style)
       );
@@ -338,6 +378,25 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
   ].join("\n");
 };
 
+/** A published component an agent cannot see, a line for each thing that hides it. */
+const unseenLines = ({ file, reasons }: UnseenComponent): readonly string[] =>
+  reasons.map(({ reason, fix }) => `${file}  agents cannot see it: ${reason}. Fix: ${fix}`);
+
+/**
+ * The published components an agent cannot see, what was not looked at, and how many were.
+ *
+ * @param document - the answer.
+ */
+export const visibilityText = (document: VisibilityDocument): string => {
+  const scope = document.since === undefined ? "" : ` changed since ${document.since}`;
+  const count = `${document.checked} published component file${document.checked === 1 ? "" : "s"}${scope}`;
+  const ending =
+    document.packages.length === 0 && document.skipped.length === 0
+      ? "No package here publishes a component: nothing to hold to this."
+      : `${count}, ${document.unseen.length} agents cannot see.`;
+  return [...document.unseen.flatMap(unseenLines), ...document.skipped, ending].join("\n");
+};
+
 /**
  * What `verify` found, each with its fix, and the verdict in one line, last: what a person reads first at a prompt.
  *
@@ -352,6 +411,7 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
         ]
       : []
   );
+  const unseen = document.unseen.flatMap(unseenLines);
   const code = document.code.problems.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
   );
@@ -364,7 +424,7 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
     ...document.notVerified.map((each) => ({ ...each, problems: [] }))
   ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
   const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
-  return [...uncovered, ...code, ...notes, ...advice, ...stories, document.summary].join("\n");
+  return [...uncovered, ...unseen, ...code, ...notes, ...advice, ...stories, document.summary].join("\n");
 };
 
 /**

@@ -11,7 +11,8 @@
  *
  * @module
  */
-import { relative } from "node:path";
+import { existsSync } from "node:fs";
+import { join, relative } from "node:path";
 
 import type { ConfigEnv, Plugin, PluginOption, ResolvedConfig as ResolvedViteConfig } from "vite";
 
@@ -29,6 +30,9 @@ import { hasTsconfigPaths } from "./tsconfigPaths.ts";
 /** The parts of an app's build a catalogue can read. */
 type AppBuildPart = "vite-config" | "postcss" | "tsconfig-paths";
 
+/** The names of a Nuxt config, whose modules the Nuxt adapter loads. */
+const NUXT_CONFIGS = ["nuxt.config.ts", "nuxt.config.js", "nuxt.config.mjs"];
+
 /** What each framework's adapter reads itself, by the adapter's name. */
 const READ_BY_ADAPTER: Readonly<Record<string, readonly AppBuildPart[]>> = {
   nextjs: ["vite-config", "postcss", "tsconfig-paths"],
@@ -40,6 +44,20 @@ const READ_BY_ADAPTER: Readonly<Record<string, readonly AppBuildPart[]>> = {
 
 /** A style sheet PostCSS runs on: plain CSS, a component's style block among them; Sass compiles its own first. */
 const CSS_FILE = /\.(?:css|pcss|postcss)(?:\?.*)?$/;
+
+/**
+ * Whether a sheet is one nobody sees: a global sheet on the server, which loads a preview for its args and parameters.
+ * Run through Tailwind 3 there, it scanned every component, most of a command's start. A module's sheet keeps its class
+ * names, which a component reads wherever it runs.
+ *
+ * @param consumer - who the environment serves.
+ * @param id - the sheet.
+ */
+const isUnseenOnServer = (consumer: string, id: string): boolean =>
+  consumer === "server" && !CSS_MODULE.test(id);
+
+/** A CSS module, whose class names a component reads wherever it runs. */
+const CSS_MODULE = /\.module\.[a-z]+(?:\?.*)?$/;
 
 /** A style sheet's imports that are not compiled, which Vite's own CSS pipeline leaves alone too. */
 const NOT_COMPILED = /[?&](?:raw|url)\b/;
@@ -79,13 +97,21 @@ const postcssPlugin = (dir: string, inlinePlugins: readonly unknown[] | undefine
   const run = projectPostcss(dir, inlinePlugins === undefined ? {} : { plugins: inlinePlugins });
   if (run === undefined) return undefined;
   let isSaid = false;
+  // Vite runs the project's PostCSS itself when the catalogue's CSS goes through PostCSS rather than Lightning CSS (an
+  // app's configuration may ask for it): a second run would cost every style sheet as much again, for the same output
+  let isRunByVite = false;
+  const isLeftAlone = (id: string): boolean => isRunByVite || NOT_COMPILED.test(id);
   return {
     name: "forgebook:app-postcss",
     enforce: "pre",
+    configResolved(resolved: ResolvedViteConfig): void {
+      isRunByVite = resolved.css.transformer !== "lightningcss";
+    },
     transform: {
       filter: { id: CSS_FILE },
       async handler(code: string, id: string): Promise<{ code: string; map: null } | undefined> {
-        if (NOT_COMPILED.test(id)) return undefined;
+        if (isLeftAlone(id)) return undefined;
+        if (isUnseenOnServer(this.environment.config.consumer, id)) return { code: "", map: null };
         let result: Processed;
         try {
           result = await run(code, id.split("?")[0] ?? id);
@@ -158,7 +184,12 @@ export const appBuildPlan = (dir: string, framework: string): AppBuildPlan => {
     tsconfigPaths: !readByAdapter.includes("tsconfig-paths") && hasTsconfigPaths(dir),
     postcss,
     // a JSON file too: the plugins it names run, and a path in it can name a file of the project's
-    runsCode: [...(viteConfig === undefined ? [] : [viteConfig]), ...(postcss === undefined ? [] : [postcss])]
+    runsCode: [
+      ...(viteConfig === undefined ? [] : [viteConfig]),
+      ...(postcss === undefined ? [] : [postcss]),
+      // Nuxt's adapter loads the project's modules through its nuxt.config
+      ...(framework === "nuxt" ? NUXT_CONFIGS.filter((name) => existsSync(join(dir, name))) : [])
+    ]
   };
 };
 

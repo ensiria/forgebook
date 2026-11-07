@@ -1723,6 +1723,14 @@
 
   // the stage
 
+  .forgebook-play__switch {
+    display: flex;
+    gap: $space-1-5;
+    align-items: center;
+    font: $text-row-compact;
+    color: $text-secondary;
+  }
+
   .forgebook-play__status {
     font: $text-caption;
     font-weight: 400;
@@ -2803,6 +2811,14 @@
 
   .forgebook-api__type {
     min-width: 10rem;
+  }
+
+  // under a prop's description, when a variant's prop can be passed or why its type is not as written; alone, why a
+  // component lists no props
+  .forgebook-api__note {
+    display: block;
+    margin: $space-1 0 0;
+    color: $text-secondary;
   }
 
   // a part named in the meta's `subcomponents`: its name as code, its summary, its tables, spaced like the section

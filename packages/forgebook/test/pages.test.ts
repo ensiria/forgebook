@@ -88,6 +88,9 @@ describe("the generated pages", () => {
     expect(frame).toContain('addEventListener("error"');
     expect(frame.indexOf("<script>")).toBeLessThan(frame.indexOf('<script type="module"'));
     expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).not.toContain('addEventListener("error"');
+    // every frame page carries it: no indent, no comment line
+    const guard = frame.slice(frame.indexOf("<script>"), frame.indexOf("</script>"));
+    expect(guard.split("\n").filter((line) => line !== line.trim() || line.startsWith("//"))).toEqual([]);
   });
 
   it("mounts the shell with the data, the logo, the own stories before the packages' and the code writer", () => {
@@ -195,6 +198,13 @@ describe("the generated pages", () => {
     );
     expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, false)).not.toContain(
       "storyGlobs"
+    );
+    // a reader of published docs did not ask for a story to play; a dev server's author did
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, false)).toContain(
+      '"play":"off"'
+    );
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, true)).not.toContain(
+      '"play"'
     );
     const source = storiesSourceModule(CONFIG);
     expect(source).toContain(

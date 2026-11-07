@@ -1,10 +1,12 @@
 /**
  * A TSDoc or Markdown sentence with its code spans shown as code: what is between backticks (as `href` is written in
- * a TSDoc) is set in the code face, the rest stays text.
+ * a TSDoc) is set in the code face, the rest stays text. Spans are read as CommonMark reads them (`codeSpans.ts`).
  *
  * @module
  */
 import type { ReactNode } from "react";
+
+import { sentencePieces } from "./codeSpans.ts";
 
 /**
  * A sentence, its backtick spans as code.
@@ -12,15 +14,14 @@ import type { ReactNode } from "react";
  * @param props - the sentence.
  */
 export const CodeText = ({ text }: { readonly text: string }): ReactNode =>
-  // a split on the backticks alternates text and code: the odd pieces were between backticks
-  text.split("`").map((piece, index) =>
-    index % 2 === 1 ? (
+  sentencePieces(text).map((piece, index) =>
+    piece.isCode ? (
       // the pieces of one sentence never reorder, so their position is a stable key
       // biome-ignore lint/suspicious/noArrayIndexKey: see above
       <code key={index} className="forgebook-inline-code">
-        {piece}
+        {piece.text}
       </code>
     ) : (
-      piece
+      piece.text
     )
   );

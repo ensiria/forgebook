@@ -144,8 +144,14 @@ export type StoryRenderer = FrameRenderer & {
  *
  * @param component - the component's name, as its documentation names it.
  * @param args - the values of the moment, a named value by its name.
+ * @param written - the args the story file writes as code (a function, an element, a constant), each as written and
+ * written over its value; none or empty writes the values alone. A writer that cannot use them may ignore them.
  */
-export type StoryCodeWriter = (component: string, args: PanelArgs) => string;
+export type StoryCodeWriter = (
+  component: string,
+  args: PanelArgs,
+  written?: Readonly<Record<string, string>>
+) => string;
 
 /** The longest pause between two looks at what a story waits for, in milliseconds. */
 const LONGEST_LOOK = 50;

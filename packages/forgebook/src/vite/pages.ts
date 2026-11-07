@@ -113,6 +113,20 @@ const escaped = (text: string): string =>
   text.replace(/[&<>"]/g, (character) => `&#${character.charCodeAt(0)};`);
 
 /**
+ * A script as the page carries it: each line without its indent, and the lines that only comment left out. Every
+ * frame of a catalogue loads it, and a build counts it in every frame page it writes; the source keeps its indents and
+ * comments for whoever reads it.
+ *
+ * @param script - the script, one statement or brace per line, no string that spans lines.
+ */
+const compactScript = (script: string): string =>
+  script
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("//"))
+    .join("\n");
+
+/**
  * What a frame shows when its code fails before the frame starts: a preview or a source that throws while it loads, or
  * a module that cannot be loaded at all. The frame's own code never runs then, so without this the frame stays blank
  * and its shell waits. Plain script in the page, since a module that failed cannot report anything; it stands down
@@ -223,7 +237,7 @@ export const pageHtml = (page: PageFile, config: ResolvedConfig, placement: Fram
     "  </head>",
     "  <body>",
     '    <div id="root"></div>',
-    ...(page === "frame.html" ? [`    <script>${frameLoadGuard(placement)}</script>`] : []),
+    ...(page === "frame.html" ? [`    <script>${compactScript(frameLoadGuard(placement))}</script>`] : []),
     `    <script type="module" src="/${PAGE_ENTRIES[page]}"></script>`,
     "  </body>",
     "</html>",
@@ -313,7 +327,8 @@ export const configModule = (
     // only a dev server draws a home with no story: a built catalogue carries nothing of the project's layout
     ...(isServing ? { storyGlobs: config.stories } : {}),
     languages: config.languages,
-    lists: config.lists,
+    // a reader of published docs did not ask for a story to play; a dev server's author did
+    lists: isServing ? config.lists : { play: "off", ...config.lists },
     frames
   };
   return `export default ${codeLiteral(data)};`;

@@ -28,26 +28,30 @@ export const NO_PLUGINS: readonly ShellPlugin[] = [];
  *
  * @param config - its name, its switches, its languages, its lists and its plugins (whose tabs it may turn off).
  */
-export const useConfiguredCatalogue = ({
-  title,
-  switches,
-  languages = NO_LANGUAGES,
-  lists,
-  plugins = NO_PLUGINS
-}: {
-  readonly title: string;
-  readonly switches?: readonly ViewSwitch[];
-  readonly languages?: readonly StoryLanguage[];
-  readonly lists?: CatalogueLists;
-  readonly plugins?: readonly ShellPlugin[];
-}): CatalogueSettings =>
-  useMemo(
-    () =>
-      catalogueSettings(
-        title,
-        catalogueSwitches(switches, languages, lists?.controls),
-        lists,
-        plugins.flatMap((plugin) => plugin.tabs.map((tab) => tab.id))
-      ),
-    [title, switches, languages, lists, plugins]
-  );
+export const useConfiguredCatalogue = (
+  {
+    title,
+    switches,
+    languages = NO_LANGUAGES,
+    lists,
+    plugins = NO_PLUGINS
+  }: {
+    readonly title: string;
+    readonly switches?: readonly ViewSwitch[];
+    readonly languages?: readonly StoryLanguage[];
+    readonly lists?: CatalogueLists;
+    readonly plugins?: readonly ShellPlugin[];
+  },
+  readStored?: (key: string) => string | null
+): CatalogueSettings =>
+  useMemo(() => {
+    const settings = catalogueSettings(
+      title,
+      catalogueSwitches(switches, languages, lists?.controls),
+      lists,
+      plugins.flatMap((plugin) => plugin.tabs.map((tab) => tab.id))
+    );
+    // a reader's choice stands in for the catalogue's default on their own pages; an address that names one comes first
+    const remembered = readStored?.(`${settings.id}:play`);
+    return remembered === "on" || remembered === "off" ? { ...settings, readerPlay: remembered } : settings;
+  }, [title, switches, languages, lists, plugins, readStored]);

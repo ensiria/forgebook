@@ -18,6 +18,12 @@ const APP = join(import.meta.dirname, "..");
 /** The `forgebook` command's entry. */
 const ENTRY = join(APP, "..", "..", "packages", "forgebook", "bin", "forgebook", "forgebook.mts");
 
+/** The line of the fixture story that throws, in its file as written: where its error's stack must point. */
+const THROWN_LINE =
+  readFileSync(join(APP, "..", "kit", "src", "Select.stories.tsx"), "utf8")
+    .split("\n")
+    .findIndex((line) => line.includes('throw new Error("The fixture story threw")')) + 1;
+
 /**
  * Runs `forgebook` with its arguments against the suite's server.
  *
@@ -36,6 +42,18 @@ const forgebook = (baseURL: string, argv: readonly string[]): { status: number |
 test.describe("forgebook story", () => {
   test.setTimeout(180_000);
 
+  test("gives an agent the story's code as the Code tab shows it: a spy as written, a render as written", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const spy = forgebook(baseURL, ["story", "sb:storybook-actions--spy", "--json"]);
+    expect(spy.status).toBe(0);
+    expect(JSON.parse(spy.stdout).code).toBe('<Button label="Press" onClick={fn()} />');
+    const own = forgebook(baseURL, ["story", "sb:storybook-meta-render-and-play--own-render", "--json"]);
+    expect(own.status).toBe(0);
+    expect(JSON.parse(own.stdout).code).toBe("(args) => <Badge {...args} />");
+  });
+
   test("gives an agent a story's design: the Figma link, the file, the node, the page to see it on", ({
     baseURL
   }) => {
@@ -49,6 +67,29 @@ test.describe("forgebook story", () => {
       nodeId: "12:34",
       address: expect.stringContaining("tab=figma")
     });
+  });
+
+  test("gives an agent a variant's props with when they apply, and what a type parameter is shown as", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const run = forgebook(baseURL, ["story", "sb:storybook-prop-types--link", "--json"]);
+    expect(run.status).toBe(0);
+    const answer = JSON.parse(run.stdout);
+    const byName = new Map(
+      answer.docs.props.map((prop: { readonly name: string }): [string, unknown] => [prop.name, prop])
+    );
+    expect(answer.requiredProps).toEqual(["kind", "label"]);
+    expect(byName.get("href")).toMatchObject({
+      isRequired: false,
+      onlyWhen: { prop: "kind", values: ["link"] }
+    });
+    expect(byName.get("items")).toMatchObject({
+      type: "readonly unknown[]",
+      notes: [{ reason: "generic", parameter: "TItem", shownAs: "unknown", type: "unknown" }]
+    });
+    const text = forgebook(baseURL, ["story", "sb:storybook-prop-types--link"]);
+    expect(text.stdout).toContain("href (when kind is link)");
   });
 
   test("gives an agent each prop's group, and the members of a prop typed with a documented object", ({
@@ -216,7 +257,7 @@ test.describe("forgebook check", () => {
 test.describe("forgebook errors", () => {
   test.setTimeout(120_000);
 
-  test("lists a story that could not be shown once a frame opened it, and only the new ones after a number", async ({
+  test("lists a story that could not be shown once a frame opened it, at its line as written, and only the new ones after a number", async ({
     page,
     baseURL
   }) => {
@@ -230,6 +271,10 @@ test.describe("forgebook errors", () => {
     const mark = `run=${test.info().testId}-${test.info().repeatEachIndex}-${test.info().retry}`;
     await page.goto(`frame.html?story=kit:inputs-selection-select--throws&${mark}`);
     await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "error");
+    // the stack the frame shows is in the lines of the file as written, once the dev server answered
+    await expect(page.locator(".forgebook-frame-error__stack")).toContainText(
+      new RegExp(`Select\\.stories\\.tsx:${THROWN_LINE}:\\d+\\)`)
+    );
     await expect
       .poll(() => JSON.parse(forgebook(baseURL ?? "", ["errors", "--since", String(since), "--json"]).stdout))
       .toMatchObject({
@@ -237,7 +282,9 @@ test.describe("forgebook errors", () => {
           expect.objectContaining({
             kind: "render",
             storyId: "kit:inputs-selection-select--throws",
-            view: expect.stringContaining(mark)
+            view: expect.stringContaining(mark),
+            // the line as written, not the line of the code the browser ran
+            place: expect.stringMatching(new RegExp(`kit/src/Select\\.stories\\.tsx:${THROWN_LINE}:\\d+$`))
           })
         ])
       });

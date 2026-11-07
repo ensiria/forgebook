@@ -58,6 +58,9 @@ export const LATER_STRINGS = lateStrings({
   playTitle: "Play function",
   playTime: (ms: number): string => `${ms} ms`,
   playAgain: "Run again",
+  playRun: "Run",
+  playOnOpen: "Play stories when they open",
+  playOff: "This story has a play function. It has not run: run it, or have stories play when they open.",
   playStepThrough: "Step through",
   playNext: "Next",
   playContinue: "Continue",
@@ -87,6 +90,21 @@ export const LATER_STRINGS = lateStrings({
   apiMember: "Member",
   memberCount: (count: number): string => `${count} ${count === 1 ? "member" : "members"}`,
   membersOf: (type: string): string => `Members of ${type}`,
+  // the names and types below come written as code spans (`codeSpans.ts`), since a type may hold backticks
+  propOnlyWhen: (prop: string, values: readonly string[], orOmitted: boolean): string => {
+    if (values.length === 0) return `Only when ${prop} is left out.`;
+    return `Only when ${prop} is ${values.join(" or ")}${orOmitted ? ", or left out" : ""}.`;
+  },
+  propGeneric: (parameter: string, type: string, shownAs: "constraint" | "default" | "unknown"): string =>
+    shownAs === "unknown"
+      ? `${parameter} is generic, with no constraint: shown as \`unknown\`.`
+      : `${parameter} is generic: shown as its ${shownAs}, ${type}.`,
+  propUnresolved: (name: string): string => `${name} cannot be found, so this type is read as \`any\`.`,
+  propAny: "Typed `any`: nothing is known of its values.",
+  propsUntyped: "Its props are typed `any`, so none can be listed.",
+  propsNoSignature: "Its type cannot be called with props, so none can be listed.",
+  propsOutsidePackage: (count: number): string =>
+    `${count === 1 ? "Its one prop comes" : `All ${count} of its props come`} from outside its package (an element's attributes), which the reference leaves out.`,
   showCode: "Show code",
   hideCode: "Hide code",
   openStory: "Open the story",

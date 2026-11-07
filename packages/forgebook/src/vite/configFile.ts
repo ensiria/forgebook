@@ -19,7 +19,7 @@ import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import { AUDIENCE_IDS } from "../audiences.ts";
-import { type CatalogueLists, catalogueSettings, type TurnedOffControl } from "../catalogue.ts";
+import { type CatalogueLists, catalogueSettings, playProblem, type TurnedOffControl } from "../catalogue.ts";
 import { deviceSettingProblem } from "../deviceView.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import { REQUIRED_FIRST_LAYOUTS } from "../propGroups.ts";
@@ -39,6 +39,7 @@ import { saysNoTokens, unknownKeysProblem } from "./configKeys.ts";
 import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
+import { realFolder } from "./realFolder.ts";
 import { filesProblem } from "./storyPatterns.ts";
 import { switchValuesProblem, withAbsoluteValueFiles } from "./switchValuesCheck.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
@@ -223,7 +224,8 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
   ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups }),
-  ...(lists.requiredFirst === undefined ? {} : { requiredFirst: lists.requiredFirst })
+  ...(lists.requiredFirst === undefined ? {} : { requiredFirst: lists.requiredFirst }),
+  ...(lists.play === undefined ? {} : { play: lists.play })
 });
 
 /**
@@ -395,7 +397,7 @@ const mergedListsProblem = (lists: CatalogueLists): string | undefined => {
     return `the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`;
   if (lists.usedIn === true && lists.componentDocs === false)
     return "usedIn is true with componentDocs false: Used in reads the import graph with the programs componentDocs turns off";
-  return undefined;
+  return playProblem(lists.play);
 };
 
 /**
@@ -605,5 +607,6 @@ export const loadConfigFile = async (file: string): Promise<ResolvedConfig> => {
   const config: unknown =
     typeof module === "object" && module !== null && "default" in module ? module.default : undefined;
   if (!isConfig(config)) throw new Error(`${file}: ${configProblem(config) ?? "it cannot be read"}`);
-  return resolveConfig(config, dirname(file));
+  // the folder as Vite makes its root, so the pages named under it compare with it
+  return resolveConfig(config, realFolder(dirname(file)));
 };
