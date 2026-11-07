@@ -85,6 +85,12 @@ test.describe("forgebook proof on a real browser", () => {
     work = mkdtempSync(join(parent, "proof-work-"));
     mkdirSync(join(dir, "src"));
     writeFileSync(join(dir, "forgebook.config.ts"), CONFIG);
+    // a package of its own, so Vite keeps its prebundled dependencies here and not in the fixture's, which the suite's
+    // dev servers read: one rebuilt under them fails the frames they are showing
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "proof-seeds", private: true, type: "module" })
+    );
     writeFileSync(join(dir, ".gitignore"), "node_modules/\n.vite/\n");
     writeFileSync(
       join(dir, "tsconfig.json"),
