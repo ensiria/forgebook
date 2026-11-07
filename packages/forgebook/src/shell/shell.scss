@@ -1726,6 +1726,32 @@
     }
   }
 
+  .forgebook-play__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1-5;
+  }
+
+  .forgebook-play__paused {
+    margin: 0;
+    font: $text-row-compact;
+    color: $text-secondary;
+    overflow-wrap: anywhere;
+  }
+
+  .forgebook-play__actions {
+    display: grid;
+    gap: $space-1;
+    margin: $space-1 0 0;
+    padding-inline-start: $space-5;
+    font: $text-mono-small;
+    overflow-wrap: anywhere;
+  }
+
+  .forgebook-play__action {
+    font: $text-mono-small;
+  }
+
   .forgebook-play__steps {
     display: grid;
     gap: $space-1-5;

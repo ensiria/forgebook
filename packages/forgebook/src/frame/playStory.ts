@@ -13,7 +13,8 @@
  */
 import type { StepFunction, StoryContext } from "@forgebook/story-format/csf";
 
-import type { PlayStep, PlayTrace } from "../playTrace.ts";
+import type { PlayAction, PlayStep, PlayTrace } from "../playTrace.ts";
+import { type ActionRecorder, isSyncEvent, isSyncQuery, recordedTool } from "./playActions.ts";
 import type { LoadedArgs, LoadedStory } from "./storyModule.ts";
 
 /** A thrown value's message. */
@@ -21,6 +22,9 @@ const messageOf = (error: unknown): string => (error instanceof Error ? error.me
 
 /** Milliseconds since an instant, rounded. */
 const since = (start: number): number => Math.round(performance.now() - start);
+
+/** The most actions a trace holds: each message carries the whole list. */
+const MAX_ACTIONS = 200;
 
 /** The play tools a project's Testing Library gives, as the frame uses them without depending on it. */
 export type PlayTools = {
@@ -36,6 +40,14 @@ export type PlayTools = {
  */
 export type PlayToolsLoader = () => Promise<PlayTools>;
 
+/** What holds a play before each action while it is stepped through. */
+export type PlayStepper = {
+  /** Whether the play still stops before an action; "continue" ends that. */
+  readonly isHolding: () => boolean;
+  /** Resolves when "next" or "continue" comes. */
+  readonly wait: () => Promise<void>;
+};
+
 /**
  * Plays a story, then calls `onPlayed`.
  *
@@ -44,6 +56,7 @@ export type PlayToolsLoader = () => Promise<PlayTools>;
  * @param onPlayed - called once the play is over, at once when there is none, whether it passed or failed.
  * @param onTrace - called with the trace after every change; never without a play.
  * @param tools - the play tools to hand the play (`canvas` bound to its canvas, `userEvent`); none without them.
+ * @param stepper - holds the play before each action, while it is stepped through; none lets it run.
  * @returns the play's promise, rejected when the play failed.
  */
 export const playStory = async (
@@ -51,22 +64,55 @@ export const playStory = async (
   context: Omit<StoryContext<LoadedArgs>, "step">,
   onPlayed: () => void,
   onTrace: (trace: PlayTrace) => void = (): void => undefined,
-  tools: PlayTools | undefined = undefined
+  tools: PlayTools | undefined = undefined,
+  stepper: PlayStepper | undefined = undefined
 ): Promise<void> => {
   if (play === undefined) {
     onPlayed();
     return;
   }
   let steps: readonly PlayStep[] = [];
-  const report = (trace: Omit<PlayTrace, "steps">): void => onTrace({ ...trace, steps });
+  let actions: readonly PlayAction[] = [];
+  let openStep: number | undefined;
+  const report = (trace: Omit<PlayTrace, "steps" | "actions">): void =>
+    onTrace({ ...trace, steps, ...(actions.length === 0 ? {} : { actions }) });
+  const gate = async (label: string): Promise<void> => {
+    if (stepper?.isHolding() !== true) return;
+    report({ status: "running", pausedAt: label });
+    await stepper.wait();
+    report({ status: "running" });
+  };
+  const recorder: ActionRecorder = {
+    gate,
+    begin: (label: string): number => {
+      // a `waitFor` runs its query again until it passes: its failures are one line, not one each
+      const last = actions.at(-1);
+      if (last?.label === label && last.status === "failed") return actions.length - 1;
+      // a play in a loop must not grow every message past what a person reads
+      if (actions.length >= MAX_ACTIONS) return actions.length;
+      actions = [
+        ...actions,
+        { label, status: "running", ...(openStep === undefined ? {} : { step: openStep }) }
+      ];
+      report({ status: "running" });
+      return actions.length - 1;
+    },
+    end: (index: number, action: PlayAction): void => {
+      actions = actions.map((current, at) => (at === index ? { ...current, ...action } : current));
+      report({ status: "running" });
+    }
+  };
   const setStep = (index: number, step: PlayStep): void => {
     steps = steps.map((current, at) => (at === index ? step : current));
     report({ status: "running" });
   };
   const step: StepFunction = async (label: string, run: () => Promise<void> | void): Promise<void> => {
+    await gate(label);
     const index = steps.length;
+    const outer = openStep;
     const start = performance.now();
     steps = [...steps, { label, status: "running" }];
+    openStep = index;
     report({ status: "running" });
     try {
       await run();
@@ -74,13 +120,20 @@ export const playStory = async (
     } catch (error) {
       setStep(index, { label, status: "failed", ms: since(start), error: messageOf(error) });
       throw error;
+    } finally {
+      openStep = outer;
     }
   };
   const start = performance.now();
   report({ status: "running" });
   try {
     const toolsContext =
-      tools === undefined ? {} : { canvas: tools.within(context.canvasElement), userEvent: tools.userEvent };
+      tools === undefined
+        ? {}
+        : {
+            canvas: recordedTool(tools.within(context.canvasElement), "canvas", recorder, isSyncQuery),
+            userEvent: recordedTool(tools.userEvent, "userEvent", recorder, isSyncEvent)
+          };
     await play({ ...context, step, ...toolsContext });
     report({ status: "passed", ms: since(start) });
   } catch (error) {
