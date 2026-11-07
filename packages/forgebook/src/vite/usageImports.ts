@@ -35,6 +35,38 @@ const STYLE_SHEET = /\.(?:css|scss|sass|less)$/;
 /** What resolves a specifier. */
 type Resolver = (specifier: string, containing: string) => string | undefined;
 
+/** The file system as each resolution cache's resolutions read it, remembered for the cache's life. */
+const HOSTS = new WeakMap<ts.ModuleResolutionCache, ts.ModuleResolutionHost>();
+
+/**
+ * The file system a resolution reads, with what it asked remembered as long as its cache lives: resolving every import
+ * of a library asks again and again whether the same candidate files and folders exist, each time a call to the disk.
+ *
+ * @param cache - the resolution cache, made for one graph.
+ */
+const hostOf = (cache: ts.ModuleResolutionCache): ts.ModuleResolutionHost => {
+  const known = HOSTS.get(cache);
+  if (known !== undefined) return known;
+  const remembered = <TValue>(read: (path: string) => TValue): ((path: string) => TValue) => {
+    const answers = new Map<string, { readonly value: TValue }>();
+    return (path: string): TValue => {
+      const answer = answers.get(path) ?? { value: read(path) };
+      answers.set(path, answer);
+      return answer.value;
+    };
+  };
+  const host: ts.ModuleResolutionHost = {
+    fileExists: remembered((path: string) => ts.sys.fileExists(path)),
+    readFile: remembered((path: string) => ts.sys.readFile(path)),
+    directoryExists: remembered((path: string) => ts.sys.directoryExists(path)),
+    realpath: remembered((path: string) => (ts.sys.realpath === undefined ? path : ts.sys.realpath(path))),
+    getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
+    getDirectories: (path: string): string[] => ts.sys.getDirectories(path)
+  };
+  HOSTS.set(cache, host);
+  return host;
+};
+
 /** Resolves a specifier as a program does, leaving out a dependency's files. */
 const resolverOf = (program: ts.Program, cache: ts.ModuleResolutionCache): Resolver => {
   return (specifier: string, containing: string): string | undefined => {
@@ -42,7 +74,7 @@ const resolverOf = (program: ts.Program, cache: ts.ModuleResolutionCache): Resol
       specifier,
       containing,
       program.getCompilerOptions(),
-      ts.sys,
+      hostOf(cache),
       cache
     ).resolvedModule;
     return resolved === undefined || resolved.isExternalLibraryImport ? undefined : resolved.resolvedFileName;
@@ -268,7 +300,13 @@ const statementTargets = (statement: ts.Statement, reading: Reading): readonly s
   const specifier = moduleNamed(statement);
   if (specifier === undefined) return [];
   const options = program.getCompilerOptions();
-  const resolved = ts.resolveModuleName(specifier, source.fileName, options, ts.sys, cache).resolvedModule;
+  const resolved = ts.resolveModuleName(
+    specifier,
+    source.fileName,
+    options,
+    hostOf(cache),
+    cache
+  ).resolvedModule;
   if (resolved === undefined) return [unresolvedTarget(specifier, source.fileName, options) ?? []].flat();
   if (resolved.isExternalLibraryImport) return [];
   const declaring = declaringFiles(statement, program);
