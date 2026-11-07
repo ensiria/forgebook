@@ -13,6 +13,7 @@
  *
  * @module
  */
+import type { AddressLink, ArgsParamRead } from "./addressArgsParam.ts";
 import { type ArgValue, isArgList, isArgObject, isNamedArg, type PanelArgs } from "./messages.ts";
 
 /**
@@ -62,3 +63,26 @@ export const addressArgsFor = (args: PanelArgs, addressTexts: AddressTexts): Pan
         // a name is checked too: a story that spreads its args into attributes writes it into the markup
         Object.entries(args).filter(([name, value]) => PLAIN_NAME.test(name) && isPlainValue(value))
       );
+
+/**
+ * What an address's `args` gives a story under a framework's rule, and what it says of the values the rule took out, so
+ * the note above the story names them as it names what the story's check refuses.
+ *
+ * @param read - the parameter, once read.
+ * @param param - the parameter as the address writes it.
+ * @param addressTexts - the framework's rule.
+ * @returns the values, and the link they came from.
+ */
+export const addressArgsRead = (
+  read: ArgsParamRead,
+  param: string | null,
+  addressTexts: AddressTexts
+): { readonly panelArgs: PanelArgs; readonly link: AddressLink | undefined } => {
+  const panelArgs = addressArgsFor(read.args, addressTexts);
+  const refused = Object.keys(read.args).filter((name) => !Object.hasOwn(panelArgs, name));
+  if (refused.length === 0) return { panelArgs, link: read.link };
+  return {
+    panelArgs,
+    link: { param: param ?? "", isWaiting: false, unread: [], ...read.link, refused }
+  };
+};

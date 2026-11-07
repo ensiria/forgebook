@@ -59,7 +59,8 @@ export const showAsideStory = (target: HTMLElement, title: string, aside: AsideS
   if (sandbox !== undefined) frame.setAttribute("sandbox", sandbox);
   frame.setAttribute(FRAME_ASIDE_ATTRIBUTE, "");
   // a width set on the stage holds as far as the room allows
-  frame.style.cssText = "display:block;max-width:100%;height:100%;margin-inline:auto;border:0";
+  frame.style.cssText =
+    "display:block;max-width:100%;height:100%;margin-inline:auto;border:0;color-scheme:light";
   frame.style.width = aside.width === "fill" ? "100%" : `${aside.width}px`;
   if (aside.background !== undefined) target.style.backgroundColor = aside.background;
   let args = aside.args;
@@ -68,7 +69,9 @@ export const showAsideStory = (target: HTMLElement, title: string, aside: AsideS
   const answer = (event: MessageEvent): void => {
     const story = frame.contentWindow;
     if (!isFromFrames(event) || event.source !== story || story === null) return;
-    if (!isFrameMessage(event.data) || event.data.type !== "forgebook:ready") return;
+    if (!isFrameMessage(event.data)) return;
+    if (event.data.type === "forgebook:scheme") frame.style.colorScheme = event.data.scheme;
+    if (event.data.type !== "forgebook:ready") return;
     isReady = true;
     if (args !== undefined) send(checkedArgsMessage(args));
     if (aside.view !== undefined) send({ type: "forgebook:view", view: aside.view });

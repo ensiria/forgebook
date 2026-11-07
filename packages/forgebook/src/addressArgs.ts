@@ -52,7 +52,7 @@ export type ArgDeclaration = {
  * Why a value of the address was left out: its name is not one the panel sets, its value is not of the prop's type, its
  * text could not be read as a value at all, or its custom control refuses it or cannot load.
  */
-export type DroppedArgReason = "undeclared" | "type" | "unreadable" | "control";
+export type DroppedArgReason = "undeclared" | "type" | "unreadable" | "control" | "markup";
 
 /** A value of the address left out. */
 export type DroppedArg = {
