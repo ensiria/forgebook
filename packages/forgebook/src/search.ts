@@ -134,8 +134,6 @@ type Field = {
   readonly labelWords: readonly string[];
   /** Its text's words. */
   readonly textWords: readonly string[];
-  /** Its name's and its text's words in order, each between spaces, as the words of a query are looked for in them. */
-  readonly sentences: readonly string[];
   /** Where it goes. */
   readonly target: SearchTarget;
 };
@@ -200,7 +198,6 @@ const fieldOf = (
     text,
     labelWords: label === undefined ? [] : labelWordsOf(label),
     textWords: [...new Set(wordsOf(text))],
-    sentences: [sentenceOf(label ?? ""), sentenceOf(text)],
     target
   };
 };
@@ -226,24 +223,77 @@ const sectionField = (section: SearchSection, target: ComponentTarget | PageTarg
   return fieldOf(section.heading === undefined ? "text" : "heading", section.heading, section.text, opened);
 };
 
+/**
+ * What the search reads of each component from the tree, and of each component's index, kept as long as they are: the
+ * tree is read once, and the index's groups arrive one after another, which must not read the tree again each time.
+ */
+const TREE_FIELDS = new WeakMap<TreeComponent, Map<string, readonly Field[]>>();
+const INDEX_FIELDS = new WeakMap<SearchComponent, Map<string, IndexFields>>();
+
+/** What a component's index adds, before and after its stories, so the fields keep their order. */
+type IndexFields = { readonly lead: readonly Field[]; readonly sections: readonly Field[] };
+
+/** A value made once per key and owner, kept while the owner is. */
+const cachedIn = <TOwner extends object, TValue>(
+  cache: WeakMap<TOwner, Map<string, TValue>>,
+  owner: TOwner,
+  key: string,
+  make: () => TValue
+): TValue => {
+  const byKey = cache.get(owner) ?? new Map<string, TValue>();
+  cache.set(owner, byKey);
+  const known = byKey.get(key);
+  if (known !== undefined) return known;
+  const made = make();
+  byKey.set(key, made);
+  return made;
+};
+
+/** What the search reads of a component in the tree: its name, its place, its search words and its stories. */
+const treeFields = (component: TreeComponent, target: ComponentTarget): readonly Field[] =>
+  cachedIn(TREE_FIELDS, component, target.id, () => [
+    fieldOf("name", component.name, "", target),
+    fieldOf("title", component.title.split("/").slice(0, -1).join(" "), "", target),
+    ...component.keywords.map((keyword) => fieldOf("keyword", keyword, "", target))
+  ]);
+
+/** What the search reads of a component's stories. */
+const storyFields = (component: TreeComponent, target: ComponentTarget): readonly Field[] =>
+  cachedIn(TREE_FIELDS, component, `${target.id}\nstories`, () =>
+    component.stories.map((story) =>
+      fieldOf("story", story.name, story.description ?? "", { kind: "story", id: story.id })
+    )
+  );
+
+/** What a component's index adds: its lead and props, and the sections of its docs. */
+const indexFields = (index: SearchComponent, target: ComponentTarget): IndexFields =>
+  cachedIn(INDEX_FIELDS, index, target.id, () => ({
+    lead: [
+      ...(index.lead === undefined ? [] : [fieldOf("description", undefined, index.lead, target)]),
+      ...(index.props ?? []).map(({ name, text, part, isEvent }) =>
+        fieldOf(isEvent === true ? "event" : "prop", name, text, {
+          ...target,
+          anchor: propAnchor(name, part)
+        })
+      )
+    ],
+    sections: (index.sections ?? []).map((section) => sectionField(section, target))
+  }));
+
 /** What the search reads of a component. */
 const componentFields = (
   component: TreeComponent,
   target: ComponentTarget,
   index: SearchComponent | undefined
-): Field[] => [
-  fieldOf("name", component.name, "", target),
-  fieldOf("title", component.title.split("/").slice(0, -1).join(" "), "", target),
-  ...component.keywords.map((keyword) => fieldOf("keyword", keyword, "", target)),
-  ...(index?.lead === undefined ? [] : [fieldOf("description", undefined, index.lead, target)]),
-  ...(index?.props ?? []).map(({ name, text, part, isEvent }) =>
-    fieldOf(isEvent === true ? "event" : "prop", name, text, { ...target, anchor: propAnchor(name, part) })
-  ),
-  ...component.stories.map((story) =>
-    fieldOf("story", story.name, story.description ?? "", { kind: "story", id: story.id })
-  ),
-  ...(index?.sections ?? []).map((section) => sectionField(section, target))
-];
+): Field[] => {
+  const added = index === undefined ? undefined : indexFields(index, target);
+  return [
+    ...treeFields(component, target),
+    ...(added?.lead ?? []),
+    ...storyFields(component, target),
+    ...(added?.sections ?? [])
+  ];
+};
 
 /** A component, read for the search. */
 const searchableComponent = (
@@ -351,9 +401,22 @@ type Scored = {
   readonly missed: readonly string[];
 };
 
+/**
+ * Each field's name and text as sentences (`sentenceOf`), made the first time a query of several words asks: most
+ * queries are one word, and making them for every field of a large catalogue is most of the first search's time.
+ */
+const SENTENCES = new WeakMap<Field, readonly string[]>();
+
 /** Whether a field holds a query's sentence, in its name or its text. */
-const holdsSentence = (field: Field, sentence: string | undefined): boolean =>
-  sentence !== undefined && field.sentences.some((each) => each.includes(sentence));
+const holdsSentence = (field: Field, sentence: string | undefined): boolean => {
+  if (sentence === undefined) return false;
+  let sentences = SENTENCES.get(field);
+  if (sentences === undefined) {
+    sentences = [sentenceOf(field.label ?? ""), sentenceOf(field.text)];
+    SENTENCES.set(field, sentences);
+  }
+  return sentences.some((each) => each.includes(sentence));
+};
 
 /** How a thing answers the query; none when it holds no word of it. */
 const scored = (found: Searchable, { words, sentence }: Query): Scored | undefined => {
