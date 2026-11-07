@@ -1555,7 +1555,18 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
-code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
+code to paste. It does not check props, which the type checker does. It exits non-zero on a problem, for CI.
+
+It also reads what a change reuses. An added import of a component whose own TSDoc says `@deprecated` or `@replacedBy` fails,
+naming what to use. A new exported component fails as `duplicate-component` when its code is a copy of another's under any name;
+or when it has the name of one that exists, past words like `Primary` or `Custom`, and two signs of being it (a telling root
+such as `button`, shared props, nearly the same classes); or when `Button` exists and a new `CustomButton` renders a plain
+`<button>`, though not a `SubmitButton`, which says what it is for. New means new since the commit compared with: an edit or a
+moved file is not. It compares only what the file could use, in its package and those its package depends on. It passes if it
+renders the other, which is reuse, or if a comment says why, above it: `// forgebook-ignore duplicate-component: why`, listed
+in `excused`. One sign, and what `@useWhen` and `@avoidWhen` say of a component just imported, are `advice`, which fails nothing.
+Imports are followed relative, through `@/`, `~/` and `#/` under the importing file's own folders, and by a workspace package's
+name; not through a third party.
 
 **It needs no tokens file.** With none named, it compares with what the application already declares, read as text and never
 run: custom properties at the root and in theme selectors (`.dark`, `[data-theme]`, a colour-scheme query), and a selector

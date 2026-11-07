@@ -7,7 +7,16 @@
  *
  * @module
  */
+import { createHash } from "node:crypto";
+
 import { type ESTree, parseSync } from "vite";
+
+import type { UsageGuidance } from "../componentDocs.ts";
+import { LEFT_ALONE } from "./checkCode.ts";
+import type { ProjectFile } from "./projectFiles.ts";
+import { singleFileComponent } from "./singleFileComponent.ts";
+import { isTooDeep, lineAt, lineStarts } from "./sourceText.ts";
+import { guidanceOfTags, tagsOfComment } from "./usageGuidance.ts";
 
 /** A component, as far as its file says. */
 export type ScannedComponent = {
@@ -25,16 +34,27 @@ export type ScannedComponent = {
   readonly classes: readonly string[];
   /** The components it renders. */
   readonly renders: readonly string[];
+  /** When to use it and when not, from its documentation comment. */
+  readonly guidance?: UsageGuidance;
+  /** Whether its file exports it, so something else can use it. */
+  readonly isExported: boolean;
+  /** Whether it is its file's default export. */
+  readonly isDefault?: boolean;
+  /** Its code with no spacing and its own name out, to tell a copy; none when too short to tell anything. */
+  readonly code?: string;
 };
+
+/** How many line comments may stand between a doc comment and what it documents. */
+const MOST_COMMENTS_BACK = 3;
+
+/** Shorter than this, two components' code being equal says nothing: every wrapper of a `div` reads alike. */
+const SHORTEST_CODE = 120;
+
+/** A file that can declare components. */
+export const COMPONENT_FILE = /\.(?:tsx|jsx|vue|svelte|astro)$/;
 
 /** A framework's own single-file component. */
 const SINGLE_FILE = /\.(?:vue|svelte|astro)$/;
-
-/** What opens or closes a level of a script. */
-const NESTING = /<\/|\/>|<[A-Za-z]|[([{)\]}]/g;
-
-/** How deep a script may nest before it is left out. */
-const MOST_NESTED = 400;
 
 /** Whether a value is a node of the syntax tree. */
 const isNode = (value: unknown): value is { readonly type: string } & Readonly<Record<string, unknown>> =>
@@ -212,41 +232,6 @@ const functionOf = (value: unknown): (Readonly<Record<string, unknown>> & { type
     : undefined;
 };
 
-/** Where each line of a text starts, to find a line by offset without reading from the start each time. */
-const lineStarts = (text: string): readonly number[] => {
-  const starts = [0];
-  for (let at = text.indexOf("\n"); at !== -1; at = text.indexOf("\n", at + 1)) starts.push(at + 1);
-  return starts;
-};
-
-/** The line of an offset, from 1. */
-const lineAt = (starts: readonly number[], offset: number): number => {
-  let [low, high] = [0, starts.length - 1];
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
-    if ((starts[middle] ?? 0) <= offset) low = middle;
-    else high = middle - 1;
-  }
-  return low + 1;
-};
-
-/**
- * Whether a text nests past what a parser and a walk over its tree can take: a crafted file must cost that file, and past
- * this depth the parser itself overflows, which no `catch` can answer.
- *
- * @param text - a script.
- */
-export const isTooDeep = (text: string): boolean => {
-  let depth = 0;
-  for (const match of text.matchAll(NESTING)) {
-    const [token = ""] = match;
-    depth +=
-      token.startsWith("</") || token === ")" || token === "]" || token === "}" || token === "/>" ? -1 : 1;
-    if (depth > MOST_NESTED) return true;
-  }
-  return false;
-};
-
 /** A function at a program's top, with what is known of it from outside. */
 type TopFunction = {
   readonly name: string;
@@ -254,6 +239,12 @@ type TopFunction = {
   readonly start: number;
   /** A declaration's type (`React.FC<Props>`). */
   readonly annotation?: unknown;
+  /** Where the statement starts, which its comment stands before. */
+  readonly statement?: number;
+  /** Whether the statement itself exports it. */
+  readonly isTop?: boolean;
+  /** Whether the statement is the default export. */
+  readonly isDefaultStatement?: boolean;
 };
 
 /** A class component's `render`, as a function. */
@@ -309,7 +300,12 @@ const topFunctions = (program: ESTree.Program, file: string): TopFunction[] =>
     const declaration = isExport ? statement.declaration : statement;
     return declaration === null || declaration === undefined
       ? []
-      : topFunctionsOf(declaration, file, statement.type === "ExportDefaultDeclaration");
+      : topFunctionsOf(declaration, file, statement.type === "ExportDefaultDeclaration").map((each) => ({
+          ...each,
+          statement: statement.start,
+          isTop: isExport,
+          isDefaultStatement: statement.type === "ExportDefaultDeclaration"
+        }));
   });
 
 /** The type arguments of a type or a call, in order. */
@@ -331,76 +327,152 @@ const typeOfValue = (value: unknown, annotation: unknown): unknown => {
 const propsOfType = (type: unknown, types: ReadonlyMap<string, readonly string[]>): readonly string[] =>
   propsOf({ type: "Identifier", typeAnnotation: { type: "TSTypeAnnotation", typeAnnotation: type } }, types);
 
+/**
+ * A component's code as a copy of it would read: spacing and quotes do not matter, and neither does its name.
+ *
+ * @param source - its code.
+ * @param name - its name.
+ */
+export const codeKey = (source: string, name: string): { readonly code?: string } => {
+  const code = source.replaceAll(name, "").replace(/[\s;'"`]+/g, "");
+  // a digest: a project's components are held in memory between questions
+  return code.length < SHORTEST_CODE ? {} : { code: createHash("sha256").update(code).digest("base64url") };
+};
+
+/** What a file exports apart from the declarations themselves: `export { X }`, `export default X`. */
+const exportedNames = (
+  program: ESTree.Program
+): { readonly named: ReadonlySet<string>; readonly byDefault: string | undefined } => {
+  const named = new Set<string>();
+  let byDefault: string | undefined;
+  for (const statement of program.body) {
+    if (statement.type === "ExportDefaultDeclaration" && statement.declaration.type === "Identifier") {
+      byDefault = statement.declaration.name;
+    }
+    if (statement.type !== "ExportNamedDeclaration" || statement.source !== null) continue;
+    for (const { local, exported } of statement.specifiers) {
+      const [from, as] = [local, exported].map((each) =>
+        "name" in each ? String(each.name) : String(each.value)
+      );
+      if (as === "default") byDefault = from;
+      else if (from !== undefined) named.add(from);
+    }
+  }
+  return { named, byDefault };
+};
+
+/** The names a file imports under another: rendering `Base` from `Button as Base` is rendering `Button`. */
+const localImports = (program: ESTree.Program): ReadonlyMap<string, string> =>
+  new Map(
+    program.body.flatMap((statement) =>
+      statement.type !== "ImportDeclaration"
+        ? []
+        : statement.specifiers.flatMap((each): [string, string][] =>
+            each.type === "ImportSpecifier" && "name" in each.imported
+              ? [[each.local.name, String(each.imported.name)]]
+              : []
+          )
+    )
+  );
+
+/** The doc comment before a statement, past line comments between them (`// eslint-disable-next-line`). */
+const commentBefore = (
+  text: string,
+  start: number,
+  comments: ReadonlyMap<number, { readonly type: string; readonly value: string; readonly start: number }>
+): string | undefined => {
+  let at = start;
+  for (let hops = 0; hops < MOST_COMMENTS_BACK; hops += 1) {
+    let end = at;
+    while (end > 0 && /\s/.test(text[end - 1] ?? "")) end -= 1;
+    const comment = comments.get(end);
+    if (comment === undefined) return undefined;
+    if (comment.type === "Block") return comment.value;
+    at = comment.start;
+  }
+  return undefined;
+};
+
+/**
+ * When to use a component and when not, from a comment's text.
+ *
+ * @param comment - the comment; none gives nothing.
+ */
+export const guidanceOfComment = (comment: string | undefined): { readonly guidance?: UsageGuidance } =>
+  comment === undefined ? {} : guidanceOfTags(tagsOfComment(comment));
+
+/** What reading one function of a script needs of the rest of it. */
+type ScriptContext = {
+  readonly file: string;
+  readonly text: string;
+  readonly types: ReadonlyMap<string, readonly string[]>;
+  readonly documented: ReadonlyMap<
+    number,
+    { readonly type: string; readonly value: string; readonly start: number }
+  >;
+  readonly starts: readonly number[];
+  readonly exported: ReturnType<typeof exportedNames>;
+  readonly imported: ReadonlyMap<string, string>;
+};
+
+/** The component a function at a script's top is, when it is one: a capital name and markup of its own. */
+const componentOf = (top: TopFunction, context: ScriptContext): ScannedComponent[] => {
+  const { name, value, start, annotation, statement, isTop, isDefaultStatement } = top;
+  const { file, text, types, documented, starts, exported, imported } = context;
+  const found = functionOf(value);
+  if (found === undefined || !/^[A-Z]/.test(name)) return [];
+  const { hasMarkup, ...drawn } = rendered(found["body"]);
+  if (hasMarkup !== true) return [];
+  const parameters = Array.isArray(found["params"]) ? found["params"] : [];
+  const written = propsOf(parameters[0], types);
+  const isDefault = exported.byDefault === name || (isTop === true && isDefaultStatement === true);
+  const hasRange = isNode(value) && typeof value["start"] === "number" && typeof value["end"] === "number";
+  return [
+    {
+      name,
+      file,
+      line: lineAt(starts, start),
+      props: written.length > 0 ? written : propsOfType(typeOfValue(value, annotation), types),
+      ...drawn,
+      renders: [...new Set(drawn.renders.flatMap((each) => [each, imported.get(each) ?? each]))],
+      isExported: isTop === true || exported.named.has(name) || isDefault,
+      ...(isDefault ? { isDefault: true } : {}),
+      ...guidanceOfComment(commentBefore(text, statement ?? start, documented)),
+      ...(hasRange ? codeKey(text.slice(Number(value["start"]), Number(value["end"])), name) : {})
+    }
+  ];
+};
+
 /** The components of a script with JSX. */
 const scriptComponents = (file: string, text: string): ScannedComponent[] => {
   if (isTooDeep(text)) return [];
-  const { program, errors } = parseSync(file, text);
+  const { program, errors, comments } = parseSync(file, text);
   if (errors.length > 0) return [];
-  const types = declaredTypes(program);
-  const starts = lineStarts(text);
-  return topFunctions(program, file).flatMap(({ name, value, start, annotation }): ScannedComponent[] => {
-    const found = functionOf(value);
-    if (found === undefined || !/^[A-Z]/.test(name)) return [];
-    const { hasMarkup, ...drawn } = rendered(found["body"]);
-    if (hasMarkup !== true) return [];
-    const parameters = Array.isArray(found["params"]) ? found["params"] : [];
-    const written = propsOf(parameters[0], types);
-    const props = written.length > 0 ? written : propsOfType(typeOfValue(value, annotation), types);
-    return [{ name, file, line: lineAt(starts, start), props, ...drawn }];
-  });
+  const context: ScriptContext = {
+    file,
+    text,
+    types: declaredTypes(program),
+    documented: new Map(comments.map((comment) => [comment.end, comment])),
+    starts: lineStarts(text),
+    exported: exportedNames(program),
+    imported: localImports(program)
+  };
+  return topFunctions(program, file).flatMap((each) => componentOf(each, context));
 };
 
-/** A word as a single-file component's file name makes a component name of it. */
-const nameOfFile = (file: string): string =>
+/**
+ * A word as a single-file component's file name makes a component name of it.
+ *
+ * @param file - the file.
+ */
+export const nameOfFile = (file: string): string =>
   (file.split("/").at(-1) ?? "")
     .replace(/\.[^.]+$/, "")
     .split(/[-_.]/)
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join("");
-
-/** A text without what stands between each pair of markers. */
-const without = (text: string, open: string, close: string): string => {
-  let out = "";
-  let index = 0;
-  for (let start = text.indexOf(open); start !== -1; start = text.indexOf(open, index)) {
-    const end = text.indexOf(close, start);
-    if (end === -1) break;
-    out += text.slice(index, start);
-    index = end + close.length;
-  }
-  return out + text.slice(index);
-};
-
-/** The markup of a single-file component: its template's, or what is left without scripts and styles. */
-const markupOf = (text: string): string => {
-  const [open, close] = [text.indexOf("<template"), text.lastIndexOf("</template>")];
-  const opened = open === -1 ? -1 : text.indexOf(">", open);
-  if (opened !== -1 && close > opened) return text.slice(opened + 1, close);
-  const plain = without(without(text, "<script", "</script>"), "<style", "</style>");
-  return plain.startsWith("---") ? plain.slice(plain.indexOf("---", 3) + 3) : plain;
-};
-
-/** The one component of a `.vue`, `.svelte` or `.astro` file, from its text. */
-const singleFileComponent = (file: string, text: string): ScannedComponent => {
-  const markup = markupOf(text);
-  const first = /<([a-zA-Z][\w.-]{0,80})([^<>]{0,2000})>/.exec(markup);
-  const classes = /(?<![:\w-])class="([^"]*)"/.exec(first?.[2] ?? "")?.[1] ?? "";
-  const defined = /defineProps<\{([^}]{0,5000})\}>/.exec(text)?.[1] ?? "";
-  const props = [
-    ...[...defined.matchAll(/(\w+)\??\s*:/g)].flatMap((match) => match[1] ?? []),
-    ...[...text.matchAll(/export let (\w+)/g)].flatMap((match) => match[1] ?? [])
-  ];
-  const renders = [...markup.matchAll(/<([A-Z][\w.]*)/g)].flatMap((match) => match[1] ?? []);
-  return {
-    name: nameOfFile(file),
-    file,
-    line: 1,
-    ...(first?.[1] === undefined ? {} : { root: first[1] }),
-    props,
-    classes: classes.split(/\s+/).filter((each) => each !== ""),
-    renders: [...new Set(renders)]
-  };
-};
+    .join("")
+    // a file's name reaches an answer as a component's, and it can hold anything
+    .replace(/[^\w$]/g, "");
 
 /**
  * The components a file declares; a file that cannot be parsed declares none, since this reads a project as it is.
@@ -416,3 +488,13 @@ export const scannedComponents = (file: string, text: string): ScannedComponent[
     return [];
   }
 };
+
+/**
+ * The components of a project's files, leaving out what is no component of its own (stories, tests).
+ *
+ * @param files - its files.
+ */
+export const projectComponents = (files: readonly ProjectFile[]): ScannedComponent[] =>
+  files.flatMap(({ file, text }) =>
+    !LEFT_ALONE.test(file) && COMPONENT_FILE.test(file) ? scannedComponents(file, text) : []
+  );
