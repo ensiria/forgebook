@@ -28,7 +28,6 @@ import type { SearchTarget } from "../search.ts";
 import { hasFilterTags } from "../storyTagNames.ts";
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
-import { HAS_REFS } from "./composition.ts";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
@@ -485,8 +484,7 @@ export const Sidebar = ({
           />
         ))}
         {/* the search and the tag filter read this catalogue only: another's list is not fetched to search it */}
-        {/* read from the rest, not named above: a catalogue that composes none keeps not even its name */}
-        {HAS_REFS && !isNarrowed ? links.composed : null}
+        {isNarrowed ? null : links.composed}
       </nav>
       <AppearanceMenu {...appearance} onShowKeys={onShowKeys} />
       {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}

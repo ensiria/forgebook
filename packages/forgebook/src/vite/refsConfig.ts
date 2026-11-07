@@ -53,3 +53,16 @@ export const refsLines = (config: Pick<ResolvedConfig, "refs">): string[] =>
         `      load: () => import(${codeLiteral(REFS_MODULE)}).then((module) => module.RefPart)`,
         "    },"
       ];
+
+/** The name the build gives whether the catalogue composes others (`shell/composition.ts`). */
+const REFS_CONSTANT = "__FORGEBOOK_REFS__";
+
+/**
+ * What the plugin defines in the build for composition: whether the catalogue composes others, so a shell that composes
+ * none has every part of composition removed.
+ *
+ * @param refs - the composed catalogues.
+ */
+export const refsDefine = (refs: ResolvedRefs): Readonly<Record<string, string>> => ({
+  [REFS_CONSTANT]: JSON.stringify(refs.length > 0)
+});

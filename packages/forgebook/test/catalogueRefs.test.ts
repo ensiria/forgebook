@@ -15,7 +15,7 @@ import {
 } from "../src/catalogueRefs.ts";
 import { switchesProblem, themeSwitch } from "../src/switches.ts";
 import { unknownKeysProblem } from "../src/vite/configKeys.ts";
-import { refsProblem, resolvedRefs } from "../src/vite/refsConfig.ts";
+import { refsDefine, refsProblem, resolvedRefs } from "../src/vite/refsConfig.ts";
 
 /** What is wrong with a configuration that gives these refs. */
 const problemOf = (refs: unknown): string | undefined => refsProblem({ refs });
@@ -54,6 +54,11 @@ describe("the configuration's refs", () => {
     expect(problemOf([{ title: "A", url: "https://a.example.com/" }])).toContain(
       "must be an object of catalogues"
     );
+  });
+
+  it("tells the build whether the catalogue composes others, so one that composes none ships none of it", () => {
+    expect(Object.entries(refsDefine([]))).toEqual([["__FORGEBOOK_REFS__", "false"]]);
+    expect(Object.entries(refsDefine([DESIGN_SYSTEM]))).toEqual([["__FORGEBOOK_REFS__", "true"]]);
   });
 
   it("names a misspelt key of a catalogue", () => {

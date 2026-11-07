@@ -51,6 +51,7 @@ import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewPar
 import type { WrittenHomeProps } from "./AuthoredHome.tsx";
 import type { ComponentPageProps } from "./ComponentPage.tsx";
 import { CatalogueContext, NO_PLUGINS, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import { HAS_REFS } from "./composition.ts";
 import type { ArgControlLoaders } from "./customControls.ts";
 import type { DocPageProps } from "./DocPage.tsx";
 import { filesCodeLoader } from "./filesCode.ts";
@@ -61,7 +62,6 @@ import { LogicMark } from "./LogicMark.tsx";
 import { type LazyModule, lazyModule } from "./lazyModule.tsx";
 import { type LoadPluginHosts, PluginHostsContext } from "./pluginHostsContext.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
-import { HAS_REFS } from "./composition.ts";
 import type { RefPartProps, ShellRefs } from "./refParts.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarShade } from "./SidebarHandle.tsx";
@@ -330,6 +330,18 @@ const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Addr
 type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience" | "play">;
 
 /**
+ * Writes a composed catalogue's story into an address's parameters; nothing for another page.
+ *
+ * @param params - the parameters.
+ * @param page - the page.
+ */
+const writeRefPage = (params: URLSearchParams, page: Page): void => {
+  if (page.kind !== "ref") return;
+  params.set(REF_PARAMETER, page.ref);
+  params.set("story", page.id);
+};
+
+/**
  * The query of an address.
  *
  * @param address - the page, the view, the panel's values and the matrix's axes.
@@ -340,8 +352,8 @@ const addressQuery = (
   catalogue: AddressCatalogue
 ): string => {
   const params = viewParams(view, catalogue.switches, catalogue.audience, catalogue.play);
-  if (HAS_REFS && page.kind === "ref") params.set(REF_PARAMETER, page.ref);
-  if (page.kind === "story" || (HAS_REFS && page.kind === "ref")) params.set("story", page.id);
+  if (HAS_REFS) writeRefPage(params, page);
+  if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
   if (page.kind === "page") params.set("page", page.id);
   const args = page.kind === "story" ? (link?.param ?? panelArgsParam(panelArgs)) : "";
@@ -367,19 +379,21 @@ type Shown =
   | { readonly kind: "missing"; readonly message: string };
 
 /**
- * What the address's page shows, in a catalogue that composes others: a composed catalogue's story, or what
- * `shownPage` says. A `ref` that names no composed catalogue is another site's mark (`?ref=newsletter`): the story is
- * this catalogue's.
+ * What a composed catalogue's address shows. A `ref` that names no composed catalogue is another site's mark
+ * (`?ref=newsletter`): the story is this catalogue's.
  */
-const shownWithRefs = (tree: ReturnType<typeof storyTree>, page: Page, refs: ShellRefs | undefined): Shown => {
-  if (page.kind !== "ref") return shownPage(tree, page);
-  return refs?.catalogues.some((each) => each.id === page.ref)
+const shownRef = (
+  tree: ReturnType<typeof storyTree>,
+  page: Extract<Page, { kind: "ref" }>,
+  refs: ShellRefs | undefined
+): Shown =>
+  refs?.catalogues.some((each) => each.id === page.ref)
     ? { kind: "ref", place: { refId: page.ref, storyId: page.id } }
-    : shownPage(tree, { kind: "story", id: page.id });
-};
+    : shownPage(tree, { kind: "story", id: page.id }, refs);
 
 /** What the address's page shows: a story or a component that is not there (renamed, removed) says so, never another. */
-const shownPage = (tree: ReturnType<typeof storyTree>, page: Page): Shown => {
+const shownPage = (tree: ReturnType<typeof storyTree>, page: Page, refs: ShellRefs | undefined): Shown => {
+  if (HAS_REFS && page.kind === "ref") return shownRef(tree, page, refs);
   if (page.kind === "story") {
     const location = findStory(tree, page.id);
     return location === undefined
@@ -440,11 +454,16 @@ const refsModuleOf = (refs: ShellRefs): LazyModule<RefPartProps> => {
   return refsModule;
 };
 
-/** Nothing of the composed catalogues. */
-const NO_REF_PARTS = { sidebar: undefined, page: undefined } as const;
+/** What the composed catalogues add to the shown page: their sidebar sections, and a story's page. */
+type RefSlots = {
+  /** Their sidebar sections. */
+  readonly sidebar: ReactNode;
+  /** A composed catalogue's story, when one is shown. */
+  readonly page: ReactNode;
+};
 
 /**
- * What the composed catalogues draw on the shown page: their sidebar sections, and a story's page when one is shown;
+ * What the composed catalogues add to the shown page: their sidebar sections, and a story's page when one is shown;
  * nothing for a catalogue that composes none.
  *
  * @param refs - the composed catalogues, if any.
@@ -452,16 +471,18 @@ const NO_REF_PARTS = { sidebar: undefined, page: undefined } as const;
  * @param links - how a story of theirs is linked and opened.
  * @param switches - this catalogue's switches, with the view's values.
  */
-const refPartsOf = (
+const refSlotsOf = (
   refs: ShellRefs | undefined,
   current: RefStoryPlace | undefined,
   links: Pick<SidebarRefsProps, "refStoryHref" | "onOpenRefStory">,
   switches: Readonly<Record<string, string>>
-): { readonly sidebar: RefPartProps | undefined; readonly page: RefPartProps | undefined } => {
-  if (refs === undefined) return NO_REF_PARTS;
+): RefSlots => {
+  if (refs === undefined) return { sidebar: null, page: null };
+  const page: RefPartProps | undefined =
+    current === undefined ? undefined : { place: "page", refs: refs.catalogues, ...current, switches };
   return {
-    sidebar: { place: "sidebar", refs: refs.catalogues, current, ...links },
-    page: current === undefined ? undefined : { place: "page", refs: refs.catalogues, ...current, switches }
+    sidebar: <RefSlot refs={refs} part={{ place: "sidebar", refs: refs.catalogues, current, ...links }} />,
+    page: <RefSlot refs={refs} part={page} />
   };
 };
 
@@ -960,19 +981,20 @@ const ShellPage = ({
 
   const { help, showHelp } = useShortcutHelp();
 
-  const shown = HAS_REFS ? shownWithRefs(tree, address.page, refs) : shownPage(tree, address.page);
-  const refParts = !HAS_REFS
-    ? NO_REF_PARTS
-    : refPartsOf(
-        refs,
-        refPlaceOf(shown),
-        {
-          refStoryHref: (place: RefStoryPlace): string =>
-            addressQuery(pageAddress(refPageOf(place)), catalogue),
-          onOpenRefStory: (place: RefStoryPlace): void => openPage(refPageOf(place))
-        },
-        address.view.switches
-      );
+  const shown = shownPage(tree, address.page, refs);
+  // what composition adds to the page; the build removes this whole block from a catalogue that composes none
+  let refSlots: RefSlots | undefined;
+  if (HAS_REFS)
+    refSlots = refSlotsOf(
+      refs,
+      refPlaceOf(shown),
+      {
+        refStoryHref: (place: RefStoryPlace): string =>
+          addressQuery(pageAddress(refPageOf(place)), catalogue),
+        onOpenRefStory: (place: RefStoryPlace): void => openPage(refPageOf(place))
+      },
+      address.view.switches
+    );
   const location = componentLocationOf(shown);
   const ownPage = recentPageOf(shown);
   const recent = useRecentPages(ownPage);
@@ -1099,7 +1121,7 @@ const ShellPage = ({
         currentPageId={shownPageLocation?.page.id}
         pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), catalogue)}
         onOpenPage={(id: string): void => openPage({ kind: "page", id })}
-        {...(HAS_REFS ? { composed: <RefSlot refs={refs} part={refParts.sidebar} /> } : {})}
+        composed={refSlots?.sidebar}
         componentHref={(sourceId: string, componentTitle: string): string =>
           addressQuery(pageAddress(titledPage(idsByTitle, sourceId, componentTitle)), catalogue)
         }
@@ -1216,7 +1238,7 @@ const ShellPage = ({
             )}
           />
         ) : null}
-        {HAS_REFS ? <RefSlot refs={refs} part={refParts.page} /> : null}
+        {refSlots?.page}
         {shown.kind === "missing" ? header : null}
       </main>
     </div>
