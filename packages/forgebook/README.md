@@ -1258,8 +1258,11 @@ errors` and their MCP tools. Saving the fix is enough, with no restart: a story 
 is broken, and redraws in place. `forgebook build` and a test run still fail on it: a build ends with
 `src/Bad.stories.tsx:4:45 does not parse: …` and a non-zero exit, and only `--verbose` adds the bundler's stack.
 
-A story that loads but cannot be drawn says why in its frame and in `forgebook check`. A frame's stack gives the lines of
-the code the browser runs, not those of the file; the browser's console maps them.
+A story that loads but cannot be drawn says why in its frame and in `forgebook check`. On the dev server, the stack under
+the reason gives the lines of the files as written: the frame sends it, and the server maps it through the source maps of
+the modules it served, so the frame loads no map. `forgebook errors` and `recent_errors` give the error's `place`, the
+first of those lines outside `node_modules` (`src/Button.stories.tsx:3:11`). A static build's stack keeps the lines of the
+built code.
 
 `forgebook build` names each script it writes by its hash alone (`assets/3f9a1c2b.js`): a catalogue names every story
 file's scripts once per loader, so shorter names make a smaller build. To read what a build holds, name each script after

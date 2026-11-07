@@ -18,6 +18,12 @@ const APP = join(import.meta.dirname, "..");
 /** The `forgebook` command's entry. */
 const ENTRY = join(APP, "..", "..", "packages", "forgebook", "bin", "forgebook", "forgebook.mts");
 
+/** The line of the fixture story that throws, in its file as written: where its error's stack must point. */
+const THROWN_LINE =
+  readFileSync(join(APP, "..", "kit", "src", "Select.stories.tsx"), "utf8")
+    .split("\n")
+    .findIndex((line) => line.includes('throw new Error("The fixture story threw")')) + 1;
+
 /**
  * Runs `forgebook` with its arguments against the suite's server.
  *
@@ -216,7 +222,7 @@ test.describe("forgebook check", () => {
 test.describe("forgebook errors", () => {
   test.setTimeout(120_000);
 
-  test("lists a story that could not be shown once a frame opened it, and only the new ones after a number", async ({
+  test("lists a story that could not be shown once a frame opened it, at its line as written, and only the new ones after a number", async ({
     page,
     baseURL
   }) => {
@@ -230,6 +236,10 @@ test.describe("forgebook errors", () => {
     const mark = `run=${test.info().testId}-${test.info().repeatEachIndex}-${test.info().retry}`;
     await page.goto(`frame.html?story=kit:inputs-selection-select--throws&${mark}`);
     await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "error");
+    // the stack the frame shows is in the lines of the file as written, once the dev server answered
+    await expect(page.locator(".forgebook-frame-error__stack")).toContainText(
+      new RegExp(`Select\\.stories\\.tsx:${THROWN_LINE}:\\d+\\)`)
+    );
     await expect
       .poll(() => JSON.parse(forgebook(baseURL ?? "", ["errors", "--since", String(since), "--json"]).stdout))
       .toMatchObject({
@@ -237,7 +247,9 @@ test.describe("forgebook errors", () => {
           expect.objectContaining({
             kind: "render",
             storyId: "kit:inputs-selection-select--throws",
-            view: expect.stringContaining(mark)
+            view: expect.stringContaining(mark),
+            // the line as written, not the line of the code the browser ran
+            place: expect.stringMatching(new RegExp(`kit/src/Select\\.stories\\.tsx:${THROWN_LINE}:\\d+$`))
           })
         ])
       });

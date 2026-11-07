@@ -321,7 +321,7 @@ export const catalogueTools = ({
   {
     name: "recent_errors",
     description:
-      "What the catalogue's open frames reported while you edited: stories that could not be shown and plays that failed, numbered, with the story index's problems. Give since (the last answer's last) to get only the new ones. Only frames open in a browser report; check_story checks a story without one.",
+      "What the catalogue's open frames reported while you edited: stories that could not be shown (with place, the file:line:column as written) and plays that failed, numbered, with the story index's problems. Give since (the last answer's last) to get only the new ones. Only frames open in a browser report; check_story checks a story without one.",
     inputSchema: {
       type: "object",
       properties: {
