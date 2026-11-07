@@ -453,7 +453,7 @@ export type VerifyVerdict =
   | "partly-verified"
   /**
    * A changed UI file has no story that ran, a story that reaches the change was never seen in its final state (its frame
-   * gave up on what it loads: `notVerified`), the catalogue has a problem that stops it telling, or nothing changed since
+   * gave up on what it loads: `notVerified`), a changed published component cannot be seen by an agent (`unseen`), the catalogue has a problem that stops it telling, or nothing changed since
    * a start nobody named: the work may be committed where this cannot see it.
    */
   | "not-verified"
@@ -539,6 +539,47 @@ export type VerifyDocument = {
   readonly outdated?: readonly OutdatedStoryFile[];
   /** How many problems there are, in `failures`, `code.problems` and `outdated` together. */
   readonly problems: number;
+  /** The changed published components an agent cannot see: these leave the change not verified. */
+  readonly unseen: readonly UnseenComponent[];
+};
+
+/** What hides a published component from an agent. */
+export type UnseenMissing = "story" | "listed-story" | "props" | "tsdoc";
+
+/** One thing that hides a published component from an agent, with what to do about it. */
+export type UnseenReason = {
+  /** What is missing. */
+  readonly missing: UnseenMissing;
+  /** Why it hides the component. */
+  readonly reason: string;
+  /** What to do about it. */
+  readonly fix: string;
+};
+
+/** A published component an agent cannot see. */
+export type UnseenComponent = {
+  /** The file that declares it, relative to the repository. */
+  readonly file: string;
+  /** Its name. */
+  readonly component: string;
+  /** What hides it. */
+  readonly reasons: readonly UnseenReason[];
+};
+
+/** What `forgebook visibility` answers, and the route `verify` asks with a commit. */
+export type VisibilityDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The commit the change is measured from; none when every published component was read. */
+  readonly since?: string;
+  /** The packages that publish components, as their manifests name them; none, with nothing `skipped`, means nothing is published here. */
+  readonly packages: readonly string[];
+  /** How many published component files were looked at. */
+  readonly checked: number;
+  /** Those an agent cannot see. */
+  readonly unseen: readonly UnseenComponent[];
+  /** What could not be looked at: an entry not led back to a source, docs turned off. */
+  readonly skipped: readonly string[];
 };
 
 /** A story and view whose checks did not run, since its frame gave up on what the story loads. */

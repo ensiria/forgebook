@@ -15,6 +15,7 @@
 import { type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 
 import type { Matrix } from "../matrix.ts";
+import type { PlayStepCommand } from "../messages.ts";
 import { type PanelArgs, UNSET_ARG } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { actionNames, mappedArgs } from "../storyArgTypes.ts";
@@ -23,6 +24,7 @@ import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
 import { ERROR_MESSAGE_CLASS } from "./frameStatus.ts";
 import { matrixLayout } from "./matrixLayout.ts";
+import { type HeldStepper, heldStepper } from "./playStepper.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
 import type {
   ArgsChange,
@@ -50,6 +52,8 @@ export type StoryControls = {
   readonly setMatrix: (matrix: Matrix | undefined) => void;
   /** Mounts the story again, so its play function runs again. */
   readonly playAgain: () => void;
+  /** Runs the play again on a fresh mount, or steps through it: from the start, to its next action, or on to its end. */
+  readonly stepPlay: (command: PlayStepCommand) => void;
   /** Sets whether the story clock runs, and how fast. */
   readonly setClock: (state: ClockState) => void;
   /**
@@ -69,6 +73,8 @@ export type StoryRunOptions = {
   readonly identity: StoryIdentity;
   /** Loads the play tools the project installed, for the first play; none without them. */
   readonly playTools?: PlayToolsLoader;
+  /** Whether a mount runs the play by itself: off (the address's `play=off`), only "run it" does. `true` by default. */
+  readonly playsOnOpen?: boolean;
   /** What the plugins prepare before every mount, ahead of the story's loaders. */
   readonly pluginSetups: readonly LoadedBeforeEach[];
   /** The framework that draws it. */
@@ -219,6 +225,12 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let shownError: HTMLElement | undefined;
   let mountCount = 0;
   let hasPlayed = false;
+  // what the next mount does with the play: "run it" asks for one, whatever the switch says
+  let playsNext = options.playsOnOpen !== false;
+  // what the next mount is stepped with, and what the shell's commands reach: each belongs to one mount, so a Replay, a
+  // file's edit or a play gone stale neither pauses unasked nor takes a command meant for the one running
+  let nextStepper: HeldStepper | undefined;
+  let stepper: HeldStepper | undefined;
   let prepared: PreparedStory = NOT_PREPARED;
   let preparing: Promise<void> = Promise.resolve();
 
@@ -318,6 +330,16 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     container.replaceChildren();
   };
 
+  // run again or stepped through, a play asked for by name plays whatever the switch says
+  const stepPlay = (command: PlayStepCommand): void => {
+    if (command === "next") stepper?.next();
+    else if (command === "continue") stepper?.release();
+    else {
+      playsNext = true;
+      nextStepper = command === "start" ? heldStepper() : undefined;
+      mountStory();
+    }
+  };
   const controls: StoryControls = {
     replay: async (): Promise<void> => {
       const mode = story.replay;
@@ -351,7 +373,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       matrix = next;
       mountStory();
     },
-    playAgain: (): void => mountStory(),
+    playAgain: (): void => stepPlay("again"),
+    stepPlay,
     setClock: clock.setState,
     restartClock: (): void => {
       clock.restart();
@@ -376,6 +399,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
 
   const mountAlone = (): void => {
     const count = mountCount;
+    stepper = nextStepper;
+    nextStepper = undefined;
     const canvas = storyCanvas(document, story);
     container.append(canvas);
     const alone = renderer.mount(canvas, drawing({}), showError);
@@ -385,7 +410,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       // a later mount (Replay, the matrix) replaced this one before it was drawn: its play would drive a gone story
       if (count !== mountCount) return;
       const isStuck = loaded.state === "waiting" || shownError !== undefined;
-      const tools = await playTools();
+      const play = isStuck ? undefined : playOfMount();
+      const tools = play === undefined ? undefined : await playTools();
       if (count !== mountCount || tools instanceof Error) return;
       const finish = (content: ContentState): void => {
         // a later mount took over meanwhile: it says how the story ended
@@ -396,7 +422,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       };
       // a failed play still ends the wait; its rejection reaches the page as an error the tests record
       void playStory(
-        isStuck ? undefined : story.play,
+        play,
         {
           ...options.identity,
           args: shownArgs(),
@@ -409,13 +435,22 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
         },
         (): void => {
           // what a play did may load something in turn (a tab it opened), which its checks must see too
-          if (isStuck || story.play === undefined || loaded.state === "unknown") finish(loaded);
+          if (play === undefined || loaded.state === "unknown") finish(loaded);
           else void contentOf(alone, story).then(finish);
         },
         options.onTrace,
-        tools
+        tools,
+        stepper
       );
     });
+  };
+
+  // what this mount plays: none when the switch keeps the play from running, which the shell is told so it can offer it
+  const playOfMount = (): LoadedStory["play"] => {
+    const isWanted = playsNext;
+    playsNext = options.playsOnOpen !== false;
+    if (!isWanted && story.play !== undefined) options.onTrace({ status: "off", steps: [] });
+    return isWanted ? story.play : undefined;
   };
 
   // the play tools the project installed, loaded for a story with a play; a failure to load them is shown as the

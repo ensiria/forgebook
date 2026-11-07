@@ -42,6 +42,12 @@ export default { title: "Actions/Button", component: Button };
 export const Plain = {};
 `;
 
+/** What makes the seeds' catalogue a library: a package with an entry that exports its button. */
+const PUBLISHED = {
+  "package.json": JSON.stringify({ name: "seed-kit", exports: "./src/index.ts" }),
+  "src/index.ts": `export { Button } from "./Button";\n`
+};
+
 /** A seed: a change, and what `verify` must say of it. */
 type Seed = {
   readonly name: string;
@@ -62,6 +68,10 @@ type VerifyAnswer = {
   readonly code: { readonly problems: readonly { readonly rule: string; readonly fix?: string }[] };
   readonly uiFiles: readonly { readonly coverage: string; readonly fix?: string }[];
   readonly outdated?: readonly { readonly file: string; readonly fix: string }[];
+  readonly unseen: readonly {
+    readonly component: string;
+    readonly reasons: readonly { readonly missing: string; readonly fix: string }[];
+  }[];
 };
 
 const TAG = "export const Tag = ({ label }: { label: string }) => <span>{label}</span>;\n";
@@ -137,6 +147,44 @@ const SEEDS: readonly Seed[] = [
     check: (document) => {
       expect(document.outdated).toBeUndefined();
     }
+  },
+  {
+    name: "a published component whose TSDoc is missing",
+    files: {
+      ...PUBLISHED,
+      "src/Button.tsx": `export const Button = () => <button type="button">Save it</button>;\n`
+    },
+    verdict: "not-verified",
+    isGreen: false,
+    check: (document) => {
+      expect(document.summary).toContain("1 published component agents cannot see");
+      expect(document.unseen[0]?.reasons.map((each) => each.missing)).toEqual(["tsdoc"]);
+    }
+  },
+  {
+    name: "a published component only another's stories draw, the case a duplicate comes from",
+    files: {
+      ...PUBLISHED,
+      "src/index.ts": `export { Button } from "./Button";\nexport { Avatar } from "./Avatar";\n`,
+      "src/Avatar.tsx": "/** Who is acting. */\nexport const Avatar = () => <i>A</i>;\n",
+      "src/Button.tsx": `import { Avatar } from "./Avatar";\n\n/** Saves. */\nexport const Button = () => <button type="button"><Avatar />Save</button>;\n`
+    },
+    verdict: "not-verified",
+    isGreen: false,
+    check: (document) => {
+      expect(document.unseen).toMatchObject([
+        { component: "Avatar", reasons: [{ missing: "story", fix: "npx forgebook new src/Avatar.tsx" }] }
+      ]);
+    }
+  },
+  {
+    name: "a published component an agent can read",
+    files: {
+      ...PUBLISHED,
+      "src/Button.tsx": `/** Saves what the person wrote. */\nexport const Button = () => <button type="button">Save it</button>;\n`
+    },
+    verdict: "verified",
+    isGreen: true
   },
   {
     name: "a non-UI change",

@@ -313,7 +313,8 @@ export const configModule = (
     // only a dev server draws a home with no story: a built catalogue carries nothing of the project's layout
     ...(isServing ? { storyGlobs: config.stories } : {}),
     languages: config.languages,
-    lists: config.lists,
+    // a reader of published docs did not ask for a story to play; a dev server's author did
+    lists: isServing ? config.lists : { play: "off", ...config.lists },
     frames
   };
   return `export default ${codeLiteral(data)};`;

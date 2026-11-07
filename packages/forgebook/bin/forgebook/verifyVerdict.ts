@@ -8,7 +8,8 @@
  * listed and did not run covers nothing, so the coverage is read from the results and not from the graph, and a story
  * whose frame gave up on what it loads did not run: no check saw it in its final state. A changed file
  * that no one sees does not fail, whatever it reaches; what `check-code` finds in it (a turned-off check, a deleted test)
- * is said as a note. An empty change passes only against a commit someone named: with none, the work may simply be
+ * is said as a note. A published component the change touches that an agent cannot find or read (`unseen`,
+ * `agentVisibility.ts`) leaves it not verified: what is checked but cannot be found gets rebuilt. An empty change passes only against a commit someone named: with none, the work may simply be
  * committed where this cannot look (a shallow clone, a default branch it does not know).
  *
  * @module
@@ -23,7 +24,8 @@ import type {
   VerifyDocument,
   VerifyFailure,
   VerifyNotVerified,
-  VerifyVerdict
+  VerifyVerdict,
+  VisibilityDocument
 } from "../../src/vite/agent.types.ts";
 
 /** A sheet, whose fix is not a story of its own. */
@@ -148,6 +150,8 @@ export type VerifyFindings = {
   readonly changed: ChangedStoriesDocument;
   /** The catalogue's answer on what the change adds. */
   readonly code: CheckedCodeDocument;
+  /** The catalogue's answer on the published components the change touches. */
+  readonly visibility: VisibilityDocument;
   /** The stories' report; none when none ran. */
   readonly report: StoryCheckReport | undefined;
   /** Why they did not run, when they were to. */
@@ -156,6 +160,8 @@ export type VerifyFindings = {
   readonly isQuick: boolean;
   /** Whether a commit was named: with none, an empty change may only mean the work is where this cannot look. */
   readonly isSinceNamed: boolean;
+  /** What is wrong with the catalogue's configuration: the answer is not verified, whatever else it found. */
+  readonly configProblems?: readonly string[];
 };
 
 /** What a line says of a change with no UI file. */
@@ -163,12 +169,14 @@ const noUiWords = ({
   files,
   ran,
   problems,
-  notVerified
+  notVerified,
+  unseen
 }: Omit<VerifyDocument, "summary" | "schema">): string => {
   const stories = ran === 0 ? "" : `, ${ran} checks of the stories they reach`;
   const found = [
     ...(problems === 0 ? [] : [counted(problems, "problem")]),
-    ...(notVerified.length === 0 ? [] : [`${notVerified.length} not verified`])
+    ...(notVerified.length === 0 ? [] : [`${notVerified.length} not verified`]),
+    ...(unseen.length === 0 ? [] : [`${counted(unseen.length, "published component")} agents cannot see`])
   ].join(", ");
   return `No changed UI file (${counted(files.length, "other file")}${stories})${found === "" ? "" : `: ${found}`}`;
 };
@@ -182,16 +190,23 @@ const outcomeWords = (
     variants,
     ran,
     notVerified: unseen,
-    outdated
+    outdated,
+    unseen: cannotBeSeen
   }: Omit<VerifyDocument, "summary" | "schema">,
   catalogueProblems: readonly string[]
 ): string => {
   const notVerified =
-    unseen.length > 0 || uiFiles.some((each) => each.coverage === "none") || catalogueProblems.length > 0;
+    unseen.length > 0 ||
+    cannotBeSeen.length > 0 ||
+    uiFiles.some((each) => each.coverage === "none") ||
+    catalogueProblems.length > 0;
   const where = variants === "all" ? "in every variant" : "in the default view";
   return [
     ...(notVerified ? ["not verified"] : []),
     ...(unseen.length > 0 ? [`${unseen.length} not seen in its final state: the frame gave up`] : []),
+    ...(cannotBeSeen.length > 0
+      ? [`${counted(cannotBeSeen.length, "published component")} agents cannot see`]
+      : []),
     ...(problems > 0 ? [counted(problems, "problem")] : []),
     ...(outdated === undefined ? [] : [`${counted(outdated.length, "story file")} written for other props`]),
     ...(verdict === "verified" || verdict === "partly-verified"
@@ -211,14 +226,15 @@ const summaryOf = (
   catalogueProblems: readonly string[]
 ): string => {
   const { verdict, uiFiles, files, since, code, skipped } = document;
+  const isBlind = files.length === 0 && catalogueProblems.length === 0;
   const notes = code.notes.length === 0 ? [] : [`${counted(code.notes.length, "note")} from check-code`];
   const said = [...skipped, ...notes];
   const tail = said.length === 0 ? "" : `; ${said.join("; ")}`;
   if (files.length === 0) {
-    const ending =
-      verdict === "not-verified"
-        ? "not verified. If your work is committed, give --since <ref>"
-        : "nothing to verify";
+    const notVerified = isBlind
+      ? "not verified. If your work is committed, give --since <ref>"
+      : "not verified";
+    const ending = verdict === "not-verified" ? notVerified : "nothing to verify";
     return `Nothing changed since ${since}: ${ending}${tail}`;
   }
   if (uiFiles.length === 0) {
@@ -234,7 +250,7 @@ const summaryOf = (
  * @param input - what was found.
  */
 export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
-  const { since, base, changed, code, report, notRun, isQuick, isSinceNamed } = input;
+  const { since, base, changed, code, visibility, report, notRun, isQuick, isSinceNamed } = input;
   const results = report?.results ?? [];
   // a story not seen in a view is left out of what ran there; seen in another it still covers its file, and the verdict
   // says not verified from `notVerified` either way
@@ -268,10 +284,21 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   );
   const skipped = skippedOf(input, notRun);
   // a story file that cannot be read may be the change, whatever else changed
-  const catalogueProblems = changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []);
+  const catalogueProblems = [
+    ...(input.configProblems ?? []),
+    ...(changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []))
+  ];
   const isBlind = changed.files.length === 0 && !isSinceNamed;
-  const verdict = verdictOf(uiFiles, problems, skipped, catalogueProblems, isBlind, notVerified.length);
-  const allSkipped = [...skipped, ...catalogueProblems];
+  const { unseen } = visibility;
+  const verdict = verdictOf(
+    uiFiles,
+    problems,
+    [...skipped, ...visibility.skipped],
+    catalogueProblems,
+    isBlind,
+    notVerified.length + unseen.length
+  );
+  const allSkipped = [...skipped, ...catalogueProblems, ...visibility.skipped];
   const variants: VerifyDocument["variants"] = isQuick ? "default" : "all";
   const body = {
     since,
@@ -294,7 +321,8 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
       ...(code.advice === undefined ? {} : { advice: code.advice })
     },
     ...(outdated.length === 0 ? {} : { outdated }),
-    problems
+    problems,
+    unseen
   };
   const summary = summaryOf({ ...body, verdict, skipped: allSkipped }, catalogueProblems);
   return { schema: 2, verdict, summary, skipped: allSkipped, ...body };

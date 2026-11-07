@@ -12,6 +12,7 @@ import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 import { catalogueSwitches } from "../../src/switches.ts";
 import type { SwitchesDocument } from "../../src/vite/agent.types.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
+import { emptyStoryGlobsProblems } from "../../src/vite/emptyStoryGlobs.ts";
 import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
 import { switchesDocument } from "../../src/vite/switchesDocument.ts";
 import { catalogueClient, previewServer } from "./agentClient.ts";
@@ -109,7 +110,10 @@ export const mcpCommands = (
                   ask: client.ask,
                   check: (stories) => runStoriesCheck(config, options.url, stories)
                 },
-                input
+                {
+                  ...input,
+                  configProblems: emptyStoryGlobsProblems(config)
+                }
               ),
             checkPage: (address) => runPageCheck(config, [address]),
             servePreview: preview.serve,

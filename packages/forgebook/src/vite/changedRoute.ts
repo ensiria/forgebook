@@ -86,7 +86,7 @@ const graphProblems = (config: ResolvedConfig): readonly string[] => {
 };
 
 /** A story the reach found in the tree, with its source and the file as that source lists it. */
-type FoundStory = IdentifiedStory & {
+export type FoundStory = IdentifiedStory & {
   /** Its source's id. */
   readonly source: string;
   /** Its file, as its source lists it (`./src/Badge.stories.tsx`). */
@@ -143,19 +143,18 @@ const outdatedFiles = async (
 };
 
 /**
- * The stories a change touches and the changed UI files with their stories.
+ * The catalogue's stories with what each reaches, and each group's answer, whose failure a route has to say.
  *
- * @param context - what the routes read.
- * @param resolveSource - finds the file of a source's module.
+ * @param loaded - the sources.
+ * @param tree - their story tree.
  */
-export const changedAnswer = async (
-  { config, loaded, tree, params, pages, view }: RouteContext,
-  resolveSource: ResolveSource
-): Promise<AgentAnswer> => {
-  const since = params.get("since") || "HEAD";
-  const base = await changeBase(config.dir, since);
-  if (base === undefined) return { status: 400, body: { error: await noBaseReason(config.dir, since) } };
-  const { root, files, deleted } = await changedFiles(config.dir, base);
+export const identifiedStories = async (
+  loaded: RouteContext["loaded"],
+  tree: RouteContext["tree"]
+): Promise<{
+  readonly groups: readonly { readonly source: string; readonly reach: unknown }[];
+  readonly identified: readonly FoundStory[];
+}> => {
   const groups = await Promise.all(
     loaded.sources.flatMap((source) =>
       source.files.map(async (group) => ({ source: source.id, reach: await group.reach?.() }))
@@ -170,6 +169,24 @@ export const changedAnswer = async (
       return found === undefined ? [] : [{ id: found.id, reach: story, source, file: found.file }];
     })
   );
+  return { groups, identified };
+};
+
+/**
+ * The stories a change touches and the changed UI files with their stories.
+ *
+ * @param context - what the routes read.
+ * @param resolveSource - finds the file of a source's module.
+ */
+export const changedAnswer = async (
+  { config, loaded, tree, params, pages, view }: RouteContext,
+  resolveSource: ResolveSource
+): Promise<AgentAnswer> => {
+  const since = params.get("since") || "HEAD";
+  const base = await changeBase(config.dir, since);
+  if (base === undefined) return { status: 400, body: { error: await noBaseReason(config.dir, since) } };
+  const { root, files, deleted } = await changedFiles(config.dir, base);
+  const { groups, identified } = await identifiedStories(loaded, tree);
   const realDir = await realpath(config.dir);
   const absolute = catalogueChangedFiles(config.dir, realDir, root, files);
   const gone = new Set(deleted);
