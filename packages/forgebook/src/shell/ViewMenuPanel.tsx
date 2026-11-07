@@ -33,6 +33,7 @@ import { controlLabel } from "./controlLabel.ts";
 import { Icon } from "./icons.tsx";
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { NamedViews } from "./NamedViews.tsx";
+import { rememberPlay } from "./playMemory.ts";
 import type { ControlContext } from "./ToolbarControl.tsx";
 import type { ToolbarLayout } from "./useToolbarLayout.ts";
 
@@ -352,6 +353,21 @@ export const ViewMenuPanel = ({
             }
           />
           {LATER_STRINGS.wrapToolbar}
+        </label>
+        <label className="forgebook-wrap-choice">
+          <input
+            type="checkbox"
+            role="switch"
+            aria-checked={context.view.play === "on"}
+            className="forgebook-switch"
+            checked={context.view.play === "on"}
+            onChange={(event: ChangeEvent<HTMLInputElement>): void => {
+              const play = event.currentTarget.checked ? "on" : "off";
+              rememberPlay(catalogue, play);
+              context.onViewChange({ ...context.view, play });
+            }}
+          />
+          {LATER_STRINGS.playOnOpen}
         </label>
       </div>
       <div className="forgebook-popover__foot">

@@ -1568,8 +1568,6 @@ test.describe("the panel", () => {
     await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
     await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
     await expect(frameOf(page).locator("select")).toBeDisabled();
-    // the toggles that name no group stay under Toggles; Select has none left there
-    await expect(tab.locator(".forgebook-prop-group__title", { hasText: "Toggles" })).toHaveCount(0);
   });
 
   test("Props puts the required props where the story says, over its meta's section", async ({ page }) => {
@@ -1580,17 +1578,17 @@ test.describe("the panel", () => {
     await expect(tab.locator(".forgebook-prop-group[data-required] .forgebook-prop__name")).toHaveText([
       "options*"
     ]);
-    await expect(
-      tab.locator(".forgebook-prop-group", { hasText: "Objects and lists" }).locator(".forgebook-prop__name")
-    ).toHaveText(["classNames"]);
-    // Hinted asks for them first in each group instead: no section, options first among its objects and lists
+    // the props with no group of their own, as the source declares them
+    const ungrouped = tab.locator(
+      ":scope > .forgebook-prop-group:not([data-required]) > .forgebook-prop-grid .forgebook-prop__name"
+    );
+    await expect(ungrouped).toHaveText(["value", "size", "hint", "classNames"]);
+    // Hinted asks for them first in each group instead: no section, options first among the rest
     await page.goto(story("hinted"));
     await frameStatus(page);
     await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
     await expect(tab.locator(".forgebook-prop-group[data-required]")).toHaveCount(0);
-    await expect(
-      tab.locator(".forgebook-prop-group", { hasText: "Objects and lists" }).locator(".forgebook-prop__name")
-    ).toHaveText(["options*", "classNames"]);
+    await expect(ungrouped).toHaveText(["options*", "value", "size", "hint", "classNames"]);
   });
 
   test("a shared link's values reach the frame only for the story's props, with their types; the rest are reported", async ({

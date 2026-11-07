@@ -33,6 +33,8 @@ export type ReachedStory = {
   readonly own: readonly string[];
   /** Its story file, absolute. */
   readonly storyFile: string;
+  /** The file its meta's component is declared in, absolute; none when its meta names none the checker resolves. */
+  readonly metaFile?: string;
 };
 
 /** The files a module reaches, itself included, through the graph's imports. */
@@ -68,7 +70,8 @@ export const storyReach = (graph: UsageGraph, files: readonly ReachFile[]): Reac
         exportName: story.exportName,
         storyFile: file.storyFile,
         files: [...reachedFrom(graph.imports, starts)],
-        own: [...new Set([...starts, ...(graph.imports[file.storyFile] ?? [])])]
+        own: [...new Set([...starts, ...(graph.imports[file.storyFile] ?? [])])],
+        ...(file.component === undefined ? {} : { metaFile: file.component.file })
       };
     })
   );

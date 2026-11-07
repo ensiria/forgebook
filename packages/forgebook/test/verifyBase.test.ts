@@ -72,6 +72,7 @@ const verdictOf = (
       problems: []
     },
     code: { schema: 1, since: "HEAD", checked: ["raw-color"], skipped: [], problems: [] },
+    visibility: { schema: 1, packages: [], checked: 0, unseen: [], skipped: [] },
     report: head,
     notRun: undefined,
     isQuick: false,

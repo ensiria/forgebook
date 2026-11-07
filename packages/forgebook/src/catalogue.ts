@@ -70,8 +70,27 @@ export type A11ySettings = {
   readonly disabledRules: readonly string[];
 };
 
+/** Whether a story's play function runs when its frame opens. */
+export type PlaySwitch = "on" | "off";
+
+/**
+ * Why a configuration's `play` cannot be used, or none: it is written by JavaScript too, which no type stops.
+ *
+ * @param play - the value written.
+ */
+export const playProblem = (play: unknown): string | undefined =>
+  play === undefined || play === "on" || play === "off"
+    ? undefined
+    : `play is ${JSON.stringify(play)}: write "on" or "off"`;
+
 /** The lists a configuration may set, every one optional. */
 export type CatalogueLists = {
+  /**
+   * Whether a story's play function runs when a reader opens it. `on` on a dev server and `off` in a build by default: an
+   * author is checking the play, a reader of published docs did not ask for it. A reader's own choice comes first, and
+   * tests and `check` run every play whatever this says.
+   */
+  readonly play?: PlaySwitch;
   /** The catalogue's id, the prefix of what the browser stores for it; from its title by default. */
   readonly id?: string;
   /** The toolbar's preset widths. */
@@ -210,6 +229,10 @@ export type CatalogueSettings = {
   readonly gridStep: number;
   /** The shell's texts replaced, by name. */
   readonly strings: Readonly<Record<string, string>>;
+  /** Whether a story's play function runs when a reader opens it, as the catalogue says: an address names what differs. */
+  readonly play: PlaySwitch;
+  /** What a page shows unless its address names one: the reader's choice, else the catalogue's. */
+  readonly readerPlay: PlaySwitch;
   /** Forgebook's own controls shown, in their order. */
   readonly ownControls: readonly OwnControlId[];
   /** The controls that start on the toolbar, in their order, by id. */
@@ -419,6 +442,8 @@ export const catalogueSettings = (
   );
   return {
     id: lists.id ?? idOf(title),
+    play: lists.play ?? "on",
+    readerPlay: lists.play ?? "on",
     switches,
     touch: touchChoiceOf(switches),
     widths: lists.widths ?? DEFAULT_WIDTHS,

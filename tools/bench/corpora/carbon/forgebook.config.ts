@@ -57,7 +57,6 @@ export default defineConfig({
     "../src/**/*.stories.js",
     "../src/**/*.stories.tsx",
     "../src/**/*-story.js",
-    "../src/**/*-story.tsx",
     ...productMigratedStoryGlobs.map((glob) => `!${glob}`)
   ],
   preview: "../.storybook/preview.js"

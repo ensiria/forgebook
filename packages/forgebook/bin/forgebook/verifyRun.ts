@@ -13,6 +13,7 @@
 import type { StoryCheckReport } from "../../src/storyCheck.ts";
 import type { CheckedCodeDocument, VerifyDocument } from "../../src/vite/agent.types.ts";
 import { isChangedStoriesDocument, isCheckedCodeDocument } from "../../src/vite/agentApi.ts";
+import { isVisibilityDocument } from "../../src/vite/agentVisibility.ts";
 import { branchStart, changeBase, noBaseReason } from "../../src/vite/gitChange.ts";
 import type { Ask } from "./mcpToolParts.ts";
 import type { StoriesCheckInput } from "./storyCheckRun.ts";
@@ -39,14 +40,24 @@ export type VerifyInput = {
   readonly isQuick: boolean;
   /** Count every problem the stories have, not only those the change brought (`--all-problems`). */
   readonly isAllProblems?: boolean;
+  /**
+   * What is wrong with the catalogue's configuration that leaves the answer not verified, said with it: a story pattern
+   * that matches nothing. None by default.
+   */
+  readonly configProblems?: readonly string[];
 };
 
 /** What a catalogue answers when it runs an older version than this command. */
 const UNEXPECTED_SHAPE =
   "The catalogue's answer has an unexpected shape: restart forgebook dev if it runs another version";
 
-/** The message of an answer that is an error. */
-const errorOf = (body: unknown, status: number): string =>
+/**
+ * The message of an answer that is an error.
+ *
+ * @param body - the answer's body.
+ * @param status - its status.
+ */
+export const errorOf = (body: unknown, status: number): string =>
   typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
     ? body.error
     : `The catalogue answered ${status}`;
@@ -74,6 +85,26 @@ const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<St
 };
 
 /**
+ * The stories that found something run again on the base: a change with none needs no base.
+ *
+ * @param reach - what it reaches the catalogue through.
+ * @param base - the base commit.
+ * @param run - the stories' check on the change.
+ * @param isAllVariants - whether every variant runs, as on the change.
+ */
+const baseRunOf = async (
+  reach: VerifyReach,
+  base: string,
+  run: StoryCheckReport | string | undefined,
+  isAllVariants: boolean
+): Promise<BaseRun | undefined> => {
+  const failing = typeof run === "object" ? failingIds(run) : [];
+  return failing.length === 0 || reach.checkBase === undefined
+    ? undefined
+    : reach.checkBase(base, { ids: failing, isAllVariants });
+};
+
+/**
  * Answers whether a change is verified.
  *
  * @param reach - what it reaches the catalogue through.
@@ -82,7 +113,7 @@ const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<St
  */
 export const runVerify = async (
   reach: VerifyReach,
-  { since, isQuick, isAllProblems = false }: VerifyInput
+  { since, isQuick, isAllProblems = false, configProblems = [] }: VerifyInput
 ): Promise<VerifyDocument | string> => {
   const named = since ?? (await branchStart(reach.dir));
   const base = await changeBase(reach.dir, named);
@@ -93,14 +124,11 @@ export const runVerify = async (
   const changed = await reach.ask("changed", params);
   if (changed.status !== 200) return errorOf(changed.body, changed.status);
   if (!isChangedStoriesDocument(changed.body)) return UNEXPECTED_SHAPE;
+  const seen = await reach.ask("visibility", params);
+  if (seen.status === 200 && !isVisibilityDocument(seen.body)) return UNEXPECTED_SHAPE;
   const ids = changed.body.stories.map((story) => story.id);
   const run = ids.length === 0 ? undefined : await checked(reach, { ids, isAllVariants: !isQuick });
-  // only the stories that found something run again on the base: a change with none needs no base
-  const failing = typeof run === "object" ? failingIds(run) : [];
-  const baseRun =
-    failing.length === 0 || isAllProblems || reach.checkBase === undefined
-      ? undefined
-      : await reach.checkBase(base, { ids: failing, isAllVariants: !isQuick });
+  const baseRun = isAllProblems ? undefined : await baseRunOf(reach, base, run, !isQuick);
   // tokens that cannot be read leave the code unchecked, which the verdict says, and do not stop the rest
   const codeBody: CheckedCodeDocument = isCheckedCodeDocument(code.body)
     ? code.body
@@ -116,10 +144,21 @@ export const runVerify = async (
     base,
     changed: changed.body,
     code: codeBody,
+    // what cannot be told of agents does not stop the rest, and the verdict says it
+    visibility: isVisibilityDocument(seen.body)
+      ? seen.body
+      : {
+          schema: 1,
+          packages: [],
+          checked: 0,
+          unseen: [],
+          skipped: [`what agents see not checked: ${errorOf(seen.body, seen.status)}`]
+        },
     report: typeof run === "object" ? run : undefined,
     notRun: typeof run === "string" ? run : undefined,
     isQuick,
     isSinceNamed: since !== undefined,
+    configProblems,
     ...(baseRun === undefined ? {} : { baseRun: { base, run: baseRun } })
   });
 };

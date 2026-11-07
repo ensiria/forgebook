@@ -184,11 +184,20 @@
     }
   }
 
+  .forgebook-search-row {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: $space-1;
+  }
+
   // flex: none, as the sidebar is a column: a long tree would otherwise squeeze the field below its height, and it
   // would grow back when a search leaves few results
   .forgebook-search {
     display: flex;
-    flex: none;
+    flex: 1;
+    min-width: 0;
     align-items: center;
     gap: $space-1-5;
     height: 1.75rem;
@@ -1714,6 +1723,14 @@
 
   // the stage
 
+  .forgebook-play__switch {
+    display: flex;
+    gap: $space-1-5;
+    align-items: center;
+    font: $text-row-compact;
+    color: $text-secondary;
+  }
+
   .forgebook-play__status {
     font: $text-caption;
     font-weight: 400;
@@ -1724,6 +1741,32 @@
     &[data-status="failed"] {
       color: $danger-text;
     }
+  }
+
+  .forgebook-play__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1-5;
+  }
+
+  .forgebook-play__paused {
+    margin: 0;
+    font: $text-row-compact;
+    color: $text-secondary;
+    overflow-wrap: anywhere;
+  }
+
+  .forgebook-play__actions {
+    display: grid;
+    gap: $space-1;
+    margin: $space-1 0 0;
+    padding-inline-start: $space-5;
+    font: $text-mono-small;
+    overflow-wrap: anywhere;
+  }
+
+  .forgebook-play__action {
+    font: $text-mono-small;
   }
 
   .forgebook-play__steps {
@@ -3182,12 +3225,6 @@
       font: $text-mono-small;
       color: $text-secondary;
     }
-  }
-
-  .forgebook-toggles {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: $space-2 $space-3;
   }
 
   .forgebook-toggle {
