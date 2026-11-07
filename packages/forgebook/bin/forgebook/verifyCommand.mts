@@ -12,6 +12,7 @@ import { catalogueClient } from "./agentClient.ts";
 import { verifyText } from "./agentText.ts";
 import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { runStoriesCheck } from "./storyCheckRun.ts";
+import { runOnBase } from "./verifyBase.ts";
 import { isVerifyFailure, runVerify } from "./verifyRun.ts";
 
 /**
@@ -37,6 +38,11 @@ export const verifyCommands = (
         type: "boolean",
         description: "Only the default view of each story: faster, and the verdict says so."
       },
+      "all-problems": {
+        type: "boolean",
+        description:
+          "Fail on every problem the stories have, not only those the change brought: the stories that found one are not run again on the base."
+      },
       url: {
         type: "string",
         env: "FORGEBOOK_URL",
@@ -57,9 +63,14 @@ export const verifyCommands = (
           {
             dir: config.dir,
             ask: client.ask,
-            check: (input) => runStoriesCheck(config, options.url, input)
+            check: (input) => runStoriesCheck(config, options.url, input),
+            checkBase: (base, input) => runOnBase(config, base, input.ids, input.isAllVariants)
           },
-          { since: options.since, isQuick: options.quick === true }
+          {
+            since: options.since,
+            isQuick: options.quick === true,
+            isAllProblems: options["all-problems"] === true
+          }
         );
         if (typeof document === "string") throw new ScriptError(document);
         io.stdout.write(isJson ? formatJson(document) : `${verifyText(document, style)}\n`);

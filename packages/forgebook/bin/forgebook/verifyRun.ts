@@ -16,6 +16,7 @@ import { isChangedStoriesDocument, isCheckedCodeDocument } from "../../src/vite/
 import { branchStart, changeBase, noBaseReason } from "../../src/vite/gitChange.ts";
 import type { Ask } from "./mcpToolParts.ts";
 import type { StoriesCheckInput } from "./storyCheckRun.ts";
+import type { BaseRun } from "./verifyBase.ts";
 import { verifyDocument } from "./verifyVerdict.ts";
 
 /** What a verification reaches the catalogue through. */
@@ -26,6 +27,8 @@ export type VerifyReach = {
   readonly ask: Ask;
   /** Runs the checks on stories: the report, or why it could not run. */
   readonly check: (input: StoriesCheckInput) => Promise<StoryCheckReport | string>;
+  /** Runs stories on the base commit, for the problems that were there before; none to count every problem. */
+  readonly checkBase?: (base: string, input: StoriesCheckInput) => Promise<BaseRun>;
 };
 
 /** What a verification is asked. */
@@ -34,6 +37,8 @@ export type VerifyInput = {
   readonly since: string | undefined;
   /** Only the default view of each story. */
   readonly isQuick: boolean;
+  /** Count every problem the stories have, not only those the change brought (`--all-problems`). */
+  readonly isAllProblems?: boolean;
 };
 
 /** What a catalogue answers when it runs an older version than this command. */
@@ -54,6 +59,11 @@ const errorOf = (body: unknown, status: number): string =>
 export const isVerifyFailure = (document: VerifyDocument): boolean =>
   document.verdict === "failed" || document.verdict === "not-verified";
 
+/** The stories with a problem in a report, each once. */
+const failingIds = (report: StoryCheckReport): string[] => [
+  ...new Set(report.results.filter((result) => result.problems.length > 0).map((result) => result.storyId))
+];
+
 /** Runs the stories' check, a thrown failure (a browser that will not start) being a reason as any other. */
 const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<StoryCheckReport | string> => {
   try {
@@ -72,7 +82,7 @@ const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<St
  */
 export const runVerify = async (
   reach: VerifyReach,
-  { since, isQuick }: VerifyInput
+  { since, isQuick, isAllProblems = false }: VerifyInput
 ): Promise<VerifyDocument | string> => {
   const named = since ?? (await branchStart(reach.dir));
   const base = await changeBase(reach.dir, named);
@@ -85,6 +95,12 @@ export const runVerify = async (
   if (!isChangedStoriesDocument(changed.body)) return UNEXPECTED_SHAPE;
   const ids = changed.body.stories.map((story) => story.id);
   const run = ids.length === 0 ? undefined : await checked(reach, { ids, isAllVariants: !isQuick });
+  // only the stories that found something run again on the base: a change with none needs no base
+  const failing = typeof run === "object" ? failingIds(run) : [];
+  const baseRun =
+    failing.length === 0 || isAllProblems || reach.checkBase === undefined
+      ? undefined
+      : await reach.checkBase(base, { ids: failing, isAllVariants: !isQuick });
   // tokens that cannot be read leave the code unchecked, which the verdict says, and do not stop the rest
   const codeBody: CheckedCodeDocument = isCheckedCodeDocument(code.body)
     ? code.body
@@ -103,6 +119,7 @@ export const runVerify = async (
     report: typeof run === "object" ? run : undefined,
     notRun: typeof run === "string" ? run : undefined,
     isQuick,
-    isSinceNamed: since !== undefined
+    isSinceNamed: since !== undefined,
+    ...(baseRun === undefined ? {} : { baseRun: { base, run: baseRun } })
   });
 };
