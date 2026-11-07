@@ -103,6 +103,14 @@ const STATES: readonly ShellState[] = [
     }
   },
   {
+    name: "tag filter",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/?tag=beta&tag=%21wip");
+      await page.getByRole("button", { name: /^Filter by tag/ }).click();
+      await page.getByRole("dialog", { name: "Tags" }).getByRole("checkbox").first().waitFor();
+    }
+  },
+  {
     name: "component page",
     open: pageWith("/?component=kit:inputs-selection-select", (page) =>
       page.locator(".forgebook-api__subcomponent").first()

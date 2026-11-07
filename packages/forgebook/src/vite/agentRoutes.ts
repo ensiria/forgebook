@@ -41,8 +41,9 @@ import {
 } from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
 import { changedAnswer } from "./changedRoute.ts";
-import { emptyStoryGlobs, emptyStoryGlobsMessage, type ResolvedConfig } from "./configFile.ts";
+import type { ResolvedConfig } from "./configFile.ts";
 import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
+import { emptyStoryGlobs, emptyStoryGlobsMessage } from "./emptyStoryGlobs.ts";
 import { findAnswer } from "./findRoute.ts";
 import { framesOriginOf } from "./framesConfig.ts";
 import { hostOf } from "./framesServer.ts";
