@@ -27,7 +27,9 @@ import {
   LEFT_ALONE
 } from "./checkCode.ts";
 import { currentComponents } from "./componentCache.ts";
+import { graphDocument } from "./componentGraph.ts";
 import { COMPONENT_FILE } from "./componentScan.ts";
+import { compositionFindings } from "./compositionCheck.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import type { DesignToken } from "./designTokens.ts";
 import { type GitChange, gitChange, gitOutput } from "./gitChange.ts";
@@ -226,10 +228,31 @@ const reuseOf = async (
   root: string,
   change: GitChange,
   added: readonly AddedLine[]
-): Promise<ReuseFindings & { readonly notes: readonly string[] }> => {
+): Promise<ReuseFindings & { readonly notes: readonly string[]; readonly hasRules: boolean }> => {
+  try {
+    return await readReuse(root, change, added);
+  } catch (error) {
+    // a crafted file past what a walk can take costs this part of the answer, and says so
+    const reason = error instanceof RangeError ? "a file nests too deep" : "it could not be read";
+    return {
+      problems: [],
+      advice: [],
+      excused: [],
+      hasRules: false,
+      notes: [`components not compared: ${reason}`]
+    };
+  }
+};
+
+/** What `reuseOf` reads. */
+const readReuse = async (
+  root: string,
+  change: GitChange,
+  added: readonly AddedLine[]
+): Promise<ReuseFindings & { readonly notes: readonly string[]; readonly hasRules: boolean }> => {
   const isComponent = (file: string): boolean => COMPONENT_FILE.test(file) && !LEFT_ALONE.test(file);
   const touched = new Set(added.flatMap(({ file }) => (isComponent(file) ? [file] : [])));
-  const empty = { problems: [], advice: [], excused: [], notes: [] };
+  const empty = { problems: [], advice: [], excused: [], notes: [], hasRules: false };
   if (touched.size === 0) return empty;
   const deleted = change.deleted.filter(isComponent);
   if (touched.size + deleted.length > MOST_REUSE_FILES) {
@@ -244,14 +267,22 @@ const reuseOf = async (
     const text = smallFileText(join(root, file));
     return text === undefined ? [] : [{ file, text }];
   });
+  const packages = workspacePackages(root);
+  const composition = compositionFindings(added, changed, components, packages);
   const findings = reuseFindings({
     added,
     changed,
     previous: await filesAtBase(root, change.base, [...touched, ...deleted]),
     components,
-    packages: workspacePackages(root)
+    packages
   });
-  return { ...findings, notes: notes.map((note) => `components not all compared: ${note}`) };
+  return {
+    problems: [...findings.problems, ...composition.problems],
+    advice: findings.advice,
+    excused: [...findings.excused, ...composition.excused],
+    hasRules: components.some((each) => each.rules !== undefined),
+    notes: notes.map((note) => `components not all compared: ${note}`)
+  };
 };
 
 /**
@@ -305,7 +336,8 @@ const checkCodeAnswer = async (
       "suppression",
       "deleted-test",
       "deprecated-component",
-      "duplicate-component"
+      "duplicate-component",
+      ...(reuse.hasRules ? (["composition"] as const) : [])
     ],
     skipped: [
       ...notCheckedLine(hasColors, hasSizes, reading),
@@ -321,6 +353,19 @@ const checkCodeAnswer = async (
     excused: [...excusedValues(added.filter(({ file }) => inFolder(file))), ...reuse.excused]
   };
   return { status: 200, body };
+};
+
+/** The map of the project, for a client with no shell. */
+const graphAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
+  const limit = Number(params.get("limit"));
+  return {
+    status: 200,
+    body: graphDocument(config.dir, {
+      component: params.get("component") || undefined,
+      intent: params.get("intent") || undefined,
+      limit: Number.isInteger(limit) && limit > 0 ? limit : undefined
+    })
+  };
 };
 
 /** The answers that need nothing of the stories, so a story broken mid-edit cannot take them down. */
@@ -340,5 +385,6 @@ export const STORYLESS_ROUTES: Readonly<
       ): Promise<AgentAnswer> => answer(await catalogueTokens(config, resolveSource), params)
     ])
   ),
-  "check-code": checkCodeAnswer
+  "check-code": checkCodeAnswer,
+  graph: graphAnswer
 };

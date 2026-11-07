@@ -1,7 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `verify`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
+ * `nearest_token`, `component_graph`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
  * for a client that renders apps. `visual_diff` and `get_guide` join them in `mcpCommand.mts`.
  *
  * @module
@@ -17,6 +17,7 @@ import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { graphTool } from "./mcpGraph.ts";
 import { previewTool } from "./mcpPreview.ts";
 import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
 import { type Verify, verifyTool } from "./mcpVerify.ts";
@@ -181,6 +182,7 @@ export const catalogueTools = ({
       problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
   },
   verifyTool(verify),
+  graphTool(ask),
   {
     name: "list_tokens",
     description:

@@ -16,6 +16,7 @@ import { type ScannedComponent, scannedComponents } from "./componentScan.ts";
 import { importsOfFile, type WrittenImport } from "./fileImports.ts";
 import { isBuiltOn, isRebuilt, isShareable, SAME_CODE, signsBetween, stemOf } from "./lookAlikes.ts";
 import type { ProjectFile, WorkspacePackage } from "./projectFiles.ts";
+import { plainWords } from "./sourceText.ts";
 
 /** Something to weigh, which fails nothing. */
 export type ReuseAdvice = {
@@ -123,13 +124,14 @@ const isImported = (component: ScannedComponent, name: string, targets: readonly
 };
 
 /** A tag's text as an answer repeats it. */
-const capped = (text: string): string => {
-  const plain = text.replaceAll(/\p{Cc}/gu, " ");
-  return plain.length > LONGEST_WORDS ? `${plain.slice(0, LONGEST_WORDS)}…` : plain;
-};
+const capped = (text: string): string => plainWords(text, LONGEST_WORDS);
 
 /** What an imported component's own words make of importing it. */
-const wordsOnImport = (file: string, line: number, { name, guidance }: ScannedComponent): ReuseFindings => {
+const wordsOnImport = (
+  file: string,
+  line: number,
+  { name, guidance, rules }: ScannedComponent
+): ReuseFindings => {
   const { deprecated, replacedBy, useWhen, avoidWhen } = guidance ?? {};
   if (deprecated !== undefined || replacedBy !== undefined) {
     const why = deprecated === undefined ? "" : `: ${deprecated}`;
@@ -149,7 +151,11 @@ const wordsOnImport = (file: string, line: number, { name, guidance }: ScannedCo
       excused: []
     };
   }
+  const intents = (rules?.intents ?? []).map(
+    ({ id, when }) => `for ${id}${when === undefined ? "" : ` (${when})`}`
+  );
   const parts = [
+    ...intents,
     ...(useWhen === undefined ? [] : [`use when ${useWhen.join("; ")}`]),
     ...(avoidWhen === undefined ? [] : [`avoid when ${avoidWhen.join("; ")}`])
   ];
@@ -172,7 +178,10 @@ const importFindings = (
     .filter((name) => !isOld(name))
     .flatMap((name) => {
       const matches = components.filter(
-        (each) => each.file !== file && each.guidance !== undefined && isImported(each, name, targets)
+        (each) =>
+          each.file !== file &&
+          (each.guidance !== undefined || each.rules?.intents !== undefined) &&
+          isImported(each, name, targets)
       );
       // two of a name through one folder could be either
       return matches.length === 1 ? matches : [];

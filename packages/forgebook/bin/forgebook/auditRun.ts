@@ -178,7 +178,7 @@ export const auditSitesDocument = (dir: string, value: string): AuditSitesDocume
  * @param text - the text.
  */
 export const printable = (text: string): string =>
-  text.replaceAll(/[\p{Cc}]/gu, (character) => (character === "\n" ? "\n" : "?"));
+  text.replaceAll(/[\p{Cc}\p{Cf}]/gu, (character) => (character === "\n" ? "\n" : "?"));
 
 /** A value as a line of a list. */
 const valueLine = ({ value, count, files, hardCoded, token }: AuditValue): string =>
