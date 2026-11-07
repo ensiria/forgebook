@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@forgebook/react": "workspace:*",
-    "@vitejs/plugin-react": "6.1.2",
+    "@vitejs/plugin-react": "6.2.1",
     "flow-remove-types": "2.338.0",
     "postcss-load-config": "6.0.1",
     "vite": "^8.3.4"
