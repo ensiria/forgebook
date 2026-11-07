@@ -14,13 +14,17 @@ import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
+import { formatJson } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 import { build } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
+import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
+import { agentSetupCommands } from "./agentSetupCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
+import { auditCommands } from "./auditCommand.mts";
 import { buildFailureText } from "./buildFailure.ts";
 import { settleAgentIndex } from "./builtCatalogue.ts";
 import {
@@ -34,6 +38,7 @@ import {
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
 import { leaveAfterCommand } from "./commandServer.ts";
 import { devCommands } from "./devCommands.mts";
+import { graphCommands } from "./graphCommand.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
@@ -68,6 +73,10 @@ await defineCommands({
           type: "boolean",
           description:
             "Name each script after its module as well as its hash (build.readableNames in the configuration)."
+        },
+        watch: {
+          type: "boolean",
+          description: "Stay running, and build again when a file the catalogue reads changes."
         }
       },
       examples: [
@@ -75,9 +84,13 @@ await defineCommands({
         {
           command: `${COMMAND} build --base /pr-12/`,
           description: "For a host that serves it under a sub-path."
+        },
+        {
+          command: `${COMMAND} build --watch --out site`,
+          description: "Keep site up to date as files change, for a host that serves the folder."
         }
       ],
-      run: async ({ options, log }): Promise<void> => {
+      run: async ({ options, log, onInterrupt }): Promise<void> => {
         const config = withReadableNames(
           await configWithStoriesOf(options.config),
           options["readable-names"]
@@ -91,13 +104,22 @@ await defineCommands({
           },
           "build"
         );
+        const settle = (): Promise<void> =>
+          settleAgentIndex(config, outDir, options["agent-index"] === true, log);
+        if (options.watch === true) {
+          const { watchBuild } = await import("./buildWatch.ts");
+          const stop = new AbortController();
+          onInterrupt(() => stop.abort());
+          await watchBuild({ vite, log, onBuilt: settle, signal: stop.signal });
+          return;
+        }
         try {
           await build(vite);
         } catch (error) {
           if (error instanceof Error && error.stack !== undefined) log.debug(error.stack);
           throw new ScriptError(buildFailureText(error));
         }
-        await settleAgentIndex(config, outDir, options["agent-index"] === true, log);
+        await settle();
         log.success(`${config.title} built`);
       }
     }),
@@ -110,6 +132,13 @@ await defineCommands({
           type: "string",
           valueName: "text",
           description: "Only components whose title holds this text."
+        },
+        tag: {
+          type: "string",
+          multiple: true,
+          valueName: "tag",
+          description:
+            "Only stories with any of these tags; !name leaves a tag's out, as the address's tag= does."
         },
         view: {
           type: "string",
@@ -135,7 +164,11 @@ await defineCommands({
           command: `${COMMAND} stories --component select --used-in --json`,
           description: "The selects, with the components whose stories use them."
         },
-        { command: `${COMMAND} stories --component button --json`, description: "The buttons, as JSON." }
+        { command: `${COMMAND} stories --component button --json`, description: "The buttons, as JSON." },
+        {
+          command: `${COMMAND} stories --tag beta --tag '!wip'`,
+          description: "The stories in beta, but for those in progress."
+        }
       ],
       run: async ({ options, io, log, isJson, style }): Promise<void> => {
         const config = await configWithStoriesOf(options.config);
@@ -145,7 +178,11 @@ await defineCommands({
         });
         const body = await askCatalogue(config, options.url, "stories", params, log);
         if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
-        const document = filteredStories(body, { source: options.source, component: options.component });
+        const document = filteredStories(body, {
+          source: options.source,
+          component: options.component,
+          tags: options.tag
+        });
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
       }
     }),
@@ -252,6 +289,7 @@ await defineCommands({
     new: forgebook.command({
       summary:
         "Write a component's first stories from its props: the main story, one per choice, the worst case.",
+      json: true,
       options: {
         export: {
           type: "string",
@@ -275,7 +313,7 @@ await defineCommands({
           description: "One of several, printed."
         }
       ],
-      run: async ({ args, options, io, log }): Promise<void> => {
+      run: async ({ args, options, io, log, isJson }): Promise<void> => {
         const written = await newStoriesFile(resolve(args.file), options.export, options.framework);
         if (options.print) {
           io.stdout.write(written.text);
@@ -287,6 +325,7 @@ await defineCommands({
             hint: "Give --force to replace it, or --print to see it"
           });
         writeFileSync(written.file, written.text);
+        if (isJson) io.stdout.write(formatJson({ schema: 1, file: VITE_PATHS.normalize(shown) }));
         log.success(`${shown} written`);
         log.info(
           `${COMMAND} stories --component ${written.text.match(/title: "([^"]*)"/)?.[1] ?? ""} lists them`
@@ -295,9 +334,12 @@ await defineCommands({
     }),
     ...agentLoopCommands(forgebook),
     ...guideCommands(forgebook),
+    ...auditCommands(forgebook),
+    ...graphCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),
+    ...agentSetupCommands(forgebook),
     ...mcpCommands(forgebook),
     story: forgebook.command({
       summary:

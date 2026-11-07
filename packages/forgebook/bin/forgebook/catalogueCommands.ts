@@ -26,12 +26,11 @@ import type {
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import {
   CONFIG_FILES,
-  emptyStoryGlobs,
-  emptyStoryGlobsMessage,
   findConfigFile,
   loadConfigFile,
   type ResolvedConfig
 } from "../../src/vite/configFile.ts";
+import { emptyStoryGlobs, emptyStoryGlobsMessage } from "../../src/vite/emptyStoryGlobs.ts";
 import { catalogueClient } from "./agentClient.ts";
 
 /** The options every `forgebook` command takes: the configuration file. */

@@ -33,7 +33,7 @@ import type {
   TokensDocument,
   VerifyDocument
 } from "../../src/vite/agent.types.ts";
-import type { DesignToken } from "../../src/vite/designTokens.ts";
+import type { DesignToken, TokenSource } from "../../src/vite/designTokens.ts";
 import type { TokenClash } from "../../src/vite/tokenClashes.ts";
 
 /** The style with no width to fit, so no cell is cut. */
@@ -231,14 +231,28 @@ export const diffText = (
  */
 export const tokensText = (document: TokensDocument): string => {
   if (!document.isConfigured)
-    return 'No tokens file: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
+    return 'No tokens file, and none found in the application: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
   if (document.total === 0) return "No tokens here.";
   const lines = document.tokens.map((token) => tokenLine(token));
   const more = document.total - document.tokens.length;
   return [
     ...lines,
-    ...(more > 0 ? [`… and ${more} more: narrow it with --category, or raise --limit.`] : [])
+    ...(more > 0 ? [`… and ${more} more: narrow it with --category, or raise --limit.`] : []),
+    ...tokenSourceLines(document.sources ?? [], document.notes ?? [])
   ].join("\n");
+};
+
+/** What tokens were read from, on one line, and what could not be, as a person reads them. */
+const tokenSourceLines = (sources: readonly TokenSource[], notes: readonly string[]): string[] => {
+  const read = sources.filter((source) => source.kind !== "tokens-file");
+  return [
+    ...(read.length === 0
+      ? []
+      : [
+          `Read from: ${read.map(({ kind, file, tokens }) => `${file} (${kind}, ${tokens ?? 0})`).join(", ")}`
+        ]),
+    ...notes.map((note) => `Not read: ${note}`)
+  ];
 };
 
 /** A token on one line, its themes and any deprecation beside it. */
@@ -315,7 +329,12 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
     ...(lines.length > 0
       ? lines
       : [document.skipped.length > 0 ? "Nothing to report in what was checked." : "Nothing to report."]),
-    ...document.skipped
+    ...document.skipped,
+    ...(document.advice ?? []).map(({ file, line, message }) => `${file}:${line}  ${message}`),
+    ...(document.excused ?? []).map(
+      ({ file, line, rule, reason }) => `${file}:${line}  ${rule} excused by a comment: ${reason}`
+    ),
+    ...tokenSourceLines(document.tokenSources ?? [], document.tokenNotes ?? [])
   ].join("\n");
 };
 
@@ -339,12 +358,13 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
   const notes = document.code.notes.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
   );
+  const advice = (document.code.advice ?? []).map((each) => `${each.file}:${each.line}  ${each.message}`);
   const results = [
     ...document.failures,
     ...document.notVerified.map((each) => ({ ...each, problems: [] }))
   ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
   const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
-  return [...uncovered, ...code, ...notes, ...stories, document.summary].join("\n");
+  return [...uncovered, ...code, ...notes, ...advice, ...stories, document.summary].join("\n");
 };
 
 /**

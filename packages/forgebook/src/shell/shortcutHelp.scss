@@ -1,0 +1,77 @@
+// The list of the shell's keys, loaded with it (`ShortcutHelp.tsx`), on the shell's palette.
+@use "../styles/tokens" as *;
+
+@layer catalogue {
+  .forgebook-keys {
+    box-sizing: border-box;
+    width: min(28rem, 100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    padding: $space-3-5;
+    border: 0;
+    border-radius: $radius-card;
+    background: $surface;
+    box-shadow: $shadow-popover;
+    color: $text;
+    overflow-y: auto;
+
+    &::backdrop {
+      background: rgb(0 0 0 / 40%);
+    }
+  }
+
+  .forgebook-keys__title {
+    margin: 0 0 $space-1-5;
+    font: $text-row-compact;
+    font-weight: 600;
+  }
+
+  .forgebook-keys__note {
+    display: block;
+    margin: 0;
+    font: $text-row-compact;
+    color: $text-secondary;
+  }
+
+  .forgebook-keys__list {
+    margin: $space-3 0;
+  }
+
+  .forgebook-keys__row {
+    display: flex;
+    gap: $space-3;
+    align-items: baseline;
+    padding-block: $space-1;
+    font: $text-row-compact;
+
+    dt {
+      display: flex;
+      flex: none;
+      gap: $space-1;
+      width: 6rem;
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  .forgebook-keys__key {
+    padding: 0 $space-1;
+    border-radius: $radius-control;
+    background: $fill;
+    font: inherit;
+  }
+
+  .forgebook-keys__switch {
+    display: flex;
+    gap: $space-1-5;
+    align-items: flex-start;
+    font: $text-row-compact;
+  }
+
+  .forgebook-keys__foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: $space-3;
+  }
+}

@@ -6,6 +6,7 @@
  * @module
  */
 
+import type { StepFunction } from "@forgebook/story-format/csf";
 import { describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
@@ -19,6 +20,7 @@ import {
   type StoryRunOptions
 } from "../src/frame/storyRun.ts";
 import type { PanelArgs } from "../src/messages.ts";
+import type { PlayTrace } from "../src/playTrace.ts";
 import { domRenderer } from "./domRenderer.ts";
 
 /** What a run told the frame. */
@@ -63,7 +65,8 @@ const run = async (
   story: LoadedStory,
   playTools?: PlayToolsLoader,
   onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
-  pluginSetups: StoryRunOptions["pluginSetups"] = []
+  pluginSetups: StoryRunOptions["pluginSetups"] = [],
+  overrides: Partial<StoryRunOptions> = {}
 ): Promise<{
   readonly container: HTMLElement;
   readonly reports: Reports;
@@ -93,7 +96,8 @@ const run = async (
     onError: (message: string): void => {
       reports.errors.push(message);
     },
-    onTrace: () => undefined
+    onTrace: () => undefined,
+    ...overrides
   };
   const running = runStory(options);
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -105,6 +109,38 @@ const controlsOf = (reports: Reports): StoryControls => {
   if (reports.controls === undefined) throw new Error("The story never got ready");
   return reports.controls;
 };
+
+describe("stepping through a play", () => {
+  it("pauses only the mount it was asked for: Replay's next mount runs on its own", async () => {
+    let played = 0;
+    const paused: (string | undefined)[] = [];
+    const { reports } = await run(
+      badge({
+        play: async ({ step }: { readonly step: StepFunction }): Promise<void> => {
+          await step("first", () => {
+            played += 1;
+          });
+        }
+      }),
+      undefined,
+      undefined,
+      [],
+      { onTrace: (trace: PlayTrace): void => void paused.push(trace.pausedAt) }
+    );
+    expect(played).toBe(1);
+    const controls = controlsOf(reports);
+    controls.stepPlay("start");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(1);
+    expect(paused.at(-1)).toBe("first");
+    controls.stepPlay("next");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(2);
+    controls.restartClock();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(3);
+  });
+});
 
 describe("runStory with a second framework", () => {
   it("draws the story in a canvas with its layout, then plays it on that canvas and is ready", async () => {

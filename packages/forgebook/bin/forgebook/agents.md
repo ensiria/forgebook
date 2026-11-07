@@ -7,7 +7,7 @@ A component you add or change gets its stories added or changed in the same chan
 
 ```sh
 npx forgebook verify --json       # every changed UI file in stories that ran, every variant, and check-code
-npx forgebook check-code --json   # what the change adds against the design system
+npx forgebook check-code --json   # what the change adds against the design system, tokens file or not
 ```
 
 A non-zero exit (`not-verified`, `failed`) means not done, and a UI file with no stories is `not-verified`: `fix` names the
