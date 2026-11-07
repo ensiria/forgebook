@@ -25,8 +25,17 @@ import type { CatalogueSection } from "./catalogueOptions.ts";
 /** The props whose keys are the parts. */
 const PART_MAPS = ["classNames", "styles", "refs"];
 
-/** A prop in short. */
+/** A prop in short, ending with when it can be passed for a variant's prop (`href:string[kind=link]`). */
 const shortProp = (prop: PropDocs): string => {
+  const condition =
+    prop.onlyWhen === undefined
+      ? ""
+      : `[${prop.onlyWhen.prop}=${prop.onlyWhen.values.map(String).join("|")}]`;
+  return `${propText(prop)}${condition}`;
+};
+
+/** A prop in short, without its condition. */
+const propText = (prop: PropDocs): string => {
   const required = prop.isRequired ? "!" : "";
   switch (prop.kind) {
     case "choice":

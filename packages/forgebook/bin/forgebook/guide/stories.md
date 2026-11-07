@@ -78,3 +78,7 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   use must set (events among them; a subcomponent's say it with their own `isRequired`); `docs.props` stays in the
   order of the source, whatever the catalogue's `requiredFirst` shows a person.
   Set every name in `requiredProps` when you use the component or write its story.
+- A prop with `onlyWhen` belongs to some variants of a union of props: pass it only with the discriminant set to one of
+  its `values` (`href` with `kind: "link"`). A prop's `notes` say why its type is not as written (a generic shown as
+  its constraint, a name that cannot be found, an `any`); a component's `propsNote` says why it lists no props. Read
+  its source before guessing a value its docs cannot describe.

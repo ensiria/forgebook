@@ -11,6 +11,7 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
+import type { ComponentDocs, PropsNote } from "../../src/componentDocs.ts";
 import type {
   StoryCheckReport,
   StoryCheckResult,
@@ -58,6 +59,32 @@ export const storiesText = (document: StoriesDocument, style: OutputStyle): stri
     uncut(style)
   );
 
+/** Why a component lists no props, as the `Props` line says it. */
+const PROPS_NOTES: Readonly<Record<PropsNote["reason"], (count: number) => string>> = {
+  untyped: (): string => "none: its props are typed any",
+  "no-signature": (): string => "none: its type cannot be called with props",
+  "outside-package": (count: number): string => `none: all ${count} come from outside the package`
+};
+
+/**
+ * A component's props in one line: each name, a variant's with when it can be passed, or why there are none.
+ *
+ * @param docs - the component's docs.
+ */
+const propsLine = (docs: ComponentDocs): string => {
+  const { propsNote } = docs;
+  if (docs.props.length === 0 && propsNote !== undefined) {
+    return PROPS_NOTES[propsNote.reason](propsNote.reason === "outside-package" ? propsNote.count : 0);
+  }
+  return docs.props
+    .map((prop) =>
+      prop.onlyWhen === undefined
+        ? prop.name
+        : `${prop.name} (when ${prop.onlyWhen.prop} is ${prop.onlyWhen.values.map(String).join(" or ")})`
+    )
+    .join(", ");
+};
+
 /**
  * One story's facts: where it is, where it opens, its args, its component's props and those every use must set.
  *
@@ -73,7 +100,7 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["Frame", document.story.links.frame],
     ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
-    ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")],
+    ["Props", document.docs === undefined ? "none" : propsLine(document.docs)],
     ["Required", document.requiredProps.length === 0 ? "none" : document.requiredProps.join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);

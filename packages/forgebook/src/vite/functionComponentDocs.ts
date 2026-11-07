@@ -16,13 +16,20 @@ import { dirname } from "node:path";
 
 import ts from "typescript-6";
 
-import type { ComponentDocs, NoComponentDocs, SubcomponentDocs } from "../componentDocs.ts";
+import type {
+  ComponentDocs,
+  NoComponentDocs,
+  PropDocs,
+  PropsNote,
+  SubcomponentDocs
+} from "../componentDocs.ts";
 import type { ExtractFileComponent, ExtractStoryComponent, StoryComponentResult } from "./adapter.ts";
 import { chosenExport, programFor, summaryOf } from "./docsProgram.ts";
 import { moduleSummaryOf } from "./moduleSummary.ts";
 import { declarationOrder, declaredSymbol, isForeign, partsOf, propDocs } from "./propDocs.ts";
 import { signatureDocs } from "./signatureDocs.ts";
 import { metaComponent, metaSubcomponents } from "./storyMeta.ts";
+import { propsOfType, type VariantProp } from "./unionProps.ts";
 import { guidanceOf } from "./usageGuidance.ts";
 
 /**
@@ -58,6 +65,31 @@ type ComponentProps = {
   readonly propsType: ts.Type | undefined;
   /** The props its package declares, in declaration order: the ones the docs list. */
   readonly ownProps: readonly ts.Symbol[];
+  /** The props only some variants of a union of props declare, with when they can be passed. */
+  readonly variantOnly: ReadonlyMap<ts.Symbol, VariantProp>;
+  /** Why it lists no props although it takes some; none when its props are read, or it takes none. */
+  readonly propsNote: PropsNote | undefined;
+};
+
+/**
+ * Why a component lists no props although it takes some: it cannot be called with props, its props are `any`, or
+ * every one of them is declared outside its package.
+ *
+ * @param signature - its first call or construct signature, if any.
+ * @param propsType - the type of its props, if it takes any.
+ * @param listed - how many props it lists.
+ * @param all - how many props its props type has, left out ones included.
+ */
+const propsNoteOf = (
+  signature: ts.Signature | undefined,
+  propsType: ts.Type | undefined,
+  listed: number,
+  all: number
+): PropsNote | undefined => {
+  if (signature === undefined) return { reason: "no-signature" };
+  if (propsType === undefined || listed > 0) return undefined;
+  if (propsType.flags & ts.TypeFlags.Any) return { reason: "untyped" };
+  return all > 0 ? { reason: "outside-package", count: all } : undefined;
 };
 
 /**
@@ -81,12 +113,40 @@ const componentProps = (
     propsSymbol === undefined
       ? undefined
       : checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(propsSymbol, expression));
+  const { props, variantOnly } =
+    propsType === undefined ? { props: [], variantOnly: new Map() } : propsOfType(propsType, checker);
   const ownProps = declarationOrder(
-    (propsType?.getProperties() ?? []).filter((prop) => !isForeign(prop)),
+    props.filter((prop) => !isForeign(prop)),
     dirname(symbol.declarations?.[0]?.getSourceFile().fileName ?? storyFile)
   );
-  return { propsType, ownProps };
+  return {
+    propsType,
+    ownProps,
+    variantOnly,
+    propsNote: propsNoteOf(signature, propsType, ownProps.length, props.length)
+  };
 };
+
+/**
+ * The docs of a component's listed props: a prop only some variants declare is never required, and says when it can
+ * be passed.
+ *
+ * @param props - the component's props, as `componentProps` read them.
+ * @param checker - the program's checker.
+ * @param expression - where the code names the component.
+ */
+const listedProps = (props: ComponentProps, checker: ts.TypeChecker, expression: ts.Expression): PropDocs[] =>
+  props.ownProps.map((prop) => {
+    const variant = props.variantOnly.get(prop);
+    if (variant === undefined) return propDocs(prop, checker, expression);
+    const variants = variant.declarations.filter((declaration) => declaration !== prop);
+    const { onlyWhen } = variant;
+    return {
+      ...propDocs(prop, checker, expression, { variants }),
+      isRequired: false,
+      ...(onlyWhen === undefined ? {} : { onlyWhen })
+    };
+  });
 
 /**
  * The files a component's docs come from: the one declaring it and those declaring its own props.
@@ -120,13 +180,13 @@ const subcomponentsOf = (
     if (symbol === undefined) {
       return `${source.fileName}: the meta's subcomponent ${subcomponent.name} cannot be resolved`;
     }
-    const { ownProps } = componentProps(symbol, subcomponent.expression, checker, source.fileName);
+    const props = componentProps(symbol, subcomponent.expression, checker, source.fileName);
     docs.push({
       name: subcomponent.name,
       description: summaryOf(symbol, checker),
-      props: ownProps.map((prop) => propDocs(prop, checker, subcomponent.expression))
+      props: listedProps(props, checker, subcomponent.expression)
     });
-    sources.push(...docsSources(symbol, ownProps, source.fileName));
+    sources.push(...docsSources(symbol, props.ownProps, source.fileName));
   }
   return { docs, sources };
 };
@@ -147,8 +207,9 @@ const componentOf = (
   file: string,
   subcomponents: { readonly docs: SubcomponentDocs[]; readonly sources: string[] }
 ): StoryComponentResult => {
-  const { propsType, ownProps } = componentProps(symbol, expression, checker, file);
-  const props = ownProps.map((prop) => propDocs(prop, checker, expression));
+  const read = componentProps(symbol, expression, checker, file);
+  const { propsType, ownProps, propsNote } = read;
+  const props = listedProps(read, checker, expression);
   const parts = partsOf(propsType, checker, expression);
   const declarationFile = symbol.declarations?.[0]?.getSourceFile();
   const sources = docsSources(symbol, ownProps, file);
@@ -162,7 +223,8 @@ const componentOf = (
       parts,
       subcomponents: subcomponents.docs,
       ...guidanceOf(symbol, checker),
-      ...(signature === undefined ? {} : { signature })
+      ...(signature === undefined ? {} : { signature }),
+      ...(propsNote === undefined ? {} : { propsNote })
     },
     file: sources[0] ?? file,
     sources: [...new Set([...sources, ...subcomponents.sources])]

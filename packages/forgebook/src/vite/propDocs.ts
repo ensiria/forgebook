@@ -15,22 +15,10 @@ import ts from "typescript-6";
 
 import type { EventSignature, MemberDocs, PropDocs, PropKind } from "../componentDocs.ts";
 import { summaryOf, tagOf } from "./docsProgram.ts";
+import { literalValues, typeAndKind } from "./propKind.ts";
+import { type DeclaredType, genericFreeText, propTypeNotes, usesTypeParameter } from "./propTypeNotes.ts";
 import { shapeOfProp } from "./shapeDocs.ts";
 import { unwrapped } from "./storyMeta.ts";
-
-/** An event: a function prop named `on` and a capital (React's `onPress`). */
-const EVENT_NAME = /^on[A-Z]/;
-
-/** Whether a type is a union of string or number literals (a choice). */
-const literalValues = (type: ts.Type): (string | number)[] | undefined => {
-  if (!type.isUnion()) return undefined;
-  const values = type.types.map((member) =>
-    member.isStringLiteral() || member.isNumberLiteral() ? member.value : undefined
-  );
-  return values.every((value) => value !== undefined)
-    ? values.filter((value) => value !== undefined)
-    : undefined;
-};
 
 /** A literal value an expression writes (`"md"`, `3`, `-1`), or none for anything else. */
 const literalOfExpression = (expression: ts.Expression): string | number | undefined => {
@@ -203,10 +191,12 @@ export const declarationOrder = (props: readonly ts.Symbol[], componentFolder: s
   });
 };
 
-/** A type node's text as the source writes it, on one line. */
-const nodeText = (node: ts.Node): string =>
-  node
-    .getText()
+/**
+ * A type node's text as the source writes it, on one line; given a checker, each generic type parameter it uses
+ * replaced by what it is shown as (`propTypeNotes.ts`).
+ */
+const nodeText = (node: ts.Node, generic: ts.TypeChecker | undefined): string =>
+  (generic === undefined ? node.getText() : genericFreeText(node, generic))
     // an inline object's TSDoc is the docs' to read, not part of its type
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\s+/g, " ")
@@ -236,9 +226,6 @@ const declaredMembers = (node: ts.TypeNode): ts.TypeNode[] => {
   return (ts.isUnionTypeNode(bare) ? bare.types : [bare]).filter((member) => !isNothing(member));
 };
 
-/** A prop's type as declared: a type node, or a method's whole signature. */
-type DeclaredType = ts.TypeNode | ts.MethodSignature;
-
 /**
  * A prop's declared type nodes: a property's type (in a type or a class) or a method's whole signature, once per
  * declaration. A prop of props written as alternatives (`{ indicator?: never } | { indicator?: "dot" | "spinner" }`)
@@ -261,13 +248,19 @@ const declaredTypesOf = (symbol: ts.Symbol): DeclaredType[] =>
  * between reads changes from one read to the next.
  *
  * @param declaredTypes - the prop's declared type nodes.
+ * @param generic - the program's checker when the prop's type is still generic, to replace the type parameters its text
+ * uses; none to write it as it is.
  * @returns the text, or none when the prop writes no type (the caller falls back to the checker's).
  */
-const writtenTypeText = (declaredTypes: readonly DeclaredType[]): string | undefined => {
+const writtenTypeText = (
+  declaredTypes: readonly DeclaredType[],
+  generic?: ts.TypeChecker
+): string | undefined => {
+  const text = (node: ts.Node): string => nodeText(node, generic);
   const texts = declaredTypes.flatMap((declared): string[] => {
-    if (!ts.isMethodSignature(declared)) return declaredMembers(declared).map(nodeText);
-    const parameters = declared.parameters.map(nodeText).join(", ");
-    return [`(${parameters}) => ${declared.type === undefined ? "void" : nodeText(declared.type)}`];
+    if (!ts.isMethodSignature(declared)) return declaredMembers(declared).map(text);
+    const parameters = declared.parameters.map(text).join(", ");
+    return [`(${parameters}) => ${declared.type === undefined ? "void" : text(declared.type)}`];
   });
   // each branch's members once, in the order the branches write them
   const unique = [...new Set(texts)];
@@ -275,12 +268,33 @@ const writtenTypeText = (declaredTypes: readonly DeclaredType[]): string | undef
 };
 
 /**
+ * A prop's type as the source writes it, or none for the checker's: a text naming a type parameter the component
+ * instantiates (`value: TValue` in `BaseProps<string>`) says less than the checker's `string`.
+ *
+ * @param declared - the prop's declared types.
+ * @param generic - the program's checker when the prop's type is still generic.
+ * @param checker - the program's checker.
+ */
+const writtenText = (
+  declared: readonly DeclaredType[],
+  generic: ts.TypeChecker | undefined,
+  checker: ts.TypeChecker
+): string | undefined =>
+  generic === undefined && usesTypeParameter(declared, checker)
+    ? undefined
+    : writtenTypeText(declared, generic);
+
+/**
  * An event's signature as the source writes it: a function type among the prop's declared members, or a method.
  *
  * @param declaredTypes - the event prop's declared type nodes.
+ * @param generic - the program's checker when the event's type is still generic, as `writtenTypeText` takes it.
  * @returns the signature, or none when the source writes none in place (a named handler type).
  */
-const writtenSignature = (declaredTypes: readonly DeclaredType[]): EventSignature | undefined => {
+const writtenSignature = (
+  declaredTypes: readonly DeclaredType[],
+  generic: ts.TypeChecker | undefined
+): EventSignature | undefined => {
   const nodes = declaredTypes.flatMap((declared): DeclaredType[] =>
     ts.isMethodSignature(declared) ? [declared] : declaredMembers(declared)
   );
@@ -291,10 +305,10 @@ const writtenSignature = (declaredTypes: readonly DeclaredType[]): EventSignatur
   if (fn === undefined) return undefined;
   return {
     parameters: fn.parameters.map((parameter) => ({
-      name: nodeText(parameter.name),
-      type: parameter.type === undefined ? "unknown" : nodeText(parameter.type)
+      name: nodeText(parameter.name, undefined),
+      type: parameter.type === undefined ? "unknown" : nodeText(parameter.type, generic)
     })),
-    returns: fn.type === undefined ? "void" : nodeText(fn.type)
+    returns: fn.type === undefined ? "void" : nodeText(fn.type, generic)
   };
 };
 
@@ -309,16 +323,6 @@ const signatureOf = (type: ts.Type, checker: ts.TypeChecker, node: ts.Node): Eve
     })),
     returns: checker.typeToString(signature.getReturnType())
   };
-};
-
-/** A prop's kind, from its name and its type without `undefined`. */
-const kindOf = (name: string, type: ts.Type, eventName: RegExp): PropKind => {
-  if (eventName.test(name) && type.getCallSignatures().length > 0) return "event";
-  if (type.flags & ts.TypeFlags.Boolean || type.flags & ts.TypeFlags.BooleanLiteral) return "toggle";
-  if (literalValues(type) !== undefined) return "choice";
-  if (type.flags & ts.TypeFlags.String) return "text";
-  if (type.flags & ts.TypeFlags.Number) return "number";
-  return "other";
 };
 
 /** Whether a symbol is declared outside the package (a DOM attribute from React's types). */
@@ -418,6 +422,33 @@ export type PropReading = {
    * capital by default.
    */
   readonly eventName?: RegExp | undefined;
+  /**
+   * The same prop as the other variants of a union of props declare it (`selected?: Date` beside `selected?: Date[]`):
+   * their written types join its own. When their types differ, what only one of them would say (an event's signature,
+   * a value's shape, an object's members) is left out, and its kind is `other` unless all share one.
+   */
+  readonly variants?: readonly ts.Symbol[] | undefined;
+};
+
+/**
+ * A choice's values across the variants' types that declare it, each once, in the order the source writes them.
+ *
+ * @param kind - the prop's kind: only a choice has values.
+ * @param types - its type in each variant, its own first.
+ * @param declared - its declared types, for their order.
+ * @param checker - the program's checker.
+ */
+const choicesOf = (
+  kind: PropKind,
+  types: readonly ts.Type[],
+  declared: readonly DeclaredType[],
+  checker: ts.TypeChecker
+): (string | number)[] | undefined => {
+  if (kind !== "choice") return undefined;
+  const lists = types.map(literalValues);
+  return lists.every((list) => list !== undefined)
+    ? writtenOrder([...new Set(lists.flat())], declared, checker)
+    : undefined;
 };
 
 /**
@@ -434,25 +465,37 @@ export const propDocs = (
   node: ts.Node,
   reading: PropReading = {}
 ): PropDocs => {
-  const { taken, eventName = EVENT_NAME } = reading;
-  const type = checker.getNonNullableType(taken?.type ?? checker.getTypeOfSymbolAtLocation(symbol, node));
+  const { taken, variants = [] } = reading;
   const takenNodes = taken?.typeNode === undefined ? [] : [taken.typeNode];
-  const declared = taken === undefined ? declaredTypesOf(symbol) : takenNodes;
+  const declared = taken === undefined ? [symbol, ...variants].flatMap(declaredTypesOf) : takenNodes;
+  const { type, variantTypes, isMixed, kind, isGeneric } = typeAndKind(
+    symbol,
+    declared,
+    reading,
+    checker,
+    node
+  );
+  // a type parameter is replaced only where the component leaves it open: a props type it instantiates is read as is
+  const generic = isGeneric ? checker : undefined;
   const name = symbol.getName();
-  const kind = kindOf(name, type, eventName);
   const defaultValue = tagOf(symbol, checker, "defaultValue");
-  const checkerChoices = kind === "choice" ? literalValues(type) : undefined;
-  const choices = checkerChoices === undefined ? undefined : writtenOrder(checkerChoices, declared, checker);
+  const choices = choicesOf(kind, [type, ...variantTypes], declared, checker);
+  // what one variant's type says of its values is not true of the others'
   const signature =
-    kind === "event" ? (writtenSignature(declared) ?? signatureOf(type, checker, node)) : undefined;
+    kind === "event" && !isMixed
+      ? (writtenSignature(declared, generic) ?? signatureOf(type, checker, node))
+      : undefined;
   // a node takes a text: the panel can set it as one, which covers labels, titles and children
-  const canTakeText = kind === "other" && checker.isTypeAssignableTo(checker.getStringType(), type);
+  const canTakeText =
+    kind === "other" &&
+    [type, ...variantTypes].every((each) => checker.isTypeAssignableTo(checker.getStringType(), each));
+  const notes = propTypeNotes(declared, type, checker, generic !== undefined);
   return {
     name,
     kind,
     type:
       choices === undefined
-        ? (writtenTypeText(declared) ?? checker.typeToString(type))
+        ? (writtenText(declared, generic, checker) ?? checker.typeToString(type))
         : choiceTypeText(choices),
     description: summaryOf(symbol, checker),
     isRequired: (symbol.flags & ts.SymbolFlags.Optional) === 0,
@@ -460,8 +503,13 @@ export const propDocs = (
     ...(choices === undefined ? {} : { choices }),
     ...(signature === undefined ? {} : { signature }),
     ...(canTakeText ? { canTakeText } : {}),
-    ...editingOf(symbol, { kind, type, canTakeText, declared, checker, node }),
-    ...groupingOf(symbol, kind, type, checker, node)
+    ...(isMixed
+      ? {}
+      : {
+          ...editingOf(symbol, { kind, type, canTakeText, declared, checker, node }),
+          ...groupingOf(symbol, kind, type, checker, node)
+        }),
+    ...(notes.length === 0 ? {} : { notes })
   };
 };
 
