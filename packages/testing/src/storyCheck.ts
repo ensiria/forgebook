@@ -149,3 +149,30 @@ export const focusProblems = async (page: Page): Promise<StoryProblem[]> => {
  */
 export const errorProblems = (errors: readonly string[]): StoryProblem[] =>
   errors.map((message) => ({ kind: "error", message }));
+
+/**
+ * Whether a story's page shows nothing a reader could see: no text, and no element with a size that shows something of its
+ * own. Runs in the page, so it holds all it reads.
+ *
+ * @returns whether it is blank.
+ */
+export const isPageBlank = (): boolean => {
+  const notContent = "script, style, link, meta, template, noscript, head";
+  const replaced = "svg, canvas, img, video, iframe, input, button, select, textarea, hr, progress, meter";
+  return ![...document.body.querySelectorAll("*")].some((element) => {
+    if (element.closest(notContent) !== null) return false;
+    const box = element.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) return false;
+    const hasOwnText = [...element.childNodes].some(
+      (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim() !== ""
+    );
+    if (hasOwnText || element.matches(replaced)) return true;
+    const look = getComputedStyle(element);
+    return (
+      look.backgroundImage !== "none" ||
+      !/^(?:transparent|rgba\(0, 0, 0, 0\))$/.test(look.backgroundColor) ||
+      Number.parseFloat(look.borderTopWidth) > 0 ||
+      Number.parseFloat(look.borderBottomWidth) > 0
+    );
+  });
+};

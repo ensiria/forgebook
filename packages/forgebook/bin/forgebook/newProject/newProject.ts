@@ -6,7 +6,8 @@
  * Nothing is written here: the plan comes back whole, so a refusal leaves the project as it was. Story globs carry the
  * extension `forgebook new` writes for the framework, and any folder that already has story files. A project with `src`
  * keeps its components there; one without lists every usual folder, an absent one included, since create-next-app's
- * `components` appears later and a glob over nothing costs nothing. The preview
+ * `components` appears later. They are one pattern, braces and all, because a command stops on any pattern that matches
+ * nothing (a misspelt one looks the same), and a project's first story fills only one of its folders. The preview
  * is `.tsx` where stories are, so the decorator a next step asks for needs no rename.
  *
  * @module
@@ -87,6 +88,10 @@ const existingStories = (
   return { folders, extensions, isCut: queue.length > SEARCH_LIMIT };
 };
 
+/** A glob's alternatives: one as it is, several in braces. */
+const oneOf = (names: readonly string[]): string =>
+  names.length === 1 ? (names[0] ?? "") : `{${names.join(",")}}`;
+
 /**
  * The configuration's story globs, and whether the search for story files stopped short.
  *
@@ -105,11 +110,13 @@ export const storyGlobsOf = (
     : [...sourceFolders].sort((a, b) => Number(isThere(b)) - Number(isThere(a)));
   const stories = existingStories(projectDir);
   const extensions = [...new Set([storyExtension, ...stories.extensions])];
-  const globs = [...new Set([...listed, ...stories.folders])].flatMap((folder) =>
-    extensions.map((extension) =>
-      folder === "" ? `*.stories.${extension}` : `${folder}/**/*.stories.${extension}`
-    )
-  );
+  const folders = [...new Set([...listed, ...stories.folders])];
+  const extension = oneOf(extensions);
+  const nested = folders.filter((folder) => folder !== "");
+  const globs = [
+    ...(folders.includes("") ? [`*.stories.${extension}`] : []),
+    ...(nested.length === 0 ? [] : [`${oneOf(nested)}/**/*.stories.${extension}`])
+  ];
   return { globs, isCut: stories.isCut };
 };
 

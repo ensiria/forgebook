@@ -24,7 +24,6 @@ import {
   markupWrappers,
   pageFacts,
   styleSheetImports,
-  viteConfigFacts,
   vueInstalls
 } from "../bin/forgebook/newProject/projectEntries.ts";
 import {
@@ -111,7 +110,7 @@ describe("the framework a project says", () => {
 describe("the floors", () => {
   it("are the adapters' own required peers", () => {
     for (const name of FRAMEWORK_NAMES) expect(PROJECT_FRAMEWORKS[name].peers).toEqual(requiredPeers(name));
-    expect(FORGEBOOK_PEERS).toEqual(requiredPeers("forgebook"));
+    expect(FORGEBOOK_PEERS).toEqual({ react: "18.2.0", "react-dom": "18.2.0" });
   });
 
   it.each([
@@ -146,8 +145,9 @@ describe("the floors", () => {
     expect(installSpecifier("vite", declared)).toBe("vite");
   });
 
-  it("keeps the higher of forgebook's floor and the adapter's", () => {
-    expect(requiredPackages("react", []).get("react")).toBe("19.0.0");
+  it("asks for the adapter's floor, and nothing of a project's Vite", () => {
+    expect(requiredPackages("react", []).get("react")).toBe("18.2.0");
+    expect(requiredPackages("react", []).has("vite")).toBe(false);
     expect(requiredPackages("react-native-web", ["@babel/core"]).has("@babel/core")).toBe(true);
   });
 
@@ -166,7 +166,7 @@ describe("the floors", () => {
       requiredPackages("web-components", [])
     );
     expect(state.tooOld).toEqual([{ name: "lit", found: "2.0.0", floor: "3.2.0" }]);
-    expect(state.missing).toEqual(["forgebook", "@forgebook/web-components", "react-dom", "vite"]);
+    expect(state.missing).toEqual(["forgebook", "@forgebook/web-components", "react-dom"]);
     expect(state.hasUninstalled).toBe(true);
   });
 });
@@ -222,8 +222,6 @@ describe("the package manager", () => {
 describe("what an entry says", () => {
   it("keeps a planted text from taking long", () => {
     const start = performance.now();
-    viteConfigFacts(`import${" ".repeat(200_000)}`);
-    viteConfigFacts(`from${" ".repeat(200_000)}`);
     pageFacts("<link ".repeat(40_000));
     isBelowFloor(" ".repeat(200_000), "19.0.0");
     expect(performance.now() - start).toBeLessThan(2000);
@@ -292,19 +290,5 @@ describe("what an entry says", () => {
       })
     ).toEqual(["a.css"]);
     expect(angularStyles(undefined)).toEqual([]);
-  });
-
-  it("names a vite.config's plugins, not the framework's own or Node's", () => {
-    expect(
-      viteConfigFacts(
-        'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\nimport path from "node:path";\nimport svgr from "vite-plugin-svgr";\nimport mine from "./mine";\nexport default defineConfig({ plugins: [react(), svgr()] });'
-      )
-    ).toEqual({ plugins: ["vite-plugin-svgr"], hasAlias: false });
-    expect(
-      viteConfigFacts(
-        'import path from "path";\nimport {\n  visualizer\n} from "rollup-plugin-visualizer";\n/* import old from "old-plugin"; */\n'
-      ).plugins
-    ).toEqual(["rollup-plugin-visualizer"]);
-    expect(viteConfigFacts("resolve: { alias: {} }").hasAlias).toBe(true);
   });
 });

@@ -1,14 +1,12 @@
 /**
  * What makes a project's stories look and work as its app does, read from its files: the global style sheets a preview
- * must load, and, named as next steps, what cannot be worked out from outside (providers, portals, the head, aliases,
- * Vite plugins).
+ * must load, and, named as next steps, what cannot be worked out from outside (providers, portals, the head).
  *
  * @remarks
- * A catalogue reads no `vite.config` and no entry of the app, so what those do for the app does not happen for a story.
- * A style sheet is the one thing written for the project, because its import is the same one line everywhere; the
- * others need code only the project knows, so each is reported with where it was read and what to do. Next.js resolves
- * `tsconfig.json` paths and runs PostCSS itself, Nuxt and SvelteKit bring their own aliases and read their own files:
- * they are not told otherwise.
+ * A catalogue runs no entry of the app, so what one does for the app does not happen for a story. A style sheet is the
+ * one thing written for the project, because its import is the same one line everywhere; the others need code only the
+ * project knows, so each is reported with where it was read and what to do. The app's build is another matter: the
+ * catalogue reads it when it starts (`appBuild`), so nothing is asked of the project for its aliases, plugins or PostCSS.
  *
  * @module
  */
@@ -29,7 +27,6 @@ import {
   type PageFacts,
   pageFacts,
   styleSheetImports,
-  viteConfigFacts,
   vueInstalls
 } from "./projectEntries.ts";
 import { installedVersion } from "./projectPackages.ts";
@@ -63,15 +60,6 @@ const PAGES: Partial<Readonly<Record<ImportedFramework, string | undefined>>> = 
   sveltekit: "src/app.html",
   angular: "src/index.html"
 };
-
-/** The frameworks whose catalogue resolves the project's aliases itself. */
-const RESOLVE_THEIR_ALIASES: readonly ImportedFramework[] = ["nextjs", "nuxt", "sveltekit"];
-
-/** The frameworks whose catalogue runs the project's PostCSS. */
-const RUN_POSTCSS: readonly ImportedFramework[] = ["nextjs", "react-native-web"];
-
-/** The frameworks whose catalogue reads what a `vite.config` adds, or which have none. */
-const READ_THEIR_VITE_CONFIG: readonly ImportedFramework[] = ["nextjs", "nuxt", "sveltekit", "angular"];
 
 /** The names a PostCSS configuration may have. */
 const POSTCSS_FILES = [
@@ -216,48 +204,15 @@ const wrappersIn = (framework: ImportedFramework, text: string): readonly string
   return markupWrappers(text);
 };
 
-/** The sentences about what an app's Vite configuration does that a catalogue does not. */
-const buildSteps = (projectDir: string, framework: ImportedFramework): readonly NextStep[] => {
-  const steps: NextStep[] = [];
-  const hint = "through the adapter's vitePlugins (README: What init cannot work out)";
-  if (!READ_THEIR_VITE_CONFIG.includes(framework)) {
-    const file = ["ts", "mts", "js", "mjs", "cjs", "cts"]
-      .map((extension) => `vite.config.${extension}`)
-      .find((name) => isFile(join(projectDir, name)));
-    const facts = file === undefined ? undefined : viteConfigFacts(readText(join(projectDir, file)));
-    if (facts !== undefined && facts.plugins.length > 0)
-      steps.push({
-        kind: "vite-plugin",
-        file,
-        message: `${file} imports ${facts.plugins.join(", ")}, and the catalogue does not read it: add what stories need ${hint}`
-      });
-    if (facts?.hasAlias === true)
-      steps.push({
-        kind: "alias",
-        file,
-        message: `${file} sets resolve.alias, and the catalogue does not read it: a story that imports through an alias fails until you set it ${hint}`
-      });
-  }
-  if (!RESOLVE_THEIR_ALIASES.includes(framework)) {
-    const aliases = tsconfigAliases(projectDir);
-    if (aliases.length > 0)
-      steps.push({
-        kind: "alias",
-        file: aliases[0]?.file,
-        message: `tsconfig maps ${[...new Set(aliases.map(({ alias }) => alias))].join(", ")}, and the catalogue does not read it: a story that imports through it fails until you turn on Vite's resolve.tsconfigPaths ${hint}`
-      });
-  }
-  if (!RUN_POSTCSS.includes(framework)) {
-    const file = POSTCSS_FILES.find((name) => isFile(join(projectDir, name)));
-    if (file !== undefined)
-      steps.push({
-        kind: "postcss",
-        file,
-        message: `${file} is not run: a ${framework} catalogue compiles style sheets with Lightning CSS, so what its plugins add (Tailwind's directives) stays undone; use Tailwind through @tailwindcss/vite instead`
-      });
-  }
-  return steps;
-};
+/** The sentence about a PostCSS configuration a catalogue cannot read: YAML, which would take a parser of its own. */
+const buildSteps = (projectDir: string): readonly NextStep[] =>
+  [".postcssrc.yaml", ".postcssrc.yml"]
+    .filter((name) => isFile(join(projectDir, name)))
+    .map((file) => ({
+      kind: "postcss",
+      file,
+      message: `${file} is not run: the catalogue reads PostCSS's JSON and script files, so write it as postcss.config.mjs, or stories draw without what its plugins add`
+    }));
 
 /** Reads a JSON file; none for one that is not there or cannot be read. */
 const readJsonFile = (file: string): unknown => {
@@ -413,7 +368,7 @@ export const readProjectLook = (
       ...steps,
       ...texts.flatMap((entry) => entrySteps(projectDir, framework, entry)),
       ...pageSteps(page, framework, facts, texts),
-      ...buildSteps(projectDir, framework)
+      ...buildSteps(projectDir)
     ]
   };
 };
