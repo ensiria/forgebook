@@ -76,6 +76,7 @@ export const Select = ({
       value={value}
       disabled={isDisabled}
       data-size={size}
+      style={{ padding: 12, outline: "2px solid currentColor" }}
       onChange={(event: ChangeEvent<HTMLSelectElement>): void => onValueChange?.(event.target.value)}
     >
       {options.map((option) => (
