@@ -12,9 +12,9 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { printable } from "../../src/printable.ts";
 import { projectManifest } from "./importers/storybook.ts";
 import type { InitRefusal } from "./newProject/newProject.types.ts";
-import { printable } from "./newProject/projectEntries.ts";
 import type { PackageState } from "./newProject/projectPackages.ts";
 
 /** Where the command prints. */

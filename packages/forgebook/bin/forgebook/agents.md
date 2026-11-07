@@ -10,7 +10,7 @@ npx forgebook verify --json       # every changed UI file in stories that ran, e
 npx forgebook check-code --json   # what the change adds against the design system, tokens file or not
 ```
 
-A non-zero exit (`not-verified`, `failed`) means not done, and a UI file with no stories is `not-verified`: `fix` names the
+A non-zero exit (`not-verified`, `failed`) means not done, and a UI file with no stories, or `unseen`, is `not-verified`: `fix` names the
 next step, usually writing them; do it and run it again. Report `partly-verified` with what `skipped` says, never as verified. To look at one story, `npx forgebook check <id> --json`
 and `npx forgebook shot <id> --view "dark 360"`.
 

@@ -245,9 +245,9 @@ const showOutcome = (outcome: StoryOutcome, storyId: string, isNotAwaited: boole
   return outcome.reason;
 };
 
-/** The play tools a project installed, for a story that uses them. */
-const playToolsOf = ({ playTools }: FrameConfig): Pick<StoryRunOptions, "playTools"> =>
-  playTools === undefined ? {} : { playTools };
+/** The play tools a project installed, and whether the frame's address lets its story play when it opens. */
+const playOptions = ({ playTools }: FrameConfig, playsOnOpen: boolean): Partial<StoryRunOptions> =>
+  playTools === undefined ? { playsOnOpen } : { playTools, playsOnOpen };
 
 /**
  * Shows the story the address names in the given element.
@@ -266,7 +266,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   // the previews' modules: an edit of one (or of what it imports) brings its successor
   let previews: readonly unknown[] = config.previews ?? [];
   let preview = mergedPreviews(previews.map(readPreview));
-  const view = parseView(window.location.search, catalogue);
+  // a frame runs its play unless its own address says otherwise, whatever the catalogue's readers start with: tests and
+  // tools open frames with no word, and a new address written below must not add one
+  const view = parseView(window.location.search, { ...catalogue, readerPlay: "on" });
   const shell = shellChannel(config.frames ?? SAME_ORIGIN, window);
   const tellShell = shell.tell;
   applyView(document.documentElement, view, catalogue);
@@ -441,7 +443,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       container,
       story,
       identity: { id: storyId, name: location.story.name, title: location.component.title },
-      ...playToolsOf(config),
+      ...playOptions(config, view.play === "on"),
       pluginSetups: plugins.setups,
       renderer: config.renderer,
       clock,
