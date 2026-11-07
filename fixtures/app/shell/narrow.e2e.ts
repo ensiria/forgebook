@@ -188,9 +188,9 @@ test.describe("the sidebar on a phone's width", () => {
     await openSidebar(page);
     const menu = page.locator(".forgebook-appearance").getByRole("button");
     await menu.click();
-    await expect(page.getByRole("dialog", { name: "Appearance" })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("dialog", { name: "Interface" })).toBeInViewport({ ratio: 1 });
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Appearance" })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Interface" })).toHaveCount(0);
     await expect(sidebarOf(page)).not.toHaveAttribute("inert");
     await expect(menu).toBeFocused();
     await page.keyboard.press("Escape");
@@ -384,6 +384,34 @@ test.describe("the sidebar across widths", () => {
     await expect(mainOf(page)).not.toHaveAttribute("inert");
   });
 
+  test("the appearance menu is whole inside the sidebar, however narrow the sidebar is", async ({ page }) => {
+    // read once it stands still: while it grows in it is narrower, and whole at some moment even when it ends up cut
+    const expectWholeMenu = async (): Promise<void> => {
+      await page.locator(".forgebook-appearance").getByRole("button").click();
+      const menu = page.getByRole("dialog", { name: "Interface" });
+      await menu.evaluate((panel) =>
+        Promise.all(panel.getAnimations().map((animation) => animation.finished))
+      );
+      await expect(menu).toBeInViewport({ ratio: 1 });
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+    };
+
+    await page.setViewportSize(PHONE);
+    await page.goto(STORY);
+    await openSidebar(page);
+    await expectWholeMenu();
+
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await page.goto(STORY);
+    await expectWholeMenu();
+    const handle = page.getByRole("separator", { name: "Sidebar width" });
+    await handle.focus();
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press("ArrowLeft");
+    await expect(sidebarOf(page)).toHaveCSS("width", "192px");
+    await expectWholeMenu();
+  });
+
   test("a wide window keeps it beside the page: no shade, nothing inert, a pick leaves it open", async ({
     page
   }) => {
@@ -396,10 +424,10 @@ test.describe("the sidebar across widths", () => {
     await expect(mainOf(page)).not.toHaveAttribute("inert");
     await expect(page.getByRole("separator", { name: "Sidebar width" })).toBeVisible();
     await expect(toggleOf(page)).toHaveCount(0);
-    // the sidebar's default width, and the 2 px its handle adds beyond it
+    // the sidebar's default width: its handle lies on the sidebar's edge and takes no room of its own
     const main = await mainOf(page).boundingBox();
-    expect(main?.x).toBe(250);
-    expect(main?.width).toBe(1190);
+    expect(main?.x).toBe(248);
+    expect(main?.width).toBe(1192);
 
     await page.keyboard.press("Escape");
     await expect(sidebar).not.toHaveAttribute("inert");

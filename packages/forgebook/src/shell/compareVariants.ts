@@ -6,12 +6,14 @@
  * Every value of a switch is drawn, its default too, so the frames show where the story starts; only the colour
  * scheme's system value is left out, since it draws as light or as dark, one of the others. A value that writes
  * nothing on the root (`isUnset`: the stories' own text, left to right, the mouse) is a value like the rest. In a pair, a cell's label leaves out the second switch's default (`Light`, `Light · More contrast`), so the familiar
- * value reads alone. Pure.
+ * value reads alone. A cell another switch's value contradicts is left out (a look drawn only for dark, at light): it
+ * would draw the same as the cell of the implied value, under a name that is not what it shows. Pure.
  *
  * @module
  */
 
 import type { CatalogueSettings } from "../catalogue.ts";
+import { shownSwitches } from "../switches.ts";
 import { type CompareAxes, SHEETS_CHOICES, type ViewState } from "../viewState.ts";
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { STRINGS } from "./strings.ts";
@@ -78,16 +80,28 @@ const axisVariants = (axis: string, catalogue: CompareCatalogue): AxisVariant[] 
  *
  * @param axes - the compared axes.
  * @param catalogue - the catalogue's switches and text sizes.
+ * @param view - the stage's view, whose other switches may imply a compared one.
  */
-export const compareVariants = (axes: CompareAxes, catalogue: CompareCatalogue): CompareVariant[] => {
+export const compareVariants = (
+  axes: CompareAxes,
+  catalogue: CompareCatalogue,
+  view: ViewState
+): CompareVariant[] => {
   const [first, second] = axes;
   if (first === undefined) return [];
   const firsts = axisVariants(first, catalogue);
-  if (second === undefined) return firsts;
-  return axisVariants(second, catalogue).flatMap((outer) =>
-    firsts.map((inner) => ({
-      label: LATER_STRINGS.compareCell(outer.isDefault ? [inner.label] : [inner.label, outer.label]),
-      viewOf: (view: ViewState): ViewState => outer.viewOf(inner.viewOf(view))
-    }))
-  );
+  const cells: CompareVariant[] =
+    second === undefined
+      ? firsts
+      : axisVariants(second, catalogue).flatMap((outer) =>
+          firsts.map((inner) => ({
+            label: LATER_STRINGS.compareCell(outer.isDefault ? [inner.label] : [inner.label, outer.label]),
+            viewOf: (stage: ViewState): ViewState => outer.viewOf(inner.viewOf(stage))
+          }))
+        );
+  return cells.filter((cell) => {
+    const { switches } = cell.viewOf(view);
+    const shown = shownSwitches(switches, catalogue.switches);
+    return axes.every((axis) => shown[axis] === switches[axis]);
+  });
 };

@@ -9,11 +9,13 @@ import { describe, expect, it } from "vitest";
 import { catalogueTools } from "../bin/forgebook/mcpTools.ts";
 import type { AgentAnswer } from "../src/vite/agentRoutes.ts";
 import { pluginsDocument } from "../src/vite/pluginConfig.ts";
+import { switchesDocument } from "../src/vite/switchesDocument.ts";
 
 /** The questions the tools asked. */
 const asked: string[] = [];
 
-const TOOLS = catalogueTools({
+/** What the tools reach the catalogue through. */
+const REACH: Parameters<typeof catalogueTools>[0] = {
   ask: async (route: string, params: URLSearchParams): Promise<AgentAnswer> => {
     asked.push(`${route}?${params.toString()}`);
     return { status: 200, body: { schema: 1 } };
@@ -23,14 +25,70 @@ const TOOLS = catalogueTools({
   checkPage: async () => "unused",
   servePreview: async () => "unused",
   shot: async () => "unused",
-  plugins: pluginsDocument([{ apiVersion: 1, id: "acme", tabs: [{ id: "a", label: "A", view: "@acme/a" }] }])
-});
+  verify: async () => "unused",
+  plugins: pluginsDocument([{ apiVersion: 1, id: "acme", tabs: [{ id: "a", label: "A", view: "@acme/a" }] }]),
+  switches: switchesDocument(
+    [
+      {
+        id: "look",
+        label: "Theme",
+        control: "gallery",
+        default: "plain",
+        apply: { kind: "code" },
+        values: [
+          { value: "plain", label: "Plain" },
+          {
+            value: "night",
+            label: "Night",
+            implies: { theme: "dark" },
+            sheet: "/project/looks/night.css",
+            preview: { image: "/project/looks/night.png" }
+          }
+        ]
+      }
+    ],
+    "/project"
+  )
+};
+
+const TOOLS = catalogueTools(REACH);
 
 const tool = (name: string): (typeof TOOLS)[number] => {
   const found = TOOLS.find((each) => each.name === name);
   if (found === undefined) throw new Error(`no tool ${name}`);
   return found;
 };
+
+describe("list_switches", () => {
+  it("answers each value's view and what it brings, from the configuration, its files from the project", async () => {
+    const count = asked.length;
+    const result = await tool("list_switches").call({});
+    expect(result.isError).toBe(false);
+    expect(result.structured).toEqual({
+      schema: 1,
+      switches: [
+        {
+          id: "look",
+          label: "Theme",
+          default: "plain",
+          control: "gallery",
+          values: [
+            { value: "plain", label: "Plain", view: "look=plain" },
+            {
+              value: "night",
+              label: "Night",
+              view: "look=night",
+              implies: { theme: "dark" },
+              sheet: "looks/night.css",
+              preview: { image: "looks/night.png" }
+            }
+          ]
+        }
+      ]
+    });
+    expect(asked.length).toBe(count);
+  });
+});
 
 describe("list_plugins", () => {
   it("answers from the configuration, without asking the catalogue", async () => {
@@ -68,5 +126,58 @@ describe("token tools", () => {
   it("gives back the catalogue's answer, not a summary of it", async () => {
     const result = await tool("list_tokens").call({});
     expect(JSON.stringify(result)).toContain("schema");
+  });
+});
+
+describe("story_address with values", () => {
+  it("hands the values to the catalogue as JSON, and declares them", async () => {
+    expect(JSON.stringify(tool("story_address").inputSchema)).toContain("forgebookUnset");
+    asked.length = 0;
+    await tool("story_address").call({ id: "kit:a--b", view: "theme=dark", args: { tags: ["ü"] } });
+    const params = new URLSearchParams(asked[0]?.split("?")[1]);
+    expect(asked[0]?.startsWith("story?")).toBe(true);
+    expect(params.get("id")).toBe("kit:a--b");
+    expect(params.get("view")).toBe("theme=dark");
+    expect(params.get("args")).toBe('{"tags":["ü"]}');
+  });
+
+  it("without values, asks for the list as before", async () => {
+    asked.length = 0;
+    await tool("story_address").call({ id: "kit:a--b" });
+    expect(asked[0]?.startsWith("stories?")).toBe(true);
+  });
+});
+
+describe("check_story on a story its frame gave up on", () => {
+  /** The tool, answering this report. */
+  const checkTool = (notVerified: string | undefined): (typeof TOOLS)[number] => {
+    const tools = catalogueTools({
+      ...REACH,
+      check: async () => ({
+        schema: 1,
+        results: [
+          {
+            storyId: "kit:a--b",
+            view: "",
+            frame: "f",
+            problems: [],
+            ...(notVerified === undefined ? {} : { notVerified })
+          }
+        ]
+      })
+    });
+    const found = tools.find((each) => each.name === "check_story");
+    if (found === undefined) throw new Error("check_story is one of the tools");
+    return found;
+  };
+
+  it("answers an error with the reason, as an agent reads it", async () => {
+    const answer = await checkTool("still loading").call({ id: "kit:a--b" });
+    expect(answer.isError).toBe(true);
+    expect(JSON.stringify(answer.structured)).toContain("still loading");
+  });
+
+  it("is no error when the checks ran and found nothing", async () => {
+    expect((await checkTool(undefined).call({ id: "kit:a--b" })).isError).toBe(false);
   });
 });

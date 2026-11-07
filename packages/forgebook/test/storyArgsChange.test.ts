@@ -9,11 +9,11 @@
 import { describe, expect, it } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
+import { panelArgsOf } from "../src/frame/panelValues.ts";
 import type { ArgsChange, MountedStory, StoryDrawing } from "../src/frame/renderer.ts";
 import { type LoadedStory, readStory } from "../src/frame/storyModule.ts";
 import { runStory, type StoryControls } from "../src/frame/storyRun.ts";
 import type { PanelArgs } from "../src/messages.ts";
-import { panelArgsOf } from "../src/namedValues.ts";
 import { domRenderer } from "./domRenderer.ts";
 
 /** A badge drawing its `label` and `tone` args, and the length of its `items`. */
@@ -125,9 +125,9 @@ describe("a story's change of its own args", () => {
 
   it("keeps a value the panel cannot show when the panel's values come back without it", async () => {
     const { container, change, controls, told } = await run();
-    change({ reset: [], set: { label: "Two", items: [{ id: 1 }, { id: 2 }] } });
+    change({ reset: [], set: { label: "Two", items: [(): number => 1, (): number => 2] } });
     expect(told.at(-1)).toEqual({ label: "Two" });
-    // the shell answers with the panel's values, which hold no list of objects
+    // the shell answers with the panel's values, which hold no list of functions
     controls().setPanelArgs({ label: "Two" });
     expect(container.textContent).toBe("Two info 2");
     change({ reset: ["items"], set: {} });

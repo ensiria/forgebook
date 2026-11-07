@@ -15,6 +15,7 @@ import ts from "typescript-6";
 
 import type { EventSignature, MemberDocs, PropDocs, PropKind } from "../componentDocs.ts";
 import { summaryOf, tagOf } from "./docsProgram.ts";
+import { shapeOfProp } from "./shapeDocs.ts";
 import { unwrapped } from "./storyMeta.ts";
 
 /** An event: a function prop named `on` and a capital (React's `onPress`). */
@@ -203,7 +204,13 @@ export const declarationOrder = (props: readonly ts.Symbol[], componentFolder: s
 };
 
 /** A type node's text as the source writes it, on one line. */
-const nodeText = (node: ts.Node): string => node.getText().replace(/\s+/g, " ").trim();
+const nodeText = (node: ts.Node): string =>
+  node
+    .getText()
+    // an inline object's TSDoc is the docs' to read, not part of its type
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /**
  * Whether a type node adds nothing a prop can take: `undefined` and `null` (left out as the checker's `NonNullable`
@@ -453,7 +460,44 @@ export const propDocs = (
     ...(choices === undefined ? {} : { choices }),
     ...(signature === undefined ? {} : { signature }),
     ...(canTakeText ? { canTakeText } : {}),
+    ...editingOf(symbol, { kind, type, canTakeText, declared, checker, node }),
     ...groupingOf(symbol, kind, type, checker, node)
+  };
+};
+
+/**
+ * How a prop's value is edited, beyond its kind: what it looks like, and the tokens its TSDoc asks for.
+ *
+ * @param symbol - the prop.
+ * @param prop - what is known of it.
+ */
+const editingOf = (
+  symbol: ts.Symbol,
+  prop: {
+    readonly kind: PropKind;
+    readonly type: ts.Type;
+    readonly canTakeText: boolean;
+    readonly declared: readonly DeclaredType[];
+    readonly checker: ts.TypeChecker;
+    readonly node: ts.Node;
+  }
+): Pick<PropDocs, "shape" | "token"> => {
+  const { kind, type, canTakeText, declared, checker, node } = prop;
+  const shape =
+    kind === "other"
+      ? shapeOfProp(type, canTakeText, {
+          checker,
+          node,
+          order: (values: readonly (string | number)[]): readonly (string | number)[] =>
+            writtenOrder(values, declared, checker),
+          typeText: (member: ts.Symbol): string | undefined => writtenTypeText(declaredTypesOf(member)),
+          description: (member: ts.Symbol): string => summaryOf(member, checker)
+        })
+      : undefined;
+  const token = tagOf(symbol, checker, "token");
+  return {
+    ...(shape === undefined ? {} : { shape }),
+    ...(token === undefined || token === "" ? {} : { token })
   };
 };
 

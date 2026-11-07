@@ -100,7 +100,7 @@ const leadingSentence = (
  *
  * @param lists - the tag lists, outermost first.
  */
-const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readonly string[] => {
+export const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readonly string[] => {
   const tags = new Set<string>();
   for (const tag of lists.flatMap((list) => list ?? [])) {
     if (tag.startsWith("!")) {
@@ -517,6 +517,20 @@ const storyExports = (program: ESTree.Program, top: TopLevel, meta: Fields): Nam
   return [...exported].sort((first, second) => rank(first.exportName) - rank(second.exportName));
 };
 
+/** What ends a line, for an editor as for JavaScript. */
+const LINE_END = /\r\n|[\n\r\u2028\u2029]/g;
+
+/**
+ * Where an offset falls in a text, as an editor counts: both from 1.
+ *
+ * @param text - the text.
+ * @param offset - the offset, in UTF-16 code units, as the parser gives it.
+ */
+const lineAndColumn = (text: string, offset: number): string => {
+  const lines = text.slice(0, offset).split(LINE_END);
+  return `${lines.length}:${(lines.at(-1)?.length ?? 0) + 1}`;
+};
+
 /**
  * The index of one story file.
  *
@@ -532,7 +546,11 @@ export const indexStoryFile = (
 ): StoryFileIndex | string => {
   const { program, comments, errors } = parseStoryFile(file, text);
   const [error] = errors;
-  if (error !== undefined) return `${file} does not parse: ${error.message}`;
+  if (error !== undefined) {
+    const [label] = error.labels;
+    const place = label === undefined ? file : `${file}:${lineAndColumn(text, label.start)}`;
+    return `${place} does not parse: ${error.message}`;
+  }
   const top = topLevelOf(program);
   const metaNode = metaObject(program, top);
   if (metaNode === undefined) return `${file} has no meta: the default export is an object (CSF)`;

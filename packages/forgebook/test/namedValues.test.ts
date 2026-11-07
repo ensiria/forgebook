@@ -3,9 +3,12 @@
  *
  * @module
  */
+
 import { describe, expect, it } from "vitest";
 
-import { type NamedValues, namedValueOf, nameOf, panelArgsOf, storyArgsOf } from "../src/namedValues.ts";
+import { nameOf, panelArgsOf, storyArgsOf } from "../src/frame/panelValues.ts";
+import { UNSET_ARG } from "../src/messages.ts";
+import { type NamedValues, namedValueOf } from "../src/namedValues.ts";
 
 /** Two components a source names. */
 const IconBell = (): null => null;
@@ -20,7 +23,7 @@ describe("named values", () => {
     expect(nameOf(() => null, NAMED)).toBeUndefined();
   });
 
-  it("gives the panel a story's texts, numbers, booleans, nulls, choice lists and named values, nothing else", () => {
+  it("gives the panel a story's plain data and named values, nothing else", () => {
     expect(
       panelArgsOf(
         {
@@ -30,7 +33,12 @@ describe("named values", () => {
           none: null,
           onX: () => 1,
           sides: ["top", 2],
-          items: [{ id: 1 }],
+          items: [{ id: 1, icon: IconBell, skipped: undefined }],
+          when: new Date(0),
+          lost: new Date(Number.NaN),
+          mixed: [{ id: 1 }, (): number => 1],
+          element: Object.fromEntries([["$$typeof", Symbol.for("react.element")]]),
+          nan: [Number.NaN],
           icon: IconBell
         },
         NAMED
@@ -41,6 +49,8 @@ describe("named values", () => {
       isOpen: true,
       none: null,
       sides: ["top", 2],
+      items: [{ id: 1, icon: { of: "IconComponent", named: "IconBell" } }],
+      when: { forgebookDate: "1970-01-01T00:00:00.000Z" },
       icon: { of: "IconComponent", named: "IconBell" }
     });
   });
@@ -72,5 +82,13 @@ describe("named values", () => {
     ).toEqual({});
     expect(namedValueOf({}, "constructor", "constructor")).toBeUndefined();
     expect(namedValueOf(NAMED, "IconComponent", "IconBell")).toBe(IconBell);
+  });
+
+  it("turns a name back into its value at any depth, and the panel's no value into none over the story's", () => {
+    const named = { of: "IconComponent", named: "IconBell" };
+    const args = storyArgsOf({ tile: { icon: named, label: "x" }, icons: [named], gone: UNSET_ARG }, NAMED);
+    expect(args).toEqual({ tile: { icon: IconBell, label: "x" }, icons: [IconBell], gone: undefined });
+    expect(Object.keys(args)).toContain("gone");
+    expect(storyArgsOf({ when: { forgebookDate: "1970-01-01T00:00:00.000Z" } })["when"]).toEqual(new Date(0));
   });
 });

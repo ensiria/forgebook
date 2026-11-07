@@ -10,7 +10,9 @@
  * have set it: a prop the panel lets the person set (the component's props with the story's `argTypes` laid over them,
  * or an arg only the `argTypes` or the story's own args name), with a value of that prop's type. Everything else is
  * left out and reported. A value that is code never comes from an address: a named value is looked up among the
- * source's own entries only, never through an object's prototype (`constructor`). Pure.
+ * source's own entries only, never through an object's prototype (`constructor`). An object's names are checked the
+ * same way, against its type (`valueShape.ts`). The panel's "no value" (`UnsetArg`) passes for any prop the panel sets:
+ * the story receives `undefined`, which any prop may. Pure.
  *
  * A frame takes values from one kind of message only, whichever frame it is (the stage's, an embed's, a plugin's aside),
  * so `checkedArgsMessage` builds it, from nothing but what this check sealed (`AcceptedArgs`): a page that skipped the
@@ -22,7 +24,14 @@ import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
 import { type PanelArgTypes, type PanelProp, panelProps, settableProps } from "./argTypes.ts";
 import type { PropDocs } from "./componentDocs.ts";
-import { type ArgValue, isChoiceList, isNamedArg, type PanelArgs, type ShellMessage } from "./messages.ts";
+import {
+  type ArgValue,
+  isChoiceList,
+  isNamedArg,
+  isUnsetArg,
+  type PanelArgs,
+  type ShellMessage
+} from "./messages.ts";
 import { type NamedValues, namedValueOf } from "./namedValues.ts";
 
 /** What a story declares about the args the panel sets, as the shell knows it once the story's frame is ready. */
@@ -39,8 +48,11 @@ export type ArgDeclaration = {
   readonly namedValues: NamedValues;
 };
 
-/** Why a value of the address was left out: its name is not one the panel sets, or its value is not of the prop's type. */
-export type DroppedArgReason = "undeclared" | "type";
+/**
+ * Why a value of the address was left out: its name is not one the panel sets, its value is not of the prop's type, its
+ * text could not be read as a value at all, or its custom control refuses it or cannot load.
+ */
+export type DroppedArgReason = "undeclared" | "type" | "unreadable" | "control" | "markup";
 
 /** A value of the address left out. */
 export type DroppedArg = {
@@ -56,6 +68,8 @@ export type CheckedArgs = {
   readonly accepted: PanelArgs;
   /** The values left out, in the address's order. */
   readonly dropped: readonly DroppedArg[];
+  /** Whether a value waits for what checks it: it is neither taken nor left out yet. */
+  readonly isWaiting: boolean;
   /** The values the story receives, as a frame can be told them. */
   readonly sealed: AcceptedArgs;
 };
@@ -82,8 +96,9 @@ const propOfStoryArg = (name: string, value: ArgValue): PanelProp | undefined =>
   if (typeof value === "boolean") return { ...prop, kind: "toggle" };
   // a named value keeps the type it is offered for, so only another value named for it is taken
   if (isNamedArg(value)) return { ...prop, kind: "other", type: value.of };
-  // a list's options and a `null`'s type are not known: nothing the address names is taken for them
-  return undefined;
+  // a `null`'s type is not known: nothing the address names is taken for it
+  if (value === null) return undefined;
+  return { ...prop, kind: "other", shape: { kind: "like", value } };
 };
 
 /**
@@ -101,7 +116,7 @@ export const declaredArgProps = (declaration: ArgDeclaration): readonly PanelPro
     const prop = propOfStoryArg(name, value);
     return prop === undefined ? [] : [prop];
   });
-  return settableProps([...panelProps(props, argTypes), ...ownProps], controls, namedValues);
+  return settableProps([...panelProps(props, argTypes, storyArgs), ...ownProps], controls, namedValues);
 };
 
 /** Whether a value is a finite number: what a number field sets (an address's JSON has no `NaN` anyway). */
@@ -112,6 +127,26 @@ const isFiniteNumber = (value: ArgValue): value is number =>
 const isOption = (prop: PanelProp, value: ArgValue): boolean =>
   (typeof value === "string" || typeof value === "number") && (prop.choices ?? []).includes(value);
 
+/** What checks a custom control's value, by control: gives what is wrong with it. A control missing here refuses all. */
+export type CustomChecks = Readonly<Record<string, (value: ArgValue) => string | undefined>>;
+
+/** What checks a structured value: `shapeValues.ts` and each control's schema, loaded with the first prop that needs them. */
+export type ArgChecks = Pick<typeof import("./shapeValues.ts"), "isValueOfShape" | "isFileList"> & {
+  /** What checks a custom control's value; none refuses them all. */
+  readonly custom?: CustomChecks;
+};
+
+/**
+ * Whether a prop's values are checked by `shapeValues.ts`.
+ *
+ * @param prop - a prop the panel sets.
+ */
+export const needsShapeChecks = (prop: PanelProp): boolean =>
+  prop.customControl !== undefined ||
+  prop.control === "file" ||
+  prop.control === "object" ||
+  (prop.control === undefined && prop.kind === "other" && prop.shape !== undefined);
+
 /**
  * Whether a value is one the panel could set for a prop: of the control the `argTypes` name, otherwise of the prop's
  * kind.
@@ -119,8 +154,14 @@ const isOption = (prop: PanelProp, value: ArgValue): boolean =>
  * @param prop - a prop the panel sets.
  * @param value - the address's value.
  * @param namedValues - the source's named values.
+ * @param shapes - what checks a value against a shape; none refuses a prop that needs it.
  */
-export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: NamedValues): boolean => {
+export const isValueOfProp = (
+  prop: PanelProp,
+  value: ArgValue,
+  namedValues: NamedValues,
+  shapes?: ArgChecks
+): boolean => {
   switch (prop.control) {
     case "select":
     case "radio":
@@ -137,6 +178,13 @@ export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: Nam
     case "range":
     case "date":
       return isFiniteNumber(value);
+    case "textarea":
+    case "token":
+      return typeof value === "string";
+    case "object":
+      return prop.shape !== undefined && shapes?.isValueOfShape(prop.shape, value, namedValues) === true;
+    case "file":
+      return shapes?.isFileList(value) === true;
     case "none":
       return false;
     case undefined:
@@ -152,13 +200,41 @@ export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: Nam
     case "toggle":
       return typeof value === "boolean";
     case "other":
-      if (isNamedArg(value)) {
-        return value.of === prop.type && namedValueOf(namedValues, value.of, value.named) !== undefined;
-      }
+      if (
+        isNamedArg(value) &&
+        value.of === prop.type &&
+        namedValueOf(namedValues, value.of, value.named) !== undefined
+      )
+        return true;
+      if (prop.shape !== undefined && shapes?.isValueOfShape(prop.shape, value, namedValues) === true)
+        return true;
       return prop.canTakeText === true && typeof value === "string";
     case "event":
       return false;
   }
+};
+
+/** Whether a custom control takes a value: it loaded, and its check finds nothing wrong. */
+const fitsControl = (custom: CustomChecks, control: string, value: ArgValue): boolean =>
+  Object.hasOwn(custom, control) && custom[control]?.(value) === undefined;
+
+/** What the check reads besides the value. */
+type CheckReach = {
+  readonly namedValues: NamedValues;
+  readonly checks: ArgChecks | undefined;
+};
+
+/** What becomes of a value for a prop the panel sets: the story takes it, it waits for its check, or why it is left out. */
+const verdictOf = (
+  prop: PanelProp,
+  value: ArgValue,
+  { namedValues, checks }: CheckReach
+): "taken" | "waiting" | DroppedArgReason => {
+  if (isUnsetArg(value)) return "taken";
+  if (checks === undefined && needsShapeChecks(prop)) return "waiting";
+  if (prop.customControl !== undefined)
+    return fitsControl(checks?.custom ?? {}, prop.customControl, value) ? "taken" : "control";
+  return isValueOfProp(prop, value, namedValues, checks) ? "taken" : "type";
 };
 
 /**
@@ -166,19 +242,33 @@ export const isValueOfProp = (prop: PanelProp, value: ArgValue, namedValues: Nam
  *
  * @param args - the values the address names.
  * @param declaration - what the story declares.
+ * @param typeValue - types a value for its prop, for a link whose form does not say (`storybookArgs.ts`); none takes each
+ *   as written.
+ * @param checks - what checks a structured value, a custom control's among them; none leaves such a value waiting.
  */
-export const checkedAddressArgs = (args: PanelArgs, declaration: ArgDeclaration): CheckedArgs => {
+export const checkedAddressArgs = (
+  args: PanelArgs,
+  declaration: ArgDeclaration,
+  typeValue?: (prop: PanelProp, value: ArgValue) => ArgValue,
+  checks?: ArgChecks
+): CheckedArgs => {
   const declared = declaredArgProps(declaration);
   const accepted: [string, ArgValue][] = [];
   const dropped: DroppedArg[] = [];
-  for (const [name, value] of Object.entries(args)) {
+  let isWaiting = false;
+  for (const [name, written] of Object.entries(args)) {
     const prop = declared.find((each) => each.name === name);
-    if (prop === undefined) dropped.push({ name, reason: "undeclared" });
-    else if (!isValueOfProp(prop, value, declaration.namedValues)) dropped.push({ name, reason: "type" });
-    else accepted.push([name, value]);
+    const value = prop !== undefined && typeValue !== undefined ? typeValue(prop, written) : written;
+    const verdict =
+      prop === undefined
+        ? "undeclared"
+        : verdictOf(prop, value, { namedValues: declaration.namedValues, checks });
+    if (verdict === "taken") accepted.push([name, value]);
+    else if (verdict === "waiting") isWaiting = true;
+    else dropped.push({ name, reason: verdict });
   }
   const values: PanelArgs = Object.fromEntries(accepted);
-  return { accepted: values, dropped, sealed: { values, [ACCEPTED]: true } };
+  return { accepted: values, dropped, isWaiting, sealed: { values, [ACCEPTED]: true } };
 };
 
 /**

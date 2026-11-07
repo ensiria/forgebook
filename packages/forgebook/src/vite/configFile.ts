@@ -12,14 +12,14 @@
 
 import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
 import type { StoryLanguage } from "@forgebook/story-format/source";
 
 import { AUDIENCE_IDS } from "../audiences.ts";
-import type { CatalogueLists, TurnedOffControl } from "../catalogue.ts";
+import { type CatalogueLists, catalogueSettings, playProblem, type TurnedOffControl } from "../catalogue.ts";
 import { deviceSettingProblem } from "../deviceView.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import { REQUIRED_FIRST_LAYOUTS } from "../propGroups.ts";
@@ -30,12 +30,17 @@ import {
   shellThemeProblems,
   themeValueProblem
 } from "../shellTheme.ts";
-import { switchesProblem, type ViewSwitch } from "../switches.ts";
+import { CONTROLS } from "../storyArgTypes.ts";
+import { catalogueSwitches, switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
+import { appBuildProblem, type ResolvedAppBuild, resolvedAppBuild } from "./appBuildOption.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
+import { saysNoTokens, unknownKeysProblem } from "./configKeys.ts";
+import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
-import { patternsProblem } from "./storyPatterns.ts";
+import { filesProblem } from "./storyPatterns.ts";
+import { switchValuesProblem, withAbsoluteValueFiles } from "./switchValuesCheck.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
@@ -49,7 +54,7 @@ export const CONFIG_FILES = ["forgebook.config.ts", "forgebook.config.mts", "for
 export const HOME_FILE = "forgebook.home.md";
 
 /** The names a preview may have beside the configuration, in the order they are looked for. */
-const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebook.preview.js"];
+export const PREVIEW_FILES = ["forgebook.preview.ts", "forgebook.preview.tsx", "forgebook.preview.js"];
 
 /** The shell's look, ready for its page. */
 export type ResolvedShell = {
@@ -108,6 +113,10 @@ export type ResolvedConfig = {
   readonly shell: ResolvedShell;
   /** The tokens files, absolute, the base first. */
   readonly tokens: readonly ResolvedTokensFile[];
+  /** Whether the configuration says `tokens: []`: no system at all, so the application's own files are not read for one. */
+  readonly isAppTokensOff?: boolean;
+  /** The custom controls' modules by name: a path absolute, a package's specifier as written. */
+  readonly argControls: Readonly<Record<string, string>>;
   /** The folders the dev server watches for new story files, absolute. */
   readonly watch: readonly string[];
   /** The lists (widths, backgrounds, story groups…), the presets' and the catalogue's merged. */
@@ -120,10 +129,32 @@ export type ResolvedConfig = {
   readonly frames: ResolvedFrames;
   /** How `forgebook build` writes the catalogue, every option given its default. */
   readonly build: Required<BuildOptions>;
+  /** How much of the app's own build its stories are drawn with. */
+  readonly appBuild: ResolvedAppBuild;
 };
 
 /** The packages of the play tools: both installed, or the plays get neither. */
 export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/user-event"] as const;
+
+/**
+ * Whether a package's folder is in the `node_modules` folders going up from a folder. Node also reads `NODE_PATH`, which
+ * pnpm's command shims point at its own store's hoisted packages, and Vite does not: a package found that way alone is one
+ * Vite then fails on, for every story.
+ *
+ * @param dir - the folder.
+ * @param name - the package or one of its subpaths.
+ */
+const isUnderNodeModules = (dir: string, name: string): boolean => {
+  const parts = name.split("/");
+  const packageName = parts.slice(0, name.startsWith("@") ? 2 : 1).join("/");
+  let current = resolve(dir);
+  while (true) {
+    if (existsSync(join(current, "node_modules", packageName))) return true;
+    const parent = dirname(current);
+    if (parent === current) return false;
+    current = parent;
+  }
+};
 
 /**
  * Resolves packages as Node does from a folder: a package's (or subpath's) file, or none when it is not there.
@@ -133,6 +164,7 @@ export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/us
 export const packageResolver =
   (dir: string) =>
   (name: string): string | undefined => {
+    if (!isUnderNodeModules(dir, name)) return undefined;
     const require = createRequire(resolve(dir, "package.json"));
     try {
       return require.resolve(name);
@@ -191,7 +223,8 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
   ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups }),
-  ...(lists.requiredFirst === undefined ? {} : { requiredFirst: lists.requiredFirst })
+  ...(lists.requiredFirst === undefined ? {} : { requiredFirst: lists.requiredFirst }),
+  ...(lists.play === undefined ? {} : { play: lists.play })
 });
 
 /**
@@ -248,24 +281,10 @@ export const mergedLists = (all: readonly CatalogueLists[]): CatalogueLists => {
   };
 };
 
-/** Whether a configuration's list has something in it. */
-const isListed = (config: object, key: string): boolean => {
-  const list: unknown = Reflect.get(config, key);
-  return Array.isArray(list) && list.length > 0;
-};
-
-/**
- * Why a configuration's list of globs lists nothing by construction (only `!` patterns), or none.
- *
- * @param config - what the file exports by default.
- * @param key - the list's key.
- */
-const globsProblem = (config: object, key: string): string | undefined => {
-  const list: unknown = Reflect.get(config, key);
-  return Array.isArray(list)
-    ? patternsProblem(list.filter((item: unknown): item is string => typeof item === "string"))
-    : undefined;
-};
+/** Why where its frames run or what it reads of the app's build cannot be used, or none. */
+const placementProblem = (config: object): string | undefined =>
+  framesProblem("frames" in config ? config.frames : undefined) ??
+  appBuildProblem("appBuild" in config ? config.appBuild : undefined);
 
 /**
  * Why a loaded configuration cannot be used, or none.
@@ -275,6 +294,9 @@ const globsProblem = (config: object, key: string): string | undefined => {
 const configProblem = (config: unknown): string | undefined => {
   if (typeof config !== "object" || config === null)
     return "it exports no configuration (`export default defineConfig({ … })`)";
+  // first: a misspelt `title` or `framework` is better named as such than as one left out
+  const keysProblem = unknownKeysProblem(config);
+  if (keysProblem !== undefined) return keysProblem;
   if (!("framework" in config) || typeof config.framework !== "object" || config.framework === null)
     return "it names no framework (`framework: react()`)";
   if (!("title" in config) || typeof config.title !== "string") return "it names no title";
@@ -285,13 +307,7 @@ const configProblem = (config: unknown): string | undefined => {
     typeof config.home !== "string"
   )
     return 'its home is neither a path (`home: "docs/home.md"`) nor false';
-  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
-    return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
-  for (const key of ["stories", "docs"]) {
-    const problem = globsProblem(config, key);
-    if (problem !== undefined) return `its ${key} list nothing: ${problem}`;
-  }
-  return framesProblem("frames" in config ? config.frames : undefined);
+  return filesProblem(config) ?? placementProblem(config);
 };
 
 /**
@@ -380,7 +396,35 @@ const mergedListsProblem = (lists: CatalogueLists): string | undefined => {
     return `the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`;
   if (lists.usedIn === true && lists.componentDocs === false)
     return "usedIn is true with componentDocs false: Used in reads the import graph with the programs componentDocs turns off";
-  return undefined;
+  return playProblem(lists.play);
+};
+
+/**
+ * What the shell would refuse when it starts, refused on Node instead: a toolbar naming no control, a key that cannot be
+ * used, a view that cannot be read. Without this a command or a build succeeds, and the mistake surfaces as a blank page
+ * in a reader's browser. The same call the shell makes (`catalogueContext.ts`), so both refuse the same things.
+ *
+ * @param resolved - the configuration's merged title, switches, languages, lists and plugins, with its folder.
+ * @throws what the shell would, with the configuration's name.
+ */
+const checkSettings = (
+  resolved: Pick<ResolvedConfig, "dir" | "title" | "switches" | "languages" | "lists" | "plugins">
+): void => {
+  const { dir, title, switches, languages, lists, plugins } = resolved;
+  try {
+    const shown = catalogueSwitches(switches, languages, lists.controls);
+    const problem = switchValuesProblem(shown, dir);
+    if (problem !== undefined) throw new Error(problem);
+    catalogueSettings(
+      title,
+      shown,
+      lists,
+      plugins.flatMap((plugin) => (plugin.tabs ?? []).map((tab) => tab.id))
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${resolve(dir, "forgebook.config")}: ${message}`);
+  }
 };
 
 /** What a catalogue shows: its own stories and docs pages, and the sources; none where it names none. */
@@ -472,6 +516,8 @@ export const resolveConfig = (
   if (listsProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${listsProblem}`);
   const themeProblem = themeValueProblem(theme);
   if (themeProblem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${themeProblem}`);
+  const languages = mergedById([...presets.map((preset) => preset.languages), config.languages]);
+  checkSettings({ dir, title: config.title, switches, languages, lists, plugins });
   const ownPreview =
     config.preview === undefined
       ? PREVIEW_FILES.map((name) => paths.join(dir, name)).find((file) => existsSync(file))
@@ -484,8 +530,8 @@ export const resolveConfig = (
     logo: config.logo === undefined ? undefined : absolute(config.logo),
     heights: config.heights,
     ...shownFiles(config),
-    switches,
-    languages: mergedById([...presets.map((preset) => preset.languages), config.languages]),
+    switches: switches === undefined ? undefined : withAbsoluteValueFiles(switches, dir, paths),
+    languages,
     previews: [
       ...presets.flatMap((preset) => (preset.preview === undefined ? [] : [ownPath(preset.preview)])),
       ...(ownPreview === undefined ? [] : [ownPreview])
@@ -504,14 +550,45 @@ export const resolveConfig = (
       problems: [...tokenThemed.problems, ...shellThemeProblems(theme)]
     },
     tokens,
+    isAppTokensOff: saysNoTokens(config),
+    argControls: resolvedArgControls(config.argControls, dir, absolute, paths.isAbsolute),
     watch: (config.watch ?? []).map(absolute),
     lists,
     hasPlayTools: hasPlayToolsIn(dir),
     plugins,
     frames: resolvedFrames(config.frames),
-    build: { readableNames: config.build?.readableNames === true }
+    build: { readableNames: config.build?.readableNames === true },
+    appBuild: resolvedAppBuild(config.appBuild)
   };
 };
+
+/**
+ * The custom controls' modules, each checked: a name a story can write, that no control of the panel already has.
+ *
+ * @param controls - what the configuration writes.
+ * @param dir - the configuration's folder.
+ * @param absolute - a path from that folder, made absolute.
+ * @param isAbsolutePath - whether a path is one already.
+ * @throws when a name or a module cannot be used.
+ */
+const resolvedArgControls = (
+  controls: Readonly<Record<string, unknown>> | undefined,
+  dir: string,
+  absolute: (path: string) => string,
+  isAbsolutePath: (path: string) => boolean
+): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    Object.entries(controls ?? {}).map(([name, module]): [string, string] => {
+      const where = `${resolve(dir, "forgebook.config")}: argControls`;
+      if (Object.hasOwn(CONTROLS, name))
+        throw new Error(`${where}: "${name}" is a control of the panel already`);
+      if (!/^[A-Za-z][\w-]*$/.test(name))
+        throw new Error(`${where}: "${name}" is no name a control can have`);
+      if (typeof module !== "string" || module === "")
+        throw new Error(`${where}: "${name}" names no module, as a path or a package's specifier`);
+      return [name, module.startsWith(".") || isAbsolutePath(module) ? absolute(module) : module];
+    })
+  );
 
 /**
  * Loads a configuration file and resolves it.
@@ -520,7 +597,12 @@ export const resolveConfig = (
  * @throws when the file does not load, or exports no usable configuration.
  */
 export const loadConfigFile = async (file: string): Promise<ResolvedConfig> => {
-  const module: unknown = await import(pathToFileURL(file).href);
+  let module: unknown;
+  try {
+    module = await import(pathToFileURL(file).href);
+  } catch (error) {
+    throw new Error(await configLoadMessage(file, error));
+  }
   const config: unknown =
     typeof module === "object" && module !== null && "default" in module ? module.default : undefined;
   if (!isConfig(config)) throw new Error(`${file}: ${configProblem(config) ?? "it cannot be read"}`);

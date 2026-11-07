@@ -14,24 +14,31 @@
 import type { StoryControlsSetting, StoryFileCode } from "@forgebook/story-format/source";
 import type { ReactNode } from "react";
 
+import { isArgShown } from "../argConditions.ts";
 import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
 import { type ComponentDocs, codeNameOf, type PropDocs } from "../componentDocs.ts";
-import type { ArgValue, PanelArgs } from "../messages.ts";
+import type { ArgValue, PanelArgs, PlayStepCommand } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { TreeStory } from "../storyTree.ts";
+import type { ViewState } from "../viewState.ts";
 import type { CheckState } from "./A11yTab.tsx";
+import type { ArgControlLoaders } from "./customControls.ts";
 import type { DockTab } from "./Dock.tsx";
 import { lazyModule } from "./lazyModule.tsx";
 import { LazyTab } from "./lazyTab.tsx";
 import type { TextArgNote } from "./PropRows.tsx";
 import { PropsTab } from "./PropsTab.tsx";
-import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 import { a11yHint, interactionsHint, styleHooks } from "./tabSummaries.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
+
+/** The Signature tab's reference, loaded when a story about logic first shows it. */
+const SIGNATURE_TAB = lazyModule(() =>
+  import("./SignatureReference.tsx").then((module) => module.SignatureReference)
+);
 
 /** The Events tab, its module, loaded when the tab is first chosen. */
 const EVENTS_TAB = lazyModule(() => import("./EventsTab.tsx").then((module) => module.EventsTab));
@@ -71,6 +78,16 @@ export type DockTabsInput = {
   readonly actions: readonly string[];
   /** The values of the moment: the story's args with the panel's over them. */
   readonly values: PanelArgs;
+  /** The panel's own values, for what can go back to the story's. */
+  readonly panelArgs: PanelArgs;
+  /** The story's own args, for a control no type describes. */
+  readonly storyArgs: PanelArgs;
+  /** Loads the catalogue's design tokens; none when it has none. */
+  readonly loadTokens: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders | undefined;
+  /** The switches' values of the moment, for the args whose `argTypes.if` reads a global. */
+  readonly globals: Readonly<Record<string, unknown>>;
   /** Called with a changed value; `undefined` removes the panel's value. */
   readonly onValueChange: (name: string, value: ArgValue | undefined) => void;
   /** Removes every value the panel set. */
@@ -89,8 +106,12 @@ export type DockTabsInput = {
   readonly onClearCalls: () => void;
   /** The play function's trace; none for a story without a play (or before it ran). */
   readonly trace: PlayTrace | undefined;
-  /** Runs the play again. */
-  readonly onPlayAgain: () => void;
+  /** Runs the play again, or steps through it. */
+  readonly onPlayStep: (command: PlayStepCommand) => void;
+  /** The view, whose play switch the Interactions tab shows. */
+  readonly view: ViewState;
+  /** Changes the view. */
+  readonly onViewChange: (view: ViewState) => void;
   /** The accessibility check. */
   readonly check: CheckState;
   /** Runs it; none when it cannot run. */
@@ -115,8 +136,11 @@ const notice = (text: string, isProblem: boolean): ReactNode => (
  * @param input - what the tabs are built from.
  * @param props - the props, from the types with the `argTypes` laid over them.
  */
-const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] =>
-  props.some((prop) => prop.kind !== "event")
+const propsTab = (input: DockTabsInput, all: readonly PanelProp[]): DockTab[] => {
+  // the condition is the moment's, so it is tested here and not where the props are declared: a value set while an arg
+  // is hidden, from the address or the story, is still the story's
+  const props = all.filter((prop) => isArgShown(input.argTypes[prop.name]?.if, input.values, input.globals));
+  return props.some((prop) => prop.kind !== "event")
     ? [
         {
           id: "props",
@@ -125,6 +149,9 @@ const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] 
             <PropsTab
               props={props}
               values={input.values}
+              panelArgs={input.panelArgs}
+              loadTokens={input.loadTokens}
+              argControls={input.argControls}
               controls={input.controls}
               onValueChange={input.onValueChange}
               onReset={input.onReset}
@@ -138,6 +165,7 @@ const propsTab = (input: DockTabsInput, props: readonly PanelProp[]): DockTab[] 
         }
       ]
     : [];
+};
 
 /**
  * The events the Events tab lists: the component's, then the story's actions its types do not name.
@@ -185,9 +213,9 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   // a story without a component (a render of its own) still has the args its `argTypes` name
   if (docs.status === "none") {
     return [
-      ...propsTab(input, panelProps([], input.argTypes)),
+      ...propsTab(input, panelProps([], input.argTypes, input.storyArgs)),
       ...eventsTab(input, eventsOf([], input.actions)),
-      ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)])
+      ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input)])
     ];
   }
   // the docs' place while they load or fail: the tab the story opens on once they are read
@@ -196,7 +224,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
     : { id: "props", label: STRINGS.tabs.props };
   // the play's trace comes from the frame, not from the docs: a first read of a project's docs can take seconds, and a
   // play that finished meanwhile is shown without waiting for them, or when they fail
-  const played = input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)];
+  const played = input.trace === undefined ? [] : [interactionsTab(input.trace, input)];
   if (docs.status === "loading")
     return [{ ...docsTab, content: notice(STRINGS.docsLoading, false) }, ...played];
   if (docs.status === "error") {
@@ -206,9 +234,9 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   const events = eventsOf(component.props, input.actions);
   if (input.story.isLogic) return logicTabs(input, component);
   const tabs: DockTab[] = [];
-  tabs.push(...propsTab(input, panelProps(component.props, input.argTypes)));
+  tabs.push(...propsTab(input, panelProps(component.props, input.argTypes, input.storyArgs)));
   tabs.push(...eventsTab(input, events));
-  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
+  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input));
   if (component.parts.length > 0 || styleHooks(component).length > 0) {
     tabs.push({
       id: "parts",
@@ -236,21 +264,27 @@ const logicTabs = (input: DockTabsInput, component: ComponentDocs): DockTab[] =>
       label: STRINGS.tabs.signature,
       content: (
         <div className="forgebook-signature-tab">
-          <SignatureReference name={component.name} signature={component.signature} />
+          <LazyTab
+            module={SIGNATURE_TAB}
+            tabProps={{ name: component.name, signature: component.signature }}
+          />
         </div>
       )
     });
   }
-  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
+  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input));
   return tabs;
 };
 
 /** The Interactions tab of a story whose play ran. */
-const interactionsTab = (trace: PlayTrace, onPlayAgain: () => void): DockTab => ({
+const interactionsTab = (
+  trace: PlayTrace,
+  { onPlayStep, view, onViewChange }: Pick<DockTabsInput, "onPlayStep" | "view" | "onViewChange">
+): DockTab => ({
   id: "play",
   label: STRINGS.tabs.play,
   hint: interactionsHint(trace),
-  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayAgain }} />
+  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayStep, view, onViewChange }} />
 });
 
 /** The Code tab, when the story file has code: loading, loaded, or failed to load. */

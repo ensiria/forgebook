@@ -56,6 +56,15 @@ describe("$fetch's addresses and errors", () => {
     expect(fetchAddress("https://example.com/a", "/shop/", {})).toBe("https://example.com/a");
   });
 
+  it("takes a base with trailing slashes, however many, and is not slowed by a run inside it", () => {
+    expect(fetchAddress("a", "/shop///", {})).toBe("/shop/a");
+    const run = "/".repeat(200_000);
+    const start = performance.now();
+    expect(fetchAddress("a", `${run}shop`, {})).toBe(`${run}shop/a`);
+    // a pattern anchored at the end takes more than ten seconds on this
+    expect(performance.now() - start).toBeLessThan(5000);
+  });
+
   it("makes Nuxt's error from a failed answer, with its status and data", () => {
     const error = createError(
       new FetchError("/api/a", new Response(null, { status: 404 }), { reason: "gone" })

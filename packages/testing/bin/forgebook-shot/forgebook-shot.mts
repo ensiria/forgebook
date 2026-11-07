@@ -20,6 +20,28 @@ import type { StoryShot } from "./storyShot.types.ts";
 /** The command, as the hints print it. */
 const COMMAND = "forgebook-shot";
 
+/**
+ * Fails a shot whose picture is not of the story: no answer, an error or a frame that gave up on what the story loads.
+ *
+ * @param shot - the report.
+ * @param timeout - how long it waited, in ms.
+ * @param catalogue - the catalogue's address.
+ * @throws what the command says of it.
+ */
+const throwUnlessShown = (shot: StoryShot, timeout: number, catalogue: string): void => {
+  if (shot.status === "timeout") {
+    throw new ScriptError(`${shot.story} did not answer in ${timeout} ms`, {
+      hint: `Is the catalogue running at ${catalogue}? Open ${shot.address}`
+    });
+  }
+  if (shot.status === "error" || shot.status === "pending") {
+    const said = shot.status === "error" ? "failed" : "is not verified";
+    throw new ScriptError(`${shot.story} ${said}: ${shot.error ?? "no message"}`, {
+      hint: `Open ${shot.address} to see it`
+    });
+  }
+};
+
 await defineScript({
   name: "forgebook-shot",
   command: COMMAND,
@@ -87,17 +109,8 @@ await defineScript({
       isA11y: options.a11y,
       timeout
     });
-    if (shot.status === "timeout") {
-      throw new ScriptError(`${shot.story} did not answer in ${timeout} ms`, {
-        hint: `Is the catalogue running at ${options.catalogue}? Open ${shot.address}`
-      });
-    }
     for (const message of shot.consoleErrors) log.warn(message);
-    if (shot.status === "error") {
-      throw new ScriptError(`${shot.story} failed: ${shot.error ?? "no message"}`, {
-        hint: `Open ${shot.address} to see it`
-      });
-    }
+    throwUnlessShown(shot, timeout, options.catalogue);
     log.success(`${shot.story} is shown, ${shot.size.width} × ${shot.size.height} px`);
     if (shot.screenshot !== undefined) log.info(`picture: ${shot.screenshot}`);
     if (shot.violations !== undefined) {

@@ -16,7 +16,8 @@ export const source: StorySource = {
   name: "Fixture kit",
   logo: logoUrl,
   // invented colours, so the tests can see a story's box wait on its page colour
-  background: { light: "#fafafa", dark: "#111111" },
+  // a catalogue's look named `night` has a page of its own colour (`fixtures/app/themes`)
+  background: { light: "#fafafa", dark: "#111111", bySwitch: { look: { night: { dark: "#0b1020" } } } },
   files: [files],
   docs: [docs],
   // loaded as a frame shows them: the catalogue's page never carries them

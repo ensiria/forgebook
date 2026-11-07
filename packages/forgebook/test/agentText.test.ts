@@ -60,6 +60,7 @@ describe("storyText", () => {
       component,
       docs: undefined,
       args: {},
+      controls: [],
       problems: [],
       design: {
         figma: "https://www.figma.com/design/File1",
@@ -84,6 +85,7 @@ describe("storyText", () => {
       component,
       docs: undefined,
       args: {},
+      controls: [],
       problems: []
     };
     const wide: OutputStyle = { ...NARROW, width: 120 };
@@ -118,5 +120,17 @@ describe("checkText", () => {
       /^Accessibility is not checked: the catalogue sets a11y: false\.\n/
     );
     expect(checkText(report, NARROW)).not.toContain("Accessibility");
+  });
+
+  it("says a story its frame gave up on is not verified, and never that it passes", () => {
+    const text = checkText(
+      {
+        schema: 1,
+        results: [{ storyId: "kit:a--b", view: "", frame: "f", problems: [], notVerified: "still loading" }]
+      },
+      { ...NARROW, width: 200 }
+    );
+    expect(text).toContain("not verified: still loading");
+    expect(text).not.toContain("passes");
   });
 });

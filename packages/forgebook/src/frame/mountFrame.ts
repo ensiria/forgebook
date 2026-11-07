@@ -5,7 +5,7 @@
  * @remarks
  * One document per story: the style sheets of the Styles setting, the switches on the root and anything the
  * story mounts on `body` stay in this document. The tests open the same address and wait for `data-forgebook-status`
- * on the root (`ready` or `error`), never for a delay. A Live story's clock runs from its start, or stays held there when
+ * on the root (`ready`, `error` or `pending`), never for a delay. A Live story's clock runs from its start, or stays held there when
  * the address says so (`clock=held`, what the tests open). The framework is the renderer the framework package
  * passes (`renderer.ts`); nothing here depends on one.
  *
@@ -16,17 +16,17 @@ import "./frame.scss";
 import type { StoryLanguage, StorySource } from "@forgebook/story-format/source";
 import { storyTextOf } from "@forgebook/story-format/texts";
 
-import { actionNames, excludedControls, panelArgTypesOf } from "../argTypes.ts";
+import { bundlerErrorLines } from "../bundlerErrors.ts";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT, previewsRenewalOf, STORY_FILE_EVENT, successionOf } from "../hotModules.ts";
 import { shownLanguage } from "../languages.ts";
 import { LIVE_ERROR_EVENT, type LiveErrorReport } from "../liveErrors.ts";
-import { detailOf, type PanelArgs, previewValue, type ShellMessage } from "../messages.ts";
-import { panelArgsOf, storyArgsOf } from "../namedValues.ts";
+import type { PanelArgs, ShellMessage } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { applySafeArea } from "../safeAreaParameter.ts";
 import { sourceFiles } from "../sourceFiles.ts";
+import { actionNames, excludedControls, panelArgTypesOf } from "../storyArgTypes.ts";
 import { isClockHeldIn } from "../storyClock.ts";
 import { type FixedView, fixedViewOf, NOT_FIXED, withFixed } from "../storyGlobals.ts";
 import { shownTexts, storyTextKeysOf, withStoryTexts } from "../storyTexts.ts";
@@ -40,20 +40,33 @@ import {
   languageOf,
   liveView,
   type MeasureTool,
-  parseView
+  parseView,
+  type SheetsChoice
 } from "../viewState.ts";
+import { detailOf, previewValue } from "./callValues.ts";
+import { followCanvasScheme } from "./canvasScheme.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
-import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "./frameStatus.ts";
+import {
+  ERROR_MESSAGE_CLASS,
+  FRAME_STARTED_ATTRIBUTE,
+  NOT_AWAITED_ATTRIBUTE,
+  PENDING_REASON_ATTRIBUTE,
+  STATUS_ATTRIBUTE
+} from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
+import { panelArgsOf, storyArgsOf } from "./panelValues.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
 import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
 import { type ShellChannel, shellChannel } from "./shellChannel.ts";
+import { checkForShell } from "./shellCheck.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
+import type { StoryOutcome } from "./storyContent.ts";
 import { mergedPreviews, readPreview, readStory, startingGlobals } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
+import type { ValueSheets } from "./valueSheets.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {
@@ -72,6 +85,11 @@ export type FrameConfig = {
   readonly previews?: readonly unknown[];
   /** The switches of the toolbar and the View menu, as the shell's configuration gives them; the theme and contrast by default. */
   readonly switches?: readonly ViewSwitch[];
+  /**
+   * The address of each switch value's own style sheet, by `<switch id>=<value>`; none when no value has one. The
+   * generated frame gives addresses the configuration's check allowed; the page checks nothing itself.
+   */
+  readonly valueSheets?: ValueSheets;
   /** The catalogue's lists (its backgrounds, text sizes, grid step, accessibility rules…); the defaults when none. */
   readonly lists?: CatalogueLists;
   /** Loads the play tools, when the project installs Testing Library (the generated frame passes it then). */
@@ -92,10 +110,61 @@ const tellDevServer = (report: LiveErrorReport): void => {
   import.meta.hot?.send(LIVE_ERROR_EVENT, report);
 };
 
-// a story that threw is gone from its frame, so a hot update has nothing to update: the fix shows only in a new page
+// a story that threw is gone from its frame, so a hot update has nothing to update: the fix shows only in a new page; a
+// story the frame gave up on keeps saying so until a new page waits for it again
 import.meta.hot?.on("vite:afterUpdate", (): void => {
-  if (document.documentElement.getAttribute(STATUS_ATTRIBUTE) === "error") window.location.reload();
+  const status = document.documentElement.getAttribute(STATUS_ATTRIBUTE);
+  if (status === "error" || status === "pending") window.location.reload();
 });
+
+/**
+ * Why the dev server last failed to serve a module, and what to do when it says so: of a module it failed to serve, a
+ * browser says only that the import failed, and the reason reaches the page on the dev server's own channel.
+ */
+let servedError: string | undefined;
+let followServedError: (() => void) | undefined;
+import.meta.hot?.on("vite:error", ({ err }): void => {
+  // the first since this page loaded: what its own import asked for, not what another frame's asked for later
+  servedError ??= bundlerErrorLines(err.message, err)[0];
+  followServedError?.();
+  followServedError = undefined;
+});
+
+/** What shows the sheets of the values drawn, and answers once they have loaded whether it is still the last asked. */
+type ValueSheetsShower = (values: Readonly<Record<string, string>>) => Promise<boolean>;
+
+/**
+ * What shows the sheets of a frame's values; none for a catalogue with none, which so loads no code for them.
+ *
+ * @param valueSheets - each value's sheet, when the catalogue has any.
+ * @param sheets - the frame's Styles setting.
+ * @param switches - the catalogue's switches.
+ * @param onFailed - told a sheet that did not load: the story is drawn without it.
+ */
+const valueSheetsShower = async (
+  valueSheets: ValueSheets | undefined,
+  sheets: SheetsChoice,
+  switches: readonly ViewSwitch[],
+  onFailed: (message: string) => void
+): Promise<ValueSheetsShower | undefined> => {
+  if (valueSheets === undefined) return undefined;
+  const { valueSheetUrls, valueSheetsIn } = await import("./valueSheets.ts");
+  const show = valueSheetsIn(document, onFailed);
+  return (values: Readonly<Record<string, string>>): Promise<boolean> =>
+    show(valueSheetUrls(values, sheets, valueSheets, switches));
+};
+
+/**
+ * Fails a frame whose story did not load, with the dev server's reason when the import only says it failed, as soon as
+ * the reason arrives: it may come after the failed import.
+ *
+ * @param message - the error's message.
+ * @param fail - shows a reason in the frame.
+ */
+const failedToLoad = (message: string, fail: (reason: string) => void): void => {
+  if (isStaleModuleError(message)) followServedError = (): void => fail(servedError ?? message);
+  fail(isStaleModuleError(message) ? (servedError ?? message) : message);
+};
 
 /**
  * Does what a message of the shell asks of the rendered story; the view's live part is applied apart, before the story
@@ -104,6 +173,8 @@ import.meta.hot?.on("vite:afterUpdate", (): void => {
  * @param message - the message.
  * @param controls - the rendered story's controls.
  * @param storyId - the story's id, for the answers.
+ * @param pendingReason - why the story was not seen in its final state, if so: a check of what it shows now would pass
+ *   on a fallback, so it answers this instead.
  * @param rules - the catalogue's accessibility rules, for a check; none when it checks no accessibility.
  * @param axeUrl - the address of axe's script, for a check.
  * @param tellShell - tells the shell the check's result.
@@ -112,6 +183,7 @@ const answerShell = (
   message: ShellMessage,
   controls: StoryControls,
   storyId: string,
+  pendingReason: string | undefined,
   rules: A11ySettings | undefined,
   axeUrl: string | undefined,
   tellShell: ShellChannel["tell"]
@@ -120,31 +192,49 @@ const answerShell = (
   else if (message.type === "forgebook:args") controls.setPanelArgs(message.args);
   else if (message.type === "forgebook:events") controls.setEvents(message.names);
   else if (message.type === "forgebook:matrix") controls.setMatrix(message.matrix ?? undefined);
-  else if (message.type === "forgebook:play-again") controls.playAgain();
+  else if (message.type === "forgebook:play-step") controls.stepPlay(message.command);
   else if (message.type === "forgebook:clock") controls.setClock(message.state);
   else if (message.type === "forgebook:clock-restart") controls.restartClock();
-  else if (message.type === "forgebook:check") {
-    // loaded on the first check: a frame that is never checked, or one of a catalogue that checks nothing, never
-    // fetches the code that loads axe
-    const checked =
-      rules === undefined
-        ? Promise.reject(new Error("The catalogue checks no accessibility (a11y: false)"))
-        : import("./checkStory.ts").then((module) => module.checkStory(document, rules, axeUrl));
-    checked
-      .then((violations) => tellShell({ type: "forgebook:checked", storyId, violations }))
-      .catch((error: unknown) =>
-        tellShell({
-          type: "forgebook:check-error",
-          storyId,
-          message: error instanceof Error ? error.message : String(error)
-        })
-      );
-  }
+  else if (message.type === "forgebook:check")
+    checkForShell(storyId, pendingReason, rules, axeUrl, tellShell);
 };
 
-/** The play tools a project installed, for a story that uses them. */
-const playToolsOf = ({ playTools }: FrameConfig): Pick<StoryRunOptions, "playTools"> =>
-  playTools === undefined ? {} : { playTools };
+/**
+ * Says on the page that the frame gave up on what the story loads: a person looking at the story, or at its picture,
+ * must not take the fallback for the story. Out of the story's own element, so the story is laid out as it was.
+ *
+ * @param reason - why.
+ */
+const showPending = (reason: string): void => {
+  const notice = document.createElement("p");
+  notice.className = "forgebook-frame-pending";
+  notice.setAttribute("role", "status");
+  notice.textContent = `Not verified: ${reason}`;
+  document.body.prepend(notice);
+};
+
+/**
+ * Says how a story ended on the frame's root and on its page.
+ *
+ * @param outcome - how it ended; an error that came during the wait stands, and this leaves it there.
+ * @param storyId - the story's id, for the dev server.
+ * @param isNotAwaited - whether the story said not to wait for what it loads, which a check reports.
+ * @returns why it was not seen in its final state, if so.
+ */
+const showOutcome = (outcome: StoryOutcome, storyId: string, isNotAwaited: boolean): string | undefined => {
+  if (outcome.status === "error") return undefined;
+  if (isNotAwaited) document.documentElement.setAttribute(NOT_AWAITED_ATTRIBUTE, "");
+  document.documentElement.setAttribute(STATUS_ATTRIBUTE, outcome.status);
+  if (outcome.status === "ready") return undefined;
+  document.documentElement.setAttribute(PENDING_REASON_ATTRIBUTE, outcome.reason);
+  showPending(outcome.reason);
+  tellDevServer({ kind: "render", storyId, view: window.location.search, message: outcome.reason });
+  return outcome.reason;
+};
+
+/** The play tools a project installed, and whether the frame's address lets its story play when it opens. */
+const playOptions = ({ playTools }: FrameConfig, playsOnOpen: boolean): Partial<StoryRunOptions> =>
+  playTools === undefined ? { playsOnOpen } : { playTools, playsOnOpen };
 
 /**
  * Shows the story the address names in the given element.
@@ -163,7 +253,9 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
   // the previews' modules: an edit of one (or of what it imports) brings its successor
   let previews: readonly unknown[] = config.previews ?? [];
   let preview = mergedPreviews(previews.map(readPreview));
-  const view = parseView(window.location.search, catalogue);
+  // a frame runs its play unless its own address says otherwise, whatever the catalogue's readers start with: tests and
+  // tools open frames with no word, and a new address written below must not add one
+  const view = parseView(window.location.search, { ...catalogue, readerPlay: "on" });
   const shell = shellChannel(config.frames ?? SAME_ORIGIN, window);
   const tellShell = shell.tell;
   applyView(document.documentElement, view, catalogue);
@@ -188,6 +280,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     tellShell({ type: "forgebook:size", storyId, height });
   };
   new ResizeObserver(reportSize).observe(document.body);
+  const reportScheme = followCanvasScheme(document, window, storyId, tellShell);
   const reportError = (message: string): void => {
     document.documentElement.setAttribute(STATUS_ATTRIBUTE, "error");
     tellShell({ type: "forgebook:error", storyId, message });
@@ -198,7 +291,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     box.className = "forgebook-frame-error";
     box.setAttribute("role", "alert");
     const text = document.createElement("p");
-    text.className = "forgebook-frame-error__message";
+    text.className = ERROR_MESSAGE_CLASS;
     text.textContent = message;
     box.append(text);
     container.replaceChildren(box);
@@ -217,23 +310,38 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       .then(({ applyTools }) => applyTools(document, latestTools, catalogue.gridStep))
       .catch((error: unknown) => reportError(error instanceof Error ? error.message : String(error)));
   };
+  // what shows the sheets of the values drawn, for a catalogue with any; set once the source's are placed
+  let showValueSheets: ValueSheetsShower | undefined;
+  // the view asked for while its sheets load: the next message is compared with it, or going back would stop short of
+  // overtaking it, and the sheets would then draw a view the reader already left
+  let askedView: LiveView | undefined;
   shell.listen((message: ShellMessage): void => {
     if (message.type === "forgebook:tools") showTools(message.tools);
     if (message.type === "forgebook:spills") showSpills(message.isOn);
     if (message.type !== "forgebook:view") return;
     const shown = withFixed(message.view, fixed);
     // the same view again draws nothing: a story's state, and the time its draw takes, are not the shell's to spend
-    if (
-      changeShown !== undefined &&
-      shownView !== undefined &&
-      isSameLiveView(withFixed(shownView, fixed), shown)
-    )
+    const latest = askedView ?? shownView;
+    if (changeShown !== undefined && latest !== undefined && isSameLiveView(withFixed(latest, fixed), shown))
       return;
-    applyView(document.documentElement, shown, catalogue);
-    changeShown?.(message.view);
-    shownView = changeShown === undefined ? undefined : message.view;
-    const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
-    window.history.replaceState(null, "", address);
+    askedView = message.view;
+    const showLive = (): void => {
+      applyView(document.documentElement, shown, catalogue);
+      changeShown?.(message.view);
+      shownView = changeShown === undefined ? undefined : message.view;
+      askedView = undefined;
+      const address = frameAddress(window.location.pathname, storyId, { ...view, ...message.view }, switches);
+      window.history.replaceState(null, "", address);
+    };
+    // the root changes with the sheet that draws it; a later view overtakes this one
+    if (showValueSheets === undefined) showLive();
+    else {
+      showValueSheets(shown.switches)
+        .then((isLast) => {
+          if (isLast) showLive();
+        })
+        .catch((error: unknown) => reportError(error instanceof Error ? error.message : String(error)));
+    }
   });
   // until the story runs, or when it cannot, an edit of a file the frame loaded loads the page again: there is no story
   // drawn to renew in place, and a story file that failed to load keeps no other way to show its fix
@@ -262,6 +370,8 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     await source.setup?.();
     await preview.setup?.();
     await loadSheets(document, viewSheets(source.sheets, view));
+    showValueSheets = await valueSheetsShower(config.valueSheets, view.sheets, switches, reportError);
+    await showValueSheets?.(view.switches);
     // the story file's exports: an edit of the file hands them on with its successor's
     let shownFile: unknown = await load();
     const first = readStory(shownFile, location.story.exportName, preview);
@@ -272,12 +382,15 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     const plugins = startPluginFrames(config.plugins, storyId, tellShell);
     let story = first;
     fixed = fixedViewOf(story.globals, story.parameters, catalogue);
+    await showValueSheets?.(withFixed(view, fixed).switches);
     applyView(document.documentElement, withFixed(view, fixed), catalogue);
     let controls: StoryControls | undefined;
+    // why the story was not seen in its final state: a check of what it shows would pass on a fallback
+    let pendingReason: string | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
     shell.listen((message: ShellMessage): void => {
       if (controls !== undefined)
-        answerShell(message, controls, storyId, catalogue.a11y, config.axeUrl, tellShell);
+        answerShell(message, controls, storyId, pendingReason, catalogue.a11y, config.axeUrl, tellShell);
     });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them); a
     // language the source gives as a loader is loaded as it is shown
@@ -316,7 +429,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       container,
       story,
       identity: { id: storyId, name: location.story.name, title: location.component.title },
-      ...playToolsOf(config),
+      ...playOptions(config, view.play === "on"),
       pluginSetups: plugins.setups,
       renderer: config.renderer,
       clock,
@@ -325,14 +438,16 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       ...shown,
       resolveArgs: (args: PanelArgs): Readonly<Record<string, unknown>> =>
         storyArgsOf(args, source.namedValues),
-      onControlsReady: (next: StoryControls): void => {
+      onControlsReady: (next: StoryControls, outcome: StoryOutcome): void => {
         controls = next;
         clearRetry(sessionStorageOf(window), window.location.href);
         // the height first: the shell sizes the frame to the drawn story before anything reads it as ready, instead of
         // waiting on the resize observer, which may report after the ready status
         reportSize();
-        document.documentElement.setAttribute(STATUS_ATTRIBUTE, "ready");
-        tellReady();
+        reportScheme();
+        pendingReason = showOutcome(outcome, storyId, story.suspense.isExpected);
+        // the shell keeps an error it was told, and would read this as the story being fine again
+        if (outcome.status !== "error") tellReady();
         changeShown = (live: LiveView): void => {
           shownCount += 1;
           const count = shownCount;
@@ -419,6 +534,6 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       window.location.reload();
       return;
     }
-    fail(message);
+    failedToLoad(message, fail);
   }
 };

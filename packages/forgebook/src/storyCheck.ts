@@ -8,7 +8,8 @@
  * when it runs (the core has no browser), and reads the report back through `isStoryCheckReport`, since it crossed a
  * dynamic import. The problems are those the catalogue's browser tests fail on, with the same messages: a frame that
  * could not show its story, axe's rules, spills, overlays past the frame, and the page's errors (a failed play among
- * them: its rejection reaches the page). Pure.
+ * them: its rejection reaches the page). A story its frame gave up on is neither passed nor failed: `notVerified` says
+ * so. Pure.
  *
  * @module
  */
@@ -34,6 +35,8 @@ export type StoryProblem = {
 export type StoryCheckStory = {
   /** The story's id. */
   readonly id: string;
+  /** Its file, as the catalogue lists it: what a report names when the story cannot be shown. */
+  readonly file?: string;
   /**
    * The id an earlier rule gave it, when it differs from `id`: a baseline stored under that id is still its baseline
    * until `forgebook shot --update` stores one under its id.
@@ -61,6 +64,8 @@ export type StoryCheckRequest = {
   readonly views: readonly string[];
   /** Check every variant the catalogue's browser tests check instead of the views given. */
   readonly isAllVariants: boolean;
+  /** How many pages to open at once; one by default. */
+  readonly concurrency?: number;
   /** The model that judges what axe cannot see; none leaves the pages on this machine. */
   readonly semantic?: SemanticModel;
 };
@@ -93,6 +98,19 @@ export type StoryCheckResult = {
   readonly frame: string;
   /** The problems; none when it passes. */
   readonly problems: readonly StoryProblem[];
+  /**
+   * Why the story's checks did not run: its frame gave up waiting for what it loads, or cannot tell (status `pending`),
+   * so no check saw the story in its final state. Absent when they ran; present, the story has not passed, whatever
+   * `problems` holds.
+   */
+  readonly notVerified?: string;
+  /** Whether the story drew nothing a reader could see: no text, and no element with a size. Absent otherwise. */
+  readonly isBlank?: boolean;
+  /**
+   * Whether the frame did not wait for what the story loads, as it asks (`parameters.suspense.expected`): the checks read
+   * it as it first drew. Absent otherwise.
+   */
+  readonly isNotAwaited?: boolean;
   /** What the model judged, when one was asked; a text says why it could not. */
   readonly judgements?: readonly StoryJudgement[] | string;
 };
@@ -139,7 +157,9 @@ const isResult = (value: unknown): value is StoryCheckResult =>
   typeof value.frame === "string" &&
   "problems" in value &&
   Array.isArray(value.problems) &&
-  value.problems.every(isProblem);
+  value.problems.every(isProblem) &&
+  (!("notVerified" in value) || value.notVerified === undefined || typeof value.notVerified === "string") &&
+  (!("isNotAwaited" in value) || value.isNotAwaited === undefined || typeof value.isNotAwaited === "boolean");
 
 /**
  * Whether what the testing package answered is a check's report.
@@ -172,8 +192,11 @@ export type StoryShot = {
   readonly frame: string;
   /** The picture, a PNG file's absolute path. */
   readonly file: string;
-  /** Why the story did not draw (`error`, or `silent` when it never said); none when it did. */
-  readonly status?: "error" | "silent";
+  /**
+   * Why the picture is not of the story as drawn (`error`; `silent` when it never said; `pending` when the frame gave up
+   * on what it loads, so this may picture a fallback); none when it is.
+   */
+  readonly status?: "error" | "silent" | "pending";
 };
 
 /** The pictures taken. */

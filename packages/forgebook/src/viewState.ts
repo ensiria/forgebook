@@ -14,7 +14,7 @@
  */
 
 import { AUDIENCE_IDS, type AudienceId, DEFAULT_AUDIENCE } from "./audiences.ts";
-import type { CatalogueSettings, OwnControlId } from "./catalogue.ts";
+import type { CatalogueSettings, OwnControlId, PlaySwitch } from "./catalogue.ts";
 import {
   DEVICE_PARAMETER,
   type DeviceChoice,
@@ -23,7 +23,13 @@ import {
   ORIENTATION_PARAMETER,
   type OrientationChoice
 } from "./deviceView.ts";
-import { switchValueOf, switchWithRole, type TouchChoice, type ViewSwitch } from "./switches.ts";
+import {
+  shownSwitches,
+  switchValueOf,
+  switchWithRole,
+  type TouchChoice,
+  type ViewSwitch
+} from "./switches.ts";
 
 /**
  * What Forgebook draws behind the story, in place of its page's colour: `plain`, the page's colour itself,
@@ -98,7 +104,15 @@ export type ViewState = {
   readonly device: DeviceChoice;
   /** How the device is held: the story's own default (`auto`), or one way. */
   readonly orientation: OrientationChoice;
+  /**
+   * Whether a story's play function runs when its frame opens. A frame's address says only `off`: one with no word plays,
+   * so a test, a check or a tool that opens a frame runs its story's play whatever a reader chose.
+   */
+  readonly play: PlaySwitch;
 };
+
+/** The values of the play switch. */
+const PLAY_SWITCHES: readonly PlaySwitch[] = ["on", "off"];
 
 /** The part of the view a frame applies on its root without loading again, so the story keeps its state. */
 export type LiveView = Pick<ViewState, "switches" | "backdrop" | "text">;
@@ -118,7 +132,8 @@ export const DEFAULT_VIEW: ViewState = {
   tools: [],
   audience: DEFAULT_AUDIENCE,
   device: "auto",
-  orientation: "auto"
+  orientation: "auto",
+  play: "on"
 };
 
 /** Every style sheet setting, in the menu's order. */
@@ -143,7 +158,15 @@ const toolsOf = (value: string | null): MeasureTool[] => {
 /** What the view reads of a catalogue: its switches and the lists its values are checked against. */
 export type ViewCatalogue = Pick<
   CatalogueSettings,
-  "switches" | "widthRange" | "zooms" | "textSizes" | "backdrops" | "tabs" | "ownControls" | "audience"
+  | "switches"
+  | "widthRange"
+  | "zooms"
+  | "textSizes"
+  | "backdrops"
+  | "tabs"
+  | "ownControls"
+  | "audience"
+  | "readerPlay"
 >;
 
 /**
@@ -265,7 +288,8 @@ export const parseView = (search: string, catalogue: ViewCatalogue): ViewState =
     tools: toolsOf(params.get("tools")),
     audience: choice(shown("audience"), AUDIENCE_IDS, catalogue.audience),
     device: deviceChoice(params.get(DEVICE_PARAMETER)),
-    orientation: orientationChoice(params.get(ORIENTATION_PARAMETER))
+    orientation: orientationChoice(params.get(ORIENTATION_PARAMETER)),
+    play: choice(params.get("play"), PLAY_SWITCHES, catalogue.readerPlay)
   };
 };
 
@@ -300,6 +324,7 @@ const frameParams = (view: ViewState, switches: readonly ViewSwitch[]): URLSearc
   if (view.sheets !== DEFAULT_VIEW.sheets) params.set("sheets", view.sheets);
   if (view.text !== DEFAULT_VIEW.text) params.set("text", String(view.text));
   if (language !== undefined) setSwitch(language);
+  if (view.play === "off") params.set("play", "off");
   return params;
 };
 
@@ -315,9 +340,13 @@ const frameParams = (view: ViewState, switches: readonly ViewSwitch[]): URLSearc
 export const viewParams = (
   view: ViewState,
   switches: readonly ViewSwitch[],
-  defaultAudience: AudienceId = DEFAULT_AUDIENCE
+  defaultAudience: AudienceId = DEFAULT_AUDIENCE,
+  defaultPlay: PlaySwitch = DEFAULT_VIEW.play
 ): URLSearchParams => {
   const params = frameParams(view, switches);
+  // the address says only what differs from the catalogue's default; the frames still hear `off`
+  if (view.play === defaultPlay) params.delete("play");
+  else params.set("play", view.play);
   if (isComparing(view)) params.set("compare", view.compare.join(","));
   if (view.width !== DEFAULT_VIEW.width) params.set("width", String(view.width));
   if (view.height !== DEFAULT_VIEW.height) params.set("height", String(view.height));
@@ -413,7 +442,7 @@ export const schemeOf = (
 ): "light" | "dark" | "system" => {
   const scheme = switchWithRole(switches, "colorScheme");
   if (scheme === undefined) return "light";
-  return switchValueOf(scheme, view.switches[scheme.id])?.scheme ?? "light";
+  return switchValueOf(scheme, shownSwitches(view.switches, switches)[scheme.id])?.scheme ?? "light";
 };
 
 /**
@@ -428,7 +457,7 @@ export const isMoreContrastOf = (
 ): boolean => {
   const contrast = switchWithRole(switches, "contrast");
   if (contrast === undefined) return false;
-  return switchValueOf(contrast, view.switches[contrast.id])?.isMore === true;
+  return switchValueOf(contrast, shownSwitches(view.switches, switches)[contrast.id])?.isMore === true;
 };
 
 /**
@@ -439,7 +468,9 @@ export const isMoreContrastOf = (
  */
 export const languageOf = (view: Pick<ViewState, "switches">, switches: readonly ViewSwitch[]): string => {
   const language = switchWithRole(switches, "language");
-  return language === undefined ? "" : (view.switches[language.id] ?? language.default);
+  return language === undefined
+    ? ""
+    : (shownSwitches(view.switches, switches)[language.id] ?? language.default);
 };
 
 /**
@@ -496,15 +527,18 @@ export const withTouchOf = <View extends Pick<ViewState, "switches">>(
 export const codeGlobalsOf = (
   view: Pick<ViewState, "switches">,
   switches: readonly ViewSwitch[]
-): Readonly<Record<string, string>> =>
-  Object.fromEntries(
+): Readonly<Record<string, string>> => {
+  const shown = shownSwitches(view.switches, switches);
+  return Object.fromEntries(
     switches
       .filter((each) => each.apply.kind === "code" || each.role === "touch")
-      .map((each) => [each.id, view.switches[each.id] ?? each.default])
+      .map((each) => [each.id, shown[each.id] ?? each.default])
   );
+};
 
 /** The parameters only the shell reads: a frame's address leaves them out. */
 const SHELL_PARAMETERS: readonly string[] = [
+  "tag",
   "compare",
   "width",
   "height",

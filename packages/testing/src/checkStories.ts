@@ -11,6 +11,7 @@
  */
 import type { Page } from "@playwright/test";
 import { type A11ySettings, catalogueSettings } from "forgebook/catalogue";
+import { NOT_AWAITED_ATTRIBUTE } from "forgebook/frame-status";
 import type {
   SemanticModel,
   StoryCheckReport,
@@ -25,11 +26,20 @@ import {
   axeProblems,
   errorProblems,
   focusProblems,
+  isPageBlank,
   overlayProblems,
   spillProblems,
   watchedErrors
 } from "./storyCheck.ts";
-import { eachStoryPage, openedStory, READY_MS, type StoryPage } from "./storyPages.ts";
+import {
+  couldNotBeShown,
+  eachStoryPage,
+  frameErrorOf,
+  openedStory,
+  pendingReasonOf,
+  READY_MS,
+  type StoryPage
+} from "./storyPages.ts";
 import { hasLookChecks } from "./storyTestPlan.ts";
 
 /**
@@ -59,7 +69,13 @@ const checkedPage = async (
       ...errorProblems(errors)
     ]);
   if (status === "error")
-    return result([{ kind: "frame", message: "The story could not be shown" }, ...errorProblems(errors)]);
+    return result([
+      { kind: "frame", message: couldNotBeShown(await frameErrorOf(page), storyPage.story.file) },
+      ...errorProblems(errors)
+    ]);
+  // what it shows now is not the story: a check of it would pass on a fallback, so none runs, and no pass is claimed
+  if (status === "pending")
+    return { ...result(errorProblems(errors)), notVerified: await pendingReasonOf(page) };
   // a story about logic gets the suite's checks of a scene, not those about looks (`storyTestPlan.ts`)
   const lookProblems = hasLookChecks(storyPage.story)
     ? [
@@ -69,7 +85,13 @@ const checkedPage = async (
       ]
     : [];
   const axe = a11y === undefined ? [] : await axeProblems(page, a11y);
-  const checked = result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(errors)]);
+  const isNotAwaited = (await page.locator("html").getAttribute(NOT_AWAITED_ATTRIBUTE)) !== null;
+  const isBlank = await page.evaluate(isPageBlank);
+  const checked = {
+    ...result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(errors)]),
+    ...(isNotAwaited ? { isNotAwaited } : {}),
+    ...(isBlank ? { isBlank } : {})
+  };
   return semantic === undefined
     ? checked
     : { ...checked, judgements: await askModel(semantic, await storySight(page)) };

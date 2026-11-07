@@ -29,9 +29,11 @@ import type {
   SearchDocument,
   StoriesDocument,
   StoryDocument,
-  TokensDocument
+  SwitchesDocument,
+  TokensDocument,
+  VerifyDocument
 } from "../../src/vite/agent.types.ts";
-import type { DesignToken } from "../../src/vite/designTokens.ts";
+import type { DesignToken, TokenSource } from "../../src/vite/designTokens.ts";
 import type { TokenClash } from "../../src/vite/tokenClashes.ts";
 
 /** The style with no width to fit, so no cell is cut. */
@@ -105,8 +107,17 @@ export const checkText = (report: StoryCheckReport, style: OutputStyle): string 
   (report.a11y === "off" ? "Accessibility is not checked: the catalogue sets a11y: false.\n" : "") +
   table(
     report.results.flatMap((result) => [
-      ...(result.problems.length === 0
-        ? [[result.storyId, result.view || "default", "passes"]]
+      ...(result.notVerified === undefined
+        ? []
+        : [[result.storyId, result.view || "default", `not verified: ${result.notVerified}`]]),
+      ...(result.problems.length === 0 && result.notVerified === undefined
+        ? [
+            [
+              result.storyId,
+              result.view || "default",
+              result.isNotAwaited === true ? "passes, as drawn: parameters.suspense.expected" : "passes"
+            ]
+          ]
         : result.problems.map((problem) => [
             result.storyId,
             result.view || "default",
@@ -164,8 +175,20 @@ export const shotText = (
   style: OutputStyle
 ): string =>
   table(
-    report.shots.map((shot) => [shot.storyId, shot.view || "default", shownFile(shot.file)]),
-    { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Picture" }] },
+    report.shots.map((shot) => [
+      shot.storyId,
+      shot.view || "default",
+      shownFile(shot.file),
+      shot.status === undefined ? "" : `not of the story: ${shot.status}`
+    ]),
+    {
+      columns: [
+        { header: "Story" },
+        { header: "View", tone: "muted" },
+        { header: "Picture" },
+        { header: "Status" }
+      ]
+    },
     uncut(style)
   );
 
@@ -208,14 +231,28 @@ export const diffText = (
  */
 export const tokensText = (document: TokensDocument): string => {
   if (!document.isConfigured)
-    return 'No tokens file: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
+    return 'No tokens file, and none found in the application: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
   if (document.total === 0) return "No tokens here.";
   const lines = document.tokens.map((token) => tokenLine(token));
   const more = document.total - document.tokens.length;
   return [
     ...lines,
-    ...(more > 0 ? [`… and ${more} more: narrow it with --category, or raise --limit.`] : [])
+    ...(more > 0 ? [`… and ${more} more: narrow it with --category, or raise --limit.`] : []),
+    ...tokenSourceLines(document.sources ?? [], document.notes ?? [])
   ].join("\n");
+};
+
+/** What tokens were read from, on one line, and what could not be, as a person reads them. */
+const tokenSourceLines = (sources: readonly TokenSource[], notes: readonly string[]): string[] => {
+  const read = sources.filter((source) => source.kind !== "tokens-file");
+  return [
+    ...(read.length === 0
+      ? []
+      : [
+          `Read from: ${read.map(({ kind, file, tokens }) => `${file} (${kind}, ${tokens ?? 0})`).join(", ")}`
+        ]),
+    ...notes.map((note) => `Not read: ${note}`)
+  ];
 };
 
 /** A token on one line, its themes and any deprecation beside it. */
@@ -289,9 +326,45 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
   );
   return [
-    ...(lines.length === 0 ? ["Nothing to report."] : lines),
-    ...document.skipped.map((each) => `Not checked: ${each}`)
+    ...(lines.length > 0
+      ? lines
+      : [document.skipped.length > 0 ? "Nothing to report in what was checked." : "Nothing to report."]),
+    ...document.skipped,
+    ...(document.advice ?? []).map(({ file, line, message }) => `${file}:${line}  ${message}`),
+    ...(document.excused ?? []).map(
+      ({ file, line, rule, reason }) => `${file}:${line}  ${rule} excused by a comment: ${reason}`
+    ),
+    ...tokenSourceLines(document.tokenSources ?? [], document.tokenNotes ?? [])
   ].join("\n");
+};
+
+/**
+ * What `verify` found, each with its fix, and the verdict in one line, last: what a person reads first at a prompt.
+ *
+ * @param document - the answer.
+ * @param style - colours, glyphs and width.
+ */
+export const verifyText = (document: VerifyDocument, style: OutputStyle): string => {
+  const uncovered = document.uiFiles.flatMap((each) =>
+    each.coverage === "none"
+      ? [
+          `${each.file}  not verified: ${each.reason ?? ""}${each.fix === undefined ? "" : ` Fix: ${each.fix}`}`
+        ]
+      : []
+  );
+  const code = document.code.problems.map(
+    (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
+  );
+  const notes = document.code.notes.map(
+    (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
+  );
+  const advice = (document.code.advice ?? []).map((each) => `${each.file}:${each.line}  ${each.message}`);
+  const results = [
+    ...document.failures,
+    ...document.notVerified.map((each) => ({ ...each, problems: [] }))
+  ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
+  const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
+  return [...uncovered, ...code, ...notes, ...advice, ...stories, document.summary].join("\n");
 };
 
 /**
@@ -362,3 +435,19 @@ export const searchText = (document: SearchDocument): string =>
           ])
         ])
         .join("\n");
+
+/**
+ * The catalogue's switches, one per line, each with its values and what they bring with them.
+ *
+ * @param document - the answer.
+ */
+export const switchesText = (document: SwitchesDocument): string =>
+  document.switches
+    .map((each) => {
+      const values = each.values.map(({ value, implies }) => {
+        const implied = Object.entries(implies ?? {}).map(([id, other]) => `${id}=${other}`);
+        return implied.length === 0 ? value : `${value} (implies ${implied.join(", ")})`;
+      });
+      return `${each.id} (${each.control}): ${values.join(", ")}`;
+    })
+    .join("\n");

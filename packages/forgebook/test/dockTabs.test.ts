@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import type { ComponentDocs } from "../src/componentDocs.ts";
 import type { PlayTrace } from "../src/playTrace.ts";
 import { type DockTabsInput, dockTabs } from "../src/shell/dockTabs.tsx";
+import { DEFAULT_VIEW } from "../src/viewState.ts";
 
 /** A hook whose options carry a value and a callback, so a component would get Props and Events. */
 const HOOK_DOCS: ComponentDocs = {
@@ -43,6 +44,10 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   argTypes: {},
   actions: [],
   values: {},
+  panelArgs: {},
+  storyArgs: {},
+  loadTokens: undefined,
+  globals: {},
   onValueChange: (): undefined => undefined,
   onReset: (): undefined => undefined,
   worstCase: {
@@ -57,7 +62,9 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   calls: [],
   onClearCalls: (): undefined => undefined,
   trace: undefined,
-  onPlayAgain: (): undefined => undefined,
+  view: DEFAULT_VIEW,
+  onViewChange: (): undefined => undefined,
+  onPlayStep: (): undefined => undefined,
   check: { status: "idle" },
   onCheck: undefined,
   pluginTabs: []

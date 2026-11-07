@@ -8,10 +8,24 @@
 
 import type { FigmaLink } from "@forgebook/story-format/source";
 
+import type { DroppedArgReason } from "../addressArgs.ts";
+import type { AddressTexts } from "../addressTexts.ts";
 import { type ComponentDocs, isComponentDocs } from "../componentDocs.ts";
 import { embedAddressOf } from "../embedCode.ts";
-import { type LoadedPreview, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
+import { panelArgsOf } from "../frame/panelValues.ts";
+import { type LoadedPreview, type LoadedStory, NO_PREVIEW, readStory } from "../frame/storyModule.ts";
 import { isLiveErrorReport } from "../liveErrors.ts";
+import type { NamedValues } from "../namedValues.ts";
+import { controlsOfParameter, excludedControls, panelArgTypesOf } from "../storyArgTypes.ts";
+import {
+  type CustomControlsRead,
+  checkedSetArgs,
+  customControlProblems,
+  type SetArgs,
+  type StoryDeclaration,
+  storyControlsOf
+} from "../storyControls.ts";
+import { passesTags } from "../storyTags.ts";
 import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
 import type { UsageIndex } from "../usedIn.ts";
 import { componentAddressOf, frameAddressOf, storyAddressOf } from "../viewState.ts";
@@ -219,6 +233,15 @@ export const jsonValue = (value: unknown): unknown => {
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** Why a value an agent asked to set was left out, as its answer says it. */
+const DROPPED_REASONS: Readonly<Record<DroppedArgReason, string>> = {
+  undeclared: "the story declares no such arg, or does not let it be set",
+  type: "it is not of the type its control takes (see `controls`)",
+  unreadable: "it is not plain JSON",
+  markup: "this framework writes it into HTML, so only plain text can be set",
+  control: "its custom control's schema refuses it, or could not be read"
+};
+
 /** What the dev server loaded for one story, for `storyDocument`. */
 export type LoadedStoryParts = {
   /** The story file's module, or why it failed to load. */
@@ -227,6 +250,14 @@ export type LoadedStoryParts = {
   readonly docs: { readonly value: unknown } | { readonly error: string };
   /** The catalogue's previews merged, whose args are under every story's. */
   readonly preview?: LoadedPreview;
+  /** The source's named values; none when it names none. */
+  readonly namedValues?: NamedValues | undefined;
+  /** The values an agent asks to set, as JSON; none reads the story as it is. */
+  readonly setArgs?: string | undefined;
+  /** The custom controls' schemas, those whose module could be read, and why the others could not. */
+  readonly customControls?: CustomControlsRead | undefined;
+  /** How the framework's stories take a link's texts: what the shell would refuse is said here too. */
+  readonly addressTexts?: AddressTexts | undefined;
 };
 
 /** The docs a story file's docs loader gave, as a document field, with the problem when there is one. */
@@ -239,6 +270,68 @@ const docsOf = (
   if (typeof value === "object" && value !== null && "error" in value && typeof value.error === "string")
     return { docs: undefined, problem: `Its component's docs failed: ${value.error}` };
   return { docs: undefined, problem: undefined };
+};
+
+/** The story read from its module, with what kept it from being read among the problems. */
+const loadedStoryOf = (
+  parts: LoadedStoryParts,
+  location: StoryLocation,
+  problems: string[]
+): LoadedStory | undefined => {
+  if ("error" in parts.module) {
+    problems.push(`Its story file failed to load: ${parts.module.error}`);
+    return undefined;
+  }
+  const read = readStory(parts.module.value, location.story.exportName, parts.preview ?? NO_PREVIEW);
+  if (typeof read !== "string") return read;
+  problems.push(read);
+  return undefined;
+};
+
+/**
+ * The custom controls a story names, read from its module before its document is made: their modules load for it.
+ *
+ * @param module - the story file's module, as the dev server loaded it.
+ * @param location - the story's place in the tree.
+ */
+export const customControlNames = (
+  module: LoadedStoryParts["module"],
+  location: StoryLocation
+): readonly string[] => {
+  const loaded = loadedStoryOf({ module, docs: { value: undefined } }, location, []);
+  if (loaded === undefined) return [];
+  return Object.values(panelArgTypesOf(loaded.argTypes, [])).flatMap((each) => each.customControl ?? []);
+};
+
+/** What a loaded story declares of its args, as the shell reads it from the story's frame. */
+const declarationOf = (
+  loaded: LoadedStory,
+  docs: ComponentDocs | undefined,
+  { namedValues = {}, customControls }: Pick<LoadedStoryParts, "namedValues" | "customControls">
+): StoryDeclaration => ({
+  customSchemas: customControls?.schemas ?? {},
+  props: docs?.props ?? [],
+  argTypes: panelArgTypesOf(loaded.argTypes, excludedControls(loaded.parameters["controls"])),
+  controls: controlsOfParameter(loaded.parameters["controls"]),
+  storyArgs: panelArgsOf(loaded.args, namedValues),
+  namedValues
+});
+
+/**
+ * A story with the links that carry the values it takes, as a person's link would. Its frame's stays as it is: a frame
+ * takes its values from the shell, which checks them, and alone it draws the story's own. Its component's page shows no
+ * one story's values.
+ */
+const withSetArgLinks = (
+  story: AgentStory,
+  setArgs: SetArgs | undefined,
+  pages: CataloguePages,
+  view: string
+): AgentStory => {
+  if (setArgs === undefined || setArgs.param === "") return story;
+  const query = new URLSearchParams({ args: setArgs.param }).toString();
+  const links = storyLinks(pages, story.id, view === "" ? query : `${view}&${query}`);
+  return { ...story, links: { ...links, frame: story.links.frame, component: story.links.component } };
 };
 
 /**
@@ -258,22 +351,26 @@ export const storyDocument = (
   usage?: { readonly tree: StoryTree; readonly index: UsageIndex }
 ): StoryDocument => {
   const component = agentComponent(location, pages, view, usage);
-  const story =
+  const listedStory =
     component.stories.find((each) => each.id === location.story.id) ??
     agentStory(location.story, false, pages, view);
   const problems: string[] = [];
-  let args: Readonly<Record<string, unknown>> = {};
-  if ("error" in parts.module) problems.push(`Its story file failed to load: ${parts.module.error}`);
-  else {
-    const read = readStory(parts.module.value, location.story.exportName, parts.preview ?? NO_PREVIEW);
-    if (typeof read === "string") problems.push(read);
-    else {
-      const json = jsonValue(read.args);
-      if (isRecord(json)) args = json;
-    }
-  }
+  const loaded = loadedStoryOf(parts, location, problems);
+  const json = loaded === undefined ? undefined : jsonValue(loaded.args);
+  const args = isRecord(json) ? json : {};
   const { docs, problem } = docsOf(parts.docs);
   if (problem !== undefined) problems.push(problem);
+  const declaration = loaded === undefined ? undefined : declarationOf(loaded, docs, parts);
+  const setArgs =
+    declaration === undefined || parts.setArgs === undefined
+      ? undefined
+      : checkedSetArgs(parts.setArgs, declaration, parts.addressTexts);
+  for (const { name, reason } of setArgs?.dropped ?? []) {
+    problems.push(`The value of "${name}" was left out: ${DROPPED_REASONS[reason]}`);
+  }
+  const story = withSetArgLinks(listedStory, setArgs, pages, view);
+  const controls = declaration === undefined ? [] : storyControlsOf(declaration);
+  problems.push(...customControlProblems(controls, parts.customControls));
   return {
     schema: 1,
     requiredProps: (docs?.props ?? []).filter((prop) => prop.isRequired).map((prop) => prop.name),
@@ -290,6 +387,8 @@ export const storyDocument = (
     ...agentDesign(location.story, pages, view),
     docs,
     args,
+    controls,
+    ...(setArgs === undefined ? {} : { setArgs: { accepted: setArgs.accepted, dropped: setArgs.dropped } }),
     problems
   };
 };
@@ -300,6 +399,11 @@ export type StoriesFilter = {
   readonly source?: string | undefined;
   /** Text a component's title holds, any case (`button`); every component when none. */
   readonly component?: string | undefined;
+  /**
+   * Tags, each `name` or `!name`, as the catalogue's address writes them: only the stories holding any `name` and no
+   * `!name`, and the components left with one; every story when none.
+   */
+  readonly tags?: readonly string[] | undefined;
 };
 
 /**
@@ -310,13 +414,23 @@ export type StoriesFilter = {
  */
 export const filteredStories = (document: StoriesDocument, filter: StoriesFilter): StoriesDocument => {
   const text = filter.component?.toLowerCase();
+  const tags = filter.tags ?? [];
   return {
     ...document,
-    components: document.components.filter(
-      (component) =>
-        (filter.source === undefined || component.source === filter.source) &&
-        (text === undefined || component.title.toLowerCase().includes(text))
-    )
+    components: document.components
+      .filter(
+        (component) =>
+          (filter.source === undefined || component.source === filter.source) &&
+          (text === undefined || component.title.toLowerCase().includes(text))
+      )
+      .flatMap((component) => {
+        if (tags.length === 0) return [component];
+        // an unlisted story is one the catalogue's lists leave out: a filter of those lists leaves it out too
+        const stories = component.stories.filter(
+          (story) => !story.isUnlisted && passesTags(story.tags, tags)
+        );
+        return stories.length === 0 ? [] : [{ ...component, stories }];
+      })
   };
 };
 
@@ -436,7 +550,9 @@ export const isChangedStoriesDocument = (value: unknown): value is ChangedStorie
   isRecord(value) &&
   value["schema"] === 1 &&
   Array.isArray(value["stories"]) &&
-  Array.isArray(value["files"]);
+  Array.isArray(value["files"]) &&
+  Array.isArray(value["uiFiles"]) &&
+  Array.isArray(value["outside"]);
 
 /**
  * Whether a value is the code check's document, as a client receives it over HTTP.

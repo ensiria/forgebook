@@ -1,0 +1,177 @@
+// The panel's editors that load on use: nested fields, a search among options, the tokens, the files.
+@use "../../styles/tokens" as *;
+@use "../../styles/mixins";
+
+@layer catalogue {
+  .forgebook-value-object,
+  .forgebook-value-list,
+  .forgebook-value-tuple,
+  .forgebook-value-union,
+  .forgebook-value-json,
+  .forgebook-value-search {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    min-width: 0;
+  }
+
+  .forgebook-value-object[data-depth]:not([data-depth="0"]) {
+    padding-inline-start: $space-2;
+    box-shadow: inset 2px 0 0 0 $separator;
+  }
+
+  .forgebook-value-tuple {
+    flex-direction: row;
+    flex-wrap: wrap;
+
+    > * {
+      flex: 1 1 5rem;
+      min-width: 0;
+    }
+  }
+
+  .forgebook-value-field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 0;
+  }
+
+  .forgebook-value-field > input[type="checkbox"] {
+    align-self: flex-start;
+  }
+
+  .forgebook-value-field__head {
+    display: flex;
+    align-items: center;
+    gap: $space-1-5;
+  }
+
+  .forgebook-value-field__name {
+    font: $text-mono-small;
+    color: $text-secondary;
+  }
+
+  .forgebook-value-list__item {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-1-5;
+    padding: $space-1-5;
+    border-radius: $radius-control;
+    box-shadow: $ring-field;
+  }
+
+  .forgebook-value-list__field {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: $space-1-5;
+    min-width: 0;
+  }
+
+  .forgebook-value-list__buttons {
+    display: flex;
+    flex: none;
+    gap: $space-0-5;
+  }
+
+  .forgebook-value-record__entry {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: $space-1-5;
+    min-width: 0;
+
+    > * {
+      flex: 1 1 7rem;
+    }
+  }
+
+  .forgebook-value-record__name {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 0;
+  }
+
+  .forgebook-value-add {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: $space-1;
+  }
+
+  .forgebook-value-switch {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .forgebook-value-note {
+    margin: 0;
+    font: $text-caption;
+    color: $text-secondary;
+
+    &[data-tone="problem"] {
+      color: $danger-text;
+    }
+  }
+
+  .forgebook-value-json__text {
+    font: $text-mono-small;
+    white-space: pre;
+    overflow: auto;
+  }
+
+  .forgebook-value-search__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 13rem;
+    padding: $space-1;
+    overflow-y: auto;
+    border-radius: $radius-control;
+    background: $surface;
+    box-shadow: $ring-field;
+  }
+
+  .forgebook-value-search__option {
+    display: flex;
+    align-items: center;
+    gap: $space-1-5;
+    min-height: 1.5rem;
+    padding: $space-0-5 $space-1-5;
+    border-radius: $radius-control-small;
+    font: $text-row-compact;
+    color: $text;
+    cursor: pointer;
+
+    &[aria-selected="true"] {
+      font-weight: 600;
+    }
+
+    &[data-active],
+    &:hover {
+      background: $hover;
+    }
+  }
+
+  .forgebook-value-search__swatch {
+    flex: none;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    box-shadow: $ring-field;
+  }
+
+  .forgebook-value-search__name {
+    @include mixins.truncate;
+    flex: 1 1 auto;
+  }
+
+  .forgebook-value-search__hint {
+    @include mixins.truncate;
+    flex: 0 1 45%;
+    font: $text-mono-small;
+    color: $text-secondary;
+    text-align: end;
+  }
+}

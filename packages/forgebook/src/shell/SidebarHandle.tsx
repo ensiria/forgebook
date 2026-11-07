@@ -73,24 +73,20 @@ export const SidebarHandle = ({
 };
 
 /**
- * What borders the sidebar: beside the page its handle, while shown; over it the shade on the page.
+ * The shade on the page under a sidebar lying over it; none while the sidebar lies beside the page.
  *
- * @param props - where the sidebar lies, whether it is shown, its width and how to hide it.
+ * @param props - where the sidebar lies, whether it is shown and how to hide it.
  */
-export const SidebarEdge = ({
+export const SidebarShade = ({
   isOverlay,
   isOpen,
-  width,
-  onWidthChange,
   onHide
 }: {
   readonly isOverlay: boolean;
   readonly isOpen: boolean;
-  readonly width: number;
-  readonly onWidthChange: (width: number) => void;
   readonly onHide: () => void;
 }): ReactNode => {
-  if (!isOverlay) return isOpen ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null;
+  if (!isOverlay) return null;
   return (
     // the pointer's way out; Escape and the sidebar's own button are the others, so the shade stays out of the tree
     <div

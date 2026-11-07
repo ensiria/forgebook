@@ -11,7 +11,7 @@ tests:
 - **on the server** (Vitest), each story rendered to a string, so no component reads `window` or `document` while it
   renders, and its controls checked against its args.
 
-**Requirements:** `forgebook` · Vite 8.3.4+ · `@playwright/test` 1.64+ · Vitest 5 · Docker for the visual tests ·
+**Requirements:** `forgebook` · `@playwright/test` 1.64+ · Vitest 5 · Docker for the visual tests ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/testing/LICENSE)
 
 ```sh
@@ -115,6 +115,9 @@ frame page and runs one test per story and variant (light, dark, both with more 
 structure view), starting Vite through the package manager that runs them (`vite` in `testServer.ts` names
 another command). A story that breaks a rule fails all its variants; `storyBrowserTests` also takes `check`, a rule of
 the package's own run on every frame.
+
+A test fails on a story its frame gave up on (status `pending`: something still loading after the wait of
+`parameters.suspense`), with the frame's reason, before any check runs: a fallback is not what the check is for.
 
 A story about logic (`parameters: { logic: true }`, a hook's or a function's scene) is tested once, in the catalogue's
 default view, named `logic`: the variants only change how it looks. Its test still waits for the frame to be ready, so

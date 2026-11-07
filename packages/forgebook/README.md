@@ -9,7 +9,7 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > and every change is in the
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
-**Requirements:** Node 22.18 or later · Vite 8.3.4+ (the catalogue is built on it; other bundlers are not supported) · React 19 through
+**Requirements:** Node 22.18 or later (the catalogue is built on it; other bundlers are not supported) · React 19 through
 [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
 [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) (a Nuxt project's through
 [`@forgebook/nuxt`](https://www.npmjs.com/package/@forgebook/nuxt)), Svelte 5 through
@@ -47,9 +47,107 @@ sidebar's index, kept with the files they were read from, so a later start answe
 TypeScript until one of those files, a configuration or the lock file changes. Removing `node_modules/.vite` starts from
 nothing.
 
+## Start with one command
+
+```sh
+npx forgebook init
+```
+
+It asks nothing, so an agent can run it. In the folder of the package that holds the components, it reads the framework
+(React, Vue, Svelte, Solid, Preact, Lit, Angular, Next.js, Nuxt, SvelteKit, React Native Web) and the package manager
+from the project's files, and writes:
+
+- `forgebook.config.ts`: the adapter, the title, and story globs over the folders that exist;
+- `forgebook.preview.ts` (`.tsx` where stories are), when the app loads global style sheets: the imports of its entry
+  (Vite's `index.css`, a Next.js root layout's `globals.css`, a SvelteKit layout's, `angular.json`'s `styles`), since
+  stories look wrong without them. Nuxt's adapter reads `css` from `nuxt.config` itself, so it needs none.
+
+Then it prints what is left, each thing named, and the next commands. The packages to add are in the exact command of
+the project's package manager; `--install` runs it. It lists React even on Vue, say, because Forgebook's shell needs it and not every package manager installs a peer by
+itself. Vite is Forgebook's own dependency: a project on an older one installs it beside its own, which stays as it is.
+
+```sh
+npx forgebook new src/Badge.tsx   # a component's first stories
+npx forgebook dev                 # the catalogue, live
+npx forgebook stories --json      # what it lists, and what did not read
+```
+
+It writes nothing and exits with an error when:
+
+- a file is already there (a configuration or a preview, under any name it is read by): `--force` replaces it;
+- `package.json` names no framework it supports, or two that stand on their own: `--framework <name>` chooses (`html`
+  for no framework). An adapter already in `package.json` settles it;
+- a framework, React or Vite in `package.json` cannot reach the version Forgebook takes: the message names each.
+
+- the project has a `.storybook` (or `.rnstorybook`) folder: `--from storybook` takes [that route](#from-storybook),
+  which loads its `main` and so runs its code, or `--framework <name>` starts from the dependencies;
+- a file it would write is a link: it never writes through one, even with `--force`.
+
+`init` runs no code of the project unless `--from storybook` or `--install` asks it to; `--install` is an install like
+any other, with the project's package manager settings and the packages' scripts. `--json` prints the result as a document, a refusal
+too (`refused`, `message`, `hint`, `supported`, exit code 1; a wrong command line is exit code 2, with no document), with `nextSteps` as `{ kind, file, message }`: `kind` is `style-sheet`,
+`provider`, `portal`, `head`, `font`, `postcss`, `setup`, `version` or `storybook`.
+
+### What init cannot work out
+
+A catalogue runs no entry of the app, so what one does for the app does not happen for a story. Each of these is
+reported with the file it was read from:
+
+- **Providers**, the components that wrap the app, and what it installs (`app.use(router)`, `provideRouter()`): a decorator
+  in the preview gives them to the stories that need them.
+- **Portals**: an element beside the app's root in its page (`#modal-root`). A decorator adds it.
+- **The page's head**: a font's or a CDN's `<link>` goes to `head` in the configuration.
+
+### The app's build
+
+A catalogue draws your components with your app's build, with nothing to write:
+
+| What | Where it is read from | Runs your code? |
+|---|---|---|
+| Aliases | `tsconfig.json`'s `paths` and `baseUrl` (through `extends` and `references`) | No: read as text, Vite resolves them |
+| Aliases, `define`, Sass options, `.env` settings, your Vite plugins (Tailwind's, SVGR…) | `vite.config.*` beside the catalogue's configuration | **Yes**, as `vite dev` does |
+| Tailwind before 4, Autoprefixer, any PostCSS plugin | `postcss.config.*`, `.postcssrc*`, `package.json`'s `postcss`, up to the repository's root | **Yes**: a script, and the plugins any of them names |
+
+So every command that starts the catalogue runs those files, on purpose: `forgebook stories` and `check` as well as `dev`.
+The catalogue's own configuration and your components already run there, and this is the build you run every day. A first
+`dev` start loads a `vite.config` twice, as its pre-bundling runs in a process of its own. `forgebook init` never runs them:
+it reads their names and reports them (`appBuild` in `--json`, with `runsCode`). `forgebook dev` prints what it read; what
+could not be read is said on stderr by every command.
+
+From a `vite.config`, a catalogue takes how modules and style sheets resolve and compile, and never the app's page,
+server or output (`root`, `base`, `build`, `server`), from the file and from what its plugins' `config` hooks return; a
+plugin that changes the configuration in place is not stopped. A plugin's `configureServer`, where one starts a backend or a
+watcher, runs on `forgebook dev` and not on a command's own server (`stories`, `check`, `verify`, `mcp`). Its plugins go in, apart from
+two kinds: the framework's own, which the adapter brings, and those known to build an app rather than draw a component
+(routers, service workers, source-map uploads, type checkers). That second list is names, so an upload plugin it does not
+know runs on `forgebook build`: name it in `skipPlugins`. A plugin's `transformIndexHtml` reaches the frames, not the
+catalogue's page. A `define` that writes out a whole `process.env` is left out, since a catalogue bundles code the app does
+not. A file that fails to load is said with what to do; stories that do not need it still draw.
+
+Not read: the options of the framework's own plugin (`react({ jsxImportSource })` goes to the adapter), and `css.modules`
+(Lightning CSS has `css.lightningcss.cssModules`, and no `localsConvention`); both are said. A workspace's other packages'
+`tsconfig` paths are not looked for, only the catalogue's own folder's, as `extends` and `references` lead on from it.
+
+A `vite.config` holding only Vite's import and the framework's plugin is not loaded at all, so a new project pays for
+none of this. Next.js, Nuxt, SvelteKit, Angular and React Native read what is theirs themselves, as their own sections say.
+
+To turn it off:
+
+```ts
+export default defineConfig({
+  // …
+  appBuild: false // or each part:
+  // appBuild: { viteConfig: false, postcss: false, tsconfigPaths: false, skipPlugins: ["some-plugin"], keepPlugins: ["react-router"] }
+});
+```
+
+A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
+says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
+Sass file goes through its own compiler alone.
+
 ## A first catalogue
 
-A component, with its props typed and documented:
+The same by hand, which is also what the command writes. A component, with its props typed and documented:
 
 ```tsx
 // src/Badge.tsx
@@ -144,9 +242,11 @@ too, with a warning.
   it by itself.
 - **A toolbar each reader arranges**: whoever uses the catalogue pins the controls they use to the toolbar, orders
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
-- **A light and a dark catalogue**: the reader picks Light, Dark or System at the sidebar's foot (their browser keeps
-  it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
-- **Keys and named views**: a key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
+- **A light and a dark catalogue**: the reader picks Light, Dark or System in the Interface menu at the sidebar's foot
+  (their browser keeps it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
+- **Keys and named views**: `?` lists the keys, as does the menu at the sidebar's foot, where a reader can turn off every
+  key without a modifier for this browser; a key pressed inside a story, in a text field or in a custom element stays
+  theirs. A key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
   key of any control (`keys: { width: "w" }`), a reader changes theirs in the View menu. The View menu's values are
   saved under a name and picked again; `views` in the configuration offers some to every reader. A dot marks each
   control whose value is not its default.
@@ -157,7 +257,8 @@ too, with a warning.
 - **Widths** to draw a story at, and a **compare** view that draws the same story once per value of one or two
   switches (every theme at both contrasts), per text size or per style sheet, side by side.
 - **Props from the types**: the API table and the panel's controls come from the component's TypeScript props and
-  their TSDoc, nothing written twice.
+  their TSDoc, nothing written twice: objects and lists as nested fields, mixed unions, tokens and named values too
+  ([below](#the-panels-controls)).
 - **Props in groups**: a component with many props lists them under the groups their TSDoc names (`@group Paging`),
   and a prop typed with a documented object (`texts?: FinderTexts`) unfolds to list its members
   ([below](#props-in-groups)).
@@ -165,11 +266,12 @@ too, with a warning.
   reader turns the ordering off with a switch ([below](#required-props-first)).
 - **Shared values, checked**: the values set in the Props tab stay in the address (`args=`), so a link shares them.
   Since whoever writes a link chooses them, a story receives only the props it declares (its component's props, its
-  `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type; anything else
-  (`onclick`, `innerHTML`, a text for a number) is left out and listed above the story, with a button that removes it
-  from the address. A value that is code never comes from a link.
+  `argTypes`, its own args) that the panel lets a person set, each with a value of that prop's type, an object with only
+  the fields its type declares; anything else (`onclick`, `innerHTML`, a text for a number) is left out and listed above
+  the story, with a button that removes it from the address, as is one that cannot be read at all. A value that is code
+  never comes from a link.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
-  long to break and every number a huge one, kept in the address; the elements that then spill out of their parents
+  long to break, every number a huge one and every list many items, nested ones too, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
 - **Examples that fill the page**: on a component's page, any story's box opens over the page, at a width of its own,
   without loading its story again.
@@ -227,6 +329,64 @@ Without `toolbar`, the colour scheme, the contrast, the width and the device sta
 shows nowhere, not even on the toolbar, and keeps its default (the width can still be dragged on the stage). A preset
 may set both; the catalogue's `toolbar` wins, and a control is off when any of them turns it off. A name in `toolbar`
 that is no control at all stops the catalogue with an error saying which.
+
+### Several visual themes
+
+A library with several looks offers them as a switch whose `control` is a gallery: a menu whose items show each look, so a
+reader sees it before applying it.
+
+```ts
+switches: [
+  { ...themeSwitch(), label: "Appearance" },
+  {
+    id: "look",
+    label: "Theme",
+    control: "gallery",
+    apply: { kind: "attribute", name: "data-look" },
+    default: "plain",
+    values: [
+      { value: "plain", label: "Plain", isUnset: true },
+      { value: "paper", label: "Paper", preview: { image: "previews/paper.png" }, sheet: "looks/paper.css" },
+      {
+        value: "night",
+        label: "Night",
+        preview: { swatches: ["#0b1020", "#7c8cff"], font: "Harbor Sans" },
+        implies: { theme: "dark" },
+        sheet: "looks/night.css"
+      }
+    ]
+  }
+]
+```
+
+- **`control: "gallery"`** beside `segments` and `list`. The first load carries only its button: the menu's code, the
+  previews and their pictures load when it first opens. Radio buttons, as the shell's other menus: one tab stop, the arrow
+  keys move and choose, Escape closes. Each item is named by the value's `label`; a value with no preview shows its first
+  letter.
+- **`preview`** is `{ image }`, a file by its path from the configuration's folder (absolute in a preset), or
+  `{ swatches, font }`, 1 to 8 plain colours and a font's name. A font is only a name: drawn in it where the reader has it
+  installed, never fetched. A preview loads nothing from an address: the configuration's check refuses one, and a `url()`.
+- **`implies`** sets other switches while the value is drawn: a look drawn only for dark selects dark by itself. The
+  implied control is off and says what sets it, and its key does nothing. The address keeps the reader's own value, which
+  comes back when the value is left: `?look=night&theme=light` draws dark, and the link stays as written. An implied
+  value wins over the address and over a story's `globals`; between two values that imply different values of one switch,
+  the switch declared first wins; an implied value implies nothing further, which the check enforces. Compare leaves
+  out a cell it contradicts (with `look,theme`, Night only at Dark) and does not offer a switch implied now.
+- **`sheet`** is a style sheet of that value alone, processed by Vite in dev and in a build, and fetched only while
+  the value is drawn. It comes after the source's sheets, the switches' in the order declared, and only with Styles › Full,
+  as the source's theme. Its path may not be an address; its contents are your own CSS, so what it imports is yours to
+  decide, as in a source's sheets. On a change the old sheet stays until the new one has loaded, and the frame's root changes with it,
+  so a story is never drawn with neither.
+
+A source's page colour can follow such a switch, so a story's box waits on the colour it will have:
+`background: { light, dark, bySwitch: { look: { night: { dark: "#0b1020" } } } }`. The first declared switch whose value
+gives the scheme's colour wins; otherwise `light` and `dark`.
+
+The catalogue's own menu, at the sidebar's foot, is named Interface, so it reads apart from a switch named Appearance: it
+colours the catalogue around the stories, never the stories. `strings: { appearance: "…" }` renames it; the
+configuration's `appearance` key and `data-forgebook-appearance` keep their names.
+
+### Backgrounds
 
 The Background control offers Forgebook's five pictures and the catalogue's own:
 `backgrounds: { builtIn: ["checkerboard"], custom: [{ id: "paper", label: "Paper", light: { color: "#fffdf5" } }] }`
@@ -434,8 +594,8 @@ export type FinderProps = {
 
 - The API reference lists the props that name no group first, then each group under its name, in the order the
   groups first appear among the props; the events keep their own heading after them. The Props tab does the same: the
-  props that name no group by control, as before, then each group with its controls, its toggles and the props it
-  cannot set.
+  props that name no group in the order the source declares them, whatever their control, then each group with its
+  controls in that order and the props it cannot set.
 - Every group starts open; a reader folds one away from its name.
 - To show some groups first, name them in order: `propGroups: ["Selection", "Paging"]` in the configuration for every
   component, or `parameters: { propGroups: ["Texts"] }` in a component's meta, written as a list of plain strings.
@@ -474,6 +634,104 @@ export default { component: Finder, parameters: { requiredFirst: false } } satis
 - Agents get the props in the order of the source and the names of the required ones at the top of
   `forgebook story --json` and `get_story` (`requiredProps`): the setting shapes the pages only.
 
+## The panel's controls
+
+The Props tab draws a control for each prop from its type, with nothing to write:
+
+| The prop's type | Its control |
+|---|---|
+| `string`, `number`, `boolean` | a field, a number, a toggle; a text with a line break becomes a text area |
+| `"sm" \| "md"` | buttons or a list; a search past 12 values |
+| `readonly string[]`, `{ a: string; b?: number }` | nested fields, with add, remove and reorder by buttons, so a keyboard does it too |
+| `[number, number]`, `Record<string, number>` | a field per item; names and values |
+| `"sm" \| number`, `string \| string[]` | choose the type, then the value |
+| `unknown`, `object`, a type too deep or wider than 40 fields | JSON, checked as it is typed |
+| a component, a function, a node | what the source's `namedValues` offer for its type, searched by name; a node takes a text too |
+
+A story names another control the way Storybook's do, and a few of Forgebook's own:
+
+```ts
+argTypes: {
+  note: { control: "textarea" },
+  options: { control: "object" }, // fields from the type, else from the story's own arg, else JSON
+  accent: { control: { type: "token", of: "color" } }, // from the catalogue's `tokens`
+  gap: { control: { type: "token", of: "space", format: "var(--{name})" } }, // writes `var(--space-small)`
+  cover: { control: { type: "file", accept: "image/*" } }
+}
+```
+
+`of` is a token's type or a part of its name. A prop asks for tokens from its TSDoc as well (`@token color`). The tokens
+load when such a control is drawn; without any to offer it stays a text field.
+
+Each value has three states, and the panel keeps them apart: the story's own (nothing in the address), the panel's (an
+empty text included), and no value at all, where the component receives `undefined` over what the story's args give it.
+Beside each field, one button leaves it with no value and another goes back to the story's; a cleared number has no
+value. The address writes no value as `{"forgebookUnset":true}`.
+
+Every value is plain JSON, kept in `args=`, text in any script included, and checked when a link is opened, in an embed
+too: an object may hold only the fields its type declares. What JSON's fallback holds has no type to check against, so
+what would run if a component spread the object on an element is left out (`onclick`, `innerHTML`, `srcdoc`, Vue's
+`.innerHTML`, an address that starts with `javascript:`), as is a named value; `__proto__`, `constructor`, `prototype` and
+values nested over 16 levels are not read at all. A token's value is a plain text, as a colour's is, and a link may give
+another. A file is kept in the link as a `data:` address, so a `file` control takes about 6 KB, of a picture, sound, film,
+plain text or a PDF. An object of exactly `of` and `named` reads as a named value. A very long value makes a very long
+address, which some servers refuse, so the worst case leaves out a value too long for one.
+
+A `Date` prop gets a date and time field, and the story receives a `Date`; a link writes it as `{"forgebookDate":"<ISO>"}`.
+The `date` control a story names sets a number of ms instead, as Storybook's does.
+
+The editors are one chunk that loads when the first such prop is drawn: a catalogue of plain props never asks for it.
+
+### Controls of your own
+
+A control the panel lacks is a module of yours, registered by name and loaded when a story names it. A catalogue that
+registers none loads nothing for this.
+
+```ts
+// forgebook.config.ts
+export default defineConfig({ /* … */ argControls: { rating: "./controls/rating.tsx" } });
+
+// a story
+argTypes: { score: { control: { type: "rating", settings: { stars: 7 } } } }
+```
+
+```tsx
+// controls/rating.tsx
+import type { ArgControlProps, ValueSchema } from "forgebook/arg-control";
+import { createRoot } from "react-dom/client";
+
+export const schema = { type: "integer", minimum: 0, maximum: 10 } satisfies ValueSchema;
+
+export const mount = (element: HTMLElement, props: ArgControlProps) => {
+  const root = createRoot(element);
+  root.render(<Rating {...props} />);
+  return () => root.unmount();
+};
+```
+
+`mount(element, { value, onChange, argType })` draws in the element and returns what takes it away. It is a function rather
+than a component, so it can be written in any framework, whatever the stories' is: `createApp` in Vue, `mount` in Svelte,
+plain DOM. `argType` holds the arg's `name`, `label` and `description`, and the control's `options`, `min`, `max`, `step`
+and `settings`. The control keeps what it draws: it is mounted again only when the value changes from outside it.
+
+`schema` says what the value looks like, in JSON Schema's words: `type`, `enum`, `const`, `minimum`, `maximum`, `minLength`,
+`maxLength`, `pattern`, `items`, `minItems`, `maxItems`, `properties`, `required`, `additionalProperties`, `anyOf`. Any other
+keyword is refused, since a schema that says less than it seems to would let a link through, as is a keyword holding what it
+cannot use. A `pattern` has the `u` flag, and may not repeat a repeat (`(a+)+`), which could hang the page. The value is
+always JSON, so a link keeps it and an agent sets it with no UI; what JSON cannot hold goes through named values, as
+`{ of, named }`.
+
+A link's value is checked against the schema before it reaches the story, and each `onChange` too. A control no one
+registered, a module that fails to load, a `mount` that throws and a value that does not fit each give a sentence beside the
+field; the other fields go on working. An error the control throws later, in its own event handlers, is out of reach: it is
+the page's.
+
+**A custom control runs in the shell's page, with a plugin's trust.** It can read and do whatever the catalogue's page can;
+unlike a story, it has no origin of its own to keep it apart. Register only code you would run as a plugin. To be read by
+agents its module also loads on the dev server when a command asks about a story that names it, for its `schema`: keep what
+touches the page inside `mount`. A name that no control has (`control: "selct"`) is read as a custom control, and says so
+beside the field.
+
 ## Docs pages
 
 Guides, foundations and recipes are Markdown files with a little front matter, not MDX: a page is read at build time, and
@@ -502,27 +760,6 @@ The buttons read their colours from the page's theme.
 
 ```story acme:actions-button--primary
 ```
-
-## Search
-
-The field at the top of the sidebar searches the whole catalogue. The tree filters by name as you type, for browsing;
-beside it a list ranks everything the words find, each component or page with what matched inside it and why (a prop,
-an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere (with the sidebar hidden, ⌘K alone,
-which shows it), ↑ and ↓ move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
-
-A prop has an address of its own, so a link to one can be pasted anywhere: `?component=acme:inputs-select#prop.value`,
-and `#prop.Group.label` for a prop of a part named in `subcomponents`. A heading of a component's documentation file
-has one too (`#accessibility`), as a docs page's has.
-
-There is no search server and nothing to set up: the plugin builds the index with the catalogue, and the shell loads it
-the first time someone types, so a reader who never searches pays nothing. A static build searches as the dev server
-does. Only what the page does not already hold goes in the index: under 4 KB gzipped for a small library of ten components
-with their documentation and a few guides. On a dev server, the first search waits for your packages' TypeScript for the props; names and docs
-pages answer first.
-
-Search and `forgebook find` rank alike, with the same synonyms: `modal` finds a `Dialog`, and a name counts more than a
-sentence. A sentence copied from a page finds that page first. Change the words people see with `strings`, as any
-other text of the shell (`"search.kindPage": "Guides"`).
 
 ## The props
 
@@ -687,6 +924,27 @@ page of the catalogue's own `docs`; a library's page is linked by its address (`
 the file are listed above the home and by `forgebook pages`, and `forgebook page home` reads it as an agent would. Restart
 `forgebook dev` after adding or removing the file.
 
+## Search
+
+The field at the top of the sidebar searches the whole catalogue. The tree filters by name as you type, for browsing;
+beside it a list ranks everything the words find, each component or page with what matched inside it and why (a prop,
+an event, a heading, a sentence, a story), the words marked. `/` or ⌘K (Ctrl+K) comes to the field from anywhere (with the sidebar hidden, ⌘K alone,
+which shows it), ↑ and ↓ move, Enter opens at the exact heading or prop, ⌘Enter or a modified press opens a new tab, Escape empties the field.
+
+A prop has an address of its own, so a link to one can be pasted anywhere: `?component=acme:inputs-select#prop.value`,
+and `#prop.Group.label` for a prop of a part named in `subcomponents`. A heading of a component's documentation file
+has one too (`#accessibility`), as a docs page's has.
+
+There is no search server and nothing to set up: the plugin builds the index with the catalogue, and the shell loads it
+the first time someone types, so a reader who never searches pays nothing. A static build searches as the dev server
+does. Only what the page does not already hold goes in the index: under 4 KB gzipped for a small library of ten components
+with their documentation and a few guides. On a dev server, the first search waits for your packages' TypeScript for the props; names and docs
+pages answer first.
+
+Search and `forgebook find` rank alike, with the same synonyms: `modal` finds a `Dialog`, and a name counts more than a
+sentence. A sentence copied from a page finds that page first. Change the words people see with `strings`, as any
+other text of the shell (`"search.kindPage": "Guides"`).
+
 ## Design links
 
 A component carries its own link to Figma, on its meta; a story with a design of its own writes it over the meta's:
@@ -724,12 +982,44 @@ blocks it uses Open in Figma. A catalogue published with a Content Security Poli
 `forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
 `address` of the Design tab to hand a person (it opens the story alone without the plugin). `list_stories` gives each component's, and `CATALOG.md` lists it.
 
+## Stepping through a play
+
+The Interactions tab lists a play's named steps and each action it took through the `canvas` and `userEvent` of its context,
+with its time and its failure. **Step through** mounts the story again and stops before each action and each `step`: **Next**
+does that one, **Continue** runs the rest. A `getBy…` query is logged but cannot stop, as it returns at once. What a play
+imports itself (`storybook/test`, `@testing-library/user-event`) runs unrecorded: use the context's tools to see it here.
+
+## Plays when a story opens
+
+A story's `play` runs when it opens on a dev server, where its author is checking it. In a build it waits: a reader of
+published docs did not ask for it, and the Interactions tab offers it with **Run**. A reader changes this for themself in
+that tab or the View menu (kept in their browser), an address says it for one link (`?play=off`, `?play=on`), and
+`play: "on"` or `"off"` in the configuration sets the default. Tests, `forgebook check` and `check_story` open a frame with
+no such word, so they run every play whatever a reader or a catalogue chose.
+
+## Tags
+
+Tag stories as CSF does, in the preview, a file's meta or a story; a `!name` takes one away:
+
+```ts
+export default { component: Button, tags: ["beta"] } satisfies Meta<typeof Button>;
+
+export const Experiment: StoryObj = { tags: ["!beta", "wip"] };
+```
+
+When any story has a tag of its own, the sidebar offers a filter beside the search: tick a tag to keep the stories that
+hold it, press its other button to leave them out. A story stays when it holds any tag asked for and none left out. The
+filter lives in the address (`?tag=beta&tag=!wip`), so a link keeps it, and it holds from page to page; a page opened by
+its address shows even if the filter leaves it out. `dev`, `test`, `autodocs`, `play-fn` and `test-fn` say what a tool
+does with a story, and are not offered. Agents ask the same way: `forgebook stories --tag beta --tag '!wip'`, or `tags`
+on `list_stories`.
+
 ## Coming from Storybook
 
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and
 titles from the file's path, `args` and `argTypes` (with their controls), actions from `fn()` or an `argTypes` action,
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
-`tags` (`!dev`, `!test`), a story's `globals`, JSX in `.js` story files (listed and shown as code; Vite compiles JSX only in
+`tags` (`!dev`, `!test`, and your own for the [tag filter](#tags)), a story's `globals`, JSX in `.js` story files (listed and shown as code; Vite compiles JSX only in
 `.jsx` and `.tsx`, so such a library adds the plugin its own Storybook uses for them, through the framework's plugins),
 hooks in a `render` or a decorator (React and
 Preact, with the story's state kept when a decorator draws `<Story />`), Storybook's preview hooks from
@@ -746,6 +1036,14 @@ or a list. A placeholder kept in args or parameters is left out of the answers, 
 cannot load (it uses one so, or one of its own files reads `document`) leaves the
 answers working: it is left out of them and named among their problems, with what it used. A
 `**` pattern skips `node_modules` unless it names it.
+
+A link keeps working too: `args=` reads Storybook's form (`label:Hello+world;count:5;open:!true;tags[0]:a;tags[1]:b`,
+with `!null`, `!hex(…)`, `!rgb(…)`, `!hsl(…)` and `!date(…)`) as well as Forgebook's own JSON, told apart by JSON's first
+`{`. Its values are typed by the prop that receives them, so `5` is a number for a number and stays `5` for a text, and they
+meet the same check as any link's. Forgebook writes its own form once a value changes in the panel. What an arg here
+cannot hold (an object such as `style.color:red`, a list with a gap) is named above the story, not dropped
+in silence. An arg's `argTypes.<name>.if` (`{ arg: "kind", eq: "link" }`, `{ global: "theme", neq: "dark" }`, with `truthy`,
+`exists`, `eq` or `neq`) hides its control the same way Storybook's does, and leaves its value alone.
 
 It lists what Storybook's indexer lists:
 
@@ -772,6 +1070,8 @@ and whose root holds the stories, with the paths to the packages' sources, gets 
 
 It does not read MDX, doc blocks or addons. Actions are explicit only: an `on*` prop is not turned into an action by
 its name.
+
+### From Storybook
 
 To try it on a Storybook project, run `npx forgebook init --from storybook` in the folder that holds `.storybook`. It
 writes `forgebook.config.ts`: the story globs of `main` (the MDX pages left out), the preview as Forgebook's preview,
@@ -863,15 +1163,66 @@ export default defineConfig({
   with no `docs`, and `forgebook changed` says it finds no story through the imports. `forgebook docs` and `forgebook new`
   still read the types when run, since they are asked for that. `usedIn: true` with it is an error.
 
+## When a configuration is refused
+
+Everything below stops every command with an exit code of 1 and a message that names the mistake, and a Vite build with
+the plugin too, since each would otherwise give a catalogue that looks right and is not:
+
+- **A key nothing reads.** `toolbr: […]` says `it has no key "toolbr". Did you mean toolbar?`; a preset's keys and those of
+  `build`, `shell`, `a11y`, `backgrounds`, `widthRange` and `controls` are checked too. An adapter's and a plugin's options
+  are their own functions' arguments, so nothing adds a key to the configuration.
+- **A toolbar, a key or a view the shell cannot use**, as [the toolbar](#the-toolbar) says.
+- **A file that does not load.** A syntax error is named as `/path/forgebook.config.ts:3:3: …`, in the configuration or in a
+  TypeScript file it imports. In a JavaScript file it imports, Node gives no place, and the message names the configuration.
+- **A story pattern that matches nothing**, for `forgebook build`, `stories`, `check` and `verify`: each pattern is read on
+  its own, so a mistaken one beside one that works is named as well, and what a `!` pattern leaves out does not count.
+  `forgebook dev` warns instead and opens a home that says where it looks, since you may be about to write the first story;
+  saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
+  may match nothing.
+
+## Stories that load
+
+A frame says a story is ready only once what the story loads is in the page, so `check`, `verify`, `shot`, the generated
+tests and the compare view read the content and never a fallback. A play function starts after the same wait, and the
+frame waits again after it, for what its clicks load. For React (Next.js and React Native too) and Vue (Nuxt too), that
+is every `Suspense` boundary, whoever wrote it, however deep; in React also a transition or a deferred value still
+loading, which shows no fallback.
+
+The wait is bounded: 10 s by default. Past it the frame's status is `pending`, with the reason on the page and in
+`data-forgebook-pending-reason`. `check` reports the story `notVerified` and exits non-zero, `verify` answers
+`not-verified`, `shot` marks the picture `pending`, the generated test fails and the Accessibility card does not pass it:
+what shows is not what you meant to check. Say so when a story is meant to stay there, or give it longer:
+
+```tsx
+export const Loading = { parameters: { suspense: { expected: true } } }; // a loading state: ready at once
+export const Slow = { parameters: { suspense: { timeout: 15_000 } } }; // in ms; in the preview, for every story
+```
+
+`check` stops listening to a frame at 30 s, and a generated test at 25 s: past that a longer `timeout` fails as a frame
+that never answered, never as a pass. A story with `expected` is checked as it first drew, and `verify` names it in
+`skipped`, so a preview cannot turn the wait off unseen.
+
+React and Vue do not say what is pending in public, so the adapters read their private tree. Each page first tries that
+reading on a boundary known to be pending and on one known not to be; on a version of React or Vue where it no longer
+works, every story is `pending` with that reason instead of ready on a guess. A cost of about one tree walk per story,
+in the adapter. A root a story creates itself with `createRoot` is out of reach, and so is what a story loads without
+`Suspense` (a `useEffect` fetch with a spinner): a play function can wait for that with `findBy…`.
+
+The other adapters have no such wait. Angular's `drawn` waits for the application to be stable. Preact's
+`preact/compat` `Suspense` and Solid's `<Suspense>` are not read; a story using them is ready once drawn, so its play
+function has to wait for the content. Svelte, Web Components and plain HTML have no fallback to read (Svelte's `{#await}`
+is a state of the component: the same).
+
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files |
+| `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files; see [a story file that cannot be read](#a-story-file-that-cannot-be-read) |
+| `forgebook build --watch` | Builds again when a file the catalogue reads changes; see [building on every change](#building-on-every-change) |
 | `forgebook prebundle` | Pre-bundles the catalogue's dependencies, as `dev` does on a first start: before it, in CI or an image |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
-| `forgebook init --from storybook` | Writes `forgebook.config.ts` from a project's `.storybook` (or on-device `.rnstorybook`) folder: its framework, story globs, preview and toolbar globals |
+| `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
@@ -882,16 +1233,33 @@ export default defineConfig({
 | `forgebook mcp` | Serves the same answers to an agent over the Model Context Protocol |
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
-| `forgebook verify` | Runs the checks on every story a change touches, with one exit code |
+| `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
+| `forgebook graph` | A map of the components and tokens, generated from the source: what exists, what each is for, how to choose |
+| `forgebook audit` | The colours, sizes and components a project actually uses, with no catalogue |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
-| `forgebook agents` | Adds Forgebook's instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
+| `forgebook init --agents` | What a project's coding agents need too: `.mcp.json`, instructions and skill, CI, a hook running `verify`; `--browser` installs the testing package and its browser, `--draw` draws a story ([more](#set-a-project-up-in-one-prompt)) |
+| `forgebook hook <assistant>` | What an assistant's hook runs when it is about to finish: `verify` on the change, sending the agent back on red |
+| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; `--with-deps` also installs what it needs of the system |
+| `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
+| `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
+
+### A story file that cannot be read
+
+On a dev server, a story file that does not parse, or that has no meta, is one problem and the rest of the catalogue
+keeps drawing. The problem names the file with its line and column, on the page, in `forgebook stories`, `forgebook
+errors` and their MCP tools. Saving the fix is enough, with no restart: a story already drawn stays drawn while its file
+is broken, and redraws in place. `forgebook build` and a test run still fail on it: a build ends with
+`src/Bad.stories.tsx:4:45 does not parse: …` and a non-zero exit, and only `--verbose` adds the bundler's stack.
+
+A story that loads but cannot be drawn says why in its frame and in `forgebook check`. A frame's stack gives the lines of
+the code the browser runs, not those of the file; the browser's console maps them.
 
 `forgebook build` names each script it writes by its hash alone (`assets/3f9a1c2b.js`): a catalogue names every story
 file's scripts once per loader, so shorter names make a smaller build. To read what a build holds, name each script after
@@ -960,20 +1328,32 @@ say what a catalogue has.
 
 The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
 
+## Building on every change
+
+`forgebook build --watch` stays running and builds again when a file the catalogue reads changes, a new story file or
+docs page included, for a folder a host, an embedding app or another machine serves. A failed build says why on one line,
+leaves the last good output and waits for the next edit. A rebuild takes about two thirds of a whole `forgebook build`
+(2.2 to 2.9 s against 3 to 4 s on 5000 stories) and writes the whole folder again; the process holds about 2 GB there. Use
+`forgebook dev` to work on stories: it redraws in place.
+
 ## A preview for every pull request
+
 `forgebook build` writes static files, so any static host gives each pull request its own catalogue, for free. `--base` is
 for a host that serves it under a sub-path. A host that sets a `Content-Security-Policy` needs `blob:` in `script-src` for
 the Accessibility card: a build keeps axe gzipped, and the frame runs it from a blob once unpacked. It also needs the
 catalogue's own origin in `connect-src` (`'self'`): the page fetches the docs, code, pages and "Used in" a build keeps
 gzipped. This workflow builds on
 every pull request and keeps the result as an artefact; the last step is yours, and any host works:
+
 ```yaml
 # .github/workflows/catalogue-preview.yml
 name: catalogue preview
 on:
   pull_request:
+
 permissions:
   contents: read
+
 jobs:
   preview:
     runs-on: ubuntu-latest
@@ -986,13 +1366,17 @@ jobs:
       - run: npm ci
       - run: npx forgebook build --out preview --base "/pr-${{ github.event.number }}/"
       - uses: actions/upload-artifact@v4
+        with:
           name: catalogue-preview
           path: preview
       # then publish the folder, for example:
       # GitHub Pages:  actions/upload-pages-artifact, then actions/deploy-pages (one site, so without --base per PR)
       # Cloudflare:    npx wrangler pages deploy preview --branch "pr-${{ github.event.number }}"
       # Your server:   rsync -az preview/ "user@host:/var/www/previews/pr-${{ github.event.number }}/"
+```
+
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+
 ## Stories on an origin of their own
 
 A story's code, or a value a shared link puts in one of its props (an `href`, an `html`), runs in its frame. So that it
@@ -1049,8 +1433,10 @@ A command, an agent or `curl` sends no browser headers: `forgebook mcp`, `forgeb
 network, so use it only on one you trust.
 
 ## Your look in the shell
+
 The catalogue's page can take your library's colours, fonts and corners. Nothing runs in the browser for it: the theme is
 written into the page at build, and the frames are left alone, since they belong to your stories.
+
 ```ts
 // forgebook.config.ts
 shell: {
@@ -1059,16 +1445,31 @@ shell: {
     dark: { accent: "#b28bff" },
     fonts: { sans: "Inter, sans-serif" },
     radius: { control: "4px", card: "8px" }
+  }
 }
+```
+
+A library with design tokens (`tokens` in the configuration) can theme the shell from them in a few lines. Each role takes the
+token's value in both appearances, its `light` and `dark` themes first; colours written by hand win, and a token that
+is not there or is no colour is warned about and leaves the shell's own. The theme is read when the configuration is, so
+restart after editing the tokens.
+
+```ts
+shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.background.card" } } }
+```
+
 Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
 `window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,
 `danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
 theme too, and the catalogue's wins role by role.
-The reader's Appearance menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
+
+The reader's Interface menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a
 dark shell. It stays on the system's while comparing, since several themes share the stage. `appearance: "story"` makes
 it the catalogue's default; a reader's own choice always wins.
+
 When the catalogue starts, a role that does not exist is named, and so is a hex colour that leaves a text or code under
 4.5:1 on its ground, or the accent, which draws the keyboard's focus, under 3:1. Other colour notations are not checked.
+
 Fonts are yours to load: a web font goes in a style sheet of your own, `shell.css`, with `@font-face`. That sheet loads
 after the shell's. It is also an escape hatch, since the shell's class names are not public API and can change in any
 release. Layout is not themable, though a font does change how wide text runs.
@@ -1120,28 +1521,75 @@ missing-story messages, and the box a frame shows when a story fails.
 
 ## For agents
 
-`forgebook agents` gives a project's coding agents what they need without being told: how to write a story file here,
-and the commands that check one, as a section of `AGENTS.md` (renewed in place when it runs again; `--skill` writes
-the same as an Agent Skill any agent can load).
+### Set a project up in one prompt
+
+```sh
+npx forgebook init --agents --browser --draw --json
+```
+
+Unattended, it writes the catalogue's files, then:
+
+- **`.mcp.json`**, with Forgebook's server beside the ones it holds.
+- **`AGENTS.md`** (Forgebook's section, its other sections kept) **and the skill**, in `.agents/skills` and `.claude/skills`.
+- **A CI workflow**, `.github/workflows/forgebook-verify.yml`, running `forgebook verify` against a pull request's target.
+- **A hook that runs `verify`**, so an agent cannot finish on red. `--hooks` names them; by default those of the assistants
+  the repository shows signs of, otherwise the commit's.
+
+`--browser` installs `@forgebook/testing` and its browser, about 200 MB, and implies `--install`. `--draw` then writes a
+component's first stories and draws them in the browser, trying components until one draws and removing the stories of those
+that do not. If components fail for want of a provider, on React, the wrappers the app's entry mounts it in are copied into the
+preview as a decorator (`draw.liftedProviders`), and stay there if a story then draws. When none does, each attempt is in `draw.attempts` with a `kind` (`missing-import`, `provider`, `style-sheet`,
+`server-only`, `native-build`, `blank`…), what was said and what to do; the exit code is then 1.
+
+`--agents` merges and never replaces what the project wrote (the skill's file is Forgebook's own, and is renewed): a JSON file it cannot parse, a link, a workflow or a commit hook already there stays as
+it is and is named in `nextSteps`. It keeps a catalogue already there and starts beside a Storybook, loading nothing of it.
+In a workspace's package, the files go at the repository's root, and find the package through its folder; a repository that
+does not track the package (a home folder kept in git, say) is not used, and they go in the package's folder.
+
+| `--hooks` | Writes | When | On red |
+|---|---|---|---|
+| `claude` | `.claude/settings.json`, `Stop` | Claude Code is about to finish | Sent back (exit 2) |
+| `codex` | `.codex/hooks.json`, `Stop` | Codex is about to finish, once the hook is reviewed and trusted | Sent back (exit 2) |
+| `gemini` | `.gemini/settings.json`, `AfterAgent` | Gemini CLI's turn ends | Sent back (exit 2) |
+| `cursor` | `.cursor/hooks.json`, `stop` | Cursor's agent ends | Another turn starts with the reason: its `stop` hook cannot refuse |
+| `pre-commit` | `.husky/pre-commit`, else `.git/hooks/pre-commit` | A commit (`verify --quick`) | The commit is refused |
+
+Those formats are the ones each assistant's documentation gives; no assistant was run against them here. An assistant not
+listed reads the instructions, and meets the commit's hook.
+
+The hook is `forgebook hook <assistant>`. Each time an assistant stops, it loads the catalogue's configuration, so the
+project's code runs unattended there as it does for `verify`. A branch that changed no UI file since it left its default
+branch starts no server. A failure that comes back the same while the hook itself is what continued the turn lets the agent
+finish, told not to call the change done: an agent that cannot fix something must not spin on it. A hook that cannot run lets
+the agent finish, with a word on stderr, because no agent can repair it. The commit's hook refuses a commit the same way, on
+what the branch changed and not only what is staged; `git commit --no-verify` is the way past it, and a clone that has not
+installed yet commits as before.
+
+`forgebook init` alone runs none of the project's code. `--draw` does, as starting a catalogue does: see [the app's
+build](#the-apps-build). An install runs what the project's package manager settings and the packages' scripts say.
+
+### What agents read
+
+A story's values can be set without the panel: `controls` in `forgebook story --json` and `get_story` says what each prop
+takes, and `forgebook story <id> --args '<json>'` or `story_address` with `args` checks the values as a link's are and
+answers the links that carry them ([the panel's controls](#the-panels-controls)).
+
+`forgebook agents` gives a project's coding agents what they need without being told, as a section of `AGENTS.md` of under
+3 KB (renewed in place when it runs again; `--skill` writes the same as an Agent Skill any agent can load): what to run
+before saying a change is done, how to look things up, and how to write a story in this project's framework, read from its
+catalogue or its `package.json` (`--framework` names another). Agents work better with text they ask for than with a long
+file, so the rest waits for them: `forgebook guide` lists the topics (a framework, `stories`, `devices`, `switches`, `docs-pages`,
+`links`, `commands`, `setup`), `forgebook guide <topic>` prints one and `forgebook guide all` the whole guide.
 
 A coding agent can use the catalogue while it works: find a story's id, read a story's args and its component's
 props, and hand a person the link that opens it. Add the MCP server to the project's agent configuration, for
 example `.mcp.json` for Claude Code:
 
-```
-
-A library with design tokens (`tokens` in the configuration) can theme the shell from them in a few lines. Each role takes the
-token's value in both appearances, its `light` and `dark` themes first; colours written by hand win, and a token that
-is not there or is no colour is warned about and leaves the shell's own. The theme is read when the configuration is, so
-restart after editing the tokens.
-
-```ts
-shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.background.card" } } }
 ```json
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers eighteen tools: `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, and `search_catalogue`, the search people use. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers 23 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `component_graph`, a map of the components and tokens to read instead of opening files, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, `list_switches`, its switches and each value's view, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
 `node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
@@ -1167,27 +1615,36 @@ page's words are replaceable as the shell's are (`strings`): `previewOpen`, `pre
 
 A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
 `@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
-The most common mistake of an agent working on a design system is a colour or a size written by hand. Name your
-[DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and each theme in a file of
-its own, and agents can ask what to write instead:
+
+The most common mistake of an agent working on a design system is a colour or a size written by hand. Agents can ask what
+to write instead, with nothing set up: Forgebook reads what the application already declares (see `check-code` below). To
+say it yourself, name your [DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and
+each theme in a file of its own, and those are the system:
+
 ```ts
 tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
 ```
+
 A library gives its tokens to every catalogue that shows it: the same list on its source, by path from the module that
 declares the source. It is read from that module's text, never by running it, so a broken story cannot hide a token: write
 it in the object of `export const source`, with plain strings and paths inside the package. A source re-exported or
 spread from another module gives no tokens.
+
 ```ts
 export const source: StorySource = { id: "acme-ui", tokens: ["tokens.json"] /* … */ };
 ```
+
 A catalogue reads each source's files in its `sources` order, then its own, so its aliases reach a library's palette. When
 two authors give one token different values in the same theme the last stands, which makes the catalogue's own the final
 word: it is what puts the libraries together. The answer says so in `clashes` (`kept`, `replaced`), the command warns,
 and neither fails: a clash is a choice to review, not a token that cannot be read. A file over another may write only
 `$value`: the token keeps its type, description and deprecation.
+
 ```sh
 npx forgebook tokens --category color --json
 npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whether each is really close
+```
+
 `forgebook mcp` offers the same as `list_tokens`, `get_token` and `nearest_token`. References (`{a.b}`, `$ref`), `$extends`
 and `$root` are followed, and a base alias follows what a theme overrides. Deprecated tokens are never suggested. Colours
 in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed but counted as `uncompared`. A theme can
@@ -1214,7 +1671,114 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
-code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
+code to paste. It does not check props, which the type checker does. It exits non-zero on a problem, for CI.
+
+It also reads what a change reuses. An added import of a component whose own TSDoc says `@deprecated` or `@replacedBy` fails,
+naming what to use. A new exported component fails as `duplicate-component` when its code is a copy of another's under any name;
+or when it has the name of one that exists, past words like `Primary` or `Custom`, and two signs of being it (a telling root
+such as `button`, shared props, nearly the same classes); or when `Button` exists and a new `CustomButton` renders a plain
+`<button>`, though not a `SubmitButton`, which says what it is for. New means new since the commit compared with: an edit or a
+moved file is not. It compares only what the file could use, in its package and those its package depends on. It passes if it
+renders the other, which is reuse, or if a comment says why, above it: `// forgebook-ignore duplicate-component: why`, listed
+in `excused`. One sign, and what `@useWhen` and `@avoidWhen` say of a component just imported, are `advice`, which fails nothing.
+Imports are followed relative, through `@/`, `~/` and `#/` under the importing file's own folders, and by a workspace package's
+name; not through a third party.
+
+**It needs no tokens file.** With none named, it compares with what the application already declares, read as text and never
+run: custom properties at the root and in theme selectors (`.dark`, `[data-theme]`, a colour-scheme query), and a selector
+holding a dozen or more of them, as a library's root does; Tailwind 4's `@theme` and default theme; a Tailwind configuration
+and its presets, as far as they are written plainly; the sheet and the configuration `components.json` names. `tokenSources`
+says which files were read and `tokenNotes` what needs running to know. Fewer than five colours is not a palette, so colours
+are then left to `skipped`. A value it cannot judge takes a comment on its line or the one above, with the reason:
+`/* forgebook-ignore raw-color: a brand's own colour */`; the answer lists each one in `excused`, with its reason. Only files
+in the catalogue's folder are compared (`notCompared` names the others), since another package has its own system. Nothing
+outside the repository is read, whatever a file names, and a catalogue's `build --agent-index` carries these tokens. `tokens:
+[]` in the configuration says the application is not to be read: with no source giving tokens, values are then not checked,
+`colours and sizes not checked: no tokens file`.
+
+What it leaves alone on purpose, since these are where false alarms came from on real projects: a drawing's colours (`<path
+fill>`, gradient stops, a canvas), masks, fully transparent ends of gradients, black or white in a shadow, a `var()`'s fallback,
+what the page's head reads (`theme-color`), emails and generated social images. A size is compared with tokens of its own
+role (spacing, radius, font size) that are steps of a scale, so `--sidebar-padding: 16px` does not make every `16px` a
+mistake; Tailwind's own scale counts only where a class's brackets hold the whole value (`p-[16px]`, not `h-[calc(100%-16px)]`).
+
+A design system can say how to choose among fixed patterns and how its parts fit, in a few tags of a component's TSDoc, with
+nothing new to learn:
+
+```ts
+/**
+ * Pick one of a few options, all in view.
+ *
+ * @intent choose-one: up to five options, all visible
+ * @parent Form, Fieldset
+ * @children Radio
+ * @insteadOf select
+ */
+export const RadioGroup = …
+```
+
+Components sharing an `@intent` are the choices for it, and agents read them with `forgebook graph --intent choose-one` or
+`component_graph`, or as `advice` when they import one. `check-code` enforces what can be checked, in `.tsx` and `.jsx` only,
+as `composition`: an element under a component `@parent` does not allow; a component `@children` or `@siblings` does not allow;
+a plain `<select>` where `@insteadOf` names one. An element at the root of what a component returns, or held in a prop, may be
+rendered anywhere, so its parent is not judged; a component above that itself renders an allowed parent passes; and which pattern a screen should have used is not something a check can tell. A file beside a
+component that cannot carry a comment says the same, named after the file or the component: `radio-group.rules.json` or
+`RadioGroup.rules.json`, `{ "RadioGroup": { "intent": ["choose-one: up to five options"], "parent": ["Form"] } }`. A meant exception takes `// forgebook-ignore composition:
+why`, listed in `excused`.
+
+`forgebook graph` is the map itself, generated from the source so it cannot drift: components, what each is for, what renders
+what, token counts; `--component Button` adds what renders it and the tokens its file uses. It needs no catalogue.
+
+`forgebook audit` reports what a project actually uses, read from its files, with no catalogue, no configuration and no code
+run: `37 greys, 5 used 90 % of the time`. It is for a project with no design system as much as one with: colours in any
+notation counted as one, how many go through tokens and how many are written by hand, sizes by what they are for, and
+components that look like one, by name and by what they render, take and carry, never by name alone. It exits 0: it is a
+report, and `check-code` is what fails. With `--json`, `actions` lists the next steps, the largest first, each with the
+command that lists what to edit:
+
+```sh
+npx forgebook audit --json
+npx forgebook audit --value "#64748b" --json   # every line that writes it by hand
+```
+
+It does not read a tokens file a catalogue names, only what the application declares, and a `.js` file's JSX is not read.
+
+`forgebook verify` and `verify` are what an agent runs before saying a change is done, and what a pull request's workflow
+runs. A change cannot pass on nothing:
+
+```sh
+$ npx forgebook verify --since origin/develop
+src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Badge.tsx
+2 changed UI files, 1 with stories: not verified; colours and sizes not checked: no tokens file
+```
+
+- **Every changed UI file is covered or fails.** A UI file is a component or a style sheet by its extension (`.tsx`, `.jsx`,
+  `.vue`, `.svelte`, `.astro`, `.component.ts`, `.component.html`, `.css`, `.scss`, `.sass`, `.less`), a story file, or a
+  script whose text defines or draws a component (`customElements.define`, `LitElement`, `@Component`, `defineComponent`,
+  JSX in a `.js` file). Tests, type declarations and generated files are not, and neither is any other script: a helper
+  or a hook does not fail, and the stories it reaches still run. What `check-code` finds in a file no one sees (a turned-off
+  check, a deleted test) is a note in the answer; `check-code` itself still fails on it.
+- **A file used through another component counts, and says so.** Stories reach a file through what they render and what
+  those files import, by the file that declares each imported name, so being exported from a barrel covers nothing. A
+  sheet counts through whatever imports it, `@use` and `@import` followed; a preview and the sheets it names are shown by
+  every story. Only stories that ran count: a project with no browser gets `not-verified`, and the reason.
+- **What was not checked is never reported as passed.** `skipped` is in the verdict (`partly-verified`) and in the line:
+  colours and sizes without a tokens file or with one that cannot be read, accessibility with `a11y: false`, a UI file only
+  another catalogue of the repository can answer for. None of these fails. A UI file nothing reaches in a package with no
+  catalogue of its own does: it is this catalogue's to show. So does a package whose types point at its build, since
+  imports stop there.
+- **It compares from where the branch left.** `--since <ref>` starts from the merge base, so what the base gained since is
+  not read as your change; with no `--since`, from the default branch (`origin/HEAD`, then `main` or `master`), so what you
+  committed counts. A branch cut from another, as `develop`, gives it with `--since`. With no `--since`, an empty change
+  is `not-verified`: the work may be committed where this cannot see, as in a shallow clone. CI gives `--since` and the
+  history: `fetch-depth: 0`.
+- **Every variant by default**, each story in light, dark, both at more contrast, the structure only, and narrow, on one
+  browser, four pages at once. `--quick` runs the default view, and the verdict says so.
+
+The exit is non-zero on `failed` and `not-verified`, zero on `verified`, `partly-verified` and `nothing-to-verify`. The
+JSON answer is schema 2: `verdict`, `summary`, `skipped`, `since`, `base`, `variants`, `files`, `uiFiles` (each with its
+`coverage`, and its `reason` and `fix` when not covered), `storyCount`, `stories` (the first twenty, with their links),
+`ran`, `failures` (only what found something), `notVerified` (stories still loading when the frame gave up), `code` (`checked`, `problems`, `notes`) and `problems`.
 
 A library tells agents what it offers with `forgebook docs`, run in its folder: `CATALOG.md`, one dense line per
 component, hook, helper and style module (what it is, how to import it, its props, the id of a story that shows it),
@@ -1226,7 +1790,7 @@ package's `package.json`:
 { "forgebook": { "catalog": { "file": "CATALOG.md", "sections": ["components", "pages", "modules"], "exclude": ["./internal/*"] } } }
 ```
 
-`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed) or a
+`forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed, a file that does not parse) or a
 docs page that names what is not there, and its JSON lists every story for a script.
 
 ## Packages

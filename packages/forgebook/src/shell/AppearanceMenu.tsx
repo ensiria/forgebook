@@ -25,8 +25,16 @@ const ICONS: Readonly<Record<Appearance, IconName>> = {
  *
  * @param props - the appearance shown and its setter.
  */
-export const AppearanceMenu = ({ appearance, setAppearance, offered }: AppearanceState): ReactNode => {
-  const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
+export const AppearanceMenu = ({
+  appearance,
+  setAppearance,
+  offered,
+  onShowKeys
+}: AppearanceState & {
+  /** Opens the list of the shell's keys, which a reader who turned them off reaches here. */
+  readonly onShowKeys: () => void;
+}): ReactNode => {
+  const { isOpen, isDrawn, setIsOpen, closeAfterChoice, buttonRef, panelRef, panelId } = usePopover();
   const name = useId();
   return (
     <div className="forgebook-appearance">
@@ -59,7 +67,7 @@ export const AppearanceMenu = ({ appearance, setAppearance, offered }: Appearanc
                   checked={each === appearance}
                   onChange={(): void => {
                     setAppearance(each);
-                    setIsOpen(false);
+                    closeAfterChoice();
                   }}
                 />
                 <Icon name={ICONS[each]} size={14} />
@@ -67,6 +75,16 @@ export const AppearanceMenu = ({ appearance, setAppearance, offered }: Appearanc
               </label>
             ))}
           </fieldset>
+          <button
+            type="button"
+            className="forgebook-button forgebook-button--quiet"
+            onClick={(event: MouseEvent<HTMLButtonElement>): void => {
+              setIsOpen(false, event);
+              onShowKeys();
+            }}
+          >
+            {STRINGS.keys}
+          </button>
         </div>
       ) : null}
     </div>

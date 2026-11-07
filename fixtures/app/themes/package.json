@@ -1,0 +1,7 @@
+{
+  "name": "@fixture/themes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A catalogue on the fixture kit with several visual themes: a gallery, values that imply another switch, sheets of a value alone. A package of its own so that Vite keeps its cache apart from the fixture app's when both start at once."
+}

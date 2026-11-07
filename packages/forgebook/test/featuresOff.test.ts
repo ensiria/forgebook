@@ -14,6 +14,7 @@ import { docsOfArgs, propsOfArgs } from "../src/argsProps.ts";
 import { catalogueSettings } from "../src/catalogue.ts";
 import { codeLiteral } from "../src/codeLiteral.ts";
 import { DEFAULT_SWITCHES } from "../src/switches.ts";
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import { textsModuleCode } from "../src/vite/builtTexts.ts";
 import type { ForgebookConfig } from "../src/vite/config.ts";
 import { mergedLists, type ResolvedConfig, resolveConfig } from "../src/vite/configFile.ts";
@@ -40,6 +41,7 @@ const kitConfig = (lists: ResolvedConfig["lists"]): ResolvedConfig => ({
   dir: KIT_DIR,
   framework: STUB_FRAMEWORK,
   title: "Kit",
+  argControls: {},
   logo: undefined,
   heights: undefined,
   stories: ["src/*.stories.tsx"],
@@ -57,7 +59,8 @@ const kitConfig = (lists: ResolvedConfig["lists"]): ResolvedConfig => ({
   home: undefined,
   hasPlayTools: false,
   frames: ISOLATED_FRAMES,
-  build: { readableNames: false }
+  build: { readableNames: false },
+  appBuild: resolvedAppBuild(false)
 });
 
 /** The code of what a hook answered, or an empty text. */

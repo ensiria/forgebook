@@ -50,10 +50,6 @@ const shellStrings = {
   >,
   text: "Text",
   textScale: (scale: TextScale): string => `${scale}%`,
-  controlMenu: (label: string): string => `${label} on the toolbar`,
-  unpinControl: "Remove from the toolbar",
-  hideInView: "Hide in View",
-  showInView: "Show in View",
   compare: "Compare",
   compareOff: "Off",
   compareText: "Text sizes",
@@ -67,6 +63,7 @@ const shellStrings = {
   embedFailed: "This story could not be shown.",
   embedPanelFailed: "This could not load: reload the page to try again.",
   clearSearch: "Clear the search",
+  keys: "Keyboard keys",
   fromTexts: "From the story's texts:",
   backToText: "Back to the text",
   widthTyped: "Width in px",
@@ -111,7 +108,7 @@ const shellStrings = {
   signatureParameter: "Parameter",
   signatureReturns: "Returns",
   signatureNone: "It takes no parameters.",
-  playStatus: { running: "running", passed: "passed", failed: "failed" },
+  playStatus: { running: "running", passed: "passed", failed: "failed", off: "not run" },
   fixedExamples: "This story draws fixed examples: its props are not set from here. Every prop, for reading:",
   allProps: "Props",
   openFrame: "Open in a new tab",
@@ -142,20 +139,25 @@ const shellStrings = {
   unknownComponent: (id: string): string =>
     `No component "${id}": it may have been renamed. Pick one in the sidebar.`,
   props: "Props",
-  propGroups: { choice: "Choices", text: "Text and numbers", toggle: "Toggles" },
   otherProps: "Other props",
   unset: "—",
+  unsetProp: (prop: string): string => `${prop}: leave without a value`,
+  resetProp: (prop: string): string => `${prop}: back to the story's value`,
+  stateUnset: "no value",
+  stateEmpty: "empty text",
   unsetDefault: (value: string): string => `— (${value})`,
   defaultIs: "Default:",
   pickColor: (prop: string): string => `${prop}: pick a colour`,
   rangeValue: (prop: string): string => `${prop}: value`,
   setByStory: "Set by the story",
+  setBy: "Set by {value}",
   required: "Required",
   requiredFirst: "Required first",
   requiredFirstHint: "Every component's required props before the others; kept in this browser",
   resetArgs: "Reset",
-  appearance: "Appearance",
-  appearanceOf: (name: string): string => `Appearance: ${name}`,
+  // not "Appearance": a catalogue's own switch may bear that name, and this one colours the catalogue, never the story
+  appearance: "Interface",
+  appearanceOf: (name: string): string => `${STRINGS.appearance}: ${name}`,
   appearances: { light: "Light", dark: "Dark", system: "System", story: "Follow the story" },
   worstCase: "Worst case",
   worstCaseHint:
@@ -172,7 +174,7 @@ const shellStrings = {
   tabError: "The tab could not be loaded",
   pageLoadError: "The page could not be loaded",
   docsError: "The component could not be read",
-  indexProblems: "Some story files could not be placed"
+  indexProblems: "Some story files could not be read or placed"
 };
 
 /** The shell's texts. */

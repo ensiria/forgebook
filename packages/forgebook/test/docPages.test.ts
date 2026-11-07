@@ -401,8 +401,10 @@ describe("agents", () => {
       check: async () => "unused",
       checkPage: async () => "unused",
       shot: async () => "unused",
+      verify: async () => "unused",
       servePreview: async () => "unused",
-      plugins: pluginsDocument([])
+      plugins: pluginsDocument([]),
+      switches: { schema: 1, switches: [] }
     });
     const tool = (name: string): (typeof tools)[number] => {
       const found = tools.find((each) => each.name === name);

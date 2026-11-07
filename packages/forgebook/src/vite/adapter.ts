@@ -29,6 +29,8 @@ export type StoryComponent = {
    * can renew the docs.
    */
   readonly sources: readonly string[];
+  /** Whether its file exports it as its default, which an import then writes without braces; read for `forgebook new`. */
+  readonly isDefaultExport?: boolean;
 };
 
 /** What a framework reads of a story file: its component, `{ docs: { name: null } }` without one, or why it cannot. */
@@ -40,6 +42,12 @@ export type StoryComponentResult = StoryComponent | { readonly docs: NoComponent
  * @param storyFile - the story file's absolute path.
  */
 export type ExtractStoryComponent = (storyFile: string) => StoryComponentResult;
+
+/** What a catalogue tells an adapter of how much of the app's build it reads. */
+export type AdapterContext = {
+  /** Whether it reads the app's build at all: `false` with `appBuild: false`, when no project code of it may run. */
+  readonly readsAppBuild: boolean;
+};
 
 /** A framework, as the plugin uses it. */
 export type FrameworkAdapter = {
@@ -63,8 +71,12 @@ export type FrameworkAdapter = {
    * opens, since Vite's scanner cannot read pages that are generated; none by default.
    */
   readonly browserDependencies?: readonly string[];
-  /** The Vite plugins the framework needs in a catalogue (React's Fast Refresh); none by default. */
-  readonly vitePlugins?: () => Promise<readonly PluginOption[]>;
+  /**
+   * The Vite plugins the framework needs in a catalogue (React's Fast Refresh); none by default. Given what the catalogue
+   * reads of the app's build, for an adapter that reads more of it (Nuxt's modules); called with nothing by an older
+   * core.
+   */
+  readonly vitePlugins?: (context?: AdapterContext) => Promise<readonly PluginOption[]>;
   /** The framework's own kind of component file, for a framework whose components are not all TypeScript; none by default. */
   readonly componentFiles?: ComponentFiles;
   /**

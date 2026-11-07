@@ -149,6 +149,12 @@ speaks and refuses any other by name.
   know, so a plugin that needs a new field raises its `forgebook` peer range to the first release that has it.
 - **Also frozen by this contract:** `ViewSwitch`, the context of a CSF `beforeEach` and `FigmaLink`, since it exposes them.
 
+## A control, not a plugin
+
+A panel control is not part of this contract: it is a module a catalogue registers in `argControls`, with a plugin's trust
+and a contract of its own (`mount` and `schema`, in the README's "Controls of your own"). A plugin cannot add one: a control
+belongs to the catalogue whose stories name it.
+
 ## What it leaves out, on purpose
 
 - **The shell's layout.** No sidebar panels, no pages, no toolbar buttons, no replacing a part. Each would freeze how the
@@ -162,6 +168,7 @@ speaks and refuses any other by name.
 - **The docs pages' notes.** A block cannot report a problem to `forgebook pages`, and a plugin fence inside a list or a quote
   stays code, without a word.
 - **Plugins from presets.** A catalogue lists its own; a preset cannot. It can be added.
-- **Roles on switches.** The colour scheme, the contrast, the language stay the catalogue's to declare.
+- **Roles on switches, and what a value brings.** The colour scheme, the contrast, the language stay the catalogue's to
+  declare; so do a value's `implies`, `preview` and `sheet`.
 - **The server tests.** `prepare` and `decorators` run in frames, so in the browser tests; a story rendered to a string
   has neither.

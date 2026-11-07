@@ -20,6 +20,7 @@ const story = (parts: Partial<LoadedStory>): LoadedStory => ({
   loaders: [],
   beforeEach: [],
   forceState: [],
+  suspense: { isExpected: false, timeout: 10_000 },
   replay: undefined,
   controls: "all",
   argTypes: {},

@@ -47,6 +47,7 @@ export const nativeFrameRenderer: FrameRenderer = {
     const mounted = reactFrameRenderer.mount(root, drawing, onError);
     return {
       drawn: mounted.drawn,
+      ...(mounted.settled === undefined ? {} : { settled: mounted.settled }),
       update: mounted.update,
       unmount: (): void => {
         mounted.unmount();

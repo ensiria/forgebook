@@ -1,6 +1,6 @@
 /**
  * The texts of the shell's parts that load after the first screen, but for the home and the docs pages
- * (`pageStrings.ts`): a component's page, the panel's tabs but Props, the View menu's panel, the embed panel and page,
+ * (`pageStrings.ts`): a component's page, the panel's tabs but Props, the View menu's panel, a pinned control's menu, the embed panel and page,
  * the comparison, the story clock's bar, the plugins' hosts and the note on args a link dropped. They load with the
  * first of those parts, so a first load carries none of them.
  *
@@ -16,6 +16,10 @@ import { lateStrings } from "./strings.ts";
 /** The later parts' texts, as shown: Forgebook's, with the catalogue's replacements. */
 export const LATER_STRINGS = lateStrings({
   audienceError: "This part of the page could not be loaded",
+  controlMenu: (label: string): string => `${label} on the toolbar`,
+  unpinControl: "Remove from the toolbar",
+  hideInView: "Hide in View",
+  showInView: "Show in View",
   controlKey: (control: string, key: string | undefined): string =>
     key === undefined ? `${control}: no key` : `${control}: key ${key.toUpperCase()}`,
   changeKey: "Change the key: press it, then the new key; Backspace takes it away",
@@ -54,6 +58,15 @@ export const LATER_STRINGS = lateStrings({
   playTitle: "Play function",
   playTime: (ms: number): string => `${ms} ms`,
   playAgain: "Run again",
+  playRun: "Run",
+  playOnOpen: "Play stories when they open",
+  playOff: "This story has a play function. It has not run: run it, or have stories play when they open.",
+  playStepThrough: "Step through",
+  playNext: "Next",
+  playContinue: "Continue",
+  playPaused: (action: string): string => `Next: ${action}`,
+  playActionsNote:
+    "The log and the stepping follow the canvas and userEvent of the play's context; what a play imports itself runs unrecorded.",
   playNoSteps: "The play names no steps: wrap its parts in step(label, run) to see them here.",
   codeFromArgs: "from the args",
   codeRender: "the story's render",
@@ -90,11 +103,17 @@ export const LATER_STRINGS = lateStrings({
   fillPage: "Fill the page",
   fillPageNamed: (name: string): string => `Fill the page with ${name}`,
   backToPlace: "Back to its place",
-  backToPlaceNamed: (name: string): string => `Put ${name} back in its place`,
+  backToPlaceNamed: (name: string): string => `Back to its place: ${name}`,
   examples: "Examples",
   pageError: "The component's page could not be read",
   droppedArgs: "The link sets values this story does not take; they were left out:",
-  droppedArgReasons: { undeclared: "not one of its props", type: "not of the prop's type" },
+  droppedArgReasons: {
+    undeclared: "not one of its props",
+    type: "not of the prop's type",
+    unreadable: "its value could not be read",
+    markup: "this framework writes it into HTML, so a link may give only plain text",
+    control: "its control refuses it, or could not be loaded"
+  },
   removeDroppedArgs: "Remove them from the address",
   events: "Events",
   calls: "Calls",

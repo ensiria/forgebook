@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import { tokensModule } from "../src/vite/storylessRoutes.ts";
@@ -26,6 +27,7 @@ const configIn = (dir: string, tokens: readonly string[]): ResolvedConfig => ({
   dir,
   framework: STUB_FRAMEWORK,
   title: "Acme",
+  argControls: {},
   logo: undefined,
   heights: undefined,
   stories: [],
@@ -43,7 +45,8 @@ const configIn = (dir: string, tokens: readonly string[]): ResolvedConfig => ({
   plugins: [],
   home: undefined,
   frames: ISOLATED_FRAMES,
-  build: { readableNames: false }
+  build: { readableNames: false },
+  appBuild: resolvedAppBuild(false)
 });
 
 /** No source resolves: the configurations here name none. */

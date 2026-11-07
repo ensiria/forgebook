@@ -30,6 +30,11 @@
       "tagName": "@group",
       "syntaxKind": "block",
       "allowMultiple": false
+    },
+    {
+      "tagName": "@token",
+      "syntaxKind": "block",
+      "allowMultiple": false
     }
   ]
 }

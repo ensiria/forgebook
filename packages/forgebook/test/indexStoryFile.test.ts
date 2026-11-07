@@ -576,6 +576,8 @@ describe("indexStoryFile", () => {
   });
 
   it("reports a syntax error", () => {
-    expect(indexStoryFile("A.stories.tsx", "export default {")).toMatch(/^A\.stories\.tsx does not parse: /);
+    expect(indexStoryFile("A.stories.tsx", "export default {")).toMatch(
+      /^A\.stories\.tsx:1:17 does not parse: /
+    );
   });
 });

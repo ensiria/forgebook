@@ -10,7 +10,7 @@ import type { UserConfig } from "vite";
 
 import { packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { pageModulePath } from "./pages.ts";
-import { prebundled, scannedEntries } from "./prebundled.ts";
+import { prebundled, scannedEntries, scanOptions } from "./prebundled.ts";
 
 /**
  * A file's text, or none when it cannot be read.
@@ -43,11 +43,15 @@ const hasOwnOutput = (userConfig: UserConfig): boolean =>
  */
 export const catalogueConfig = (config: ResolvedConfig, userConfig: UserConfig): UserConfig => ({
   root: config.dir,
+  // a hoisted workspace can keep a package's React in its folder while the adapter, at the root, reads another copy, and
+  // every component then fails with "invalid hook call": the catalogue's folder decides
+  resolve: { dedupe: ["react", "react-dom"] },
   // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
   // story files (the project's and the sources') are scanned for what their components import
   optimizeDeps: {
     include: prebundled(config, packageResolver(config.dir)),
-    entries: scannedEntries(config, packageResolver(config.dir), readTextFile)
+    entries: scannedEntries(config, packageResolver(config.dir), readTextFile),
+    rolldownOptions: scanOptions()
   },
   build: {
     rolldownOptions: {

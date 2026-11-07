@@ -11,5 +11,7 @@ export default defineConfig({
   framework: vue(),
   title: "Vue fixture",
   sources: ["./stories.ts"],
+  // a custom control written in Vue: nothing in its contract names a framework
+  argControls: { stepper: "./controls/stepper.ts" },
   languages: [{ id: "it", label: "Italiano" }]
 });

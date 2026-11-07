@@ -155,6 +155,8 @@ const measureStory = async (
     .then(async (handle) => String(await handle.jsonValue()))
     .catch(() => "timeout");
   if (status === "timeout") return { story: storyId, reason: `no answer in ${timeout} ms` };
+  // the height of a fallback would hold the story's box at the wrong size
+  if (status === "pending") return { story: storyId, reason: "it was still loading when the frame gave up" };
   if (status !== "ready") {
     const error = await page.locator(".forgebook-frame-error__message").first().textContent();
     return { story: storyId, reason: error ?? "the story failed" };

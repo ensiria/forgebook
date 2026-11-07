@@ -5,7 +5,17 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,6 +23,7 @@ import { runScriptProcess } from "@ensiria/cli-kit/testing";
 import type { ScriptProcessRun } from "@ensiria/cli-kit/testing.types";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { printable } from "../bin/forgebook/auditRun.ts";
 import { KIT_DIR, STORYBOOK_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
@@ -66,6 +77,70 @@ afterAll(() => {
 const forgebook = (config: string, argv: readonly string[]): ScriptProcessRun =>
   runScriptProcess(ENTRY, [...argv, "--config", config, "--url", NO_SERVER]);
 
+describe("a configuration that cannot be used", () => {
+  /** A folder of files, one of them the configuration. */
+  const folderOf = (name: string, files: Readonly<Record<string, string>>): string => {
+    const dir = join(root, name);
+    mkdirSync(join(dir, "src"), { recursive: true });
+    for (const [file, code] of Object.entries(files)) writeFileSync(join(dir, file), code);
+    return dir;
+  };
+  const brokenFile = 'export default {\n  title: "x"\n  framework: 1,\n};\n';
+
+  it.each(["forgebook.config.ts", "forgebook.config.mts", "forgebook.config.js"])(
+    "names the file, line and column of a syntax error in %s",
+    (file) => {
+      const dir = folderOf(`syntax-${file}`, { "package.json": '{"type":"module"}', [file]: brokenFile });
+      const run = forgebook(join(dir, file), ["stories"]);
+      expect(run.exitCode).toBe(1);
+      expect(run.stderr).toContain(`${join(dir, file)}:3:3: `);
+    }
+  );
+
+  it("names the file at fault when the configuration imports it", () => {
+    const dir = folderOf("syntax-imported", {
+      "forgebook.config.ts": 'import shared from "./shared.ts";\nexport default shared;\n',
+      "shared.ts": brokenFile
+    });
+    const run = forgebook(join(dir, "forgebook.config.ts"), ["stories"]);
+    expect(run.exitCode).toBe(1);
+    // Node resolves an import to its real path, which a temporary folder may not be
+    expect(run.stderr).toContain(`${realpathSync(join(dir, "shared.ts"))}:3:3: `);
+  });
+
+  it("names the configuration when it fails for another reason", () => {
+    const dir = folderOf("throws", { "forgebook.config.ts": 'throw new Error("boom");\n' });
+    const run = forgebook(join(dir, "forgebook.config.ts"), ["stories"]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain(`${join(dir, "forgebook.config.ts")}: it did not load: boom`);
+  });
+
+  it("stops on a misspelt key before answering", () => {
+    const dir = folderOf("misspelt", {
+      "forgebook.config.ts": `export default ${JSON.stringify({
+        framework: STUB_FRAMEWORK,
+        title: "T",
+        stories: ["src/*.stories.tsx"],
+        toolbr: []
+      })};\n`
+    });
+    const run = forgebook(join(dir, "forgebook.config.ts"), ["stories", "--json"]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stdout).toBe("");
+    expect(run.stderr).toContain('it has no key "toolbr". Did you mean toolbar?');
+  });
+
+  it.each(["build", "stories", "check x", "verify"])(
+    "%s stops on a story pattern that matches nothing, naming it",
+    (command) => {
+      const empty = catalogue(root, `empty-${command.split(" ")[0]}`, {});
+      const run = runScriptProcess(ENTRY, [...command.split(" "), "--config", empty]);
+      expect(run.exitCode).toBe(1);
+      expect(run.stderr).toContain('No story file matches "src/*.stories.tsx"');
+    }
+  );
+});
+
 describe("forgebook stories", () => {
   it("lists the stories as JSON from a server of its own, with their links", async () => {
     const run = forgebook(healthy, ["stories", "--json"]);
@@ -89,6 +164,78 @@ describe("forgebook stories", () => {
     const run = forgebook(broken, ["stories"]);
     expect(run.exitCode).toBe(1);
     expect(run.stderr).toContain("again.stories.tsx");
+  }, 60_000);
+
+  it("keeps the good stories of a catalogue with a story file that does not parse, and names its place", () => {
+    const config = catalogue(root, "Unparsed", {
+      "good.stories.tsx": 'export default { title: "Good" };\nexport const Main = {};\n',
+      "bad.stories.tsx": 'export default { title: "Bad" };\nexport const Main = { args: { a: 1 };\n'
+    });
+    const run = forgebook(config, ["stories", "--json"]);
+    // a CI step still fails on it
+    expect(run.exitCode).toBe(1);
+    const document: unknown = JSON.parse(run.stdout);
+    expect(document).toMatchObject({ components: [{ title: "Good" }] });
+    expect(document).toMatchObject({
+      problems: [expect.stringMatching(/bad\.stories\.tsx:2:\d+ does not parse: /)]
+    });
+  }, 60_000);
+
+  it("gives an agent the same problem through forgebook mcp", () => {
+    const config = join(root, "Unparsed", "forgebook.config.ts");
+    const message = (id: number, method: string, params: unknown): string =>
+      JSON.stringify({ jsonrpc: "2.0", id, method, params });
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", config, "--url", NO_SERVER], {
+      input: [
+        message(0, "initialize", {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "test", version: "1" }
+        }),
+        message(1, "tools/call", { name: "list_stories", arguments: {} })
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: SERVER_TIMEOUT
+    });
+    expect(run.stdout).toMatch(/bad\.stories\.tsx:2:\d+ does not parse/);
+    expect(run.stdout).toContain("Good");
+  }, 60_000);
+});
+
+describe("forgebook build", () => {
+  it("ends on a story file that does not parse with its place, without a stack", () => {
+    // a real framework, for a build's pages: the fixture app's packages under a catalogue of its own
+    const project = join(root, "unparsed-build");
+    mkdirSync(join(project, "src"), { recursive: true });
+    symlinkSync(
+      join(import.meta.dirname, "..", "..", "..", "fixtures", "app", "node_modules"),
+      join(project, "node_modules"),
+      "junction"
+    );
+    writeFileSync(join(project, "package.json"), '{ "type": "module" }\n');
+    const config = join(project, "forgebook.config.ts");
+    writeFileSync(
+      config,
+      [
+        'import { react } from "@forgebook/react/vite";',
+        'import { defineConfig } from "forgebook";',
+        'export default defineConfig({ framework: react(), title: "Unparsed", stories: ["src/*.stories.tsx"] });',
+        ""
+      ].join("\n")
+    );
+    writeFileSync(
+      join(project, "src", "bad.stories.tsx"),
+      'export default { title: "Bad" };\nexport const Main = { args: { a: 1 };\n'
+    );
+    const build = (...flags: readonly string[]): ScriptProcessRun =>
+      runScriptProcess(ENTRY, ["build", "--config", config, "--out", join(root, "unparsed-site"), ...flags]);
+    const run = build();
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toMatch(/bad\.stories\.tsx:2:\d+ does not parse: /);
+    expect(run.stderr).not.toMatch(/\bat .+:\d+:\d+/);
+    const verbose = build("--verbose");
+    expect(verbose.exitCode).toBe(1);
+    expect(verbose.stdout).toMatch(/\bat .+:\d+:\d+/);
   }, 60_000);
 });
 
@@ -161,6 +308,37 @@ describe("forgebook mcp", () => {
       }
     ]);
   }, 60_000);
+
+  it("carries a story pattern that matches nothing in list_stories' problems, for an agent about to write a story", () => {
+    const empty = catalogue(root, "empty-mcp", {});
+    const messages = [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-11-25", capabilities: {} }
+      },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "list_stories", arguments: {} } }
+    ];
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", empty, "--url", NO_SERVER], {
+      input: messages.map((message) => JSON.stringify(message)).join("\n"),
+      encoding: "utf8"
+    });
+    expect(run.status).toBe(0);
+    const answers: unknown[] = run.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(answers[1]).toMatchObject({
+      id: 2,
+      result: {
+        structuredContent: {
+          problems: [expect.stringContaining('No story file matches "src/*.stories.tsx"')]
+        }
+      }
+    });
+  }, 60_000);
 });
 
 describe("forgebook docs", () => {
@@ -179,6 +357,47 @@ describe("forgebook new", () => {
     expect(run.stdout).toContain('import { Select } from "./Select";');
     expect(run.stdout).toContain("args: { options: [] },");
     expect(run.stdout).toContain("export const SizeLg: Story<typeof Select>");
+  }, 60_000);
+
+  it("imports a default export without braces, and one exported both ways by its name", () => {
+    const project = join(root, "default-export");
+    mkdirSync(join(project, "src"), { recursive: true });
+    writeFileSync(join(project, "package.json"), "{}\n");
+    // the framework's docs are found from the component's package
+    symlinkSync(join(KIT_DIR, "node_modules"), join(project, "node_modules"), "junction");
+    writeFileSync(
+      join(project, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: { jsx: "preserve", strict: true, skipLibCheck: true, module: "esnext" },
+        include: ["src"]
+      })
+    );
+    writeFileSync(
+      join(project, "src", "App.tsx"),
+      "function App(props: { title: string }) {\n  return props.title;\n}\nexport default App;\n"
+    );
+    writeFileSync(
+      join(project, "src", "Both.tsx"),
+      "export const Both = (props: { title: string }) => props.title;\nexport default Both;\n"
+    );
+    writeFileSync(
+      join(project, "src", "Card.tsx"),
+      "export default function Card(props: { title: string }) {\n  return props.title;\n}\n"
+    );
+    const newStories = (file: string, ...flags: readonly string[]): ScriptProcessRun =>
+      runScriptProcess(ENTRY, [
+        "new",
+        join(project, "src", file),
+        "--framework",
+        "react",
+        "--print",
+        ...flags
+      ]);
+    const app = newStories("App.tsx");
+    expect(app.stdout).toContain('import App from "./App";');
+    expect(newStories("Both.tsx").stdout).toContain('import { Both } from "./Both";');
+    expect(newStories("Both.tsx", "--export", "default").stdout).toContain('import Both from "./Both";');
+    expect(newStories("Card.tsx").stdout).toContain('import Card from "./Card";');
   }, 60_000);
 
   it("refuses to replace a stories file that exists", () => {
@@ -648,6 +867,13 @@ describe("forgebook changed", { timeout: 60_000 }, () => {
     expect(refused.exitCode).not.toBe(0);
     expect(refused.stderr).toContain("names no commit");
     expect(readFileSync(precious, "utf8")).toBe("keep\n");
+
+    // a change whose only story file does not parse touches no story that can be read, and still fails
+    git("checkout", "--", "src/helper.ts");
+    writeFileSync(join(project, "src", "broken.stories.tsx"), "export const = ;\n");
+    const verify = runScriptProcess(ENTRY, ["verify", "--config", config, "--url", NO_SERVER, "--json"]);
+    expect(verify.exitCode).toBe(1);
+    expect(verify.stderr).toMatch(/broken\.stories\.tsx:1:\d+ does not parse/);
   });
 });
 
@@ -722,6 +948,342 @@ describe("forgebook check-code", { timeout: SERVER_TIMEOUT }, () => {
   });
 });
 
+describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
+  /** A catalogue in a repository, its sheet declaring a system and one commit made. */
+  const appProject = (name: string, sheet: string, written?: string): string => {
+    const config = catalogue(root, name, { "A.stories.tsx": "export default { title: 'A/B' };\n" });
+    const project = join(root, name);
+    if (written !== undefined) writeFileSync(config, written);
+    writeFileSync(join(project, ".gitignore"), "node_modules/\n.vite/\n");
+    writeFileSync(join(project, "src", "a.css"), sheet);
+    writeFileSync(
+      join(project, "src", "Button.tsx"),
+      'export const Button = ({ size, tone }) => <button className="a" />;\n'
+    );
+    writeFileSync(
+      join(project, "src", "OldCard.tsx"),
+      "/** @deprecated Too plain. @replacedBy Card */\nexport const OldCard = () => <div />;\n"
+    );
+    const git = (...args: readonly string[]): void => {
+      spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
+        cwd: project
+      });
+    };
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-q", "-m", "first");
+    return config;
+  };
+  const System = [
+    ":root { --ink: #111111; --paper: #ffffff; --brand: #ff0033; --line: #dddddd; --muted: #777777; --space-2: 8px; }",
+    ".dark { --ink: #eeeeee; --paper: #000000; }",
+    ""
+  ].join("\n");
+
+  it("checks a change against what the application declares, and says what it read", () => {
+    const config = appProject("app-system", System);
+    writeFileSync(
+      join(root, "app-system", "src", "New.tsx"),
+      'export const New = () => <p style={{ color: "#ff0033" }} />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).not.toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      skipped: [],
+      checked: [
+        "raw-color",
+        "raw-size",
+        "suppression",
+        "deleted-test",
+        "deprecated-component",
+        "duplicate-component"
+      ],
+      tokenSources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
+      tokenClashes: 0,
+      problems: [{ rule: "raw-color", file: "src/New.tsx", fix: "--brand" }]
+    });
+    expect(forgebook(config, ["check-code"]).stdout).toContain("Read from: src/a.css (css-variables, 6)");
+  });
+
+  it("answers the token questions from the same reading", () => {
+    const config = appProject("app-tokens", System);
+    expect(JSON.parse(forgebook(config, ["tokens", "--category", "color", "--json"]).stdout)).toMatchObject({
+      isConfigured: true,
+      total: 5,
+      sources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
+      notes: []
+    });
+    const nearest = JSON.parse(forgebook(config, ["tokens", "--nearest", "#ff0034", "--json"]).stdout);
+    expect(nearest.matches[0]).toMatchObject({ name: "--brand", isClose: true });
+    // a custom property's dashes read as an option on a command line, so its name holds without them
+    const ink = JSON.parse(forgebook(config, ["tokens", "ink", "--json"]).stdout);
+    expect(ink.token).toMatchObject({
+      name: "--ink",
+      modes: { dark: "#eeeeee" },
+      origin: { kind: "css-variables", file: "src/a.css", line: 1 }
+    });
+  });
+
+  it("does not stop on what it cannot read: it says so and goes on", () => {
+    const config = appProject("app-notes", `@import "@acme/gone/x.css";\n${System}`);
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout).tokenNotes[0]).toContain("@acme/gone/x.css");
+    expect(forgebook(config, ["tokens", "--json"]).exitCode).toBe(0);
+  });
+
+  it("does not take a brand colour and little else for a palette", () => {
+    const config = appProject("app-small", ":root { --brand: #ff0033; }\n");
+    writeFileSync(
+      join(root, "app-small", "src", "New.tsx"),
+      'export const New = () => <p style={{ color: "#123456" }} />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      checked: ["suppression", "deleted-test", "deprecated-component", "duplicate-component"],
+      skipped: ["colours and sizes not checked: too few tokens of that kind in the application (1)"],
+      problems: []
+    });
+  });
+
+  it("compares only its own folder's files: another package of the repository has its own system", () => {
+    const config = appProject("app-monorepo-outer", System);
+    const project = join(root, "app-monorepo-outer");
+    mkdirSync(join(project, "packages", "ui", "src"), { recursive: true });
+    const inner = join(project, "packages", "ui", "forgebook.config.ts");
+    writeFileSync(inner, readFileSync(config, "utf8"));
+    writeFileSync(join(project, "packages", "ui", "src", "a.css"), System);
+    writeFileSync(
+      join(project, "packages", "ui", "src", "Own.tsx"),
+      'export const A = <p style={{ color: "#ff0033" }} />;\n'
+    );
+    writeFileSync(
+      join(project, "src", "Other.tsx"),
+      'export const A = <p style={{ color: "#ff0033" }} />;\n'
+    );
+    const answer = JSON.parse(forgebook(inner, ["check-code", "--json"]).stdout);
+    expect(answer.problems.map((each: { file: string }) => each.file)).toEqual(["packages/ui/src/Own.tsx"]);
+    expect(answer.notCompared).toContain("src/Other.tsx");
+  });
+
+  it("names an import of what is deprecated and a new component that copies one, with no tags needed for the second", () => {
+    const config = appProject("app-reuse", ":root { --a: 1px; }\n");
+    const project = join(root, "app-reuse");
+    writeFileSync(
+      join(project, "src", "New.tsx"),
+      'import { OldCard } from "./OldCard";\nexport const PrimaryButton = ({ size, tone }) => <button className="b" />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).not.toBe(0);
+    const { problems } = JSON.parse(run.stdout);
+    expect(problems).toContainEqual(
+      expect.objectContaining({ rule: "deprecated-component", value: "OldCard", fix: "Card" })
+    );
+    expect(problems).toContainEqual(
+      expect.objectContaining({ rule: "duplicate-component", value: "PrimaryButton", fix: "Button" })
+    );
+  });
+
+  it("reads nothing when the configuration says there is no system", () => {
+    const off = `export default ${JSON.stringify({
+      framework: STUB_FRAMEWORK,
+      title: "off",
+      stories: ["src/*.stories.tsx"],
+      tokens: []
+    })};\n`;
+    const config = appProject("app-off", System, off);
+    expect(JSON.parse(forgebook(config, ["check-code", "--json"]).stdout)).toMatchObject({
+      skipped: ["colours and sizes not checked: no tokens file"],
+      tokenSources: []
+    });
+    expect(JSON.parse(forgebook(config, ["tokens", "--json"]).stdout)).toMatchObject({ isConfigured: false });
+  });
+
+  it("does not read the application when a tokens file is named: that is the system", () => {
+    const named = `export default ${JSON.stringify({
+      framework: STUB_FRAMEWORK,
+      title: "named",
+      stories: ["src/*.stories.tsx"],
+      tokens: ["tokens.json"]
+    })};\n`;
+    const config = appProject("app-named", System, named);
+    writeFileSync(
+      join(root, "app-named", "tokens.json"),
+      readFileSync(join(import.meta.dirname, "fixtures", "tokens.json"))
+    );
+    const { tokens, sources } = JSON.parse(forgebook(config, ["tokens", "--json"]).stdout);
+    expect(tokens.some((each: { name: string }) => each.name === "--ink")).toBe(false);
+    expect(sources[0]).toMatchObject({ kind: "tokens-file", file: "tokens.json" });
+  });
+});
+
+describe("forgebook graph", () => {
+  /** A project with a small system and rules on it. */
+  const ruledProject = (): string => {
+    const dir = mkdtempSync(join(root, "graph-"));
+    writeFileSync(join(dir, "a.css"), ":root { --ink: #111111; }\n");
+    writeFileSync(
+      join(dir, "Radio.tsx"),
+      '/**\n * @intent choose-one: a few options\n * @parent Form\n */\nexport const Radio = () => <input style={{ color: "var(--ink)" }} />;\n'
+    );
+    writeFileSync(
+      join(dir, "Select.tsx"),
+      "/** @intent choose-one: many options */\nexport const Select = () => <select />;\n"
+    );
+    writeFileSync(join(dir, "Form.tsx"), "export const Form = () => <form><Radio /></form>;\n");
+    return dir;
+  };
+
+  it("gives what exists and how to choose, those with something to say first, with no configuration", () => {
+    const run = runScriptProcess(ENTRY, ["graph", ruledProject(), "--json"]);
+    expect(run.exitCode).toBe(0);
+    const document = JSON.parse(run.stdout);
+    expect(document).toMatchObject({
+      schema: 1,
+      total: 3,
+      tokens: { color: 1 },
+      intents: {
+        "choose-one": [
+          { component: "Radio", when: "a few options" },
+          { component: "Select", when: "many options" }
+        ]
+      }
+    });
+    expect(document.components[2]).toMatchObject({ name: "Form", renders: ["Radio"] });
+  });
+
+  it("gives one intent's choices, and one component with what is around it", () => {
+    const dir = ruledProject();
+    const intent = JSON.parse(
+      runScriptProcess(ENTRY, ["graph", dir, "--intent", "choose-one", "--json"]).stdout
+    );
+    expect(intent.components.map((each: { name: string }) => each.name).toSorted()).toEqual([
+      "Radio",
+      "Select"
+    ]);
+    const detail = JSON.parse(
+      runScriptProcess(ENTRY, ["graph", dir, "--component", "Radio", "--json"]).stdout
+    ).detail;
+    expect(detail).toMatchObject({ renderedBy: ["Form"], tokens: ["--ink"], usedBy: 1 });
+    expect(runScriptProcess(ENTRY, ["graph", dir]).stdout).toContain("3 components, tokens: 1 color.");
+  });
+
+  it("takes any name for an intent, and rules beside a file by either name", () => {
+    const dir = ruledProject();
+    writeFileSync(join(dir, "Tag.tsx"), "/** @intent constructor: odd */\nexport const Tag = () => <b />;\n");
+    writeFileSync(join(dir, "pick-list.tsx"), "export const PickList = () => <ul />;\n");
+    writeFileSync(join(dir, "PickList.rules.json"), '{ "PickList": { "intent": "pick-many: long lists" } }');
+    const document = JSON.parse(runScriptProcess(ENTRY, ["graph", dir, "--json"]).stdout);
+    expect(document.intents.constructor).toEqual([{ id: "constructor", when: "odd", component: "Tag" }]);
+    expect(document.intents["pick-many"]).toEqual([
+      { id: "pick-many", when: "long lists", component: "PickList" }
+    ]);
+    expect(runScriptProcess(ENTRY, ["graph", dir, "--intent", "constructor", "--json"]).exitCode).toBe(0);
+  });
+
+  it("answers an agent with no shell through the catalogue", () => {
+    const config = catalogue(root, "graph-mcp", {
+      "A.stories.tsx": "export default { title: 'A/B' };\n",
+      "Thing.tsx": "export const Thing = () => <a />;\n"
+    });
+    const document = JSON.parse(
+      spawnSync(process.execPath, [ENTRY, "mcp", "--config", config, "--url", NO_SERVER], {
+        encoding: "utf8",
+        input: [
+          JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/call",
+            params: { name: "component_graph", arguments: {} }
+          }),
+          ""
+        ].join("\n")
+      })
+        .stdout.split("\n")
+        .filter((line) => line.includes('"id":2'))[0] ?? "{}"
+    );
+    expect(document.result.content[0].text).toContain('"name":"Thing"');
+  });
+});
+
+describe("forgebook audit", () => {
+  /** A project with no catalogue. */
+  const plainProject = (): string => {
+    const dir = mkdtempSync(join(root, "audit-"));
+    writeFileSync(
+      join(dir, "a.css"),
+      ":root { --ink: #111111; }\na { color: #111111; }\nb { color: #ff0033; }\nc { color: #ff0033; }\nd { color: #ff0033; }\n"
+    );
+    writeFileSync(
+      join(dir, "Button.tsx"),
+      'export const Button = ({ size, tone }) => <button className="a" />;\n'
+    );
+    writeFileSync(join(dir, "Btn.tsx"), 'export const Btn = ({ size, tone }) => <button className="b" />;\n');
+    return dir;
+  };
+
+  it("reports with no configuration, gives an agent its next steps, and exits 0", () => {
+    const run = runScriptProcess(ENTRY, ["audit", plainProject(), "--json"]);
+    expect(run.exitCode).toBe(0);
+    const document = JSON.parse(run.stdout);
+    expect(document).toMatchObject({
+      schema: 1,
+      system: { tokens: 1, own: 1, sources: [{ kind: "css-variables", file: "a.css", tokens: 1 }] },
+      colors: { distinct: 2, hardCoded: 4 },
+      components: { count: 2, lookAlikes: [{ confidence: "high" }] }
+    });
+    expect(document.actions).toContainEqual(
+      expect.objectContaining({
+        kind: "use-token",
+        args: ["audit", expect.any(String), "--value", "#111111", "--json"]
+      })
+    );
+    expect(document.actions).toContainEqual(expect.objectContaining({ kind: "name-value", count: 3 }));
+    expect(document.actions).toContainEqual(expect.objectContaining({ kind: "merge-components", count: 2 }));
+  });
+
+  it("says it to a person, and lists the lines of one value", () => {
+    const dir = plainProject();
+    const text = runScriptProcess(ENTRY, ["audit", dir]).stdout;
+    expect(text).toContain("Greys: 1 different, 1 used 90 % of the time.");
+    expect(text).toContain("Components: 2, 1 groups that look like one.");
+    const sites = JSON.parse(runScriptProcess(ENTRY, ["audit", dir, "--value", "#FF0033", "--json"]).stdout);
+    expect(sites.sites.map((each: { line: number }) => each.line)).toEqual([3, 4, 5]);
+  });
+
+  it("reads nothing a link leads to outside the project, and runs nothing git is told to", () => {
+    const outside = mkdtempSync(join(root, "audit-outside-"));
+    writeFileSync(join(outside, "secret.css"), "a { color: #abc123; } /* API_TOKEN */\n");
+    const dir = mkdtempSync(join(root, "audit-links-"));
+    symlinkSync(join(outside, "secret.css"), join(dir, "leak.css"));
+    writeFileSync(join(dir, "own.css"), "a { color: #123abc; }\n");
+    spawnSync("git", ["init", "-q"], { cwd: dir });
+    spawnSync("git", ["config", "core.fsmonitor", `touch ${join(dir, "ran")}`], { cwd: dir });
+    const document = JSON.parse(runScriptProcess(ENTRY, ["audit", dir, "--json"]).stdout);
+    expect(JSON.stringify(document)).not.toContain("abc123");
+    expect(document.colors.distinct).toBe(1);
+    expect(existsSync(join(dir, "ran"))).toBe(false);
+  });
+
+  it("refuses a value that is neither a colour nor a size, rather than say it is not there", () => {
+    expect(runScriptProcess(ENTRY, ["audit", ".", "--value", "red"]).exitCode).not.toBe(0);
+  });
+
+  it("keeps a report one line per line, whatever a file's name holds", () => {
+    expect(printable("a\u001b[2Jb\nc")).toBe("a?[2Jb\nc");
+  });
+
+  it("says when there is nothing to read, and refuses a bad limit", () => {
+    const empty = mkdtempSync(join(root, "audit-empty-"));
+    expect(runScriptProcess(ENTRY, ["audit", empty]).stdout).toContain(
+      "No style sheet or component file here"
+    );
+    expect(runScriptProcess(ENTRY, ["audit", empty, "--limit", "0"]).exitCode).not.toBe(0);
+  });
+});
+
 describe("a built catalogue for agents", { timeout: SERVER_TIMEOUT }, () => {
   /** The fixture's catalogue, which has a real framework to build with. */
   const Fixture = join(import.meta.dirname, "..", "..", "..", "fixtures", "app", "forgebook.config.ts");
@@ -792,6 +1354,75 @@ describe("forgebook agents", () => {
     const skill = readFileSync(join(project, ".agents", "skills", "forgebook", "SKILL.md"), "utf8");
     expect(skill).toContain("name: forgebook");
     expect(readFileSync(join(project, ".claude", "skills", "forgebook", "SKILL.md"), "utf8")).toBe(skill);
+  });
+});
+
+describe("forgebook agents, for a framework", () => {
+  it("writes the framework the project lists, and only its words", () => {
+    const project = join(root, "on-vue");
+    mkdirSync(project, { recursive: true });
+    writeFileSync(join(project, "package.json"), '{ "devDependencies": { "@forgebook/vue": "1.0.0" } }\n');
+    const run = spawnSync(process.execPath, [ENTRY, "agents", "--skill"], { cwd: project, encoding: "utf8" });
+    expect(run.status).toBe(0);
+    const text = readFileSync(join(project, "AGENTS.md"), "utf8");
+    expect(text).toContain('"@forgebook/vue"');
+    expect(text).not.toContain("@forgebook/angular");
+    expect(Buffer.byteLength(text)).toBeLessThan(3200);
+    const skill = readFileSync(join(project, ".agents", "skills", "forgebook", "SKILL.md"), "utf8");
+    expect(skill).toContain('"@forgebook/vue"');
+  });
+
+  it("takes the framework it is told, and refuses one it does not know", () => {
+    const told = runScriptProcess(ENTRY, ["agents", "--print", "--framework", "svelte"]);
+    expect(told.exitCode).toBe(0);
+    expect(told.stdout).toContain('"@forgebook/svelte"');
+    expect(runScriptProcess(ENTRY, ["agents", "--print", "--framework", "cobol"]).exitCode).toBe(2);
+  });
+});
+
+describe("forgebook guide", () => {
+  it("lists the topics, and prints one, in text and in JSON", () => {
+    const list = runScriptProcess(ENTRY, ["guide", "--json"]);
+    expect(list.exitCode).toBe(0);
+    expect(list.stdout).toContain('"topic": "docs-pages"');
+    expect(runScriptProcess(ENTRY, ["guide"]).stdout).toContain("docs-pages");
+    const topic = runScriptProcess(ENTRY, ["guide", "vue"]);
+    expect(topic.exitCode).toBe(0);
+    expect(topic.stdout).toContain("Badge.vue");
+    expect(runScriptProcess(ENTRY, ["guide", "vue", "--json"]).stdout).toContain('"topic": "vue"');
+  });
+
+  it("fails on a topic it does not have", () => {
+    expect(runScriptProcess(ENTRY, ["guide", "nope"]).exitCode).not.toBe(0);
+  });
+});
+
+describe("the README's tools", { timeout: SERVER_TIMEOUT }, () => {
+  it("says how many tools a client gets, and names each, as tools/list answers", () => {
+    const fixture = join(import.meta.dirname, "..", "..", "..", "fixtures", "app", "forgebook.config.ts");
+    const message = (id: number, method: string, params: unknown): string =>
+      JSON.stringify({ jsonrpc: "2.0", id, method, params });
+    const input = [
+      message(1, "initialize", {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" }
+      }),
+      JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      message(2, "tools/list", {})
+    ].join("\n");
+    const run = spawnSync(process.execPath, [ENTRY, "mcp", "--config", fixture, "--url", NO_SERVER], {
+      input: `${input}\n`,
+      encoding: "utf8"
+    });
+    expect(run.status).toBe(0);
+    const names = [...(run.stdout.trim().split("\n")[1] ?? "").matchAll(/"name":"([a-z_]+)"/g)].map(
+      (match) => match[1] ?? ""
+    );
+    expect(names).not.toContain("story_preview");
+    const readme = readFileSync(join(import.meta.dirname, "..", "README.md"), "utf8");
+    expect(/It offers (\d+) tools/.exec(readme)?.[1]).toBe(String(names.length));
+    for (const name of names) expect(readme).toContain(`\`${name}\``);
   });
 });
 

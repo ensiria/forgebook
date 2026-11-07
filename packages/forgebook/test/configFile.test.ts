@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, win32 } from "node:path";
 
@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { contrastSwitch, themeSwitch } from "../src/switches.ts";
 import type { ForgebookConfig } from "../src/vite/config.ts";
-import { findConfigFile, loadConfigFile, resolveConfig } from "../src/vite/configFile.ts";
+import { findConfigFile, loadConfigFile, packageResolver, resolveConfig } from "../src/vite/configFile.ts";
 import { VITE_PATHS, vitePathsOf } from "../src/vite/vitePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
@@ -295,5 +295,20 @@ describe("resolveConfig on Windows", () => {
       { path: "C:/Users/ada/tokens/dark.json", mode: "dark" }
     ]);
     expect(resolved.watch).toEqual(["C:/Users/ada/kit/src"]);
+  });
+});
+
+describe("packageResolver", () => {
+  it("does not take a package Node finds through NODE_PATH alone, which Vite would then fail on", () => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-resolver-"));
+    try {
+      expect(packageResolver(dir)("@testing-library/dom")).toBeUndefined();
+      mkdirSync(join(dir, "node_modules", "@acme", "ui"), { recursive: true });
+      writeFileSync(join(dir, "node_modules", "@acme", "ui", "package.json"), '{ "main": "index.js" }');
+      writeFileSync(join(dir, "node_modules", "@acme", "ui", "index.js"), "");
+      expect(packageResolver(dir)("@acme/ui")).toContain("index.js");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -12,7 +12,7 @@
  *
  * @module
  */
-import { globSync } from "node:fs";
+import { globSync, statSync } from "node:fs";
 
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
@@ -76,12 +76,12 @@ const isLeftOut = (key: string, left: ReadonlySet<string>): boolean => {
 };
 
 /**
- * A pattern without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them. A loop,
- * not a regular expression, whose backtracking a long run of slashes would make quadratic.
+ * A pattern or an address without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them.
+ * A loop, not a regular expression, whose backtracking a long run of slashes would make quadratic.
  *
- * @param pattern - the pattern.
+ * @param pattern - the pattern or the address.
  */
-const withoutTrailingSlashes = (pattern: string): string => {
+export const withoutTrailingSlashes = (pattern: string): string => {
   let end = pattern.length;
   while (end > 0 && pattern[end - 1] === "/") end -= 1;
   return pattern.slice(0, end);
@@ -133,4 +133,55 @@ export const listedFiles = (
   return [...listed]
     .sort(([first], [second]) => (first < second ? -1 : 1))
     .map(([key, pattern]) => ({ key, pattern }));
+};
+
+/**
+ * The patterns of a list that list no file, left out by the `!` ones as they are when the catalogue lists its files. Each
+ * is read on its own: a mistaken pattern beside one that works is as silent as a list that lists nothing.
+ *
+ * @param root - the folder the patterns are relative to.
+ * @param patterns - the patterns.
+ */
+export const unmatchedPatterns = (root: string, patterns: readonly string[]): readonly string[] => {
+  const leftOut = patterns.filter(isNegated);
+  // a pattern can match folders alone (`stories/**` over empty ones), which hold no story
+  const isFile = ({ key }: ListedFile): boolean =>
+    statSync(VITE_PATHS.resolve(root, key), { throwIfNoEntry: false })?.isFile() === true;
+  return patterns
+    .filter((pattern) => !isNegated(pattern))
+    .filter((pattern) => !listedFiles(root, [pattern, ...leftOut]).some(isFile));
+};
+
+/** Whether a configuration's list has something in it. */
+const isListed = (config: object, key: string): boolean => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list) && list.length > 0;
+};
+
+/**
+ * Why a configuration's list of globs lists nothing by construction (only `!` patterns), or none.
+ *
+ * @param config - what the file exports by default.
+ * @param key - the list's key.
+ */
+const globsProblem = (config: object, key: string): string | undefined => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list)
+    ? patternsProblem(list.filter((item: unknown): item is string => typeof item === "string"))
+    : undefined;
+};
+
+/**
+ * Why what a configuration lists to show cannot be used, or none.
+ *
+ * @param config - what the file exports by default.
+ */
+export const filesProblem = (config: object): string | undefined => {
+  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
+    return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
+  for (const key of ["stories", "docs"]) {
+    const problem = globsProblem(config, key);
+    if (problem !== undefined) return `its ${key} list nothing: ${problem}`;
+  }
+  return undefined;
 };

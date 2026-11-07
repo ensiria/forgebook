@@ -17,10 +17,14 @@ import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
-import type { CodeProblem, CodeRule } from "./checkCode.ts";
-import type { DesignToken } from "./designTokens.ts";
+import type { StoryCheckResult } from "../storyCheck.ts";
+import type { SetArgs, StoryControl } from "../storyControls.ts";
+import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
+import type { CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
+import type { DesignToken, TokenSource } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
+import type { ReuseAdvice } from "./reuseCheck.ts";
 import type { TokenClash } from "./tokenClashes.ts";
 
 /** The version of the documents' shape. */
@@ -180,6 +184,14 @@ export type StoryDocument = {
   readonly design?: AgentDesign;
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
+  /**
+   * The props its values can set, as the panel sets them: each one's control and what its value looks like, its
+   * `argTypes` taken into account. Give values through `args` of `forgebook story` or of the tools, or in the address's
+   * `args=` as JSON.
+   */
+  readonly controls: readonly StoryControl[];
+  /** What became of the values asked for (`args`), checked as a link's are; the links carry those it takes. */
+  readonly setArgs?: Pick<SetArgs, "accepted" | "dropped">;
   /** What went wrong while reading it: its module failing to load, its docs failing to be read. */
   readonly problems: readonly string[];
   /**
@@ -246,14 +258,14 @@ export type PageDocument = {
 /** A token in a list: what to write, without what a list does not need. */
 export type AgentTokenSummary = Pick<
   DesignToken,
-  "name" | "type" | "value" | "modes" | "deprecated" | "isThemeOnly"
+  "name" | "type" | "value" | "modes" | "deprecated" | "isThemeOnly" | "utility"
 >;
 
 /** The catalogue's tokens: how many, and the first of them, since agents degrade on long answers. */
 export type TokensDocument = {
   /** The shape's version. */
   readonly schema: AgentSchema;
-  /** Whether the catalogue or one of its sources names a tokens file at all. */
+  /** Whether there is a system to ask about: a tokens file named by the catalogue or a source, or tokens read from the application. */
   readonly isConfigured: boolean;
   /** How many tokens match, whatever the limit. */
   readonly total: number;
@@ -265,6 +277,10 @@ export type TokensDocument = {
   readonly problems: readonly string[];
   /** The tokens listed here that two authors give different values, with whose stands. */
   readonly clashes: readonly TokenClash[];
+  /** What the tokens were read from, each file with how many it gives; none from an older catalogue. */
+  readonly sources?: readonly TokenSource[];
+  /** What the application's files hold that could not be read without running them, so some tokens may be unknown. */
+  readonly notes?: readonly string[];
 };
 
 /** One token, with all that is known of it. */
@@ -371,6 +387,21 @@ export type AgentChangedStory = {
   readonly links: StoryLinks;
 };
 
+/** How a changed UI file is covered: by stories of its own, only through another component's, or by none. */
+export type UiFileCoverage = "own" | "through" | "none";
+
+/** A changed file a person sees (`changeCoverage.ts`), and the stories that show it. */
+export type ChangedUiFile = {
+  /** The file, relative to the repository. */
+  readonly file: string;
+  /** The same file, relative to the catalogue's folder: what a command run there names. */
+  readonly path: string;
+  /** How it is covered. */
+  readonly coverage: UiFileCoverage;
+  /** The ids of the stories that reach it. */
+  readonly stories: readonly string[];
+};
+
 /** The stories a change touches. */
 export type ChangedStoriesDocument = {
   /** The shape's version. */
@@ -381,8 +412,120 @@ export type ChangedStoriesDocument = {
   readonly files: readonly string[];
   /** The stories that reach them. */
   readonly stories: readonly AgentChangedStory[];
-  /** What could not be read: a group whose usage failed. */
+  /** The changed files a person sees and that this catalogue can show, each with its stories. */
+  readonly uiFiles: readonly ChangedUiFile[];
+  /** The changed files a person sees that no story reaches and another catalogue of the repository answers for. */
+  readonly outside: readonly string[];
+  /** What could not be read: a group whose usage failed, a story file (`unread`). */
   readonly problems: readonly string[];
+  /** The story files that cannot be read, whose stories no change can reach: a check of a change fails on them. */
+  readonly unread?: readonly string[];
+};
+
+/** How `verify` ended. */
+export type VerifyVerdict =
+  /** Every changed UI file ran in stories, every check ran, and nothing was found. */
+  | "verified"
+  /** Nothing was found, but `skipped` names what was not checked. */
+  | "partly-verified"
+  /**
+   * A changed UI file has no story that ran, a story that reaches the change was never seen in its final state (its frame
+   * gave up on what it loads: `notVerified`), the catalogue has a problem that stops it telling, or nothing changed since
+   * a start nobody named: the work may be committed where this cannot see it.
+   */
+  | "not-verified"
+  /** A check found a problem. */
+  | "failed"
+  /** No UI file changed; `skipped` names what was not checked. */
+  | "nothing-to-verify";
+
+/** A changed UI file, as `verify` ends up with it. */
+export type VerifiedUiFile = {
+  /** The file, relative to the repository. */
+  readonly file: string;
+  /** How it is covered by stories that ran; `none` when none of those that reach it ran. */
+  readonly coverage: UiFileCoverage;
+  /** How many stories that ran reach it. */
+  readonly stories: number;
+  /** Why it is not verified. */
+  readonly reason?: string;
+  /** What to do about it: the command to run, when there is one. */
+  readonly fix?: string;
+};
+
+/** A story and view that found something. */
+export type VerifyFailure = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view, in the address's form; empty for the default. */
+  readonly view: string;
+  /** What it found. */
+  readonly problems: StoryCheckResult["problems"];
+  /** The links that open the story; those of a server started for the run would be dead by now. */
+  readonly links?: StoryLinks;
+};
+
+/** The one answer to whether a change is verified. */
+export type VerifyDocument = {
+  /** The shape's version: this shape is not the first `verify` answered. */
+  readonly schema: 2;
+  /** How it ended; `not-verified` and `failed` exit non-zero. */
+  readonly verdict: VerifyVerdict;
+  /** The verdict in one line, what was not checked included. */
+  readonly summary: string;
+  /** What was not checked: never read an empty list of problems as all clear when these are named. */
+  readonly skipped: readonly string[];
+  /** What the change is measured from, as named. */
+  readonly since: string;
+  /** The commit that is: where the branch left `since`. */
+  readonly base: string;
+  /** The views the stories ran in: every variant the browser tests check, or `quick`'s default view. */
+  readonly variants: "all" | "default";
+  /** The files changed, relative to the repository. */
+  readonly files: readonly string[];
+  /** The changed UI files. */
+  readonly uiFiles: readonly VerifiedUiFile[];
+  /** How many stories reach the change. */
+  readonly storyCount: number;
+  /** The first of them, with the links that open them: a shared sheet reaches every story, and an answer stays short. */
+  readonly stories: readonly AgentChangedStory[];
+  /** How many story and view pairs ran. */
+  readonly ran: number;
+  /** The pairs that found something, with the links that open the story; those that pass are only counted. */
+  readonly failures: readonly VerifyFailure[];
+  /** The pairs no check saw in their final state: their frame gave up on what the story loads. None of them passed. */
+  readonly notVerified: readonly VerifyNotVerified[];
+  /** What the change adds, by `check-code`. */
+  readonly code: {
+    /** What was checked. */
+    readonly checked: readonly CodeRule[];
+    /** What breaks the design system in a changed UI file: these fail. */
+    readonly problems: readonly CodeProblem[];
+    /** What it found in a file no one sees: a turned-off check, a deleted test. Said, and not a failure. */
+    readonly notes: readonly CodeProblem[];
+    /** What the values were compared with, each file with how many tokens it gives. */
+    readonly tokenSources?: readonly TokenSource[];
+    /** What the application's files hold that could not be read without running them. */
+    readonly tokenNotes?: readonly string[];
+    /** The values a comment in the change says are meant. */
+    readonly excused?: readonly ExcusedValue[];
+    /** What it found to weigh and not to fail on. */
+    readonly advice?: readonly ReuseAdvice[];
+  };
+  /** How many problems there are, in `failures` and `code.problems` together. */
+  readonly problems: number;
+};
+
+/** A story and view whose checks did not run, since its frame gave up on what the story loads. */
+export type VerifyNotVerified = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view, or the variant's name. */
+  readonly view: string;
+  /** Why, as the frame says it. */
+  readonly notVerified: string;
+  /** The links that open the story. */
+  readonly links?: AgentChangedStory["links"];
 };
 
 /** What a change adds that breaks the design system. */
@@ -391,12 +534,24 @@ export type CheckedCodeDocument = {
   readonly schema: AgentSchema;
   /** What the change is measured from. */
   readonly since: string;
-  /** What was checked. Props, imports and deprecated components never are: a clean answer says no more than this. */
+  /** What was checked. Props never are, since the type checker does: a clean answer says no more than this. */
   readonly checked: readonly CodeRule[];
   /** What was not, and why: an agent must not read an empty list as all clear when these were skipped. */
   readonly skipped: readonly string[];
   /** What it found, by file and line. */
   readonly problems: readonly CodeProblem[];
+  /** What it found to weigh and not to fail on: a component that may be one that exists, what `@useWhen` says of an import. */
+  readonly advice?: readonly ReuseAdvice[];
+  /** What the values were compared with, each file with how many tokens it gives; none from an older catalogue. */
+  readonly tokenSources?: readonly TokenSource[];
+  /** How many tokens two files give different values: `forgebook tokens` names them. */
+  readonly tokenClashes?: number;
+  /** What the application's files hold that could not be read without running them, so some tokens may be unknown. */
+  readonly tokenNotes?: readonly string[];
+  /** The changed files whose values were not compared, being outside the folder whose system was read. */
+  readonly notCompared?: readonly string[];
+  /** The values a comment in the change says are meant, each with the comment's reason. */
+  readonly excused?: readonly ExcusedValue[];
 };
 
 /** What the open frames reported while someone edited, and the story index's problems. */
@@ -432,6 +587,43 @@ export type AgentPlugin = {
   readonly runsInFrames: boolean;
 };
 
+/** A switch's value as the documents give it. */
+export type AgentSwitchValue = {
+  /** The value, as the address writes it. */
+  readonly value: string;
+  /** Its name. */
+  readonly label: string;
+  /** What to write in a view to draw it (`look=night`). */
+  readonly view: string;
+  /** The values it sets on other switches while drawn, by switch id. */
+  readonly implies?: Readonly<Record<string, string>>;
+  /** Its own style sheet, by its path from the configuration's folder. */
+  readonly sheet?: string;
+  /** What a gallery shows of it: a picture by its path from the configuration's folder, or colours and a font's name. */
+  readonly preview?: SwitchPreview;
+};
+
+/** What `forgebook switches` and `list_switches` answer. */
+export type SwitchesDocument = {
+  /** The shape's version. */
+  readonly schema: 1;
+  /** The catalogue's switches, the ready-made ones among them, in their order. */
+  readonly switches: readonly {
+    /** Its id, the address's parameter. */
+    readonly id: string;
+    /** Its name. */
+    readonly label: string;
+    /** The value when a view names none. */
+    readonly default: string;
+    /** How the shell offers it. */
+    readonly control: SwitchControlKind;
+    /** What the catalogue reads of it; none for a switch only the library reads. */
+    readonly role?: SwitchRole;
+    /** Its values, in their order. */
+    readonly values: readonly AgentSwitchValue[];
+  }[];
+};
+
 /** What `forgebook plugins` and `list_plugins` answer. */
 export type PluginsDocument = {
   /** The version of this document. */
@@ -440,4 +632,24 @@ export type PluginsDocument = {
   readonly apiVersions: readonly number[];
   /** The plugins the configuration lists, in order. */
   readonly plugins: readonly AgentPlugin[];
+};
+
+/** The list of the agents' guide, as `forgebook guide --json` and `get_guide` answer with no topic. */
+export type GuideListDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** Each topic: its name, as `forgebook guide <name>` takes it, and what it is about. */
+  readonly topics: ReadonlyArray<{ readonly topic: string; readonly about: string }>;
+  /** The frameworks found in this project, whose topics are the ones to read. */
+  readonly frameworks: readonly string[];
+};
+
+/** One topic of the agents' guide, as `forgebook guide <topic> --json` and `get_guide` answer. */
+export type GuideDocument = {
+  /** The document's version. */
+  readonly schema: AgentSchema;
+  /** The topic's name. */
+  readonly topic: string;
+  /** Its Markdown. */
+  readonly text: string;
 };

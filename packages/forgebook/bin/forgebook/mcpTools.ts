@@ -1,8 +1,8 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
- * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page`, `search_catalogue` and `list_plugins`; and `story_preview` (`mcpPreview.ts`),
- * for a client that renders apps.
+ * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `verify`, `list_tokens`, `get_token`,
+ * `nearest_token`, `component_graph`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
+ * for a client that renders apps. `visual_diff` and `get_guide` join them in `mcpCommand.mts`.
  *
  * @module
  */
@@ -12,16 +12,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
-import type { PluginsDocument } from "../../src/vite/agent.types.ts";
+import type { PluginsDocument, SwitchesDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
-import { namedStory } from "../../src/vite/agentIds.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { graphTool } from "./mcpGraph.ts";
 import { previewTool } from "./mcpPreview.ts";
-import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
+import { tokenTools } from "./mcpTokens.ts";
+import { type Ask, resultOf, textOf, textsOf, VIEW } from "./mcpToolParts.ts";
+import { type Verify, verifyTool } from "./mcpVerify.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
+import { storyAddressTool } from "./setArgsTool.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
 
 /** The session's folder for pictures; made on the first call. */
@@ -64,6 +67,8 @@ const problemsResult = (answer: AgentAnswer): McpToolResult => {
 export type CatalogueReach = {
   /** The plugins the configuration lists. */
   readonly plugins: PluginsDocument;
+  /** The switches the configuration declares, the ready-made ones among them. */
+  readonly switches: SwitchesDocument;
   /** Asks the catalogue (the running dev server, or the server `forgebook mcp` keeps). */
   readonly ask: Ask;
   /** Writes a component's first stories, the file relative to the catalogue's folder. */
@@ -72,6 +77,8 @@ export type CatalogueReach = {
   readonly check: Check;
   /** Takes a story's pictures. */
   readonly shot: Shot;
+  /** Answers whether a change is verified. */
+  readonly verify: Verify;
   /** Runs the checks on a page of the application. */
   readonly checkPage: (address: string) => Promise<StoryCheckReport | string>;
   /** Serves the catalogue where a browser can open a preview, and answers where. */
@@ -88,9 +95,11 @@ export const catalogueTools = ({
   writeNew,
   check,
   shot,
+  verify,
   checkPage,
   servePreview,
-  plugins
+  plugins,
+  switches
 }: CatalogueReach): readonly McpTool[] => [
   ...pageTools(ask),
   {
@@ -99,6 +108,13 @@ export const catalogueTools = ({
       "The plugins this catalogue lists and what each adds: panel tabs (open one with tab=<id> in a view), switches, docs blocks. A tab needs its plugin: a story's parameter does nothing without it.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     call: async (): Promise<McpToolResult> => ({ structured: plugins, isError: false })
+  },
+  {
+    name: "list_switches",
+    description:
+      "The switches this catalogue offers and their values, each with the view that draws it (look=night), what it implies on other switches, its style sheet and its gallery preview. get_guide with topic switches explains them.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    call: async (): Promise<McpToolResult> => ({ structured: switches, isError: false })
   },
   {
     name: "check_page",
@@ -122,7 +138,7 @@ export const catalogueTools = ({
   {
     name: "changed_stories",
     description:
-      "The stories a change touches: every story that reaches a file git says changed, through the imports. Call it after editing, then run check_story on what it lists.",
+      "The stories a change touches: every story that reaches a file git says changed, through the imports, and each changed UI file with its stories. To check them, call verify.",
     inputSchema: {
       type: "object",
       properties: {
@@ -152,7 +168,7 @@ export const catalogueTools = ({
   {
     name: "check_code",
     description:
-      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
+      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. With no tokens file it compares with what the application declares (CSS variables, Tailwind, components.json); `tokenSources` says what was read. It also names an added import of a component marked @deprecated or @replacedBy, and a new component that looks like one that exists; `advice` is what to weigh, not a failure. It does not check props, so a clean answer is not a review. `skipped` says what it could not check.",
     inputSchema: {
       type: "object",
       properties: {
@@ -166,73 +182,9 @@ export const catalogueTools = ({
     call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
       problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
   },
-  {
-    name: "list_tokens",
-    description:
-      "The design tokens of this catalogue and of the libraries it shows, to use instead of a colour, size or duration written by hand: how many of each type, the first of them, and `clashes` where two authors disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        category: {
-          type: "string",
-          description: "A token type (color) or a first group (space); none for all."
-        },
-        limit: { type: "number", description: "The most tokens to give; 100 by default." }
-      },
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
-      resultOf(
-        await ask(
-          "tokens",
-          new URLSearchParams({
-            category: textOf(args, "category") ?? "",
-            limit: String(args["limit"] ?? "")
-          })
-        )
-      )
-  },
-  {
-    name: "get_token",
-    description:
-      "One design token: its value in each theme, what it is for, the token it aliases, and why not to use it if deprecated.",
-    inputSchema: {
-      type: "object",
-      properties: { name: { type: "string", description: "The token's name, as list_tokens gives it." } },
-      required: ["name"],
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
-      resultOf(await ask("token", new URLSearchParams({ name: textOf(args, "name") ?? "" })))
-  },
-  {
-    name: "nearest_token",
-    description:
-      "The tokens nearest a value written by hand, nearest first: call it before writing a raw colour or size. Use a match only when `isClose` or `isExact` is true; otherwise no token fits, so say so rather than force one. Deprecated tokens are left out.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        value: {
-          type: "string",
-          description: "The value, as code writes it: #1c1b1b, rgb(1 2 3), 16px, 200ms."
-        },
-        type: {
-          type: "string",
-          description:
-            "What to compare with: color, dimension, duration, number, fontWeight, or a CSS property (background, padding, font-size). Read from the value when left out."
-        }
-      },
-      required: ["value"],
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
-      resultOf(
-        await ask(
-          "nearest-token",
-          new URLSearchParams({ value: textOf(args, "value") ?? "", type: textOf(args, "type") ?? "" })
-        )
-      )
-  },
+  verifyTool(verify),
+  graphTool(ask),
+  ...tokenTools(ask),
   {
     name: "list_stories",
     description:
@@ -242,6 +194,11 @@ export const catalogueTools = ({
       properties: {
         source: { type: "string", description: "Only this source's stories (its id)." },
         component: { type: "string", description: "Only components whose title holds this text, any case." },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: 'Only stories with any of these tags; "!name" leaves a tag\'s out.'
+        },
         usedIn: {
           type: "boolean",
           description:
@@ -257,14 +214,18 @@ export const catalogueTools = ({
         new URLSearchParams({ view: textOf(args, "view") ?? "", usedIn: String(args["usedIn"] === true) })
       );
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const filter = { source: textOf(args, "source"), component: textOf(args, "component") };
+      const filter = {
+        source: textOf(args, "source"),
+        component: textOf(args, "component"),
+        tags: textsOf(args, "tags")
+      };
       return { structured: filteredStories(answer.body, filter), isError: false };
     }
   },
   {
     name: "get_story",
     description:
-      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -282,29 +243,7 @@ export const catalogueTools = ({
         )
       )
   },
-  {
-    name: "story_address",
-    description:
-      "The links that open a story in the catalogue, in its frame alone, and with no chrome for a wiki or Notion (embed), in the view asked for: give them to a person to look at what you describe.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", description: "The story's id, as list_stories gives it." },
-        view: VIEW
-      },
-      required: ["id"],
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
-      const id = textOf(args, "id") ?? "";
-      const answer = await ask("stories", new URLSearchParams({ view: textOf(args, "view") ?? "" }));
-      if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const named = namedStory(answer.body, id);
-      return named === undefined
-        ? { structured: { error: `No story "${id}"` }, isError: true }
-        : { structured: { id: named.story.id, links: named.story.links }, isError: false };
-    }
-  },
+  storyAddressTool(ask),
   {
     name: "new_stories",
     description:
@@ -336,7 +275,7 @@ export const catalogueTools = ({
   {
     name: "check_story",
     description:
-      "Run the catalogue's checks on a story in a browser, as its tests do: accessibility (axe), elements spilling out of their parents, overlays past the frame, the page's errors (a failed play among them), a story that could not be shown. Give a component's id to check all its stories. Needs @forgebook/testing and Playwright in the project.",
+      "Run the catalogue's checks on a story in a browser, as its tests do: accessibility (axe), elements spilling out of their parents, overlays past the frame, the page's errors (a failed play among them), a story that could not be shown; `notVerified` on a result means its frame gave up on what the story loads and no check ran, which is an error too. Give a component's id to check all its stories. Needs @forgebook/testing and Playwright in the project.",
     inputSchema: {
       type: "object",
       properties: {
@@ -371,7 +310,12 @@ export const catalogueTools = ({
         isSemantic: args["semantic"] === true
       });
       if (typeof report === "string") return { structured: { error: report }, isError: true };
-      return { structured: report, isError: report.results.some((result) => result.problems.length > 0) };
+      return {
+        structured: report,
+        isError: report.results.some(
+          (result) => result.problems.length > 0 || result.notVerified !== undefined
+        )
+      };
     }
   },
   {
@@ -427,7 +371,7 @@ export const catalogueTools = ({
         data: readFileSync(each.file).toString("base64"),
         mimeType: "image/png"
       }));
-      return { structured: report, isError: false, images };
+      return { structured: report, isError: report.shots.some((each) => each.status !== undefined), images };
     }
   },
   previewTool({ ask, serve: servePreview })

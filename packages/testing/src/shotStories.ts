@@ -56,7 +56,13 @@ export const shotStories = async (request: StoryShotRequest): Promise<StoryShotR
       // a story's scheme of `system` is pictured light, as the held window has no system to follow
       const scheme = schemeOf(storyPage.view, request.switches) === "dark" ? "dark" : "light";
       await framedShot(page, storyPage.device, storyPage.isEdgeToEdge, scheme, file);
-      return { storyId: storyPage.story.id, view: storyPage.name, frame: storyPage.frame, file };
+      return {
+        storyId: storyPage.story.id,
+        view: storyPage.name,
+        frame: storyPage.frame,
+        file,
+        ...(status === "ready" ? {} : { status })
+      };
     }
     // the story at its own height, not the window's: the body's, as the shell sizes a frame
     const size = await page.evaluate(() => ({

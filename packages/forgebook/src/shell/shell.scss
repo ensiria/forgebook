@@ -120,18 +120,23 @@
   }
 
   // the sidebar's right edge: dragged to set its width
+  // on the sidebar's own edge, inside it: it belongs to the sidebar's landmark, and the sidebar clips what leaves it
   .forgebook-sidebar-handle {
-    flex: none;
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
     width: 5px;
-    margin-inline-start: -3px;
     cursor: ew-resize;
     touch-action: none;
     z-index: 1;
 
     &:hover,
-    &:active,
-    &:focus-visible {
+    &:active {
       background: color-mix(in srgb, $accent 35%, transparent);
+    }
+
+    &:focus-visible {
+      background: $accent;
       outline: none;
     }
   }
@@ -179,11 +184,20 @@
     }
   }
 
+  .forgebook-search-row {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: $space-1;
+  }
+
   // flex: none, as the sidebar is a column: a long tree would otherwise squeeze the field below its height, and it
   // would grow back when a search leaves few results
   .forgebook-search {
     display: flex;
-    flex: none;
+    flex: 1;
+    min-width: 0;
     align-items: center;
     gap: $space-1-5;
     height: 1.75rem;
@@ -835,8 +849,9 @@
     color: inherit;
     text-align: end;
 
+    // the presets' ground under it is darker than the surface the tertiary text is made for
     &::placeholder {
-      color: $text-tertiary;
+      color: $text-secondary;
     }
 
     &:focus-visible {
@@ -846,7 +861,6 @@
 
   .forgebook-width-field__unit {
     font: $text-mono-small;
-    color: $text-tertiary;
   }
 
   // the zoom and the tools float in the story pane's lower end corner while the story scrolls under them
@@ -1042,6 +1056,11 @@
     }
   }
 
+  // its radio is hidden inside it: when the radio takes the focus, the panel scrolls with it into sight
+  .forgebook-segmented__option {
+    position: relative;
+  }
+
   .forgebook-segmented__face {
     display: inline-flex;
     align-items: center;
@@ -1087,12 +1106,29 @@
     transform-origin: top left;
   }
 
-  // a popover at the window's foot opens above its button
+  // a popover at the window's foot opens above its button; it lies inside the sidebar, which clips what passes its edge,
+  // so it keeps the sidebar's margin on the right as on the left, however narrow the sidebar was dragged
   .forgebook-popover.forgebook-popover--up {
     top: auto;
     bottom: calc(100% - $space-1);
     left: $space-3;
+    box-sizing: border-box;
+    width: min(13rem + 2 * $space-3-5, 100% - 2 * $space-3);
+    white-space: normal;
     transform-origin: bottom left;
+
+    .forgebook-choices {
+      min-width: 0;
+    }
+
+    // a long name breaks beside its icon, not under it
+    .forgebook-choice {
+      flex-wrap: nowrap;
+
+      svg {
+        flex: none;
+      }
+    }
   }
 
   .forgebook-popover.forgebook-popover--end {
@@ -1407,6 +1443,25 @@
     gap: $space-2;
   }
 
+  // a gallery's button: its names in one cell, the one shown visible, at the longest's width up to a limit
+  .forgebook-gallery-names {
+    display: inline-grid;
+    max-width: 10rem;
+    text-align: start;
+
+    span {
+      grid-area: 1 / 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      visibility: hidden;
+      white-space: nowrap;
+    }
+
+    [data-shown] {
+      visibility: visible;
+    }
+  }
+
   .forgebook-toolbar__label {
     font: $text-caption;
     color: $text-secondary;
@@ -1593,6 +1648,7 @@
 
   .forgebook-empty {
     margin: $space-8;
+    font: inherit;
     color: $text-secondary;
   }
 
@@ -1667,6 +1723,14 @@
 
   // the stage
 
+  .forgebook-play__switch {
+    display: flex;
+    gap: $space-1-5;
+    align-items: center;
+    font: $text-row-compact;
+    color: $text-secondary;
+  }
+
   .forgebook-play__status {
     font: $text-caption;
     font-weight: 400;
@@ -1677,6 +1741,32 @@
     &[data-status="failed"] {
       color: $danger-text;
     }
+  }
+
+  .forgebook-play__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1-5;
+  }
+
+  .forgebook-play__paused {
+    margin: 0;
+    font: $text-row-compact;
+    color: $text-secondary;
+    overflow-wrap: anywhere;
+  }
+
+  .forgebook-play__actions {
+    display: grid;
+    gap: $space-1;
+    margin: $space-1 0 0;
+    padding-inline-start: $space-5;
+    font: $text-mono-small;
+    overflow-wrap: anywhere;
+  }
+
+  .forgebook-play__action {
+    font: $text-mono-small;
   }
 
   .forgebook-play__steps {
@@ -1851,10 +1941,13 @@
     }
   }
 
+  // the scheme of a document that declares none, until the frame says which it draws in: a frame element in the shell's
+  // dark over such a document would get an opaque white canvas, which hides the story's page colour
   .forgebook-frame-view {
     display: block;
     width: 100%;
     border: 0;
+    color-scheme: light;
   }
 
   // the story's room, as a browser's device mode: the width above, the story centred between two handles
@@ -2009,6 +2102,26 @@
     // as the page's column (`.forgebook-doc`): no wider than its box, so a long name wraps instead of widening it
     grid-template-columns: minmax(0, 1fr);
     gap: $space-2;
+  }
+
+  .forgebook-home__no-story {
+    display: grid;
+    gap: $space-2;
+    min-width: 0;
+
+    p,
+    ul,
+    pre {
+      margin: 0;
+    }
+
+    ul {
+      padding-inline-start: $space-4;
+    }
+
+    code {
+      overflow-wrap: anywhere;
+    }
   }
 
   .forgebook-home__title {
@@ -2576,6 +2689,7 @@
       overflow-x: auto;
       font: $text-mono;
       line-height: 1.6;
+      @include mixins.focus-ring($shadow: $shadow-card);
 
       code {
         padding: 0;
@@ -2611,6 +2725,7 @@
   // the API reference: the names in the code face, the types coloured without a tint, a row lit under the pointer
   .forgebook-api {
     overflow-x: auto;
+    @include mixins.focus-ring(inside);
   }
 
   .forgebook-api__table {
@@ -2919,8 +3034,10 @@
     background: $surface;
   }
 
+  // on a ground of its own: the cell under it has the story's background, whatever the shell's palette
   .forgebook-compare__label {
     padding: $space-2 $space-3;
+    background: $surface;
     font: $text-caption;
     color: $text-secondary;
   }
@@ -2959,7 +3076,8 @@
     gap: $space-1-5;
 
     select,
-    input {
+    input,
+    textarea {
       box-sizing: border-box;
       height: 1.625rem;
       padding: 0 $space-2;
@@ -2971,16 +3089,85 @@
       color: $text;
       @include mixins.focus-ring($edge: $focus-edge);
     }
+
+    textarea {
+      flex: 1;
+      min-width: 0;
+      height: auto;
+      padding: $space-1 $space-2;
+      resize: vertical;
+    }
+
+    input[type="checkbox"],
+    input[type="radio"] {
+      height: auto;
+      box-shadow: none;
+    }
+
+    // nested fields take the row: they cannot be read in a column of the grid
+    &[data-wide] {
+      grid-column: 1 / -1;
+      max-width: 48rem;
+    }
+  }
+
+  // the two ways back from a value, shown only when each changes something
+  .forgebook-prop__actions {
+    display: inline-flex;
+    flex: none;
+    gap: $space-0-5;
+  }
+
+  .forgebook-prop__action {
+    display: inline-grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: $radius-control-small;
+    background: none;
+    color: $text-secondary;
+    cursor: pointer;
+    @include mixins.focus-ring($edge: $focus-edge);
+
+    &:hover:not([aria-disabled="true"]) {
+      color: $text;
+      background: $hover;
+    }
+
+    &[aria-disabled="true"] {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  .forgebook-prop__description.forgebook-prop__problem {
+    color: $danger-text;
+  }
+
+  .forgebook-prop__state {
+    flex: none;
+    font: $text-caption;
+    color: $text-tertiary;
+  }
+
+  .forgebook-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
   }
 
   .forgebook-prop__head {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: $space-2;
+    min-height: 1.25rem;
   }
 
   .forgebook-prop__name {
+    flex: none;
+    margin-inline-end: auto;
     font: $text-mono;
     font-weight: 500;
   }
@@ -3038,12 +3225,6 @@
       font: $text-mono-small;
       color: $text-secondary;
     }
-  }
-
-  .forgebook-toggles {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: $space-2 $space-3;
   }
 
   .forgebook-toggle {

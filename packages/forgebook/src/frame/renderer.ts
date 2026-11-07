@@ -66,6 +66,18 @@ export type StoryDrawing = {
   readonly changeArgs?: (change: ArgsChange) => void;
 };
 
+/**
+ * What a framework can say of what a drawn story still waits for: everything came, something is still loading (a
+ * `Suspense` boundary showing its fallback), or it cannot tell, which is never read as everything came.
+ */
+export type ContentState =
+  | { readonly state: "settled" }
+  | {
+      readonly state: "waiting" | "unknown";
+      /** What it waits for, or why it cannot tell, in a sentence a person reads. */
+      readonly reason: string;
+    };
+
 /** What the frame keeps of a story drawn in a canvas. */
 export type MountedStory = {
   /**
@@ -73,6 +85,17 @@ export type MountedStory = {
    * story throws while it is first drawn (the error goes to `onError` instead).
    */
   readonly drawn: Promise<void>;
+  /**
+   * Waits until the story no longer shows a loading state of its framework (`Suspense`), for so long, in milliseconds.
+   * The frame calls it after `drawn` and after the play function, unless the story says it stays there
+   * (`parameters.suspense.expected`). A framework with no such state, or none it can read, leaves it out: its stories
+   * are ready once drawn.
+   *
+   * @param timeout - the most to wait, in milliseconds.
+   * @returns `settled`, `waiting` when the time ran out, or `unknown` when the framework cannot tell; a rejection reads as
+   *   `unknown`.
+   */
+  readonly settled?: (timeout: number) => Promise<ContentState>;
   /**
    * Draws the story again, keeping its state: other args, other switch values, another language; a story that threw
    * is tried again.
@@ -123,6 +146,33 @@ export type StoryRenderer = FrameRenderer & {
  * @param args - the values of the moment, a named value by its name.
  */
 export type StoryCodeWriter = (component: string, args: PanelArgs) => string;
+
+/** The longest pause between two looks at what a story waits for, in milliseconds. */
+const LONGEST_LOOK = 50;
+
+/**
+ * Waits for what a story waits for by looking at it: the first look is at once, so a story that waits for nothing pays
+ * for one look; the next ones start close together, since most waits are a state set in an effect, and spread out.
+ *
+ * @param read - looks at the story: what `MountedStory.settled` answers at this moment.
+ * @param timeout - the most to wait, in milliseconds.
+ * @returns the state once it is not `waiting`, or `waiting` once the time ran out.
+ */
+export const contentSettled = (read: () => ContentState, timeout: number): Promise<ContentState> =>
+  new Promise((resolve) => {
+    const start = performance.now();
+    let pause = 1;
+    const look = (): void => {
+      const content = read();
+      if (content.state !== "waiting" || performance.now() - start >= timeout) {
+        resolve(content);
+        return;
+      }
+      setTimeout(look, pause);
+      pause = Math.min(pause * 2, LONGEST_LOOK);
+    };
+    look();
+  });
 
 /** The `step` a render and a decorator receive: outside a play there is no trace, so a step only runs its part. */
 export const untracedStep: StepFunction = async (

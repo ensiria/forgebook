@@ -38,6 +38,7 @@ import type { ProjectRoute } from "../project.ts";
 import { componentName, type ProjectComponent, wordsOf } from "./componentNames.ts";
 import type { NuxtOptions } from "./nuxt.ts";
 import { loadNuxtConfig, type NuxtProjectConfig, withEnvironment } from "./nuxtConfig.ts";
+import { builtFile, builtScriptName, isWrittenByNuxt, type NuxtModules, sayModules } from "./nuxtModules.ts";
 import { pageRoutes } from "./pageRoutes.ts";
 import { withPlaceKeys } from "./placeKeys.ts";
 import { BUILT_IN_COMPONENT_NAMES, COMPONENTS_MODULE, NUXT_STAND_INS, ROUTER_STAND_INS } from "./standIns.ts";
@@ -76,6 +77,19 @@ const resolvedId = (name: string): string => `${RESOLVED}${name.replace(/^#/, "h
  * @param id - the id.
  */
 const nameOfId = (id: string): string => id.slice(RESOLVED.length).replace(/^hash:/, "#");
+
+/**
+ * What a `#build/` import of a module's names: the file Nuxt wrote (`#build/ui.css`), or a script it keeps in memory.
+ *
+ * @param id - the import.
+ * @param modules - what the modules gave; none when they were not loaded.
+ */
+const moduleBuildId = (id: string, modules: NuxtModules | undefined): string | undefined => {
+  const written = builtFile(id, modules?.buildDir);
+  if (written !== undefined) return written;
+  const kept = builtScriptName(id, modules?.builtScripts ?? new Map());
+  return kept === undefined ? undefined : resolvedId(`kept:${kept}`);
+};
 
 /** Nuxt's build's own modules, which a catalogue cannot give. */
 const BUILD_MODULE = /^#(build|internal|app-manifest|server)(\/|$)/;
@@ -157,18 +171,31 @@ export const componentsOf = (
  *
  * @param config - the project's config.
  * @param env - the environment's variables, by name.
+ * @param modules - what the project's modules give; none when they were not loaded.
  */
 const readProject = async (
   config: NuxtProjectConfig,
-  env: Readonly<Record<string, string>>
+  env: Readonly<Record<string, string>>,
+  modules: NuxtModules | undefined
 ): Promise<ProjectState> => {
   // a composables folder's files, and the `index` of each of its folders, as Nuxt scans them
   const scanned = await scanDirExports([...config.importsDirs], {
     filePatterns: ["*.{ts,js,mjs,mts}", "*/index.{ts,js,mjs,mts}"],
     cwd: config.rootDir
   });
-  const imports: Import[] = [...NUXT_STAND_INS, ...ROUTER_STAND_INS, ...scanned];
+  const nameOf = (each: { readonly name: string; readonly as?: string | undefined }): string =>
+    each.as ?? each.name;
+  const own = new Set([...NUXT_STAND_INS, ...ROUTER_STAND_INS, ...scanned].map(nameOf));
+  const imports: Import[] = [
+    ...NUXT_STAND_INS,
+    ...ROUTER_STAND_INS,
+    ...scanned,
+    // the project's and Nuxt's own win over a module's of the same name
+    ...(modules?.imports ?? []).filter((each) => !own.has(nameOf(each)))
+  ];
   const { components, skipped } = componentsOf(config);
+  for (const component of modules?.components ?? [])
+    if (!components.has(component.name)) components.set(component.name, component);
   return {
     config,
     publicRuntimeConfig: withEnvironment(config.publicRuntimeConfig, env),
@@ -208,8 +235,28 @@ const componentsModule = (state: ProjectState): string =>
  * loaders.
  *
  * @param state - the project.
+ * @param builtAppConfig - the app config Nuxt wrote, when the modules were loaded and it did.
  */
-const projectModule = (state: ProjectState): string => {
+const projectModule = (state: ProjectState, builtAppConfig: string | undefined): string => {
+  const { config } = state;
+  // what Nuxt wrote merges the modules' defaults (Nuxt UI's `ui`) under the project's file and `appConfig`
+  if (builtAppConfig !== undefined)
+    return projectCode(state, `import appConfig from ${codeLiteral(builtAppConfig)};`, "appConfig");
+  return projectCode(
+    state,
+    config.appConfigFile === undefined ? "" : `import appConfig from ${codeLiteral(config.appConfigFile)};`,
+    `${codeLiteral(config.appConfig)}${config.appConfigFile === undefined ? "" : ", appConfig"}`
+  );
+};
+
+/**
+ * The code of the project module, with how its app configs are read.
+ *
+ * @param state - the project.
+ * @param imports - the statements that import the app configs.
+ * @param appConfigs - the list's items, as code.
+ */
+const projectCode = (state: ProjectState, imports: string, appConfigs: string): string => {
   const { config } = state;
   const runtimeConfig = {
     public: state.publicRuntimeConfig,
@@ -219,13 +266,11 @@ const projectModule = (state: ProjectState): string => {
     ({ name, file }) => `    ${codeLiteral(name)}: () => import(${codeLiteral(file)})`
   );
   return [
-    ...(config.appConfigFile === undefined
-      ? []
-      : [`import appConfig from ${codeLiteral(config.appConfigFile)};`]),
+    imports,
     "export const project = {",
     `  routes: ${codeLiteral(state.routes)},`,
     `  runtimeConfig: ${codeLiteral(runtimeConfig)},`,
-    `  appConfigs: [${codeLiteral(config.appConfig)}${config.appConfigFile === undefined ? "" : ", appConfig"}],`,
+    `  appConfigs: [${appConfigs}],`,
     `  components: {\n${loaders.join(",\n")}\n  }`,
     "};"
   ].join("\n");
@@ -236,14 +281,24 @@ const projectModule = (state: ProjectState): string => {
  *
  * @param name - the module, as code imports it.
  * @param state - the project.
+ * @param css - the style sheets the modules' Nuxt lists, the config's among them; none for the config's alone.
+ * @param buildDir - Nuxt's build folder, when the modules were loaded.
+ * @param isFresh - whether what Nuxt wrote there is newer than the project's configs.
  */
-const virtualModule = async (name: string, state: ProjectState): Promise<string> => {
+const virtualModule = async (
+  name: string,
+  state: ProjectState,
+  css: readonly string[] | undefined,
+  buildDir: string | undefined,
+  isFresh: boolean
+): Promise<string> => {
   if (name === "#app" || name === "nuxt/app") return toExports([...NUXT_STAND_INS]);
   if (name === "#imports") return toExports(await state.unimport.getImports());
   if (name === "#components") return componentsModule(state);
-  if (name === PROJECT_MODULE) return projectModule(state);
+  if (name === PROJECT_MODULE)
+    return projectModule(state, isFresh ? builtFile("#build/app.config", buildDir) : undefined);
   if (name === "virtual:forgebook-nuxt/styles")
-    return state.config.css.map((sheet) => `import ${codeLiteral(sheet)};`).join("\n");
+    return (css ?? state.config.css).map((sheet) => `import ${codeLiteral(sheet)};`).join("\n");
   return [
     'import "virtual:forgebook-nuxt/styles";',
     'import { mountFrame as mountForgebookFrame } from "forgebook/frame";',
@@ -429,9 +484,10 @@ const aliasesOf = (config: NuxtProjectConfig): { readonly find: RegExp; readonly
  * The plugins of a Nuxt catalogue.
  *
  * @param options - the options of `nuxt()`.
+ * @param modules - what the project's modules give; none when they were not loaded.
  * @returns the plugins.
  */
-export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
+export const nuxtPlugins = (options: NuxtOptions = {}, modules?: NuxtModules): PluginOption[] => {
   let state: ProjectState | undefined;
   let env: Readonly<Record<string, string>> = {};
   let problem: string | undefined;
@@ -449,7 +505,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
       problem = loaded.problem;
       // Nuxt's variables only: the environment's others never reach the page
       env = loadEnv(environment.mode, rootDir, "NUXT_");
-      state = await readProject(loaded.config, env);
+      state = await readProject(loaded.config, env, modules);
       isDev = environment.command === "serve";
       return {
         resolve: { alias: aliasesOf(loaded.config) },
@@ -469,21 +525,30 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
     },
     configResolved: (config: ResolvedConfig): void => {
       if (problem !== undefined) config.logger.warn(`[forgebook] ${problem}`);
+      sayModules(config.logger, modules);
       warnSkipped(config.logger, project().skipped);
     },
-    resolveId: (id: string): string | undefined => {
+    async resolveId(id: string, importer: string | undefined): Promise<string | undefined> {
+      // a package a file Nuxt wrote imports, from Nuxt's own folder, where a strict install keeps it
+      if (/^[\w@]/.test(id) && modules?.nuxtDir !== undefined && isWrittenByNuxt(importer, modules)) {
+        const found = await this.resolve(id, join(modules.nuxtDir, "package.json"), { skipSelf: true });
+        if (found !== null) return found.id;
+      }
       if (VIRTUAL_MODULES.some((name) => name === id)) return resolvedId(id);
       // a deep import of Nuxt's app (`#app/composables/router`) names a part of what `#app` exports
       if (id.startsWith("#app/") || id.startsWith("nuxt/app/")) return resolvedId("#app");
+      const built = moduleBuildId(id, modules);
+      if (built !== undefined) return built;
       if (BUILD_MODULE.test(id)) return resolvedId(`build:${id.slice(1)}`);
       return undefined;
     },
     load: async (id: string): Promise<string | undefined> => {
       if (!id.startsWith(RESOLVED)) return undefined;
       const name = nameOfId(id);
+      if (name.startsWith("kept:")) return modules?.builtScripts.get(name.slice(5));
       if (name.startsWith("build:"))
         return `throw new Error(${codeLiteral(`#${name.slice(6)} is written by Nuxt's build, which a catalogue does not run`)});`;
-      return virtualModule(name, project());
+      return virtualModule(name, project(), modules?.css, modules?.buildDir, modules?.isFresh === true);
     },
     configureServer: (server: ViteDevServer): void => {
       const isWatched = (file: string, isAddedOrRemoved: boolean): boolean => {
@@ -499,7 +564,7 @@ export const nuxtPlugins = (options: NuxtOptions = {}): PluginOption[] => {
       const reread = async (file: string, isAddedOrRemoved: boolean): Promise<void> => {
         if (!isWatched(file, isAddedOrRemoved)) return;
         const before = shapeOf(project());
-        state = await readProject(project().config, env);
+        state = await readProject(project().config, env, modules);
         warnSkipped(server.config.logger, project().skipped);
         // an edit that changes no export of a composable leaves the page to its hot update
         if (shapeOf(project()) === before) return;
