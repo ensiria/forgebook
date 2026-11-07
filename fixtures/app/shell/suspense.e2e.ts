@@ -225,8 +225,9 @@ test.describe("a story still loading", () => {
     expect(document.notVerified.map((each: { readonly storyId: string }) => each.storyId)).toContain(
       storyId("stuck")
     );
-    // the faint stories are found as well: a problem found is the worst that holds
-    expect(document.verdict).toBe("failed");
+    // the faint stories' problems were there before the change: set apart, and the stuck story leaves it not verified
+    expect(document.existing.problems).toBeGreaterThan(0);
+    expect(document.verdict).toBe("not-verified");
     expect(run.status).not.toBe(0);
   });
 

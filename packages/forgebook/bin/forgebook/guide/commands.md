@@ -39,7 +39,7 @@ nothing: its checks did not run. `verify` answers `not-verified` then, or `faile
 sizes with no tokens anywhere, accessibility with `a11y: false`, a UI file of another catalogue); `nothing-to-verify`, when no
 UI file changed (read `skipped` and `code.notes` there too); `not-verified`, when a changed UI file has no story that ran,
 a story file cannot be read, a story pattern of the configuration matches nothing, the catalogue has a problem that stops
-it telling, or nothing changed and no `--since` was given; `failed`, when a check found a problem. The last two exit non-zero. Do not say a change is done on either, and do
+it telling, or nothing changed and no `--since` was given; `failed`, when a check found a problem the change brought: a problem the stories had on the base too is in `existing`, not counted (`--all-problems` counts it). The last two exit non-zero. Do not say a change is done on either, and do
 not report `partly-verified` as verified: say what `skipped` says. A file in `uiFiles` with `coverage: "none"` says why in
 `reason`; when no story reaches it, `fix` names what to do, usually `npx forgebook new <file>`: write the story, then run
 `verify` again. `coverage: "through"` means it ran in another component's stories. A UI file is a component or a style

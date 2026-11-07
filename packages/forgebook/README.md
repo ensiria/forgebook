@@ -1919,6 +1919,12 @@ src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Bad
   another catalogue of the repository can answer for. None of these fails. A UI file nothing reaches in a package with no
   catalogue of its own does: it is this catalogue's to show. So does a package whose types point at its build, since
   imports stop there.
+- **Only what the change brought fails.** The stories that found something run again on the commit the change starts
+  from, checked out in a worktree beside the repository (`.<repository>-forgebook-base-<commit>-<process>`) and removed
+  after, the working tree untouched; the base's configuration and stories run there, as yours do. A problem
+  they had there too is set apart in `existing` and said in the line ("2 problems the stories had before the change not
+  counted"), so an application whose stories already break a rule can still be verified. `--all-problems` fails on
+  every problem. When the base cannot run, every problem counts and `skipped` says why.
 - **Stories written for other props fail.** A story file `forgebook new` wrote says which props it was written for
   (`// forgebook-props: 1a2b3c4d`). When a change reaches it and the component's props no longer match, `verify` lists the
   file in `outdated` and fails, since a framework ignores a prop that is gone and never shows one that is new: check the
