@@ -5,6 +5,7 @@
  * @module
  */
 
+import type { AgentSteps } from "../agentSetup/initAgentSteps.ts";
 import type { AppBuildPlan } from "../appBuild/appBuild.ts";
 import type { ImportedFramework } from "../importers/storybookFrameworks.ts";
 
@@ -59,8 +60,8 @@ export type InitCommand = {
 };
 
 /**
- * What `forgebook init --json` prints when it wrote the files. The exit code is 0, or 1 with `install.status` `"failed"`:
- * the files are written either way.
+ * What `forgebook init --json` prints when it wrote the files. The exit code is 0, or 1 with `install.status` `"failed"`,
+ * `browser.status` `"failed"` or a `draw.status` other than `"drawn"`: the files are written either way.
  */
 export type InitDocument = {
   /** The document's version. */
@@ -80,7 +81,7 @@ export type InitDocument = {
   readonly written: readonly string[];
   /** Those of them that replaced a file, with `--force`. */
   readonly replaced: readonly string[];
-  /** The story globs of the configuration. */
+  /** The story globs written; none when a catalogue already there was kept (`--agents`). */
   readonly stories: readonly string[];
   /** What the configuration needs installed. */
   readonly install: InitInstall;
@@ -90,7 +91,7 @@ export type InitDocument = {
   readonly nextSteps: readonly NextStep[];
   /** The commands to run next, in order. */
   readonly commands: readonly InitCommand[];
-};
+} & AgentSteps;
 
 /** Why `forgebook init` wrote nothing. */
 export type InitRefusalCode =
