@@ -13,7 +13,7 @@
  *
  * @module
  */
-import type { StoryCheckReport } from "../../src/storyCheck.ts";
+import type { StoryCheckReport, StoryCheckResult } from "../../src/storyCheck.ts";
 import type {
   ChangedStoriesDocument,
   ChangedUiFile,
@@ -24,6 +24,7 @@ import type {
   VerifyNotVerified,
   VerifyVerdict
 } from "../../src/vite/agent.types.ts";
+import { type BaseRun, splitByBase } from "./verifyBase.ts";
 
 /** A sheet, whose fix is not a story of its own. */
 const SHEET_FILE = /\.(?:css|scss|sass|less)$/;
@@ -164,6 +165,40 @@ export type VerifyFindings = {
   readonly isQuick: boolean;
   /** Whether a commit was named: with none, an empty change may only mean the work is where this cannot look. */
   readonly isSinceNamed: boolean;
+  /** The failing stories run again on the base, when they were: what the base had too is not the change's. */
+  readonly baseRun?: { readonly base: string; readonly run: BaseRun };
+};
+
+/** A base run that found no story of the change's: every problem is the change's, as with a base that has none. */
+const NO_STORY = /^No story or component /;
+
+/**
+ * The report on the change with the problems the base had too taken out, and those problems; the report as it is when
+ * no base ran or it could not, with why.
+ */
+const comparedWithBase = (
+  report: StoryCheckReport | undefined,
+  baseRun: VerifyFindings["baseRun"]
+): {
+  readonly report: StoryCheckReport | undefined;
+  readonly existing: readonly StoryCheckResult[];
+  readonly isCompared: boolean;
+  readonly unseen: number;
+  readonly notCompared?: string;
+} => {
+  if (report === undefined || baseRun === undefined)
+    return { report, existing: [], isCompared: false, unseen: 0 };
+  const { run } = baseRun;
+  if (typeof run === "string" && !NO_STORY.test(run))
+    return {
+      report,
+      existing: [],
+      isCompared: false,
+      unseen: 0,
+      notCompared: `not compared with ${baseRun.base.slice(0, 12)}: ${run}`
+    };
+  if (typeof run === "string") return { report, existing: [], isCompared: true, unseen: 0 };
+  return { ...splitByBase(report, run.report, [run.root, run.folder]), isCompared: true };
 };
 
 /** What a line says of a change with no UI file. */
@@ -240,7 +275,9 @@ const summaryOf = (
  * @param input - what was found.
  */
 export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
-  const { since, base, changed, code, report, notRun, isQuick, isSinceNamed } = input;
+  const { since, base, changed, code, notRun, isQuick, isSinceNamed } = input;
+  const compared = comparedWithBase(input.report, input.baseRun);
+  const { report } = compared;
   const results = report?.results ?? [];
   // a story not seen in a view is left out of what ran there; seen in another it still covers its file, and the verdict
   // says not verified from `notVerified` either way
@@ -267,7 +304,18 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const outside = new Set(changed.outside);
   const notes = code.problems.filter((problem) => !seen.has(problem.file) && !outside.has(problem.file));
   const problems = failures.reduce((sum, each) => sum + each.problems.length, codeProblems.length);
-  const skipped = skippedOf(input, notRun);
+  const existingProblems = compared.existing.reduce((sum, each) => sum + each.problems.length, 0);
+  const skipped = [
+    ...skippedOf(input, notRun),
+    ...(compared.notCompared === undefined
+      ? []
+      : [`${compared.notCompared}; every problem the stories have is counted`]),
+    ...(compared.unseen === 0
+      ? []
+      : [
+          `${counted(compared.unseen, "story")} not seen on the base in its final state: every problem of it counted`
+        ])
+  ];
   // a story file that cannot be read may be the change, whatever else changed
   const catalogueProblems = changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []);
   const isBlind = changed.files.length === 0 && !isSinceNamed;
@@ -294,8 +342,29 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
       ...(code.excused === undefined ? {} : { excused: code.excused }),
       ...(code.advice === undefined ? {} : { advice: code.advice })
     },
-    problems
+    problems,
+    ...(!compared.isCompared
+      ? {}
+      : {
+          existing: {
+            problems: existingProblems,
+            failures: compared.existing.map(({ storyId, view, problems: found }): VerifyFailure => {
+              const storyLinks = links.get(storyId);
+              return {
+                storyId,
+                view,
+                problems: found,
+                ...(storyLinks === undefined ? {} : { links: storyLinks })
+              };
+            })
+          }
+        })
   };
-  const summary = summaryOf({ ...body, verdict, skipped: allSkipped }, catalogueProblems);
+  // problems the base had too are not a check left undone: said in the line, never in skipped
+  const old =
+    existingProblems === 0
+      ? ""
+      : `; ${counted(existingProblems, "problem")} the stories had before the change not counted (existing; --all-problems counts them)`;
+  const summary = `${summaryOf({ ...body, verdict, skipped: allSkipped }, catalogueProblems)}${old}`;
   return { schema: 2, verdict, summary, skipped: allSkipped, ...body };
 };

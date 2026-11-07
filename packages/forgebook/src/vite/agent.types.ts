@@ -512,8 +512,18 @@ export type VerifyDocument = {
     /** What it found to weigh and not to fail on. */
     readonly advice?: readonly ReuseAdvice[];
   };
-  /** How many problems there are, in `failures` and `code.problems` together. */
+  /** How many problems there are, in `failures` and `code.problems` together: those the change brought. */
   readonly problems: number;
+  /**
+   * The problems the stories had on the base as well, which the verdict does not count: present when the stories that
+   * found something ran again on the base. `--all-problems` counts them.
+   */
+  readonly existing?: {
+    /** How many. */
+    readonly problems: number;
+    /** The pairs that had them, with the links that open the story. */
+    readonly failures: readonly VerifyFailure[];
+  };
 };
 
 /** A story and view whose checks did not run, since its frame gave up on what the story loads. */
