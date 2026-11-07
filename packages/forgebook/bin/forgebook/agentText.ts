@@ -31,7 +31,9 @@ import type {
   StoryDocument,
   SwitchesDocument,
   TokensDocument,
-  VerifyDocument
+  UnseenComponent,
+  VerifyDocument,
+  VisibilityDocument
 } from "../../src/vite/agent.types.ts";
 import type { DesignToken, TokenSource } from "../../src/vite/designTokens.ts";
 import type { TokenClash } from "../../src/vite/tokenClashes.ts";
@@ -330,11 +332,31 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
       ? lines
       : [document.skipped.length > 0 ? "Nothing to report in what was checked." : "Nothing to report."]),
     ...document.skipped,
+    ...(document.advice ?? []).map(({ file, line, message }) => `${file}:${line}  ${message}`),
     ...(document.excused ?? []).map(
       ({ file, line, rule, reason }) => `${file}:${line}  ${rule} excused by a comment: ${reason}`
     ),
     ...tokenSourceLines(document.tokenSources ?? [], document.tokenNotes ?? [])
   ].join("\n");
+};
+
+/** A published component an agent cannot see, a line for each thing that hides it. */
+const unseenLines = ({ file, reasons }: UnseenComponent): readonly string[] =>
+  reasons.map(({ reason, fix }) => `${file}  agents cannot see it: ${reason}. Fix: ${fix}`);
+
+/**
+ * The published components an agent cannot see, what was not looked at, and how many were.
+ *
+ * @param document - the answer.
+ */
+export const visibilityText = (document: VisibilityDocument): string => {
+  const scope = document.since === undefined ? "" : ` changed since ${document.since}`;
+  const count = `${document.checked} published component file${document.checked === 1 ? "" : "s"}${scope}`;
+  const ending =
+    document.packages.length === 0 && document.skipped.length === 0
+      ? "No package here publishes a component: nothing to hold to this."
+      : `${count}, ${document.unseen.length} agents cannot see.`;
+  return [...document.unseen.flatMap(unseenLines), ...document.skipped, ending].join("\n");
 };
 
 /**
@@ -351,18 +373,20 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
         ]
       : []
   );
+  const unseen = document.unseen.flatMap(unseenLines);
   const code = document.code.problems.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
   );
   const notes = document.code.notes.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
   );
+  const advice = (document.code.advice ?? []).map((each) => `${each.file}:${each.line}  ${each.message}`);
   const results = [
     ...document.failures,
     ...document.notVerified.map((each) => ({ ...each, problems: [] }))
   ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
   const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
-  return [...uncovered, ...code, ...notes, ...stories, document.summary].join("\n");
+  return [...uncovered, ...unseen, ...code, ...notes, ...advice, ...stories, document.summary].join("\n");
 };
 
 /**

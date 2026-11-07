@@ -63,6 +63,7 @@ const shellStrings = {
   embedFailed: "This story could not be shown.",
   embedPanelFailed: "This could not load: reload the page to try again.",
   clearSearch: "Clear the search",
+  keys: "Keyboard keys",
   fromTexts: "From the story's texts:",
   backToText: "Back to the text",
   widthTyped: "Width in px",
@@ -107,7 +108,7 @@ const shellStrings = {
   signatureParameter: "Parameter",
   signatureReturns: "Returns",
   signatureNone: "It takes no parameters.",
-  playStatus: { running: "running", passed: "passed", failed: "failed" },
+  playStatus: { running: "running", passed: "passed", failed: "failed", off: "not run" },
   fixedExamples: "This story draws fixed examples: its props are not set from here. Every prop, for reading:",
   allProps: "Props",
   openFrame: "Open in a new tab",
@@ -138,12 +139,6 @@ const shellStrings = {
   unknownComponent: (id: string): string =>
     `No component "${id}": it may have been renamed. Pick one in the sidebar.`,
   props: "Props",
-  propGroups: {
-    choice: "Choices",
-    text: "Text and numbers",
-    structured: "Objects and lists",
-    toggle: "Toggles"
-  },
   otherProps: "Other props",
   unset: "—",
   unsetProp: (prop: string): string => `${prop}: leave without a value`,

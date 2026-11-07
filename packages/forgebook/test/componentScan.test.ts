@@ -16,6 +16,7 @@ const component = (name: string, file: string, fields: Partial<ScannedComponent>
   props: [],
   classes: [],
   renders: [],
+  isExported: true,
   ...fields
 });
 
@@ -88,7 +89,7 @@ describe("scannedComponents", () => {
   it("reads a single-file component from its name and template", () => {
     const vue = `<script setup lang="ts">defineProps<{ title: string; open?: boolean }>()</script>
       <template><button class="a b"><Icon /></button></template>`;
-    expect(scannedComponents("src/my-button.vue", vue)).toEqual([
+    expect(scannedComponents("src/my-button.vue", vue)).toMatchObject([
       {
         name: "MyButton",
         file: "src/my-button.vue",

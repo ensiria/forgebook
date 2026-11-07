@@ -5,22 +5,31 @@
  * Nuxt is Vue: the props are read as Vue's, and the stories drawn with Vue's renderer, each story's app given its Nuxt
  * (its router, data, state and config). What Nuxt adds is Vite's work: Vue's plugin, and this package's plugin for
  * Nuxt's aliases, auto-imports, components and `#imports` (`nuxtPlugin.ts`). Forgebook stays on Vite and does not run
- * Nuxt's build: a Nuxt module's or plugin's work is not done.
+ * Nuxt's build: a module's Vite plugins and style sheets are taken from the project's own Nuxt (`nuxtModules.ts`), and
+ * what a module or a plugin does in Nuxt's runtime is not done.
  *
  * @module
  */
-import { extname } from "node:path";
+import { extname, resolve } from "node:path";
 
 import { vue } from "@forgebook/vue/vite";
-import type { FrameworkAdapter } from "forgebook/vite/adapter";
+import type { AdapterContext, FrameworkAdapter } from "forgebook/vite/adapter";
 import type { PluginOption } from "vite";
 
+import { loadNuxtModules } from "./nuxtModules.ts";
 import { FRAME_MODULE, nuxtPlugins } from "./nuxtPlugin.ts";
 
 /** The options of `nuxt()`. */
 export type NuxtOptions = {
   /** The Nuxt project's folder, from the catalogue's; the catalogue's own folder by default. */
   readonly dir?: string;
+  /**
+   * Whether to load the project's modules with its own Nuxt on every start of the catalogue, for what they give
+   * components: their Vite plugins (Nuxt UI's Tailwind CSS, UnoCSS), style sheets, components, auto-imports, app config
+   * and `#build/` files. `true` by default, unless the catalogue's `appBuild` is `false`. Loading them runs their code, as
+   * `nuxt dev` does.
+   */
+  readonly loadModules?: boolean;
 };
 
 /**
@@ -39,9 +48,14 @@ export const nuxt = (options: NuxtOptions = {}): FrameworkAdapter => {
     pages: { frame: FRAME_MODULE, code: "@forgebook/nuxt/code" },
     browserDependencies: [...(base.browserDependencies ?? []), "vue-router", "forgebook/frame"],
     ...(base.componentFiles === undefined ? {} : { componentFiles: base.componentFiles }),
-    vitePlugins: async (): Promise<readonly PluginOption[]> => [
-      ...((await base.vitePlugins?.()) ?? []),
-      ...nuxtPlugins(options)
-    ]
+    vitePlugins: async (context?: AdapterContext): Promise<readonly PluginOption[]> => {
+      const isLoaded = options.loadModules !== false && context?.readsAppBuild !== false;
+      const modules = isLoaded ? await loadNuxtModules(resolve(options.dir ?? ".")) : undefined;
+      return [
+        ...((await base.vitePlugins?.()) ?? []),
+        ...nuxtPlugins(options, modules),
+        ...(modules?.plugins ?? [])
+      ];
+    }
   };
 };

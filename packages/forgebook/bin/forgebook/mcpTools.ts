@@ -1,7 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `verify`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
+ * `nearest_token`, `component_graph`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
  * for a client that renders apps. `visual_diff` and `get_guide` join them in `mcpCommand.mts`.
  *
  * @module
@@ -17,8 +17,10 @@ import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { graphTool } from "./mcpGraph.ts";
 import { previewTool } from "./mcpPreview.ts";
-import { type Ask, resultOf, textOf, VIEW } from "./mcpToolParts.ts";
+import { tokenTools } from "./mcpTokens.ts";
+import { type Ask, resultOf, textOf, textsOf, VIEW } from "./mcpToolParts.ts";
 import { type Verify, verifyTool } from "./mcpVerify.ts";
 import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
@@ -166,7 +168,7 @@ export const catalogueTools = ({
   {
     name: "check_code",
     description:
-      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. With no tokens file it compares with what the application declares (CSS variables, Tailwind, components.json); `tokenSources` says what was read. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
+      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. With no tokens file it compares with what the application declares (CSS variables, Tailwind, components.json); `tokenSources` says what was read. It also names an added import of a component marked @deprecated or @replacedBy, and a new component that looks like one that exists; `advice` is what to weigh, not a failure. It does not check props, so a clean answer is not a review. `skipped` says what it could not check.",
     inputSchema: {
       type: "object",
       properties: {
@@ -181,73 +183,8 @@ export const catalogueTools = ({
       problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
   },
   verifyTool(verify),
-  {
-    name: "list_tokens",
-    description:
-      "The design tokens of this catalogue and of the libraries it shows or, with no tokens file, what the application declares (CSS variables, Tailwind, components.json), to use instead of a colour, size or duration written by hand: how many of each type, the first of them, `sources` (what was read), `notes` (what was not) and `clashes` where two files disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        category: {
-          type: "string",
-          description: "A token type (color) or a first group (space); none for all."
-        },
-        limit: { type: "number", description: "The most tokens to give; 100 by default." }
-      },
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
-      resultOf(
-        await ask(
-          "tokens",
-          new URLSearchParams({
-            category: textOf(args, "category") ?? "",
-            limit: String(args["limit"] ?? "")
-          })
-        )
-      )
-  },
-  {
-    name: "get_token",
-    description:
-      "One design token: its value in each theme, what it is for, the token it aliases, and why not to use it if deprecated.",
-    inputSchema: {
-      type: "object",
-      properties: { name: { type: "string", description: "The token's name, as list_tokens gives it." } },
-      required: ["name"],
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
-      resultOf(await ask("token", new URLSearchParams({ name: textOf(args, "name") ?? "" })))
-  },
-  {
-    name: "nearest_token",
-    description:
-      "The tokens nearest a value written by hand, nearest first: call it before writing a raw colour or size. Use a match only when `isClose` or `isExact` is true; otherwise no token fits, so say so rather than force one. Deprecated tokens are left out.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        value: {
-          type: "string",
-          description: "The value, as code writes it: #1c1b1b, rgb(1 2 3), 16px, 200ms."
-        },
-        type: {
-          type: "string",
-          description:
-            "What to compare with: color, dimension, duration, number, fontWeight, or a CSS property (background, padding, font-size). Read from the value when left out."
-        }
-      },
-      required: ["value"],
-      additionalProperties: false
-    },
-    call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> =>
-      resultOf(
-        await ask(
-          "nearest-token",
-          new URLSearchParams({ value: textOf(args, "value") ?? "", type: textOf(args, "type") ?? "" })
-        )
-      )
-  },
+  graphTool(ask),
+  ...tokenTools(ask),
   {
     name: "list_stories",
     description:
@@ -257,6 +194,11 @@ export const catalogueTools = ({
       properties: {
         source: { type: "string", description: "Only this source's stories (its id)." },
         component: { type: "string", description: "Only components whose title holds this text, any case." },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: 'Only stories with any of these tags; "!name" leaves a tag\'s out.'
+        },
         usedIn: {
           type: "boolean",
           description:
@@ -272,7 +214,11 @@ export const catalogueTools = ({
         new URLSearchParams({ view: textOf(args, "view") ?? "", usedIn: String(args["usedIn"] === true) })
       );
       if (answer.status !== 200 || !isStoriesDocument(answer.body)) return resultOf(answer);
-      const filter = { source: textOf(args, "source"), component: textOf(args, "component") };
+      const filter = {
+        source: textOf(args, "source"),
+        component: textOf(args, "component"),
+        tags: textsOf(args, "tags")
+      };
       return { structured: filteredStories(answer.body, filter), isError: false };
     }
   },

@@ -125,7 +125,14 @@ describe("forgebook verify", { timeout: 60_000 }, () => {
     expect(document).toMatchObject({
       verdict: "failed",
       code: {
-        checked: ["raw-color", "raw-size", "suppression", "deleted-test"],
+        checked: [
+          "raw-color",
+          "raw-size",
+          "suppression",
+          "deleted-test",
+          "deprecated-component",
+          "duplicate-component"
+        ],
         problems: [{ rule: "raw-color", file: "src/Badge.tsx", fix: "--brand" }],
         tokenSources: [{ kind: "css-variables", file: "src/system.css", tokens: 6 }]
       }
@@ -325,7 +332,8 @@ describe("the verify tool", () => {
         failures: [],
         notVerified: [],
         code: { checked: [], problems: [], notes: [] },
-        problems: 0
+        problems: 0,
+        unseen: []
       })
     }).find((tool) => tool.name === "verify");
 
@@ -361,6 +369,9 @@ describe("runVerify", () => {
           : {
               schema: 1,
               since: "HEAD",
+              packages: [],
+              unseen: [],
+              skipped: [],
               files: ["src/Icon.tsx"],
               stories: [{ id: "a" }, { id: "b" }],
               uiFiles: [],

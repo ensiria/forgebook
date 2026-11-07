@@ -192,7 +192,9 @@ test("keeps a story's mocks when it is played again", async ({ page }) => {
   // marked, so the story drawn again is told from the first one
   await firstDrawn.evaluate((element) => element.setAttribute("data-first", ""));
   await page.evaluate(() =>
-    document.querySelector("iframe")?.contentWindow?.postMessage({ type: "forgebook:play-again" }, "*")
+    document
+      .querySelector("iframe")
+      ?.contentWindow?.postMessage({ type: "forgebook:play-step", command: "again" }, "*")
   );
   await expect(frame.locator('[data-testid="greeting"]:not([data-first])')).toHaveText(answered.text);
 });
