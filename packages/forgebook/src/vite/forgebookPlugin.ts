@@ -22,7 +22,7 @@
  */
 import { extname, join, resolve } from "node:path";
 
-import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
+import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { checksA11y, offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
@@ -57,8 +57,7 @@ import {
   PAGE_FILES,
   type PageFile,
   pageHtml,
-  pageModulePath,
-  pluginViewsNeedReact
+  pageModulePath
 } from "./pages.ts";
 import { CONFIG_ID, DOCS_PAGES_PREFIX, patternId, TOKENS_ID, virtualId } from "./pluginIds.ts";
 import {
@@ -73,6 +72,7 @@ import {
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
+import { checkAtStart, type RunningVite } from "./runningVersions.ts";
 import {
   type IndexedStoryFile,
   type IsFileKept,
@@ -470,17 +470,11 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (pattern !== null) access.noteImported(pattern);
       return pattern;
     },
-    // a warning and not a failure: a theme a reader can still use must not stop a catalogue from building
-    configResolved: (resolved: { readonly logger: Logger; readonly cacheDir: string }): void => {
+    configResolved: (resolved: RunningVite & { readonly cacheDir: string }): void => {
+      checkAtStart(resolved, config);
       // a dev server's answers only: a build reads everything once, and stamping each answer's files costs it more than
       // a later build would save
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
-      for (const problem of config?.shell.problems ?? [])
-        resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
-      if (config !== undefined && pluginViewsNeedReact(config))
-        resolved.logger.error(
-          "[forgebook] A plugin's panel draws with React 19, and this project has an older React, whose hooks the panel would call: those panels fail. Upgrade React, or leave the plugin out"
-        );
       if (config !== undefined && !isTestRun) sayEmptyStoryGlobs(config, isServing(), resolved.logger);
     },
     configureServer: (server: ViteDevServer): void => {

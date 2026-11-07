@@ -406,7 +406,11 @@ describe("the custom controls in the shell's entry", () => {
 });
 
 describe("a plugin's view on a project's older React", () => {
-  const PluginWithTab: ForgebookPlugin = { id: "p", tabs: [{ id: "p", label: "T", view: "m" }] };
+  const PluginWithTab: ForgebookPlugin = {
+    apiVersion: 1,
+    id: "p",
+    tabs: [{ id: "p", label: "T", view: "m" }]
+  };
 
   const withReact = (version: string): ResolvedConfig => {
     const dir = mkdtempSync(join(tmpdir(), "forgebook-plugin-react-"));

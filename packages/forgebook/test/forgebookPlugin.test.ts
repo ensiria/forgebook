@@ -17,6 +17,7 @@ import { codeLiteral } from "../src/codeLiteral.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
+import { assertViteEight } from "../src/vite/runningVersions.ts";
 import { FILES_SPECIFIER_PREFIX, storyFilesGroupText } from "../src/vite/storyFilesModule.ts";
 import { VITE_PATHS } from "../src/vite/vitePaths.ts";
 import { KIT_DIR } from "./fixturePaths.ts";
@@ -416,5 +417,13 @@ describe("forgebookPlugin in a build", () => {
     expect(code).toContain("?forgebook-page");
     expect(texts).toBeUndefined();
     expect(emitted.size).toBe(0);
+  });
+});
+
+describe("on a Vite older than 8", () => {
+  it("stops at once, naming the command that brings its own", () => {
+    expect(() => assertViteEight({ outDir: "dist" })).toThrow("forgebook command");
+    expect(() => assertViteEight({ rolldownOptions: {} })).not.toThrow();
+    expect(() => assertViteEight(undefined)).not.toThrow();
   });
 });
