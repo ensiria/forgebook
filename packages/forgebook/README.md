@@ -1218,6 +1218,7 @@ is a state of the component: the same).
 | Command | What it does |
 |---|---|
 | `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files; see [a story file that cannot be read](#a-story-file-that-cannot-be-read) |
+| `forgebook build --watch` | Builds again when a file the catalogue reads changes; see [building on every change](#building-on-every-change) |
 | `forgebook prebundle` | Pre-bundles the catalogue's dependencies, as `dev` does on a first start: before it, in CI or an image |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
@@ -1326,6 +1327,14 @@ or translate its texts (`strings: { "plugin.figma.compare": "Confronta" }`). `fo
 say what a catalogue has.
 
 The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
+
+## Building on every change
+
+`forgebook build --watch` stays running and builds again when a file the catalogue reads changes, a new story file or
+docs page included, for a folder a host, an embedding app or another machine serves. A failed build says why on one line,
+leaves the last good output and waits for the next edit. A rebuild takes about two thirds of a whole `forgebook build`
+(2.2 to 2.9 s against 3 to 4 s on 5000 stories) and writes the whole folder again; the process holds about 2 GB there. Use
+`forgebook dev` to work on stories: it redraws in place.
 
 ## A preview for every pull request
 

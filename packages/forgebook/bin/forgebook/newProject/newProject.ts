@@ -150,7 +150,7 @@ const frameworkSteps = (projectDir: string, framework: ImportedFramework): reado
         kind: "provider",
         file: "nuxt.config",
         message:
-          "Nuxt's modules and plugins are not run: a component that needs what one provides (a store, i18n) gets it from a decorator in forgebook.preview.ts"
+          "Nuxt's modules are loaded for their plugins, styles and components, but what they and the app's plugins set up at run time is not: a component that needs one (a store, i18n) gets it from a decorator in forgebook.preview.ts"
       }
     ];
   if (framework === "sveltekit" && !existsSync(join(projectDir, ".svelte-kit")))

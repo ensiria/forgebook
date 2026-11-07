@@ -21,6 +21,8 @@ export type DrawFailureKind =
   | "browser"
   | "app-config"
   | "older-forgebook"
+  | "nuxt-runtime"
+  | "network"
   | "unbuilt-package"
   | "generated-files"
   | "needs-props"
@@ -55,6 +57,19 @@ const NATIVE_STEP =
 
 /** The rules, the most telling first. */
 const RULES: readonly Rule[] = [
+  {
+    pattern: /fetch failed|ETIMEDOUT|ENOTFOUND|ECONNREFUSED|ECONNRESET|Fetch web fonts timeout/,
+    kind: "network",
+    nextStep: (): string =>
+      "Something the app's build runs fetched from the network and could not (UnoCSS's web fonts, a fonts module): check the connection and run this again, or name the plugin in appBuild.skipPlugins"
+  },
+  {
+    pattern:
+      /written by Nuxt's build, which a catalogue does not run|#nuxt-i18n\/|forgebook-nuxt:(?:kept|build):/i,
+    kind: "nuxt-runtime",
+    nextStep: (): string =>
+      "The component reads what a Nuxt module sets up when Nuxt's app runs (i18n's messages, a plugin's provide), which a catalogue does not run: give it in a decorator of forgebook.preview, or try a component that needs none"
+  },
   {
     pattern: /TSCONFIG_ERROR|Failed to load tsconfig|Cannot find base config/i,
     kind: "generated-files",
