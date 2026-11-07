@@ -324,6 +324,20 @@ test.describe("docs pages", () => {
     }
   });
 
+  test("a page whose code cannot be fetched offers to load the page again, which then draws it", async ({
+    page
+  }) => {
+    // as when the page stayed open across a new build, whose files replaced the ones it asks for
+    const pageModule = /\/DocPage[.-][^/]*$/;
+    await page.route(pageModule, (route) => route.abort());
+    await page.goto(STARTED);
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("The page could not be loaded");
+    await page.unroute(pageModule);
+    await alert.getByRole("button", { name: "Reload the page" }).click();
+    await expect(page.locator("h1")).toHaveText("Getting started");
+  });
+
   test("a page that is not there says so", async ({ page }) => {
     await page.goto(docs("kit:gone"));
     await expect(page.getByRole("alert")).toContainText('No page "kit:gone"');

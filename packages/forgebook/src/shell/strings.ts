@@ -173,6 +173,7 @@ const shellStrings = {
   tabLoading: "Loading the tab…",
   tabError: "The tab could not be loaded",
   pageLoadError: "The page could not be loaded",
+  pageReload: "Reload the page",
   docsError: "The component could not be read",
   indexProblems: "Some story files could not be read or placed"
 };

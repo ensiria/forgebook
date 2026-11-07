@@ -920,7 +920,7 @@ docs page, with every block above, a few values and the generated home's pieces 
 
 ````md
 ---
-description: "{{components}} components in {{libraries}} libraries, version {{version}}."
+description: "{{components}} components and {{stories}} stories, version {{version}}."
 ---
 
 Our design system, for every product team.
