@@ -20,7 +20,7 @@ import {
 import type { SearchTarget } from "../search.ts";
 import type { StoryTree } from "../storyTree.ts";
 import { Icon } from "./icons.tsx";
-import { isTyping } from "./keyboard.ts";
+import { isSingleKeyFree } from "./keyboard.ts";
 import type { SearchPanelKeys } from "./SearchPanel.tsx";
 import { STRINGS } from "./strings.ts";
 import type { shownTree } from "./treeSearch.ts";
@@ -104,7 +104,7 @@ export const SidebarSearch = ({
       // "/" goes to the search from anywhere in the shell, as in most catalogues
       // a hidden sidebar leaves the key to the page
       if (!isSidebarOpen) return;
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target))
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || !isSingleKeyFree(event))
         return;
       event.preventDefault();
       inputRef.current?.focus();

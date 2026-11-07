@@ -224,7 +224,9 @@ too, with a warning.
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
 - **A light and a dark catalogue**: the reader picks Light, Dark or System in the Interface menu at the sidebar's foot
   (their browser keeps it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
-- **Keys and named views**: a key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
+- **Keys and named views**: `?` lists the keys, as does the menu at the sidebar's foot, where a reader can turn off every
+  key without a modifier for this browser; a key pressed inside a story, in a text field or in a custom element stays
+  theirs. A key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
   key of any control (`keys: { width: "w" }`), a reader changes theirs in the View menu. The View menu's values are
   saved under a name and picked again; `views` in the configuration offers some to every reader. A dot marks each
   control whose value is not its default.
