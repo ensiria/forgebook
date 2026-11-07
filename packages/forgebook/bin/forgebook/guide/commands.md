@@ -16,12 +16,12 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
 | `npx forgebook plugins --json` | The plugins the catalogue lists: their tabs (`tab=<id>` in a view opens one), switches and docs fences |
 | `npx forgebook switches --json` | The catalogue's switches and values, each with its `view`, what it `implies`, its `sheet` and its gallery `preview` |
-| `npx forgebook tokens --category color --json` | The design tokens, of the catalogue and of the libraries it shows; `clashes` says whose value stands where two disagree |
+| `npx forgebook tokens --category color --json` | The design tokens, of the catalogue and of the libraries it shows or, with no tokens file, what the application declares (CSS variables, Tailwind `@theme` and configuration, `components.json`), read and never run; `sources` says what was read, `notes` what could not be, `clashes` whose value stands where two disagree |
 | `npx forgebook tokens --nearest "#1c1b1b" --json` | The token to write instead of a raw value; the type comes from the value, or `--type padding` |
 | `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |
 | `npx forgebook changed --json` | The stories your change touches, through what they import |
 | `npx forgebook verify --json` | Whether your change is done, with one exit code: run it before you say so. Every changed UI file must reach a story that ran; those stories run in every variant, with `check-code`. Compares from where your branch left the default branch; in a pull request give `--since origin/develop`. `--quick` runs the default view only, and says so |
-| `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests |
+| `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests. `tokenSources` says what the values were compared with. A value that is meant takes a comment on its line or the one above: `forgebook-ignore raw-color: why` |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`); a model's id in the view (`iphone-16`) frames it in that device |
 | `npx forgebook shot <id> --update` then `npx forgebook diff <id> --json` | Baselines, then what changed against them: the region, the percentage, a marked picture |
@@ -30,7 +30,7 @@ A story still loading when its frame gave up (`notVerified`, on `check`'s result
 nothing: its checks did not run. `verify` answers `not-verified` then, or `failed` when something else was found.
 
 `verify` answers one `verdict`: `verified`; `partly-verified`, when `skipped` names what was not checked (colours and
-sizes with no tokens file, accessibility with `a11y: false`, a UI file of another catalogue); `nothing-to-verify`, when no
+sizes with no tokens anywhere, accessibility with `a11y: false`, a UI file of another catalogue); `nothing-to-verify`, when no
 UI file changed (read `skipped` and `code.notes` there too); `not-verified`, when a changed UI file has no story that ran,
 a story file cannot be read, the catalogue has a problem that stops it telling, or nothing changed and no `--since` was
 given; `failed`, when a check found a problem. The last two exit non-zero. Do not say a change is done on either, and do

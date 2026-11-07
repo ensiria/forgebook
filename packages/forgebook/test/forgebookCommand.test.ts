@@ -947,6 +947,143 @@ describe("forgebook check-code", { timeout: SERVER_TIMEOUT }, () => {
   });
 });
 
+describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
+  /** A catalogue in a repository, its sheet declaring a system and one commit made. */
+  const appProject = (name: string, sheet: string, written?: string): string => {
+    const config = catalogue(root, name, { "A.stories.tsx": "export default { title: 'A/B' };\n" });
+    const project = join(root, name);
+    if (written !== undefined) writeFileSync(config, written);
+    writeFileSync(join(project, ".gitignore"), "node_modules/\n.vite/\n");
+    writeFileSync(join(project, "src", "a.css"), sheet);
+    const git = (...args: readonly string[]): void => {
+      spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
+        cwd: project
+      });
+    };
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-q", "-m", "first");
+    return config;
+  };
+  const System = [
+    ":root { --ink: #111111; --paper: #ffffff; --brand: #ff0033; --line: #dddddd; --muted: #777777; --space-2: 8px; }",
+    ".dark { --ink: #eeeeee; --paper: #000000; }",
+    ""
+  ].join("\n");
+
+  it("checks a change against what the application declares, and says what it read", () => {
+    const config = appProject("app-system", System);
+    writeFileSync(
+      join(root, "app-system", "src", "New.tsx"),
+      'export const New = () => <p style={{ color: "#ff0033" }} />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).not.toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      skipped: [],
+      checked: ["raw-color", "raw-size", "suppression", "deleted-test"],
+      tokenSources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
+      tokenClashes: 0,
+      problems: [{ rule: "raw-color", file: "src/New.tsx", fix: "--brand" }]
+    });
+    expect(forgebook(config, ["check-code"]).stdout).toContain("Read from: src/a.css (css-variables, 6)");
+  });
+
+  it("answers the token questions from the same reading", () => {
+    const config = appProject("app-tokens", System);
+    expect(JSON.parse(forgebook(config, ["tokens", "--category", "color", "--json"]).stdout)).toMatchObject({
+      isConfigured: true,
+      total: 5,
+      sources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
+      notes: []
+    });
+    const nearest = JSON.parse(forgebook(config, ["tokens", "--nearest", "#ff0034", "--json"]).stdout);
+    expect(nearest.matches[0]).toMatchObject({ name: "--brand", isClose: true });
+    // a custom property's dashes read as an option on a command line, so its name holds without them
+    const ink = JSON.parse(forgebook(config, ["tokens", "ink", "--json"]).stdout);
+    expect(ink.token).toMatchObject({
+      name: "--ink",
+      modes: { dark: "#eeeeee" },
+      origin: { kind: "css-variables", file: "src/a.css", line: 1 }
+    });
+  });
+
+  it("does not stop on what it cannot read: it says so and goes on", () => {
+    const config = appProject("app-notes", `@import "@acme/gone/x.css";\n${System}`);
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout).tokenNotes[0]).toContain("@acme/gone/x.css");
+    expect(forgebook(config, ["tokens", "--json"]).exitCode).toBe(0);
+  });
+
+  it("does not take a brand colour and little else for a palette", () => {
+    const config = appProject("app-small", ":root { --brand: #ff0033; }\n");
+    writeFileSync(
+      join(root, "app-small", "src", "New.tsx"),
+      'export const New = () => <p style={{ color: "#123456" }} />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      checked: ["suppression", "deleted-test"],
+      skipped: ["colours and sizes not checked: too few tokens of that kind in the application (1)"],
+      problems: []
+    });
+  });
+
+  it("compares only its own folder's files: another package of the repository has its own system", () => {
+    const config = appProject("app-monorepo-outer", System);
+    const project = join(root, "app-monorepo-outer");
+    mkdirSync(join(project, "packages", "ui", "src"), { recursive: true });
+    const inner = join(project, "packages", "ui", "forgebook.config.ts");
+    writeFileSync(inner, readFileSync(config, "utf8"));
+    writeFileSync(join(project, "packages", "ui", "src", "a.css"), System);
+    writeFileSync(
+      join(project, "packages", "ui", "src", "Own.tsx"),
+      'export const A = <p style={{ color: "#ff0033" }} />;\n'
+    );
+    writeFileSync(
+      join(project, "src", "Other.tsx"),
+      'export const A = <p style={{ color: "#ff0033" }} />;\n'
+    );
+    const answer = JSON.parse(forgebook(inner, ["check-code", "--json"]).stdout);
+    expect(answer.problems.map((each: { file: string }) => each.file)).toEqual(["packages/ui/src/Own.tsx"]);
+    expect(answer.notCompared).toContain("src/Other.tsx");
+  });
+
+  it("reads nothing when the configuration says there is no system", () => {
+    const off = `export default ${JSON.stringify({
+      framework: STUB_FRAMEWORK,
+      title: "off",
+      stories: ["src/*.stories.tsx"],
+      tokens: []
+    })};\n`;
+    const config = appProject("app-off", System, off);
+    expect(JSON.parse(forgebook(config, ["check-code", "--json"]).stdout)).toMatchObject({
+      skipped: ["colours and sizes not checked: no tokens file"],
+      tokenSources: []
+    });
+    expect(JSON.parse(forgebook(config, ["tokens", "--json"]).stdout)).toMatchObject({ isConfigured: false });
+  });
+
+  it("does not read the application when a tokens file is named: that is the system", () => {
+    const named = `export default ${JSON.stringify({
+      framework: STUB_FRAMEWORK,
+      title: "named",
+      stories: ["src/*.stories.tsx"],
+      tokens: ["tokens.json"]
+    })};\n`;
+    const config = appProject("app-named", System, named);
+    writeFileSync(
+      join(root, "app-named", "tokens.json"),
+      readFileSync(join(import.meta.dirname, "fixtures", "tokens.json"))
+    );
+    const { tokens, sources } = JSON.parse(forgebook(config, ["tokens", "--json"]).stdout);
+    expect(tokens.some((each: { name: string }) => each.name === "--ink")).toBe(false);
+    expect(sources[0]).toMatchObject({ kind: "tokens-file", file: "tokens.json" });
+  });
+});
+
 describe("a built catalogue for agents", { timeout: SERVER_TIMEOUT }, () => {
   /** The fixture's catalogue, which has a real framework to build with. */
   const Fixture = join(import.meta.dirname, "..", "..", "..", "fixtures", "app", "forgebook.config.ts");

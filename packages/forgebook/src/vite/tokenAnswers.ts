@@ -11,15 +11,19 @@ import type {
   TokensDocument
 } from "./agent.types.ts";
 import type { AgentAnswer } from "./agentRoutes.ts";
-import { type DesignToken, filteredTokens, type ParsedTokens } from "./designTokens.ts";
+import { type DesignToken, filteredTokens, type ParsedTokens, type TokenSource } from "./designTokens.ts";
 import { nearestTokens } from "./nearestToken.ts";
 
 /** The tokens read, with whether anything names some: a file that cannot be read is named, which is not "no tokens". */
 export type TokenReading = ParsedTokens & {
-  /** Whether the catalogue or a source names a tokens file. */
+  /** Whether there is a system to ask about: a tokens file named, or tokens read from the application. */
   readonly isConfigured: boolean;
   /** The sources whose modules could not be read: whether they hold tokens is not known. */
   readonly unread: readonly string[];
+  /** What the tokens were read from. */
+  readonly sources: readonly TokenSource[];
+  /** What the application's files hold that could not be read without running them. Unlike a problem, it fails nothing. */
+  readonly notes: readonly string[];
 };
 
 /** A list's size unless asked otherwise: an agent degrades on long answers, and asks `nearest` or one token. */
@@ -30,7 +34,7 @@ const NO_TOKENS_FILE: AgentAnswer = {
   status: 404,
   body: {
     error:
-      'This catalogue names no tokens file: `tokens: ["tokens.json"]` in forgebook.config.ts, or on a source it shows'
+      'This catalogue names no tokens file and has none to read: an application with no system of its own (custom properties at the root, Tailwind, components.json), or `tokens: []`. Name a file with `tokens: ["tokens.json"]` in forgebook.config.ts, or on a source it shows'
   }
 };
 
@@ -43,20 +47,21 @@ const typeCounts = (tokens: readonly DesignToken[]): Record<string, number> => {
 
 /** A token as a list gives it: no description, and no empty fields, since each one costs an agent's context. */
 export const tokenSummary = (token: DesignToken): AgentTokenSummary => {
-  const { name, type, value, modes, deprecated, isThemeOnly } = token;
+  const { name, type, value, modes, deprecated, isThemeOnly, utility } = token;
   return {
     name,
     type,
     value,
     modes,
     ...(deprecated === undefined ? {} : { deprecated }),
-    ...(isThemeOnly === undefined ? {} : { isThemeOnly })
+    ...(isThemeOnly === undefined ? {} : { isThemeOnly }),
+    ...(utility === undefined ? {} : { utility })
   };
 };
 
 /** The tokens, of a category when one is asked for, up to a limit, with how many there are. */
 const tokensAnswer = (
-  { tokens, problems, unread, clashes, isConfigured }: TokenReading,
+  { tokens, problems, unread, clashes, isConfigured, sources, notes }: TokenReading,
   params: URLSearchParams
 ): AgentAnswer => {
   const chosen = filteredTokens(tokens, params.get("category") || undefined);
@@ -70,7 +75,9 @@ const tokensAnswer = (
     types: typeCounts(chosen),
     tokens: listed.map(tokenSummary),
     problems: [...unread, ...problems],
-    clashes: clashes.filter((clash) => names.has(clash.name))
+    clashes: clashes.filter((clash) => names.has(clash.name)),
+    sources: sources ?? [],
+    notes: notes ?? []
   };
   return { status: 200, body };
 };
@@ -81,7 +88,8 @@ const tokenAnswer = (reading: TokenReading, params: URLSearchParams): AgentAnswe
   const { tokens, clashes } = reading;
   const problems = [...reading.unread, ...reading.problems];
   const name = params.get("name") ?? "";
-  const token = tokens.find((each) => each.name === name);
+  // a custom property's dashes read as an option on a command line, so its name holds without them
+  const token = tokens.find((each) => each.name === name || each.name === `--${name}`);
   if (token === undefined) {
     const read = problems.length === 0 ? "" : ` (and the tokens files have problems: ${problems.join("; ")})`;
     return { status: 404, body: { error: `No token "${name}"${read}` } };
@@ -90,7 +98,7 @@ const tokenAnswer = (reading: TokenReading, params: URLSearchParams): AgentAnswe
     schema: 1,
     token,
     problems,
-    clashes: clashes.filter((clash) => clash.name === name)
+    clashes: clashes.filter((clash) => clash.name === token.name)
   };
   return { status: 200, body };
 };

@@ -8,17 +8,30 @@
  *
  * @module
  */
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { codeLiteral } from "../codeLiteral.ts";
 import type { CheckedCodeDocument } from "./agent.types.ts";
 import type { AgentAnswer } from "./agentRoutes.ts";
-import { addedLines, checkedCode, deletedTests, fileLines } from "./checkCode.ts";
+import { type AppTokens, readAppTokens } from "./appTokens.ts";
+import {
+  type AddedLine,
+  addedLines,
+  type CodeProblem,
+  checkedCode,
+  deletedTests,
+  excusedValues,
+  fileLines
+} from "./checkCode.ts";
 import type { ResolvedConfig } from "./configFile.ts";
+import type { DesignToken } from "./designTokens.ts";
 import { gitChange, gitOutput } from "./gitChange.ts";
 import { readTokenFiles, type SourceTokens, sourceTokensIn } from "./sourceTokens.ts";
 import { TOKEN_ANSWERS, type TokenReading, tokenSummary } from "./tokenAnswers.ts";
+
+/** Fewer colours than this in what an application declares is no palette to compare with. */
+const FEWEST_COLORS = 5;
 
 /** Finds the file of a source's module specifier. */
 export type ResolveSource = (specifier: string) => Promise<string | undefined>;
@@ -49,14 +62,14 @@ const sourceDeclaration = async (
 };
 
 /**
- * The catalogue's tokens, read at each question, so an edited file answers at once and costs nothing unasked. Sources
- * are read from their modules' text, each source's files before the catalogue's, which win a clash.
+ * The tokens a catalogue and its sources name, read at each question, so an edited file answers at once and costs nothing
+ * unasked. Sources are read from their modules' text, each source's files before the catalogue's, which win a clash.
  *
  * @param config - the catalogue's configuration.
  * @param resolveSource - finds the file of a source's module.
  * @param watch - told of every file read: the sources' modules and the tokens files; none by default.
  */
-export const catalogueTokens = async (
+const namedTokens = async (
   config: ResolvedConfig,
   resolveSource: ResolveSource,
   watch: (file: string) => void = (): undefined => undefined
@@ -74,7 +87,47 @@ export const catalogueTokens = async (
     clashes,
     problems: [...declaring, ...problems],
     unread: declared.flatMap((source) => (source.unread === undefined ? [] : [source.unread])),
-    isConfigured: files.length > 0 || declaring.length > 0
+    isConfigured: files.length > 0 || declaring.length > 0,
+    sources: files.map(({ label }) => ({ kind: "tokens-file", file: label })),
+    notes: []
+  };
+};
+
+/** What the application declares; a failure of the system (a folder gone) is a note, with no machine's path in it. */
+const appTokensOf = (dir: string): AppTokens => {
+  try {
+    return readAppTokens(dir);
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String(error.code) : "an error";
+    return { tokens: [], clashes: [], sources: [], files: [], unread: [`the application's files: ${code}`] };
+  }
+};
+
+/**
+ * The tokens an agent is answered from: what the catalogue and its sources name or, when they name none, what the
+ * application already declares, which is read from its files and never run. A catalogue that says `tokens: []` wants
+ * none, so a named file is not the only way to say so.
+ *
+ * @param config - the catalogue's configuration.
+ * @param resolveSource - finds the file of a source's module.
+ * @param watch - told of every file read; none by default.
+ */
+export const catalogueTokens = async (
+  config: ResolvedConfig,
+  resolveSource: ResolveSource,
+  watch: (file: string) => void = (): undefined => undefined
+): Promise<TokenReading> => {
+  const named = await namedTokens(config, resolveSource, watch);
+  if (named.isConfigured || config.isAppTokensOff === true) return named;
+  const app = appTokensOf(config.dir);
+  for (const file of app.files) watch(file);
+  return {
+    ...named,
+    tokens: app.tokens,
+    clashes: app.clashes,
+    isConfigured: app.tokens.length > 0,
+    sources: app.sources,
+    notes: app.unread
   };
 };
 
@@ -92,12 +145,53 @@ export const tokensModule = async (
   watch: (file: string) => void,
   resolveSource: ResolveSource
 ): Promise<{ code: string; moduleType: "js" }> => {
-  const { tokens, problems, unread } = await catalogueTokens(config, resolveSource, watch);
+  const { tokens, problems, unread } = await namedTokens(config, resolveSource, watch);
   // in both forms: Vite's, and the system's, which a Windows error message writes
   const shown = (problem: string): string =>
     problem.replaceAll(config.dir, ".").replaceAll(resolve(config.dir), ".");
   const value = { tokens: tokens.map(tokenSummary), problems: [...unread, ...problems].map(shown) };
   return { code: `export default ${codeLiteral(value)};`, moduleType: "js" };
+};
+
+/**
+ * The tokens worth comparing a change with. A named tokens file is the system whatever its size. In what an application
+ * merely declares, a handful of colours (a brand colour, a chart's) is no palette: against it every colour written by hand
+ * would read as a mistake, and a check that says so on every line gets turned off.
+ */
+const checkableTokens = ({ tokens, sources }: TokenReading): readonly DesignToken[] => {
+  if (sources.some((source) => source.kind === "tokens-file")) return tokens;
+  const colors = tokens.filter((token) => token.type === "color").length;
+  return colors >= FEWEST_COLORS ? tokens : tokens.filter((token) => token.type !== "color");
+};
+
+/**
+ * What added lines break: values only in the catalogue's folder when the tokens are what that folder's application
+ * declares, since a repository's other packages have systems of their own. A turned-off check is one everywhere.
+ */
+const codeProblems = (
+  added: readonly AddedLine[],
+  tokens: readonly DesignToken[],
+  inFolder: (file: string) => boolean
+): CodeProblem[] => [
+  ...checkedCode(
+    added.filter(({ file }) => inFolder(file)),
+    tokens
+  ),
+  ...checkedCode(
+    added.filter(({ file }) => !inFolder(file)),
+    []
+  )
+];
+
+/** What a change's values were not compared with, and why, in the words `skipped` gives. */
+const notCheckedLine = (hasColors: boolean, hasSizes: boolean, { tokens }: TokenReading): string[] => {
+  if (hasColors && hasSizes) return [];
+  const what = [...(hasColors ? [] : ["colours"]), ...(hasSizes ? [] : ["sizes"])].join(" and ");
+  const reason =
+    tokens.length === 0
+      ? "no tokens file"
+      : `too few tokens of that kind in the application (${tokens.length})`;
+  return [`${what} not checked: ${reason}`];
 };
 
 /**
@@ -115,7 +209,9 @@ const checkCodeAnswer = async (
   resolveSource: ResolveSource
 ): Promise<AgentAnswer> => {
   const since = params.get("since") || "HEAD";
-  const { tokens, problems, unread } = await catalogueTokens(config, resolveSource);
+  const reading = await catalogueTokens(config, resolveSource);
+  const { problems, unread } = reading;
+  const tokens = checkableTokens(reading);
   if (problems.length > 0) {
     return { status: 400, body: { error: `The tokens files have problems: ${problems.join("; ")}` } };
   }
@@ -127,21 +223,32 @@ const checkCodeAnswer = async (
       fileLines(file, await readFile(join(root, file), "utf8").catch(() => ""))
     )
   );
-  const hasTokens = tokens.length > 0;
+  const hasNamedFile = reading.sources.some((source) => source.kind === "tokens-file");
+  const added = [...addedLines(change.diff), ...fresh.flat()];
+  const folder = relative(root, await realpath(config.dir)).replaceAll("\\", "/");
+  const inFolder = (file: string): boolean =>
+    hasNamedFile || folder === "" || file === folder || file.startsWith(`${folder}/`);
+  const hasColors = tokens.some((token) => token.type === "color") || (hasNamedFile && tokens.length > 0);
+  const hasSizes = tokens.some((token) => token.type === "dimension") || (hasNamedFile && tokens.length > 0);
   const body: CheckedCodeDocument = {
     schema: 1,
     since,
-    checked: hasTokens
-      ? ["raw-color", "raw-size", "suppression", "deleted-test"]
-      : ["suppression", "deleted-test"],
+    checked: [
+      ...(hasColors ? (["raw-color"] as const) : []),
+      ...(hasSizes ? (["raw-size"] as const) : []),
+      "suppression",
+      "deleted-test"
+    ],
     skipped: [
-      ...(hasTokens ? [] : ["colours and sizes not checked: no tokens file"]),
+      ...notCheckedLine(hasColors, hasSizes, reading),
       ...unread.map((source) => `tokens of a source not checked: ${source}`)
     ],
-    problems: [
-      ...checkedCode([...addedLines(change.diff), ...fresh.flat()], tokens),
-      ...deletedTests(change.deleted)
-    ]
+    problems: [...codeProblems(added, tokens, inFolder), ...deletedTests(change.deleted)],
+    tokenSources: reading.sources,
+    tokenClashes: reading.clashes.length,
+    tokenNotes: [...reading.notes],
+    notCompared: [...new Set(added.flatMap(({ file }) => (inFolder(file) ? [] : [file])))],
+    excused: excusedValues(added.filter(({ file }) => inFolder(file)))
   };
   return { status: 200, body };
 };

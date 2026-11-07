@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { addedLines, checkedCode, deletedTests, fileLines } from "../src/vite/checkCode.ts";
-import type { DesignToken } from "../src/vite/designTokens.ts";
+import { addedLines, checkedCode, deletedTests, excusedValues, fileLines } from "../src/vite/checkCode.ts";
+import type { DesignToken, TokenOriginKind } from "../src/vite/designTokens.ts";
 
 /** A token. */
 const token = (name: string, type: string, value: string, deprecated?: string): DesignToken => ({
@@ -218,5 +218,172 @@ describe("fileLines", () => {
       { file: "a.css", line: 1, text: "one" },
       { file: "a.css", line: 2, text: "two" }
     ]);
+  });
+});
+
+describe("tokens read from an application", () => {
+  /** A token as the application declares it. */
+  const declared = (name: string, type: string, value: string, kind: TokenOriginKind): DesignToken => ({
+    name,
+    type,
+    value,
+    modes: {},
+    origin: { kind, file: "a.css" }
+  });
+  const App = [
+    declared("--color-card", "color", "#ffffff", "tailwind-theme"),
+    declared("--color-popover", "color", "#ffffff", "tailwind-theme"),
+    declared("--color-ink", "color", "#111111", "tailwind-theme"),
+    { ...declared("--color-brand", "color", "#ff0033", "tailwind-theme"), utility: "brand" },
+    declared("--space-2", "dimension", "8px", "css-variables"),
+    declared("--radius-lg", "dimension", "12px", "css-variables"),
+    declared("--text-sm", "dimension", "14px", "css-variables"),
+    declared("--sidebar-padding", "dimension", "16px", "css-variables"),
+    { ...declared("--spacing-4", "dimension", "16px", "tailwind-default"), utility: "4" },
+    { ...declared("--spacing-2", "dimension", "8px", "tailwind-default"), utility: "2" }
+  ];
+  /** The values found in one line. */
+  const found = (text: string, file = "src/Card.tsx"): readonly (string | undefined)[] =>
+    checkedCode([{ file, line: 3, text }], App).map((each) => each.fix ?? each.value);
+
+  it("names a raw colour, and how a class writes the token", () => {
+    const [problem] = checkedCode([{ file: "src/a.css", line: 1, text: "color: #ff0033;" }], App);
+    expect(problem).toMatchObject({ rule: "raw-color", fix: "--color-brand" });
+    expect(problem?.message).toContain("-brand in a class");
+  });
+
+  it("gives no fix when two tokens hold the value, since which one depends on its use", () => {
+    const [problem] = checkedCode([{ file: "src/a.css", line: 1, text: "color: #fff;" }], App);
+    expect(problem?.fix).toBeUndefined();
+    expect(problem?.message).toContain("--color-card or --color-popover");
+  });
+
+  it.each([
+    ["a size of its role", "padding: 8px;", ["--space-2"]],
+    ["a radius", "border-radius: 12px;", ["--radius-lg"]],
+    ["a font's size", "font-size: 14px;", ["--text-sm"]],
+    ["a class's brackets", '<p className="p-[16px]" />', ["--spacing-4"]],
+    ["a negative offset", '<p className="top-[-16px]" />', ["--spacing-4"]]
+  ])("names %s", (_, line, expected) => {
+    expect(found(line)).toEqual(expected);
+  });
+
+  it.each([
+    ["a size of another role", "width: 8px;"],
+    ["a token that is one place's value", "margin: 16px;"],
+    ["Tailwind's scale outside a class", "padding: 16px;"],
+    ["a sum in a class", '<p className="h-[calc(100%-16px)]" />'],
+    ["a sum in a sheet", "padding: calc(40px - 8px);"]
+  ])("leaves alone %s", (_, line) => {
+    expect(found(line)).toEqual([]);
+  });
+
+  it.each([
+    ["a logo's shape", '<path fill="#4285F4" d="M0 0" />'],
+    ["a shape's attribute on its own line", '  fill="#4285F4"'],
+    ["a gradient's stop", '<stop stopColor="#CDCDCD" />'],
+    ["a mask", 'className="mask-[linear-gradient(0deg,#123456,#654321)]"'],
+    ["a canvas", "ctx.fillStyle = '#123456'"],
+    ["the browser's theme colour", 'const LIGHT_THEME_COLOR = "#123456";'],
+    ["the page's head", '<meta name="x" content="#123456" />'],
+    ["a fallback, the token being used", "color: var(--danger, #123456);"],
+    ["a gradient's transparent end", "background: linear-gradient(rgba(1, 2, 3, 0), red);"],
+    ["black in a shadow", "box-shadow: 0 1px rgba(0, 0, 0, 0.5);"]
+  ])("leaves alone %s", (_, line) => {
+    expect(found(line)).toEqual([]);
+  });
+
+  it("still names a shape outside a drawing, and a colour in a shadow", () => {
+    expect(found('<Bar fill="#123456" />')).toEqual(["#123456"]);
+    expect(found("box-shadow: 0 1px #12345a;")).toEqual(["#12345a"]);
+  });
+
+  it("gives no fix when two tokens hold the value in any notation, and names a colour only a theme has", () => {
+    const oklch = [
+      declared("--card", "color", "oklch(1 0 0)", "css-variables"),
+      declared("--popover", "color", "oklch(1 0 0)", "css-variables")
+    ];
+    const [problem] = checkedCode([{ file: "a.css", line: 1, text: "color: #ffffff;" }], oklch);
+    expect(problem?.fix).toBeUndefined();
+    const themed: DesignToken = {
+      ...declared("--ink", "color", "#111111", "css-variables"),
+      isThemeOnly: true,
+      modes: { dark: "#123456" }
+    };
+    const [only] = checkedCode([{ file: "a.css", line: 1, text: "color: #123456;" }], [themed]);
+    expect(only?.message).toContain("--ink is #123456 in the dark theme");
+    expect(only?.fix).toBeUndefined();
+  });
+
+  it("does not take a class's double dash or a bracketed variable for a declaration", () => {
+    expect(found(".btn--primary:hover { color: #ff0000 }", "src/a.css")).toHaveLength(1);
+    expect(found('className="[--w:16px] bg-[#ff0000]"')).toHaveLength(1);
+    expect(found('className="mask-image bg-[#ff0000]"')).toHaveLength(1);
+  });
+
+  it("leaves alone a sheet's one-line declarations", () => {
+    expect(found(":root { --a: #12345a; --b: 8px; }", "src/a.css")).toEqual([]);
+  });
+
+  it("leaves alone a value's next line in a sheet, usually a token's", () => {
+    expect(found("    0 1px 2px #123456,", "src/a.css")).toEqual([]);
+  });
+
+  it.each(["src/emails/Welcome.tsx", "src/app/og/route.tsx", "src/share.opengraph.tsx"])(
+    "leaves alone %s, where a page's variables do not reach",
+    (file) => {
+      expect(found('<p style={{ color: "#123456" }} />', file)).toEqual([]);
+    }
+  );
+
+  it("takes a value that is meant, on its line or the one above, with its reason", () => {
+    expect(found('color: "#123456"; // forgebook-ignore raw-color: a tag\'s default')).toEqual([]);
+    expect(
+      checkedCode(
+        [
+          { file: "a.css", line: 1, text: "/* forgebook-ignore raw-color: the brand's own */" },
+          { file: "a.css", line: 2, text: "color: #123456;" }
+        ],
+        App
+      )
+    ).toEqual([]);
+  });
+
+  it("lists every excuse with its reason, and takes it only from a comment", () => {
+    expect(found('<p data-x="/ forgebook-ignore raw-color: why" style={{ color: "#12345a" }} />')).toEqual([
+      "#12345a"
+    ]);
+    expect(
+      excusedValues([
+        { file: "a.css", line: 2, text: "color: #123456; /* forgebook-ignore raw-color: the brand */" }
+      ])
+    ).toEqual([{ file: "a.css", line: 2, rule: "raw-color", reason: "the brand" }]);
+  });
+
+  it("stays quick on a long line of what its patterns read", () => {
+    const line = `${"a-".repeat(900)}: ${"padding ".repeat(20)} 8px`;
+    const started = performance.now();
+    for (let count = 0; count < 200; count += 1) found(line);
+    expect(performance.now() - started).toBeLessThan(5000);
+  });
+
+  it("does not take it with no reason, or for another rule, or from a line further up", () => {
+    expect(found('color: "#123456"; // forgebook-ignore raw-color')).toEqual(["#123456"]);
+    expect(found('color: "#123456"; // forgebook-ignore raw-size: why')).toEqual(["#123456"]);
+    expect(
+      checkedCode(
+        [
+          { file: "a.css", line: 1, text: "/* forgebook-ignore raw-color: why */" },
+          { file: "a.css", line: 5, text: "color: #123456;" }
+        ],
+        App
+      )
+    ).toHaveLength(1);
+  });
+
+  it("does not compare colours with no colour tokens", () => {
+    expect(checkedCode([{ file: "a.css", line: 1, text: "color: #123456;" }], [])).toEqual([]);
+    const sizes = App.filter((each) => each.type !== "color");
+    expect(checkedCode([{ file: "a.css", line: 1, text: "color: #123456;" }], sizes)).toEqual([]);
   });
 });
