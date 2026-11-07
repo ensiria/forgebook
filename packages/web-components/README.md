@@ -5,7 +5,7 @@ frame draws a custom element story with, and the adapter that reads an element's
 and CSS parts from its [Custom Elements Manifest](https://github.com/webcomponents/custom-elements-manifest), or from a
 Lit element's TypeScript where there is none.
 
-**Requirements:** Lit 3.2 · `forgebook` · Vite 8.3.4+ · React in the project, for the catalogue's own interface (the frames
+**Requirements:** Lit 3.2 · `forgebook` · React 18.2 or 19 in the project, for the catalogue's own interface (the frames
 that draw your elements load none) · `@lit-labs/ssr` only for the generated server tests ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/web-components/LICENSE)
 

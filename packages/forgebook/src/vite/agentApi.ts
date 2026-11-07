@@ -238,6 +238,7 @@ const DROPPED_REASONS: Readonly<Record<DroppedArgReason, string>> = {
   undeclared: "the story declares no such arg, or does not let it be set",
   type: "it is not of the type its control takes (see `controls`)",
   unreadable: "it is not plain JSON",
+  markup: "this framework writes it into HTML, so only plain text can be set",
   control: "its custom control's schema refuses it, or could not be read"
 };
 

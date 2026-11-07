@@ -87,7 +87,7 @@ describe("checkedSetArgs", () => {
   it("says what a framework that writes texts into markup would refuse", () => {
     const set = checkedSetArgs(JSON.stringify({ title: "<b>", tags: ["fine"] }), DECLARATION, "plain");
     expect(set.accepted).toEqual({ tags: ["fine"] });
-    expect(set.dropped).toEqual([{ name: "title", reason: "type" }]);
+    expect(set.dropped).toEqual([{ name: "title", reason: "markup" }]);
   });
 
   it("takes the panel's no value", () => {

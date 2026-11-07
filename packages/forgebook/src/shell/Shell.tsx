@@ -19,7 +19,7 @@ import {
 } from "react";
 
 import { type AddressLink, readArgsParam, readStorybookLink } from "../addressArgsParam.ts";
-import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
+import { type AddressTexts, addressArgsRead } from "../addressTexts.ts";
 import type { CatalogueLists, CatalogueSettings } from "../catalogue.ts";
 import { type DeviceDefault, deviceDefaultOf, pageDeviceDefault } from "../deviceView.ts";
 import { type PanelArgs, panelArgsParam } from "../messages.ts";
@@ -40,6 +40,7 @@ import {
   type StoryLocation,
   type StoryTree,
   sidebarStoryIds,
+  storyOfAddress,
   storyTree,
   type TreeComponent,
   type TreeSource,
@@ -261,7 +262,7 @@ type Address = {
  */
 const pageOf = (search: string, hash: string): Page => {
   const params = new URLSearchParams(search);
-  const story = params.get("story");
+  const story = storyOfAddress(params);
   const component = params.get("component");
   const page = params.get("page");
   if (story !== null) return { kind: "story", id: story };
@@ -279,12 +280,11 @@ const pageOf = (search: string, hash: string): Page => {
  */
 const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Address => {
   const params = new URLSearchParams(window.location.search);
-  const read = readArgsParam(params.get("args"));
+  const param = params.get("args");
   return {
     page: pageOf(window.location.search, window.location.hash),
     view: parseView(window.location.search, catalogue),
-    panelArgs: addressArgsFor(read.args, addressTexts),
-    link: read.link,
+    ...addressArgsRead(readArgsParam(param), param, addressTexts),
     matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== ""),
     tags: params.getAll("tag").filter((tag) => tag !== "" && tag !== "!")
   };
@@ -732,7 +732,7 @@ const useAddress = (catalogue: CatalogueSettings, addressTexts: AddressTexts): A
       (read) =>
         setAddress((current) =>
           current.link?.isWaiting === true && current.link.param === waitingParam
-            ? { ...current, panelArgs: addressArgsFor(read.args, addressTexts), link: read.link }
+            ? { ...current, ...addressArgsRead(read, waitingParam, addressTexts) }
             : current
         )
     );
