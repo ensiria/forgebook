@@ -51,6 +51,7 @@ const STAND_INS: Readonly<Record<string, readonly string[]>> = {
     "useRuntimeConfig",
     "useAppConfig",
     "updateAppConfig",
+    "_replaceAppConfig",
     "useNuxtApp",
     "tryUseNuxtApp",
     "callOnce",

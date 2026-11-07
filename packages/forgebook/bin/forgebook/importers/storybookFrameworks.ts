@@ -87,7 +87,7 @@ export const STORYBOOK_PACKAGES: readonly string[] = Object.keys(STORYBOOK_FRAME
 
 /** What a Nuxt project's stories get differently once moved, said once the configuration is written. */
 const NUXT_NOTES = [
-  "Nuxt's modules and plugins are not run: a component that needs what one provides (a store, i18n) gets it from a decorator",
+  "Nuxt's modules are loaded for their plugins, styles and components, but what they and the app's plugins set up at run time is not: a component that needs one (a store, i18n) gets it from a decorator",
   "A story's route, data, state and cookies are set with parameters.nuxt (route, data, state, cookies), not by a decorator that drives the router"
 ] as const;
 

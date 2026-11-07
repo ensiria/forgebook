@@ -14,6 +14,7 @@ import { packedUsage } from "../usedIn.ts";
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult, UsageResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
+import { previewTagsOf, withPreviewTags } from "./previewTags.ts";
 import {
   EVERY_FILE,
   FILES_SPECIFIER_PREFIX,
@@ -101,6 +102,7 @@ export const docsModule = (
  * @param isKept - whether a listed file may be read; every one by default.
  * @param isForgiving - whether a file that cannot be indexed is named among the catalogue's problems while the others
  * draw (a person at a dev server), rather than failing the module (a build, a test run).
+ * @param catalogue - the catalogue, whose previews' tags every story takes; none has none.
  * @throws when a story file cannot be indexed, unless it is forgiven.
  */
 export const patternModule = (
@@ -111,7 +113,8 @@ export const patternModule = (
   warm: ((storyFile: string) => void) | undefined,
   startTexts?: (files: readonly IndexedStoryFile[]) => void,
   isKept: IsFileKept = EVERY_FILE,
-  isForgiving = false
+  isForgiving = false,
+  catalogue?: { readonly previews: readonly string[] }
 ): {
   code: string;
   moduleType: "js";
@@ -124,7 +127,14 @@ export const patternModule = (
   const [first] = files;
   if (first !== undefined) warm?.(first.file);
   startTexts?.(files);
-  const code = storyFilesCode(root, patterns, files, loaders, startTexts !== undefined, refused);
+  const code = storyFilesCode(
+    root,
+    patterns,
+    withPreviewTags(files, previewTagsOf(catalogue, watch)),
+    loaders,
+    startTexts !== undefined,
+    refused
+  );
   return { code, moduleType: "js", files, refused };
 };
 
