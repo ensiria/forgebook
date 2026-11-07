@@ -236,7 +236,9 @@ too, with a warning.
   edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does. On macOS
   the files you work on (the story files the open frames show, and each file they load once you have edited it) are
   watched one by one, so an edit reaches the page without the system's change events' wait of a tenth of a second or
-  more. Where the system's change events come late or never (a container's mounted volume, a Windows drive under WSL,
+  more. A checkout that moves the repository to another commit (`git switch`, `git reset --hard`, a pull) is heard
+  through git's own files, and each file it wrote reaches the dev server at once: the branch's stories, a removed one
+  gone, a new folder's shown, with no restart. Where the system's change events come late or never (a container's mounted volume, a Windows drive under WSL,
   a network drive), `forgebook dev --poll` checks the files itself.
 - **Switches** for theme, contrast and motion, and the languages you declare; a library adds its own (density, brand)
   through a preset. A direction switch draws every story right to left, and a language declared `dir: "rtl"` does
