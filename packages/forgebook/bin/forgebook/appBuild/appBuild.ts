@@ -16,7 +16,13 @@ import { relative } from "node:path";
 import type { ConfigEnv, Plugin, PluginOption, ResolvedConfig as ResolvedViteConfig } from "vite";
 
 import type { ResolvedConfig } from "../../../src/vite/configFile.ts";
-import { postcssConfigPlace, projectPostcss, watchedFiles } from "../../../src/vite/projectPostcss.ts";
+import {
+  PostcssConfigError,
+  type Processed,
+  postcssConfigPlace,
+  projectPostcss,
+  watchedFiles
+} from "../../../src/vite/projectPostcss.ts";
 import { type AppViteConfig, isWorthLoading, loadAppViteConfig, viteConfigFile } from "./appViteConfig.ts";
 import { hasTsconfigPaths } from "./tsconfigPaths.ts";
 
@@ -72,6 +78,7 @@ export type AppBuild = {
 const postcssPlugin = (dir: string, inlinePlugins: readonly unknown[] | undefined): Plugin | undefined => {
   const run = projectPostcss(dir, inlinePlugins === undefined ? {} : { plugins: inlinePlugins });
   if (run === undefined) return undefined;
+  let isSaid = false;
   return {
     name: "forgebook:app-postcss",
     enforce: "pre",
@@ -79,7 +86,18 @@ const postcssPlugin = (dir: string, inlinePlugins: readonly unknown[] | undefine
       filter: { id: CSS_FILE },
       async handler(code: string, id: string): Promise<{ code: string; map: null } | undefined> {
         if (NOT_COMPILED.test(id)) return undefined;
-        const result = await run(code, id.split("?")[0] ?? id);
+        let result: Processed;
+        try {
+          result = await run(code, id.split("?")[0] ?? id);
+        } catch (error) {
+          if (!(error instanceof PostcssConfigError)) throw error;
+          if (!isSaid)
+            this.warn(
+              `The project's PostCSS could not be loaded: ${error.message}. Set appBuild: { postcss: false } to leave it out`
+            );
+          isSaid = true;
+          return undefined;
+        }
         // the files a plugin read (Tailwind CSS reads the components for their classes) renew the style sheet
         for (const watched of watchedFiles(result.messages)) this.addWatchFile(watched);
         return { code: result.css, map: null };
@@ -139,12 +157,8 @@ export const appBuildPlan = (dir: string, framework: string): AppBuildPlan => {
     viteConfig,
     tsconfigPaths: !readByAdapter.includes("tsconfig-paths") && hasTsconfigPaths(dir),
     postcss,
-    runsCode: [
-      ...(viteConfig === undefined ? [] : [viteConfig]),
-      ...(postcss === undefined || place?.kind === "package" || /\.json$|\.postcssrc$/.test(postcss)
-        ? []
-        : [postcss])
-    ]
+    // a JSON file too: the plugins it names run, and a path in it can name a file of the project's
+    runsCode: [...(viteConfig === undefined ? [] : [viteConfig]), ...(postcss === undefined ? [] : [postcss])]
   };
 };
 
@@ -160,7 +174,8 @@ const settingsPlugin = (fields: AppViteConfig["fields"], report: AppBuildReport)
   configResolved: (resolved: ResolvedViteConfig): void => {
     const line = appBuildLine(report);
     if (line !== undefined) resolved.logger.info(`[forgebook] ${line}`);
-    for (const problem of report.problems) resolved.logger.warn(`[forgebook] ${problem}`);
+    // an error's level: a command's server logs nothing less, and the run must not pass this over in silence
+    for (const problem of report.problems) resolved.logger.error(`[forgebook] ${problem}`);
   }
 });
 
@@ -169,18 +184,27 @@ const settingsPlugin = (fields: AppViteConfig["fields"], report: AppBuildReport)
  *
  * @param config - the catalogue's configuration, read.
  * @param environment - the command and the mode the catalogue runs for.
+ * @param isReadingPaths - whether Vite reads `tsconfig` paths here.
  * @returns what it gives; why it could not be loaded.
  */
 const appViteConfigOf = async (
   config: ResolvedConfig,
-  environment: ConfigEnv
+  environment: ConfigEnv,
+  isReadingPaths: boolean
 ): Promise<{ readonly app?: AppViteConfig; readonly problem?: string }> => {
   const isOwn = READ_BY_ADAPTER[config.framework.name]?.includes("vite-config") === true;
   const file = isOwn ? undefined : viteConfigFile(config.dir, config.appBuild.viteConfig);
   if (file === undefined || !isWorthLoading(config.dir, file)) return {};
   try {
     return {
-      app: await loadAppViteConfig(config.dir, file, environment, config.framework.name, config.appBuild)
+      app: await loadAppViteConfig(
+        config.dir,
+        file,
+        environment,
+        config.framework.name,
+        config.appBuild,
+        isReadingPaths
+      )
     };
   } catch (error) {
     return { problem: viteConfigProblem(file, error) };
@@ -196,9 +220,9 @@ const appViteConfigOf = async (
 export const appBuildOf = async (config: ResolvedConfig, environment: ConfigEnv): Promise<AppBuild> => {
   const options = config.appBuild;
   const readByAdapter = READ_BY_ADAPTER[config.framework.name] ?? [];
-  const { app, problem } = await appViteConfigOf(config, environment);
   const tsconfigPaths =
     options.tsconfigPaths && !readByAdapter.includes("tsconfig-paths") && hasTsconfigPaths(config.dir);
+  const { app, problem } = await appViteConfigOf(config, environment, tsconfigPaths);
   const postcss =
     options.postcss && !readByAdapter.includes("postcss")
       ? postcssPlugin(config.dir, app?.postcssPlugins)
@@ -209,7 +233,7 @@ export const appBuildOf = async (config: ResolvedConfig, environment: ConfigEnv)
     leftOutPlugins: app?.leftOut ?? [],
     tsconfigPaths,
     postcss: postcss !== undefined,
-    problems: problem === undefined ? [] : [problem]
+    problems: [...(problem === undefined ? [] : [problem]), ...(app?.notes ?? [])]
   };
   const fields = app?.fields ?? {};
   const settings = tsconfigPaths

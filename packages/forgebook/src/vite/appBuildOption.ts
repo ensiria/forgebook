@@ -59,7 +59,11 @@ export const appBuildProblem = (value: unknown): string | undefined => {
     return "`appBuild` is false or `{ viteConfig, tsconfigPaths, postcss, skipPlugins, keepPlugins }`";
   const fields = new Map(Object.entries(value));
   const viteConfig = fields.get("viteConfig");
-  if (viteConfig !== undefined && viteConfig !== false && typeof viteConfig !== "string")
+  if (
+    viteConfig !== undefined &&
+    viteConfig !== false &&
+    (typeof viteConfig !== "string" || viteConfig === "")
+  )
     return "`appBuild.viteConfig` is a path or false";
   for (const key of ["tsconfigPaths", "postcss"]) {
     const field = fields.get(key);

@@ -14,8 +14,11 @@
  */
 import { existsSync, globSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { inlineCssImports } from "./cssImports.ts";
 
 /** The names of a PostCSS configuration, in the order they are read. */
 const CONFIG_FILES = [
@@ -122,7 +125,8 @@ export const postcssConfigPlace = (dir: string): PostcssConfigPlace | undefined 
     const config = packageConfig(current);
     if (config !== undefined) return { kind: "package", file: join(current, "package.json"), config };
     const parent = dirname(current);
-    if (parent === current || ROOT_MARKS.some((mark) => existsSync(join(current, mark)))) return undefined;
+    const isLast = current === homedir() || ROOT_MARKS.some((mark) => existsSync(join(current, mark)));
+    if (parent === current || isLast) return undefined;
     current = parent;
   }
 };
@@ -226,9 +230,20 @@ const viteFolder = (): string | undefined => packageFolder(import.meta.dirname, 
 /** The `plugins` of a configuration, read from where it is. */
 const pluginsOf = async (place: PostcssConfigPlace | undefined): Promise<unknown> => {
   if (place === undefined) return undefined;
-  const config = place.kind === "package" ? place.config : await loadConfig(place.file);
+  const loaded = place.kind === "package" ? place.config : await loadConfig(place.file);
+  // PostCSS's loader calls a configuration that is a function, with what it runs for
+  const config =
+    typeof loaded === "function"
+      ? await Reflect.apply(loaded, undefined, [{ cwd: dirname(place.file), env: "development" }])
+      : loaded;
   return isRecord(config) ? config["plugins"] : undefined;
 };
+
+/**
+ * A project's PostCSS configuration that could not be loaded, which is a different thing from a sheet it refuses: every
+ * sheet would fail alike, so a catalogue goes on without it and says so once.
+ */
+export class PostcssConfigError extends Error {}
 
 /** Runs the project's PostCSS on a style sheet. */
 export type PostcssRunner = (css: string, file: string) => Promise<Processed>;
@@ -271,7 +286,16 @@ export const projectPostcss = (dir: string, options: PostcssOptions = {}): Postc
     return postcss(plugins);
   };
   return async (css: string, path: string): Promise<Processed> => {
-    processor ??= ready();
-    return (await processor).process(css, { from: path, to: path });
+    processor ??= ready().catch((error: unknown) => {
+      // read again on the next sheet: the configuration may be saved fixed while the server runs
+      processor = undefined;
+      throw new PostcssConfigError(error instanceof Error ? error.message : String(error));
+    });
+    const { css: inlined, files } = inlineCssImports(css, path);
+    const result = await (await processor).process(inlined, { from: path, to: path });
+    return {
+      css: result.css,
+      messages: [...result.messages, ...files.map((file) => ({ type: "dependency", file }))]
+    };
   };
 };

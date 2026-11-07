@@ -23,8 +23,8 @@ const MAX_FILES = 32;
 /** The largest file read, in bytes. */
 const MAX_FILE_SIZE = 1_000_000;
 
-/** A `paths` key. */
-const PATHS_KEY = /"paths"\s*:/;
+/** A `paths` key, or a `baseUrl`, which Vite resolves through as well. */
+const PATHS_KEY = /"(?:paths|baseUrl)"\s*:/;
 
 /** The value of an `extends` key, one path or a list. */
 const EXTENDS_VALUE = /"extends"\s*:\s*("[^"\n]+"|\[[^\]]*\])/;
@@ -52,7 +52,8 @@ export const namedTsconfigs = (text: string): readonly string[] => {
   const referenced = [...(text.match(REFERENCES_VALUE)?.[1] ?? "").matchAll(REFERENCE_PATH)].flatMap(
     (each) => (each[1] === undefined ? [] : [each[1]])
   );
-  return [...extended, ...referenced].filter((path) => path.startsWith("."));
+  // a bare `extends` is a package's; a bare reference is a file beside this one
+  return [...extended.filter((path) => path.startsWith(".")), ...referenced];
 };
 
 /**

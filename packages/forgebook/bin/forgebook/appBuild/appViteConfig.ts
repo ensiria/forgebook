@@ -18,9 +18,15 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { isBuiltin } from "node:module";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
-import type { ConfigEnv, Plugin, UserConfig } from "vite";
+import type {
+  ConfigEnv,
+  IndexHtmlTransformContext,
+  IndexHtmlTransformResult,
+  Plugin,
+  UserConfig
+} from "vite";
 
 import type { ResolvedAppBuild } from "../../../src/vite/appBuildOption.ts";
 
@@ -68,11 +74,11 @@ const LOADED_MODULE = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)["'`]([^
 
 /** A word naming one of the settings a catalogue takes. */
 const TAKEN_SETTING =
-  /\b(?:resolve|alias|css|define|esbuild|oxc|optimizeDeps|envPrefix|envDir|publicDir|assetsInclude|json|dedupe|conditions|mainFields|extensions|tsconfigPaths)\b/;
+  /\b(?:resolve|alias|css|define|esbuild|oxc|optimizeDeps|envPrefix|envDir|publicDir|assetsInclude|json|dedupe|conditions|mainFields|extensions|tsconfigPaths|name|transform|load|resolveId|configureServer|enforce|jsxImportSource|babel)\b/;
 
 /**
  * Whether a `vite.config` can hold nothing for a catalogue, as its text shows: it loads only Vite and the framework's
- * plugin, and names none of the settings taken.
+ * plugin, and names none of the settings taken nor anything a plugin written in the file would hold.
  *
  * @remarks
  * The usual configuration of a new project is exactly this, and loading it means bundling it and starting the module
@@ -100,6 +106,8 @@ export type AppViteConfig = {
   readonly leftOut: readonly string[];
   /** The PostCSS plugins its `css.postcss` makes; none when it makes none. */
   readonly postcssPlugins: readonly unknown[] | undefined;
+  /** What it sets that a catalogue cannot do, each said. */
+  readonly notes: readonly string[];
 };
 
 /** Whether a value is a plain object. */
@@ -153,12 +161,18 @@ export const isWorthLoading = (dir: string, file: string): boolean => {
  * @param name - the plugin's name.
  * @param framework - the adapter's name.
  * @param options - what the catalogue's configuration asks.
+ * @param isReadingPaths - whether Vite reads `tsconfig` paths here, which a plugin that does the same is then not needed for.
  */
-export const keepsAppPlugin = (name: string, framework: string, options: ResolvedAppBuild): boolean => {
+export const keepsAppPlugin = (
+  name: string,
+  framework: string,
+  options: ResolvedAppBuild,
+  isReadingPaths = true
+): boolean => {
   if (options.skipPlugins.includes(name)) return false;
   if (options.keepPlugins.includes(name)) return true;
   if (FRAMEWORK_PLUGINS[framework]?.test(name) === true) return false;
-  return !APP_ONLY_PLUGINS.test(name) && !TSCONFIG_PATHS_PLUGIN.test(name);
+  return !APP_ONLY_PLUGINS.test(name) && !(isReadingPaths && TSCONFIG_PATHS_PLUGIN.test(name));
 };
 
 /** What is taken of `resolve`. */
@@ -171,15 +185,21 @@ const resolveFields = (given: NonNullable<UserConfig["resolve"]>): NonNullable<U
   ...(given.tsconfigPaths === undefined ? {} : { tsconfigPaths: given.tsconfigPaths })
 });
 
+/** Lightning CSS's options but its visitor. */
+const withoutVisitor = ({
+  visitor: _visitor,
+  ...rest
+}: NonNullable<NonNullable<UserConfig["css"]>["lightningcss"]>): NonNullable<
+  NonNullable<UserConfig["css"]>["lightningcss"]
+> => rest;
+
 /** What is taken of `css`: its visitor stays Forgebook's, since the forced states are a rewrite of the style sheets. */
 const cssFields = (given: NonNullable<UserConfig["css"]>): NonNullable<UserConfig["css"]> => ({
   ...(given.preprocessorOptions === undefined ? {} : { preprocessorOptions: given.preprocessorOptions }),
   ...(given.preprocessorMaxWorkers === undefined
     ? {}
     : { preprocessorMaxWorkers: given.preprocessorMaxWorkers }),
-  ...(given.lightningcss?.cssModules === undefined
-    ? {}
-    : { lightningcss: { cssModules: given.lightningcss.cssModules } })
+  ...(given.lightningcss === undefined ? {} : { lightningcss: withoutVisitor(given.lightningcss) })
 });
 
 /** What is taken of `optimizeDeps`. */
@@ -190,9 +210,32 @@ const optimizeFields = (
   ...(given.exclude === undefined ? {} : { exclude: given.exclude })
 });
 
+/** The `define` names that replace a whole environment. */
+const WHOLE_ENVIRONMENT = new Set(["process.env", "import.meta.env"]);
+
+/**
+ * Whether a `define` value is empty: `process.env: {}` is a common way to keep code that reads it from failing, and holds
+ * nothing.
+ */
+const isEmptyDefine = (value: unknown): boolean =>
+  value === "{}" || (typeof value === "object" && value !== null && Object.keys(value).length === 0);
+
+/**
+ * A `define` without a whole environment written out: a catalogue bundles code the app does not (Testing Library reads
+ * `process.env`), so what the app kept out of its bundles would reach the catalogue's.
+ *
+ * @param define - the configuration's.
+ */
+export const withoutWholeEnvironment = (
+  define: NonNullable<UserConfig["define"]>
+): NonNullable<UserConfig["define"]> =>
+  Object.fromEntries(
+    Object.entries(define).filter(([name, value]) => !WHOLE_ENVIRONMENT.has(name) || isEmptyDefine(value))
+  );
+
 /** What is taken of how code compiles and what it reads. */
 const compileFields = (config: UserConfig): UserConfig => ({
-  ...(config.define === undefined ? {} : { define: config.define }),
+  ...(config.define === undefined ? {} : { define: withoutWholeEnvironment(config.define) }),
   ...(config.assetsInclude === undefined ? {} : { assetsInclude: config.assetsInclude }),
   ...(config.json === undefined ? {} : { json: config.json }),
   ...(config.esbuild === undefined ? {} : { esbuild: config.esbuild }),
@@ -237,6 +280,89 @@ const inlinePostcssPlugins = (config: UserConfig): readonly unknown[] | undefine
   return isRecord(postcss) && Array.isArray(postcss["plugins"]) ? postcss["plugins"] : undefined;
 };
 
+/** A hook's function, from the function or the function with its order. */
+const handlerOf = <THandler>(hook: THandler | { readonly handler: THandler }): THandler =>
+  typeof hook === "object" && hook !== null && "handler" in hook ? hook.handler : hook;
+
+/** A hook's order, when it names one. */
+const orderOf = (hook: unknown): { readonly order?: "pre" | "post" | null } => {
+  const order: unknown =
+    typeof hook === "object" && hook !== null && "order" in hook ? hook.order : undefined;
+  return order === "pre" || order === "post" ? { order } : {};
+};
+
+/** A plugin's `config`, what it returns filtered. */
+const guardedConfig = (hook: NonNullable<Plugin["config"]>, dir: string): NonNullable<Plugin["config"]> => {
+  const handler = handlerOf(hook);
+  return {
+    ...orderOf(hook),
+    async handler(this: unknown, config: UserConfig, env: ConfigEnv): Promise<UserConfig | null> {
+      const returned: UserConfig | null | undefined = await Reflect.apply(handler, this, [config, env]);
+      return returned === null || returned === undefined ? null : appConfigFields(returned, dir);
+    }
+  };
+};
+
+/** A plugin's `transformIndexHtml`, for the frames' page alone. */
+const guardedHtml = (
+  hook: NonNullable<Plugin["transformIndexHtml"]>
+): NonNullable<Plugin["transformIndexHtml"]> => {
+  const handler = handlerOf(hook);
+  return {
+    ...orderOf(hook),
+    handler(this: unknown, html: string, context: IndexHtmlTransformContext): IndexHtmlTransformResult {
+      return context.path.endsWith("frame.html") ? Reflect.apply(handler, this, [html, context]) : html;
+    }
+  };
+};
+
+/**
+ * One of the app's plugins, kept from reaching past what a catalogue takes of an app.
+ *
+ * @remarks
+ * What its `config` returns goes through the same filter as the file's, or a plugin could set the host, `fs.strict` or the
+ * output. Its `configureServer` runs at the normal time, after the middlewares that keep each origin to itself: `order: "pre"`
+ * would answer ahead of them. Its `transformIndexHtml` reaches the frames and not the catalogue's page, whose origin holds the
+ * agent API: a story's frame is what the app's page stands for.
+ *
+ * @param plugin - the plugin.
+ * @param dir - the folder its relative paths are read against.
+ */
+export const guardedAppPlugin = (plugin: Plugin, dir: string): Plugin => {
+  const { config, configureServer, transformIndexHtml } = plugin;
+  return {
+    ...plugin,
+    ...(config === undefined ? {} : { config: guardedConfig(config, dir) }),
+    ...(configureServer === undefined ? {} : { configureServer: handlerOf(configureServer) }),
+    ...(transformIndexHtml === undefined ? {} : { transformIndexHtml: guardedHtml(transformIndexHtml) })
+  };
+};
+
+/**
+ * What a configuration sets that a catalogue cannot do: stories would differ from the app without a word otherwise.
+ *
+ * @param config - the configuration, loaded.
+ * @param environment - what it was loaded for.
+ * @param text - the file's text.
+ */
+const configNotes = (config: UserConfig, environment: ConfigEnv, text: string): readonly string[] => [
+  ...(config.css?.modules !== undefined && config.css.modules !== false
+    ? [
+        "css.modules is not read: a catalogue compiles CSS modules with Lightning CSS, so localsConvention and the like do not apply; set css.lightningcss.cssModules"
+      ]
+    : []),
+  ...(/\bjsxImportSource\b/.test(text)
+    ? [
+        "jsxImportSource is not read from the framework's plugin, which the adapter makes itself: give it to the adapter in the catalogue's configuration (react({ jsxImportSource }))"
+      ]
+    : []),
+  ...(environment.command === "build" &&
+  Object.keys(config.define ?? {}).some((name) => WHOLE_ENVIRONMENT.has(name)) &&
+  Object.keys(withoutWholeEnvironment(config.define ?? {})).length !== Object.keys(config.define ?? {}).length
+    ? ["define writes out a whole environment (process.env), which is left out of the catalogue's build"]
+    : [])
+];
+
 /**
  * Loads the app's Vite configuration, and takes what a catalogue takes of it.
  *
@@ -245,6 +371,7 @@ const inlinePostcssPlugins = (config: UserConfig): readonly unknown[] | undefine
  * @param environment - the command and the mode it is loaded for: a configuration may be a function of them.
  * @param framework - the adapter's name.
  * @param options - what the catalogue's configuration asks.
+ * @param isReadingPaths - whether Vite reads `tsconfig` paths here.
  * @throws what the file throws when it loads.
  */
 export const loadAppViteConfig = async (
@@ -252,23 +379,22 @@ export const loadAppViteConfig = async (
   file: string,
   environment: ConfigEnv,
   framework: string,
-  options: ResolvedAppBuild
+  options: ResolvedAppBuild,
+  isReadingPaths: boolean
 ): Promise<AppViteConfig> => {
   const { loadConfigFromFile } = await import("vite");
-  const loaded = await loadConfigFromFile(environment, resolve(dir, file), dir, "silent");
+  const path = resolve(dir, file);
+  const loaded = await loadConfigFromFile(environment, path, dir, "silent");
   const config = loaded?.config ?? {};
   const written = await flatPlugins(config.plugins);
+  const isKept = (plugin: Plugin): boolean => keepsAppPlugin(plugin.name, framework, options, isReadingPaths);
+  const home = dirname(path);
   return {
     file,
-    fields: appConfigFields(config, dir),
-    plugins: written.filter((plugin) => keepsAppPlugin(plugin.name, framework, options)),
-    leftOut: [
-      ...new Set(
-        written
-          .filter((plugin) => !keepsAppPlugin(plugin.name, framework, options))
-          .map((plugin) => plugin.name)
-      )
-    ],
-    postcssPlugins: inlinePostcssPlugins(config)
+    fields: appConfigFields(config, home),
+    plugins: written.filter(isKept).map((plugin) => guardedAppPlugin(plugin, home)),
+    leftOut: [...new Set(written.filter((plugin) => !isKept(plugin)).map((plugin) => plugin.name))],
+    postcssPlugins: inlinePostcssPlugins(config),
+    notes: configNotes(config, environment, readFileSync(path, "utf8"))
   };
 };

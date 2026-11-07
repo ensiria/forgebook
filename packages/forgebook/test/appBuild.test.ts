@@ -8,21 +8,24 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { createServer } from "vite";
+import { createServer, type Plugin } from "vite";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type AppBuild, appBuildLine, appBuildOf, appBuildPlan } from "../bin/forgebook/appBuild/appBuild.ts";
 import {
   appConfigFields,
+  guardedAppPlugin,
   holdsNothingForCatalogue,
   keepsAppPlugin,
-  viteConfigFile
+  viteConfigFile,
+  withoutWholeEnvironment
 } from "../bin/forgebook/appBuild/appViteConfig.ts";
 import { hasTsconfigPaths, namedTsconfigs } from "../bin/forgebook/appBuild/tsconfigPaths.ts";
 import { commandServerVite } from "../bin/forgebook/commandServer.ts";
 import { type AppBuildOption, appBuildProblem, resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import { type ResolvedConfig, resolveConfig } from "../src/vite/configFile.ts";
-import { postcssConfigPlace } from "../src/vite/projectPostcss.ts";
+import { inlineCssImports } from "../src/vite/cssImports.ts";
+import { PostcssConfigError, postcssConfigPlace, projectPostcss } from "../src/vite/projectPostcss.ts";
 
 const made: string[] = [];
 
@@ -90,6 +93,9 @@ describe("tsconfig paths", () => {
       hasTsconfigPaths(projectWith({ "tsconfig.json": '{ "extends": "@tsconfig/strictest/tsconfig.json" }' }))
     ).toBe(false);
     expect(namedTsconfigs('{ "extends": "@tsconfig/node24" }')).toEqual([]);
+    expect(namedTsconfigs('{ "references": [{ "path": "tsconfig.app.json" }] }')).toEqual([
+      "tsconfig.app.json"
+    ]);
   });
 
   it("does not go round a loop", () => {
@@ -158,7 +164,8 @@ describe("whether a vite.config is worth loading", () => {
     ["a dynamic import", 'export default async () => (await import("./x")).default;'],
     ["a require", 'module.exports = require("./x");'],
     ["an alias", 'export default { resolve: { alias: { "@": "/src" } } };'],
-    ["a define", "export default { define: { A: 1 } };"]
+    ["a define", "export default { define: { A: 1 } };"],
+    ["a plugin written in the file", 'export default { plugins: [{ name: "md", transform() {} }] };']
   ])("loads one with %s", (_name, text) => {
     expect(holdsNothingForCatalogue(text)).toBe(false);
   });
@@ -289,7 +296,8 @@ describe("what init is told, with nothing run", () => {
       viteConfig: "vite.config.mjs",
       tsconfigPaths: true,
       postcss: "postcss.config.json",
-      runsCode: ["vite.config.mjs"]
+      // the plugins a JSON file names run too
+      runsCode: ["vite.config.mjs", "postcss.config.json"]
     });
   });
 
@@ -320,6 +328,112 @@ describe("where a PostCSS configuration is", () => {
       file: join(dir, "package.json"),
       config: { plugins: {} }
     });
+  });
+});
+
+describe("how far a plugin of the app's reaches", () => {
+  const hookOf = (plugin: Plugin, name: "config" | "configureServer" | "transformIndexHtml"): unknown =>
+    plugin[name];
+
+  it("takes from what its config returns what is taken of a file", async () => {
+    const plugin = guardedAppPlugin(
+      { name: "p", config: () => ({ server: { host: "0.0.0.0" }, base: "/x/", define: { A: "1" } }) },
+      "/project"
+    );
+    const hook = hookOf(plugin, "config");
+    const handler = typeof hook === "object" && hook !== null && "handler" in hook ? hook.handler : undefined;
+    expect(
+      typeof handler === "function" ? await Reflect.apply(handler, undefined, [{}, {}]) : "none"
+    ).toEqual({
+      define: { A: "1" }
+    });
+  });
+
+  it("runs its server hook in the normal order, after the guards", () => {
+    const server = (): void => undefined;
+    const plugin = guardedAppPlugin({ name: "p", configureServer: { order: "pre", handler: server } }, "/");
+    expect(hookOf(plugin, "configureServer")).toBe(server);
+  });
+
+  it("changes the frames' page and not the catalogue's", async () => {
+    const plugin = guardedAppPlugin({ name: "p", transformIndexHtml: () => "changed" }, "/");
+    const hook = hookOf(plugin, "transformIndexHtml");
+    const handler = typeof hook === "object" && hook !== null && "handler" in hook ? hook.handler : undefined;
+    const run = (path: string): unknown =>
+      typeof handler === "function" ? Reflect.apply(handler, undefined, ["html", { path }]) : "none";
+    expect(run("/index.html")).toBe("html");
+    expect(run("/frame.html")).toBe("changed");
+  });
+});
+
+describe("a define that writes out an environment", () => {
+  it("is left out, and an empty one or another name is kept", () => {
+    expect(
+      withoutWholeEnvironment({ "process.env": { KEY: "secret" }, "process.env.A": '"1"', B: "2" })
+    ).toEqual({ "process.env.A": '"1"', B: "2" });
+    expect(withoutWholeEnvironment({ "process.env": {} })).toEqual({ "process.env": {} });
+    expect(withoutWholeEnvironment({ "import.meta.env": "{}" })).toEqual({ "import.meta.env": "{}" });
+  });
+});
+
+describe("a plugin that does the same as Vite's reading of paths", () => {
+  it("stays when Vite does not read them here", () => {
+    const options = resolvedAppBuild(undefined);
+    expect(keepsAppPlugin("vite-tsconfig-paths", "react", options, true)).toBe(false);
+    expect(keepsAppPlugin("vite-tsconfig-paths", "react", options, false)).toBe(true);
+  });
+});
+
+describe("what is said of a configuration", () => {
+  it("names what a catalogue cannot do", async () => {
+    const dir = projectWith({
+      "vite.config.mjs":
+        'export default { css: { modules: { localsConvention: "camelCase" } } };\n// jsxImportSource'
+    });
+    const { report } = await read(catalogue(dir));
+    expect(report.problems.join()).toContain("css.modules is not read");
+    expect(report.problems.join()).toContain("jsxImportSource is not read");
+  });
+});
+
+describe("a PostCSS configuration", () => {
+  const css = (dir: string): Promise<string> =>
+    projectPostcss(dir)?.("a { color: RAW; }", join(dir, "a.css")).then((result) => result.css) ??
+    Promise.reject(new Error("none"));
+
+  it("may be a function, as PostCSS's loader reads it", async () => {
+    const dir = projectWith({
+      "postcss.config.cjs":
+        'module.exports = () => ({ plugins: [{ postcssPlugin: "p", Declaration: (node) => { node.value = "red"; } }] });'
+    });
+    expect(await css(dir)).toContain("red");
+  });
+
+  it("that cannot load is told apart, and is read again on the next sheet", async () => {
+    const dir = projectWith({ "postcss.config.cjs": 'throw new Error("broken");' });
+    await expect(css(dir)).rejects.toBeInstanceOf(PostcssConfigError);
+    const run = projectPostcss(dir);
+    await expect(run?.("a{}", join(dir, "a.css"))).rejects.toBeInstanceOf(PostcssConfigError);
+    writeFileSync(join(dir, "postcss.config.json"), '{ "plugins": {} }');
+  });
+
+  it("sees the sheets a sheet imports by relative path", () => {
+    const dir = projectWith({
+      "src/parts/b.css": "@import './c.css';\n.b { background: url(./i.png); }",
+      "src/parts/c.css": ".c { color: red; }",
+      "src/loop.css": "@import './loop.css';"
+    });
+    const { css: text, files } = inlineCssImports(
+      '@import "./parts/b.css";\n@import "tailwindcss";\n@import "./gone.css";\n@import "./parts/c.css" layer(x);',
+      join(dir, "src", "a.css")
+    );
+    expect(text).toContain(".c { color: red; }");
+    expect(text).toContain("url(parts/./i.png)");
+    expect(text).toContain('@import "tailwindcss";');
+    expect(text).toContain('@import "./gone.css";');
+    expect(text).toContain("layer(x)");
+    expect(files).toHaveLength(2);
+    expect(inlineCssImports("@import './loop.css';", join(dir, "src", "loop.css")).css).toContain("@import");
   });
 });
 
