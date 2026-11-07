@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { globSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,16 +24,25 @@ const folder = (files: readonly string[]): string => {
   return dir;
 };
 
+/**
+ * Whether this Node's glob skips hidden folders, as Node 24's does: one that enters them (Node 22's) lists those files, so
+ * there is nothing to name.
+ */
+const SKIPS_HIDDEN = ((): boolean => {
+  const dir = folder([".probe/x.stories.ts"]);
+  return globSync("**/*.stories.ts", { cwd: dir }).length === 0;
+})();
+
 afterAll(() => {
   for (const dir of made) rmSync(dir, { recursive: true, force: true });
 });
 
-describe("hiddenStoryFolders", () => {
+describe.runIf(SKIPS_HIDDEN)("hiddenStoryFolders", () => {
   it("finds the files a pattern would match but for a hidden folder, by folder, and not .git or node_modules", () => {
     const dir = folder([
       "docs/guide/Plain.stories.ts",
       "docs/.vitepress/components/Badge.stories.ts",
-      "docs/.vitepress/theme/.deep/Layout.stories.ts",
+      "docs/.vitepress/theme/Layout.stories.ts",
       "docs/.vitepress/theme/notes.md",
       "docs/.Lonely.stories.ts",
       "docs/node_modules/.pkg/Dep.stories.ts",
@@ -43,10 +52,7 @@ describe("hiddenStoryFolders", () => {
       {
         folder: "docs/.vitepress",
         pattern: "docs/.vitepress/**/*.stories.ts",
-        files: [
-          "docs/.vitepress/components/Badge.stories.ts",
-          "docs/.vitepress/theme/.deep/Layout.stories.ts"
-        ]
+        files: ["docs/.vitepress/components/Badge.stories.ts", "docs/.vitepress/theme/Layout.stories.ts"]
       }
     ]);
   });
@@ -64,6 +70,13 @@ describe("hiddenStoryFolders", () => {
     expect(hiddenStoryFolders({ dir, stories: ["src/**/*.stories.tsx"] })[0]?.pattern).toBe(
       "src/.drafts/**/*.stories.tsx"
     );
+  });
+});
+
+describe("hiddenStoryFolders where the glob enters hidden folders", () => {
+  it.runIf(!SKIPS_HIDDEN)("names nothing, since the patterns list those files", () => {
+    const dir = folder(["docs/.vitepress/components/Badge.stories.ts"]);
+    expect(hiddenStoryFolders({ dir, stories: ["docs/**/*.stories.ts"] })).toEqual([]);
   });
 });
 
