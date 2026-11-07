@@ -235,14 +235,23 @@ describe("forgebook init in a new project", () => {
     expect(initJson(told).document["framework"]).toBe("web-components");
   }, 30_000);
 
+  it("takes a project on an older React or Vite, whose own stay as they are", () => {
+    const dir = projectWith({
+      "package.json": JSON.stringify({ name: "older", dependencies: { react: "^18.3.0", vite: "^5.0.0" } })
+    });
+    const { status, document } = initJson(dir);
+    expect(status).toBe(0);
+    expect(JSON.stringify(document["install"])).toContain('"forgebook","@forgebook/react"');
+  }, 30_000);
+
   it("stops on a version Forgebook cannot draw with, and on no package.json", () => {
     const dir = projectWith({
-      "package.json": JSON.stringify({ name: "old", dependencies: { react: "^18.3.0", vite: "^7.0.0" } })
+      "package.json": JSON.stringify({ name: "old", dependencies: { react: "^17.0.0" } })
     });
     const { status, document } = initJson(dir);
     expect(status).toBe(1);
     expect(document["refused"]).toBe("versions");
-    expect(document["concerned"]).toEqual(["react", "vite"]);
+    expect(document["concerned"]).toEqual(["react"]);
     expect(existsSync(join(dir, "forgebook.config.ts"))).toBe(false);
     const empty = projectWith({ "note.txt": "" });
     expect(initJson(empty).document["refused"]).toBe("no-package");
