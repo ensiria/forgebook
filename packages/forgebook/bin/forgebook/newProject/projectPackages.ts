@@ -165,7 +165,8 @@ export const installedVersion = (dir: string, name: string): string | undefined 
 
 /**
  * The packages a configuration needs with the lowest version of each: `forgebook`, the adapter, what either asks the
- * project for, and what the adapter's options add (no floor, written as `0.0.0`).
+ * project for, and what the adapter's options add (no floor, written as `0.0.0`). Forgebook's own Vite is its dependency,
+ * so a project's is no concern here.
  *
  * @param framework - the framework.
  * @param extraPeers - what its options add.

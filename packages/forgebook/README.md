@@ -9,7 +9,7 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > and every change is in the
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
-**Requirements:** Node 22.18 or later · Vite 8.3.4+ (the catalogue is built on it; other bundlers are not supported) · React 19 through
+**Requirements:** Node 22.18 or later (the catalogue is built on it; other bundlers are not supported) · React 19 through
 [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
 [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) (a Nuxt project's through
 [`@forgebook/nuxt`](https://www.npmjs.com/package/@forgebook/nuxt)), Svelte 5 through
@@ -63,8 +63,8 @@ from the project's files, and writes:
   stories look wrong without them. Nuxt's adapter reads `css` from `nuxt.config` itself, so it needs none.
 
 Then it prints what is left, each thing named, and the next commands. The packages to add are in the exact command of
-the project's package manager; `--install` runs it. It lists React and Vite even on Vue, say, because Forgebook's shell
-needs them and not every package manager installs a peer by itself.
+the project's package manager; `--install` runs it. It lists React even on Vue, say, because Forgebook's shell needs it and not every package manager installs a peer by
+itself. Vite is Forgebook's own dependency: a project on an older one installs it beside its own, which stays as it is.
 
 ```sh
 npx forgebook new src/Badge.tsx   # a component's first stories
@@ -86,44 +86,64 @@ It writes nothing and exits with an error when:
 `init` runs no code of the project unless `--from storybook` or `--install` asks it to; `--install` is an install like
 any other, with the project's package manager settings and the packages' scripts. `--json` prints the result as a document, a refusal
 too (`refused`, `message`, `hint`, `supported`, exit code 1; a wrong command line is exit code 2, with no document), with `nextSteps` as `{ kind, file, message }`: `kind` is `style-sheet`,
-`provider`, `portal`, `head`, `font`, `alias`, `vite-plugin`, `postcss`, `setup`, `version` or `storybook`.
+`provider`, `portal`, `head`, `font`, `postcss`, `setup`, `version` or `storybook`.
 
 ### What init cannot work out
 
-A catalogue runs no entry of the app and reads no `vite.config`, so what those do for the app does not happen for a
-story. Each of these is reported with the file it was read from:
+A catalogue runs no entry of the app, so what one does for the app does not happen for a story. Each of these is
+reported with the file it was read from:
 
 - **Providers**, the components that wrap the app, and what it installs (`app.use(router)`, `provideRouter()`): a decorator
   in the preview gives them to the stories that need them.
 - **Portals**: an element beside the app's root in its page (`#modal-root`). A decorator adds it.
 - **The page's head**: a font's or a CDN's `<link>` goes to `head` in the configuration.
-- **Vite plugins and aliases**: Tailwind's plugin, `resolve.alias`, `tsconfig.json`'s `paths`. Without its alias, a story
-  whose component imports through one does not draw. They go through the adapter:
 
-  ```ts
-  // forgebook.config.ts
-  import { react } from "@forgebook/react/vite";
-  import tailwindcss from "@tailwindcss/vite";
-  import { defineConfig } from "forgebook";
+### The app's build
 
-  const adapter = react();
+A catalogue draws your components with your app's build, with nothing to write:
 
-  export default defineConfig({
-    framework: {
-      ...adapter,
-      vitePlugins: async () => [
-        ...((await adapter.vitePlugins?.()) ?? []),
-        tailwindcss(),
-        { name: "project-aliases", config: () => ({ resolve: { tsconfigPaths: true } }) }
-      ]
-    },
-    title: "My components",
-    stories: ["src/**/*.stories.tsx"]
-  });
-  ```
+| What | Where it is read from | Runs your code? |
+|---|---|---|
+| Aliases | `tsconfig.json`'s `paths` and `baseUrl` (through `extends` and `references`) | No: read as text, Vite resolves them |
+| Aliases, `define`, Sass options, `.env` settings, your Vite plugins (Tailwind's, SVGR…) | `vite.config.*` beside the catalogue's configuration | **Yes**, as `vite dev` does |
+| Tailwind before 4, Autoprefixer, any PostCSS plugin | `postcss.config.*`, `.postcssrc*`, `package.json`'s `postcss`, up to the repository's root | **Yes**: a script, and the plugins any of them names |
 
-- **PostCSS**: a `postcss.config` is run by the Next.js and React Native Web adapters only; the others compile style
-  sheets with Lightning CSS, so Tailwind goes through its Vite plugin, as above.
+So every command that starts the catalogue runs those files, on purpose: `forgebook stories` and `check` as well as `dev`.
+The catalogue's own configuration and your components already run there, and this is the build you run every day. A first
+`dev` start loads a `vite.config` twice, as its pre-bundling runs in a process of its own. `forgebook init` never runs them:
+it reads their names and reports them (`appBuild` in `--json`, with `runsCode`). `forgebook dev` prints what it read; what
+could not be read is said on stderr by every command.
+
+From a `vite.config`, a catalogue takes how modules and style sheets resolve and compile, and never the app's page,
+server or output (`root`, `base`, `build`, `server`), from the file and from what its plugins' `config` hooks return; a
+plugin that changes the configuration in place is not stopped. A plugin's `configureServer`, where one starts a backend or a
+watcher, runs on `forgebook dev` and not on a command's own server (`stories`, `check`, `verify`, `mcp`). Its plugins go in, apart from
+two kinds: the framework's own, which the adapter brings, and those known to build an app rather than draw a component
+(routers, service workers, source-map uploads, type checkers). That second list is names, so an upload plugin it does not
+know runs on `forgebook build`: name it in `skipPlugins`. A plugin's `transformIndexHtml` reaches the frames, not the
+catalogue's page. A `define` that writes out a whole `process.env` is left out, since a catalogue bundles code the app does
+not. A file that fails to load is said with what to do; stories that do not need it still draw.
+
+Not read: the options of the framework's own plugin (`react({ jsxImportSource })` goes to the adapter), and `css.modules`
+(Lightning CSS has `css.lightningcss.cssModules`, and no `localsConvention`); both are said. A workspace's other packages'
+`tsconfig` paths are not looked for, only the catalogue's own folder's, as `extends` and `references` lead on from it.
+
+A `vite.config` holding only Vite's import and the framework's plugin is not loaded at all, so a new project pays for
+none of this. Next.js, Nuxt, SvelteKit, Angular and React Native read what is theirs themselves, as their own sections say.
+
+To turn it off:
+
+```ts
+export default defineConfig({
+  // …
+  appBuild: false // or each part:
+  // appBuild: { viteConfig: false, postcss: false, tsconfigPaths: false, skipPlugins: ["some-plugin"], keepPlugins: ["react-router"] }
+});
+```
+
+A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
+says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
+Sass file goes through its own compiler alone.
 
 ## A first catalogue
 
@@ -1185,6 +1205,9 @@ is a state of the component: the same).
 | `forgebook audit` | The colours, sizes and components a project actually uses, with no catalogue |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
+| `forgebook init --agents` | What a project's coding agents need too: `.mcp.json`, instructions and skill, CI, a hook running `verify`; `--browser` installs the testing package and its browser, `--draw` draws a story ([more](#set-a-project-up-in-one-prompt)) |
+| `forgebook hook <assistant>` | What an assistant's hook runs when it is about to finish: `verify` on the change, sending the agent back on red |
+| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; `--with-deps` also installs what it needs of the system |
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
@@ -1454,6 +1477,55 @@ It is on by default. The theme reaches everything Forgebook draws: the catalogue
 missing-story messages, and the box a frame shows when a story fails.
 
 ## For agents
+
+### Set a project up in one prompt
+
+```sh
+npx forgebook init --agents --browser --draw --json
+```
+
+Unattended, it writes the catalogue's files, then:
+
+- **`.mcp.json`**, with Forgebook's server beside the ones it holds.
+- **`AGENTS.md`** (Forgebook's section, its other sections kept) **and the skill**, in `.agents/skills` and `.claude/skills`.
+- **A CI workflow**, `.github/workflows/forgebook-verify.yml`, running `forgebook verify` against a pull request's target.
+- **A hook that runs `verify`**, so an agent cannot finish on red. `--hooks` names them; by default those of the assistants
+  the repository shows signs of, otherwise the commit's.
+
+`--browser` installs `@forgebook/testing` and its browser, about 200 MB, and implies `--install`. `--draw` then writes a
+component's first stories and draws them in the browser, trying components until one draws and removing the stories of those
+that do not. If components fail for want of a provider, on React, the wrappers the app's entry mounts it in are copied into the
+preview as a decorator (`draw.liftedProviders`), and stay there if a story then draws. When none does, each attempt is in `draw.attempts` with a `kind` (`missing-import`, `provider`, `style-sheet`,
+`server-only`, `native-build`, `blank`…), what was said and what to do; the exit code is then 1.
+
+`--agents` merges and never replaces what the project wrote (the skill's file is Forgebook's own, and is renewed): a JSON file it cannot parse, a link, a workflow or a commit hook already there stays as
+it is and is named in `nextSteps`. It keeps a catalogue already there and starts beside a Storybook, loading nothing of it.
+In a workspace's package, the files go at the repository's root, and find the package through its folder; a repository that
+does not track the package (a home folder kept in git, say) is not used, and they go in the package's folder.
+
+| `--hooks` | Writes | When | On red |
+|---|---|---|---|
+| `claude` | `.claude/settings.json`, `Stop` | Claude Code is about to finish | Sent back (exit 2) |
+| `codex` | `.codex/hooks.json`, `Stop` | Codex is about to finish, once the hook is reviewed and trusted | Sent back (exit 2) |
+| `gemini` | `.gemini/settings.json`, `AfterAgent` | Gemini CLI's turn ends | Sent back (exit 2) |
+| `cursor` | `.cursor/hooks.json`, `stop` | Cursor's agent ends | Another turn starts with the reason: its `stop` hook cannot refuse |
+| `pre-commit` | `.husky/pre-commit`, else `.git/hooks/pre-commit` | A commit (`verify --quick`) | The commit is refused |
+
+Those formats are the ones each assistant's documentation gives; no assistant was run against them here. An assistant not
+listed reads the instructions, and meets the commit's hook.
+
+The hook is `forgebook hook <assistant>`. Each time an assistant stops, it loads the catalogue's configuration, so the
+project's code runs unattended there as it does for `verify`. A branch that changed no UI file since it left its default
+branch starts no server. A failure that comes back the same while the hook itself is what continued the turn lets the agent
+finish, told not to call the change done: an agent that cannot fix something must not spin on it. A hook that cannot run lets
+the agent finish, with a word on stderr, because no agent can repair it. The commit's hook refuses a commit the same way, on
+what the branch changed and not only what is staged; `git commit --no-verify` is the way past it, and a clone that has not
+installed yet commits as before.
+
+`forgebook init` alone runs none of the project's code. `--draw` does, as starting a catalogue does: see [the app's
+build](#the-apps-build). An install runs what the project's package manager settings and the packages' scripts say.
+
+### What agents read
 
 A story's values can be set without the panel: `controls` in `forgebook story --json` and `get_story` says what each prop
 takes, and `forgebook story <id> --args '<json>'` or `story_address` with `args` checks the values as a link's are and

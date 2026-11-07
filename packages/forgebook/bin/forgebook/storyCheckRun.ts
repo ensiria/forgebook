@@ -40,7 +40,7 @@ import { servedCatalogue } from "./agentClient.ts";
 
 /** What the project installs to run the stories in a browser, and how. */
 const INSTALL =
-  "Stories run in a browser with @forgebook/testing: npm install -D @forgebook/testing @playwright/test, then npx playwright install chromium";
+  "Stories run in a browser with @forgebook/testing: npm install -D @forgebook/testing @playwright/test, then forgebook browser";
 
 /** How many pages a run on several stories opens at once: enough to matter, few enough for a laptop or a CI runner. */
 const STORIES_AT_ONCE = 4;

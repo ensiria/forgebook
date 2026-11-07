@@ -26,6 +26,7 @@ import {
   axeProblems,
   errorProblems,
   focusProblems,
+  isPageBlank,
   overlayProblems,
   spillProblems,
   watchedErrors
@@ -85,9 +86,11 @@ const checkedPage = async (
     : [];
   const axe = a11y === undefined ? [] : await axeProblems(page, a11y);
   const isNotAwaited = (await page.locator("html").getAttribute(NOT_AWAITED_ATTRIBUTE)) !== null;
+  const isBlank = await page.evaluate(isPageBlank);
   const checked = {
     ...result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(errors)]),
-    ...(isNotAwaited ? { isNotAwaited } : {})
+    ...(isNotAwaited ? { isNotAwaited } : {}),
+    ...(isBlank ? { isBlank } : {})
   };
   return semantic === undefined
     ? checked
