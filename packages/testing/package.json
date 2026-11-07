@@ -53,8 +53,12 @@
   "peerDependencies": {
     "@playwright/test": "^1.64.0",
     "forgebook": "workspace:^",
-    "vite": "^8.3.4",
-    "vitest": "^5.0.0"
+    "vitest": "*"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@forgebook/tools": "workspace:*",

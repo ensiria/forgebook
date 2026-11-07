@@ -10,7 +10,7 @@ that draw your elements load none) · `@lit-labs/ssr` only for the generated ser
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/web-components/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/web-components lit react react-dom
+npm install --save-dev forgebook @forgebook/web-components lit
 ```
 
 The catalogue's configuration names it as its framework:

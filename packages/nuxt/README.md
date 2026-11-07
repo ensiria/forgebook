@@ -11,7 +11,7 @@ the catalogue's own interface (the frames that draw your components load none) Â
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/nuxt/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/nuxt react react-dom
+npm install --save-dev forgebook @forgebook/nuxt
 ```
 
 The catalogue's configuration, in the Nuxt project's folder, names it as its framework:

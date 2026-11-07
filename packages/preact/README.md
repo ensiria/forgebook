@@ -7,7 +7,7 @@ a story with, on Preact itself, and the adapter that reads a component's props f
 frames that draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/preact/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/preact react react-dom
+npm install --save-dev forgebook @forgebook/preact
 ```
 
 The catalogue's configuration names it as its framework:

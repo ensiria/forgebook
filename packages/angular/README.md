@@ -9,7 +9,7 @@ Vite 8.3.4+ · React in the project, for the catalogue's own interface (the fram
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/angular/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/angular react react-dom
+npm install --save-dev forgebook @forgebook/angular
 ```
 
 The catalogue's configuration names it as its framework:

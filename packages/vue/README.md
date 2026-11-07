@@ -7,7 +7,7 @@ mounts a story with, and the adapter that reads a component's props, events and 
 draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/vue/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/vue react react-dom
+npm install --save-dev forgebook @forgebook/vue
 ```
 
 The catalogue's configuration names it as its framework:

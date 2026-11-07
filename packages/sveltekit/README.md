@@ -10,7 +10,7 @@ interface (the frames that draw your components load none) ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/sveltekit/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/sveltekit react react-dom
+npm install --save-dev forgebook @forgebook/sveltekit
 ```
 
 The catalogue's configuration names it as its framework, beside the app's `vite.config`:

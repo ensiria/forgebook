@@ -7,7 +7,7 @@ mounts a story with, and the adapter that reads a component's props from its Typ
 that draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/solid/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/solid react react-dom
+npm install --save-dev forgebook @forgebook/solid
 ```
 
 The catalogue's configuration names it as its framework:

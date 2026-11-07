@@ -7,7 +7,7 @@ frame mounts a story with, and the adapter that reads a component's props, snipp
 that draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/svelte/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/svelte react react-dom
+npm install --save-dev forgebook @forgebook/svelte
 ```
 
 The catalogue's configuration names it as its framework:

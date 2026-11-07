@@ -8,7 +8,7 @@ types, the renderer the frame draws them with, and the adapter that reads a stor
 your stories load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/html/LICENSE)
 
 ```sh
-npm install --save-dev forgebook @forgebook/html react react-dom
+npm install --save-dev forgebook @forgebook/html
 ```
 
 The catalogue's configuration names it as its framework:

@@ -29,13 +29,6 @@ export type ProjectFramework = {
   readonly sourceFolders: readonly string[];
 };
 
-/** The packages `forgebook` itself asks the project for: its shell is React, and it is built on Vite. */
-export const FORGEBOOK_PEERS: Readonly<Record<string, string>> = {
-  react: "19.0.0",
-  "react-dom": "19.0.0",
-  vite: "8.3.4"
-};
-
 /** The names `--framework` takes, the order of the supported list. */
 export const FRAMEWORK_NAMES: readonly ImportedFramework[] = [
   "react",
@@ -117,7 +110,7 @@ export const PROJECT_FRAMEWORKS: Readonly<Record<ImportedFramework, ProjectFrame
     label: "Angular",
     markers: ["@angular/core"],
     builtOn: [],
-    peers: { ...ANGULAR_PEERS, vite: "8.3.4" },
+    peers: ANGULAR_PEERS,
     storyExtension: "ts",
     sourceFolders: ["src", "projects"]
   },
@@ -125,7 +118,7 @@ export const PROJECT_FRAMEWORKS: Readonly<Record<ImportedFramework, ProjectFrame
     label: "Next.js",
     markers: ["next"],
     builtOn: ["react"],
-    peers: { next: "15.0.0", react: "19.0.0", "react-dom": "19.0.0", vite: "8.3.4" },
+    peers: { next: "15.0.0", react: "19.0.0", "react-dom": "19.0.0" },
     storyExtension: "tsx",
     sourceFolders: ["src", "app", "components", "lib"]
   },
@@ -133,7 +126,7 @@ export const PROJECT_FRAMEWORKS: Readonly<Record<ImportedFramework, ProjectFrame
     label: "Nuxt",
     markers: ["nuxt"],
     builtOn: ["vue"],
-    peers: { vite: "8.3.4", vue: "3.5.0", "vue-router": "4.5.0" },
+    peers: { vue: "3.5.0", "vue-router": "4.5.0" },
     storyExtension: "ts",
     sourceFolders: ["app", "components"]
   },
@@ -141,7 +134,7 @@ export const PROJECT_FRAMEWORKS: Readonly<Record<ImportedFramework, ProjectFrame
     label: "SvelteKit",
     markers: ["@sveltejs/kit"],
     builtOn: ["svelte"],
-    peers: { svelte: "5.46.4", vite: "8.3.4" },
+    peers: { svelte: "5.46.4" },
     storyExtension: "ts",
     sourceFolders: ["src"]
   },
@@ -153,8 +146,7 @@ export const PROJECT_FRAMEWORKS: Readonly<Record<ImportedFramework, ProjectFrame
       react: "18.2.0",
       "react-dom": "18.2.0",
       "react-native": "0.76.0",
-      "react-native-web": "0.21.0",
-      vite: "8.3.4"
+      "react-native-web": "0.21.0"
     },
     storyExtension: "tsx",
     sourceFolders: ["src", "app", "components", "lib"]

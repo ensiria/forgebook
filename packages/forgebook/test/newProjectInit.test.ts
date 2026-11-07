@@ -163,8 +163,8 @@ describe("forgebook init in a new project", () => {
     const { document } = initJson(pnpm);
     expect(document["packageManager"]).toEqual({ name: "pnpm", detectedFrom: "pnpm-lock.yaml" });
     expect(document["install"]).toEqual({
-      missing: ["forgebook", "@forgebook/vue", "react", "react-dom"],
-      command: "pnpm add --save-dev forgebook @forgebook/vue react react-dom",
+      missing: ["forgebook", "@forgebook/vue"],
+      command: "pnpm add --save-dev forgebook @forgebook/vue",
       status: "to-run"
     });
     expect(document["replaced"]).toEqual([]);
@@ -172,7 +172,7 @@ describe("forgebook init in a new project", () => {
     expect(JSON.stringify(document["commands"])).toContain('"placeholder":"<component file>"');
     const person = forgebook(projectWith(NEW_PROJECTS["vue"] ?? {}), ["init"]);
     expect(person.status).toBe(0);
-    expect(person.stdout).toContain("npm install --save-dev forgebook @forgebook/vue react react-dom");
+    expect(person.stdout).toContain("npm install --save-dev forgebook @forgebook/vue");
     expect(person.stdout).toContain("npx forgebook dev");
   }, 30_000);
 
@@ -235,14 +235,23 @@ describe("forgebook init in a new project", () => {
     expect(initJson(told).document["framework"]).toBe("web-components");
   }, 30_000);
 
+  it("takes a project on an older React or Vite, whose own stay as they are", () => {
+    const dir = projectWith({
+      "package.json": JSON.stringify({ name: "older", dependencies: { react: "^18.3.0", vite: "^5.0.0" } })
+    });
+    const { status, document } = initJson(dir);
+    expect(status).toBe(0);
+    expect(JSON.stringify(document["install"])).toContain('"forgebook","@forgebook/react"');
+  }, 30_000);
+
   it("stops on a version Forgebook cannot draw with, and on no package.json", () => {
     const dir = projectWith({
-      "package.json": JSON.stringify({ name: "old", dependencies: { react: "^18.3.0", vite: "^7.0.0" } })
+      "package.json": JSON.stringify({ name: "old", dependencies: { react: "^17.0.0" } })
     });
     const { status, document } = initJson(dir);
     expect(status).toBe(1);
     expect(document["refused"]).toBe("versions");
-    expect(document["concerned"]).toEqual(["react", "vite"]);
+    expect(document["concerned"]).toEqual(["react"]);
     expect(existsSync(join(dir, "forgebook.config.ts"))).toBe(false);
     const empty = projectWith({ "note.txt": "" });
     expect(initJson(empty).document["refused"]).toBe("no-package");

@@ -53,14 +53,14 @@
   },
   "dependencies": {
     "@forgebook/react": "workspace:*",
-    "@forgebook/story-format": "workspace:*"
+    "@forgebook/story-format": "workspace:*",
+    "vite": "^8.3.4"
   },
   "peerDependencies": {
     "forgebook": "workspace:^",
     "next": "^15.0.0 || ^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "vite": "^8.3.4",
     "msw": "^2.11.0 || ^3.0.0"
   },
   "peerDependenciesMeta": {
