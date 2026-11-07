@@ -19,8 +19,8 @@ import { type AppTokens, readAppTokens } from "./appTokens.ts";
 import {
   type AddedLine,
   addedLines,
-  type CodeProblem,
-  checkedCode,
+  type CodeFindings,
+  codeFindings,
   deletedTests,
   excusedValues,
   fileLines,
@@ -175,24 +175,29 @@ const checkableTokens = ({ tokens, sources }: TokenReading): readonly DesignToke
   return colors >= FEWEST_COLORS ? tokens : tokens.filter((token) => token.type !== "color");
 };
 
+/** How many sizes in objects that may not be styles an answer lists: past this, a file of options would bury the rest. */
+const MOST_CODE_ADVICE = 20;
+
 /**
  * What added lines break: values only in the catalogue's folder when the tokens are what that folder's application
- * declares, since a repository's other packages have systems of their own. A turned-off check is one everywhere.
+ * declares, since a repository's other packages have systems of their own. A turned-off check is one everywhere. Only
+ * the compared values give advice: with no tokens there is nothing to weigh.
  */
-const codeProblems = (
+const codeFindingsOf = (
   added: readonly AddedLine[],
   tokens: readonly DesignToken[],
   inFolder: (file: string) => boolean
-): CodeProblem[] => [
-  ...checkedCode(
+): CodeFindings => {
+  const compared = codeFindings(
     added.filter(({ file }) => inFolder(file)),
     tokens
-  ),
-  ...checkedCode(
+  );
+  const elsewhere = codeFindings(
     added.filter(({ file }) => !inFolder(file)),
     []
-  )
-];
+  );
+  return { problems: [...compared.problems, ...elsewhere.problems], advice: compared.advice };
+};
 
 /** What a change's values were not compared with, and why, in the words `skipped` gives. */
 const notCheckedLine = (hasColors: boolean, hasSizes: boolean, { tokens }: TokenReading): string[] => {
@@ -327,6 +332,7 @@ const checkCodeAnswer = async (
     change,
     added.filter(({ file }) => isInCatalogue(file))
   );
+  const code = codeFindingsOf(added, tokens, inFolder);
   const body: CheckedCodeDocument = {
     schema: 1,
     since,
@@ -342,10 +348,13 @@ const checkCodeAnswer = async (
     skipped: [
       ...notCheckedLine(hasColors, hasSizes, reading),
       ...reuse.notes,
-      ...unread.map((source) => `tokens of a source not checked: ${source}`)
+      ...unread.map((source) => `tokens of a source not checked: ${source}`),
+      ...(code.advice.length > MOST_CODE_ADVICE
+        ? [`${code.advice.length - MOST_CODE_ADVICE} more sizes in objects to weigh not listed`]
+        : [])
     ],
-    problems: [...codeProblems(added, tokens, inFolder), ...deletedTests(change.deleted), ...reuse.problems],
-    advice: reuse.advice,
+    problems: [...code.problems, ...deletedTests(change.deleted), ...reuse.problems],
+    advice: [...code.advice.slice(0, MOST_CODE_ADVICE), ...reuse.advice],
     tokenSources: reading.sources,
     tokenClashes: reading.clashes.length,
     tokenNotes: [...reading.notes],
