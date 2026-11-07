@@ -20,11 +20,6 @@ export type LazyPageProps<TProps> = {
   readonly header: ReactNode;
 };
 
-/** Loads the page again, with the build the host serves now. */
-const reload = (): void => {
-  window.location.reload();
-};
-
 /**
  * A page drawn once its module is there.
  *
@@ -49,7 +44,7 @@ export const LazyPage = <TProps extends object>({
         <p className="forgebook-problems" role="alert">
           {STRINGS.pageLoadError}: {message}{" "}
           {/* a page left open across a new build asks for code the host no longer has: a reload gets the new one */}
-          <button type="button" className="forgebook-text-button" onClick={reload}>
+          <button type="button" className="forgebook-text-button" onClick={(): void => location.reload()}>
             {STRINGS.pageReload}
           </button>
         </p>
