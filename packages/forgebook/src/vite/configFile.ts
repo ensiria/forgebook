@@ -35,7 +35,7 @@ import { CONTROLS } from "../storyArgTypes.ts";
 import { catalogueSwitches, switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
-import { unknownKeysProblem } from "./configKeys.ts";
+import { saysNoTokens, unknownKeysProblem } from "./configKeys.ts";
 import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
@@ -113,6 +113,8 @@ export type ResolvedConfig = {
   readonly shell: ResolvedShell;
   /** The tokens files, absolute, the base first. */
   readonly tokens: readonly ResolvedTokensFile[];
+  /** Whether the configuration says `tokens: []`: no system at all, so the application's own files are not read for one. */
+  readonly isAppTokensOff?: boolean;
   /** The custom controls' modules by name: a path absolute, a package's specifier as written. */
   readonly argControls: Readonly<Record<string, string>>;
   /** The folders the dev server watches for new story files, absolute. */
@@ -584,6 +586,7 @@ export const resolveConfig = (
       problems: [...tokenThemed.problems, ...shellThemeProblems(theme)]
     },
     tokens,
+    isAppTokensOff: saysNoTokens(config),
     argControls: resolvedArgControls(config.argControls, dir, absolute, paths.isAbsolute),
     watch: (config.watch ?? []).map(absolute),
     lists,

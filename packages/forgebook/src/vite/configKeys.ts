@@ -162,3 +162,11 @@ export const unknownKeysProblem = (config: object): string | undefined => {
   ];
   return problems.length === 0 ? undefined : problems.join(" ");
 };
+
+/**
+ * Whether a configuration says it has no design system (`tokens: []`), which leaving the key out does not.
+ *
+ * @param config - the configuration.
+ */
+export const saysNoTokens = ({ tokens }: { readonly tokens?: readonly unknown[] }): boolean =>
+  tokens?.length === 0;

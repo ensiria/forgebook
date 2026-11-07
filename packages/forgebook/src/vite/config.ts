@@ -79,7 +79,9 @@ export type ForgebookConfig = CatalogueLists & {
   /**
    * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of
    * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from,
-   * after each source's: a name given twice takes the catalogue's value, and tools report the clash.
+   * after each source's: a name given twice takes the catalogue's value, and tools report the clash. With none named here
+   * or on a source, what the application already declares is read instead (custom properties, Tailwind, `components.json`);
+   * `[]` says there is no system, so nothing is.
    */
   readonly tokens?: readonly TokensFile[];
   /**

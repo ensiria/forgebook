@@ -1499,9 +1499,10 @@ page's words are replaceable as the shell's are (`strings`): `previewOpen`, `pre
 A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
 `@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
 
-The most common mistake of an agent working on a design system is a colour or a size written by hand. Name your
-[DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and each theme in a file of
-its own, and agents can ask what to write instead:
+The most common mistake of an agent working on a design system is a colour or a size written by hand. Agents can ask what
+to write instead, with nothing set up: Forgebook reads what the application already declares (see `check-code` below). To
+say it yourself, name your [DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and
+each theme in a file of its own, and those are the system:
 
 ```ts
 tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
@@ -1553,8 +1554,25 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
-code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI. A catalogue
-with no tokens file gets no check of values, which `skipped` and the line say: `colours and sizes not checked: no tokens file`.
+code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
+
+**It needs no tokens file.** With none named, it compares with what the application already declares, read as text and never
+run: custom properties at the root and in theme selectors (`.dark`, `[data-theme]`, a colour-scheme query), and a selector
+holding a dozen or more of them, as a library's root does; Tailwind 4's `@theme` and default theme; a Tailwind configuration
+and its presets, as far as they are written plainly; the sheet and the configuration `components.json` names. `tokenSources`
+says which files were read and `tokenNotes` what needs running to know. Fewer than five colours is not a palette, so colours
+are then left to `skipped`. A value it cannot judge takes a comment on its line or the one above, with the reason:
+`/* forgebook-ignore raw-color: a brand's own colour */`; the answer lists each one in `excused`, with its reason. Only files
+in the catalogue's folder are compared (`notCompared` names the others), since another package has its own system. Nothing
+outside the repository is read, whatever a file names, and a catalogue's `build --agent-index` carries these tokens. `tokens:
+[]` in the configuration says the application is not to be read: with no source giving tokens, values are then not checked,
+`colours and sizes not checked: no tokens file`.
+
+What it leaves alone on purpose, since these are where false alarms came from on real projects: a drawing's colours (`<path
+fill>`, gradient stops, a canvas), masks, fully transparent ends of gradients, black or white in a shadow, a `var()`'s fallback,
+what the page's head reads (`theme-color`), emails and generated social images. A size is compared with tokens of its own
+role (spacing, radius, font size) that are steps of a scale, so `--sidebar-padding: 16px` does not make every `16px` a
+mistake; Tailwind's own scale counts only where a class's brackets hold the whole value (`p-[16px]`, not `h-[calc(100%-16px)]`).
 
 `forgebook verify` and `verify` are what an agent runs before saying a change is done, and what a pull request's workflow
 runs. A change cannot pass on nothing:
