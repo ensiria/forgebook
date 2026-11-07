@@ -11,6 +11,8 @@
  *
  * @module
  */
+import { readFileSync } from "node:fs";
+
 import { codeLiteral } from "../codeLiteral.ts";
 import { OWN_SOURCE_ID } from "../docPages.ts";
 import { FRAME_STARTED_ATTRIBUTE, STATUS_ATTRIBUTE } from "../frame/frameStatus.ts";
@@ -19,7 +21,7 @@ import type { FramesPlacement } from "../frameOrigins.ts";
 import { PREVIEWS_EVENT } from "../hotModules.ts";
 import type { PageConfig } from "../pageConfig.ts";
 import type { ViewSwitch } from "../switches.ts";
-import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { PLAY_TOOLS_PACKAGES, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { pluginFrameModule } from "./pluginConfig.ts";
 import {
   DOCS_PAGES_SPECIFIER_PREFIX,
@@ -357,9 +359,25 @@ const writtenHomeCode = (home: string): string =>
 export const PLUGIN_HOSTS_MODULE = "forgebook/shell/plugin-hosts";
 
 /**
- * Whether a catalogue lists a plugin with a view in the shell: a tab or a docs block.
+ * Whether a catalogue's plugins have views while its project is on a React below the shell's: a view renders with the
+ * shell's React, and its own hooks are read from the project's, which cannot work across two copies.
  *
- * @param config - the configuration.
+ * @param config - the catalogue's configuration.
+ */
+export const pluginViewsNeedReact = (config: ResolvedConfig): boolean => {
+  if (!hasPluginViews(config)) return false;
+  const file = packageResolver(config.dir)("react/package.json");
+  if (file === undefined) return false;
+  const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+  const version =
+    typeof parsed === "object" && parsed !== null && "version" in parsed ? parsed.version : undefined;
+  return typeof version === "string" && Number(version.split(".")[0]) < 19;
+};
+
+/**
+ * Whether a catalogue's plugins have views in the shell.
+ *
+ * @param config - the catalogue's configuration.
  */
 export const hasPluginViews = (config: ResolvedConfig): boolean =>
   config.plugins.some((plugin) => (plugin.tabs ?? []).length > 0 || (plugin.docBlocks ?? []).length > 0);

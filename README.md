@@ -29,7 +29,7 @@ This repository holds Forgebook's packages; each has its own README, which is al
 | [`@forgebook/plugin-figma`](packages/plugin-figma) | A story's design in the panel, and beside the story |
 | [`@forgebook/plugin-msw`](packages/plugin-msw) | A story's API answered by its handlers, and a Network tab |
 
-Requirements: Node 22.18 or later and Vite 8.3.4+; React 19, Vue 3.5, Svelte 5, Solid 1.9, Preact 10.19 or 11, Lit 3,
+Requirements: Node 22.18 or later (Vite 8 and React 19 for its own interface come with it, beside any the project has); React 18.2 or 19, Vue 3.5, Svelte 5, Solid 1.9, Preact 10.19 or 11, Lit 3,
 Angular 20 to 22 or no framework, Next.js 15 and 16 through `@forgebook/nextjs`, Nuxt 3 or 4 through `@forgebook/nuxt`,
 SvelteKit 2 or 3 through `@forgebook/sveltekit`, React Native through react-native-web.
 [MIT licence](LICENSE).

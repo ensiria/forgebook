@@ -24,7 +24,7 @@ import { pluginModules } from "./pluginConfig.ts";
 import { parseStoryFile } from "./storyParse.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
-/** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
+/** What the shell and the frame import in the browser from the project's packages (the core's own React, when the project resolves the same). */
 const CORE_BROWSER_DEPENDENCIES = [
   "react",
   "react/jsx-runtime",

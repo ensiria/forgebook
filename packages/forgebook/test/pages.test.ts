@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, win32 } from "node:path";
 
@@ -22,6 +22,7 @@ import {
   pageHtml,
   pageModuleOf,
   pageModulePath,
+  pluginViewsNeedReact,
   shellEntry,
   storiesSourceModule
 } from "../src/vite/pages.ts";
@@ -401,5 +402,28 @@ describe("the custom controls in the shell's entry", () => {
     expect(shellEntry(CONFIG)).not.toContain("argControls");
     const entry = shellEntry({ ...CONFIG, argControls: { rating: "/catalogue/controls/rating.tsx" } });
     expect(entry).toContain('"rating": () => import("\\u002fcatalogue\\u002fcontrols\\u002frating.tsx")');
+  });
+});
+
+describe("a plugin's view on a project's older React", () => {
+  const PluginWithTab: ForgebookPlugin = { id: "p", tabs: [{ id: "p", label: "T", view: "m" }] };
+
+  const withReact = (version: string): ResolvedConfig => {
+    const dir = mkdtempSync(join(tmpdir(), "forgebook-plugin-react-"));
+    mkdirSync(join(dir, "node_modules", "react"), { recursive: true });
+    writeFileSync(
+      join(dir, "node_modules", "react", "package.json"),
+      JSON.stringify({ name: "react", version, exports: { "./package.json": "./package.json" } })
+    );
+    return { ...CONFIG, dir, plugins: [PluginWithTab] };
+  };
+
+  it("is said on 18, and not on 19", () => {
+    expect(pluginViewsNeedReact(withReact("18.3.1"))).toBe(true);
+    expect(pluginViewsNeedReact(withReact("19.0.0"))).toBe(false);
+  });
+
+  it("is no matter without a view", () => {
+    expect(pluginViewsNeedReact({ ...withReact("18.3.1"), plugins: [] })).toBe(false);
   });
 });

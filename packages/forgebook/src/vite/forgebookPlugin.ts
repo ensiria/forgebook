@@ -57,7 +57,8 @@ import {
   PAGE_FILES,
   type PageFile,
   pageHtml,
-  pageModulePath
+  pageModulePath,
+  pluginViewsNeedReact
 } from "./pages.ts";
 import { CONFIG_ID, DOCS_PAGES_PREFIX, patternId, TOKENS_ID, virtualId } from "./pluginIds.ts";
 import {
@@ -476,6 +477,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
       for (const problem of config?.shell.problems ?? [])
         resolved.logger.warn(`Forgebook's shell theme: ${problem}`);
+      if (config !== undefined && pluginViewsNeedReact(config))
+        resolved.logger.error(
+          "[forgebook] A plugin's panel draws with React 19, and this project has an older React, whose hooks the panel would call: those panels fail. Upgrade React, or leave the plugin out"
+        );
       if (config !== undefined && !isTestRun) sayEmptyStoryGlobs(config, isServing(), resolved.logger);
     },
     configureServer: (server: ViteDevServer): void => {
