@@ -98,6 +98,18 @@ const objectOf = (
 };
 
 /**
+ * The object literal an expression stands for, as written in the file (through a name it declares, `satisfies`, `as`);
+ * none when it is built some other way.
+ *
+ * @param expression - the expression.
+ * @param file - the file.
+ */
+export const objectLiteralOf = (
+  expression: ts.Expression,
+  file: ts.SourceFile
+): ts.ObjectLiteralExpression | undefined => objectOf(expression, file, NAME_DEPTH);
+
+/**
  * The object a configuration file exports by default, as written in it; none when the file builds it some other way (a
  * function's result, an import).
  *
@@ -110,6 +122,9 @@ export const defaultExportObject = (file: ts.SourceFile): ts.ObjectLiteralExpres
   }
   return undefined;
 };
+
+/** The line ending a text uses: CRLF when any line ends so, LF otherwise. */
+const lineEndingOf = (text: string): string => (text.includes("\r\n") ? "\r\n" : "\n");
 
 /** Where the line holding an offset starts. */
 const lineStart = (text: string, at: number): number => text.lastIndexOf("\n", at - 1) + 1;
@@ -215,29 +230,37 @@ export const removalEdits = (
  * @param object - the object literal.
  * @param property - the property's text (`play: "on"`), with no comma.
  * @param before - the property it goes before; none for the end.
+ * @returns the edits: one, or two when the last property needs a comma before the new one.
  */
 export const insertionEdit = (
   file: ts.SourceFile,
   object: ts.ObjectLiteralExpression,
   property: string,
   before: ts.ObjectLiteralElementLike | undefined
-): TextEdit => {
+): TextEdit[] => {
   const text = file.text;
+  const eol = lineEndingOf(text);
   const elements = object.properties;
   const last = elements[elements.length - 1];
   if (last === undefined) {
     const inside = object.getStart(file) + 1;
-    return { start: inside, end: object.end - 1, insert: ` ${property} ` };
+    return [{ start: inside, end: object.end - 1, insert: ` ${property} ` }];
   }
   if (before !== undefined) {
     const start = before.getStart(file);
-    if (!isLineLead(text, start)) return { start, end: start, insert: `${property}, ` };
+    if (!isLineLead(text, start)) return [{ start, end: start, insert: `${property}, ` }];
     const from = lineStart(text, start);
-    return { start: from, end: from, insert: `${text.slice(from, start)}${property},\n` };
+    return [{ start: from, end: from, insert: `${text.slice(from, start)}${property},${eol}` }];
   }
   const start = last.getStart(file);
-  const separator = isLineLead(text, start) ? `\n${text.slice(lineStart(text, start), start)}` : " ";
-  return { start: last.end, end: last.end, insert: `,${separator}${property}` };
+  const tail = lineTailEnd(text, last.end);
+  if (!isLineLead(text, start) || tail === undefined)
+    return [{ start: last.end, end: last.end, insert: `, ${property}` }];
+  // a line of its own after the last property's, so that a comment ending that line stays with it
+  const indent = text.slice(lineStart(text, start), start);
+  const line = `${indent}${property}${elements.hasTrailingComma ? "," : ""}${text.endsWith("\n", tail) ? eol : ""}`;
+  const added: TextEdit = { start: tail, end: tail, insert: tail === text.length ? `${eol}${line}` : line };
+  return elements.hasTrailingComma ? [added] : [{ start: last.end, end: last.end, insert: "," }, added];
 };
 
 /**

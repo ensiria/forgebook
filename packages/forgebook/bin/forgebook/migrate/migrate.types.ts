@@ -21,8 +21,11 @@ export type TextEdit = {
 export type CodemodResult = {
   /** The edits, none overlapping; none when the file holds nothing to rewrite. */
   readonly edits: readonly TextEdit[];
-  /** What it could not rewrite and a person has to, each a sentence; none when it could do everything. */
-  readonly manual: readonly string[];
+  /**
+   * What it could not see into and a person may want to check, each a sentence; none when it saw everything. Advice keeps
+   * the exit code at 0: a configuration the codemod cannot read may need nothing, and a run must be able to end clean.
+   */
+  readonly advice: readonly string[];
 };
 
 /**
@@ -36,7 +39,7 @@ export type CodemodKind = "rewrite" | "keep";
 export type Codemod = {
   /** Its stable id, as `--only` takes it. */
   readonly id: string;
-  /** The first version of `forgebook` with the breaking change. */
+  /** The first version of `forgebook` with the breaking change, which `--from` is compared with. */
   readonly breaksIn: string;
   /** Whether it rewrites what no longer works or keeps an old behaviour. */
   readonly kind: CodemodKind;
@@ -57,7 +60,12 @@ export type Codemod = {
 export type MigrationNote = {
   /** Its stable id. */
   readonly id: string;
-  /** The first version of `forgebook` with the change. */
+  /**
+   * The package whose version `breaksIn` is. Each package has its own versions, and `--from` names `forgebook`'s, so a
+   * note of another package is listed whatever `--from` says.
+   */
+  readonly package: string;
+  /** The first version of that package with the change. */
   readonly breaksIn: string;
   /** What changed and what to do, in a sentence or two. */
   readonly text: string;
@@ -75,13 +83,13 @@ export type MigrateChange = {
   readonly added: string;
 };
 
-/** What a codemod left to a person. */
-export type MigrateManual = {
+/** What a codemod could not see into. */
+export type MigrateAdvice = {
   /** The file, from the folder the command ran in. */
   readonly file: string;
   /** The codemod's id. */
   readonly codemod: string;
-  /** What to do. */
+  /** What to check. */
   readonly text: string;
 };
 
@@ -105,11 +113,14 @@ export type MigrateDocument = {
   readonly files: readonly string[];
   /** The changes, made or to make. */
   readonly changes: readonly MigrateChange[];
-  /** What the codemods could not do. */
-  readonly manual: readonly MigrateManual[];
+  /** What the codemods could not see into: to check, with no effect on the exit code. */
+  readonly advice: readonly MigrateAdvice[];
   /** The codemods that did not run. */
   readonly skipped: readonly MigrateSkipped[];
-  /** The breaking changes with no codemod, for the versions migrated across: to read and act on by hand. */
+  /**
+   * The breaking changes with no codemod: `forgebook`'s for the versions migrated across, other packages' always. To read
+   * and act on by hand, with no effect on the exit code.
+   */
   readonly notes: readonly MigrationNote[];
   /** One sentence. */
   readonly summary: string;

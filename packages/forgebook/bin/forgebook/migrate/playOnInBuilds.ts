@@ -29,35 +29,55 @@ const quoteOf = (file: ts.SourceFile, object: ts.ObjectLiteralExpression): strin
   return quote === "'" ? "'" : '"';
 };
 
+/** Whether a file names `play` as a property anywhere: in the configuration, or in an object it spreads or is built from. */
+const namesPlay = (file: ts.SourceFile): boolean => {
+  let isFound = false;
+  const visit = (node: ts.Node): void => {
+    if (isFound) return;
+    if (
+      (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
+      ts.isObjectLiteralExpression(node.parent) &&
+      propertyName(node) === "play"
+    ) {
+      isFound = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return isFound;
+};
+
 /**
- * The edit to the configuration: `play: "on"` after its title, unless it says `play` already.
+ * The edit to the configuration: `play: "on"` after its title, unless the file says `play` already. A configuration it
+ * cannot see into gets advice, which leaves the exit code alone: it may need nothing.
  *
  * @param text - the configuration's text.
  * @param path - its path.
  */
 const run = (text: string, path: string): CodemodResult => {
   const file = parsedFile(text, path);
+  if (namesPlay(file)) return { edits: [], advice: [] };
   const object = defaultExportObject(file);
   if (object === undefined)
     return {
       edits: [],
-      manual: [
-        'The configuration\'s object was not found in this file: write play: "on" in it to keep plays running when a built story opens.'
+      advice: [
+        'The configuration\'s object is not written in this file: if plays should still run when a built story opens, write play: "on" in it.'
       ]
     };
-  const names = object.properties.map(propertyName);
-  if (names.includes("play")) return { edits: [], manual: [] };
   if (object.properties.some(ts.isSpreadAssignment))
     return {
       edits: [],
-      manual: [
-        'The configuration spreads another object: unless that one sets play, write play: "on" to keep plays running when a built story opens.'
+      advice: [
+        'The configuration spreads an object from elsewhere: if plays should still run when a built story opens, write play: "on" in it.'
       ]
     };
+  const names = object.properties.map(propertyName);
   const title = names.indexOf("title");
   const before = object.properties[title === -1 ? 0 : title + 1];
   const quote = quoteOf(file, object);
-  return { edits: [insertionEdit(file, object, `play: ${quote}on${quote}`, before)], manual: [] };
+  return { edits: insertionEdit(file, object, `play: ${quote}on${quote}`, before), advice: [] };
 };
 
 /** The codemod. */

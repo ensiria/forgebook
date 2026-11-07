@@ -5,7 +5,7 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -17,6 +17,7 @@ import {
   isMigrationPending,
   isVersionBefore,
   migrateProblem,
+  requestProblem,
   runMigrate
 } from "../bin/forgebook/migrate/migrateRun.ts";
 import { appliedEdits } from "../bin/forgebook/migrate/objectEdits.ts";
@@ -119,6 +120,36 @@ describe("prop-group-strings", () => {
     expect(propGroupStrings.run(text, "Button.stories.ts").edits).toEqual([]);
   });
 
+  it("follows strings through a name the file declares, shorthand or not, once", () => {
+    const before = [
+      'const strings = { props: "P", "propGroups.choice": "C" };',
+      "export const a = { strings };",
+      'export default { title: "Kit", strings: strings };'
+    ].join("\n");
+    expect(migrated(propGroupStrings, before)).toBe(
+      [
+        'const strings = { props: "P" };',
+        "export const a = { strings };",
+        'export default { title: "Kit", strings: strings };'
+      ].join("\n")
+    );
+  });
+
+  it("gives advice for strings it cannot read: from an import, or under a computed key", () => {
+    expect(
+      propGroupStrings.run(
+        'import { strings } from "./t";\nexport default { strings };',
+        "forgebook.config.ts"
+      ).advice
+    ).toHaveLength(1);
+    const computed = propGroupStrings.run(
+      'export default { strings: { [KEY]: "C", props: "P" } };',
+      "forgebook.config.ts"
+    );
+    expect(computed).toMatchObject({ edits: [] });
+    expect(computed.advice).toHaveLength(1);
+  });
+
   it("is idempotent", () => {
     const before = 'export default { strings: { props: "P", "propGroups.choice": "C" } };';
     const once = migrated(propGroupStrings, before);
@@ -169,15 +200,38 @@ describe("play-on-in-builds", () => {
       playOnInBuilds.run('export default { title: "Kit", play: "off" };', "forgebook.config.ts")
     ).toEqual({
       edits: [],
-      manual: []
+      advice: []
     });
   });
 
-  it("leaves to a person a configuration it cannot see into", () => {
-    expect(playOnInBuilds.run("export default makeConfig();", "forgebook.config.ts").manual).toHaveLength(1);
+  it("gives advice, and no edit, for a configuration it cannot see into", () => {
+    expect(playOnInBuilds.run("export default makeConfig();", "forgebook.config.ts").advice).toHaveLength(1);
     expect(
-      playOnInBuilds.run('export default { ...shared, title: "Kit" };', "forgebook.config.ts").manual
+      playOnInBuilds.run('export default { ...shared, title: "Kit" };', "forgebook.config.ts").advice
     ).toHaveLength(1);
+  });
+
+  it("leaves a file that names play anywhere, such as in an object the configuration spreads", () => {
+    const text = 'const shared = { play: "off" };\nexport default { ...shared, title: "Kit" };\n';
+    expect(playOnInBuilds.run(text, "forgebook.config.ts")).toEqual({ edits: [], advice: [] });
+  });
+
+  it("keeps a comment ending the last property's line on that line, and the file's line endings", () => {
+    const before = 'export default {\r\n  framework: react(),\r\n  title: "Kit" // the name\r\n};\r\n';
+    expect(migrated(playOnInBuilds, before)).toBe(
+      'export default {\r\n  framework: react(),\r\n  title: "Kit", // the name\r\n  play: "on"\r\n};\r\n'
+    );
+    const trailing = 'export default {\n  title: "Kit", // the name\n};\n';
+    expect(migrated(playOnInBuilds, trailing)).toBe(
+      'export default {\n  title: "Kit", // the name\n  play: "on",\n};\n'
+    );
+  });
+
+  it("writes play before the property after the title in CRLF files", () => {
+    const before = 'export default {\r\n  title: "Kit",\r\n  stories: []\r\n};\r\n';
+    expect(migrated(playOnInBuilds, before)).toBe(
+      'export default {\r\n  title: "Kit",\r\n  play: "on",\r\n  stories: []\r\n};\r\n'
+    );
   });
 
   it("is idempotent", () => {
@@ -192,6 +246,8 @@ describe("the codemods' choice", () => {
     expect(isVersionBefore("0.10.0", "0.4.0")).toBe(false);
     expect(isVersionBefore("0.4.0", "0.4.0")).toBe(false);
     expect(isVersionBefore("v0.3.9-beta.1", "0.4.0")).toBe(true);
+    expect(isVersionBefore("0.4.0-rc.1", "0.4.0")).toBe(true);
+    expect(isVersionBefore("0.4.0", "0.4.0-rc.1")).toBe(false);
   });
 
   it("refuses a version that is not one and a codemod nobody wrote", () => {
@@ -269,10 +325,55 @@ describe("runMigrate", () => {
     expect(document.changes.map((change) => change.file)).toEqual(["forgebook.config.ts", "preset.ts"]);
   });
 
-  it("runs nothing and gives no notes for a project past every change", () => {
+  it("says one change and one file in the singular", () => {
+    const document = runMigrate({ cwd: dir, config: config(), modules: [], isWrite: true });
+    expect(document.summary).toBe("1 change written to 1 file.");
+  });
+
+  it("writes through a temporary file it leaves nowhere", () => {
+    const preset = join(dir, "kit", "preset.ts");
+    mkdirSync(join(dir, "kit"));
+    writeFileSync(preset, 'export const kit = { strings: { "propGroups.toggle": "T", props: "P" } };\n');
+    runMigrate({ cwd: dir, config: config(), modules: [preset], isWrite: true });
+    expect(readFileSync(preset, "utf8")).toBe('export const kit = { strings: { props: "P" } };\n');
+    expect(readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    expect(readdirSync(join(dir, "kit"))).toEqual(["preset.ts"]);
+  });
+
+  // a folder's mode does not stop a write on Windows
+  it.skipIf(process.platform === "win32")("changes nothing when one file cannot be written", () => {
+    const preset = join(dir, "kit", "preset.ts");
+    mkdirSync(join(dir, "kit"));
+    writeFileSync(preset, 'export const kit = { strings: { "propGroups.toggle": "T", props: "P" } };\n');
+    chmodSync(join(dir, "kit"), 0o555);
+    try {
+      expect(() => runMigrate({ cwd: dir, config: config(), modules: [preset], isWrite: true })).toThrow(
+        /no file was changed/
+      );
+      expect(readFileSync(config(), "utf8")).toBe(Old);
+      expect(readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    } finally {
+      chmodSync(join(dir, "kit"), 0o755);
+    }
+  });
+
+  it("refuses a module under node_modules or outside the folder it runs in", () => {
+    mkdirSync(join(dir, "node_modules", "kit"), { recursive: true });
+    const installed = join(dir, "node_modules", "kit", "preset.js");
+    writeFileSync(installed, "export const kit = {};\n");
+    expect(requestProblem({ cwd: dir, config: config(), modules: [installed], isWrite: false })).toContain(
+      "node_modules"
+    );
+    expect(requestProblem({ cwd: join(dir, "node_modules"), modules: [config()], isWrite: false })).toContain(
+      "is outside"
+    );
+    expect(requestProblem({ cwd: dir, config: config(), modules: [], isWrite: false })).toBeUndefined();
+  });
+
+  it("runs nothing past every change, and still lists the notes of other packages", () => {
     const document = runMigrate({ cwd: dir, config: config(), modules: [], from: "0.4.0", isWrite: false });
     expect(document.changes).toEqual([]);
-    expect(document.notes).toEqual([]);
+    expect(document.notes.map((note) => note.package)).toEqual(["@forgebook/story-format"]);
     expect(document.skipped).toHaveLength(CODEMODS.length);
   });
 });
@@ -302,6 +403,8 @@ describe("forgebook migrate", () => {
     expect(run("--from", "0.3.3").status).toBe(0);
     expect(run("--from", "soon").status).toBe(2);
     expect(run("missing.ts").status).toBe(2);
-    // five runs of the whole command, as the other tests of a command as a process allow
+    // the notes alone are to read: they leave the exit code at 0
+    expect(run("--from", "0.4.0").status).toBe(0);
+    // six runs of the whole command, as the other tests of a command as a process allow
   }, 60_000);
 });

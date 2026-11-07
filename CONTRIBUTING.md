@@ -103,13 +103,16 @@ A change to any of these is breaking:
 
 - **The configuration:** the keys of `forgebook.config.*` and of a preset, the values they take and their defaults.
 - **The story format:** `@forgebook/story-format`, each adapter's story types, and what a story's fields mean.
-- **The commands:** their names, options and exit codes, and the documents `--json` prints. Each document carries
-  `schema`, raised when a field is removed or changes meaning; a field added is not breaking.
+- **The commands:** their names, options and exit codes, and the documents `--json` prints. A field added is not
+  breaking. Some documents carry `schema`, raised when a field is removed or changes meaning; before 1.0 every one
+  will.
 - **The MCP tools:** their names, inputs and answers.
 - **Each package's exports** and their types, the adapter contract (`FrameworkAdapter`) and the plugin contract.
 - **What a link says:** the catalogue's addresses and their parameters, and the names `strings` replaces.
 - **What the gates fail on:** `verify`, `check-code`, `check` and the other commands with an exit code for CI. Failing
-  where they passed is breaking, even when the old answer was wrong, since a pipeline turns red.
+  where they passed is breaking, even when the old answer was wrong, since a pipeline turns red. The exception is a gate
+  that passed what it exists to catch (a security hole, a check that never ran): fixing it ships in a patch or a minor
+  as a fix, says so in its commit, and gets its note all the same.
 
 Not public: anything a package does not export, the shell's markup and class names (the theme's variables and roles are
 public), the look, the layout of a build's files, and the wording of messages (agents read fields, not sentences).
@@ -122,10 +125,12 @@ changelog is written from it. A check that starts refusing what it accepted is b
 
 ### Deprecation
 
-An option with a replacement is deprecated before it is removed. It keeps working for at least one minor version while
-0.x, and from 1.0 until the next major and for at least three months. Its TSDoc says `@deprecated` with the replacement,
-and Forgebook warns once per run, in the dev server and in the commands, naming the replacement and the version that
-removes it. An option removed with no replacement goes straight to the next minor, with its note.
+An option with a replacement is deprecated before it is removed. While 0.x, it keeps working for at least one minor
+version. From 1.0, it is removed only in a major version, and only once at least three months have passed since the
+release that deprecated it. Its TSDoc says `@deprecated` with the replacement. Before 1.0, Forgebook will also warn once
+per run, in the dev server and in the commands, naming the replacement and the version that removes it: that warning is
+not built yet, since nothing is deprecated today. An option removed with no replacement goes straight to the next minor
+while 0.x, with its note.
 
 ### Codemods
 
@@ -135,8 +140,8 @@ A breaking change ships in the same pull request with:
   project may want to keep): a module in `packages/forgebook/bin/forgebook/migrate/`, pure and idempotent, tested on files
   before and after, listed in `codemods.ts` with the version that breaks. `forgebook migrate` runs it. A codemod that keeps
   an old behaviour is of kind `keep`, and runs only for a project coming from before the change;
-- **its note, when it is not** (a gate stricter, a JSON shape): an entry in `MIGRATION_NOTES` in the same file, which
-  `forgebook migrate` prints for the versions crossed;
+- **its note, when it is not** (a gate stricter, a JSON shape): an entry in `MIGRATION_NOTES` in the same file, keyed
+  on the package and version that break (each package has its own versions), which `forgebook migrate` prints;
 - **its row** in the Upgrading table of `packages/forgebook/README.md`.
 
 ### The path to 1.0
@@ -147,9 +152,9 @@ A breaking change ships in the same pull request with:
   among them where published, and green.
 - **Every breaking change since 0.3** made by `forgebook migrate` or written in its notes, and two minor releases in a row
   with no breaking change the policy did not plan.
-- **The shapes settled:** the configuration's keys reviewed once more, every `--json` document and MCP answer with its
+- **The shapes settled:** the configuration's keys reviewed once more, every `--json` document and MCP answer given a
   `schema`, the story format's types and the adapter contract unchanged for those two releases.
-- **The deprecation warnings** working as written above, with a test.
+- **The deprecation warnings** built as written above, with a test.
 - **The documentation** published: getting started for people and for agents, the main how-tos, and troubleshooting from
   the errors the code prints.
 - **More than one person** able to review and release, so that the project does not stop when one does.
