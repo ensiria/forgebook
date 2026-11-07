@@ -22,7 +22,7 @@ document.
 | 143 | Stopped by SIGTERM |
 
 `forgebook hook <assistant>` also exits 2 when it sends a coding agent back to work on red, as the assistants' hooks
-expect.
+expect; for Cursor it exits 0 with a follow-up message, the form Cursor's hooks read.
 
 ## forgebook init
 
@@ -101,7 +101,7 @@ commas.
 
 | `kind` | What to do |
 |---|---|
-| `provider` | The component needs what the app wraps it in: add a decorator with that provider to the [preview](./how-to/writing-stories.md#the-preview) |
+| `provider` | The component needs what the app wraps it in: add a decorator with that provider to the [preview](./how-to/writing-stories.md#the-preview), or let `forgebook new <file> --repair` draw the stories inside the providers their errors name (JSX frameworks) |
 | `missing-import` | An import does not resolve: install the project, or check the aliases `forgebook dev` says it read |
 | `style-sheet` | A style sheet did not compile: check the preview's imports and the app's PostCSS |
 | `needs-props` or `blank` | The component needs props or data the first story does not give: complete its args |
@@ -208,8 +208,10 @@ A frame waits up to 10 s for what a story loads (`Suspense` in React and Vue). P
 
 ## forgebook verify
 
-`verify` prints one line per changed UI file it could not verify, then its verdict, and exits 1 unless the change is
-verified.
+`verify` prints one line per changed UI file it could not verify, then its verdict. It exits 1 on `not-verified` or
+`failed`; `partly-verified` (a check it could not run, such as colours and sizes without a tokens file) and
+`nothing-to-verify` exit 0. A problem a story already had on the base branch does not fail it, only those the change
+brought; `--all-problems` fails on every one.
 
 ```text
 <file>  not verified: <reason> Fix: <fix>

@@ -38,6 +38,8 @@ Then it prints what is left to do, each item named, starting with the install co
 › npm install --save-dev forgebook @forgebook/react: Install what the configuration imports.
 › npx forgebook new <component file>: Write a component's first stories (React).
 › npx forgebook dev: Open the catalogue.
+› npx forgebook stories --json: List the stories, and what did not read.
+› npx forgebook agents: Tell the project's coding agents about the catalogue.
 ```
 
 Run that install, or give `--install` to have `init` run it. React is in the list even on Vue or Svelte: the
@@ -171,14 +173,16 @@ npx forgebook verify
 ```
 
 `verify` says whether a change is done: every UI file the branch changed since it left the default branch must reach a
-story, and those stories must run in every variant without a problem. It needs `@forgebook/testing` and its browser:
+story, and those stories must run in every variant without a problem the change brought (`--all-problems` counts
+those the stories already had too). It needs `@forgebook/testing` and its browser:
 
 ```sh
 npm install --save-dev @forgebook/testing @playwright/test
 npx forgebook browser
 ```
 
-Its last line is the verdict, and its exit code says the same (0 when verified):
+Its last line is the verdict. It exits 1 on `not-verified` or `failed`, and 0 otherwise, including `partly-verified`,
+as here, where colours and sizes went unchecked:
 
 ```text
 1 changed UI file, 1 with stories: verified in every variant (30 checks); colours and sizes not checked: no tokens file

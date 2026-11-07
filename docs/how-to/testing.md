@@ -17,7 +17,8 @@ npx forgebook browser
 `--with-deps` also installs what it needs of the system, as a CI runner does.
 
 The commands below use a running `forgebook dev` when there is one at `--url` (Vite's `http://localhost:5173` by
-default), and start a server of their own otherwise.
+default), and start a server of their own otherwise; `forgebook errors` is the exception: it reads what a running
+`forgebook dev` collected.
 
 ## Check one story
 
