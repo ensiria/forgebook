@@ -244,7 +244,9 @@ too, with a warning.
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
 - **A light and a dark catalogue**: the reader picks Light, Dark or System in the Interface menu at the sidebar's foot
   (their browser keeps it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
-- **Keys and named views**: a key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
+- **Keys and named views**: `?` lists the keys, as does the menu at the sidebar's foot, where a reader can turn off every
+  key without a modifier for this browser; a key pressed inside a story, in a text field or in a custom element stays
+  theirs. A key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
   key of any control (`keys: { width: "w" }`), a reader changes theirs in the View menu. The View menu's values are
   saved under a name and picked again; `views` in the configuration offers some to every reader. A dot marks each
   control whose value is not its default.
@@ -592,8 +594,8 @@ export type FinderProps = {
 
 - The API reference lists the props that name no group first, then each group under its name, in the order the
   groups first appear among the props; the events keep their own heading after them. The Props tab does the same: the
-  props that name no group by control, as before, then each group with its controls, its toggles and the props it
-  cannot set.
+  props that name no group in the order the source declares them, whatever their control, then each group with its
+  controls in that order and the props it cannot set.
 - Every group starts open; a reader folds one away from its name.
 - To show some groups first, name them in order: `propGroups: ["Selection", "Paging"]` in the configuration for every
   component, or `parameters: { propGroups: ["Texts"] }` in a component's meta, written as a list of plain strings.
@@ -980,12 +982,36 @@ blocks it uses Open in Figma. A catalogue published with a Content Security Poli
 `forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
 `address` of the Design tab to hand a person (it opens the story alone without the plugin). `list_stories` gives each component's, and `CATALOG.md` lists it.
 
+## Stepping through a play
+
+The Interactions tab lists a play's named steps and each action it took through the `canvas` and `userEvent` of its context,
+with its time and its failure. **Step through** mounts the story again and stops before each action and each `step`: **Next**
+does that one, **Continue** runs the rest. A `getBy…` query is logged but cannot stop, as it returns at once. What a play
+imports itself (`storybook/test`, `@testing-library/user-event`) runs unrecorded: use the context's tools to see it here.
+
+## Tags
+
+Tag stories as CSF does, in the preview, a file's meta or a story; a `!name` takes one away:
+
+```ts
+export default { component: Button, tags: ["beta"] } satisfies Meta<typeof Button>;
+
+export const Experiment: StoryObj = { tags: ["!beta", "wip"] };
+```
+
+When any story has a tag of its own, the sidebar offers a filter beside the search: tick a tag to keep the stories that
+hold it, press its other button to leave them out. A story stays when it holds any tag asked for and none left out. The
+filter lives in the address (`?tag=beta&tag=!wip`), so a link keeps it, and it holds from page to page; a page opened by
+its address shows even if the filter leaves it out. `dev`, `test`, `autodocs`, `play-fn` and `test-fn` say what a tool
+does with a story, and are not offered. Agents ask the same way: `forgebook stories --tag beta --tag '!wip'`, or `tags`
+on `list_stories`.
+
 ## Coming from Storybook
 
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and
 titles from the file's path, `args` and `argTypes` (with their controls), actions from `fn()` or an `argTypes` action,
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
-`tags` (`!dev`, `!test`), a story's `globals`, JSX in `.js` story files (listed and shown as code; Vite compiles JSX only in
+`tags` (`!dev`, `!test`, and your own for the [tag filter](#tags)), a story's `globals`, JSX in `.js` story files (listed and shown as code; Vite compiles JSX only in
 `.jsx` and `.tsx`, so such a library adds the plugin its own Storybook uses for them, through the framework's plugins),
 hooks in a `render` or a decorator (React and
 Preact, with the story's state kept when a decorator draws `<Story />`), Storybook's preview hooks from
@@ -1184,6 +1210,7 @@ is a state of the component: the same).
 | Command | What it does |
 |---|---|
 | `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files; see [a story file that cannot be read](#a-story-file-that-cannot-be-read) |
+| `forgebook build --watch` | Builds again when a file the catalogue reads changes; see [building on every change](#building-on-every-change) |
 | `forgebook prebundle` | Pre-bundles the catalogue's dependencies, as `dev` does on a first start: before it, in CI or an image |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
@@ -1201,6 +1228,7 @@ is a state of the component: the same).
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
+| `forgebook graph` | A map of the components and tokens, generated from the source: what exists, what each is for, how to choose |
 | `forgebook audit` | The colours, sizes and components a project actually uses, with no catalogue |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
@@ -1291,6 +1319,14 @@ or translate its texts (`strings: { "plugin.figma.compare": "Confronta" }`). `fo
 say what a catalogue has.
 
 The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
+
+## Building on every change
+
+`forgebook build --watch` stays running and builds again when a file the catalogue reads changes, a new story file or
+docs page included, for a folder a host, an embedding app or another machine serves. A failed build says why on one line,
+leaves the last good output and waits for the next edit. A rebuild takes about two thirds of a whole `forgebook build`
+(2.2 to 2.9 s against 3 to 4 s on 5000 stories) and writes the whole folder again; the process holds about 2 GB there. Use
+`forgebook dev` to work on stories: it redraws in place.
 
 ## A preview for every pull request
 
@@ -1545,7 +1581,7 @@ example `.mcp.json` for Claude Code:
 { "mcpServers": { "forgebook": { "command": "npx", "args": ["forgebook", "mcp"] } } }
 ```
 
-It offers 22 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, `list_switches`, its switches and each value's view, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
+It offers 23 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `component_graph`, a map of the components and tokens to read instead of opening files, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, `list_switches`, its switches and each value's view, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
 `node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
@@ -1627,7 +1663,18 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
-code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
+code to paste. It does not check props, which the type checker does. It exits non-zero on a problem, for CI.
+
+It also reads what a change reuses. An added import of a component whose own TSDoc says `@deprecated` or `@replacedBy` fails,
+naming what to use. A new exported component fails as `duplicate-component` when its code is a copy of another's under any name;
+or when it has the name of one that exists, past words like `Primary` or `Custom`, and two signs of being it (a telling root
+such as `button`, shared props, nearly the same classes); or when `Button` exists and a new `CustomButton` renders a plain
+`<button>`, though not a `SubmitButton`, which says what it is for. New means new since the commit compared with: an edit or a
+moved file is not. It compares only what the file could use, in its package and those its package depends on. It passes if it
+renders the other, which is reuse, or if a comment says why, above it: `// forgebook-ignore duplicate-component: why`, listed
+in `excused`. One sign, and what `@useWhen` and `@avoidWhen` say of a component just imported, are `advice`, which fails nothing.
+Imports are followed relative, through `@/`, `~/` and `#/` under the importing file's own folders, and by a workspace package's
+name; not through a third party.
 
 **It needs no tokens file.** With none named, it compares with what the application already declares, read as text and never
 run: custom properties at the root and in theme selectors (`.dark`, `[data-theme]`, a colour-scheme query), and a selector
@@ -1646,6 +1693,33 @@ fill>`, gradient stops, a canvas), masks, fully transparent ends of gradients, b
 what the page's head reads (`theme-color`), emails and generated social images. A size is compared with tokens of its own
 role (spacing, radius, font size) that are steps of a scale, so `--sidebar-padding: 16px` does not make every `16px` a
 mistake; Tailwind's own scale counts only where a class's brackets hold the whole value (`p-[16px]`, not `h-[calc(100%-16px)]`).
+
+A design system can say how to choose among fixed patterns and how its parts fit, in a few tags of a component's TSDoc, with
+nothing new to learn:
+
+```ts
+/**
+ * Pick one of a few options, all in view.
+ *
+ * @intent choose-one: up to five options, all visible
+ * @parent Form, Fieldset
+ * @children Radio
+ * @insteadOf select
+ */
+export const RadioGroup = …
+```
+
+Components sharing an `@intent` are the choices for it, and agents read them with `forgebook graph --intent choose-one` or
+`component_graph`, or as `advice` when they import one. `check-code` enforces what can be checked, in `.tsx` and `.jsx` only,
+as `composition`: an element under a component `@parent` does not allow; a component `@children` or `@siblings` does not allow;
+a plain `<select>` where `@insteadOf` names one. An element at the root of what a component returns, or held in a prop, may be
+rendered anywhere, so its parent is not judged; a component above that itself renders an allowed parent passes; and which pattern a screen should have used is not something a check can tell. A file beside a
+component that cannot carry a comment says the same, named after the file or the component: `radio-group.rules.json` or
+`RadioGroup.rules.json`, `{ "RadioGroup": { "intent": ["choose-one: up to five options"], "parent": ["Form"] } }`. A meant exception takes `// forgebook-ignore composition:
+why`, listed in `excused`.
+
+`forgebook graph` is the map itself, generated from the source so it cannot drift: components, what each is for, what renders
+what, token counts; `--component Button` adds what renders it and the tokens its file uses. It needs no catalogue.
 
 `forgebook audit` reports what a project actually uses, read from its files, with no catalogue, no configuration and no code
 run: `37 greys, 5 used 90 % of the time`. It is for a project with no design system as much as one with: colours in any

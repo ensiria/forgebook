@@ -37,3 +37,17 @@ export const resultOf = (answer: AgentAnswer): McpToolResult => ({
   structured: answer.body,
   isError: answer.status !== 200
 });
+
+/**
+ * A tool's argument that is a list of texts, without what is no text; none when it is not a list.
+ *
+ * @param args - the tool's arguments.
+ * @param name - the argument's name.
+ */
+export const textsOf = (
+  args: Readonly<Record<string, unknown>>,
+  name: string
+): readonly string[] | undefined => {
+  const value = args[name];
+  return Array.isArray(value) ? value.filter((each) => typeof each === "string") : undefined;
+};

@@ -152,7 +152,9 @@ test.describe("the Network tab", () => {
     await greeting.evaluate((element) => element.setAttribute("data-first", ""));
     // from the shell's page: a frame hears only its shell
     await page.evaluate(() =>
-      document.querySelector("iframe")?.contentWindow?.postMessage({ type: "forgebook:play-again" }, "*")
+      document
+        .querySelector("iframe")
+        ?.contentWindow?.postMessage({ type: "forgebook:play-step", command: "again" }, "*")
     );
     // the mocks run on, so the new mount waits on nothing the first one held
     await expect(frameOf(page).locator('[data-testid="greeting"]:not([data-first])')).toHaveText("Loading");

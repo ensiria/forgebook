@@ -956,6 +956,14 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     if (written !== undefined) writeFileSync(config, written);
     writeFileSync(join(project, ".gitignore"), "node_modules/\n.vite/\n");
     writeFileSync(join(project, "src", "a.css"), sheet);
+    writeFileSync(
+      join(project, "src", "Button.tsx"),
+      'export const Button = ({ size, tone }) => <button className="a" />;\n'
+    );
+    writeFileSync(
+      join(project, "src", "OldCard.tsx"),
+      "/** @deprecated Too plain. @replacedBy Card */\nexport const OldCard = () => <div />;\n"
+    );
     const git = (...args: readonly string[]): void => {
       spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
         cwd: project
@@ -982,7 +990,14 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     expect(run.exitCode).not.toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({
       skipped: [],
-      checked: ["raw-color", "raw-size", "suppression", "deleted-test"],
+      checked: [
+        "raw-color",
+        "raw-size",
+        "suppression",
+        "deleted-test",
+        "deprecated-component",
+        "duplicate-component"
+      ],
       tokenSources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
       tokenClashes: 0,
       problems: [{ rule: "raw-color", file: "src/New.tsx", fix: "--brand" }]
@@ -1026,7 +1041,7 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     const run = forgebook(config, ["check-code", "--json"]);
     expect(run.exitCode).toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({
-      checked: ["suppression", "deleted-test"],
+      checked: ["suppression", "deleted-test", "deprecated-component", "duplicate-component"],
       skipped: ["colours and sizes not checked: too few tokens of that kind in the application (1)"],
       problems: []
     });
@@ -1050,6 +1065,24 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     const answer = JSON.parse(forgebook(inner, ["check-code", "--json"]).stdout);
     expect(answer.problems.map((each: { file: string }) => each.file)).toEqual(["packages/ui/src/Own.tsx"]);
     expect(answer.notCompared).toContain("src/Other.tsx");
+  });
+
+  it("names an import of what is deprecated and a new component that copies one, with no tags needed for the second", () => {
+    const config = appProject("app-reuse", ":root { --a: 1px; }\n");
+    const project = join(root, "app-reuse");
+    writeFileSync(
+      join(project, "src", "New.tsx"),
+      'import { OldCard } from "./OldCard";\nexport const PrimaryButton = ({ size, tone }) => <button className="b" />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).not.toBe(0);
+    const { problems } = JSON.parse(run.stdout);
+    expect(problems).toContainEqual(
+      expect.objectContaining({ rule: "deprecated-component", value: "OldCard", fix: "Card" })
+    );
+    expect(problems).toContainEqual(
+      expect.objectContaining({ rule: "duplicate-component", value: "PrimaryButton", fix: "Button" })
+    );
   });
 
   it("reads nothing when the configuration says there is no system", () => {
@@ -1082,6 +1115,96 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     const { tokens, sources } = JSON.parse(forgebook(config, ["tokens", "--json"]).stdout);
     expect(tokens.some((each: { name: string }) => each.name === "--ink")).toBe(false);
     expect(sources[0]).toMatchObject({ kind: "tokens-file", file: "tokens.json" });
+  });
+});
+
+describe("forgebook graph", () => {
+  /** A project with a small system and rules on it. */
+  const ruledProject = (): string => {
+    const dir = mkdtempSync(join(root, "graph-"));
+    writeFileSync(join(dir, "a.css"), ":root { --ink: #111111; }\n");
+    writeFileSync(
+      join(dir, "Radio.tsx"),
+      '/**\n * @intent choose-one: a few options\n * @parent Form\n */\nexport const Radio = () => <input style={{ color: "var(--ink)" }} />;\n'
+    );
+    writeFileSync(
+      join(dir, "Select.tsx"),
+      "/** @intent choose-one: many options */\nexport const Select = () => <select />;\n"
+    );
+    writeFileSync(join(dir, "Form.tsx"), "export const Form = () => <form><Radio /></form>;\n");
+    return dir;
+  };
+
+  it("gives what exists and how to choose, those with something to say first, with no configuration", () => {
+    const run = runScriptProcess(ENTRY, ["graph", ruledProject(), "--json"]);
+    expect(run.exitCode).toBe(0);
+    const document = JSON.parse(run.stdout);
+    expect(document).toMatchObject({
+      schema: 1,
+      total: 3,
+      tokens: { color: 1 },
+      intents: {
+        "choose-one": [
+          { component: "Radio", when: "a few options" },
+          { component: "Select", when: "many options" }
+        ]
+      }
+    });
+    expect(document.components[2]).toMatchObject({ name: "Form", renders: ["Radio"] });
+  });
+
+  it("gives one intent's choices, and one component with what is around it", () => {
+    const dir = ruledProject();
+    const intent = JSON.parse(
+      runScriptProcess(ENTRY, ["graph", dir, "--intent", "choose-one", "--json"]).stdout
+    );
+    expect(intent.components.map((each: { name: string }) => each.name).toSorted()).toEqual([
+      "Radio",
+      "Select"
+    ]);
+    const detail = JSON.parse(
+      runScriptProcess(ENTRY, ["graph", dir, "--component", "Radio", "--json"]).stdout
+    ).detail;
+    expect(detail).toMatchObject({ renderedBy: ["Form"], tokens: ["--ink"], usedBy: 1 });
+    expect(runScriptProcess(ENTRY, ["graph", dir]).stdout).toContain("3 components, tokens: 1 color.");
+  });
+
+  it("takes any name for an intent, and rules beside a file by either name", () => {
+    const dir = ruledProject();
+    writeFileSync(join(dir, "Tag.tsx"), "/** @intent constructor: odd */\nexport const Tag = () => <b />;\n");
+    writeFileSync(join(dir, "pick-list.tsx"), "export const PickList = () => <ul />;\n");
+    writeFileSync(join(dir, "PickList.rules.json"), '{ "PickList": { "intent": "pick-many: long lists" } }');
+    const document = JSON.parse(runScriptProcess(ENTRY, ["graph", dir, "--json"]).stdout);
+    expect(document.intents.constructor).toEqual([{ id: "constructor", when: "odd", component: "Tag" }]);
+    expect(document.intents["pick-many"]).toEqual([
+      { id: "pick-many", when: "long lists", component: "PickList" }
+    ]);
+    expect(runScriptProcess(ENTRY, ["graph", dir, "--intent", "constructor", "--json"]).exitCode).toBe(0);
+  });
+
+  it("answers an agent with no shell through the catalogue", () => {
+    const config = catalogue(root, "graph-mcp", {
+      "A.stories.tsx": "export default { title: 'A/B' };\n",
+      "Thing.tsx": "export const Thing = () => <a />;\n"
+    });
+    const document = JSON.parse(
+      spawnSync(process.execPath, [ENTRY, "mcp", "--config", config, "--url", NO_SERVER], {
+        encoding: "utf8",
+        input: [
+          JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/call",
+            params: { name: "component_graph", arguments: {} }
+          }),
+          ""
+        ].join("\n")
+      })
+        .stdout.split("\n")
+        .filter((line) => line.includes('"id":2'))[0] ?? "{}"
+    );
+    expect(document.result.content[0].text).toContain('"name":"Thing"');
   });
 });
 

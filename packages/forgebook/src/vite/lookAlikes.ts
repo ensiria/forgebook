@@ -70,6 +70,11 @@ const UNTELLING_PROPS = new Set([
   "slot"
 ]);
 
+/**
+ * The sign of a copy, the surest there is, so it counts twice.
+ */
+export const SAME_CODE = "the same code";
+
 /** The sign of two components with one look. */
 const SAME_CLASSES = "nearly the same classes";
 
@@ -111,14 +116,20 @@ const overlap = (first: readonly string[], second: readonly string[]): number =>
   return a.size + b.size === 0 ? 0 : shared / (a.size + b.size - shared);
 };
 
-/** What two components have in common, each a sign they are one. */
-const signsBetween = (first: ScannedComponent, second: ScannedComponent): string[] => {
+/**
+ * What two components have in common, each a sign they are one.
+ *
+ * @param first - one.
+ * @param second - the other.
+ */
+export const signsBetween = (first: ScannedComponent, second: ScannedComponent): string[] => {
   const shared = first.props.filter((prop) => !UNTELLING_PROPS.has(prop) && second.props.includes(prop));
   const hasSameLook =
     first.classes.length >= FEWEST_CLASSES &&
     second.classes.length >= FEWEST_CLASSES &&
     overlap(first.classes, second.classes) >= SAME_LOOK;
   return [
+    ...(first.code !== undefined && first.code === second.code ? [SAME_CODE, SAME_CODE] : []),
     ...(first.root !== undefined && first.root === second.root && TELLING_ROOT.test(first.root)
       ? [`both render ${first.root}`]
       : []),
@@ -127,9 +138,45 @@ const signsBetween = (first: ScannedComponent, second: ScannedComponent): string
   ];
 };
 
-/** Whether one is built on the other: reuse, not a copy. */
-const isBuiltOn = (first: ScannedComponent, second: ScannedComponent): boolean =>
+/** What a name's last word says it would render, for what a person presses or fills in. */
+const NATIVE_OF: Readonly<Record<string, string>> = {
+  Button: "button",
+  Input: "input",
+  Select: "select",
+  Textarea: "textarea",
+  Link: "a",
+  Dialog: "dialog"
+};
+
+/**
+ * Whether a component of a name renders by hand the element a component of that name exists for: an agent's way of
+ * rebuilding one, whatever the other's root (often a slot this cannot read) and props.
+ *
+ * @param added - the new one.
+ * @param stem - what both names say they are.
+ */
+export const isRebuilt = (added: ScannedComponent, stem: string): boolean => {
+  const last = stem.match(/[A-Z][a-z0-9]*/g)?.at(-1) ?? stem;
+  const native = NATIVE_OF[stem];
+  return stem === last && native !== undefined && added.root === native;
+};
+
+/**
+ * Whether one is built on the other: reuse, not a copy.
+ *
+ * @param first - one.
+ * @param second - the other.
+ */
+export const isBuiltOn = (first: ScannedComponent, second: ScannedComponent): boolean =>
   first.renders.includes(second.name) || second.renders.includes(first.name);
+
+/**
+ * Whether a component is one to share: a screen is one of a kind, however alike its layout.
+ *
+ * @param component - the component.
+ */
+export const isShareable = ({ file, name }: Pick<ScannedComponent, "file" | "name">): boolean =>
+  !ROUTE_FILE.test(file) && !SCREEN_NAME.test(name);
 
 /** Joins pairs that share a component into groups. */
 const joined = (pairs: readonly (readonly [ScannedComponent, ScannedComponent])[]): ScannedComponent[][] => {
@@ -170,7 +217,7 @@ const groupsOfName = (stem: string, members: readonly ScannedComponent[]): LookA
       )
     ];
     return {
-      confidence: signs.length >= 2 ? "high" : "medium",
+      confidence: signs.length >= 2 || signs.includes(SAME_CODE) ? "high" : "medium",
       why: `named alike (${stem}): ${signs.join(", ")}`,
       members: group.map(({ name, file, line }) => ({ name, file, line }))
     };
@@ -193,6 +240,28 @@ const groupsByLook = (components: readonly ScannedComponent[]): LookAlike[] => {
   }));
 };
 
+/** Copies under other names: nothing but the code tells them, and that is enough. */
+const groupsByCode = (components: readonly ScannedComponent[], inGroup: ReadonlySet<string>): LookAlike[] => {
+  const byCode = new Map<string, ScannedComponent[]>();
+  for (const each of components) {
+    if (each.code !== undefined && !inGroup.has(`${each.file}\0${each.name}`)) {
+      byCode.set(each.code, [...(byCode.get(each.code) ?? []), each]);
+    }
+  }
+  return [...byCode.values()].flatMap((members): LookAlike[] => {
+    const files = new Set(members.map(({ file }) => file));
+    return files.size < 2
+      ? []
+      : [
+          {
+            confidence: "high",
+            why: SAME_CODE,
+            members: members.map(({ name, file, line }) => ({ name, file, line }))
+          }
+        ];
+  });
+};
+
 /**
  * The components that look like one: first by name, then by look across names. Screens are left out: each is one of a
  * kind, however alike their layouts.
@@ -200,7 +269,7 @@ const groupsByLook = (components: readonly ScannedComponent[]): LookAlike[] => {
  * @param components - every component of the project.
  */
 export const lookAlikes = (components: readonly ScannedComponent[]): LookAlike[] => {
-  const shareable = components.filter(({ file, name }) => !ROUTE_FILE.test(file) && !SCREEN_NAME.test(name));
+  const shareable = components.filter(isShareable);
   const byStem = new Map<string, ScannedComponent[]>();
   for (const each of shareable) {
     const stem = stemOf(each.name);
@@ -218,7 +287,7 @@ export const lookAlikes = (components: readonly ScannedComponent[]): LookAlike[]
         !inGroup.has(`${each.file}\0${each.name}`)
     )
     .slice(0, MOST_COMPARED);
-  return [...named, ...groupsByLook(looked)].toSorted(
+  return [...named, ...groupsByLook(looked), ...groupsByCode(shareable, inGroup)].toSorted(
     (first, second) => Number(first.confidence === "medium") - Number(second.confidence === "medium")
   );
 };
