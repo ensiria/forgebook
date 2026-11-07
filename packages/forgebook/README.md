@@ -989,6 +989,14 @@ with its time and its failure. **Step through** mounts the story again and stops
 does that one, **Continue** runs the rest. A `getBy…` query is logged but cannot stop, as it returns at once. What a play
 imports itself (`storybook/test`, `@testing-library/user-event`) runs unrecorded: use the context's tools to see it here.
 
+## Plays when a story opens
+
+A story's `play` runs when it opens on a dev server, where its author is checking it. In a build it waits: a reader of
+published docs did not ask for it, and the Interactions tab offers it with **Run**. A reader changes this for themself in
+that tab or the View menu (kept in their browser), an address says it for one link (`?play=off`, `?play=on`), and
+`play: "on"` or `"off"` in the configuration sets the default. Tests, `forgebook check` and `check_story` open a frame with
+no such word, so they run every play whatever a reader or a catalogue chose.
+
 ## Tags
 
 Tag stories as CSF does, in the preview, a file's meta or a story; a `!name` takes one away:
