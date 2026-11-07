@@ -23,6 +23,7 @@ import { runScriptProcess } from "@ensiria/cli-kit/testing";
 import type { ScriptProcessRun } from "@ensiria/cli-kit/testing.types";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { printable } from "../bin/forgebook/auditRun.ts";
 import { KIT_DIR, STORYBOOK_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
@@ -1081,6 +1082,82 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     const { tokens, sources } = JSON.parse(forgebook(config, ["tokens", "--json"]).stdout);
     expect(tokens.some((each: { name: string }) => each.name === "--ink")).toBe(false);
     expect(sources[0]).toMatchObject({ kind: "tokens-file", file: "tokens.json" });
+  });
+});
+
+describe("forgebook audit", () => {
+  /** A project with no catalogue. */
+  const plainProject = (): string => {
+    const dir = mkdtempSync(join(root, "audit-"));
+    writeFileSync(
+      join(dir, "a.css"),
+      ":root { --ink: #111111; }\na { color: #111111; }\nb { color: #ff0033; }\nc { color: #ff0033; }\nd { color: #ff0033; }\n"
+    );
+    writeFileSync(
+      join(dir, "Button.tsx"),
+      'export const Button = ({ size, tone }) => <button className="a" />;\n'
+    );
+    writeFileSync(join(dir, "Btn.tsx"), 'export const Btn = ({ size, tone }) => <button className="b" />;\n');
+    return dir;
+  };
+
+  it("reports with no configuration, gives an agent its next steps, and exits 0", () => {
+    const run = runScriptProcess(ENTRY, ["audit", plainProject(), "--json"]);
+    expect(run.exitCode).toBe(0);
+    const document = JSON.parse(run.stdout);
+    expect(document).toMatchObject({
+      schema: 1,
+      system: { tokens: 1, own: 1, sources: [{ kind: "css-variables", file: "a.css", tokens: 1 }] },
+      colors: { distinct: 2, hardCoded: 4 },
+      components: { count: 2, lookAlikes: [{ confidence: "high" }] }
+    });
+    expect(document.actions).toContainEqual(
+      expect.objectContaining({
+        kind: "use-token",
+        args: ["audit", expect.any(String), "--value", "#111111", "--json"]
+      })
+    );
+    expect(document.actions).toContainEqual(expect.objectContaining({ kind: "name-value", count: 3 }));
+    expect(document.actions).toContainEqual(expect.objectContaining({ kind: "merge-components", count: 2 }));
+  });
+
+  it("says it to a person, and lists the lines of one value", () => {
+    const dir = plainProject();
+    const text = runScriptProcess(ENTRY, ["audit", dir]).stdout;
+    expect(text).toContain("Greys: 1 different, 1 used 90 % of the time.");
+    expect(text).toContain("Components: 2, 1 groups that look like one.");
+    const sites = JSON.parse(runScriptProcess(ENTRY, ["audit", dir, "--value", "#FF0033", "--json"]).stdout);
+    expect(sites.sites.map((each: { line: number }) => each.line)).toEqual([3, 4, 5]);
+  });
+
+  it("reads nothing a link leads to outside the project, and runs nothing git is told to", () => {
+    const outside = mkdtempSync(join(root, "audit-outside-"));
+    writeFileSync(join(outside, "secret.css"), "a { color: #abc123; } /* API_TOKEN */\n");
+    const dir = mkdtempSync(join(root, "audit-links-"));
+    symlinkSync(join(outside, "secret.css"), join(dir, "leak.css"));
+    writeFileSync(join(dir, "own.css"), "a { color: #123abc; }\n");
+    spawnSync("git", ["init", "-q"], { cwd: dir });
+    spawnSync("git", ["config", "core.fsmonitor", `touch ${join(dir, "ran")}`], { cwd: dir });
+    const document = JSON.parse(runScriptProcess(ENTRY, ["audit", dir, "--json"]).stdout);
+    expect(JSON.stringify(document)).not.toContain("abc123");
+    expect(document.colors.distinct).toBe(1);
+    expect(existsSync(join(dir, "ran"))).toBe(false);
+  });
+
+  it("refuses a value that is neither a colour nor a size, rather than say it is not there", () => {
+    expect(runScriptProcess(ENTRY, ["audit", ".", "--value", "red"]).exitCode).not.toBe(0);
+  });
+
+  it("keeps a report one line per line, whatever a file's name holds", () => {
+    expect(printable("a\u001b[2Jb\nc")).toBe("a?[2Jb\nc");
+  });
+
+  it("says when there is nothing to read, and refuses a bad limit", () => {
+    const empty = mkdtempSync(join(root, "audit-empty-"));
+    expect(runScriptProcess(ENTRY, ["audit", empty]).stdout).toContain(
+      "No style sheet or component file here"
+    );
+    expect(runScriptProcess(ENTRY, ["audit", empty, "--limit", "0"]).exitCode).not.toBe(0);
   });
 });
 

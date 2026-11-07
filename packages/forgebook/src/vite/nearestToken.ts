@@ -44,7 +44,16 @@ export type NearestTokens = {
 };
 
 /** A colour in Oklab, with its alpha. */
-type OklabColor = { readonly l: number; readonly a: number; readonly b: number; readonly alpha: number };
+export type OklabColor = {
+  /** Its lightness, from 0 to 1. */
+  readonly l: number;
+  /** How far from green to red. */
+  readonly a: number;
+  /** How far from blue to yellow. */
+  readonly b: number;
+  /** Its opacity, from 0 to 1. */
+  readonly alpha: number;
+};
 
 /** How a type's values compare. */
 type Comparison = {
@@ -215,6 +224,8 @@ const functionColor = (text: string): OklabColor | undefined => {
   const call = functionArguments(text);
   if (call === undefined) return undefined;
   const { name, parts, alpha } = call;
+  // more channels than a colour has is text that happens to start like one
+  if (parts.length > (name === "color" ? 4 : 3)) return undefined;
   const [first = "", second = "", third = "", fourth = ""] = parts;
   const fromRgb = (): OklabColor =>
     fromSrgb(percentOf(first, 255) / 255, percentOf(second, 255) / 255, percentOf(third, 255) / 255, alpha);
@@ -239,8 +250,12 @@ const functionColor = (text: string): OklabColor | undefined => {
   return convert[name]?.();
 };
 
-/** A colour as CSS writes it, in Oklab; none for what cannot be read. Keywords beyond these three carry no design. */
-const parsedColor = (written: string): OklabColor | undefined => {
+/**
+ * A colour as CSS writes it, in Oklab; none for what cannot be read. Keywords beyond these three carry no design.
+ *
+ * @param written - the colour, as code writes it.
+ */
+export const parsedColor = (written: string): OklabColor | undefined => {
   const text = written.trim().toLowerCase();
   if (text === "transparent") return fromSrgb(0, 0, 0, 0);
   if (text === "black") return fromSrgb(0, 0, 0, 1);

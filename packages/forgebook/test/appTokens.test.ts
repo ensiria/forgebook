@@ -268,6 +268,8 @@ describe("a Tailwind configuration", () => {
     const names = namesOf(dir);
     expect(names).toContain("--color-blue-500");
     expect(names).toContain("--spacing-4");
+    expect(names).toContain("--text-sm");
+    expect(names).toContain("--radius-md");
   });
 
   it("takes a whole scale or one shade from the palette by name, even when the palette is replaced", () => {
