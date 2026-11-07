@@ -22,7 +22,7 @@
  */
 import { extname, join, resolve } from "node:path";
 
-import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from "vite";
+import type { ConfigEnv, Logger, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { checksA11y, offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
@@ -240,6 +240,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
    */
   let isTestRun = false;
+  /** Vite's logger, for the dependency scan's warnings: the scan runs after the configuration is resolved. */
+  let scanLogger: Logger | undefined;
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
   /** The stamp of the plugin's own code, which makes the kept indexes and code: another version is a miss. */
@@ -441,7 +443,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
       }
-      const pages = config === undefined ? {} : catalogueConfig(config, userConfig);
+      // the scan runs once the server is up, when the logger is known
+      const pages =
+        config === undefined ? {} : catalogueConfig(config, userConfig, (line) => scanLogger?.warn(line));
       return {
         ...pages,
         css: {
@@ -468,6 +472,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     },
     configResolved: (resolved: ResolvedVite): void => {
       checkAtStart(resolved, config?.shell.problems ?? []);
+      scanLogger = resolved.logger;
       // a dev server's answers only: a build reads everything once, and stamping each answer's files costs it more than
       // a later build would save
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
