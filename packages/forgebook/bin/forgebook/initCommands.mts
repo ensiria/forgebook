@@ -11,6 +11,7 @@
  */
 import type { CommandNode, CommandScope } from "@ensiria/cli-kit/commands.types";
 
+import { HOOK_NAMES } from "./agentSetup/hookNames.ts";
 import { COMMAND, type ForgebookOptions } from "./catalogueCommands.ts";
 import { CONFIG_FILE } from "./initConfig.ts";
 import { FRAMEWORK_NAMES } from "./newProject/projectFrameworks.ts";
@@ -25,7 +26,7 @@ export const initCommands = (
 ): Readonly<Record<string, CommandNode>> => ({
   init: forgebook.command({
     summary:
-      "Write forgebook.config.ts, and a preview with the app's global style sheets, from the project's files.",
+      "Write forgebook.config.ts, and a preview with the app's global style sheets, from the project's files; with --agents, what a project's coding agents need too.",
     json: true,
     options: {
       from: {
@@ -47,12 +48,36 @@ export const initCommands = (
         description:
           "Run the package manager's install of what the configuration imports; as any install, it runs what the project's package manager settings and the packages' scripts say."
       },
-      force: { type: "boolean", description: `Replace a ${CONFIG_FILE} or a preview that is already there.` }
+      force: { type: "boolean", description: `Replace a ${CONFIG_FILE} or a preview that is already there.` },
+      agents: {
+        type: "boolean",
+        description:
+          "Also set up the project's coding agents: .mcp.json, AGENTS.md and the skill, a CI workflow for verify, and a hook that runs verify. Merges, and never replaces; keeps a catalogue already there, and starts beside a Storybook."
+      },
+      hooks: {
+        type: "string",
+        valueName: "list",
+        description: `With --agents, the hooks to write, by commas: ${HOOK_NAMES.join(", ")}. By default those of the assistants the repository shows signs of, otherwise pre-commit.`
+      },
+      browser: {
+        type: "boolean",
+        description:
+          "Install the testing package and its browser, which downloads about 200 MB; implies --install."
+      },
+      draw: {
+        type: "boolean",
+        description:
+          "Then draw a story in the browser, trying components until one draws, and say why each that did not; exits 1 if none does. Runs the project's code (its vite.config, its components), and keeps the story that drew."
+      }
     },
     examples: [
       { command: `${COMMAND} init`, description: "Read the project and write the files." },
       { command: `${COMMAND} init --json`, description: "The same, as a document, for an agent." },
-      { command: `${COMMAND} init --from storybook`, description: "Read .storybook." }
+      { command: `${COMMAND} init --from storybook`, description: "Read .storybook." },
+      {
+        command: `${COMMAND} init --agents --browser --draw --json`,
+        description: "All of it, unattended, for an agent: ends with a story drawn, or why none was."
+      }
     ],
     run: async ({ options, io, log, isJson }): Promise<void> => {
       const { runInit } = await import("./initRun.ts");
@@ -61,7 +86,11 @@ export const initCommands = (
           from: options.from,
           framework: options.framework,
           isForced: options.force === true,
-          shouldInstall: options.install === true
+          shouldInstall: options.install === true || options.browser === true,
+          isForAgents: options.agents === true,
+          hooks: options.hooks?.split(",").map((name) => name.trim()),
+          shouldInstallBrowser: options.browser === true,
+          shouldDraw: options.draw === true
         },
         { io, log, isJson }
       );
