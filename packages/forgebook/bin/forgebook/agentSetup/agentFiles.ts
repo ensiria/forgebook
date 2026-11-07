@@ -12,7 +12,15 @@
  * @module
  */
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
@@ -245,7 +253,9 @@ const gitHooksFolder = (root: string): string | undefined => {
       encoding: "utf8",
       stdio: "pipe"
     });
-    return path.trim();
+    // git may name the folder in a short form (Windows' 8.3 names): the long one, as the root is named, compares
+    const folder = path.trim();
+    return existsSync(folder) ? realpathSync.native(folder) : folder;
   } catch {
     return undefined;
   }
@@ -301,7 +311,7 @@ const writePreCommit = (root: string, command: string, done: Written): WrittenHo
   }
   writeInto(file, `#!/bin/sh\n${preCommitLines(command)}`);
   chmodSync(file, 0o755);
-  const shown = VITE_PATHS.normalize(relative(root, file));
+  const shown = VITE_PATHS.normalize(relative(realpathSync.native(root), file));
   done.written.push(shown);
   done.nextSteps.push({
     kind: "setup",
