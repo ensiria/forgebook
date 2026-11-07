@@ -5,7 +5,7 @@
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -51,7 +51,8 @@ describe("extractCallSites", () => {
     const dir = project();
     const sites = extractCallSites(join(dir, "src", "components", "StatusBadge.vue"), "default");
     if (typeof sites === "string") throw new Error(sites);
-    const byFile = sites.map((site) => [site.file.split("/").pop(), site.args]);
+    const byFile = sites.map((site) => [basename(site.file), site.args]);
+    expect(sites.every((site) => !site.file.includes("\\"))).toBe(true);
     expect(byFile).toEqual(
       expect.arrayContaining([
         ["Archive.vue", { label: '"Archived"' }],

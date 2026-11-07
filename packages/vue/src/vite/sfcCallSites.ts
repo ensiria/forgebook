@@ -13,7 +13,7 @@
  * @module
  */
 import { type Dirent, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
 import type { CallSite, ExtractCallSites } from "forgebook/vite/adapter";
 import { literalExpressionCode } from "forgebook/vite/jsx-call-sites";
@@ -247,7 +247,8 @@ export const sfcCallSites: ExtractCallSites = (file: string): readonly CallSite[
     );
     const visit = (node: TemplateNode): void => {
       if (node.type === ELEMENT && node.tag !== undefined && tags.has(node.tag))
-        sites.push({ file: sfc, args: argsOf(node) });
+        // forward slashes, as the JSX reader's files are on every system
+        sites.push({ file: sfc.split(sep).join("/"), args: argsOf(node) });
       for (const child of node.children ?? []) visit(child);
     };
     visit(templateNode(ast));
