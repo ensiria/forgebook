@@ -42,6 +42,7 @@ const STORY_IDS = [
   "components-button--unlisted",
   "components-button--untested",
   "storybook-arg-types--controls",
+  "storybook-prop-types--link",
   "storybook-arg-types--conditional",
   "storybook-custom-controls--rated",
   "storybook-value-props--filled",
@@ -115,6 +116,11 @@ test.describe("files written the Storybook way", () => {
     await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
   });
 
+  test("Code shows the meta's render for a story without one of its own", async ({ page }) => {
+    await page.goto(story("storybook-meta-render-and-play--from-meta", "tab=code"));
+    await expect(page.locator(".forgebook-code-block")).toContainText("From the meta: <Badge {...args} />");
+  });
+
   test("loaders and beforeEach run before the story is drawn", async ({ page }) => {
     await page.goto(story("storybook-loaders--loaded", "tab=play"));
     await isReady(page);
@@ -177,6 +183,22 @@ test.describe("a title written in several files, and ids", () => {
     await wrapping.getByRole("button", { name: "Show code" }).click();
     await expect(wrapping.locator(".forgebook-example__code")).toContainText("A label long enough to wrap");
     await expect(page.locator(".forgebook-api__table").first().locator("tbody th")).toContainText(["label"]);
+  });
+
+  test("the reference lists a variant's props with when they apply, and says what a type parameter is", async ({
+    page
+  }) => {
+    await page.goto("/?component=sb:storybook-prop-types");
+    const reference = page.locator(".forgebook-api__table");
+    // the first read of a component's types builds its program: the answer can take longer than an assertion's default
+    await expect(reference.locator('tr[data-prop="href"]')).toContainText('Only when kind is "link".', {
+      timeout: 20_000
+    });
+    await expect(reference.locator('tr[data-prop="onClick"]')).toContainText('Only when kind is "button".');
+    await expect(reference.locator('tr[data-prop="items"]')).toContainText("readonly unknown[]");
+    await expect(reference.locator('tr[data-prop="items"]')).toContainText(
+      "TItem is generic, with no constraint: shown as unknown."
+    );
   });
 
   test("a story a helper makes, another constant and a re-export are drawn", async ({ page }) => {
@@ -355,6 +377,16 @@ test.describe("arg types and actions", () => {
     await isReady(page);
     await frameOf(page).getByRole("button", { name: "Close" }).click();
     await expect(page.locator(".forgebook-calls__item")).toContainText(["onClose"]);
+  });
+
+  test("Code shows a spy as the file writes it, and a value the panel set from that value", async ({
+    page
+  }) => {
+    await page.goto(story("storybook-actions--spy", "tab=code"));
+    const code = page.locator(".forgebook-code-block");
+    await expect(code).toHaveText('<Button label="Press" onClick={fn()} />');
+    await page.goto(story("storybook-actions--spy", "tab=code&args=label:Pressed"));
+    await expect(code).toHaveText('<Button label="Pressed" onClick={fn()} />');
   });
 });
 

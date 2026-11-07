@@ -185,6 +185,13 @@ export type StoryDocument = {
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
   /**
+   * The story's code, as its Code tab shows and copies it: its `render` as written, or the component in the
+   * framework's code with the args its file writes as code (functions, elements) as written and the rest from their
+   * values, those set through `args` from theirs. None when it cannot be written: the story file did not load, or
+   * the framework's code writer does not load on the server.
+   */
+  readonly code?: string;
+  /**
    * The props its values can set, as the panel sets them: each one's control and what its value looks like, its
    * `argTypes` taken into account. Give values through `args` of `forgebook story` or of the tools, or in the address's
    * `args=` as JSON.

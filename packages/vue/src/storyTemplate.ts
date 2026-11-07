@@ -6,8 +6,8 @@
  * Attributes follow Vue's style guide: a prop in kebab-case, a text in quotes, a number, `null`, `false` or a list bound
  * (`:count="3"`, `:options="['a', 'b']"`), `true` the bare name, a named value by its name (`:icon="IconFolder"`). A slot
  * goes between the tags: `#default` as its text, any other in a `<template #name>`. Only the values that cross from the
- * frame are known (texts, numbers, booleans, `null`, lists of texts and numbers, named values): a function the story
- * passes is left out. Pure.
+ * frame are known (texts, numbers, booleans, `null`, lists of texts and numbers, named values): a function or other code
+ * the story file writes comes as written (`written`) and is bound as it is (`:on-close="fn()"`). Pure.
  *
  * @module
  */
@@ -75,12 +75,24 @@ const slotsText = (slots: readonly (readonly [string, ArgValue])[]): string | un
  *
  * @param component - the component's name (`IconTile`).
  * @param args - the values, in the order they are written.
+ * @param written - the args the story file writes as code, each as written, bound as an expression; after the values.
  */
-export const storyTemplate = (component: string, args: PanelArgs): string => {
+export const storyTemplate = (
+  component: string,
+  args: PanelArgs,
+  written: Readonly<Record<string, string>> = {}
+): string => {
   const entries = Object.entries(args);
-  const attributes = entries
-    .filter(([name]) => slotOfArg(name) === undefined)
-    .map(([name, value]) => attribute(name, value));
+  // a slot's written code is not markup: only the attributes take it
+  const names = [...new Set([...Object.keys(args), ...Object.keys(written)])].filter(
+    (name) => slotOfArg(name) === undefined
+  );
+  const attributes = names.flatMap((name): string[] => {
+    const code = written[name];
+    if (code !== undefined) return [`:${kebab(name)}="${attributeText(code)}"`];
+    const value = args[name];
+    return value === undefined ? [] : [attribute(name, value)];
+  });
   const inner = slotsText(
     entries.flatMap(([name, value]): [string, ArgValue][] => {
       const slot = slotOfArg(name);
@@ -88,10 +100,10 @@ export const storyTemplate = (component: string, args: PanelArgs): string => {
     })
   );
   const oneLine = [component, ...attributes].join(" ");
-  const isOneLine = oneLine.length + 2 <= ONE_LINE;
+  const isOneLine = oneLine.length + 2 <= ONE_LINE && !oneLine.includes("\n");
   const opening = isOneLine
     ? `<${oneLine}`
-    : `<${component}\n${attributes.map((text) => `  ${text}`).join("\n")}\n`;
+    : `<${component}\n${attributes.map((text) => `  ${text.replace(/\n/g, "\n  ")}`).join("\n")}\n`;
   if (inner === undefined) return `${opening}${isOneLine ? " " : ""}/>`;
   return `${opening}>${inner}</${component}>`;
 };

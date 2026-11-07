@@ -26,7 +26,7 @@ import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from "vite";
 
 import { checksA11y, offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
-import { createLiveErrors, isLiveErrorReport, LIVE_ERROR_EVENT } from "../liveErrors.ts";
+import { createLiveErrors } from "../liveErrors.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { agentMiddleware, FRAMED_AGENT_PAGES } from "./agentRoutes.ts";
 import { STORY_FILE } from "./autoTitle.ts";
@@ -40,6 +40,7 @@ import { createDocsExtractor, type DocsExtractor, NO_DOCS_EXTRACTOR } from "./do
 import { sayEmptyStoryGlobs } from "./emptyStoryGlobs.ts";
 import { devServerAccess, VITEST_HOOKS } from "./fileAccess.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
+import { receiveFrameErrors } from "./frameErrors.ts";
 import { builtPlacement } from "./framesConfig.ts";
 import { serveFrames } from "./framesServer.ts";
 import { generatedId, generatedModule } from "./generatedModules.ts";
@@ -497,9 +498,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         };
         server.middlewares.use(missingHeightsMiddleware(file));
       }
-      server.ws.on(LIVE_ERROR_EVENT, (report: unknown): void => {
-        if (isLiveErrorReport(report)) live.add(report, new Date());
-      });
+      receiveFrameErrors(server, live);
       // the catalogue's pages, made here: no HTML file is written
       server.middlewares.use((request, response, next): void => {
         const page = requestedPage(request.url ?? "/");

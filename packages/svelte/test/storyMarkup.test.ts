@@ -51,4 +51,16 @@ describe("a story's markup", () => {
       '<Dialog\n  title="A title that is long enough"\n  description="And a description that pushes it over"\n/>'
     );
   });
+
+  it("sets the args the file writes as code as expressions, but never in a snippet", () => {
+    expect(
+      storyMarkup("Dialog", { title: "Hi", "#children": "Body" }, { onclose: "fn()", "#children": "body" })
+    ).toBe('<Dialog title="Hi" onclose={fn()}>Body</Dialog>');
+  });
+
+  it("indents written code that spans lines under its attribute", () => {
+    expect(storyMarkup("Dialog", { title: "Hi" }, { onclose: "() => {\n  save();\n}" })).toBe(
+      '<Dialog\n  title="Hi"\n  onclose={() => {\n    save();\n  }}\n/>'
+    );
+  });
 });

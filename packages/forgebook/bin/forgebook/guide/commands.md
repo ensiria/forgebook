@@ -10,7 +10,7 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook search onValueChange --json` | The whole catalogue by its text: which component has a prop, where the docs say something, with the address of the exact heading or prop |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` or `badge.component.ts` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken, which `problems` names by `file:line:column` while the other stories stay usable |
-| `npx forgebook story <id> --json` | One story: the props every use must set (`requiredProps`), its args, its component's props, the components whose stories use it, its design, and its `links`: `address` in the catalogue, `frame` alone, `embed` with no chrome, for a wiki or an iframe |
+| `npx forgebook story <id> --json` | One story: the props every use must set (`requiredProps`), its args, its `code` as the Code tab shows it (the render, or the args as written), its component's props, the components whose stories use it, its design, and its `links`: `address` in the catalogue, `frame` alone, `embed` with no chrome, for a wiki or an iframe |
 | `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |
 | `npx forgebook page <id> --json` | One docs page: its Markdown, its headings, the address that opens it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |
@@ -26,7 +26,7 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests, imports of what is `@deprecated` or `@replacedBy`, a new component that looks like one that exists. `advice` is what to weigh and fails nothing. `tokenSources` says what the values were compared with. Where a system writes them, it also checks allowed parents, children and siblings, and a plain element a component is `@insteadOf`. A value that is meant takes a comment on its line or the one above, `forgebook-ignore raw-color: why`, and a new component above it, `forgebook-ignore duplicate-component: why`; each is listed in `excused` |
 | `npx forgebook audit --json` | What a project uses, with no catalogue or configuration: colours and sizes by frequency, what is written by hand, components that look like one. `actions` lists the next steps; `npx forgebook audit --value "#64748b" --json` gives every line to edit for one |
 | `npx forgebook graph --json` | A map of the components and tokens, generated from the source, to read instead of opening files. `--intent choose-one` lists how to choose among fixed patterns, `--component Button` what renders it and its tokens |
-| `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
+| `npx forgebook errors --json` | What the open frames reported while you edited: render errors (with their `place`, `file:line:column` as written), failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`); a model's id in the view (`iphone-16`) frames it in that device |
 | `npx forgebook shot <id> --update` then `npx forgebook diff <id> --json` | Baselines, then what changed against them: the region, the percentage, a marked picture |
 
@@ -36,8 +36,8 @@ nothing: its checks did not run. `verify` answers `not-verified` then, or `faile
 `verify` answers one `verdict`: `verified`; `partly-verified`, when `skipped` names what was not checked (colours and
 sizes with no tokens anywhere, accessibility with `a11y: false`, a UI file of another catalogue); `nothing-to-verify`, when no
 UI file changed (read `skipped` and `code.notes` there too); `not-verified`, when a changed UI file has no story that ran,
-a story file cannot be read, the catalogue has a problem that stops it telling, or nothing changed and no `--since` was
-given; `failed`, when a check found a problem. The last two exit non-zero. Do not say a change is done on either, and do
+a story file cannot be read, a story pattern of the configuration matches nothing, the catalogue has a problem that stops
+it telling, or nothing changed and no `--since` was given; `failed`, when a check found a problem. The last two exit non-zero. Do not say a change is done on either, and do
 not report `partly-verified` as verified: say what `skipped` says. A file in `uiFiles` with `coverage: "none"` says why in
 `reason`; when no story reaches it, `fix` names what to do, usually `npx forgebook new <file>`: write the story, then run
 `verify` again. `coverage: "through"` means it ran in another component's stories. A UI file is a component or a style

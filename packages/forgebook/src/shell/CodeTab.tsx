@@ -1,15 +1,17 @@
 /**
  * The panel's Code tab: the story's `render` as written in its file, or, for a story drawn from its args, the
- * component's JSX with the values of the moment (the story's and the Props tab's), with a button that copies it.
+ * component's JSX with the args its file writes as code and the values of the moment (the story's and the Props
+ * tab's), with a button that copies it.
  *
  * @module
  */
 
 import type { ReactNode } from "react";
 
+import { type StoryCodeSource, storyCodeText } from "../storyCodeText.ts";
 import { useCodeWriter } from "./codeWriter.ts";
 import { LATER_STRINGS } from "./laterStrings.ts";
-import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
+import { hasRenderCode, StoryCodeBlock } from "./StoryCodeBlock.tsx";
 import { STRINGS } from "./strings.ts";
 import { useCopy } from "./useCopy.ts";
 
@@ -24,7 +26,7 @@ export type CodeTabProps = StoryCodeSource;
 export const CodeTab = (props: CodeTabProps): ReactNode => {
   const { isCopied, copy } = useCopy();
   const write = useCodeWriter();
-  const hasRender = props.code[props.exportName] !== undefined;
+  const hasRender = hasRenderCode(props);
   return (
     <div className="forgebook-prop-group">
       <div className="forgebook-calls__head">
