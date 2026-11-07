@@ -76,6 +76,13 @@ describe("askModel", () => {
     expect(seen[0]).toContain("Bearer k|/v1/chat/completions|");
   });
 
+  it("takes an address with trailing slashes, however many", async () => {
+    const seen: string[] = [];
+    const url = await provider(200, answered('{"findings":[]}'), seen);
+    expect(await askModel({ url: `${url}///`, name: "a-model", key: "k" }, SIGHT)).toEqual([]);
+    expect(seen[0]).toContain("|/v1/chat/completions|");
+  });
+
   it("says when the provider refuses or is not there, and never names the key", async () => {
     const url = await provider(401, {}, []);
     expect(await askModel({ url, name: "a-model", key: "secret" }, SIGHT)).toBe("The model answered 401");
