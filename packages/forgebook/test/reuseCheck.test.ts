@@ -284,6 +284,14 @@ describe("new components", () => {
 });
 
 describe("a component's comment", () => {
+  it("reads a library's part given a name, which an author can write rules on", () => {
+    const text = "/** @parent Form */\nexport const Select = SelectPrimitive.Root;";
+    expect(scannedComponents("a.tsx", text)[0]).toMatchObject({
+      name: "Select",
+      rules: { parents: ["Form"] }
+    });
+  });
+
   it("is read from the text, on a declaration, a function and an export", () => {
     const text = `
       /**

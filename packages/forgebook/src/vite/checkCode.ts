@@ -36,7 +36,8 @@ export type CodeRule =
   | "suppression"
   | "deleted-test"
   | "deprecated-component"
-  | "duplicate-component";
+  | "duplicate-component"
+  | "composition";
 
 /** A value a comment says is meant. */
 export type ExcusedValue = {
@@ -45,7 +46,7 @@ export type ExcusedValue = {
   /** The comment's line. */
   readonly line: number;
   /** The rule it excuses. */
-  readonly rule: "raw-color" | "raw-size" | "duplicate-component";
+  readonly rule: "raw-color" | "raw-size" | "duplicate-component" | "composition";
   /** Why, as the comment says. */
   readonly reason: string;
 };

@@ -151,20 +151,21 @@ const MOST = 0.9;
 const SITE_TEXT = 120;
 
 /** A colour's class: what it paints, and the rest of the name. */
-const COLOR_CLASS =
+export const COLOR_CLASS =
   /(?<![\w-])(?:bg|text|border(?:-[trblxyse])?|ring|fill|stroke|from|via|to|divide|outline|decoration|accent|caret|placeholder|shadow)-([a-z][\w-]*)(?:\/[\w.%[\]]+)?(?![\w-])/g;
 
 /** A reference to a custom property. */
 const VAR_USE = /var\(\s*(--[\w-]+)/g;
 
 /** A spacing class on a scale. */
-const SPACE_CLASS = /(?<![\w-])-?(?:[pm][xytrblse]?|gap(?:-[xy])?|space-[xy])-(\d+(?:\.\d+)?)(?![\w.-])/g;
+export const SPACE_CLASS =
+  /(?<![\w-])-?(?:[pm][xytrblse]?|gap(?:-[xy])?|space-[xy])-(\d+(?:\.\d+)?)(?![\w.-])/g;
 
 /** A radius class. */
-const RADIUS_CLASS = /(?<![\w-])rounded(?:-[trblse]{1,2})?-(xs|sm|md|lg|xl|2xl|3xl|4xl)(?![\w-])/g;
+export const RADIUS_CLASS = /(?<![\w-])rounded(?:-[trblse]{1,2})?-(xs|sm|md|lg|xl|2xl|3xl|4xl)(?![\w-])/g;
 
 /** A font's size class. */
-const FONT_CLASS = /(?<![\w-])text-(xs|sm|base|lg|xl|[2-9]xl)(?![\w-])/g;
+export const FONT_CLASS = /(?<![\w-])text-(xs|sm|base|lg|xl|[2-9]xl)(?![\w-])/g;
 
 /** A size as a number in a style object, which has no unit to find it by. */
 const STYLE_NUMBER =

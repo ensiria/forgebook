@@ -38,6 +38,7 @@ import {
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
 import { leaveAfterCommand } from "./commandServer.ts";
 import { devCommands } from "./devCommands.mts";
+import { graphCommands } from "./graphCommand.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
@@ -302,6 +303,7 @@ await defineCommands({
     ...agentLoopCommands(forgebook),
     ...guideCommands(forgebook),
     ...auditCommands(forgebook),
+    ...graphCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),

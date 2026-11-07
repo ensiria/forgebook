@@ -1118,6 +1118,96 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
   });
 });
 
+describe("forgebook graph", () => {
+  /** A project with a small system and rules on it. */
+  const ruledProject = (): string => {
+    const dir = mkdtempSync(join(root, "graph-"));
+    writeFileSync(join(dir, "a.css"), ":root { --ink: #111111; }\n");
+    writeFileSync(
+      join(dir, "Radio.tsx"),
+      '/**\n * @intent choose-one: a few options\n * @parent Form\n */\nexport const Radio = () => <input style={{ color: "var(--ink)" }} />;\n'
+    );
+    writeFileSync(
+      join(dir, "Select.tsx"),
+      "/** @intent choose-one: many options */\nexport const Select = () => <select />;\n"
+    );
+    writeFileSync(join(dir, "Form.tsx"), "export const Form = () => <form><Radio /></form>;\n");
+    return dir;
+  };
+
+  it("gives what exists and how to choose, those with something to say first, with no configuration", () => {
+    const run = runScriptProcess(ENTRY, ["graph", ruledProject(), "--json"]);
+    expect(run.exitCode).toBe(0);
+    const document = JSON.parse(run.stdout);
+    expect(document).toMatchObject({
+      schema: 1,
+      total: 3,
+      tokens: { color: 1 },
+      intents: {
+        "choose-one": [
+          { component: "Radio", when: "a few options" },
+          { component: "Select", when: "many options" }
+        ]
+      }
+    });
+    expect(document.components[2]).toMatchObject({ name: "Form", renders: ["Radio"] });
+  });
+
+  it("gives one intent's choices, and one component with what is around it", () => {
+    const dir = ruledProject();
+    const intent = JSON.parse(
+      runScriptProcess(ENTRY, ["graph", dir, "--intent", "choose-one", "--json"]).stdout
+    );
+    expect(intent.components.map((each: { name: string }) => each.name).toSorted()).toEqual([
+      "Radio",
+      "Select"
+    ]);
+    const detail = JSON.parse(
+      runScriptProcess(ENTRY, ["graph", dir, "--component", "Radio", "--json"]).stdout
+    ).detail;
+    expect(detail).toMatchObject({ renderedBy: ["Form"], tokens: ["--ink"], usedBy: 1 });
+    expect(runScriptProcess(ENTRY, ["graph", dir]).stdout).toContain("3 components, tokens: 1 color.");
+  });
+
+  it("takes any name for an intent, and rules beside a file by either name", () => {
+    const dir = ruledProject();
+    writeFileSync(join(dir, "Tag.tsx"), "/** @intent constructor: odd */\nexport const Tag = () => <b />;\n");
+    writeFileSync(join(dir, "pick-list.tsx"), "export const PickList = () => <ul />;\n");
+    writeFileSync(join(dir, "PickList.rules.json"), '{ "PickList": { "intent": "pick-many: long lists" } }');
+    const document = JSON.parse(runScriptProcess(ENTRY, ["graph", dir, "--json"]).stdout);
+    expect(document.intents.constructor).toEqual([{ id: "constructor", when: "odd", component: "Tag" }]);
+    expect(document.intents["pick-many"]).toEqual([
+      { id: "pick-many", when: "long lists", component: "PickList" }
+    ]);
+    expect(runScriptProcess(ENTRY, ["graph", dir, "--intent", "constructor", "--json"]).exitCode).toBe(0);
+  });
+
+  it("answers an agent with no shell through the catalogue", () => {
+    const config = catalogue(root, "graph-mcp", {
+      "A.stories.tsx": "export default { title: 'A/B' };\n",
+      "Thing.tsx": "export const Thing = () => <a />;\n"
+    });
+    const document = JSON.parse(
+      spawnSync(process.execPath, [ENTRY, "mcp", "--config", config, "--url", NO_SERVER], {
+        encoding: "utf8",
+        input: [
+          JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/call",
+            params: { name: "component_graph", arguments: {} }
+          }),
+          ""
+        ].join("\n")
+      })
+        .stdout.split("\n")
+        .filter((line) => line.includes('"id":2'))[0] ?? "{}"
+    );
+    expect(document.result.content[0].text).toContain('"name":"Thing"');
+  });
+});
+
 describe("forgebook audit", () => {
   /** A project with no catalogue. */
   const plainProject = (): string => {

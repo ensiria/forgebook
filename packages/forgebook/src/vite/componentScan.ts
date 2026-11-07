@@ -13,6 +13,7 @@ import { type ESTree, parseSync } from "vite";
 
 import type { UsageGuidance } from "../componentDocs.ts";
 import { LEFT_ALONE } from "./checkCode.ts";
+import { type ComponentRules, rulesOfTags } from "./componentRules.ts";
 import type { ProjectFile } from "./projectFiles.ts";
 import { singleFileComponent } from "./singleFileComponent.ts";
 import { isTooDeep, lineAt, lineStarts } from "./sourceText.ts";
@@ -36,6 +37,8 @@ export type ScannedComponent = {
   readonly renders: readonly string[];
   /** When to use it and when not, from its documentation comment. */
   readonly guidance?: UsageGuidance;
+  /** How it is chosen and how it fits with others, from its documentation comment or a file beside it. */
+  readonly rules?: ComponentRules;
   /** Whether its file exports it, so something else can use it. */
   readonly isExported: boolean;
   /** Whether it is its file's default export. */
@@ -398,8 +401,14 @@ const commentBefore = (
  *
  * @param comment - the comment; none gives nothing.
  */
-export const guidanceOfComment = (comment: string | undefined): { readonly guidance?: UsageGuidance } =>
-  comment === undefined ? {} : guidanceOfTags(tagsOfComment(comment));
+export const guidanceOfComment = (
+  comment: string | undefined
+): { readonly guidance?: UsageGuidance; readonly rules?: ComponentRules } => {
+  if (comment === undefined) return {};
+  const tags = tagsOfComment(comment);
+  const rules = rulesOfTags(tags);
+  return { ...guidanceOfTags(tags), ...(rules === undefined ? {} : { rules }) };
+};
 
 /** What reading one function of a script needs of the rest of it. */
 type ScriptContext = {
@@ -415,11 +424,33 @@ type ScriptContext = {
   readonly imported: ReadonlyMap<string, string>;
 };
 
+/** Whether a value is a part of a library, as `SelectPrimitive.Root`. */
+const isPartOfALibrary = (value: unknown): boolean =>
+  isNode(value) &&
+  value.type === "MemberExpression" &&
+  isNode(value["object"]) &&
+  value["object"].type === "Identifier" &&
+  /^[A-Z]/.test(String(value["object"]["name"]));
+
+/** A library's part given a name: `export const Select = SelectPrimitive.Root` has no markup, yet can carry rules. */
+const partOfALibrary = (top: TopFunction, context: ScriptContext): ScannedComponent => ({
+  name: top.name,
+  file: context.file,
+  line: lineAt(context.starts, top.start),
+  props: [],
+  classes: [],
+  renders: [],
+  isExported: top.isTop === true || context.exported.named.has(top.name),
+  ...guidanceOfComment(commentBefore(context.text, top.statement ?? top.start, context.documented))
+});
+
 /** The component a function at a script's top is, when it is one: a capital name and markup of its own. */
 const componentOf = (top: TopFunction, context: ScriptContext): ScannedComponent[] => {
   const { name, value, start, annotation, statement, isTop, isDefaultStatement } = top;
   const { file, text, types, documented, starts, exported, imported } = context;
   const found = functionOf(value);
+  if (found === undefined && /^[A-Z]/.test(name) && isPartOfALibrary(value))
+    return [partOfALibrary(top, context)];
   if (found === undefined || !/^[A-Z]/.test(name)) return [];
   const { hasMarkup, ...drawn } = rendered(found["body"]);
   if (hasMarkup !== true) return [];
