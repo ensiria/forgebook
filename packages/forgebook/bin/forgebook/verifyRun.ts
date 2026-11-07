@@ -12,11 +12,8 @@
  */
 import type { StoryCheckReport } from "../../src/storyCheck.ts";
 import type { CheckedCodeDocument, VerifyDocument } from "../../src/vite/agent.types.ts";
-import {
-  isChangedStoriesDocument,
-  isCheckedCodeDocument,
-  isVisibilityDocument
-} from "../../src/vite/agentApi.ts";
+import { isChangedStoriesDocument, isCheckedCodeDocument } from "../../src/vite/agentApi.ts";
+import { isVisibilityDocument } from "../../src/vite/agentVisibility.ts";
 import { branchStart, changeBase, noBaseReason } from "../../src/vite/gitChange.ts";
 import type { Ask } from "./mcpToolParts.ts";
 import type { StoriesCheckInput } from "./storyCheckRun.ts";

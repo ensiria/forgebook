@@ -76,12 +76,12 @@ const isLeftOut = (key: string, left: ReadonlySet<string>): boolean => {
 };
 
 /**
- * A pattern without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them. A loop,
- * not a regular expression, whose backtracking a long run of slashes would make quadratic.
+ * A pattern or an address without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them.
+ * A loop, not a regular expression, whose backtracking a long run of slashes would make quadratic.
  *
- * @param pattern - the pattern.
+ * @param pattern - the pattern or the address.
  */
-const withoutTrailingSlashes = (pattern: string): string => {
+export const withoutTrailingSlashes = (pattern: string): string => {
   let end = pattern.length;
   while (end > 0 && pattern[end - 1] === "/") end -= 1;
   return pattern.slice(0, end);
@@ -150,4 +150,38 @@ export const unmatchedPatterns = (root: string, patterns: readonly string[]): re
   return patterns
     .filter((pattern) => !isNegated(pattern))
     .filter((pattern) => !listedFiles(root, [pattern, ...leftOut]).some(isFile));
+};
+
+/** Whether a configuration's list has something in it. */
+const isListed = (config: object, key: string): boolean => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list) && list.length > 0;
+};
+
+/**
+ * Why a configuration's list of globs lists nothing by construction (only `!` patterns), or none.
+ *
+ * @param config - what the file exports by default.
+ * @param key - the list's key.
+ */
+const globsProblem = (config: object, key: string): string | undefined => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list)
+    ? patternsProblem(list.filter((item: unknown): item is string => typeof item === "string"))
+    : undefined;
+};
+
+/**
+ * Why what a configuration lists to show cannot be used, or none.
+ *
+ * @param config - what the file exports by default.
+ */
+export const filesProblem = (config: object): string | undefined => {
+  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
+    return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
+  for (const key of ["stories", "docs"]) {
+    const problem = globsProblem(config, key);
+    if (problem !== undefined) return `its ${key} list nothing: ${problem}`;
+  }
+  return undefined;
 };

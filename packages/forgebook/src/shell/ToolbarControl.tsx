@@ -29,12 +29,18 @@ import {
 import { useCatalogue } from "./catalogueContext.ts";
 import { DeviceControl } from "./DeviceControl.tsx";
 import { Icon, type IconName } from "./icons.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { Segmented, type SegmentOption } from "./Segmented.tsx";
-import { SwitchGallery } from "./SwitchGallery.tsx";
+import type { SwitchGalleryProps } from "./SwitchGallery.tsx";
 import type { SwitchPreviews } from "./SwitchGalleryPanel.tsx";
 import { STRINGS } from "./strings.ts";
 import { switchValueIn, withSwitch } from "./switchView.ts";
 import { WidthField } from "./WidthField.tsx";
+
+/** A switch's gallery, loaded with the first catalogue's switch that has one: most catalogues have none. */
+const SWITCH_GALLERY = lazyModule<SwitchGalleryProps>(() =>
+  import("./SwitchGallery.tsx").then((module) => module.SwitchGallery)
+);
 
 /** Where a control is drawn: on the toolbar, or in a row of the View menu. */
 export type ControlForm = "bar" | "row";
@@ -188,14 +194,23 @@ const SwitchControl = ({
   const standard = each.values.find((option) => option.isMore !== true);
   if (switchControl(each) === "gallery") {
     return (
-      <SwitchGallery
-        each={each}
-        isOnBar={form === "bar"}
-        value={value}
-        onValueChange={choose}
-        isDisabled={isDisabled}
-        disabledNote={disabledNote}
-        loadPreviews={loadSwitchPreviews}
+      <LazyView
+        module={SWITCH_GALLERY}
+        props={{
+          each,
+          isOnBar: form === "bar",
+          value,
+          onValueChange: choose,
+          isDisabled,
+          disabledNote,
+          loadPreviews: loadSwitchPreviews
+        }}
+        loading={null}
+        failed={(message: string): ReactNode => (
+          <p className="forgebook-problems" role="alert">
+            {message}
+          </p>
+        )}
       />
     );
   }

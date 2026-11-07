@@ -10,8 +10,6 @@
  *
  * @module
  */
-import { isBuiltin } from "node:module";
-
 /** The extensions of a style sheet Vite compiles. */
 const STYLE_SHEET = /\.(?:css|scss|sass|less|styl|stylus|pcss|postcss)$/;
 
@@ -222,41 +220,4 @@ const recordAt = (value: unknown, name: string): Readonly<Record<string, unknown
   const field: unknown = Object.entries(value).find(([key]) => key === name)?.[1];
   if (typeof field !== "object" || field === null || Array.isArray(field)) return undefined;
   return Object.fromEntries(Object.entries(field));
-};
-
-/** A `vite.config`'s imports that are the framework's own plugin or Vite's: the catalogue brings those itself. */
-const OWN_VITE_IMPORTS = new Set([
-  "vite",
-  "vitest/config",
-  "@vitejs/plugin-react",
-  "@vitejs/plugin-react-swc",
-  "@vitejs/plugin-vue",
-  "@sveltejs/vite-plugin-svelte",
-  "vite-plugin-solid",
-  "@preact/preset-vite",
-  "@analogjs/vite-plugin-angular"
-]);
-
-/** What a `vite.config` holds that the catalogue does not read. */
-export type ViteConfigFacts = {
-  /** The packages it imports other than Vite's and the framework's own: its plugins, as far as text can tell. */
-  readonly plugins: readonly string[];
-  /** Whether it sets `resolve.alias`. */
-  readonly hasAlias: boolean;
-};
-
-/**
- * What a `vite.config` holds that the catalogue does not read.
- *
- * @param text - the file's text.
- */
-export const viteConfigFacts = (text: string): ViteConfigFacts => {
-  const live = liveLines(text);
-  return {
-    // by its `from`, so an import over several lines is read too
-    plugins: [...live.matchAll(/\bfrom\s*["']([^"'\n]+)["']/g)]
-      .map((match) => match[1] ?? "")
-      .filter((name) => !OWN_VITE_IMPORTS.has(name) && !name.startsWith(".") && !isBuiltin(name)),
-    hasAlias: /\balias\s*:/.test(live)
-  };
 };

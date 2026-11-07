@@ -100,7 +100,7 @@ const leadingSentence = (
  *
  * @param lists - the tag lists, outermost first.
  */
-const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readonly string[] => {
+export const combinedTags = (lists: readonly (readonly string[] | undefined)[]): readonly string[] => {
   const tags = new Set<string>();
   for (const tag of lists.flatMap((list) => list ?? [])) {
     if (tag.startsWith("!")) {

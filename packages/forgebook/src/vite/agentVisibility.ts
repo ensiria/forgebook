@@ -14,7 +14,7 @@
  * @module
  */
 import { shellWord } from "../shellWord.ts";
-import type { UnseenComponent, UnseenReason } from "./agent.types.ts";
+import type { UnseenComponent, UnseenReason, VisibilityDocument } from "./agent.types.ts";
 import type { PublishedFile } from "./publishedExports.ts";
 
 /** A catalogue's component as this reads it. */
@@ -212,3 +212,19 @@ export const unseenComponent = (
       : reasonsAbout(published, path, own);
   return reasons.length === 0 ? undefined : { file, component: name, reasons };
 };
+
+/** Whether a value is a plain object. */
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Whether a value is the answer on what agents cannot see, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isVisibilityDocument = (value: unknown): value is VisibilityDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["packages"]) &&
+  Array.isArray(value["unseen"]) &&
+  Array.isArray(value["skipped"]);

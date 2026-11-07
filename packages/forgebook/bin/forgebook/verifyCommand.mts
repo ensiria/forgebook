@@ -8,7 +8,7 @@ import { EXIT } from "@ensiria/cli-kit/constants";
 import { formatJson } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import { isVisibilityDocument } from "../../src/vite/agentApi.ts";
+import { isVisibilityDocument } from "../../src/vite/agentVisibility.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { verifyText, visibilityText } from "./agentText.ts";
 import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";

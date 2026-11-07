@@ -25,6 +25,7 @@ import {
   type StoryDeclaration,
   storyControlsOf
 } from "../storyControls.ts";
+import { passesTags } from "../storyTags.ts";
 import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
 import type { UsageIndex } from "../usedIn.ts";
 import { componentAddressOf, frameAddressOf, storyAddressOf } from "../viewState.ts";
@@ -46,8 +47,7 @@ import type {
   StoryDocument,
   StoryLinks,
   TokenDocument,
-  TokensDocument,
-  VisibilityDocument
+  TokensDocument
 } from "./agent.types.ts";
 
 /** Where the catalogue is served, for the links: its page and its frame page. */
@@ -238,6 +238,7 @@ const DROPPED_REASONS: Readonly<Record<DroppedArgReason, string>> = {
   undeclared: "the story declares no such arg, or does not let it be set",
   type: "it is not of the type its control takes (see `controls`)",
   unreadable: "it is not plain JSON",
+  markup: "this framework writes it into HTML, so only plain text can be set",
   control: "its custom control's schema refuses it, or could not be read"
 };
 
@@ -398,6 +399,11 @@ export type StoriesFilter = {
   readonly source?: string | undefined;
   /** Text a component's title holds, any case (`button`); every component when none. */
   readonly component?: string | undefined;
+  /**
+   * Tags, each `name` or `!name`, as the catalogue's address writes them: only the stories holding any `name` and no
+   * `!name`, and the components left with one; every story when none.
+   */
+  readonly tags?: readonly string[] | undefined;
 };
 
 /**
@@ -408,13 +414,23 @@ export type StoriesFilter = {
  */
 export const filteredStories = (document: StoriesDocument, filter: StoriesFilter): StoriesDocument => {
   const text = filter.component?.toLowerCase();
+  const tags = filter.tags ?? [];
   return {
     ...document,
-    components: document.components.filter(
-      (component) =>
-        (filter.source === undefined || component.source === filter.source) &&
-        (text === undefined || component.title.toLowerCase().includes(text))
-    )
+    components: document.components
+      .filter(
+        (component) =>
+          (filter.source === undefined || component.source === filter.source) &&
+          (text === undefined || component.title.toLowerCase().includes(text))
+      )
+      .flatMap((component) => {
+        if (tags.length === 0) return [component];
+        // an unlisted story is one the catalogue's lists leave out: a filter of those lists leaves it out too
+        const stories = component.stories.filter(
+          (story) => !story.isUnlisted && passesTags(story.tags, tags)
+        );
+        return stories.length === 0 ? [] : [{ ...component, stories }];
+      })
   };
 };
 
@@ -537,18 +553,6 @@ export const isChangedStoriesDocument = (value: unknown): value is ChangedStorie
   Array.isArray(value["files"]) &&
   Array.isArray(value["uiFiles"]) &&
   Array.isArray(value["outside"]);
-
-/**
- * Whether a value is the answer on what agents cannot see, as a client receives it over HTTP.
- *
- * @param value - the answer's body.
- */
-export const isVisibilityDocument = (value: unknown): value is VisibilityDocument =>
-  isRecord(value) &&
-  value["schema"] === 1 &&
-  Array.isArray(value["packages"]) &&
-  Array.isArray(value["unseen"]) &&
-  Array.isArray(value["skipped"]);
 
 /**
  * Whether a value is the code check's document, as a client receives it over HTTP.

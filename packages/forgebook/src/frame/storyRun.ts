@@ -15,6 +15,7 @@
 import { type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 
 import type { Matrix } from "../matrix.ts";
+import type { PlayStepCommand } from "../messages.ts";
 import { type PanelArgs, UNSET_ARG } from "../messages.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { actionNames, mappedArgs } from "../storyArgTypes.ts";
@@ -23,6 +24,7 @@ import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
 import { ERROR_MESSAGE_CLASS } from "./frameStatus.ts";
 import { matrixLayout } from "./matrixLayout.ts";
+import { type HeldStepper, heldStepper } from "./playStepper.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
 import type {
   ArgsChange,
@@ -50,6 +52,8 @@ export type StoryControls = {
   readonly setMatrix: (matrix: Matrix | undefined) => void;
   /** Mounts the story again, so its play function runs again. */
   readonly playAgain: () => void;
+  /** Runs the play again on a fresh mount, or steps through it: from the start, to its next action, or on to its end. */
+  readonly stepPlay: (command: PlayStepCommand) => void;
   /** Sets whether the story clock runs, and how fast. */
   readonly setClock: (state: ClockState) => void;
   /**
@@ -219,6 +223,10 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
   let shownError: HTMLElement | undefined;
   let mountCount = 0;
   let hasPlayed = false;
+  // what the next mount is stepped with, and what the shell's commands reach: each belongs to one mount, so a Replay, a
+  // file's edit or a play gone stale neither pauses unasked nor takes a command meant for the one running
+  let nextStepper: HeldStepper | undefined;
+  let stepper: HeldStepper | undefined;
   let prepared: PreparedStory = NOT_PREPARED;
   let preparing: Promise<void> = Promise.resolve();
 
@@ -352,6 +360,14 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
       mountStory();
     },
     playAgain: (): void => mountStory(),
+    stepPlay: (command: PlayStepCommand): void => {
+      if (command === "next") stepper?.next();
+      else if (command === "continue") stepper?.release();
+      else {
+        nextStepper = command === "start" ? heldStepper() : undefined;
+        mountStory();
+      }
+    },
     setClock: clock.setState,
     restartClock: (): void => {
       clock.restart();
@@ -376,6 +392,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
 
   const mountAlone = (): void => {
     const count = mountCount;
+    stepper = nextStepper;
+    nextStepper = undefined;
     const canvas = storyCanvas(document, story);
     container.append(canvas);
     const alone = renderer.mount(canvas, drawing({}), showError);
@@ -413,7 +431,8 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
           else void contentOf(alone, story).then(finish);
         },
         options.onTrace,
-        tools
+        tools,
+        stepper
       );
     });
   };

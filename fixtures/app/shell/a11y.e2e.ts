@@ -11,7 +11,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { catalogueUrl } from "./ports";
-import { type AxeException, animationsDone, scanShell, unexcused } from "./shellAxe";
+import { type AxeException, animationsDone, scanShell, scanShellNow, unexcused } from "./shellAxe";
 
 /** How long a page waits for what the docs worker or the search index answers on a cold dev server. */
 const SLOW_ANSWER = { timeout: 30_000 };
@@ -94,6 +94,30 @@ const popover =
 /** The states the shell can stand in. */
 const STATES: readonly ShellState[] = [
   { name: "home", open: pageWith("/", (page) => page.locator(".forgebook-home__families").last()) },
+  {
+    name: "play stepped through",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/?story=sb:storybook-play--with-context&tab=play");
+      await page.getByRole("button", { name: "Step through" }).click();
+      await page.getByRole("button", { name: "Continue" }).waitFor();
+    }
+  },
+  {
+    name: "list of keys",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/");
+      await page.locator("body").press("?");
+      await page.getByRole("dialog", { name: "Keyboard keys" }).waitFor();
+    }
+  },
+  {
+    name: "tag filter",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/?tag=beta&tag=%21wip");
+      await page.getByRole("button", { name: /^Filter by tag/ }).click();
+      await page.getByRole("dialog", { name: "Tags" }).getByRole("checkbox").first().waitFor();
+    }
+  },
   {
     name: "component page",
     open: pageWith("/?component=kit:inputs-selection-select", (page) =>
@@ -297,5 +321,15 @@ test.describe("axe over the shell", () => {
         expect(left.stale).toEqual([]);
       });
     }
+
+    test(`the note over a frame that is still loading, once it has faded in (${colorScheme})`, async ({
+      page
+    }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+      await page.route(/\/frame\.html\?/, () => undefined);
+      await page.goto(story("overview"));
+      await expect(page.locator(".forgebook-frame-loading")).toBeVisible(SLOW_ANSWER);
+      expect(await scanShellNow(page)).toEqual([]);
+    });
   }
 });

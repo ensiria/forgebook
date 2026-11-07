@@ -73,14 +73,34 @@ export const foldedText = (text: string): string =>
     .toLowerCase();
 
 /**
+ * The words of short texts read so far: names, story names and search words come back many times in a catalogue
+ * (`Primary`, `Default`), and reading each is most of what the first search does. Long texts are read once anyway.
+ */
+const WORDS = new Map<string, readonly string[]>();
+
+/** The longest text whose words are kept: a name or a title, not a page. */
+const MAX_KEPT_TEXT = 80;
+
+/** The most texts kept: past that the cache starts again, so a long session holds a bounded amount. */
+const MAX_KEPT_TEXTS = 20_000;
+
+/**
  * A text's words, lower case and without accents, a camel-case name split into its words.
  *
  * @param text - any text.
  */
-export const wordsOf = (text: string): string[] =>
-  foldedText(text.replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2"))
+export const wordsOf = (text: string): string[] => {
+  const known = WORDS.get(text);
+  if (known !== undefined) return [...known];
+  const words = foldedText(text.replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2"))
     .split(/[^\p{L}\p{N}]+/u)
     .filter((word) => word !== "");
+  if (text.length <= MAX_KEPT_TEXT) {
+    if (WORDS.size >= MAX_KEPT_TEXTS) WORDS.clear();
+    WORDS.set(text, words);
+  }
+  return [...words];
+};
 
 /** A word without its plural. */
 const singularOf = (word: string): string =>

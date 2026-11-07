@@ -36,7 +36,8 @@
   "dependencies": {
     "@analogjs/vite-plugin-angular": "2.9.5",
     "@forgebook/story-format": "workspace:*",
-    "typescript-6": "npm:typescript@6.0.3"
+    "typescript-6": "npm:typescript@6.0.3",
+    "vite": "^8.3.4"
   },
   "peerDependencies": {
     "@angular/build": "^20.0.0 || ^21.0.0 || ^22.0.0",
@@ -46,8 +47,7 @@
     "@angular/core": "^20.0.0 || ^21.0.0 || ^22.0.0",
     "@angular/platform-browser": "^20.0.0 || ^21.0.0 || ^22.0.0",
     "@angular/platform-server": "^20.0.0 || ^21.0.0 || ^22.0.0",
-    "forgebook": "workspace:^",
-    "vite": "^8.3.4"
+    "forgebook": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@angular/platform-server": {

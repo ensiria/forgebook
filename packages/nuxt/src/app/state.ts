@@ -121,6 +121,17 @@ export const updateAppConfig = (values: Readonly<Record<string, unknown>>): void
   Object.assign(useNuxtStore().appConfig, values);
 };
 
+/**
+ * Replaces the app config, as Nuxt's own helper does on a hot update of the config it wrote.
+ *
+ * @param values - the new config.
+ */
+export const _replaceAppConfig = (values: Readonly<Record<string, unknown>>): void => {
+  const config = useNuxtStore().appConfig;
+  for (const key of Object.keys(config)) Reflect.deleteProperty(config, key);
+  Object.assign(config, values);
+};
+
 /** The story's app: its payload, its config, its router, what plugins would have provided. */
 export const useNuxtApp = (): NuxtAppStandIn => useNuxtStore().nuxtApp;
 
