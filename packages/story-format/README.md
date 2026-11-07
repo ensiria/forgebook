@@ -36,4 +36,8 @@ An app's `forgebook.config.ts` then lists it: `sources: ["@acme/ui/stories"]`.
 | `@forgebook/story-format/clock` | The story clock a live story reads |
 | `@forgebook/story-format/testing-library` | `canvas` and `userEvent` in every `play`, once Testing Library is installed |
 
+A story file's code (`StoryFileCode`, what a file's `code` loader answers) holds, by export name, a story's `render` as
+written (`StoryCode`: `text`, `html`) or, for a story drawn from its args, the args its file writes as code
+(`StoryArgsCode`: `args`). Code that read `.text` of every entry narrows first: `"text" in entry`.
+
 More: [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).

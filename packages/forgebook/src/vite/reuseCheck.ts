@@ -11,29 +11,19 @@
  *
  * @module
  */
-import type { AddedLine, CodeProblem, ExcusedValue } from "./checkCode.ts";
+import type { AddedLine, CodeAdvice, CodeProblem, ExcusedValue } from "./checkCode.ts";
 import { type ScannedComponent, scannedComponents } from "./componentScan.ts";
 import { importsOfFile, type WrittenImport } from "./fileImports.ts";
 import { isBuiltOn, isRebuilt, isShareable, SAME_CODE, signsBetween, stemOf } from "./lookAlikes.ts";
 import type { ProjectFile, WorkspacePackage } from "./projectFiles.ts";
 import { plainWords } from "./sourceText.ts";
 
-/** Something to weigh, which fails nothing. */
-export type ReuseAdvice = {
-  /** The file, relative to the repository. */
-  readonly file: string;
-  /** The line in it. */
-  readonly line: number;
-  /** What to weigh, in a sentence. */
-  readonly message: string;
-};
-
 /** What the reuse check found. */
 export type ReuseFindings = {
   /** What fails. */
   readonly problems: readonly CodeProblem[];
   /** What to weigh. */
-  readonly advice: readonly ReuseAdvice[];
+  readonly advice: readonly CodeAdvice[];
   /** New components a comment says are meant. */
   readonly excused: readonly ExcusedValue[];
 };

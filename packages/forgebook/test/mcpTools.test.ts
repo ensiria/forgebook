@@ -22,6 +22,23 @@ const REACH: Parameters<typeof catalogueTools>[0] = {
   },
   writeNew: () => Promise.reject(new Error("not asked in these tests")),
   check: async () => "unused",
+  stress: async (id: string) =>
+    id === "kit:a--b"
+      ? {
+          schema: 1,
+          cases: [
+            { name: "plain", storyId: id, args: {}, frame: "f", problems: [] },
+            {
+              name: "narrow",
+              storyId: id,
+              args: {},
+              frame: "f",
+              problems: [{ kind: "spill", message: "spills" }]
+            }
+          ],
+          skipped: []
+        }
+      : "unused",
   checkPage: async () => "unused",
   servePreview: async () => "unused",
   shot: async () => "unused",
@@ -179,5 +196,14 @@ describe("check_story on a story its frame gave up on", () => {
 
   it("is no error when the checks ran and found nothing", async () => {
     expect((await checkTool(undefined).call({ id: "kit:a--b" })).isError).toBe(false);
+  });
+});
+
+describe("check_story with stress", () => {
+  it("answers the stress matrix, an error when a case breaks something", async () => {
+    const tool = catalogueTools(REACH).find((each) => each.name === "check_story");
+    const answer = await tool?.call({ id: "kit:a--b", stress: true });
+    expect(answer?.isError).toBe(true);
+    expect(answer?.structured).toMatchObject({ schema: 1, cases: [{ name: "plain" }, { name: "narrow" }] });
   });
 });

@@ -25,6 +25,7 @@ import { catalogueTools } from "./mcpTools.ts";
 import { newStoriesFile } from "./newStoriesFile.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoriesCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
+import { runStoryStress } from "./stressRun.ts";
 import { runOnBase } from "./verifyBase.ts";
 import { runVerify } from "./verifyRun.ts";
 import { baselinesOf, visualDiffTool } from "./visualCommands.mts";
@@ -103,6 +104,7 @@ export const mcpCommands = (
             writeNew: (file, exportName) =>
               newStoriesFile(resolve(config.dir, file), exportName, config.framework.name),
             check: (input) => runStoryCheck(config, options.url, input, semanticModelOf(options)),
+            stress: (id) => runStoryStress(config, options.url, id),
             shot: (input, outDir) => runStoryShot(config, options.url, input, outDir),
             verify: (input) =>
               runVerify(

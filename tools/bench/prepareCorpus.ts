@@ -36,9 +36,17 @@ const NO_SCRIPTS = {
   YARN_ENABLE_SCRIPTS: "false"
 };
 
-/** Fetches the commit alone, or finds it there, and puts the clone back on it. */
-const fetchClone = async (
-  { repository, commit }: RealCorpus,
+/**
+ * Fetches the commit alone, or finds it there, and puts the clone back on it: shallow, without large files, with no
+ * hook and no credentials asked.
+ *
+ * @param source - the repository and its pinned commit.
+ * @param clone - the clone's folder, made when missing.
+ * @param io - the script's streams.
+ * @param onActivity - told when the checkout starts.
+ */
+export const fetchClone = async (
+  { repository, commit }: Pick<RealCorpus, "repository" | "commit">,
   clone: string,
   io: ScriptIo,
   onActivity: (activity: RunActivity) => void

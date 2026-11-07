@@ -6,8 +6,9 @@
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
+import { normalizePath } from "vite";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -37,7 +38,10 @@ afterEach(() => {
   for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const BUILD = "/p/.nuxt";
+/** The project the paths are under, absolute on the running system (`D:/p` on Windows), in Vite's form. */
+const PROJECT = normalizePath(resolve("/p"));
+
+const BUILD = `${PROJECT}/.nuxt`;
 
 describe("a module's auto-imports", () => {
   const Text = [
@@ -53,12 +57,12 @@ describe("a module's auto-imports", () => {
       {
         name: "useToast",
         as: "useToast",
-        from: "/p/node_modules/@nuxt/ui/dist/runtime/composables/useToast"
+        from: `${PROJECT}/node_modules/@nuxt/ui/dist/runtime/composables/useToast`
       },
       {
         name: "defineShortcuts",
         as: "shortcuts",
-        from: "/p/node_modules/@nuxt/ui/dist/runtime/composables/useToast"
+        from: `${PROJECT}/node_modules/@nuxt/ui/dist/runtime/composables/useToast`
       },
       { name: "useThing", as: "useThing", from: "vue-demi" }
     ]);
@@ -96,8 +100,8 @@ describe("a module's components", () => {
       `export const NuxtLink: typeof import("../node_modules/nuxt/dist/app/components/nuxt-link")['default']`
     ].join("\n");
     expect(moduleComponents(text, BUILD)).toEqual([
-      { name: "UButton", file: "/p/node_modules/@nuxt/ui/dist/runtime/components/Button.vue" },
-      { name: "UCard", file: "/p/node_modules/@nuxt/ui/dist/runtime/components/Card.vue" }
+      { name: "UButton", file: `${PROJECT}/node_modules/@nuxt/ui/dist/runtime/components/Button.vue` },
+      { name: "UCard", file: `${PROJECT}/node_modules/@nuxt/ui/dist/runtime/components/Card.vue` }
     ]);
   });
 });
@@ -105,8 +109,8 @@ describe("a module's components", () => {
 describe("the build folder", () => {
   it("gives a file Nuxt wrote, its extension left out or not", () => {
     const dir = folderWith({ "app.config.mjs": "", "ui.css": "" });
-    expect(builtFile("#build/app.config", dir)).toBe(join(dir, "app.config.mjs"));
-    expect(builtFile("#build/ui.css", dir)).toBe(join(dir, "ui.css"));
+    expect(builtFile("#build/app.config", dir)).toBe(normalizePath(join(dir, "app.config.mjs")));
+    expect(builtFile("#build/ui.css", dir)).toBe(normalizePath(join(dir, "ui.css")));
     expect(builtFile("#build/gone.css", dir)).toBeUndefined();
     expect(builtFile("#app", dir)).toBeUndefined();
     expect(builtFile("#build/ui.css", undefined)).toBeUndefined();

@@ -1,0 +1,20 @@
+{
+  "say": "Scripted stand-in, arm without Forgebook: colours and sizes typed by hand, a rating by length only, turned on for both password fields.",
+  "edits": [
+    {
+      "file": "src/components/password-input.tsx",
+      "write": "import * as React from 'react'\nimport { Eye, EyeOff } from 'lucide-react'\nimport { cn } from '@/lib/utils'\nimport { Button } from './ui/button'\n\ntype PasswordInputProps = Omit<\n  React.InputHTMLAttributes<HTMLInputElement>,\n  'type'\n> & {\n  ref?: React.Ref<HTMLInputElement>\n  showStrength?: boolean\n}\n\nexport function PasswordInput({\n  className,\n  disabled,\n  ref,\n  showStrength,\n  ...props\n}: PasswordInputProps) {\n  const [showPassword, setShowPassword] = React.useState(false)\n  const value = String(props.value ?? '')\n  let label = 'Weak'\n  let color = '#ef4444'\n  if (value.length >= 12) {\n    label = 'Strong'\n    color = '#22c55e'\n  } else if (value.length >= 8) {\n    label = 'Fair'\n    color = '#f59e0b'\n  }\n\n  return (\n    <div className={cn('relative rounded-md', className)}>\n      <input\n        type={showPassword ? 'text' : 'password'}\n        className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50'\n        ref={ref}\n        disabled={disabled}\n        {...props}\n      />\n      <Button\n        type='button'\n        size='icon'\n        variant='ghost'\n        disabled={disabled}\n        className='absolute inset-e-1 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md text-muted-foreground'\n        onClick={() => setShowPassword((prev) => !prev)}\n      >\n        {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}\n        <span className='sr-only'>\n          {showPassword ? 'Hide password' : 'Show password'}\n        </span>\n      </Button>\n      {showStrength && value !== '' ? (\n        <div style={{ marginTop: 6, height: 4, width: 220, background: color }}>\n          <span style={{ fontSize: 11, color }}>{label}</span>\n        </div>\n      ) : null}\n    </div>\n  )\n}\n"
+    },
+    {
+      "file": "src/features/auth/sign-up/components/sign-up-form.tsx",
+      "find": "              <FormLabel>Password</FormLabel>\n              <FormControl>\n                <PasswordInput placeholder='********' {...field} />",
+      "replace": "              <FormLabel>Password</FormLabel>\n              <FormControl>\n                <PasswordInput placeholder='********' showStrength {...field} />"
+    },
+    {
+      "file": "src/features/auth/sign-up/components/sign-up-form.tsx",
+      "find": "              <FormLabel>Confirm Password</FormLabel>\n              <FormControl>\n                <PasswordInput placeholder='********' {...field} />",
+      "replace": "              <FormLabel>Confirm Password</FormLabel>\n              <FormControl>\n                <PasswordInput placeholder='********' showStrength {...field} />"
+    }
+  ],
+  "result": "done"
+}

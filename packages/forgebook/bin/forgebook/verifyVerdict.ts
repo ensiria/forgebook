@@ -225,6 +225,7 @@ const outcomeWords = (
     variants,
     ran,
     notVerified: unseen,
+    outdated,
     unseen: cannotBeSeen
   }: Omit<VerifyDocument, "summary" | "schema">,
   catalogueProblems: readonly string[]
@@ -242,6 +243,7 @@ const outcomeWords = (
       ? [`${counted(cannotBeSeen.length, "published component")} agents cannot see`]
       : []),
     ...(problems > 0 ? [counted(problems, "problem")] : []),
+    ...(outdated === undefined ? [] : [`${counted(outdated.length, "story file")} written for other props`]),
     ...(verdict === "verified" || verdict === "partly-verified"
       ? [`verified ${where} (${counted(ran, "check")})`]
       : [])
@@ -278,6 +280,35 @@ const summaryOf = (
 };
 
 /**
+ * The pairs that found a problem, each with the links that open its story.
+ *
+ * @param results - the pairs that ran.
+ * @param links - the links of the change's stories, by id.
+ */
+const failuresOf = (
+  results: readonly StoryCheckResult[],
+  links: ReadonlyMap<string, VerifyFailure["links"]>
+): VerifyFailure[] =>
+  results
+    .filter((result) => result.problems.length > 0)
+    .map(({ storyId, view, problems: found }): VerifyFailure => {
+      const storyLinks = links.get(storyId);
+      return { storyId, view, problems: found, ...(storyLinks === undefined ? {} : { links: storyLinks }) };
+    });
+
+/** What the comparison with the base leaves unchecked: a base that could not run, stories it never saw. */
+const baseSkips = (compared: ReturnType<typeof comparedWithBase>): string[] => [
+  ...(compared.notCompared === undefined
+    ? []
+    : [`${compared.notCompared}; every problem the stories have is counted`]),
+  ...(compared.unseen === 0
+    ? []
+    : [
+        `${counted(compared.unseen, "story")} not seen on the base in its final state: every problem of it counted`
+      ])
+];
+
+/**
  * The answer to whether a change is verified.
  *
  * @param input - what was found.
@@ -293,12 +324,7 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const ran = new Set(seenResults.map((result) => result.storyId));
   const uiFiles = changed.uiFiles.map((file) => verifiedFile(file, ran, notRun));
   const links = new Map(changed.stories.map((story) => [story.id, story.links]));
-  const failures = results
-    .filter((result) => result.problems.length > 0)
-    .map(({ storyId, view, problems: found }): VerifyFailure => {
-      const storyLinks = links.get(storyId);
-      return { storyId, view, problems: found, ...(storyLinks === undefined ? {} : { links: storyLinks }) };
-    });
+  const failures = failuresOf(results, links);
   const notVerified = results.flatMap(({ storyId, view, notVerified: reason }): VerifyNotVerified[] => {
     if (reason === undefined) return [];
     const storyLinks = links.get(storyId);
@@ -311,19 +337,14 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const codeProblems = code.problems.filter((problem) => seen.has(problem.file));
   const outside = new Set(changed.outside);
   const notes = code.problems.filter((problem) => !seen.has(problem.file) && !outside.has(problem.file));
-  const problems = failures.reduce((sum, each) => sum + each.problems.length, codeProblems.length);
+  // stories written for props the component no longer has pass a check they no longer mean: each is a problem
+  const outdated = changed.outdated ?? [];
+  const problems = failures.reduce(
+    (sum, each) => sum + each.problems.length,
+    codeProblems.length + outdated.length
+  );
   const existingProblems = compared.existing.reduce((sum, each) => sum + each.problems.length, 0);
-  const skipped = [
-    ...skippedOf(input, notRun),
-    ...(compared.notCompared === undefined
-      ? []
-      : [`${compared.notCompared}; every problem the stories have is counted`]),
-    ...(compared.unseen === 0
-      ? []
-      : [
-          `${counted(compared.unseen, "story")} not seen on the base in its final state: every problem of it counted`
-        ])
-  ];
+  const skipped = [...skippedOf(input, notRun), ...baseSkips(compared)];
   // a story file that cannot be read may be the change, whatever else changed
   const catalogueProblems = [
     ...(input.configProblems ?? []),
@@ -361,23 +382,11 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
       ...(code.excused === undefined ? {} : { excused: code.excused }),
       ...(code.advice === undefined ? {} : { advice: code.advice })
     },
+    ...(outdated.length === 0 ? {} : { outdated }),
     problems,
-    ...(!compared.isCompared
-      ? {}
-      : {
-          existing: {
-            problems: existingProblems,
-            failures: compared.existing.map(({ storyId, view, problems: found }): VerifyFailure => {
-              const storyLinks = links.get(storyId);
-              return {
-                storyId,
-                view,
-                problems: found,
-                ...(storyLinks === undefined ? {} : { links: storyLinks })
-              };
-            })
-          }
-        }),
+    ...(compared.isCompared
+      ? { existing: { problems: existingProblems, failures: failuresOf(compared.existing, links) } }
+      : {}),
     unseen
   };
   // problems the base had too are not a check left undone: said in the line, never in skipped

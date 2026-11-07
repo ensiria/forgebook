@@ -27,14 +27,14 @@ export const RENEWED_MODULE_EVENT = "forgebook:module-renewed";
 export const PREVIEWS_EVENT = "forgebook:previews";
 
 /**
- * The event an edit of a story file sends when it changes whether the file can be read: from the dev server to the
- * group's module, which hands it on to the page in a `CustomEvent` whose detail is `StoryFileRead`, for the shell to
- * name the file at once. The file stays in the list a page read: its frame keeps what it drew, and its fix draws in
+ * The event an edit of a story file sends when it changes whether the file can be read, and an edit of any other of the
+ * project's scripts when it changes whether it parses: from the dev server to the group's module, which hands it on to
+ * the page in a `CustomEvent` whose detail is `StoryFileRead`, for the shell to name the file at once. The file stays in the list a page read: its frame keeps what it drew, and its fix draws in
  * place.
  */
 export const STORY_FILE_READ_EVENT = "forgebook:story-file-read";
 
-/** Whether an edited story file can be read now. */
+/** Whether an edited story file can be read now, or another script parses. */
 export type StoryFileRead = {
   /** The file, absolute in Vite's form. */
   readonly file: string;
