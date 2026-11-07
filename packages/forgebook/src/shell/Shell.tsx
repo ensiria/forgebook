@@ -379,21 +379,32 @@ type Shown =
   | { readonly kind: "missing"; readonly message: string };
 
 /**
- * What a composed catalogue's address shows. A `ref` that names no composed catalogue is another site's mark
- * (`?ref=newsletter`): the story is this catalogue's.
+ * What the address's page shows in a catalogue that composes others: a composed catalogue's story, or what `shownPage`
+ * said. A `ref` that names no composed catalogue is another site's mark (`?ref=newsletter`): the story is this
+ * catalogue's.
+ *
+ * @param tree - the tree.
+ * @param page - the address's page.
+ * @param refs - the composed catalogues, if any.
+ * @param shown - what `shownPage` said of it.
  */
 const shownRef = (
   tree: ReturnType<typeof storyTree>,
-  page: Extract<Page, { kind: "ref" }>,
-  refs: ShellRefs | undefined
-): Shown =>
-  refs?.catalogues.some((each) => each.id === page.ref)
+  page: Page,
+  refs: ShellRefs | undefined,
+  shown: Shown
+): Shown => {
+  if (page.kind !== "ref") return shown;
+  return refs?.catalogues.some((each) => each.id === page.ref)
     ? { kind: "ref", place: { refId: page.ref, storyId: page.id } }
-    : shownPage(tree, { kind: "story", id: page.id }, refs);
+    : shownPage(tree, { kind: "story", id: page.id });
+};
 
-/** What the address's page shows: a story or a component that is not there (renamed, removed) says so, never another. */
-const shownPage = (tree: ReturnType<typeof storyTree>, page: Page, refs: ShellRefs | undefined): Shown => {
-  if (HAS_REFS && page.kind === "ref") return shownRef(tree, page, refs);
+/**
+ * What the address's page shows: a story or a component that is not there (renamed, removed) says so, never another. A
+ * composed catalogue's story is `shownRef`'s.
+ */
+const shownPage = (tree: ReturnType<typeof storyTree>, page: Page): Shown => {
   if (page.kind === "story") {
     const location = findStory(tree, page.id);
     return location === undefined
@@ -457,7 +468,7 @@ const refsModuleOf = (refs: ShellRefs): LazyModule<RefPartProps> => {
 /** What the composed catalogues add to the shown page: their sidebar sections, and a story's page. */
 type RefSlots = {
   /** Their sidebar sections. */
-  readonly sidebar: ReactNode;
+  readonly sidebar: Pick<SidebarProps, "composed">;
   /** A composed catalogue's story, when one is shown. */
   readonly page: ReactNode;
 };
@@ -477,11 +488,13 @@ const refSlotsOf = (
   links: Pick<SidebarRefsProps, "refStoryHref" | "onOpenRefStory">,
   switches: Readonly<Record<string, string>>
 ): RefSlots => {
-  if (refs === undefined) return { sidebar: null, page: null };
+  if (refs === undefined) return { sidebar: {}, page: null };
   const page: RefPartProps | undefined =
     current === undefined ? undefined : { place: "page", refs: refs.catalogues, ...current, switches };
   return {
-    sidebar: <RefSlot refs={refs} part={{ place: "sidebar", refs: refs.catalogues, current, ...links }} />,
+    sidebar: {
+      composed: <RefSlot refs={refs} part={{ place: "sidebar", refs: refs.catalogues, current, ...links }} />
+    },
     page: <RefSlot refs={refs} part={page} />
   };
 };
@@ -981,10 +994,11 @@ const ShellPage = ({
 
   const { help, showHelp } = useShortcutHelp();
 
-  const shown = shownPage(tree, address.page, refs);
+  let shown = shownPage(tree, address.page);
   // what composition adds to the page; the build removes this whole block from a catalogue that composes none
   let refSlots: RefSlots | undefined;
-  if (HAS_REFS)
+  if (HAS_REFS) {
+    shown = shownRef(tree, address.page, refs, shown);
     refSlots = refSlotsOf(
       refs,
       refPlaceOf(shown),
@@ -995,6 +1009,7 @@ const ShellPage = ({
       },
       address.view.switches
     );
+  }
   const location = componentLocationOf(shown);
   const ownPage = recentPageOf(shown);
   const recent = useRecentPages(ownPage);
@@ -1121,7 +1136,7 @@ const ShellPage = ({
         currentPageId={shownPageLocation?.page.id}
         pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), catalogue)}
         onOpenPage={(id: string): void => openPage({ kind: "page", id })}
-        composed={refSlots?.sidebar}
+        {...refSlots?.sidebar}
         componentHref={(sourceId: string, componentTitle: string): string =>
           addressQuery(pageAddress(titledPage(idsByTitle, sourceId, componentTitle)), catalogue)
         }
