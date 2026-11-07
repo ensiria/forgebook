@@ -25,3 +25,6 @@ export const FRAME_STARTED_ATTRIBUTE = "data-forgebook-started";
 
 /** The class of the text saying why a frame's story could not be drawn: what a check reports as the reason. */
 export const ERROR_MESSAGE_CLASS = "forgebook-frame-error__message";
+
+/** The class of a thrown error's stack under its message: the dev server's answer rewrites it in the lines as written. */
+export const ERROR_STACK_CLASS = "forgebook-frame-error__stack";

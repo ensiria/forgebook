@@ -41,6 +41,15 @@ describe("FORCED_STATES_VISITOR", () => {
     );
   });
 
+  it("leaves the catalogue's own interface alone, which no story forces and nothing touches", () => {
+    expect(rewrite(".forgebook-tree__item:hover,.forgebook-select:focus-visible{color:red}")).toBe(
+      ".forgebook-tree__item:hover,.forgebook-select:focus-visible{color:red}"
+    );
+    expect(rewrite(".forgebook-tree .a:hover,.b:hover{color:red}")).toBe(
+      `.forgebook-tree .a:hover,.b${HOVER}{color:red}`
+    );
+  });
+
   it("leaves other selectors alone", () => {
     expect(rewrite(".a:first-child .b[data-state=open]{color:red}")).toBe(
       ".a:first-child .b[data-state=open]{color:red}"
