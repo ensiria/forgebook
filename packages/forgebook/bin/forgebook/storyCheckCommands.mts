@@ -12,7 +12,8 @@ import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { checkText } from "./agentText.ts";
 import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
-import { runStoryCheck, runStoryStress } from "./storyCheckRun.ts";
+import { runStoryCheck } from "./storyCheckRun.ts";
+import { runStoryStress } from "./stressRun.ts";
 import { isStressFailure, stressText } from "./stressText.ts";
 
 /** What a stress run's printing reads. */

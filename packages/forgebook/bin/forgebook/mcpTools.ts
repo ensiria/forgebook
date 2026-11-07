@@ -229,7 +229,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, its code as the Code tab shows it (code: the render or the args as written), the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions; onlyWhen for a variant's prop, notes when a type is generic or unread, propsNote when none are listed), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -331,7 +331,7 @@ export const catalogueTools = ({
   {
     name: "recent_errors",
     description:
-      "What the catalogue's open frames reported while you edited: stories that could not be shown and plays that failed, numbered, with the story index's problems. Give since (the last answer's last) to get only the new ones. Only frames open in a browser report; check_story checks a story without one.",
+      "What the catalogue's open frames reported while you edited: stories that could not be shown (with place, the file:line:column as written) and plays that failed, numbered, with the story index's problems. Give since (the last answer's last) to get only the new ones. Only frames open in a browser report; check_story checks a story without one.",
     inputSchema: {
       type: "object",
       properties: {

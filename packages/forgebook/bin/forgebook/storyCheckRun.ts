@@ -20,27 +20,23 @@ import {
   isStoryCheckReport,
   isStoryDiffReport,
   isStoryShotReport,
-  isStressReport,
   type SemanticModel,
   type StoryCheckReport,
   type StoryCheckRequest,
   type StoryCheckStory,
   type StoryDiffReport,
   type StoryDiffRequest,
-  type StoryShotReport,
-  type StressReport,
-  type StressRequest
+  type StoryShotReport
 } from "../../src/storyCheck.ts";
 import { formerComponentId } from "../../src/storyTree.ts";
 import { catalogueSwitches, type ViewSwitch } from "../../src/switches.ts";
 import { viewQuery } from "../../src/viewWords.ts";
 import type { AgentComponent, AgentStory, StoriesDocument } from "../../src/vite/agent.types.ts";
-import { isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
+import { isStoriesDocument } from "../../src/vite/agentApi.ts";
 import { formerIdOf, namedComponent, namedStory } from "../../src/vite/agentIds.ts";
 import { AGENT_API } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { servedCatalogue } from "./agentClient.ts";
-import { stressPlan } from "./stressCases.ts";
 
 /** What the project installs to run the stories in a browser, and how. */
 const INSTALL =
@@ -170,7 +166,7 @@ export const testingFunction = async (
  *
  * @param origin - where it is served.
  */
-const storiesAt = async (origin: string): Promise<StoriesDocument | string> => {
+export const storiesAt = async (origin: string): Promise<StoriesDocument | string> => {
   const response = await fetch(`${origin}${AGENT_API}stories`);
   const body: unknown = await response.json();
   return isStoriesDocument(body) ? body : `The catalogue answered ${response.status} for its stories`;
@@ -193,6 +189,8 @@ const runOnStories = async (
     readonly specifier: string;
     readonly name: string;
     readonly extra: (document: StoriesDocument) => Readonly<Record<string, unknown>>;
+    /** The server to use and no other: a comparison must not draw one side from a server of its own. */
+    readonly exactOrigin?: string;
   }
 ): Promise<unknown> => {
   const call = await testingFunction(config.dir, run.specifier, run.name);
@@ -200,7 +198,10 @@ const runOnStories = async (
   const switches = catalogueSwitches(config.switches, config.languages, config.lists.controls);
   const views = queriesOf(input.views ?? [], switches);
   if (typeof views === "string") return views;
-  const served = await servedCatalogue(config, url);
+  const served =
+    run.exactOrigin === undefined
+      ? await servedCatalogue(config, url)
+      : { origin: run.exactOrigin, close: async (): Promise<void> => undefined };
   try {
     const document = await storiesAt(served.origin);
     if (typeof document === "string") return document;
@@ -341,52 +342,54 @@ export const runStoryDiff = async (
 };
 
 /**
- * Runs the stress matrix on the stories an id names: each drawn plain, then with worst-case values and views it never
- * declared, and what each case breaks that the plain story does not.
+ * Takes several stories' pictures from one server and no other: what `proof` asks of each side.
+ *
+ * @param config - the catalogue's configuration, whose testing package and switches both sides are drawn with.
+ * @param origin - the server.
+ * @param input - the stories, and whether to picture every variant.
+ * @param outDir - the folder the pictures go in, absolute.
+ * @returns the pictures, or why they could not be taken.
+ */
+export const runStoriesShot = async (
+  config: ResolvedConfig,
+  origin: string,
+  input: StoriesCheckInput,
+  outDir: string
+): Promise<StoryShotReport | string> => {
+  const answer = await runOnStories(config, origin, input, {
+    specifier: "@forgebook/testing/shot",
+    name: "shotStories",
+    exactOrigin: origin,
+    extra: () => ({ outDir })
+  });
+  if (typeof answer === "string" || isStoryShotReport(answer)) return answer;
+  return "@forgebook/testing/shot answered something that is not a picture run's report";
+};
+
+/**
+ * Compares several stories' pictures with a folder of pictures, from one server and no other: what `proof` asks of the
+ * change.
  *
  * @param config - the catalogue's configuration.
- * @param url - where `forgebook dev` runs, when not at Vite's default address.
- * @param id - a story's id, or a component's for its listed stories.
- * @returns the report, or why it could not run.
+ * @param origin - the server.
+ * @param input - the stories, and whether to compare every variant.
+ * @param folders - the pictures to compare with and the folder the new ones go in, absolute.
+ * @returns the results, or why they could not be had.
  */
-export const runStoryStress = async (
+export const runStoriesDiff = async (
   config: ResolvedConfig,
-  url: string | undefined,
-  id: string
-): Promise<StressReport | string> => {
-  const call = await testingFunction(config.dir, "@forgebook/testing/stress", "stressStories");
-  if (typeof call === "string") return call;
-  const switches = catalogueSwitches(config.switches, config.languages, config.lists.controls);
-  const served = await servedCatalogue(config, url);
-  try {
-    const document = await storiesAt(served.origin);
-    if (typeof document === "string") return document;
-    const stories = storiesNamed(document, id, deviceDefaultOf(NO_DEVICE, config.lists.device));
-    if (stories.length === 0) return `No story or component "${id}"`;
-    const planned = await Promise.all(
-      stories.map(async (story) => {
-        const response = await fetch(`${served.origin}${AGENT_API}story?id=${encodeURIComponent(story.id)}`);
-        const body: unknown = await response.json();
-        return isStoryDocument(body) ? { story, plan: stressPlan(body.controls, switches) } : story.id;
-      })
-    );
-    const unread = planned.filter((each) => typeof each === "string");
-    if (unread.length > 0) return `The catalogue could not say what these stories take: ${unread.join(", ")}`;
-    const plans = planned.filter((each) => typeof each !== "string");
-    const request: StressRequest = {
-      frameUrl: `${served.origin}/frame.html`,
-      stories: plans.map(({ story, plan }) => ({ story, cases: plan.cases })),
-      switches,
-      lists: config.lists
-    };
-    const answer = await call(request);
-    if (!isStressReport(answer))
-      return "@forgebook/testing/stress answered something that is not a stress report";
-    const skipped = plans.flatMap(({ story, plan }) => plan.skipped.map((each) => `${story.id}: ${each}`));
-    return { ...answer, skipped };
-  } finally {
-    await served.close();
-  }
+  origin: string,
+  input: StoriesCheckInput,
+  folders: { readonly baselines: string; readonly outDir: string }
+): Promise<StoryDiffReport | string> => {
+  const answer = await runOnStories(config, origin, input, {
+    specifier: "@forgebook/testing/diff",
+    name: "diffStories",
+    exactOrigin: origin,
+    extra: () => folders
+  });
+  if (typeof answer === "string" || isStoryDiffReport(answer)) return answer;
+  return "@forgebook/testing/diff answered something that is not a comparison's report";
 };
 
 /**
