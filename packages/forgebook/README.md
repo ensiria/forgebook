@@ -1318,9 +1318,10 @@ the configuration:
 export default defineConfig({ /* … */ build: { readableNames: true } });
 ```
 
-A component's docs, a story file's code and a component's page are data, not scripts: a build writes each as a gzipped
-`.bin` file, which the page unpacks when it shows it, or in the story index itself when it is shorter than that file
-(a story file whose stories are all args has no code).
+A component's docs, a story file's code and a component's page are data, not scripts: a build writes them gzipped in
+`.bin` files, neighbouring texts together up to 64 KB of JSON each so they compress as one, which the page unpacks when
+it shows one; a text no longer than its loader goes in the story index itself (a story file whose stories are all args
+has no code).
 
 ## Mocking an API
 

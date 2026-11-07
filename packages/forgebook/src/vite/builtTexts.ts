@@ -10,6 +10,11 @@
  * whose stories are all args has no code, most components have no page) is written in the module itself. Either way
  * the loader answers the text, as the query's module's default did.
  *
+ * The packed texts of a group go in shared files, in the rows' order, up to `PACK_LIMIT` of JSON each, rather than a
+ * file each: gzip reads each file alone, and the docs of neighbouring components repeat their keys, their types and
+ * their wording, which a file of one text cannot share. On a library of small components a file each weighs ten times
+ * what the same texts weigh together, and a page that asks for one text fetches a few kilobytes more.
+ *
  * The texts are a module of their own (`TEXTS_PREFIX`), imported by the group's module alone, so the bundler keeps
  * them in its chunk. Reading them waits for every component's docs, seconds on a large library: written in the group's
  * module, they would hold back the stories it imports, and everything those import, until the last docs were read. As
@@ -50,40 +55,74 @@ export type FileTexts = readonly [docs: unknown, code: KeptCode, page: Component
 /** The function that makes a packed file's loader, in the generated code. */
 const PACKED = "packedText";
 
+/** The function that makes the loader of one text of a packed file, in the generated code. */
+const PART = "packedPart";
+
+/** The loaders of the packed files, in the generated code, numbered. */
+const PACKED_FILE = "packedTexts";
+
 /** The function that makes the loader of a text written in the module, in the generated code. */
 const WRITTEN = "writtenText";
 
 /**
- * Writes texts as loaders: each in a gzipped file, or in the module when that weighs no more than the file and its
- * address (an empty page's JSON is shorter than its gzip header and the fetch it would cost). A text written in the
- * module is written once, however many files share it (most story files have no code and no page), and its loader
- * shared with them.
- *
- * @param emit - writes a packed file.
+ * The JSON a packed file holds at most, in characters, unless one text alone is longer: enough for the docs of a few
+ * components to share their words, little enough that a page asking for one text fetches a few kilobytes.
  */
-const textWriter = (
-  emit: EmitAsset
-): { readonly loaderOf: (value: unknown) => string; readonly written: () => readonly string[] } => {
-  const names = new Map<string, string>();
-  const written = (json: string): string => {
-    const name = names.get(json) ?? `${WRITTEN}${names.size}`;
-    names.set(json, name);
-    return name;
+export const PACK_LIMIT = 64 * 1024;
+
+/** The texts that go in one packed file, in their order, and the JSON they add up to. */
+type Pack = { readonly texts: string[]; length: number };
+
+/**
+ * Writes texts as loaders: each in a packed file shared with its neighbours, or in the module when it weighs no more
+ * than its loader there (an empty page, a story file with no code). A text is written once, however many files share
+ * it, and its loader shared with them.
+ */
+const textWriter = (): {
+  readonly loaderOf: (value: unknown) => string;
+  readonly code: (emit: EmitAsset) => readonly string[];
+} => {
+  const written = new Map<string, string>();
+  const packed = new Map<string, string>();
+  const packs: Pack[] = [];
+  const pack = (json: string): string => {
+    const known = packed.get(json);
+    if (known !== undefined) return known;
+    let last = packs.at(-1);
+    if (last === undefined || (last.texts.length > 0 && last.length + json.length > PACK_LIMIT)) {
+      last = { texts: [], length: 0 };
+      packs.push(last);
+    }
+    const loader = `${PART}(${PACKED_FILE}${packs.length - 1},${last.texts.length})`;
+    last.texts.push(json);
+    last.length += json.length;
+    packed.set(json, loader);
+    return loader;
   };
   return {
     loaderOf: (value: unknown): string => {
       const json = JSON.stringify(value);
-      const fileName = packedFileName(json);
-      const address = codeLiteral(fileName);
-      const packed = gzippedJson(json);
-      if (json.length <= address.length + packed.length) return written(json);
-      emit({ type: "asset", fileName, source: packed });
-      return `${PACKED}(${address})`;
+      if (written.has(json) || json.length <= `${PART}(${PACKED_FILE}${packs.length},0)`.length) {
+        const name = written.get(json) ?? `${WRITTEN}${written.size}`;
+        written.set(json, name);
+        return name;
+      }
+      return pack(json);
     },
-    written: (): readonly string[] =>
-      [...names].map(([json, name]) => `const ${name} = () => Promise.resolve(${codeOfJson(json)});`)
+    code: (emit: EmitAsset): readonly string[] => [
+      ...[...written].map(([json, name]) => `const ${name} = () => Promise.resolve(${codeOfJson(json)});`),
+      ...packs.map((each, at) => {
+        const json = `[${each.texts.join(",")}]`;
+        const fileName = packedFileName(json);
+        emit({ type: "asset", fileName, source: gzippedJson(json) });
+        return `const ${PACKED_FILE}${at} = ${PACKED}(${codeLiteral(fileName)});`;
+      })
+    ]
   };
 };
+
+/** The code of the function that makes the loader of one text of a packed file: it answers the same value each time. */
+const PART_MAKER = `const ${PART} = (load, at) => () => load().then((texts) => texts[at]);`;
 
 /**
  * Every file's texts, read: a build reads them all once, as it would for their modules.
@@ -106,12 +145,17 @@ const readTexts = (files: readonly IndexedStoryFile[], read: TextReaders): Promi
  */
 export const textsModuleCode = (texts: readonly FileTexts[], emit: EmitAsset): string => {
   // written in the files' order once all are read, so the names in the module do not depend on which read ended first
-  const writer = textWriter(emit);
+  const writer = textWriter();
   // a text not read (the docs of a catalogue that reads none) has no loader, and its place stays in the row
   const rows = texts.map(
     (each) => `[${each.map((text) => (text === undefined ? "null" : writer.loaderOf(text))).join(", ")}]`
   );
-  return [packedLoaderMaker(PACKED), ...writer.written(), `export default [${rows.join(",\n")}];`].join("\n");
+  return [
+    packedLoaderMaker(PACKED),
+    PART_MAKER,
+    ...writer.code(emit),
+    `export default [${rows.join(",\n")}];`
+  ].join("\n");
 };
 
 /** What the plugin gives a build's texts: the docs as the panel reads them, and what reading a page needs. */
