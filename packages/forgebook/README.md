@@ -594,8 +594,8 @@ export type FinderProps = {
 
 - The API reference lists the props that name no group first, then each group under its name, in the order the
   groups first appear among the props; the events keep their own heading after them. The Props tab does the same: the
-  props that name no group by control, as before, then each group with its controls, its toggles and the props it
-  cannot set.
+  props that name no group in the order the source declares them, whatever their control, then each group with its
+  controls in that order and the props it cannot set.
 - Every group starts open; a reader folds one away from its name.
 - To show some groups first, name them in order: `propGroups: ["Selection", "Paging"]` in the configuration for every
   component, or `parameters: { propGroups: ["Texts"] }` in a component's meta, written as a list of plain strings.
