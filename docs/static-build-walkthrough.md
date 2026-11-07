@@ -39,5 +39,5 @@ screenshot was read. The build took 3.2 s and weighs 1.4 MB.
 
 ## Numbers
 
-- First-load JavaScript referenced by `index.html`, gzipped: 122 049 B before, 122 126 B after the fixes (+77 B).
+- First-load JavaScript referenced by `index.html`, gzipped: 122 049 B before, 122 092 B after the fixes (+43 B).
 - Screenshots: 33 across three passes (home, docs, component, story, search; light and dark at 1440 px, light at 360 px).
