@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     # runs nothing of the branch; a fork's token stays read-only whatever this asks
     permissions:
-      pull-requests: write
+      pull-requests: read
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true
