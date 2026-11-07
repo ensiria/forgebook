@@ -22,7 +22,7 @@ import { actionNames, mappedArgs } from "../storyArgTypes.ts";
 import type { ClockState } from "../storyClock.ts";
 import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
-import { ERROR_MESSAGE_CLASS } from "./frameStatus.ts";
+import { ERROR_MESSAGE_CLASS, ERROR_STACK_CLASS } from "./frameStatus.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type HeldStepper, heldStepper } from "./playStepper.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
@@ -101,8 +101,10 @@ export type StoryRunOptions = {
    * makes, so the panel shows them.
    */
   readonly onArgsChange: (args: PanelArgs) => void;
-  /** Called with the message when the story throws while it is drawn; the frame shows the error instead. */
-  readonly onError: (message: string) => void;
+  /**
+   * Called with the message and the stack when the story throws while it is drawn; the frame shows the error instead.
+   */
+  readonly onError: (message: string, stack: string | undefined) => void;
   /** Called with the play function's trace after every change. */
   readonly onTrace: (trace: PlayTrace) => void;
 };
@@ -123,7 +125,7 @@ const errorElement = (document: Document, error: Error): HTMLElement => {
   box.append(message);
   if (error.stack !== undefined) {
     const stack = document.createElement("pre");
-    stack.className = "forgebook-frame-error__stack";
+    stack.className = ERROR_STACK_CLASS;
     stack.textContent = error.stack;
     box.append(stack);
   }
@@ -317,7 +319,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     for (const child of container.children) if (child instanceof HTMLElement) child.hidden = true;
     shownError = errorElement(document, error);
     container.append(shownError);
-    options.onError(error.message);
+    options.onError(error.message, error.stack);
   };
   const unmountAll = (): void => {
     for (const { story: each } of mounted) each.unmount();

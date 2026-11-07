@@ -139,7 +139,11 @@ export const errorsText = (document: ErrorsDocument, style: OutputStyle): string
   document.errors.length === 0
     ? ""
     : table(
-        document.errors.map((error) => [String(error.n), error.storyId, `${error.kind}: ${error.message}`]),
+        document.errors.map((error) => [
+          String(error.n),
+          error.storyId,
+          `${error.kind}: ${error.place === undefined ? "" : `${error.place}: `}${error.message}`
+        ]),
         { columns: [{ header: "#", tone: "muted" }, { header: "Story" }, { header: "Error" }] },
         uncut(style)
       );
