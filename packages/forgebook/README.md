@@ -143,7 +143,8 @@ export default defineConfig({
 
 A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
 says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
-Sass file goes through its own compiler alone.
+Sass file goes through its own compiler alone. When a framework plugin or the app's `vite.config` sets
+`css.transformer: "postcss"`, Vite runs the project's PostCSS itself and the catalogue does not run it a second time.
 
 ## A first catalogue
 
