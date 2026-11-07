@@ -424,7 +424,7 @@ export const Example = ({
   const { shown, framed, scheme } = useExampleDevice(story, context);
   // the frame loads with the story's finger as it is then; a change after reaches it live, keeping the story's state
   const loadedView = useLoadedView(
-    context.frameView.sheets,
+    `${context.frameView.sheets}|${context.frameView.play}`,
     touchedView(context.frameView, story.id, context.touches, touch)
   );
   const boxWidth = useBoxWidth(full.isOver, context.view.width);

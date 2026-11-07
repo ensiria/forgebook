@@ -19,13 +19,34 @@ import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
-import { SidebarDocs, type SidebarPageLinks } from "./SidebarDocs.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
+import type { SidebarDocsProps, SidebarPageLinks } from "./SidebarDocs.tsx";
 import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { SidebarSearch } from "./SidebarSearch.tsx";
 import { STRINGS } from "./strings.ts";
 import type { ShownTree, shownTree } from "./treeSearch.ts";
 import type { AppearanceState } from "./useAppearance.ts";
+
+/** The docs pages' section, loaded only for a catalogue that has some. */
+const SIDEBAR_DOCS = lazyModule<SidebarDocsProps>(() =>
+  import("./SidebarDocs.tsx").then((module) => module.SidebarDocs)
+);
+
+/**
+ * The docs pages' section, once its module is there; nothing for a catalogue with no pages.
+ *
+ * @param props - the section's props.
+ */
+const LoadedDocs = (props: SidebarDocsProps): ReactNode =>
+  props.sources.length === 0 ? null : (
+    <LazyView
+      module={SIDEBAR_DOCS}
+      props={props}
+      loading={null}
+      failed={(message: string): ReactNode => <p className="forgebook-tree__empty">{message}</p>}
+    />
+  );
 
 /** The sidebar's props. */
 export type SidebarProps = SidebarPageLinks & {
@@ -255,7 +276,7 @@ export const Sidebar = ({
       />
       <nav ref={navRef} className="forgebook-tree" aria-label={STRINGS.componentsNav}>
         {hasMatches || !isSearching ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}
-        <SidebarDocs
+        <LoadedDocs
           sources={pages}
           currentPageId={currentPageId}
           isSearching={isSearching}

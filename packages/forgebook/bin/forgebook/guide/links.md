@@ -9,5 +9,8 @@ and no code, `coder` the API first with the code open, `tester` what the stories
 npx forgebook story <id> --view audience=designer --json   # links.component opens the page for a designer
 ```
 
+A frame runs its story's `play` unless its address says `play=off`; tests and `check` never say it. A person's catalogue may
+start with plays off (a build does), so a link meant to show a story after its play says `play=on`.
+
 Each story also says whether a `play` function acts on it (`hasPlay`), and `tags` holds `!test` when the generated tests
 leave it out.

@@ -1714,6 +1714,14 @@
 
   // the stage
 
+  .forgebook-play__switch {
+    display: flex;
+    gap: $space-1-5;
+    align-items: center;
+    font: $text-row-compact;
+    color: $text-secondary;
+  }
+
   .forgebook-play__status {
     font: $text-caption;
     font-weight: 400;

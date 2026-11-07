@@ -107,7 +107,7 @@ const shellStrings = {
   signatureParameter: "Parameter",
   signatureReturns: "Returns",
   signatureNone: "It takes no parameters.",
-  playStatus: { running: "running", passed: "passed", failed: "failed" },
+  playStatus: { running: "running", passed: "passed", failed: "failed", off: "not run" },
   fixedExamples: "This story draws fixed examples: its props are not set from here. Every prop, for reading:",
   allProps: "Props",
   openFrame: "Open in a new tab",

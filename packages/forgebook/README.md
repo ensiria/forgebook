@@ -960,6 +960,14 @@ blocks it uses Open in Figma. A catalogue published with a Content Security Poli
 `forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
 `address` of the Design tab to hand a person (it opens the story alone without the plugin). `list_stories` gives each component's, and `CATALOG.md` lists it.
 
+## Plays when a story opens
+
+A story's `play` runs when it opens on a dev server, where its author is checking it. In a build it waits: a reader of
+published docs did not ask for it, and the Interactions tab offers it with **Run**. A reader changes this for themself in
+that tab or the View menu (kept in their browser), an address says it for one link (`?play=off`, `?play=on`), and
+`play: "on"` or `"off"` in the configuration sets the default. Tests, `forgebook check` and `check_story` open a frame with
+no such word, so they run every play whatever a reader or a catalogue chose.
+
 ## Coming from Storybook
 
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and

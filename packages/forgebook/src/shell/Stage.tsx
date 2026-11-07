@@ -331,7 +331,12 @@ export const Stage = ({
   // a device sets the story's width and height in place of the stage's own, and its story area is the toolbar's width
   const { shown, framed } = useStageDevice(view, story.device, onShownWidthChange);
   const address = deviceAddress(
-    frameAddress(frameUrl, story.id, useLoadedView(`${story.id}|${view.sheets}`, view), switches),
+    frameAddress(
+      frameUrl,
+      story.id,
+      useLoadedView(`${story.id}|${view.sheets}|${view.play}`, view),
+      switches
+    ),
     framed
   );
   useLiveView(storyRef, view, !isComparing(view));
@@ -392,10 +397,9 @@ export const Stage = ({
     calls: calls.filter((call) => call.storyId === story.id),
     onClearCalls: (): void => setCalls([]),
     trace: isComparing(view) ? undefined : traces.get(story.id),
-    onPlayAgain: (): void => {
-      const message: ShellMessage = { type: "forgebook:play-again" };
-      frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
-    },
+    view,
+    onViewChange,
+    onPlayAgain: (): void => tellFrames(storyRef.current, { type: "forgebook:play-again" }),
     check: storyCheck.check,
     onCheck: isComparing(view) ? undefined : storyCheck.run,
     pluginTabs

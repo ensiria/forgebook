@@ -20,7 +20,7 @@ import type { StoryLanguage } from "@forgebook/story-format/source";
 import type { Logger } from "vite";
 
 import { AUDIENCE_IDS } from "../audiences.ts";
-import { type CatalogueLists, catalogueSettings, type TurnedOffControl } from "../catalogue.ts";
+import { type CatalogueLists, catalogueSettings, playProblem, type TurnedOffControl } from "../catalogue.ts";
 import { deviceSettingProblem } from "../deviceView.ts";
 import type { ForgebookPlugin } from "../plugin.ts";
 import { REQUIRED_FIRST_LAYOUTS } from "../propGroups.ts";
@@ -198,7 +198,8 @@ const singleValues = (lists: CatalogueLists): CatalogueLists => ({
   ...(lists.audience === undefined ? {} : { audience: lists.audience }),
   ...(lists.appearance === undefined ? {} : { appearance: lists.appearance }),
   ...(lists.propGroups === undefined ? {} : { propGroups: lists.propGroups }),
-  ...(lists.requiredFirst === undefined ? {} : { requiredFirst: lists.requiredFirst })
+  ...(lists.requiredFirst === undefined ? {} : { requiredFirst: lists.requiredFirst }),
+  ...(lists.play === undefined ? {} : { play: lists.play })
 });
 
 /**
@@ -390,7 +391,7 @@ const mergedListsProblem = (lists: CatalogueLists): string | undefined => {
     return `the audience "${lists.audience}" is none of ${AUDIENCE_IDS.join(", ")}`;
   if (lists.usedIn === true && lists.componentDocs === false)
     return "usedIn is true with componentDocs false: Used in reads the import graph with the programs componentDocs turns off";
-  return undefined;
+  return playProblem(lists.play);
 };
 
 /**
