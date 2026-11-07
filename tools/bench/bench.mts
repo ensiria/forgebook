@@ -22,10 +22,12 @@ import { type BenchFolders, packForgebook, publishedForgebook } from "./prepare.
 import { type RealRun, realTargets } from "./prepareRun.ts";
 import { execProgram, TIME_LIMITS } from "./programs.ts";
 import { corpusPaths, DEFINITION_FILE, definitionFolder, parseCorpus } from "./realCorpus.ts";
+import type { RealCorpus } from "./realCorpus.types.ts";
 import { finishedReport, reportFormat, reportOutput } from "./reportOutput.ts";
 import { parseReport, reportProblems, reportRows } from "./reportTable.ts";
 import { METRIC_GROUPS, type MetricGroup, runBench } from "./runBench.ts";
 import { statusWriter } from "./statusFile.ts";
+import { sweepProblems } from "./sweep.ts";
 import { FRAMES_MODES, forgebookTarget, type Target, targetsOf } from "./targets.ts";
 
 /** The share two runs' medians may differ by and still count as reproduced. */
@@ -65,16 +67,14 @@ const realRun = (argument: string | undefined, work: string): RealRun | undefine
 };
 
 /** Why a run on a real library found another number of stories than its definition states; nothing when it agrees. */
-const countProblems = ({ sweep, corpus }: BenchReport): readonly string[] => {
-  if (sweep === undefined || corpus.real === undefined) return [];
-  const missing = corpus.stories - sweep.listed;
-  const lost = sweep.listed - sweep.drawn;
-  return [
-    ...(missing > 0 ? [`${missing} of ${corpus.stories} stories were not listed`] : []),
-    ...(missing < 0 ? [`${-missing} stories were listed beyond the ${corpus.stories} expected`] : []),
-    ...(lost === 0 ? [] : [`${lost} of ${sweep.listed} stories did not draw`])
-  ];
-};
+const countProblems = ({ sweep, corpus }: BenchReport, real: RealCorpus | undefined): readonly string[] =>
+  sweep === undefined || corpus.real === undefined
+    ? []
+    : sweepProblems(
+        sweep,
+        corpus.stories,
+        (real?.failsInStorybook ?? []).map((failure) => failure.story)
+      );
 
 /** The tools a run measures, in report order. */
 const toolsOf = (
@@ -308,7 +308,7 @@ await defineScript({
     const problems = [
       ...reportProblems(report, earlier, REPRODUCIBLE_WITHIN),
       ...budgetLines(report, budget),
-      ...countProblems(report)
+      ...countProblems(report, real?.corpus)
     ];
     const written = finishedReport(report, problems);
     const reportFile = real === undefined ? "report.json" : `report-${real.corpus.name}.json`;
