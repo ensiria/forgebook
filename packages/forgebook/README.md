@@ -116,7 +116,8 @@ could not be read is said on stderr by every command.
 
 From a `vite.config`, a catalogue takes how modules and style sheets resolve and compile, and never the app's page,
 server or output (`root`, `base`, `build`, `server`), from the file and from what its plugins' `config` hooks return; a
-plugin that changes the configuration in place, or starts a process of its own, is not stopped. Its plugins go in, apart from
+plugin that changes the configuration in place is not stopped. A plugin's `configureServer`, where one starts a backend or a
+watcher, runs on `forgebook dev` and not on a command's own server (`stories`, `check`, `verify`, `mcp`). Its plugins go in, apart from
 two kinds: the framework's own, which the adapter brings, and those known to build an app rather than draw a component
 (routers, service workers, source-map uploads, type checkers). That second list is names, so an upload plugin it does not
 know runs on `forgebook build`: name it in `skipPlugins`. A plugin's `transformIndexHtml` reaches the frames, not the

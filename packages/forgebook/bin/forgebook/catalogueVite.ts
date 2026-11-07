@@ -21,19 +21,22 @@ import { unresolvedImports } from "./viteCache.ts";
  * @param config - the catalogue's configuration, read.
  * @param overrides - what the command sets (the port, the output folder); its plugins run after the catalogue's.
  * @param command - what it runs for: a `vite.config` may be a function of it, and of the mode that follows from it.
+ * @param isOneShot - whether the server is a one-shot command's, whose app plugins start nothing of their own.
  */
 export const catalogueVite = async (
   config: ResolvedConfig,
   overrides: InlineConfig,
-  command: "serve" | "build" = "serve"
+  command: "serve" | "build" = "serve",
+  isOneShot = false
 ): Promise<InlineConfig> => {
   // what a first start's pre-bundling left out, left out here too: it is part of the pre-bundle's hash, and a server
   // whose hash differed would pre-bundle everything again itself
   const unresolved = unresolvedImports(config.dir);
-  const app = await appBuildOf(config, {
-    command,
-    mode: overrides.mode ?? (command === "build" ? "production" : "development")
-  });
+  const app = await appBuildOf(
+    config,
+    { command, mode: overrides.mode ?? (command === "build" ? "production" : "development") },
+    isOneShot
+  );
   return {
     ...overrides,
     ...(unresolved.length === 0

@@ -323,17 +323,20 @@ const guardedHtml = (
  * What its `config` returns goes through the same filter as the file's, or a plugin could set the host, `fs.strict` or the
  * output. Its `configureServer` runs at the normal time, after the middlewares that keep each origin to itself: `order: "pre"`
  * would answer ahead of them. Its `transformIndexHtml` reaches the frames and not the catalogue's page, whose origin holds the
- * agent API: a story's frame is what the app's page stands for.
+ * agent API: a story's frame is what the app's page stands for. A one-shot command's server runs no `configureServer` at all:
+ * that hook is where a plugin starts a backend or a watcher of its own, whose output on an inherited stdout would break a
+ * command's `--json`, and nothing a story asks for in the moment it is checked needs what it sets up for edits.
  *
  * @param plugin - the plugin.
  * @param dir - the folder its relative paths are read against.
+ * @param isOneShot - whether the server is a one-shot command's.
  */
-export const guardedAppPlugin = (plugin: Plugin, dir: string): Plugin => {
-  const { config, configureServer, transformIndexHtml } = plugin;
+export const guardedAppPlugin = (plugin: Plugin, dir: string, isOneShot = false): Plugin => {
+  const { config, configureServer: serverHook, transformIndexHtml, ...rest } = plugin;
   return {
-    ...plugin,
+    ...rest,
     ...(config === undefined ? {} : { config: guardedConfig(config, dir) }),
-    ...(configureServer === undefined ? {} : { configureServer: handlerOf(configureServer) }),
+    ...(serverHook === undefined || isOneShot ? {} : { configureServer: handlerOf(serverHook) }),
     ...(transformIndexHtml === undefined ? {} : { transformIndexHtml: guardedHtml(transformIndexHtml) })
   };
 };
@@ -372,6 +375,7 @@ const configNotes = (config: UserConfig, environment: ConfigEnv, text: string): 
  * @param framework - the adapter's name.
  * @param options - what the catalogue's configuration asks.
  * @param isReadingPaths - whether Vite reads `tsconfig` paths here.
+ * @param isOneShot - whether the server is a one-shot command's.
  * @throws what the file throws when it loads.
  */
 export const loadAppViteConfig = async (
@@ -380,7 +384,8 @@ export const loadAppViteConfig = async (
   environment: ConfigEnv,
   framework: string,
   options: ResolvedAppBuild,
-  isReadingPaths: boolean
+  isReadingPaths: boolean,
+  isOneShot: boolean
 ): Promise<AppViteConfig> => {
   const { loadConfigFromFile } = await import("vite");
   const path = resolve(dir, file);
@@ -392,7 +397,7 @@ export const loadAppViteConfig = async (
   return {
     file,
     fields: appConfigFields(config, home),
-    plugins: written.filter(isKept).map((plugin) => guardedAppPlugin(plugin, home)),
+    plugins: written.filter(isKept).map((plugin) => guardedAppPlugin(plugin, home, isOneShot)),
     leftOut: [...new Set(written.filter((plugin) => !isKept(plugin)).map((plugin) => plugin.name))],
     postcssPlugins: inlinePostcssPlugins(config),
     notes: configNotes(config, environment, readFileSync(path, "utf8"))

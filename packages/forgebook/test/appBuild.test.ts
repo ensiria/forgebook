@@ -355,6 +355,11 @@ describe("how far a plugin of the app's reaches", () => {
     expect(hookOf(plugin, "configureServer")).toBe(server);
   });
 
+  it("starts nothing of its own on a one-shot command's server", () => {
+    const plugin = guardedAppPlugin({ name: "p", configureServer: (): void => undefined }, "/", true);
+    expect(hookOf(plugin, "configureServer")).toBeUndefined();
+  });
+
   it("changes the frames' page and not the catalogue's", async () => {
     const plugin = guardedAppPlugin({ name: "p", transformIndexHtml: () => "changed" }, "/");
     const hook = hookOf(plugin, "transformIndexHtml");

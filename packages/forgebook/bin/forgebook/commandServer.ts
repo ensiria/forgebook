@@ -69,5 +69,10 @@ const keepPluginsOffStdout = (): void => {
 export const commandServerVite = (config: ResolvedConfig, overrides: InlineConfig): Promise<InlineConfig> => {
   hasStartedServer = true;
   keepPluginsOffStdout();
-  return catalogueVite(config, { ...overrides, plugins: [...(overrides.plugins ?? []), commandCache()] });
+  return catalogueVite(
+    config,
+    { ...overrides, plugins: [...(overrides.plugins ?? []), commandCache()] },
+    "serve",
+    true
+  );
 };

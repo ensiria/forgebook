@@ -185,12 +185,14 @@ const settingsPlugin = (fields: AppViteConfig["fields"], report: AppBuildReport)
  * @param config - the catalogue's configuration, read.
  * @param environment - the command and the mode the catalogue runs for.
  * @param isReadingPaths - whether Vite reads `tsconfig` paths here.
+ * @param isOneShot - whether the server is a one-shot command's.
  * @returns what it gives; why it could not be loaded.
  */
 const appViteConfigOf = async (
   config: ResolvedConfig,
   environment: ConfigEnv,
-  isReadingPaths: boolean
+  isReadingPaths: boolean,
+  isOneShot: boolean
 ): Promise<{ readonly app?: AppViteConfig; readonly problem?: string }> => {
   const isOwn = READ_BY_ADAPTER[config.framework.name]?.includes("vite-config") === true;
   const file = isOwn ? undefined : viteConfigFile(config.dir, config.appBuild.viteConfig);
@@ -203,7 +205,8 @@ const appViteConfigOf = async (
         environment,
         config.framework.name,
         config.appBuild,
-        isReadingPaths
+        isReadingPaths,
+        isOneShot
       )
     };
   } catch (error) {
@@ -216,13 +219,18 @@ const appViteConfigOf = async (
  *
  * @param config - the catalogue's configuration, read.
  * @param environment - the command and the mode the catalogue runs for.
+ * @param isOneShot - whether the server is a one-shot command's, which leaves out the plugins' `configureServer`.
  */
-export const appBuildOf = async (config: ResolvedConfig, environment: ConfigEnv): Promise<AppBuild> => {
+export const appBuildOf = async (
+  config: ResolvedConfig,
+  environment: ConfigEnv,
+  isOneShot = false
+): Promise<AppBuild> => {
   const options = config.appBuild;
   const readByAdapter = READ_BY_ADAPTER[config.framework.name] ?? [];
   const tsconfigPaths =
     options.tsconfigPaths && !readByAdapter.includes("tsconfig-paths") && hasTsconfigPaths(config.dir);
-  const { app, problem } = await appViteConfigOf(config, environment, tsconfigPaths);
+  const { app, problem } = await appViteConfigOf(config, environment, tsconfigPaths, isOneShot);
   const postcss =
     options.postcss && !readByAdapter.includes("postcss")
       ? postcssPlugin(config.dir, app?.postcssPlugins)
