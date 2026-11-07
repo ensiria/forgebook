@@ -44,6 +44,11 @@ not report `partly-verified` as verified: say what `skipped` says. A file in `ui
 `verify` again. `coverage: "through"` means it ran in another component's stories. A UI file is a component or a style
 sheet by its extension, a story file, or a script that defines or draws a component; anything else does not fail.
 
+A story file `forgebook new` wrote carries `// forgebook-props: <signature>`, the props it was written for. When the change
+reaches it and its component's props no longer give that signature, `verify` lists it in `outdated` and fails: its args
+may pass a prop that is gone or miss one now required. Check them against `story <id>`'s props, then set the line to
+`current`, or write the file again with `npx forgebook new <component file> --force`, which replaces any edit.
+
 Never write a raw colour or size when a token exists: ask `tokens --nearest` first, and use a match only when it says
 `isClose` or `isExact`. A match that is not close means no token fits: say so, do not force one.
 
