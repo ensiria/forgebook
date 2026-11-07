@@ -84,16 +84,20 @@ const unionShape = (type: ts.UnionType, walk: Walk, depth: number, text: string 
     member.isStringLiteral() || member.isNumberLiteral() ? [member.value] : []
   );
   const hasBoolean = members.some((member) => (member.flags & ts.TypeFlags.BooleanLiteral) !== 0);
-  const others = members
-    .filter(
-      (member) =>
-        !member.isStringLiteral() &&
-        !member.isNumberLiteral() &&
-        (member.flags & ts.TypeFlags.BooleanLiteral) === 0
+  // a node, or anything else with a part JSON cannot hold, is one thing to fill, not a choice among its parts: the first
+  // such part ends the reading, and the parts after it are not read for nothing
+  const others: ValueShape[] = [];
+  for (const member of members) {
+    if (
+      member.isStringLiteral() ||
+      member.isNumberLiteral() ||
+      (member.flags & ts.TypeFlags.BooleanLiteral) !== 0
     )
-    .map((member) => shapeOfType(member, walk, depth + 1, undefined));
-  // a node, or anything else with a part JSON cannot hold, is one thing to fill, not a choice among its parts
-  if (others.some((member) => member.kind === "named")) return namedPart(type, text, walk);
+      continue;
+    const shape = shapeOfType(member, walk, depth + 1, undefined);
+    if (shape.kind === "named") return namedPart(type, text, walk);
+    others.push(shape);
+  }
   const shapes: ValueShape[] = [
     ...(literals.length === 0 ? [] : [{ kind: "choice", values: walk.order(literals) } satisfies ValueShape]),
     ...(hasBoolean ? [{ kind: "boolean" } satisfies ValueShape] : []),
