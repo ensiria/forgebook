@@ -7,12 +7,13 @@
  * @module
  */
 import type { ComponentDocs, NoComponentDocs } from "forgebook/component-docs";
-import type { ExtractFileComponent, ExtractStoryComponent } from "forgebook/vite/adapter";
+import type { ExtractCallSites, ExtractFileComponent, ExtractStoryComponent } from "forgebook/vite/adapter";
 import {
   functionComponentDocs,
   functionFileComponent,
   functionStoryComponent
 } from "forgebook/vite/function-component-docs";
+import { jsxCallSites } from "forgebook/vite/jsx-call-sites";
 
 /** The module a Preact story file imports its types from (`Meta`, `Story`), for the stories `forgebook new` writes. */
 export const storyTypesModule = "@forgebook/preact";
@@ -22,6 +23,9 @@ export const extractStoryComponent: ExtractStoryComponent = functionStoryCompone
 
 /** Reads a component a file exports, for writing its first stories (`forgebook new`). */
 export const extractFileComponent: ExtractFileComponent = functionFileComponent;
+
+/** Finds where the application draws a component, for the values its first stories take (`forgebook new`). */
+export const extractCallSites: ExtractCallSites = jsxCallSites;
 
 /**
  * The docs of a story file's component.
