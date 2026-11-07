@@ -1250,7 +1250,7 @@ is a state of the component: the same).
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
 | `forgebook init --agents` | What a project's coding agents need too: `.mcp.json`, instructions and skill, CI, a hook running `verify`; `--browser` installs the testing package and its browser, `--draw` draws a story ([more](#set-a-project-up-in-one-prompt)) |
 | `forgebook hook <assistant>` | What an assistant's hook runs when it is about to finish: `verify` on the change, sending the agent back on red |
-| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; `--with-deps` also installs what it needs of the system |
+| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; it adds that one build and never removes another project's; `--with-deps` also installs what it needs of the system |
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
