@@ -19,6 +19,7 @@
   "exports": {
     ".": "./src/stories.ts",
     "./clock": "./src/clock.ts",
+    "./setup": "./src/appSetup.ts",
     "./texts": "./src/texts.ts",
     "./renderer": "./src/vueRenderer.ts",
     "./frame": "./src/mountFrame.ts",
@@ -66,6 +67,10 @@
       "./clock": {
         "types": "./dist/src/clock.d.ts",
         "default": "./dist/src/clock.js"
+      },
+      "./setup": {
+        "types": "./dist/src/appSetup.d.ts",
+        "default": "./dist/src/appSetup.js"
       },
       "./texts": {
         "types": "./dist/src/texts.d.ts",
