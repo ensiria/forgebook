@@ -19,6 +19,7 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 import { build } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
+import { realFolder } from "../../src/vite/realFolder.ts";
 import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
@@ -95,7 +96,8 @@ await defineCommands({
           await configWithStoriesOf(options.config),
           options["readable-names"]
         );
-        const outDir = resolve(config.dir, options.out ?? "dist");
+        // in the form of Vite's root, which empties an output it sees inside it
+        const outDir = realFolder(resolve(config.dir, options.out ?? "dist"));
         const vite = await catalogueVite(
           config,
           {

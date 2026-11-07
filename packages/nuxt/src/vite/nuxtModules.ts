@@ -357,9 +357,8 @@ const COMPONENT_LINE = /^export const ([A-Z]\w*): typeof import\("([^"]+)"\)(?:\
 export const moduleComponents = (text: string, buildDir: string): readonly ProjectComponent[] =>
   [...text.matchAll(COMPONENT_LINE)].flatMap((match) => {
     const file = fromBuildDir(buildDir, match[2] ?? "");
-    return match[1] === undefined || isNuxtOwn(file) || !file.startsWith("/")
-      ? []
-      : [{ name: match[1], file }];
+    // absolute on the running system: on Windows a file Nuxt wrote starts with its drive (`D:/`)
+    return match[1] === undefined || isNuxtOwn(file) || !isAbsolute(file) ? [] : [{ name: match[1], file }];
   });
 
 /** The extensions a source Nuxt wrote without one may have. */
