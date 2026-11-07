@@ -1258,6 +1258,12 @@ errors` and their MCP tools. Saving the fix is enough, with no restart: a story 
 is broken, and redraws in place. `forgebook build` and a test run still fail on it: a build ends with
 `src/Bad.stories.tsx:4:45 does not parse: …` and a non-zero exit, and only `--verbose` adds the bundler's stack.
 
+A component file that does not parse breaks only the stories that import it: each says
+`The story could not be shown: src/Broken.tsx:3:24: Unexpected token` in its frame and in `forgebook check`. Neither it
+nor a story file stops Vite's dependency scan on a first start, so the other stories' packages are still pre-bundled
+and the pages do not reload as each is found; `forgebook prebundle` prints one line per such component,
+`The dependency scan skipped src/Broken.tsx:3:24: Unexpected token`.
+
 A story that loads but cannot be drawn says why in its frame and in `forgebook check`. A frame's stack gives the lines of
 the code the browser runs, not those of the file; the browser's console maps them.
 

@@ -13,15 +13,15 @@
  *
  * @module
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 
-import type { UserConfig } from "vite";
+import { parseSync, type UserConfig } from "vite";
 
 import { STORY_FILE } from "./autoTitle.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
+import { lineAndColumn } from "./lineAndColumn.ts";
 import { hasPluginViews, PLUGIN_HOSTS_MODULE, WRITTEN_HOME_MODULE } from "./pages.ts";
 import { pluginModules } from "./pluginConfig.ts";
-import { parseStoryFile } from "./storyParse.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /** What the shell and the frame import in the browser from the project's packages (React is a peer of the core). */
@@ -118,26 +118,84 @@ export const scannedEntries = (
 /** Vite's options of its dependency scan. */
 type ScanOptions = NonNullable<NonNullable<UserConfig["optimizeDeps"]>["rolldownOptions"]>;
 
+/** A module the scan reads in place of a file's own text. */
+type ScanModule = { code: string; moduleType: "js" | "jsx" };
+
+/** Where the scan's warnings go. */
+export type ScanWarnings = {
+  /** The catalogue's folder: a warning names a file relative to it; absolute without it. */
+  readonly root?: string;
+  /** Writes one warning line; none are written without it. */
+  readonly warn?: (line: string) => void;
+};
+
+/** A project's script: JavaScript or TypeScript, with or without JSX. */
+const SCRIPT = /\.[cm]?[jt]sx?$/;
+
+/** A file of an installed package, which the scan does not read past its imports. */
+const INSTALLED = /[\\/]node_modules[\\/]/;
+
+/** A script whose extension says nothing about JSX. */
+const PLAIN_SCRIPT = /\.[cm]?js$/;
+
 /**
- * Keeps Vite's dependency scan going past a story file that does not parse, which adds nothing to what it finds. One
- * such file otherwise stops the scan, and with it the pre-bundling of every other story's packages, and fills the log
- * with the scanner's stack. The catalogue names the file itself (`storyFilesModule.ts`). Its text is read here on the
- * scan only: a start that keeps its pre-bundled packages does not scan.
+ * What the scan reads for one of the project's scripts: nothing in its place when it parses (the scan reads it), the
+ * same text read as JSX when only JSX makes it parse, and an empty module when it does not parse at all.
+ *
+ * @param file - the script's path as a message names it; its extension decides TypeScript and JSX.
+ * @param text - its source.
+ * @returns the module to scan, or none to let the scan read the file, and the parse error of a file that does not parse.
  */
-export const scanOptions = (): ScanOptions => ({
-  plugins: [
-    {
-      name: "forgebook:scan-story-files",
-      load: {
-        filter: { id: STORY_FILE },
-        handler: (id: string): { code: string; moduleType: "js" } | null => {
-          // an id that names no file (a plugin's own module) is not this hook's to answer
-          if (!existsSync(id)) return null;
-          return parseStoryFile(id, readFileSync(id, "utf8")).errors.length > 0
-            ? { code: "", moduleType: "js" }
-            : null;
+export const scannedScript = (
+  file: string,
+  text: string
+): { module: ScanModule | undefined; error: string | undefined } => {
+  const { errors } = parseSync(file, text);
+  const [error] = errors;
+  if (error === undefined) return { module: undefined, error: undefined };
+  // a `.js` file holding JSX, as libraries that write their stories in JavaScript do: its imports still count
+  if (PLAIN_SCRIPT.test(file) && parseSync(file, text, { lang: "jsx" }).errors.length === 0) {
+    return { module: { code: text, moduleType: "jsx" }, error: undefined };
+  }
+  const [label] = error.labels;
+  const place = label === undefined ? file : `${file}:${lineAndColumn(text, label.start)}`;
+  return { module: { code: "", moduleType: "js" }, error: `${place}: ${error.message}` };
+};
+
+/**
+ * Keeps Vite's dependency scan going past one of the project's scripts that does not parse, a story file or a
+ * component, and reads a `.js` file holding JSX as JSX. One such file otherwise stops the scan, and with it the
+ * pre-bundling of every other story's packages, and fills the log with the scanner's stack; the pages then reload as
+ * each package is found. A script that does not parse adds nothing to what the scan finds: a story file is named by
+ * the catalogue itself (`storyFilesModule.ts`), any other by one warning with its place, and by the frame of each
+ * story that imports it. The texts are read here on the scan only: a start that keeps its pre-bundled packages does
+ * not scan.
+ *
+ * @param options - the catalogue's folder, which the warnings' places are relative to, and what writes a warning line
+ * for a script, other than a story file, that does not parse.
+ */
+export const scanOptions = (options: ScanWarnings = {}): ScanOptions => {
+  // the scan names files by their real path: a folder reached through a link (`/tmp` on macOS) would not prefix them
+  const root =
+    options.root === undefined || !existsSync(options.root) ? undefined : realpathSync(options.root);
+  return {
+    plugins: [
+      {
+        name: "forgebook:scan-scripts",
+        load: {
+          filter: { id: { include: SCRIPT, exclude: INSTALLED } },
+          handler: (id: string): ScanModule | null => {
+            // an id that names no file (a plugin's own module) is not this hook's to answer
+            if (!existsSync(id)) return null;
+            const shown = root === undefined ? id : VITE_PATHS.relative(root, id);
+            const { module, error } = scannedScript(shown, readFileSync(id, "utf8"));
+            if (error !== undefined && !STORY_FILE.test(id)) {
+              options.warn?.(`The dependency scan skipped ${error}`);
+            }
+            return module ?? null;
+          }
         }
       }
-    }
-  ]
-});
+    ]
+  };
+};

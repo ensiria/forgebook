@@ -46,6 +46,7 @@ import {
   stringListOf,
   unwrapped
 } from "./indexFields.ts";
+import { lineAndColumn } from "./lineAndColumn.ts";
 import { moduleName, type NamedExport, namedExports } from "./storyExports.ts";
 import { parseStoryFile } from "./storyParse.ts";
 import { playField } from "./storyPlay.ts";
@@ -515,20 +516,6 @@ const storyExports = (program: ESTree.Program, top: TopLevel, meta: Fields): Nam
   if (order === undefined) return exported;
   const rank = (name: string): number => (order.includes(name) ? order.indexOf(name) : order.length);
   return [...exported].sort((first, second) => rank(first.exportName) - rank(second.exportName));
-};
-
-/** What ends a line, for an editor as for JavaScript. */
-const LINE_END = /\r\n|[\n\r\u2028\u2029]/g;
-
-/**
- * Where an offset falls in a text, as an editor counts: both from 1.
- *
- * @param text - the text.
- * @param offset - the offset, in UTF-16 code units, as the parser gives it.
- */
-const lineAndColumn = (text: string, offset: number): string => {
-  const lines = text.slice(0, offset).split(LINE_END);
-  return `${lines.length}:${(lines.at(-1)?.length ?? 0) + 1}`;
 };
 
 /**

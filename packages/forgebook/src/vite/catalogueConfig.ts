@@ -40,8 +40,13 @@ const hasOwnOutput = (userConfig: UserConfig): boolean =>
  *
  * @param config - the catalogue's configuration.
  * @param userConfig - the configuration so far, whose own `server.cors` and build output the plugin leaves alone.
+ * @param warn - writes a warning line of the dependency scan.
  */
-export const catalogueConfig = (config: ResolvedConfig, userConfig: UserConfig): UserConfig => ({
+export const catalogueConfig = (
+  config: ResolvedConfig,
+  userConfig: UserConfig,
+  warn?: (line: string) => void
+): UserConfig => ({
   root: config.dir,
   // a hoisted workspace can keep a package's React in its folder while the adapter, at the root, reads another copy, and
   // every component then fails with "invalid hook call": the catalogue's folder decides
@@ -51,7 +56,7 @@ export const catalogueConfig = (config: ResolvedConfig, userConfig: UserConfig):
   optimizeDeps: {
     include: prebundled(config, packageResolver(config.dir)),
     entries: scannedEntries(config, packageResolver(config.dir), readTextFile),
-    rolldownOptions: scanOptions()
+    rolldownOptions: scanOptions({ root: config.dir, ...(warn === undefined ? {} : { warn }) })
   },
   build: {
     rolldownOptions: {
