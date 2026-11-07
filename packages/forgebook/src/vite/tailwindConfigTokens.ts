@@ -12,6 +12,7 @@
  */
 import { type ESTree, parseSync } from "vite";
 
+import { isTooDeep } from "./componentScan.ts";
 import { keyName, propertyValue, unwrapped } from "./indexFields.ts";
 
 /** A theme value the file writes. */
@@ -300,6 +301,7 @@ const presetsOf = (
  */
 export const readTailwindConfig = (file: string, text: string): TailwindConfigReading => {
   const empty = { tokens: [], presets: [], replaced: [], paletteAliases: [] };
+  if (isTooDeep(text)) return { ...empty, unread: ["it nests too deep to read"] };
   const { program, errors } = parseSync(file, text);
   if (errors.length > 0) return { ...empty, unread: [`it cannot be parsed: ${errors[0]?.message ?? ""}`] };
   const constants = constantsOf(program);
@@ -344,6 +346,7 @@ export const readTailwindConfig = (file: string, text: string): TailwindConfigRe
  * @returns each colour's name as Tailwind 4 names it, with its value.
  */
 export const readTailwindPalette = (file: string, text: string): ConfigToken[] => {
+  if (isTooDeep(text)) return [];
   const { program, errors } = parseSync(file, text);
   if (errors.length > 0) return [];
   const palette = constantsOf(program).get("_default");

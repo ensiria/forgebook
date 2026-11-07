@@ -12,7 +12,7 @@
  * @module
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -75,8 +75,11 @@ const MOST_SHEETS = 400;
 /** How long git may take to list them, in milliseconds. */
 const LIST_TIMEOUT = 10_000;
 
+/** How many files a walk with no git gives. */
+const MOST_WALKED = 20_000;
+
 /** How deep folders are walked with no git to ask. */
-const WALK_DEPTH = 6;
+const WALK_DEPTH = 12;
 
 /** How deep presets of presets are followed. */
 const PRESET_DEPTH = 4;
@@ -98,10 +101,10 @@ export const smallFileText = (file: string): string | undefined => {
   }
 };
 
-/** Whether a path is a folder; one that cannot be followed (a link to itself) is not. */
+/** Whether a path is a folder and no link to one: a walk that follows links can leave the project or never end. */
 const isFolder = (path: string): boolean => {
   try {
-    return statSync(path).isDirectory();
+    return lstatSync(path).isDirectory();
   } catch {
     return false;
   }
@@ -116,8 +119,8 @@ const isFile = (path: string): boolean => {
   }
 };
 
-/** The sheets under a folder with no git to ask, sorted, leaving out what no source folder holds. */
-const walkedSheets = (dir: string, depth = 0): string[] => {
+/** The files of a kind under a folder with no git to ask, sorted, leaving out what no source folder holds. */
+const walkedFiles = (dir: string, kind: RegExp, left: RegExp, depth = 0): string[] => {
   if (depth > WALK_DEPTH) return [];
   let entries: string[] = [];
   try {
@@ -127,26 +130,54 @@ const walkedSheets = (dir: string, depth = 0): string[] => {
   }
   return entries.flatMap((entry) => {
     const path = join(dir, entry);
-    if (entry.startsWith(".") || NOT_THE_SYSTEM.test(`${entry}/`)) return [];
-    if (SHEET_FILE.test(entry)) return NOT_THE_SYSTEM.test(entry) ? [] : [path];
-    return isFolder(path) ? walkedSheets(path, depth + 1) : [];
+    if (entry.startsWith(".") || left.test(`${entry}/`)) return [];
+    if (kind.test(entry)) return left.test(entry) ? [] : [path];
+    return isFolder(path) ? walkedFiles(path, kind, left, depth + 1) : [];
   });
 };
 
-/** The sheets of a folder: what git tracks and would track, or a walk when this is not a repository. */
-const listedSheets = (dir: string): string[] => {
+/**
+ * The source files of a folder, relative to it: what git tracks and would track, or a walk when this is not a repository.
+ *
+ * @param dir - the folder.
+ * @param patterns - what git is asked for (`*.tsx`).
+ * @param kind - the same as a pattern for a file's name, for the walk.
+ * @param left - what the walk leaves out, as git would by what it ignores.
+ */
+export const listedFiles = (
+  dir: string,
+  patterns: readonly string[],
+  kind: RegExp,
+  left: RegExp
+): string[] => {
+  // a repository's configuration may name a program for git to run while listing: nothing here is to run
   const listed = spawnSync(
     "git",
-    ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...SHEET_PATTERNS],
+    [
+      "-c",
+      "core.fsmonitor=false",
+      "ls-files",
+      "-z",
+      "--cached",
+      "--others",
+      "--exclude-standard",
+      "--",
+      ...patterns
+    ],
     { cwd: dir, encoding: "utf8", timeout: LIST_TIMEOUT, maxBuffer: 64 * 1024 * 1024 }
   );
-  if (listed.status !== 0) return walkedSheets(dir);
-  return listed.stdout
-    .split("\0")
-    .filter((file) => file !== "" && !NOT_THE_SYSTEM.test(file))
+  if (listed.status === 0) return listed.stdout.split("\0").filter((file) => file !== "");
+  return walkedFiles(dir, kind, left)
+    .slice(0, MOST_WALKED)
+    .map((file) => relative(dir, file).replaceAll("\\", "/"));
+};
+
+/** The sheets of a folder, what is not the application's system left out, absolute and in a stable order. */
+const listedSheets = (dir: string): string[] =>
+  listedFiles(dir, SHEET_PATTERNS, SHEET_FILE, NOT_THE_SYSTEM)
+    .filter((file) => !NOT_THE_SYSTEM.test(file))
     .toSorted()
     .map((file) => join(dir, file));
-};
 
 /** Where a name leads: a file of the workspace, nothing of this application's, or nowhere that could be found. */
 type Resolved = { readonly file: string } | "third-party" | "missing";

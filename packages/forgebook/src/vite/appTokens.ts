@@ -60,6 +60,33 @@ const SPACING_STEPS = [
   60, 64, 72, 80, 96
 ];
 
+/** Tailwind 3's font sizes, which its configuration file does not list unless it changes them. */
+const OLD_FONT_SIZES: Readonly<Record<string, string>> = {
+  xs: "0.75rem",
+  sm: "0.875rem",
+  base: "1rem",
+  lg: "1.125rem",
+  xl: "1.25rem",
+  "2xl": "1.5rem",
+  "3xl": "1.875rem",
+  "4xl": "2.25rem",
+  "5xl": "3rem",
+  "6xl": "3.75rem",
+  "7xl": "4.5rem",
+  "8xl": "6rem",
+  "9xl": "8rem"
+};
+
+/** Tailwind 3's radii. */
+const OLD_RADII: Readonly<Record<string, string>> = {
+  sm: "0.125rem",
+  md: "0.375rem",
+  lg: "0.5rem",
+  xl: "0.75rem",
+  "2xl": "1rem",
+  "3xl": "1.5rem"
+};
+
 /** Plugins whose additions to the theme are not tokens worth saying they are unknown. */
 const KNOWN_PLUGIN = /typography|forms|animate|container-queries|aspect-ratio/;
 
@@ -200,7 +227,26 @@ const configDefaults = (
     ? []
     : palette.map(({ name, value, type }) => ({ name, value, mode: undefined, type, origin }));
   const scale = replaced.has("spacing") ? [] : spacingScale("0.25rem", origin, new Set());
-  return [...colors, ...scale];
+  const named = (
+    prefix: string,
+    values: Readonly<Record<string, string>>,
+    key: string
+  ): TokenDeclaration[] =>
+    replaced.has(key)
+      ? []
+      : Object.entries(values).map(([name, value]) => ({
+          name: `${prefix}${name}`,
+          value,
+          mode: undefined,
+          type: "dimension",
+          origin
+        }));
+  return [
+    ...colors,
+    ...scale,
+    ...named("--text-", OLD_FONT_SIZES, "fontSize"),
+    ...named("--radius-", OLD_RADII, "borderRadius")
+  ];
 };
 
 /** A configuration's tokens as declarations. */

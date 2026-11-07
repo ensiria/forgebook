@@ -21,6 +21,7 @@ import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/v
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
+import { auditCommands } from "./auditCommand.mts";
 import { buildFailureText } from "./buildFailure.ts";
 import { settleAgentIndex } from "./builtCatalogue.ts";
 import {
@@ -290,6 +291,7 @@ await defineCommands({
     }),
     ...agentLoopCommands(forgebook),
     ...guideCommands(forgebook),
+    ...auditCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),
