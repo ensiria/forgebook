@@ -1,0 +1,119 @@
+{
+  "id": "notifications-pause",
+  "app": "nuxt-shadcn-dashboard",
+  "prompt": "On Settings › Notifications (app/components/settings/NotificationsForm.vue), add a \"Pause all notifications\" switch at the top of the form. While it is on, every other option of the form is disabled and a note says \"Notifications are paused\"; turning it off restores them as they were. The pause is saved with the rest of the form.",
+  "scope": ["app/components/settings/NotificationsForm.vue"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built on the app's existing Switch, form fields and Alert or text styles, as the other options are."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Off, on with the options disabled, in the dark theme and in a narrow window."
+    },
+    {
+      "id": "a11y",
+      "text": "The switch has its label and says its state; disabled options are announced as disabled; the note is announced."
+    },
+    {
+      "id": "scope",
+      "text": "Only the notifications form changes; the other settings pages are unchanged, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "Settings › Notifications as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/notifications"
+        }
+      ]
+    },
+    {
+      "name": "paused",
+      "description": "Notifications paused.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/notifications"
+        },
+        {
+          "click": {
+            "role": "switch",
+            "name": "Pause all notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "paused-dark",
+      "description": "The same, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/settings/notifications"
+        },
+        {
+          "click": {
+            "role": "switch",
+            "name": "Pause all notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "narrow",
+      "description": "The form in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/notifications"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "pausing shows the note, and resuming hides it",
+      "steps": [
+        {
+          "goto": "/settings/notifications"
+        },
+        {
+          "click": {
+            "role": "switch",
+            "name": "Pause all notifications"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Notifications are paused"
+          }
+        },
+        {
+          "click": {
+            "role": "switch",
+            "name": "Pause all notifications"
+          }
+        },
+        {
+          "expectHidden": {
+            "text": "Notifications are paused"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

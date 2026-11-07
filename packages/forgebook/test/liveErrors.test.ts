@@ -8,7 +8,12 @@ import { describe, expect, it } from "vitest";
 
 import { errorsOutput } from "../bin/forgebook/agentText.ts";
 import { askErrors, followErrors, sinceOf } from "../bin/forgebook/errorsRun.ts";
-import { createLiveErrors, isLiveErrorReport, type LiveErrorReport } from "../src/liveErrors.ts";
+import {
+  createLiveErrors,
+  isLiveErrorReport,
+  isMappedStackAnswer,
+  type LiveErrorReport
+} from "../src/liveErrors.ts";
 import type { ErrorsDocument } from "../src/vite/agent.types.ts";
 
 const REPORT: LiveErrorReport = {
@@ -38,6 +43,19 @@ describe("isLiveErrorReport", () => {
     expect(isLiveErrorReport({ ...REPORT, kind: "crash" })).toBe(false);
     expect(isLiveErrorReport({ kind: "render" })).toBe(false);
     expect(isLiveErrorReport("render")).toBe(false);
+  });
+
+  it("takes a report's stack when it is text", () => {
+    expect(isLiveErrorReport({ ...REPORT, stack: "Error: It threw" })).toBe(true);
+    expect(isLiveErrorReport({ ...REPORT, stack: 3 })).toBe(false);
+  });
+});
+
+describe("isMappedStackAnswer", () => {
+  it("takes the dev server's mapped stack, and refuses anything else", () => {
+    expect(isMappedStackAnswer({ sent: "at a (x:19:1)", stack: "at a (x:3:1)" })).toBe(true);
+    expect(isMappedStackAnswer({ sent: "at a (x:19:1)" })).toBe(false);
+    expect(isMappedStackAnswer(null)).toBe(false);
   });
 });
 
@@ -105,6 +123,13 @@ describe("forgebook errors' parts", () => {
     expect(JSON.parse(errorsOutput(document, { isJson: true, isFollowing: false }, style))).toEqual(document);
     expect(errorsOutput(document, { isJson: false, isFollowing: false }, style)).toContain(
       "render: It threw"
+    );
+    const placed: ErrorsDocument = {
+      ...document,
+      errors: [{ ...REPORT, place: "src/A.stories.tsx:3:9", n: 4, at: "2026-10-31T12:00:00.000Z" }]
+    };
+    expect(errorsOutput(placed, { isJson: false, isFollowing: false }, style)).toContain(
+      "render: src/A.stories.tsx:3:9: It threw"
     );
   });
 });

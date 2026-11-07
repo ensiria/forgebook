@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { StoryCheckReport, StoryShotReport } from "../../src/storyCheck.ts";
+import type { StoryCheckReport, StoryShotReport, StressReport } from "../../src/storyCheck.ts";
 import type { PluginsDocument, SwitchesDocument } from "../../src/vite/agent.types.ts";
 import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
@@ -26,6 +26,7 @@ import type { NewStoriesFile } from "./newStoriesFile.ts";
 import { pageTools } from "./pageTools.ts";
 import { storyAddressTool } from "./setArgsTool.ts";
 import type { StoryCheckInput } from "./storyCheckRun.ts";
+import { stressToolResult } from "./stressText.ts";
 
 /** The session's folder for pictures; made on the first call. */
 let shotsDir: string | undefined;
@@ -75,6 +76,8 @@ export type CatalogueReach = {
   readonly writeNew: NewStories;
   /** Runs the checks on a story. */
   readonly check: Check;
+  /** Runs the stress matrix on a story: worst-case values and views it never declared. */
+  readonly stress: (id: string) => Promise<StressReport | string>;
   /** Takes a story's pictures. */
   readonly shot: Shot;
   /** Answers whether a change is verified. */
@@ -94,6 +97,7 @@ export const catalogueTools = ({
   ask,
   writeNew,
   check,
+  stress,
   shot,
   verify,
   checkPage,
@@ -225,7 +229,7 @@ export const catalogueTools = ({
   {
     name: "get_story",
     description:
-      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
+      "One story in detail: the names of the props every use must set (requiredProps, first), its args as the catalogue renders it, its code as the Code tab shows it (code: the render or the args as written), the props its values can set (controls: each one's control and the shape of its value), its component's props in the order of the source (types, defaults, descriptions; onlyWhen for a variant's prop, notes when a type is generic or unread, propsNote when none are listed), the components whose stories use it (usedIn), the device it is shown in by default (device), its design in Figma when it has one (design: the link, the file key and the node id, and the address where a person sees it beside the story), its links in the view asked for, and what failed while reading it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -294,6 +298,11 @@ export const catalogueTools = ({
           type: "boolean",
           description:
             "Also ask the model the user configured whether headings, labels and alternatives say the right thing. Its judgements are opinions, in `judgements`."
+        },
+        stress: {
+          type: "boolean",
+          description:
+            "Draw it with worst-case values instead of checking it as written (alone: no views, allVariants or semantic), and with views it never declared (long-text, unbreakable, empty, huge-number, rtl, zoom-200, narrow, dark, contrast), with no story written: each case lists only what it breaks that the plain story does not; `skipped` names cases with nothing to set."
         }
       },
       required: ["id"],
@@ -303,6 +312,7 @@ export const catalogueTools = ({
       const views = Array.isArray(args["views"])
         ? args["views"].filter((view): view is string => typeof view === "string")
         : [];
+      if (args["stress"] === true) return stressToolResult(stress, args);
       const report = await check({
         id: textOf(args, "id") ?? "",
         views,
@@ -321,7 +331,7 @@ export const catalogueTools = ({
   {
     name: "recent_errors",
     description:
-      "What the catalogue's open frames reported while you edited: stories that could not be shown and plays that failed, numbered, with the story index's problems. Give since (the last answer's last) to get only the new ones. Only frames open in a browser report; check_story checks a story without one.",
+      "What the catalogue's open frames reported while you edited: stories that could not be shown (with place, the file:line:column as written) and plays that failed, numbered, with the story index's problems. Give since (the last answer's last) to get only the new ones. Only frames open in a browser report; check_story checks a story without one.",
     inputSchema: {
       type: "object",
       properties: {

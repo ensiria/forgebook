@@ -103,6 +103,8 @@ export const docsModule = (
  * @param isForgiving - whether a file that cannot be indexed is named among the catalogue's problems while the others
  * draw (a person at a dev server), rather than failing the module (a build, a test run).
  * @param catalogue - the catalogue, whose previews' tags every story takes; none has none.
+ * @param scriptProblems - the project's scripts that do not parse, named among the catalogue's problems with the files
+ * that cannot be indexed (`scriptProblems.ts`), where those are (a dev server); none by default.
  * @throws when a story file cannot be indexed, unless it is forgiven.
  */
 export const patternModule = (
@@ -114,7 +116,8 @@ export const patternModule = (
   startTexts?: (files: readonly IndexedStoryFile[]) => void,
   isKept: IsFileKept = EVERY_FILE,
   isForgiving = false,
-  catalogue?: { readonly previews: readonly string[] }
+  catalogue?: { readonly previews: readonly string[] },
+  scriptProblems: readonly string[] = []
 ): {
   code: string;
   moduleType: "js";
@@ -133,7 +136,8 @@ export const patternModule = (
     withPreviewTags(files, previewTagsOf(catalogue, watch)),
     loaders,
     startTexts !== undefined,
-    refused
+    refused,
+    isForgiving ? scriptProblems : []
   );
   return { code, moduleType: "js", files, refused };
 };

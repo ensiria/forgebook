@@ -7,6 +7,7 @@
 import { heldStoryClock } from "@forgebook/story-format/clock";
 import { describe, expect, it } from "vitest";
 
+import { runPlay } from "../src/frame/playStepper.ts";
 import { playStory } from "../src/frame/playStory.ts";
 import type { PlayTrace } from "../src/playTrace.ts";
 
@@ -104,5 +105,29 @@ describe("playStory", () => {
       (trace) => traces.push(trace)
     );
     expect(traces).toEqual([]);
+  });
+});
+
+describe("runPlay", () => {
+  it("says at once that a story without a play is over, and runs a play through the runner it loads", async () => {
+    const events: string[] = [];
+    void runPlay(undefined, CONTEXT, () => events.push("over at once"));
+    expect(events).toEqual(["over at once"]);
+    await runPlay(
+      async (): Promise<void> => {
+        await Promise.resolve();
+        events.push("played");
+      },
+      CONTEXT,
+      () => events.push("over")
+    );
+    expect(events).toEqual(["over at once", "played", "over"]);
+    await expect(
+      runPlay(
+        (): Promise<void> => Promise.reject(new Error("failed")),
+        CONTEXT,
+        () => undefined
+      )
+    ).rejects.toThrow("failed");
   });
 });

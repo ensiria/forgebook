@@ -1,0 +1,11 @@
+{
+  "say": "Scripted stand-in, arm without Forgebook: an inline empty state with a colour typed by hand and a clickable span instead of a button.",
+  "edits": [
+    {
+      "file": "src/features/apps/index.tsx",
+      "find": "        <ul className='faded-bottom no-scrollbar grid gap-4 overflow-auto pt-4 pb-16 md:grid-cols-2 lg:grid-cols-3'>",
+      "replace": "        {filteredApps.length === 0 ? (\n          <div className='mt-10 text-center' style={{ color: '#6b7280' }}>\n            <p>No apps found.</p>\n            <span\n              className='cursor-pointer underline'\n              onClick={() => {\n                setSearchTerm('')\n                setAppType('all')\n                navigate({\n                  search: (prev) => ({ ...prev, filter: undefined, type: undefined }),\n                })\n              }}\n            >\n              Clear filters\n            </span>\n          </div>\n        ) : null}\n        <ul className='faded-bottom no-scrollbar grid gap-4 overflow-auto pt-4 pb-16 md:grid-cols-2 lg:grid-cols-3'>"
+    }
+  ],
+  "result": "done"
+}

@@ -8,10 +8,51 @@ import { EXIT } from "@ensiria/cli-kit/constants";
 import { formatJson } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { checkText } from "./agentText.ts";
 import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runStoryCheck } from "./storyCheckRun.ts";
+import { runStoryStress } from "./stressRun.ts";
+import { isStressFailure, stressText } from "./stressText.ts";
+
+/** What a stress run's printing reads. */
+type StressOutput = {
+  readonly config: ResolvedConfig;
+  readonly url: string | undefined;
+  readonly id: string;
+  readonly io: { readonly stdout: { readonly write: (text: string) => unknown } };
+  readonly log: { readonly warn: (text: string) => void };
+  readonly isJson: boolean;
+};
+
+/** Refuses what `--stress` does not take: it chooses its own values and views. */
+const refuseWithStress = (options: {
+  readonly view?: readonly string[];
+  readonly "all-variants"?: boolean;
+  readonly semantic?: boolean;
+}): void => {
+  if ((options.view ?? []).length > 0 || options["all-variants"] === true || options.semantic === true)
+    throw new ScriptError(
+      "--stress chooses its own values and views: leave out --view, --all-variants and --semantic",
+      {
+        exitCode: EXIT.usage
+      }
+    );
+};
+
+/** Runs the stress matrix and prints it, failing when a case breaks what the plain story does not. */
+const stressRun = async ({ config, url, id, io, log, isJson }: StressOutput): Promise<void> => {
+  const stressed = await runStoryStress(config, url, id);
+  if (typeof stressed === "string") throw new ScriptError(stressed);
+  io.stdout.write(isJson ? formatJson(stressed) : `${stressText(stressed)}\n`);
+  for (const each of isJson ? (stressed.skipped ?? []) : []) log.warn(each);
+  if (isStressFailure(stressed))
+    throw new ScriptError("A case breaks what the plain story does not", {
+      exitCode: EXIT.failure,
+      isReported: true
+    });
+};
 
 /**
  * The command.
@@ -40,6 +81,11 @@ export const storyCheckCommands = (
         type: "boolean",
         description: "Also ask the configured model, sending it each story's tree and picture."
       },
+      stress: {
+        type: "boolean",
+        description:
+          "Draw it with worst-case values and views it never declared (long text, unbreakable words, huge numbers, empty, right to left, 200 % zoom, narrow, dark, more contrast), with no story written, and report what each breaks that the plain story does not."
+      },
       ...SEMANTIC_OPTIONS,
       url: {
         type: "string",
@@ -59,10 +105,19 @@ export const storyCheckCommands = (
       {
         command: `${COMMAND} check kit:inputs-select --view "theme=dark" --json`,
         description: "Every story of a component, in the dark theme, as JSON."
+      },
+      {
+        command: `${COMMAND} check kit:inputs-select--overview --stress --json`,
+        description: "The states nobody wrote a story for."
       }
     ],
-    run: async ({ args, options, io, isJson, style }): Promise<void> => {
+    run: async ({ args, options, io, log, isJson, style }): Promise<void> => {
       const config = await configWithStoriesOf(options.config);
+      if (options.stress === true) {
+        refuseWithStress(options);
+        await stressRun({ config, url: options.url, id: args.id, io, log, isJson });
+        return;
+      }
       const report = await runStoryCheck(
         config,
         options.url,

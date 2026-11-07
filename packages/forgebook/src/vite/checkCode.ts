@@ -10,6 +10,10 @@
  * name, not code to paste, and it is offered only when one token clearly fits: forcing the nearest is how a wrong colour
  * gets a token's name. Props are the type checker's; what a change reuses is `reuseCheck.ts`'s.
  *
+ * React reads a bare number in a style object as pixels, so `padding: 16` there is a size like `16px`. The same keys are
+ * options of other code (`fitView({ padding: 16 })`), and an added line seldom shows where its object starts: such a
+ * number fails only on a line that says the object is a style, and is advice elsewhere.
+ *
  * A token read from an application says less than one in a tokens file, which someone wrote for this use: a project's
  * `--sidebar-width: 16px` does not make every `16px` a mistake. So a size is compared with those of the same role only:
  * spacing with spacing, a radius with a radius, a font's size with a font's size. A size with no such role is left alone.
@@ -393,6 +397,95 @@ const sizeProblems = (
   });
 };
 
+/**
+ * A size a style object writes as a bare number, which React reads as pixels: `marginTop: 6`, `style={{ padding: 12 }}`,
+ * a styled component's object. Only the properties whose sizes have an equal on a scale, spelled as a style object spells
+ * them, and only a number that ends the value: `padding: 8 * scale` is a sum no token replaces.
+ */
+const OBJECT_SIZE =
+  /(?:^|[\s{,(])["']?((?:margin|padding)(?:Top|Right|Bottom|Left|Inline|Block|InlineStart|InlineEnd|BlockStart|BlockEnd|Horizontal|Vertical)?|gap|rowGap|columnGap|fontSize|border(?:TopLeft|TopRight|BottomLeft|BottomRight|StartStart|StartEnd|EndStart|EndEnd)?Radius)["']?\s*:\s*-?(\d*\.?\d+)(?=\s*(?:[,})]|$))/g;
+
+/** The files where a bare number in a style object is pixels: React's, which adds the unit; Vue, Svelte and Solid do not. */
+const PIXELS_FOR_NUMBERS = /\.[jt]sx$/;
+
+/**
+ * What says on the line itself that an object is a style. The same keys are options elsewhere (`fitView({ padding: 0.3 })`,
+ * `measureText(text, { fontSize: 12 })`, an export's `padding: 16`), and an added line seldom shows the object's start.
+ */
+const STYLE_OBJECT =
+  /\b(?:style|sx)\s*=\s*\{\{|\bstyle\s*:\s*\{|:\s*(?:React\.)?CSSProperties\b|\bstyled(?:\.\w+|\([^)]*\))\s*\(|\bcss\(\s*\{|\bStyleSheet\.create\(/;
+
+/** Something to weigh, which fails nothing. */
+export type CodeAdvice = {
+  /** The file, relative to the repository. */
+  readonly file: string;
+  /** The line in it. */
+  readonly line: number;
+  /** What to weigh, in a sentence. */
+  readonly message: string;
+};
+
+/** What the checks found: what fails, and what to weigh. */
+export type CodeFindings = {
+  /** What fails. */
+  readonly problems: readonly CodeProblem[];
+  /** What to weigh. */
+  readonly advice: readonly CodeAdvice[];
+};
+
+/** The role of a style object's property: the same scales as the sheet's property, which every key it reads has. */
+const objectRole = (property: string): SizeRole =>
+  PROPERTY_ROLES.find(([pattern]) => pattern.test(property))?.[1] ?? "space";
+
+/**
+ * The bare numbers of an object in a line that equal one token, as sizes in pixels: a problem where the line says the
+ * object is a style, advice where it does not, since an option of the same name is no style.
+ */
+const objectSizeFindings = (
+  { file, line }: AddedLine,
+  code: string,
+  tokens: readonly DesignToken[]
+): CodeFindings => {
+  if (!PIXELS_FOR_NUMBERS.test(file)) return { problems: [], advice: [] };
+  const isStyle = STYLE_OBJECT.test(code);
+  const found = [...code.matchAll(OBJECT_SIZE)].flatMap((match) => {
+    const [, property = "", number = ""] = match;
+    if (Number(number) === 0) return [];
+    const role = objectRole(property);
+    const candidates = tokens.filter(
+      (token) =>
+        token.origin === undefined ||
+        (token.origin.kind !== "tailwind-default" && tokenRole(token.name) === role)
+    );
+    const exact = nearestTokens(candidates, `${number}px`, "dimension").matches.filter(
+      (each) => each.isExact && each.mode === undefined
+    );
+    const [only] = exact;
+    if (only === undefined) return [];
+    const names = exact.map((each) => writtenAs(each.name, tokens)).join(" or ");
+    return [{ value: `${property}: ${number}`, fix: exact.length === 1 ? only.name : undefined, names }];
+  });
+  if (!isStyle) {
+    const advice = found.map(({ value, names }) => ({
+      file,
+      line,
+      message: `\`${value}\` is a size written by hand if this object is a style: use ${names}.`
+    }));
+    return { problems: [], advice };
+  }
+  const problems = found.map(
+    ({ value, fix, names }): CodeProblem => ({
+      rule: "raw-size",
+      file,
+      line,
+      value,
+      ...(fix === undefined ? {} : { fix }),
+      message: `A size written by hand, pixels in a style: use ${names}.`
+    })
+  );
+  return { problems, advice: [] };
+};
+
 /** The suppression a line adds, unless it says why. */
 const suppressionProblem = ({ file, line, text }: AddedLine): CodeProblem[] =>
   SUPPRESSION.test(text) && !HAS_REASON.test(text)
@@ -441,20 +534,26 @@ const ignoredRules = (text: string): string[] =>
   [...text.matchAll(IGNORE_COMMENT)].flatMap((match) => match[1] ?? []);
 
 /** The raw values in a line of a checked file, but for those a comment excuses. */
-const valueProblems = (
+const valueFindings = (
   added: AddedLine,
   above: AddedLine | undefined,
   tokens: readonly DesignToken[]
-): CodeProblem[] => {
-  if (added.text.length > LONGEST_LINE) return [];
+): CodeFindings => {
+  const none = { problems: [], advice: [] };
+  if (added.text.length > LONGEST_LINE) return none;
   const written = withoutComment(added.text);
   const isSheet = SHEET_FILE.test(added.file);
   const code = isSheet ? written.replace(CUSTOM_PROPERTY, "") : written;
   // in a sheet, a line with no property continues a value started above, usually a token's
-  if ((isSheet && !code.includes(":")) || COMMENT_LINE.test(code)) return [];
+  if ((isSheet && !code.includes(":")) || COMMENT_LINE.test(code)) return none;
   const ignored = [...ignoredRules(added.text), ...(above === undefined ? [] : ignoredRules(above.text))];
   const colors = comparesColors(tokens) ? colorProblems(added, code, tokens) : [];
-  return [...colors, ...sizeProblems(added, code, tokens)].filter(({ rule }) => !ignored.includes(rule));
+  const objects = objectSizeFindings(added, code, tokens);
+  const problems = [...colors, ...sizeProblems(added, code, tokens), ...objects.problems];
+  return {
+    problems: problems.filter(({ rule }) => !ignored.includes(rule)),
+    advice: ignored.includes("raw-size") ? [] : objects.advice
+  };
 };
 
 /**
@@ -474,19 +573,34 @@ export const excusedValues = (lines: readonly AddedLine[]): ExcusedValue[] =>
   );
 
 /**
- * What lines a change adds break. Only code is read: a rule named in a sentence is not that rule.
+ * What lines a change adds break, and what they hold to weigh. Only code is read: a rule named in a sentence is not that
+ * rule.
  *
  * @param lines - the added lines.
  * @param tokens - the catalogue's tokens; none skips the checks on values, which have nothing to compare with.
  */
-export const checkedCode = (lines: readonly AddedLine[], tokens: readonly DesignToken[]): CodeProblem[] =>
-  lines.flatMap((added, index): CodeProblem[] => {
-    if (!CHECKED_FILE.test(added.file) && !/\.[cm]?[jt]s$/.test(added.file)) return [];
-    if (LEFT_ALONE.test(added.file)) return [];
+export const codeFindings = (lines: readonly AddedLine[], tokens: readonly DesignToken[]): CodeFindings => {
+  const found = lines.map((added, index): CodeFindings => {
+    if (!CHECKED_FILE.test(added.file) && !/\.[cm]?[jt]s$/.test(added.file))
+      return { problems: [], advice: [] };
+    if (LEFT_ALONE.test(added.file)) return { problems: [], advice: [] };
     const suppression = suppressionProblem(added);
     if (tokens.length === 0 || !CHECKED_FILE.test(added.file) || DEFINES_VALUE.test(added.text))
-      return suppression;
+      return { problems: suppression, advice: [] };
     const above = lines[index - 1];
     const lineAbove = above?.file === added.file && above.line === added.line - 1 ? above : undefined;
-    return [...suppression, ...valueProblems(added, lineAbove, tokens)];
+    const values = valueFindings(added, lineAbove, tokens);
+    return { problems: [...suppression, ...values.problems], advice: values.advice };
   });
+  return { problems: found.flatMap((each) => each.problems), advice: found.flatMap((each) => each.advice) };
+};
+
+/**
+ * What lines a change adds break.
+ *
+ * @param lines - the added lines.
+ * @param tokens - the catalogue's tokens; none skips the checks on values, which have nothing to compare with.
+ */
+export const checkedCode = (lines: readonly AddedLine[], tokens: readonly DesignToken[]): CodeProblem[] => [
+  ...codeFindings(lines, tokens).problems
+];

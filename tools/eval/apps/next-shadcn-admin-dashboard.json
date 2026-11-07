@@ -1,0 +1,15 @@
+{
+  "name": "next-shadcn-admin-dashboard",
+  "repository": "https://github.com/arhamkhnz/next-shadcn-admin-dashboard",
+  "commit": "05b2b927f556e0dce18c9023afa23f8219f39c93",
+  "framework": "nextjs",
+  "packageManager": "npm",
+  "install": ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"],
+  "prepare": [],
+  "dev": ["npx", "--no-install", "next", "dev", "--port", "{port}", "--hostname", "localhost"],
+  "readyPath": "/dashboard/default",
+  "checks": {
+    "typecheck": ["npx", "--no-install", "tsc", "--noEmit"],
+    "lint": ["npx", "--no-install", "biome", "lint"]
+  }
+}
