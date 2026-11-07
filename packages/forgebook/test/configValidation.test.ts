@@ -13,9 +13,10 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { ForgebookConfig } from "../src/vite/config.ts";
-import { emptyStoryGlobs, loadConfigFile, resolveConfig } from "../src/vite/configFile.ts";
+import { loadConfigFile, resolveConfig } from "../src/vite/configFile.ts";
 import { unknownKeysProblem } from "../src/vite/configKeys.ts";
 import { placeInStack } from "../src/vite/configLoadError.ts";
+import { emptyStoryGlobs } from "../src/vite/emptyStoryGlobs.ts";
 import { unmatchedPatterns } from "../src/vite/storyPatterns.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 

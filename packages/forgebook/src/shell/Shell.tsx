@@ -71,8 +71,10 @@ import { ShowSidebarButton, Toolbar, type ToolbarProps } from "./Toolbar.tsx";
 import type { UsedInProps } from "./UsedIn.tsx";
 import { useAppearance } from "./useAppearance.ts";
 import { useEditedProblems } from "./useEditedProblems.ts";
+import { useListedTree } from "./useListedTree.ts";
 import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
+import { useShortcutHelp } from "./useShortcutHelp.tsx";
 import { useShownView } from "./useShownView.ts";
 import { useSidebarLayout } from "./useSidebarLayout.ts";
 import { useSidebarOverlay } from "./useSidebarOverlay.ts";
@@ -249,6 +251,8 @@ type Address = {
   /** What else the address says of the values, until the person changes one. */
   readonly link: AddressLink | undefined;
   readonly matrix: readonly string[];
+  /** The sidebar's tag filter, each `name` or `!name`: a place in the catalogue, so it stays from page to page. */
+  readonly tags: readonly string[];
 };
 
 /**
@@ -282,7 +286,8 @@ const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Addr
     page: pageOf(window.location.search, window.location.hash),
     view: parseView(window.location.search, catalogue),
     ...addressArgsRead(readArgsParam(param), param, addressTexts),
-    matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== "")
+    matrix: (params.get("matrix") ?? "").split(",").filter((name) => name !== ""),
+    tags: params.getAll("tag").filter((tag) => tag !== "" && tag !== "!")
   };
 };
 
@@ -296,7 +301,7 @@ type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience">;
  * @param catalogue - the catalogue's switches and default audience, for the view's values.
  */
 const addressQuery = (
-  { page, view, panelArgs, link, matrix }: Address,
+  { page, view, panelArgs, link, matrix, tags }: Address,
   catalogue: AddressCatalogue
 ): string => {
   const params = viewParams(view, catalogue.switches, catalogue.audience);
@@ -306,6 +311,7 @@ const addressQuery = (
   const args = page.kind === "story" ? (link?.param ?? panelArgsParam(panelArgs)) : "";
   if (args !== "") params.set("args", args);
   if (page.kind === "story" && matrix.length > 0) params.set("matrix", matrix.join(","));
+  for (const tag of tags) params.append("tag", tag);
   const query = params.toString();
   // the fragment is part of what is written back on every change of the view, or a change would lose the heading
   const fragment =
@@ -738,7 +744,8 @@ const useAddress = (catalogue: CatalogueSettings, addressTexts: AddressTexts): A
     view: { ...address.view, height: "auto" },
     panelArgs: {},
     link: undefined,
-    matrix: []
+    matrix: [],
+    tags: address.tags
   });
   const open = (page: Page, movesFocus: boolean): void => {
     const next = pageAddress(page);
@@ -860,6 +867,8 @@ const ShellPage = ({
     )
   );
 
+  const { help, showHelp } = useShortcutHelp();
+
   const shown = shownPage(tree, address.page);
   const location = componentLocationOf(shown);
   const ownPage = recentPageOf(shown);
@@ -886,8 +895,9 @@ const ShellPage = ({
     onAddressViewChange: changeView
   });
 
+  const listedTree = useListedTree(tree, address.tags);
   useStoryKeys(
-    tree,
+    listedTree,
     shownStoryId,
     shown.kind === "component" ? shown.location.component.stories[0]?.id : undefined,
     (id: string): void => openPage({ kind: "story", id })
@@ -968,10 +978,14 @@ const ShellPage = ({
         onHide={hideSidebar}
         onShow={showSidebar}
         appearance={appearance}
+        onShowKeys={showHelp}
         title={title}
         logo={logo}
         hasBranding={hasBranding !== false}
-        tree={tree}
+        tree={listedTree}
+        wholeTree={tree}
+        tags={address.tags}
+        onTagsChange={(tags: readonly string[]): void => replaceAddress({ ...address, tags })}
         sources={sources}
         searchHref={(target: SearchTarget): string => addressQuery(pageAddress(target), catalogue)}
         onOpenResult={openFound}
@@ -989,6 +1003,7 @@ const ShellPage = ({
           openPage(titledPage(idsByTitle, sourceId, componentTitle))
         }
       />
+      {help}
       <SidebarShade isOverlay={isSidebarOverlay} isOpen={isSidebarOpen} onHide={hideSidebar} />
       {/* under a sidebar lying over it, the page leaves Tab, screen readers and the pointer */}
       <main className="forgebook-main" inert={isSidebarOver}>

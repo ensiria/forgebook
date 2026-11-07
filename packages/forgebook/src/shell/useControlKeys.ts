@@ -11,7 +11,7 @@ import type { FixedView } from "../storyGlobals.ts";
 import type { ViewState } from "../viewState.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import { cycledView } from "./controlCycle.ts";
-import { isTyping } from "./keyboard.ts";
+import { isSingleKeyFree } from "./keyboard.ts";
 
 /** What the keys read and change. */
 export type ControlKeysInput = {
@@ -41,7 +41,7 @@ export const useControlKeys = (input: ControlKeysInput): void => {
   latest.current = input;
   useEffect(() => {
     const cycle = (event: KeyboardEvent): void => {
-      if (isTyping(event.target)) return;
+      if (!isSingleKeyFree(event)) return;
       const { keys, view, onViewChange, fixed, isStoryPage, isComponentPage } = latest.current;
       const pressed = pressedControl(keys, {
         key: event.key,

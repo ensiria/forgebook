@@ -184,11 +184,20 @@
     }
   }
 
+  .forgebook-search-row {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: $space-1;
+  }
+
   // flex: none, as the sidebar is a column: a long tree would otherwise squeeze the field below its height, and it
   // would grow back when a search leaves few results
   .forgebook-search {
     display: flex;
-    flex: none;
+    flex: 1;
+    min-width: 0;
     align-items: center;
     gap: $space-1-5;
     height: 1.75rem;
@@ -3208,12 +3217,6 @@
       font: $text-mono-small;
       color: $text-secondary;
     }
-  }
-
-  .forgebook-toggles {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: $space-2 $space-3;
   }
 
   .forgebook-toggle {
