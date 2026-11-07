@@ -167,6 +167,21 @@ describe("the story patterns that match nothing", () => {
     expect(unmatchedPatterns(dir, ["empty/**"])).toEqual(["empty/**"]);
   });
 
+  it("finds a match the same way from a pattern that climbs out of its folder, and none in a hidden folder", () => {
+    const outer = folderOf({
+      "lib/a/b/Card.stories.tsx": "",
+      "lib/.cache/Hidden.stories.tsx": "",
+      "lib/node_modules/x/Dep.stories.tsx": ""
+    });
+    const inner = join(outer, "app");
+    mkdirSync(inner);
+    expect(unmatchedPatterns(inner, ["../lib/**/*.stories.@(ts|tsx)", "./../lib/a/*/*.tsx"])).toEqual([]);
+    expect(unmatchedPatterns(outer, ["lib/*/Hidden.stories.tsx", "lib/**/Dep.stories.tsx"])).toEqual([
+      "lib/*/Hidden.stories.tsx",
+      "lib/**/Dep.stories.tsx"
+    ]);
+  });
+
   it("counts what a `!` pattern leaves out as not matched", () => {
     expect(unmatchedPatterns(dir, ["drafts/*.stories.tsx", "src/*.stories.tsx", "!drafts/**"])).toEqual([
       "drafts/*.stories.tsx"
