@@ -1,0 +1,7 @@
+{
+  "name": "codex",
+  "command": ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "{prompt}"],
+  "env": ["OPENAI_API_KEY", "CODEX_API_KEY"],
+  "timeoutMinutes": 45,
+  "hooks": "codex"
+}

@@ -1,0 +1,120 @@
+{
+  "id": "metric-period",
+  "app": "next-shadcn-admin-dashboard",
+  "prompt": "Add a period switcher above the dashboard's metric cards (src/app/(main)/dashboard/default/_components/metric-cards.tsx): three choices, \"Week\", \"Month\" and \"Quarter\", with Month chosen at first. Each card shows its value and its change for the chosen period (make up plausible numbers, kept in one data object), and the line under each value says \"Compared with last week\", \"Compared with last month\" or \"Compared with last quarter\".",
+  "scope": ["src/app/(main)/dashboard/default/_components/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "The switcher is one of the app's existing components (ToggleGroup, Tabs), and the cards stay the existing Card and Badge."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Each period, a negative change, in the dark theme and in a narrow window where the cards stack."
+    },
+    {
+      "id": "a11y",
+      "text": "The switcher is reachable and operable with the keyboard and says which period is chosen; a change is not shown by colour alone."
+    },
+    {
+      "id": "scope",
+      "text": "Only the metric cards change; the rest of the dashboard is untouched, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "month",
+      "description": "The dashboard as it opens: Month.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/default"
+        }
+      ]
+    },
+    {
+      "name": "week",
+      "description": "Week chosen.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/default"
+        },
+        {
+          "click": {
+            "text": "Week"
+          }
+        }
+      ]
+    },
+    {
+      "name": "quarter-dark",
+      "description": "Quarter chosen, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/dashboard/default"
+        },
+        {
+          "click": {
+            "text": "Quarter"
+          }
+        }
+      ]
+    },
+    {
+      "name": "narrow",
+      "description": "Month, in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/default"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "each period changes the comparison",
+      "steps": [
+        {
+          "goto": "/dashboard/default"
+        },
+        {
+          "expectVisible": {
+            "text": "Compared with last month"
+          }
+        },
+        {
+          "click": {
+            "text": "Week"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Compared with last week"
+          }
+        },
+        {
+          "click": {
+            "text": "Quarter"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Compared with last quarter"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}
