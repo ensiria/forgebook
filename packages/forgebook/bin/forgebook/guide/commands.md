@@ -20,6 +20,7 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook check-page http://localhost:3000/checkout --json` | The same checks on a real page of the application: the screen you built, not only its stories |
 | `npx forgebook changed --json` | The stories your change touches, through what they import |
 | `npx forgebook verify --json` | Whether your change is done, with one exit code: run it before you say so. Every changed UI file must reach a story that ran; those stories run in every variant, with `check-code`. Compares from where your branch left the default branch; in a pull request give `--since origin/develop`. `--quick` runs the default view only, and says so |
+| `npx forgebook proof --base origin/main --json` | Pictures of the states a change touches against where it started, both drawn in this run with nothing stored; `--write-workflow` sets up the pull request's comment. It reports: `verify` is the gate |
 | `npx forgebook check-code --json` | What your change adds against the design system: raw values, with the token to use, turned-off checks, deleted tests |
 | `npx forgebook errors --json` | What the open frames reported while you edited: render errors, failed plays |
 | `npx forgebook shot <id> --view "dark 360"` | The story as a picture, to look at it (a view as words, or `theme=dark&width=360`); a model's id in the view (`iphone-16`) frames it in that device |

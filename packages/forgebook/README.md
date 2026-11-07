@@ -1179,6 +1179,7 @@ is a state of the component: the same).
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
+| `forgebook proof` | Compares a change's states with where it started, both drawn in one run, for a pull request's comment |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
@@ -1308,6 +1309,37 @@ jobs:
 ```
 
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+
+## Proof in the pull request, made by CI
+
+`forgebook proof --base origin/main` draws the states a change touches twice in one run, from the commit it is compared with and
+with the change, and writes `comment.md`, `proof.json`, `index.html` and the pictures. `forgebook proof
+--write-workflow` writes a GitHub workflow that posts that comment, one per pull request, replaced on each push. Nothing runs
+outside GitHub, and the pictures are the run's artefact.
+
+- **No baseline, so nothing for an agent to approve.** The "before" is drawn in this run from where the change left the base (on a pull request's run, the base's tip), in a checkout
+  with its own install and server, and thrown away. `forgebook-baselines` is never read, and `proof` has no `--update`.
+- **What differs is pictured again.** A state that also differs between two pictures of the same code is `unstable`, and its
+  difference proves nothing. `forgebook proof --base HEAD --all` shows whether a project's pictures hold still between two
+  builds of one commit.
+- **It says what it did not check:** what `verify` skipped, UI files no story reaches, stories past `--max-stories`, a state
+  that did not draw, and real pages, which no story shows.
+- **A changed picture is for a person to judge.** The command exits zero once it has a proof, unless `--fail-on-verdict`
+  holds it to `verify`'s verdict, as the workflow does.
+- **It cannot defend against the code it runs.** The branch's code runs in the comparing job, and a `postinstall` before it,
+  so a hostile branch can forge the result or edit the workflow: no baseline can be approved, but a result can be faked. So
+  that job holds no write token and keeps no credential. The posting job runs nothing of the branch, writes the comment
+  itself from `proof.json` with every name in a code span or a fence, and lists from GitHub which files shape the run
+  (`.github/`, `patches/`, `package.json`, lockfiles, `.npmrc`, the catalogue's configuration and preview). The comment says
+  this at its top. Protect `.github/` with code owners if agents push to your repository, and treat `index.html` in a
+  stranger's artefact as any download.
+- **A fork's pull request gets no comment.** GitHub gives its run a read-only token, so posting fails and the job goes on:
+  the proof stays in the run's summary and its artefact. Never run this on `pull_request_target`, which would hand a fork's
+  code a write token.
+- **A picture needs a download.** GitHub cannot show an artefact's picture in a comment, so the comment links the artefact:
+  open `index.html` in it.
+- **A picture with something from the network proves little.** A story loading a random image reads as `unstable`, or as
+  changed when it differs only between the two sides. Mock what a story fetches.
 
 ## Stories on an origin of their own
 

@@ -1,0 +1,131 @@
+# The workflow `forgebook proof --write-workflow` writes, on the fixture catalogue: a change to it gets its before and after
+# in a comment, so the comment is exercised on real pull requests. Actions are pinned to a commit, as in `checks.yml`.
+name: proof
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "fixtures/app/**"
+      - "fixtures/kit/**"
+      - ".github/workflows/proof.yml"
+
+# a newer push replaces the run, so an older one cannot overwrite its comment
+concurrency:
+  group: proof-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    # what runs here is the branch's code: no write token, and no credential left in its checkout
+    permissions:
+      contents: read
+    outputs:
+      artifact: ${{ steps.pictures.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @fixture/app exec playwright install --with-deps chromium
+      - name: Compare the base and this branch
+        working-directory: fixtures/app
+        run: pnpm exec forgebook proof --base "origin/$BASE_REF" --out "$RUNNER_TEMP/forgebook-proof" --max-stories 20 --quick
+        env:
+          BASE_REF: ${{ github.base_ref }}
+      - name: Keep the proof in the run's summary
+        if: ${{ !cancelled() }}
+        run: cat "$RUNNER_TEMP/forgebook-proof/comment.md" >> "$GITHUB_STEP_SUMMARY" || true
+      - id: pictures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: forgebook-proof
+          path: ${{ runner.temp }}/forgebook-proof
+          if-no-files-found: ignore
+          retention-days: 7
+
+  comment:
+    needs: proof
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    # runs nothing of the branch; a fork's token stays read-only whatever this asks
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: forgebook-proof
+      - name: Post one comment
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ needs.proof.outputs.artifact }}
+          PULL: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          RUN: ${{ github.run_id }}
+          OWN_FILES: "^(\\.github/|patches/)|(^|/)(forgebook\\.(config|preview)\\.[^/]+|vite\\.config\\.[^/]+|package\\.json|package-lock\\.json|pnpm-lock\\.yaml|pnpm-workspace\\.yaml|yarn\\.lock|bun\\.lock|\\.npmrc|\\.yarnrc\\.yml|\\.pnpmfile\\.c?js)$"
+          COMMENT_FILTER: |
+            def word: tostring | gsub("[\u0060\r\n\t|]"; " ") | .[0:120];
+            def line: tostring | gsub("\u0060"; "'") | gsub("\r"; " ") | .[0:600];
+            def fence($lines): "\u0060\u0060\u0060text\n" + ($lines | map(line) | join("\n")) + "\n\u0060\u0060\u0060";
+            def row: "| \u0060 " + (.storyId | word) + " \u0060 | \u0060 " + ((if .view == "" then "default" else .view end) | word) + " \u0060 | "
+              + (if (.status | IN("changed","resized","new","broken","removed","unstable")) then .status else "unknown" end)
+              + " | " + ((.percent | tonumber? // 0) * 100 | round / 100 | tostring) + " % |";
+            [
+              "### Forgebook proof",
+              "",
+              "Made by this branch's own run, so a hostile branch could forge what follows. Files it edits that shape the run, as GitHub lists them:",
+              "",
+              (if ($files | length) == 0 then "None." else fence($files[:100]) end),
+              "",
+              (if $pictures == "" then "[The run](" + $run + ")" else "[Before and after pictures](" + $pictures + "): open index.html in the download." end),
+              "",
+              "#### States touched",
+              "",
+              ((.states | length | tostring) + " differ, " + (.same | tonumber? // 0 | tostring) + " the same."),
+              "",
+              (if (.states | length) == 0 then "" else "| Story | View | Compared with the base | Pixels |\n|---|---|---|---|\n" + (.states[:40] | map(row) | join("\n")) end),
+              "",
+              "#### Checked",
+              "",
+              fence(["verdict: " + (.verdict | tostring), .summary] + .checked),
+              "",
+              "#### Not checked",
+              "",
+              (if (.notChecked | length) == 0 then "Nothing this run knows of." else fence(.notChecked[:60]) end)
+            ] | join("\n")
+        run: |
+          marker='<!-- forgebook-proof -->'
+          run_url="$GITHUB_SERVER_URL/$REPOSITORY/actions/runs/$RUN"
+          if gh api "repos/$REPOSITORY/pulls/$PULL/files" --paginate --jq '.[].filename' > files.txt; then
+            grep -E "$OWN_FILES" files.txt | jq -R . | jq -s . > own.json || echo '[]' > own.json
+          else
+            echo '["GitHub did not list the files: read them in the pull request"]' > own.json
+          fi
+          pictures=""
+          artifact_id=$(basename "$ARTIFACT")
+          case "$ARTIFACT" in
+            "$run_url/artifacts/$artifact_id")
+              if [ -n "$artifact_id" ] && [ -z "$(printf '%s' "$artifact_id" | tr -d 0-9)" ]; then pictures="$ARTIFACT"; fi
+              ;;
+          esac
+          if [ -s proof.json ] && text=$(jq -r --slurpfile own own.json --arg run "$run_url" --arg pictures "$pictures" "\$own[0] as \$files | $COMMENT_FILTER" proof.json); then
+            body="$marker"$'\n'"$text"
+          else
+            body="$marker"$'\n'"### Forgebook proof"$'\n\n'"This run did not finish, so nothing is proved for this commit: [read the run]($run_url)."
+          fi
+          found=$(gh api "repos/$REPOSITORY/issues/$PULL/comments" --paginate --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
+          if [ -n "$found" ]; then
+            gh api --method PATCH "repos/$REPOSITORY/issues/comments/$found" -f body="$body" > /dev/null
+          else
+            gh api --method POST "repos/$REPOSITORY/issues/$PULL/comments" -f body="$body" > /dev/null
+          fi
