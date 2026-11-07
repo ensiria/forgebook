@@ -110,6 +110,8 @@ export type SidebarProps = SidebarPageLinks & {
   readonly onShow: () => void;
   /** The shell's appearance and its setter, for the menu at the foot. */
   readonly appearance: AppearanceState;
+  /** Opens the list of the shell's keys. */
+  readonly onShowKeys: () => void;
 };
 
 /** A family's key, unique across sources. */
@@ -383,6 +385,7 @@ export const Sidebar = ({
   onHide,
   onShow,
   appearance,
+  onShowKeys,
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
@@ -477,7 +480,7 @@ export const Sidebar = ({
           />
         ))}
       </nav>
-      <AppearanceMenu {...appearance} />
+      <AppearanceMenu {...appearance} onShowKeys={onShowKeys} />
       {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}
     </aside>
   );

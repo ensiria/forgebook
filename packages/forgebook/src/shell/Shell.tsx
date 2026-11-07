@@ -74,6 +74,7 @@ import { useEditedProblems } from "./useEditedProblems.ts";
 import { useListedTree } from "./useListedTree.ts";
 import { type RecentPage, useRecentPages } from "./useRecentPages.ts";
 import type { PageScroll, PageVisit } from "./useScrollMemory.ts";
+import { useShortcutHelp } from "./useShortcutHelp.tsx";
 import { useShownView } from "./useShownView.ts";
 import { useSidebarLayout } from "./useSidebarLayout.ts";
 import { useSidebarOverlay } from "./useSidebarOverlay.ts";
@@ -866,6 +867,8 @@ const ShellPage = ({
     )
   );
 
+  const { help, showHelp } = useShortcutHelp();
+
   const shown = shownPage(tree, address.page);
   const location = componentLocationOf(shown);
   const ownPage = recentPageOf(shown);
@@ -975,6 +978,7 @@ const ShellPage = ({
         onHide={hideSidebar}
         onShow={showSidebar}
         appearance={appearance}
+        onShowKeys={showHelp}
         title={title}
         logo={logo}
         hasBranding={hasBranding !== false}
@@ -999,6 +1003,7 @@ const ShellPage = ({
           openPage(titledPage(idsByTitle, sourceId, componentTitle))
         }
       />
+      {help}
       <SidebarShade isOverlay={isSidebarOverlay} isOpen={isSidebarOpen} onHide={hideSidebar} />
       {/* under a sidebar lying over it, the page leaves Tab, screen readers and the pointer */}
       <main className="forgebook-main" inert={isSidebarOver}>

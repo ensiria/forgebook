@@ -95,6 +95,14 @@ const popover =
 const STATES: readonly ShellState[] = [
   { name: "home", open: pageWith("/", (page) => page.locator(".forgebook-home__families").last()) },
   {
+    name: "list of keys",
+    open: async (page: Page): Promise<void> => {
+      await page.goto("/");
+      await page.locator("body").press("?");
+      await page.getByRole("dialog", { name: "Keyboard keys" }).waitFor();
+    }
+  },
+  {
     name: "tag filter",
     open: async (page: Page): Promise<void> => {
       await page.goto("/?tag=beta&tag=%21wip");
