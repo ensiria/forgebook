@@ -20,11 +20,10 @@ import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
 import type { StoryCheckResult } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
-import type { CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
+import type { CodeAdvice, CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
 import type { DesignToken, TokenSource } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
-import type { ReuseAdvice } from "./reuseCheck.ts";
 import type { TokenClash } from "./tokenClashes.ts";
 
 /** The version of the documents' shape. */
@@ -510,7 +509,7 @@ export type VerifyDocument = {
     /** The values a comment in the change says are meant. */
     readonly excused?: readonly ExcusedValue[];
     /** What it found to weigh and not to fail on. */
-    readonly advice?: readonly ReuseAdvice[];
+    readonly advice?: readonly CodeAdvice[];
   };
   /** How many problems there are, in `failures` and `code.problems` together. */
   readonly problems: number;
@@ -581,8 +580,8 @@ export type CheckedCodeDocument = {
   readonly skipped: readonly string[];
   /** What it found, by file and line. */
   readonly problems: readonly CodeProblem[];
-  /** What it found to weigh and not to fail on: a component that may be one that exists, what `@useWhen` says of an import. */
-  readonly advice?: readonly ReuseAdvice[];
+  /** What it found to weigh and not to fail on: a component that may be one that exists, what `@useWhen` says of an import, a bare number in an object that may be a style. */
+  readonly advice?: readonly CodeAdvice[];
   /** What the values were compared with, each file with how many tokens it gives; none from an older catalogue. */
   readonly tokenSources?: readonly TokenSource[];
   /** How many tokens two files give different values: `forgebook tokens` names them. */

@@ -1676,7 +1676,10 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 `judgements`, apart from the problems, as an opinion: it does not fail the check.
 
 `forgebook check-code` and `check_code` read what a change adds, new files included, from where it left `--since`: a colour
-written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
+written by hand, with the token to use when one clearly fits; a size that equals a token, in a sheet, a class's brackets
+or a React style object, where a bare number is pixels (`style={{ padding: 16 }}`, a `CSSProperties`, `styled.div({ … })`).
+A bare number on a line that does not say its object is a style is only `advice`, since an option has the same keys
+(`fitView({ padding: 16 })`). Then a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
 code to paste. It does not check props, which the type checker does. It exits non-zero on a problem, for CI.
