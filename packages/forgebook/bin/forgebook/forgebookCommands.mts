@@ -19,7 +19,6 @@ import { ScriptError } from "@ensiria/cli-kit/script";
 import { build } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
-import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
 import { agentSetupCommands } from "./agentSetupCommands.mts";
@@ -42,7 +41,7 @@ import { graphCommands } from "./graphCommand.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
-import { newStoriesFile } from "./newStoriesFile.ts";
+import { newStoriesDocument, newStoriesFile, usesWords } from "./newStoriesFile.ts";
 import { pagesCommands } from "./pagesCommands.mts";
 import { runTokens } from "./tokensRun.ts";
 import { visualCommands } from "./visualCommands.mts";
@@ -325,8 +324,9 @@ await defineCommands({
             hint: "Give --force to replace it, or --print to see it"
           });
         writeFileSync(written.file, written.text);
-        if (isJson) io.stdout.write(formatJson({ schema: 1, file: VITE_PATHS.normalize(shown) }));
-        log.success(`${shown} written`);
+        if (isJson) io.stdout.write(formatJson(newStoriesDocument(written, shown)));
+        log.success(`${shown} written${usesWords(written.uses)}`);
+        if (written.usesProblem !== undefined) log.warn(`Its uses were not read: ${written.usesProblem}`);
         log.info(
           `${COMMAND} stories --component ${written.text.match(/title: "([^"]*)"/)?.[1] ?? ""} lists them`
         );
