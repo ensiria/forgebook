@@ -61,7 +61,8 @@ export const storiesText = (document: StoriesDocument, style: OutputStyle): stri
   );
 
 /**
- * One story's facts: where it is, where it opens, its args, its component's props and those every use must set.
+ * One story's facts: where it is, where it opens, its args, its component's props and those every use must set, then
+ * its code.
  *
  * @param document - the story document.
  * @param style - colours, glyphs and width.
@@ -80,7 +81,9 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
   if (document.design !== undefined) entries.push(["Design", document.design.figma]);
-  return keyValue(entries, uncut(style));
+  const fields = keyValue(entries, uncut(style));
+  // the code spans lines: under the fields, as it is copied
+  return document.code === undefined ? fields : `${fields}\n\n${document.code}`;
 };
 
 /** What a model judged, each line saying it is an opinion. */

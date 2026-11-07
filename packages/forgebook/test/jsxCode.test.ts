@@ -52,4 +52,30 @@ describe("jsxCode", () => {
       '<Select options={["weekly", "monthly"]} counts={[1, 2]} />'
     );
   });
+
+  it("writes the args the file writes as code as written, over their values, functions and elements included", () => {
+    expect(
+      jsxCode(
+        "Button",
+        { label: "Star", items: ["a"] },
+        { onClick: "fn()", icon: "<IconStar size={16} />", items: "ITEMS" }
+      )
+    ).toBe('<Button label="Star" items={ITEMS} onClick={fn()} icon={<IconStar size={16} />} />');
+  });
+
+  it("puts written children between the tags: an element as it is, other code in braces", () => {
+    expect(jsxCode("Menu", {}, { children: "<Menu.Item>Copy</Menu.Item>" })).toBe(
+      "<Menu><Menu.Item>Copy</Menu.Item></Menu>"
+    );
+    expect(jsxCode("Text", {}, { children: "greeting.trim()" })).toBe("<Text>{greeting.trim()}</Text>");
+  });
+
+  it("indents written code that spans lines under its attribute", () => {
+    expect(jsxCode("Button", { label: "Go" }, { onClick: "() => {\n  save();\n}" })).toBe(
+      '<Button\n  label="Go"\n  onClick={() => {\n    save();\n  }}\n/>'
+    );
+    expect(jsxCode("Card", {}, { children: "<>\n  <Body />\n</>" })).toBe(
+      "<Card>\n  <>\n    <Body />\n  </>\n</Card>"
+    );
+  });
 });

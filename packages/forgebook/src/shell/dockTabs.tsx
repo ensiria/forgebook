@@ -313,7 +313,8 @@ const codeTabs = (input: DockTabsInput): DockTab[] => {
             code: code.value,
             exportName: input.story.exportName,
             componentName: docs.status === "ready" ? codeNameOf(docs.value) : input.componentName,
-            args: input.values
+            args: input.values,
+            edited: Object.keys(input.panelArgs)
           }}
         />
       )

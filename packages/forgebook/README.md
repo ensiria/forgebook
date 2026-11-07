@@ -270,6 +270,14 @@ too, with a warning.
   the fields its type declares; anything else (`onclick`, `innerHTML`, a text for a number) is left out and listed above
   the story, with a button that removes it from the address, as is one that cannot be read at all. A value that is code
   never comes from a link.
+- **Code as you wrote it**: the Code tab and Show code give a story's `render` as written in its file (its own, else
+  the meta's; one kept in a constant or a function of the file shows as that code), with its hooks and compound
+  components as they are. A story drawn from its args shows its component with each arg the file writes as code
+  (`onClick: fn()`, `icon: <IconStar />`, a constant of the file) as written, spreads of the file's objects and of
+  another story's args followed, and the plain values as they are now. A value set in the Props tab is written from
+  that value. `forgebook story --json` gives the same text as `code`. Vue and Svelte bind such an arg as written
+  (`:on-close="fn()"`); Angular, HTML and Web Components still write the plain values only. A story made by a
+  helper, imported from another file or written in CSF 4 (`meta.story(…)`) is written from its values.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break, every number a huge one and every list many items, nested ones too, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.

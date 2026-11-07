@@ -42,6 +42,18 @@ const forgebook = (baseURL: string, argv: readonly string[]): { status: number |
 test.describe("forgebook story", () => {
   test.setTimeout(180_000);
 
+  test("gives an agent the story's code as the Code tab shows it: a spy as written, a render as written", ({
+    baseURL
+  }) => {
+    if (baseURL === undefined) throw new Error("the suite has no server");
+    const spy = forgebook(baseURL, ["story", "sb:storybook-actions--spy", "--json"]);
+    expect(spy.status).toBe(0);
+    expect(JSON.parse(spy.stdout).code).toBe('<Button label="Press" onClick={fn()} />');
+    const own = forgebook(baseURL, ["story", "sb:storybook-meta-render-and-play--own-render", "--json"]);
+    expect(own.status).toBe(0);
+    expect(JSON.parse(own.stdout).code).toBe("(args) => <Badge {...args} />");
+  });
+
   test("gives an agent a story's design: the Figma link, the file, the node, the page to see it on", ({
     baseURL
   }) => {
