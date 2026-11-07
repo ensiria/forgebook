@@ -67,7 +67,7 @@ const HEX_COLOR = /(?:^|[\s:'"`(,[=])(#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})
 const COLOR_FUNCTION = /(?<![\w.])(?:rgba?|hsla?|oklch|oklab)\((?![^)]*\$\{)[\d\s.,%/-]+\)/gi;
 
 /** A size, signed or in Tailwind's brackets. */
-const SIZE = /(?:^|[\s:'"`(,[-])(\d*\.?\d+(?:px|rem))\b/g;
+export const SIZE = /(?:^|[\s:'"`(,[-])(\d*\.?\d+(?:px|rem))\b/g;
 
 /** A comment that turns a check off. */
 const SUPPRESSION =
@@ -89,7 +89,7 @@ export const CHECKED_FILE = /\.(?:css|scss|sass|less|tsx|jsx|vue|svelte|astro)$/
  * Where raw values belong: stories, tests, tokens and what a tool wrote; and what is drawn where a page's custom
  * properties do not reach, as an email or a generated social image.
  */
-const LEFT_ALONE =
+export const LEFT_ALONE =
   /(?:\.stories\.|\.test\.|\.spec\.|\.e2e\.|\.min\.|opengraph|twitter-image|(?:^|\/)_?(?:design-)?tokens?(?:\.|\/)|\.tokens?\.|(?:^|\/)theme\.|(?:^|\/)(?:__tests__|tests?|e2e|dist|build|generated|vendor|og|emails?)\/)/;
 
 /** A style sheet. */
@@ -102,19 +102,28 @@ const TEST_FILE = /(?:\.test\.|\.spec\.|\.e2e\.|_test\.|(?:^|\/)(?:__tests__|tes
 const HUNK = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
 /** A line that defines a value: a custom property or a Sass variable, where raw values belong. */
-const DEFINES_VALUE = /^\s*(?:--[\w-]+|\$[\w-]+)\s*:/;
+export const DEFINES_VALUE = /^\s*(?:--[\w-]+|\$[\w-]+)\s*:/;
 
 /** How far before a size its property or class is looked for, in characters. */
 const LOOK_BACK = 200;
 
 /** Past this a line is data or a minified bundle, written by no one, and these patterns would take long to read it. */
-const LONGEST_LINE = 2000;
+export const LONGEST_LINE = 2000;
+
+/** A line inside a block comment, whose start this cannot see when only added lines are read. */
+const COMMENT_LINE = /^\s*\*(?:\s|\/|$)/;
 
 /** A custom property declared in the middle of a line, as a sheet's one-line `:root { … }` does. */
 const CUSTOM_PROPERTY = /(?<![\w-])--[\w-]+\s*:[^;}]*;?/g;
 
 /** A media condition, where `var()` does not work, so a token cannot stand in. */
 const MEDIA_CONDITION = /@(?:media|container)\b/;
+
+/** A custom property read from a script, with what shows if it is missing: the token being used, as in `var()`. */
+const SCRIPT_FALLBACK = /getPropertyValue\([^()]*\)[^"'`]{0,20}(?:\|\||\?\?)\s*["'`][^"'`]*["'`]/g;
+
+/** A Vue slot's shorthand, whose name may read as a colour (`<template #add>`). */
+const SLOT_SHORTHAND = /<template\s+#[\w-]+/;
 
 /** A Tailwind class holding a mask, whose colours only give it alpha. */
 const MASK_CLASS = /\bmask-\[[^\]]*\]/g;
@@ -128,16 +137,25 @@ const VAR_FALLBACK = /var\(\s*--[\w-]+\s*,[^()]*(?:\([^()]*\)[^()]*)*\)/g;
  * cannot reach.
  */
 const NOT_A_COLOUR_OF_THE_SYSTEM =
-  /^\s*(?:fill|stroke|stop-?color)=|<(?:path|circle|rect|g|stop|ellipse|polygon|polyline|line|linearGradient|radialGradient)\b|\bstop-?color\s*[=:]|\bmask(?:-image)?\s*:|theme[-_]?color|<meta\b|\bmeta\d*\.|\b(?:fillStyle|strokeStyle|shadowColor)\b/i;
+  /^\s*(?:fill|stroke|stop-?color)=|<(?:path|circle|rect|g|stop|ellipse|polygon|polyline|line|linearGradient|radialGradient)\b|\bstop-?color\s*[=:]|(?:\b-?webkit-?|\b)mask(?:-?image)?\s*:|theme[-_]?color|<meta\b|\bmeta\d*\.|\b(?:fillStyle|strokeStyle|shadowColor)\b/i;
 
-/** A selector, whose `#` is an id. */
-const SELECTOR_LINE = /[{,]\s*$/;
+/**
+ * A line of a table of colours, keyed by a step (`500: "#3b82f6"`): a palette shown or converted, written as data, and a
+ * single table would otherwise be hundreds of findings.
+ */
+const PALETTE_ROW = /^\s*["']?\d+["']?\s*:\s*["'`][^"'`]*["'`],?\s*$/;
+
+/** Black or white picked by what is underneath: the contrast of a colour a user chose, which no token can know. */
+const CONTRAST_PICK = /\?\s*["'`]#(?:fff|ffffff|000|000000)["'`]\s*:\s*["'`]#(?:fff|ffffff|000|000000)["'`]/i;
+
+/** A selector, whose `#` is an id; an object's line ends in a comma too, but holds its value in quotes. */
+const SELECTOR_LINE = /\{\s*$|^[^"'`]*,\s*$/;
 
 /** A name's last part that makes it a step of a scale. */
 const SCALE_STEP = /-(?:\d+(?:\.\d+)?|\d*x[sl]|sm|md|lg|small|medium|large|tiny|huge)$/i;
 
 /** What a size is for. */
-type SizeRole = "space" | "radius" | "font";
+export type SizeRole = "space" | "radius" | "font";
 
 /** Tailwind's utilities whose arbitrary sizes have an equal on a scale. */
 const UTILITY_ROLES: readonly (readonly [RegExp, SizeRole])[] = [
@@ -156,8 +174,13 @@ const PROPERTY_ROLES: readonly (readonly [RegExp, SizeRole])[] = [
   [/^(?:margin|padding|gap|row-?gap|column-?gap)/i, "space"]
 ];
 
-/** A line's code, without what follows a `//` or a comment's start. */
-const withoutComment = (text: string): string => text.replace(/(?:^|\s)\/\/.*$/, "").replace(/\/\*.*$/, "");
+/**
+ * A line's code, without what follows a `//` or a comment's start.
+ *
+ * @param text - the line.
+ */
+export const withoutComment = (text: string): string =>
+  text.replace(/(?:^|\s)\/\/.*$/, "").replace(/\/\*.*$/, "");
 
 /**
  * The lines a unified diff adds. A header is read only outside a hunk, since an added line of `++ x` looks like one.
@@ -262,22 +285,33 @@ const isNeutralShade = (value: string): boolean =>
   /^#(?:0{6}|f{6})[0-9a-f]{2}$/i.test(value) ||
   /^#(?:0{3}|f{3})[0-9a-f]$/i.test(value);
 
-/** The raw colours in a line of code. */
-const colorProblems = (added: AddedLine, written: string, tokens: readonly DesignToken[]): CodeProblem[] => {
+/**
+ * The colours written by hand in a line of code, leaving out what is not the system's to give.
+ *
+ * @param written - the line, its comment taken off.
+ */
+export const rawColorsOf = (written: string): readonly string[] => {
   // a fallback in `var()` is the token being used; the value is what shows only if it is missing
-  const code = written.replace(VAR_FALLBACK, "var()").replace(MASK_CLASS, "");
+  const plain = written.replace(VAR_FALLBACK, "var()").replace(SCRIPT_FALLBACK, "").replace(MASK_CLASS, "");
+  // a theme's pair of values is what a token is for; a pick on anything else is a contrast
+  const code = /theme|mode|dark\s*[=?]/i.test(plain) ? plain : plain.replace(CONTRAST_PICK, "");
   if (SELECTOR_LINE.test(code) || /(?:href|url)\s*[=(]/.test(code)) return [];
-  if (NOT_A_COLOUR_OF_THE_SYSTEM.test(code)) return [];
+  if (NOT_A_COLOUR_OF_THE_SYSTEM.test(code) || PALETTE_ROW.test(code)) return [];
+  if (SLOT_SHORTHAND.test(code)) return [];
   // digits alone are a number more often than a colour (`Order #1042`), unless they stand as a value
   const hexes = [...code.matchAll(HEX_COLOR)]
     .flatMap((match) => match[1] ?? [])
     .filter((value) => !/^#\d+$/.test(value) || new RegExp(`[:=]\\s*['"\`]?${value}`).test(code));
   const functions = [...code.matchAll(COLOR_FUNCTION)].map((match) => match[0]);
   const isShadow = /shadow/i.test(code);
-  return [...hexes, ...functions]
-    .filter((value) => !isFullyTransparent(value) && !(isShadow && isNeutralShade(value)))
-    .map((value) => colorProblem(added, value, tokens));
+  return [...hexes, ...functions].filter(
+    (value) => !isFullyTransparent(value) && !(isShadow && isNeutralShade(value))
+  );
 };
+
+/** The raw colours in a line of code, as problems. */
+const colorProblems = (added: AddedLine, written: string, tokens: readonly DesignToken[]): CodeProblem[] =>
+  rawColorsOf(written).map((value) => colorProblem(added, value, tokens));
 
 /**
  * What a token read from an application is for, from its name, when it is a step of a scale (`--radius-lg`, `--space-2`):
@@ -290,8 +324,14 @@ const tokenRole = (name: string): SizeRole | undefined => {
   return /spac|gap|gutter|margin|padding|^--size-/i.test(name) ? "space" : undefined;
 };
 
-/** What a size in a line is for, and whether a class holds it; none when it stands in a sum no token can replace. */
-const roleInLine = (before: string): { readonly role: SizeRole; readonly isClass: boolean } | undefined => {
+/**
+ * What a size in a line is for, and whether a class holds it; none when it stands in a sum no token can replace.
+ *
+ * @param before - the line up to the size.
+ */
+export const roleInLine = (
+  before: string
+): { readonly role: SizeRole; readonly isClass: boolean } | undefined => {
   // what decides is close by: a limit keeps these patterns linear on a long line
   const near = before.slice(-LOOK_BACK);
   if (/-\[[^\]]*$/.test(near)) {
@@ -310,8 +350,11 @@ const roleInLine = (before: string): { readonly role: SizeRole; readonly isClass
  * The tokens a size can be compared with where it stands: a tokens file's all, an application's of its role. Tailwind's
  * own scale counts only in a class's brackets, where a class of that scale says the same (`p-[16px]`, `p-4`): in a sheet
  * or a style, a size equal to a step of a scale nobody there chose means nothing.
+ *
+ * @param tokens - the tokens.
+ * @param before - the line up to the size.
  */
-const sizeTokens = (tokens: readonly DesignToken[], before: string): readonly DesignToken[] => {
+export const sizeTokens = (tokens: readonly DesignToken[], before: string): readonly DesignToken[] => {
   const where = roleInLine(before);
   return tokens.filter((token) => {
     if (token.origin === undefined) return true;
@@ -364,6 +407,28 @@ const suppressionProblem = ({ file, line, text }: AddedLine): CodeProblem[] =>
 const comparesColors = (tokens: readonly DesignToken[]): boolean =>
   tokens.some((token) => token.type === "color" || token.origin === undefined);
 
+/**
+ * A file with its block comments blanked and its lines kept, so what is commented out does not count as used. A `/*` right
+ * after a word or a star or a quote is a path's pattern (`src/**` then `/*.ts`), not a comment.
+ *
+ * @param text - the file.
+ */
+export const withoutBlockComments = (text: string): string => {
+  let out = "";
+  let index = 0;
+  while (index < text.length) {
+    const open = text.slice(index).search(/(?<![*"'`\w])\/\*|<!--/);
+    if (open === -1) return out + text.slice(index);
+    const start = index + open;
+    const close = text.startsWith("/*", start) ? "*/" : "-->";
+    const end = text.indexOf(close, start + 2);
+    const stop = end === -1 ? text.length : end + close.length;
+    out += text.slice(index, start) + text.slice(start, stop).replace(/[^\n]/g, " ");
+    index = stop;
+  }
+  return out;
+};
+
 /** The rules a line's comment excuses. */
 const ignoredRules = (text: string): string[] =>
   [...text.matchAll(IGNORE_COMMENT)].flatMap((match) => match[1] ?? []);
@@ -379,7 +444,7 @@ const valueProblems = (
   const isSheet = SHEET_FILE.test(added.file);
   const code = isSheet ? written.replace(CUSTOM_PROPERTY, "") : written;
   // in a sheet, a line with no property continues a value started above, usually a token's
-  if (isSheet && !code.includes(":")) return [];
+  if ((isSheet && !code.includes(":")) || COMMENT_LINE.test(code)) return [];
   const ignored = [...ignoredRules(added.text), ...(above === undefined ? [] : ignoredRules(above.text))];
   const colors = comparesColors(tokens) ? colorProblems(added, code, tokens) : [];
   return [...colors, ...sizeProblems(added, code, tokens)].filter(({ rule }) => !ignored.includes(rule));

@@ -288,7 +288,12 @@ describe("tokens read from an application", () => {
     ["the page's head", '<meta name="x" content="#123456" />'],
     ["a fallback, the token being used", "color: var(--danger, #123456);"],
     ["a gradient's transparent end", "background: linear-gradient(rgba(1, 2, 3, 0), red);"],
-    ["black in a shadow", "box-shadow: 0 1px rgba(0, 0, 0, 0.5);"]
+    ["black in a shadow", "box-shadow: 0 1px rgba(0, 0, 0, 0.5);"],
+    ["a Vue slot's name", "<template #add>"],
+    ["a custom property's fallback in a script", `up: root.getPropertyValue("--bs-primary") || "#5cdd8b",`],
+    ["a table of a palette's steps", '  "500": "oklch(0.7 0.1 200)",'],
+    ["a contrast picked for a user's colour", 'color: isDark(c) ? "#fff" : "#000",'],
+    ["a style object's mask", "WebkitMask: 'radial-gradient(rgba(1, 2, 3, 1) 0%)',"]
   ])("leaves alone %s", (_, line) => {
     expect(found(line)).toEqual([]);
   });
@@ -319,6 +324,22 @@ describe("tokens read from an application", () => {
     expect(found(".btn--primary:hover { color: #ff0000 }", "src/a.css")).toHaveLength(1);
     expect(found('className="[--w:16px] bg-[#ff0000]"')).toHaveLength(1);
     expect(found('className="mask-image bg-[#ff0000]"')).toHaveLength(1);
+  });
+
+  it("reads the rest of a line with a contrast pick, and takes a theme's pair for what it is", () => {
+    expect(found('a: c ? "#fff" : "#000", b: "#12345a",')).toEqual(["#12345a"]);
+    expect(found('color: theme === "dark" ? "#fff" : "#000",').length).toBeGreaterThan(0);
+  });
+
+  it("leaves alone a line inside a block comment, and a selector with quotes", () => {
+    expect(found(" * color: #12345a;")).toEqual([]);
+    expect(found('a[data-x="y"] #bad {', "src/a.css")).toEqual([]);
+    expect(found("maskImage: 'linear-gradient(#12345a, #abcdef)',")).toEqual([]);
+  });
+
+  it("reads a colour on an object's line, which ends in a comma as a selector does", () => {
+    expect(found('    color: "#12345a",')).toEqual(["#12345a"]);
+    expect(found(".a #bcd,", "src/a.css")).toEqual([]);
   });
 
   it("leaves alone a sheet's one-line declarations", () => {
