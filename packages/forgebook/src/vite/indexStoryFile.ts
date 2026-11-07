@@ -198,7 +198,7 @@ const storyFields = (
 };
 
 /** The file's top level, read once: its constants and the properties assigned to names. */
-type TopLevel = {
+export type TopLevel = {
   /** Each constant's value, by name. */
   readonly values: ReadonlyMap<string, ESTree.Expression>;
   /** The properties assigned to a name after it (`A.storyName = "…"`), by name then property. */
@@ -248,7 +248,7 @@ const declaredBy = (statement: ESTree.Program["body"][number]): Declared[] => {
  *
  * @param program - the parsed file.
  */
-const topLevelOf = (program: ESTree.Program): TopLevel => {
+export const topLevelOf = (program: ESTree.Program): TopLevel => {
   const values = new Map<string, ESTree.Expression>();
   const assigned = new Map<string, Map<string, ESTree.Expression>>();
   for (const statement of program.body) {
@@ -270,7 +270,7 @@ const topLevelOf = (program: ESTree.Program): TopLevel => {
  * @param value - the value.
  * @param seen - the names followed so far.
  */
-const objectOf = (
+export const objectOf = (
   top: TopLevel,
   value: ESTree.Expression | undefined,
   seen: ReadonlySet<string> = new Set()
@@ -369,7 +369,7 @@ const namedMeta = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpress
  * @param program - the parsed file.
  * @param top - the file's top level.
  */
-const metaObject = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
+export const metaObject = (program: ESTree.Program, top: TopLevel): ESTree.ObjectExpression | undefined => {
   const meta = program.body.find((statement) => statement.type === "ExportDefaultDeclaration");
   if (meta === undefined) return namedMeta(program, top);
   const { declaration } = meta;
@@ -507,7 +507,7 @@ const metaFieldsOf = (meta: Fields, notes: string[]): MetaFields | Error => {
  * @param top - the file's top level.
  * @param meta - the meta's fields, for `includeStories` and `excludeStories`.
  */
-const storyExports = (program: ESTree.Program, top: TopLevel, meta: Fields): NamedExport[] => {
+export const storyExports = (program: ESTree.Program, top: TopLevel, meta: Fields): NamedExport[] => {
   const exported = namedExports(program).filter(
     ({ exportName }) => exportName !== "__namedExportsOrder" && isIncluded(meta, exportName)
   );

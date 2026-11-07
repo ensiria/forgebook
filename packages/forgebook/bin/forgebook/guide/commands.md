@@ -10,7 +10,7 @@ They answer in JSON with `--json`, and every answer about a story carries the li
 | `npx forgebook search onValueChange --json` | The whole catalogue by its text: which component has a prop, where the docs say something, with the address of the exact heading or prop |
 | `npx forgebook new src/Badge.tsx` | A component's first stories, from its typed props (`Badge.vue` or `badge.component.ts` writes `Badge.stories.ts`) |
 | `npx forgebook stories --component badge --json` | The stories and their ids; fails when a story file is broken, which `problems` names by `file:line:column` while the other stories stay usable |
-| `npx forgebook story <id> --json` | One story: the props every use must set (`requiredProps`), its args, its component's props, the components whose stories use it, its design, and its `links`: `address` in the catalogue, `frame` alone, `embed` with no chrome, for a wiki or an iframe |
+| `npx forgebook story <id> --json` | One story: the props every use must set (`requiredProps`), its args, its `code` as the Code tab shows it (the render, or the args as written), its component's props, the components whose stories use it, its design, and its `links`: `address` in the catalogue, `frame` alone, `embed` with no chrome, for a wiki or an iframe |
 | `npx forgebook pages --json` | The docs pages, with their ids and addresses; fails when a page names what is not there |
 | `npx forgebook page <id> --json` | One docs page: its Markdown, its headings, the address that opens it |
 | `npx forgebook check <id> --json` | The catalogue's checks on one story: accessibility, spills, overlays, a modal's focus, errors, a failed play |

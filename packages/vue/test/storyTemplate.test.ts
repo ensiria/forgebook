@@ -65,4 +65,14 @@ describe("storyTemplate", () => {
   it("leaves out an empty slot", () => {
     expect(storyTemplate("Badge", { "#default": false, "#icon": null })).toBe("<Badge />");
   });
+
+  it("binds the args the file writes as code as written, but never in a slot", () => {
+    expect(
+      storyTemplate(
+        "Dialog",
+        { title: "Hi", "#default": "Body" },
+        { onClose: 'fn("x")', "#default": "h(Body)" }
+      )
+    ).toBe('<Dialog title="Hi" :on-close="fn(&quot;x&quot;)">Body</Dialog>');
+  });
 });
