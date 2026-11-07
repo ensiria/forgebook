@@ -22,7 +22,7 @@
  */
 import { extname, join, resolve } from "node:path";
 
-import type { ConfigEnv, Plugin, UserConfig, ViteDevServer } from "vite";
+import type { ConfigEnv, Plugin, UserConfig, ResolvedConfig as ViteConfig, ViteDevServer } from "vite";
 
 import { checksA11y, offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { type FramesPlacement, SAME_ORIGIN } from "../frameOrigins.ts";
@@ -46,6 +46,7 @@ import { serveFrames } from "./framesServer.ts";
 import { generatedId, generatedModule } from "./generatedModules.ts";
 import { missingHeightsMiddleware } from "./heightsRoute.ts";
 import { filesModuleHot, renewedModule, servedPatterns, storyFileHotHooks } from "./hotSnippets.ts";
+import { type CompiledScript, jsxInScripts } from "./jsxInScripts.ts";
 import { type EmitAsset, inlineJson, type PackJson, packedJsonOf } from "./packedModule.ts";
 import {
   AGENT_SOURCES_FILE,
@@ -68,7 +69,8 @@ import {
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
-import { checkAtStart, type ResolvedVite } from "./runningVersions.ts";
+import { checkAtStart } from "./runningVersions.ts";
+import { scriptProblems } from "./scriptProblems.ts";
 import {
   type IndexedStoryFile,
   type IsFileKept,
@@ -241,8 +243,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
    */
   let isTestRun = false;
+  const scripts = scriptProblems();
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
+  const jsxScripts = jsxInScripts(() => config?.framework ?? options.framework);
   /** The stamp of the plugin's own code, which makes the kept indexes and code: another version is a miss. */
   let pluginCode: string | undefined;
   const keptCache = <TValue>(
@@ -331,7 +335,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       startTexts,
       access.isKept,
       isForgiving(),
-      config
+      config,
+      scripts.list()
     );
     filesModules.set(id, new Set([...files, ...refused].map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
@@ -442,7 +447,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         const file = findConfigFile(resolve(userConfig.root ?? process.cwd()));
         if (file !== undefined) config = await loadConfigFile(file);
       }
-      const pages = config === undefined ? {} : catalogueConfig(config, userConfig);
+      const pages = config === undefined ? {} : catalogueConfig(config, userConfig, scripts);
       return {
         ...pages,
         css: {
@@ -467,11 +472,13 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       if (pattern !== null) access.noteImported(pattern);
       return pattern;
     },
-    configResolved: (resolved: ResolvedVite): void => {
+    configResolved: (resolved: ViteConfig): void => {
+      jsxScripts.remember(resolved);
       checkAtStart(resolved, config?.shell.problems ?? []);
       // a dev server's answers only: a build reads everything once, and stamping each answer's files costs it more than
       // a later build would save
       if (isServing()) cacheFolder = join(resolved.cacheDir, "forgebook");
+      scripts.start(resolved.logger, cacheFolder);
       if (config !== undefined && !isTestRun) sayEmptyStoryGlobs(config, isServing(), resolved.logger);
     },
     configureServer: (server: ViteDevServer): void => {
@@ -545,13 +552,12 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     closeBundle: async (): Promise<void> => {
       await docs?.close();
     },
-    ...storyFileHotHooks(isRedrawing, served, watching),
+    ...storyFileHotHooks(isRedrawing, served, watching, scripts),
     ...vitestHooks,
-    async load(id: string): Promise<{ code: string; moduleType: "js" } | string | null> {
-      const generated = await pagesModule(id);
-      if (generated !== undefined) return generated;
-      const refusal = access.refusal(id);
-      if (refusal !== undefined) return refusal;
+    async load(id: string): Promise<{ code: string; moduleType: "js" } | CompiledScript | string | null> {
+      // a generated module, a file the server refuses, or a `.js` file whose JSX is compiled as it loads
+      const early = (await pagesModule(id)) ?? access.refusal(id) ?? (await jsxScripts.load(id));
+      if (early !== null) return early;
       // in Vite's form, the text Vite's module graph knows a file by: a Node path on Windows (`C:\app\x.md`) is another
       const watch = (file: string): void => this.addWatchFile(VITE_PATHS.normalize(file));
       const resolveImport = async (specifier: string, importer: string): Promise<string | undefined> => {

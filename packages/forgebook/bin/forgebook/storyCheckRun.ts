@@ -143,8 +143,12 @@ export const testingFunction = async (
   let resolved: string;
   try {
     resolved = createRequire(join(dir, "package.json")).resolve(specifier);
-  } catch {
-    return INSTALL;
+  } catch (error) {
+    // installed, and older than the function asked for
+    const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+    return code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
+      ? `${specifier} is not in this @forgebook/testing: update it`
+      : INSTALL;
   }
   const module: unknown = await import(pathToFileURL(resolved).href);
   if (typeof module !== "object" || module === null || !(name in module))
@@ -162,7 +166,7 @@ export const testingFunction = async (
  *
  * @param origin - where it is served.
  */
-const storiesAt = async (origin: string): Promise<StoriesDocument | string> => {
+export const storiesAt = async (origin: string): Promise<StoriesDocument | string> => {
   const response = await fetch(`${origin}${AGENT_API}stories`);
   const body: unknown = await response.json();
   return isStoriesDocument(body) ? body : `The catalogue answered ${response.status} for its stories`;

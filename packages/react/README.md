@@ -19,8 +19,8 @@ import { defineConfig } from "forgebook";
 export default defineConfig({ framework: react(), title: "My components", stories: ["src/**/*.stories.tsx"] });
 ```
 
-`react()` brings React's Vite plugin, with Fast Refresh; a library whose files need it configured passes its options,
-as `react({ include: /\.[jt]sx?$/ })` for JSX in `.js` files. Leave the plugin to the adapter rather than adding your own:
+`react()` brings React's Vite plugin, with Fast Refresh; a library whose files need it configured passes its options.
+JSX in `.js` files needs none: Forgebook compiles it. Leave the plugin to the adapter rather than adding your own:
 the adapter's plugins around it redraw an edited component sooner.
 
 and the stories take their types from it:

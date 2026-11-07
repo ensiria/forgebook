@@ -13,11 +13,14 @@ import { readFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 
 import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
+import { isComponentDocs } from "../componentDocs.ts";
+import { propsSignature, writtenSignature } from "../propsSignature.ts";
+import { shellWord } from "../shellWord.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { findComponentByTitle } from "../storyTree.ts";
-import type { AgentChangedStory, ChangedStoriesDocument } from "./agent.types.ts";
+import type { AgentChangedStory, ChangedStoriesDocument, OutdatedStoryFile } from "./agent.types.ts";
 import { storyLinks } from "./agentApi.ts";
-import type { AgentAnswer, RouteContext } from "./agentRoutes.ts";
+import { type AgentAnswer, type RouteContext, settled } from "./agentRoutes.ts";
 import {
   belongsToOtherCatalogue,
   changedUiFiles,
@@ -82,6 +85,63 @@ const graphProblems = (config: ResolvedConfig): readonly string[] => {
   ];
 };
 
+/** A story the reach found in the tree, with its source and the file as that source lists it. */
+export type FoundStory = IdentifiedStory & {
+  /** Its source's id. */
+  readonly source: string;
+  /** Its file, as its source lists it (`./src/Badge.stories.tsx`). */
+  readonly file: string;
+};
+
+/** A touched story file: where it is on disk, one of its stories, and what loads its component's docs. */
+type TouchedFile = {
+  /** The file, absolute. */
+  readonly absolute: string;
+  /** One of its stories' ids. */
+  readonly story: string;
+  /** What loads the docs of the component its meta names. */
+  readonly docs: (() => Promise<unknown>) | undefined;
+};
+
+/**
+ * The touched story files `forgebook new` wrote for other props than their component has now.
+ *
+ * @param touched - the touched story files, once each.
+ * @param dir - the catalogue's folder.
+ * @param root - the repository's folder, as the catalogue's folder is reached.
+ */
+const outdatedFiles = async (
+  touched: readonly TouchedFile[],
+  dir: string,
+  root: string
+): Promise<OutdatedStoryFile[]> => {
+  const found = await Promise.all(
+    touched.map(async (file): Promise<OutdatedStoryFile[]> => {
+      const written = writtenSignature(textOf(file.absolute));
+      if (written === undefined) return [];
+      // only a file that says what it was written for is compared: docs that cannot be read leave it alone
+      const docs = await settled(file.docs);
+      if (!("value" in docs) || !isComponentDocs(docs.value)) return [];
+      const current = propsSignature(docs.value.props);
+      if (current === written) return [];
+      const path = VITE_PATHS.relative(dir, file.absolute);
+      return [
+        {
+          file: VITE_PATHS.relative(root, file.absolute),
+          path,
+          story: file.story,
+          component: docs.value.name,
+          written,
+          current,
+          // the names reach a command an agent runs, so they are quoted; the signature is eight hexadecimal digits
+          fix: `check the args in ${shellWord(path)} against the props npx forgebook story ${shellWord(file.story)} --json lists, then set its forgebook-props line to ${current}; or write it again with npx forgebook new on the component file it imports, with --force, which replaces any edit`
+        }
+      ];
+    })
+  );
+  return found.flat();
+};
+
 /**
  * The catalogue's stories with what each reaches, and each group's answer, whose failure a route has to say.
  *
@@ -93,7 +153,7 @@ export const identifiedStories = async (
   tree: RouteContext["tree"]
 ): Promise<{
   readonly groups: readonly { readonly source: string; readonly reach: unknown }[];
-  readonly identified: readonly IdentifiedStory[];
+  readonly identified: readonly FoundStory[];
 }> => {
   const groups = await Promise.all(
     loaded.sources.flatMap((source) =>
@@ -101,12 +161,12 @@ export const identifiedStories = async (
     )
   );
   const identified = groups.flatMap(({ source, reach }) =>
-    (isReach(reach) ? reach : []).flatMap((story): IdentifiedStory[] => {
+    (isReach(reach) ? reach : []).flatMap((story): FoundStory[] => {
       const component = findComponentByTitle(tree, source, story.title)?.component;
       const found = [...(component?.stories ?? []), ...(component?.unlisted ?? [])].find(
         (each) => each.exportName === story.exportName
       );
-      return found === undefined ? [] : [{ id: found.id, reach: story }];
+      return found === undefined ? [] : [{ id: found.id, reach: story, source, file: found.file }];
     })
   );
   return { groups, identified };
@@ -141,6 +201,21 @@ export const changedAnswer = async (
         changed
       );
   const touchedSet = new Set(touched);
+  const touchedFiles = new Map<string, TouchedFile>();
+  for (const story of identified.filter(({ reach }) => touchedSet.has(reach))) {
+    const source = loaded.sources.find((each) => each.id === story.source);
+    if (source !== undefined && !touchedFiles.has(story.reach.storyFile))
+      touchedFiles.set(story.reach.storyFile, {
+        absolute: story.reach.storyFile,
+        story: story.id,
+        docs: sourceFiles(source).docs[story.file]
+      });
+  }
+  const outdated = await outdatedFiles(
+    [...touchedFiles.values()],
+    config.dir,
+    VITE_PATHS.join(config.dir, VITE_PATHS.relative(realDir, root))
+  );
   const stories = identified
     .filter(({ reach }) => touchedSet.has(reach))
     .map(
@@ -188,7 +263,8 @@ export const changedAnswer = async (
     uiFiles,
     outside,
     problems,
-    ...(unread.length === 0 ? {} : { unread })
+    ...(unread.length === 0 ? {} : { unread }),
+    ...(outdated.length === 0 ? {} : { outdated })
   };
   return { status: 200, body };
 };

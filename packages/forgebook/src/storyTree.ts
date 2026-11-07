@@ -528,7 +528,13 @@ export const storyTree = (sources: readonly StorySource[]): StoryTree => {
   const shown = tree.filter((source) => source.families.length > 0 || source.pages.length > 0);
   return {
     sources: shown,
-    problems: [...problems, ...pageProblems(shown, new Set(storyIds(shown)), new Set(componentIds(shown)))]
+    // a script that does not parse is named by every group a dev server serves: once is enough
+    problems: [
+      ...new Set([
+        ...problems,
+        ...pageProblems(shown, new Set(storyIds(shown)), new Set(componentIds(shown)))
+      ])
+    ]
   };
 };
 

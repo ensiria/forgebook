@@ -1,0 +1,119 @@
+{
+  "id": "bio-counter",
+  "app": "nuxt-shadcn-dashboard",
+  "prompt": "On Settings › Profile (app/components/settings/ProfileForm.vue), the Bio field allows 160 characters but does not say so. Add a counter under it that reads like \"17/160\" and updates as the user types; past 160 it turns to the error colour and reads like \"170/160\", and the form's existing message about the limit shows as it does today on submit.",
+  "scope": ["app/components/settings/ProfileForm.vue"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built on the app's form components (FormDescription, FormMessage) and its text styles, as the other fields are."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Short, at the limit, over the limit, in the dark theme and in a narrow window."
+    },
+    {
+      "id": "a11y",
+      "text": "The counter is tied to the field and announced politely, not on every key; over the limit is not shown by colour alone."
+    },
+    {
+      "id": "scope",
+      "text": "Only the profile form changes; the other settings pages are unchanged, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "Settings › Profile as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/profile"
+        }
+      ]
+    },
+    {
+      "name": "over",
+      "description": "A bio of 170 characters.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/profile"
+        },
+        {
+          "fill": {
+            "label": "Bio"
+          },
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      ]
+    },
+    {
+      "name": "over-dark",
+      "description": "The same, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/settings/profile"
+        },
+        {
+          "fill": {
+            "label": "Bio"
+          },
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      ]
+    },
+    {
+      "name": "narrow",
+      "description": "The form in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/settings/profile"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "the counter follows what is typed",
+      "steps": [
+        {
+          "goto": "/settings/profile"
+        },
+        {
+          "fill": {
+            "label": "Bio"
+          },
+          "value": "Hello"
+        },
+        {
+          "expectVisible": {
+            "text": "5/160"
+          }
+        },
+        {
+          "fill": {
+            "label": "Bio"
+          },
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "expectVisible": {
+            "text": "170/160"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

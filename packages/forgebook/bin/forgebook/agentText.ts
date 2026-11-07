@@ -423,6 +423,10 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
   const code = document.code.problems.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
   );
+  const outdated = (document.outdated ?? []).map(
+    (each) =>
+      `${each.file}  out of date: written for props ${each.written}, now ${each.current}. Fix: ${each.fix}`
+  );
   const notes = document.code.notes.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
   );
@@ -432,7 +436,16 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
     ...document.notVerified.map((each) => ({ ...each, problems: [] }))
   ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
   const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
-  return [...uncovered, ...unseen, ...code, ...notes, ...advice, ...stories, document.summary].join("\n");
+  return [
+    ...uncovered,
+    ...unseen,
+    ...code,
+    ...outdated,
+    ...notes,
+    ...advice,
+    ...stories,
+    document.summary
+  ].join("\n");
 };
 
 /**

@@ -1,0 +1,6 @@
+{
+  "name": "dry-run",
+  "command": ["node", "{evalDir}/dry-run-agent/dry-run-agent.mts", "--task", "{task}", "--arm", "{arm}"],
+  "env": [],
+  "timeoutMinutes": 2
+}

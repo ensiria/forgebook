@@ -7,7 +7,7 @@
  */
 
 import type { StepFunction } from "@forgebook/story-format/csf";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
@@ -22,6 +22,11 @@ import {
 import type { PanelArgs } from "../src/messages.ts";
 import type { PlayTrace } from "../src/playTrace.ts";
 import { domRenderer } from "./domRenderer.ts";
+
+// a frame loads the play runner with its first play: loaded here first, a test's play starts within the turn it waits
+beforeAll(async () => {
+  await import("../src/frame/playStory.ts");
+});
 
 /** What a run told the frame. */
 type Reports = {
