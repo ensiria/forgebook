@@ -166,7 +166,7 @@ export const catalogueTools = ({
   {
     name: "check_code",
     description:
-      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
+      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. With no tokens file it compares with what the application declares (CSS variables, Tailwind, components.json); `tokenSources` says what was read. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
     inputSchema: {
       type: "object",
       properties: {
@@ -184,7 +184,7 @@ export const catalogueTools = ({
   {
     name: "list_tokens",
     description:
-      "The design tokens of this catalogue and of the libraries it shows, to use instead of a colour, size or duration written by hand: how many of each type, the first of them, and `clashes` where two authors disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
+      "The design tokens of this catalogue and of the libraries it shows or, with no tokens file, what the application declares (CSS variables, Tailwind, components.json), to use instead of a colour, size or duration written by hand: how many of each type, the first of them, `sources` (what was read), `notes` (what was not) and `clashes` where two files disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
     inputSchema: {
       type: "object",
       properties: {

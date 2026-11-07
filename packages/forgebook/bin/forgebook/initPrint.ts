@@ -25,6 +25,20 @@ const sayAppBuild = ({ viteConfig, tsconfigPaths, postcss, runsCode }: AppBuildP
   log.info(`The catalogue will read ${read.join(", ")}${running} (appBuild: false turns it off)`);
 };
 
+/** Says what was written for the project's coding agents. */
+const sayAgentFiles = ({ agents }: InitDocument, log: Logger): void => {
+  for (const file of agents?.written ?? []) log.success(`${file} written`);
+  for (const hook of agents?.hooks ?? []) log.info(`Hook: ${hook.name} (${hook.effect})`);
+};
+
+/** Says what came of drawing: what did not draw, each with what to do. */
+const sayDraw = ({ draw }: InitDocument, log: Logger): void => {
+  if (draw === undefined) return;
+  for (const { file, diagnosis } of draw.attempts)
+    log.warn(`${file}: ${diagnosis.kind}: ${diagnosis.message}\n  ${diagnosis.nextStep}`);
+  if (draw.status === "drawn") log.success(`${draw.story ?? ""} drew: ${draw.picture ?? ""}`);
+};
+
 /** Prints the outcome: the document under `--json`, sentences for a person otherwise. */
 export const printInit = (
   document: InitDocument,
@@ -40,9 +54,12 @@ export const printInit = (
     log.success(`${PROJECT_FRAMEWORKS[document.framework].label} project, ${name} (${from})`);
   }
   const count = document.stories.length;
-  log.success(`${CONFIG_FILE} written: ${count} story ${count === 1 ? "glob" : "globs"}`);
-  for (const file of document.written.slice(1)) log.success(`${file} written`);
+  if (document.written.includes(CONFIG_FILE))
+    log.success(`${CONFIG_FILE} written: ${count} story ${count === 1 ? "glob" : "globs"}`);
+  for (const file of document.written.filter((name) => name !== CONFIG_FILE)) log.success(`${file} written`);
   sayAppBuild(document.appBuild, log);
+  sayAgentFiles(document, log);
   for (const step of document.nextSteps) log.warn(step.message);
+  sayDraw(document, log);
   for (const { command, description } of document.commands) log.info(`${command}: ${description}`);
 };

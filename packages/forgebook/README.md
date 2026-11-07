@@ -1201,8 +1201,12 @@ is a state of the component: the same).
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
+| `forgebook audit` | The colours, sizes and components a project actually uses, with no catalogue |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
+| `forgebook init --agents` | What a project's coding agents need too: `.mcp.json`, instructions and skill, CI, a hook running `verify`; `--browser` installs the testing package and its browser, `--draw` draws a story ([more](#set-a-project-up-in-one-prompt)) |
+| `forgebook hook <assistant>` | What an assistant's hook runs when it is about to finish: `verify` on the change, sending the agent back on red |
+| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; `--with-deps` also installs what it needs of the system |
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
@@ -1473,6 +1477,55 @@ missing-story messages, and the box a frame shows when a story fails.
 
 ## For agents
 
+### Set a project up in one prompt
+
+```sh
+npx forgebook init --agents --browser --draw --json
+```
+
+Unattended, it writes the catalogue's files, then:
+
+- **`.mcp.json`**, with Forgebook's server beside the ones it holds.
+- **`AGENTS.md`** (Forgebook's section, its other sections kept) **and the skill**, in `.agents/skills` and `.claude/skills`.
+- **A CI workflow**, `.github/workflows/forgebook-verify.yml`, running `forgebook verify` against a pull request's target.
+- **A hook that runs `verify`**, so an agent cannot finish on red. `--hooks` names them; by default those of the assistants
+  the repository shows signs of, otherwise the commit's.
+
+`--browser` installs `@forgebook/testing` and its browser, about 200 MB, and implies `--install`. `--draw` then writes a
+component's first stories and draws them in the browser, trying components until one draws and removing the stories of those
+that do not. If components fail for want of a provider, on React, the wrappers the app's entry mounts it in are copied into the
+preview as a decorator (`draw.liftedProviders`), and stay there if a story then draws. When none does, each attempt is in `draw.attempts` with a `kind` (`missing-import`, `provider`, `style-sheet`,
+`server-only`, `native-build`, `blank`…), what was said and what to do; the exit code is then 1.
+
+`--agents` merges and never replaces what the project wrote (the skill's file is Forgebook's own, and is renewed): a JSON file it cannot parse, a link, a workflow or a commit hook already there stays as
+it is and is named in `nextSteps`. It keeps a catalogue already there and starts beside a Storybook, loading nothing of it.
+In a workspace's package, the files go at the repository's root, and find the package through its folder; a repository that
+does not track the package (a home folder kept in git, say) is not used, and they go in the package's folder.
+
+| `--hooks` | Writes | When | On red |
+|---|---|---|---|
+| `claude` | `.claude/settings.json`, `Stop` | Claude Code is about to finish | Sent back (exit 2) |
+| `codex` | `.codex/hooks.json`, `Stop` | Codex is about to finish, once the hook is reviewed and trusted | Sent back (exit 2) |
+| `gemini` | `.gemini/settings.json`, `AfterAgent` | Gemini CLI's turn ends | Sent back (exit 2) |
+| `cursor` | `.cursor/hooks.json`, `stop` | Cursor's agent ends | Another turn starts with the reason: its `stop` hook cannot refuse |
+| `pre-commit` | `.husky/pre-commit`, else `.git/hooks/pre-commit` | A commit (`verify --quick`) | The commit is refused |
+
+Those formats are the ones each assistant's documentation gives; no assistant was run against them here. An assistant not
+listed reads the instructions, and meets the commit's hook.
+
+The hook is `forgebook hook <assistant>`. Each time an assistant stops, it loads the catalogue's configuration, so the
+project's code runs unattended there as it does for `verify`. A branch that changed no UI file since it left its default
+branch starts no server. A failure that comes back the same while the hook itself is what continued the turn lets the agent
+finish, told not to call the change done: an agent that cannot fix something must not spin on it. A hook that cannot run lets
+the agent finish, with a word on stderr, because no agent can repair it. The commit's hook refuses a commit the same way, on
+what the branch changed and not only what is staged; `git commit --no-verify` is the way past it, and a clone that has not
+installed yet commits as before.
+
+`forgebook init` alone runs none of the project's code. `--draw` does, as starting a catalogue does: see [the app's
+build](#the-apps-build). An install runs what the project's package manager settings and the packages' scripts say.
+
+### What agents read
+
 A story's values can be set without the panel: `controls` in `forgebook story --json` and `get_story` says what each prop
 takes, and `forgebook story <id> --args '<json>'` or `story_address` with `args` checks the values as a link's are and
 answers the links that carry them ([the panel's controls](#the-panels-controls)).
@@ -1519,9 +1572,10 @@ page's words are replaceable as the shell's are (`strings`): `previewOpen`, `pre
 A component's TSDoc can say what a person knows and an agent cannot guess: `@useWhen`, `@avoidWhen`, `@alternatives`,
 `@deprecated` and `@replacedBy`. `forgebook story` and `get_story` return them as `docs.guidance`.
 
-The most common mistake of an agent working on a design system is a colour or a size written by hand. Name your
-[DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and each theme in a file of
-its own, and agents can ask what to write instead:
+The most common mistake of an agent working on a design system is a colour or a size written by hand. Agents can ask what
+to write instead, with nothing set up: Forgebook reads what the application already declares (see `check-code` below). To
+say it yourself, name your [DTCG](https://www.designtokens.org/tr/2025.10/) files in the configuration, the base first and
+each theme in a file of its own, and those are the system:
 
 ```ts
 tokens: ["tokens.json", { file: "dark.tokens.json", mode: "dark" }]
@@ -1573,8 +1627,39 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
-code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI. A catalogue
-with no tokens file gets no check of values, which `skipped` and the line say: `colours and sizes not checked: no tokens file`.
+code to paste. It does not check props, imports or deprecated components. It exits non-zero on a problem, for CI.
+
+**It needs no tokens file.** With none named, it compares with what the application already declares, read as text and never
+run: custom properties at the root and in theme selectors (`.dark`, `[data-theme]`, a colour-scheme query), and a selector
+holding a dozen or more of them, as a library's root does; Tailwind 4's `@theme` and default theme; a Tailwind configuration
+and its presets, as far as they are written plainly; the sheet and the configuration `components.json` names. `tokenSources`
+says which files were read and `tokenNotes` what needs running to know. Fewer than five colours is not a palette, so colours
+are then left to `skipped`. A value it cannot judge takes a comment on its line or the one above, with the reason:
+`/* forgebook-ignore raw-color: a brand's own colour */`; the answer lists each one in `excused`, with its reason. Only files
+in the catalogue's folder are compared (`notCompared` names the others), since another package has its own system. Nothing
+outside the repository is read, whatever a file names, and a catalogue's `build --agent-index` carries these tokens. `tokens:
+[]` in the configuration says the application is not to be read: with no source giving tokens, values are then not checked,
+`colours and sizes not checked: no tokens file`.
+
+What it leaves alone on purpose, since these are where false alarms came from on real projects: a drawing's colours (`<path
+fill>`, gradient stops, a canvas), masks, fully transparent ends of gradients, black or white in a shadow, a `var()`'s fallback,
+what the page's head reads (`theme-color`), emails and generated social images. A size is compared with tokens of its own
+role (spacing, radius, font size) that are steps of a scale, so `--sidebar-padding: 16px` does not make every `16px` a
+mistake; Tailwind's own scale counts only where a class's brackets hold the whole value (`p-[16px]`, not `h-[calc(100%-16px)]`).
+
+`forgebook audit` reports what a project actually uses, read from its files, with no catalogue, no configuration and no code
+run: `37 greys, 5 used 90 % of the time`. It is for a project with no design system as much as one with: colours in any
+notation counted as one, how many go through tokens and how many are written by hand, sizes by what they are for, and
+components that look like one, by name and by what they render, take and carry, never by name alone. It exits 0: it is a
+report, and `check-code` is what fails. With `--json`, `actions` lists the next steps, the largest first, each with the
+command that lists what to edit:
+
+```sh
+npx forgebook audit --json
+npx forgebook audit --value "#64748b" --json   # every line that writes it by hand
+```
+
+It does not read a tokens file a catalogue names, only what the application declares, and a `.js` file's JSX is not read.
 
 `forgebook verify` and `verify` are what an agent runs before saying a change is done, and what a pull request's workflow
 runs. A change cannot pass on nothing:

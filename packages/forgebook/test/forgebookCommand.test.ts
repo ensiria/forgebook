@@ -23,6 +23,7 @@ import { runScriptProcess } from "@ensiria/cli-kit/testing";
 import type { ScriptProcessRun } from "@ensiria/cli-kit/testing.types";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { printable } from "../bin/forgebook/auditRun.ts";
 import { KIT_DIR, STORYBOOK_DIR } from "./fixturePaths.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
@@ -944,6 +945,219 @@ describe("forgebook check-code", { timeout: SERVER_TIMEOUT }, () => {
     const broken = check();
     expect(broken.exitCode).not.toBe(0);
     expect(broken.stderr).toContain("tokens files have problems");
+  });
+});
+
+describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
+  /** A catalogue in a repository, its sheet declaring a system and one commit made. */
+  const appProject = (name: string, sheet: string, written?: string): string => {
+    const config = catalogue(root, name, { "A.stories.tsx": "export default { title: 'A/B' };\n" });
+    const project = join(root, name);
+    if (written !== undefined) writeFileSync(config, written);
+    writeFileSync(join(project, ".gitignore"), "node_modules/\n.vite/\n");
+    writeFileSync(join(project, "src", "a.css"), sheet);
+    const git = (...args: readonly string[]): void => {
+      spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
+        cwd: project
+      });
+    };
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-q", "-m", "first");
+    return config;
+  };
+  const System = [
+    ":root { --ink: #111111; --paper: #ffffff; --brand: #ff0033; --line: #dddddd; --muted: #777777; --space-2: 8px; }",
+    ".dark { --ink: #eeeeee; --paper: #000000; }",
+    ""
+  ].join("\n");
+
+  it("checks a change against what the application declares, and says what it read", () => {
+    const config = appProject("app-system", System);
+    writeFileSync(
+      join(root, "app-system", "src", "New.tsx"),
+      'export const New = () => <p style={{ color: "#ff0033" }} />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).not.toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      skipped: [],
+      checked: ["raw-color", "raw-size", "suppression", "deleted-test"],
+      tokenSources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
+      tokenClashes: 0,
+      problems: [{ rule: "raw-color", file: "src/New.tsx", fix: "--brand" }]
+    });
+    expect(forgebook(config, ["check-code"]).stdout).toContain("Read from: src/a.css (css-variables, 6)");
+  });
+
+  it("answers the token questions from the same reading", () => {
+    const config = appProject("app-tokens", System);
+    expect(JSON.parse(forgebook(config, ["tokens", "--category", "color", "--json"]).stdout)).toMatchObject({
+      isConfigured: true,
+      total: 5,
+      sources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
+      notes: []
+    });
+    const nearest = JSON.parse(forgebook(config, ["tokens", "--nearest", "#ff0034", "--json"]).stdout);
+    expect(nearest.matches[0]).toMatchObject({ name: "--brand", isClose: true });
+    // a custom property's dashes read as an option on a command line, so its name holds without them
+    const ink = JSON.parse(forgebook(config, ["tokens", "ink", "--json"]).stdout);
+    expect(ink.token).toMatchObject({
+      name: "--ink",
+      modes: { dark: "#eeeeee" },
+      origin: { kind: "css-variables", file: "src/a.css", line: 1 }
+    });
+  });
+
+  it("does not stop on what it cannot read: it says so and goes on", () => {
+    const config = appProject("app-notes", `@import "@acme/gone/x.css";\n${System}`);
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout).tokenNotes[0]).toContain("@acme/gone/x.css");
+    expect(forgebook(config, ["tokens", "--json"]).exitCode).toBe(0);
+  });
+
+  it("does not take a brand colour and little else for a palette", () => {
+    const config = appProject("app-small", ":root { --brand: #ff0033; }\n");
+    writeFileSync(
+      join(root, "app-small", "src", "New.tsx"),
+      'export const New = () => <p style={{ color: "#123456" }} />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      checked: ["suppression", "deleted-test"],
+      skipped: ["colours and sizes not checked: too few tokens of that kind in the application (1)"],
+      problems: []
+    });
+  });
+
+  it("compares only its own folder's files: another package of the repository has its own system", () => {
+    const config = appProject("app-monorepo-outer", System);
+    const project = join(root, "app-monorepo-outer");
+    mkdirSync(join(project, "packages", "ui", "src"), { recursive: true });
+    const inner = join(project, "packages", "ui", "forgebook.config.ts");
+    writeFileSync(inner, readFileSync(config, "utf8"));
+    writeFileSync(join(project, "packages", "ui", "src", "a.css"), System);
+    writeFileSync(
+      join(project, "packages", "ui", "src", "Own.tsx"),
+      'export const A = <p style={{ color: "#ff0033" }} />;\n'
+    );
+    writeFileSync(
+      join(project, "src", "Other.tsx"),
+      'export const A = <p style={{ color: "#ff0033" }} />;\n'
+    );
+    const answer = JSON.parse(forgebook(inner, ["check-code", "--json"]).stdout);
+    expect(answer.problems.map((each: { file: string }) => each.file)).toEqual(["packages/ui/src/Own.tsx"]);
+    expect(answer.notCompared).toContain("src/Other.tsx");
+  });
+
+  it("reads nothing when the configuration says there is no system", () => {
+    const off = `export default ${JSON.stringify({
+      framework: STUB_FRAMEWORK,
+      title: "off",
+      stories: ["src/*.stories.tsx"],
+      tokens: []
+    })};\n`;
+    const config = appProject("app-off", System, off);
+    expect(JSON.parse(forgebook(config, ["check-code", "--json"]).stdout)).toMatchObject({
+      skipped: ["colours and sizes not checked: no tokens file"],
+      tokenSources: []
+    });
+    expect(JSON.parse(forgebook(config, ["tokens", "--json"]).stdout)).toMatchObject({ isConfigured: false });
+  });
+
+  it("does not read the application when a tokens file is named: that is the system", () => {
+    const named = `export default ${JSON.stringify({
+      framework: STUB_FRAMEWORK,
+      title: "named",
+      stories: ["src/*.stories.tsx"],
+      tokens: ["tokens.json"]
+    })};\n`;
+    const config = appProject("app-named", System, named);
+    writeFileSync(
+      join(root, "app-named", "tokens.json"),
+      readFileSync(join(import.meta.dirname, "fixtures", "tokens.json"))
+    );
+    const { tokens, sources } = JSON.parse(forgebook(config, ["tokens", "--json"]).stdout);
+    expect(tokens.some((each: { name: string }) => each.name === "--ink")).toBe(false);
+    expect(sources[0]).toMatchObject({ kind: "tokens-file", file: "tokens.json" });
+  });
+});
+
+describe("forgebook audit", () => {
+  /** A project with no catalogue. */
+  const plainProject = (): string => {
+    const dir = mkdtempSync(join(root, "audit-"));
+    writeFileSync(
+      join(dir, "a.css"),
+      ":root { --ink: #111111; }\na { color: #111111; }\nb { color: #ff0033; }\nc { color: #ff0033; }\nd { color: #ff0033; }\n"
+    );
+    writeFileSync(
+      join(dir, "Button.tsx"),
+      'export const Button = ({ size, tone }) => <button className="a" />;\n'
+    );
+    writeFileSync(join(dir, "Btn.tsx"), 'export const Btn = ({ size, tone }) => <button className="b" />;\n');
+    return dir;
+  };
+
+  it("reports with no configuration, gives an agent its next steps, and exits 0", () => {
+    const run = runScriptProcess(ENTRY, ["audit", plainProject(), "--json"]);
+    expect(run.exitCode).toBe(0);
+    const document = JSON.parse(run.stdout);
+    expect(document).toMatchObject({
+      schema: 1,
+      system: { tokens: 1, own: 1, sources: [{ kind: "css-variables", file: "a.css", tokens: 1 }] },
+      colors: { distinct: 2, hardCoded: 4 },
+      components: { count: 2, lookAlikes: [{ confidence: "high" }] }
+    });
+    expect(document.actions).toContainEqual(
+      expect.objectContaining({
+        kind: "use-token",
+        args: ["audit", expect.any(String), "--value", "#111111", "--json"]
+      })
+    );
+    expect(document.actions).toContainEqual(expect.objectContaining({ kind: "name-value", count: 3 }));
+    expect(document.actions).toContainEqual(expect.objectContaining({ kind: "merge-components", count: 2 }));
+  });
+
+  it("says it to a person, and lists the lines of one value", () => {
+    const dir = plainProject();
+    const text = runScriptProcess(ENTRY, ["audit", dir]).stdout;
+    expect(text).toContain("Greys: 1 different, 1 used 90 % of the time.");
+    expect(text).toContain("Components: 2, 1 groups that look like one.");
+    const sites = JSON.parse(runScriptProcess(ENTRY, ["audit", dir, "--value", "#FF0033", "--json"]).stdout);
+    expect(sites.sites.map((each: { line: number }) => each.line)).toEqual([3, 4, 5]);
+  });
+
+  it("reads nothing a link leads to outside the project, and runs nothing git is told to", () => {
+    const outside = mkdtempSync(join(root, "audit-outside-"));
+    writeFileSync(join(outside, "secret.css"), "a { color: #abc123; } /* API_TOKEN */\n");
+    const dir = mkdtempSync(join(root, "audit-links-"));
+    symlinkSync(join(outside, "secret.css"), join(dir, "leak.css"));
+    writeFileSync(join(dir, "own.css"), "a { color: #123abc; }\n");
+    spawnSync("git", ["init", "-q"], { cwd: dir });
+    spawnSync("git", ["config", "core.fsmonitor", `touch ${join(dir, "ran")}`], { cwd: dir });
+    const document = JSON.parse(runScriptProcess(ENTRY, ["audit", dir, "--json"]).stdout);
+    expect(JSON.stringify(document)).not.toContain("abc123");
+    expect(document.colors.distinct).toBe(1);
+    expect(existsSync(join(dir, "ran"))).toBe(false);
+  });
+
+  it("refuses a value that is neither a colour nor a size, rather than say it is not there", () => {
+    expect(runScriptProcess(ENTRY, ["audit", ".", "--value", "red"]).exitCode).not.toBe(0);
+  });
+
+  it("keeps a report one line per line, whatever a file's name holds", () => {
+    expect(printable("a\u001b[2Jb\nc")).toBe("a?[2Jb\nc");
+  });
+
+  it("says when there is nothing to read, and refuses a bad limit", () => {
+    const empty = mkdtempSync(join(root, "audit-empty-"));
+    expect(runScriptProcess(ENTRY, ["audit", empty]).stdout).toContain(
+      "No style sheet or component file here"
+    );
+    expect(runScriptProcess(ENTRY, ["audit", empty, "--limit", "0"]).exitCode).not.toBe(0);
   });
 });
 

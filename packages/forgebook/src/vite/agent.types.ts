@@ -20,8 +20,8 @@ import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
 import type { StoryCheckResult } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
-import type { CodeProblem, CodeRule } from "./checkCode.ts";
-import type { DesignToken } from "./designTokens.ts";
+import type { CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
+import type { DesignToken, TokenSource } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
 import type { TokenClash } from "./tokenClashes.ts";
@@ -257,14 +257,14 @@ export type PageDocument = {
 /** A token in a list: what to write, without what a list does not need. */
 export type AgentTokenSummary = Pick<
   DesignToken,
-  "name" | "type" | "value" | "modes" | "deprecated" | "isThemeOnly"
+  "name" | "type" | "value" | "modes" | "deprecated" | "isThemeOnly" | "utility"
 >;
 
 /** The catalogue's tokens: how many, and the first of them, since agents degrade on long answers. */
 export type TokensDocument = {
   /** The shape's version. */
   readonly schema: AgentSchema;
-  /** Whether the catalogue or one of its sources names a tokens file at all. */
+  /** Whether there is a system to ask about: a tokens file named by the catalogue or a source, or tokens read from the application. */
   readonly isConfigured: boolean;
   /** How many tokens match, whatever the limit. */
   readonly total: number;
@@ -276,6 +276,10 @@ export type TokensDocument = {
   readonly problems: readonly string[];
   /** The tokens listed here that two authors give different values, with whose stands. */
   readonly clashes: readonly TokenClash[];
+  /** What the tokens were read from, each file with how many it gives; none from an older catalogue. */
+  readonly sources?: readonly TokenSource[];
+  /** What the application's files hold that could not be read without running them, so some tokens may be unknown. */
+  readonly notes?: readonly string[];
 };
 
 /** One token, with all that is known of it. */
@@ -498,6 +502,12 @@ export type VerifyDocument = {
     readonly problems: readonly CodeProblem[];
     /** What it found in a file no one sees: a turned-off check, a deleted test. Said, and not a failure. */
     readonly notes: readonly CodeProblem[];
+    /** What the values were compared with, each file with how many tokens it gives. */
+    readonly tokenSources?: readonly TokenSource[];
+    /** What the application's files hold that could not be read without running them. */
+    readonly tokenNotes?: readonly string[];
+    /** The values a comment in the change says are meant. */
+    readonly excused?: readonly ExcusedValue[];
   };
   /** How many problems there are, in `failures` and `code.problems` together. */
   readonly problems: number;
@@ -527,6 +537,16 @@ export type CheckedCodeDocument = {
   readonly skipped: readonly string[];
   /** What it found, by file and line. */
   readonly problems: readonly CodeProblem[];
+  /** What the values were compared with, each file with how many tokens it gives; none from an older catalogue. */
+  readonly tokenSources?: readonly TokenSource[];
+  /** How many tokens two files give different values: `forgebook tokens` names them. */
+  readonly tokenClashes?: number;
+  /** What the application's files hold that could not be read without running them, so some tokens may be unknown. */
+  readonly tokenNotes?: readonly string[];
+  /** The changed files whose values were not compared, being outside the folder whose system was read. */
+  readonly notCompared?: readonly string[];
+  /** The values a comment in the change says are meant, each with the comment's reason. */
+  readonly excused?: readonly ExcusedValue[];
 };
 
 /** What the open frames reported while someone edited, and the story index's problems. */

@@ -114,6 +114,25 @@ describe("forgebook verify", { timeout: 60_000 }, () => {
     });
   });
 
+  it("compares with what the application declares, so colours are no longer skipped", () => {
+    const repo = project();
+    repo.write(
+      "src/system.css",
+      ":root { --a: #111111; --b: #222222; --c: #333333; --d: #444444; --brand: #ff0033; --space-2: 8px; }\n"
+    );
+    repo.write("src/Badge.tsx", 'export const Badge = () => <b style={{ color: "#ff0033" }} />;\n');
+    const document = answer(repo.verify());
+    expect(document).toMatchObject({
+      verdict: "failed",
+      code: {
+        checked: ["raw-color", "raw-size", "suppression", "deleted-test"],
+        problems: [{ rule: "raw-color", file: "src/Badge.tsx", fix: "--brand" }],
+        tokenSources: [{ kind: "css-variables", file: "src/system.css", tokens: 6 }]
+      }
+    });
+    expect(document["skipped"]).not.toContain("colours and sizes not checked: no tokens file");
+  });
+
   it("says the same to a person, the coverage in one line", () => {
     const repo = project();
     repo.write("src/Badge.tsx", "export const Badge = () => <b />;\n");

@@ -102,6 +102,14 @@ const verdictOf = (
   return skipped.length > 0 ? "partly-verified" : "verified";
 };
 
+/** A changed file the stories do reach, whose values were compared with nothing: outside the catalogue's folder. */
+const notComparedLine = ({ changed, code }: VerifyFindings): readonly string[] => {
+  const compared = new Set(code.notCompared);
+  return changed.uiFiles.some((file) => compared.has(file.file))
+    ? ["colours and sizes of a file outside this catalogue's folder not checked"]
+    : [];
+};
+
 /** What was not checked, in the words a person reads. */
 const skippedOf = (input: VerifyFindings, notRun: string | undefined): readonly string[] => {
   const { changed, code, report, isQuick, isSinceNamed, since } = input;
@@ -119,6 +127,7 @@ const skippedOf = (input: VerifyFindings, notRun: string | undefined): readonly 
         ]),
     // nothing a token names was touched when no UI file changed, so its absence said nothing about the change
     ...(hasUi ? code.skipped : []),
+    ...notComparedLine(input),
     ...(report?.a11y === "off" && hasStories
       ? ["accessibility not checked: the catalogue sets a11y: false"]
       : []),
@@ -276,7 +285,14 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
     ran: seenResults.length,
     failures,
     notVerified,
-    code: { checked: code.checked, problems: codeProblems, notes },
+    code: {
+      checked: code.checked,
+      problems: codeProblems,
+      notes,
+      ...(code.tokenSources === undefined ? {} : { tokenSources: code.tokenSources }),
+      ...(code.tokenNotes === undefined ? {} : { tokenNotes: code.tokenNotes }),
+      ...(code.excused === undefined ? {} : { excused: code.excused })
+    },
     problems
   };
   const summary = summaryOf({ ...body, verdict, skipped: allSkipped }, catalogueProblems);
