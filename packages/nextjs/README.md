@@ -5,7 +5,7 @@ A Next.js project's components in [Forgebook](https://www.npmjs.com/package/forg
 components. Next.js is React, so this is React's adapter ([`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react))
 with what Next.js's modules need in a browser; the catalogue stays on Vite, and Next.js's own bundler is not run.
 
-**Requirements:** Next.js 15 or 16 · React 19 · `forgebook` · Vite 8.3.4+ ·
+**Requirements:** Next.js 15 or 16 · React 19 · `forgebook` ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/nextjs/LICENSE)
 
 ```sh

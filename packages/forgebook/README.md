@@ -9,7 +9,7 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > and every change is in the
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
-**Requirements:** Node 22.18 or later · Vite 8.3.4+ (the catalogue is built on it; other bundlers are not supported) · React 19 through
+**Requirements:** Node 22.18 or later (the catalogue is built on it; other bundlers are not supported) · React 19 through
 [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
 [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) (a Nuxt project's through
 [`@forgebook/nuxt`](https://www.npmjs.com/package/@forgebook/nuxt)), Svelte 5 through
@@ -63,8 +63,8 @@ from the project's files, and writes:
   stories look wrong without them. Nuxt's adapter reads `css` from `nuxt.config` itself, so it needs none.
 
 Then it prints what is left, each thing named, and the next commands. The packages to add are in the exact command of
-the project's package manager; `--install` runs it. It lists React and Vite even on Vue, say, because Forgebook's shell
-needs them and not every package manager installs a peer by itself.
+the project's package manager; `--install` runs it. It lists React even on Vue, say, because Forgebook's shell needs it and not every package manager installs a peer by
+itself. Vite is Forgebook's own dependency: a project on an older one installs it beside its own, which stays as it is.
 
 ```sh
 npx forgebook new src/Badge.tsx   # a component's first stories
