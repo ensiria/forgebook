@@ -25,6 +25,7 @@ import {
   type StoryDeclaration,
   storyControlsOf
 } from "../storyControls.ts";
+import { passesTags } from "../storyTags.ts";
 import { findComponentByTitle, type StoryLocation, type StoryTree, type TreeStory } from "../storyTree.ts";
 import type { UsageIndex } from "../usedIn.ts";
 import { componentAddressOf, frameAddressOf, storyAddressOf } from "../viewState.ts";
@@ -398,6 +399,11 @@ export type StoriesFilter = {
   readonly source?: string | undefined;
   /** Text a component's title holds, any case (`button`); every component when none. */
   readonly component?: string | undefined;
+  /**
+   * Tags, each `name` or `!name`, as the catalogue's address writes them: only the stories holding any `name` and no
+   * `!name`, and the components left with one; every story when none.
+   */
+  readonly tags?: readonly string[] | undefined;
 };
 
 /**
@@ -408,13 +414,23 @@ export type StoriesFilter = {
  */
 export const filteredStories = (document: StoriesDocument, filter: StoriesFilter): StoriesDocument => {
   const text = filter.component?.toLowerCase();
+  const tags = filter.tags ?? [];
   return {
     ...document,
-    components: document.components.filter(
-      (component) =>
-        (filter.source === undefined || component.source === filter.source) &&
-        (text === undefined || component.title.toLowerCase().includes(text))
-    )
+    components: document.components
+      .filter(
+        (component) =>
+          (filter.source === undefined || component.source === filter.source) &&
+          (text === undefined || component.title.toLowerCase().includes(text))
+      )
+      .flatMap((component) => {
+        if (tags.length === 0) return [component];
+        // an unlisted story is one the catalogue's lists leave out: a filter of those lists leaves it out too
+        const stories = component.stories.filter(
+          (story) => !story.isUnlisted && passesTags(story.tags, tags)
+        );
+        return stories.length === 0 ? [] : [{ ...component, stories }];
+      })
   };
 };
 

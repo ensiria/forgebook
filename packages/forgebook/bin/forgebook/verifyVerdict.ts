@@ -290,7 +290,8 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
       notes,
       ...(code.tokenSources === undefined ? {} : { tokenSources: code.tokenSources }),
       ...(code.tokenNotes === undefined ? {} : { tokenNotes: code.tokenNotes }),
-      ...(code.excused === undefined ? {} : { excused: code.excused })
+      ...(code.excused === undefined ? {} : { excused: code.excused }),
+      ...(code.advice === undefined ? {} : { advice: code.advice })
     },
     ...(outdated.length === 0 ? {} : { outdated }),
     problems

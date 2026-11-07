@@ -125,7 +125,14 @@ describe("forgebook verify", { timeout: 60_000 }, () => {
     expect(document).toMatchObject({
       verdict: "failed",
       code: {
-        checked: ["raw-color", "raw-size", "suppression", "deleted-test"],
+        checked: [
+          "raw-color",
+          "raw-size",
+          "suppression",
+          "deleted-test",
+          "deprecated-component",
+          "duplicate-component"
+        ],
         problems: [{ rule: "raw-color", file: "src/Badge.tsx", fix: "--brand" }],
         tokenSources: [{ kind: "css-variables", file: "src/system.css", tokens: 6 }]
       }

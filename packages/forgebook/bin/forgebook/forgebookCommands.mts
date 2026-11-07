@@ -38,6 +38,7 @@ import {
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
 import { leaveAfterCommand } from "./commandServer.ts";
 import { devCommands } from "./devCommands.mts";
+import { graphCommands } from "./graphCommand.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
@@ -115,6 +116,13 @@ await defineCommands({
           valueName: "text",
           description: "Only components whose title holds this text."
         },
+        tag: {
+          type: "string",
+          multiple: true,
+          valueName: "tag",
+          description:
+            "Only stories with any of these tags; !name leaves a tag's out, as the address's tag= does."
+        },
         view: {
           type: "string",
           valueName: "query",
@@ -139,7 +147,11 @@ await defineCommands({
           command: `${COMMAND} stories --component select --used-in --json`,
           description: "The selects, with the components whose stories use them."
         },
-        { command: `${COMMAND} stories --component button --json`, description: "The buttons, as JSON." }
+        { command: `${COMMAND} stories --component button --json`, description: "The buttons, as JSON." },
+        {
+          command: `${COMMAND} stories --tag beta --tag '!wip'`,
+          description: "The stories in beta, but for those in progress."
+        }
       ],
       run: async ({ options, io, log, isJson, style }): Promise<void> => {
         const config = await configWithStoriesOf(options.config);
@@ -149,7 +161,11 @@ await defineCommands({
         });
         const body = await askCatalogue(config, options.url, "stories", params, log);
         if (!isStoriesDocument(body)) throw new ScriptError("The catalogue's answer has an unexpected shape");
-        const document = filteredStories(body, { source: options.source, component: options.component });
+        const document = filteredStories(body, {
+          source: options.source,
+          component: options.component,
+          tags: options.tag
+        });
         printAnswer(storiesText(document, style), document, document.problems, { io, log, isJson });
       }
     }),
@@ -302,6 +318,7 @@ await defineCommands({
     ...agentLoopCommands(forgebook),
     ...guideCommands(forgebook),
     ...auditCommands(forgebook),
+    ...graphCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),

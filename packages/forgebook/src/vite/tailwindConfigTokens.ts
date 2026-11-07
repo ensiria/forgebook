@@ -12,8 +12,8 @@
  */
 import { type ESTree, parseSync } from "vite";
 
-import { isTooDeep } from "./componentScan.ts";
 import { keyName, propertyValue, unwrapped } from "./indexFields.ts";
+import { isTooDeep } from "./sourceText.ts";
 
 /** A theme value the file writes. */
 export type ConfigToken = {

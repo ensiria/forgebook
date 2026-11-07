@@ -330,6 +330,7 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
       ? lines
       : [document.skipped.length > 0 ? "Nothing to report in what was checked." : "Nothing to report."]),
     ...document.skipped,
+    ...(document.advice ?? []).map(({ file, line, message }) => `${file}:${line}  ${message}`),
     ...(document.excused ?? []).map(
       ({ file, line, rule, reason }) => `${file}:${line}  ${rule} excused by a comment: ${reason}`
     ),
@@ -361,12 +362,13 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
   const notes = document.code.notes.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
   );
+  const advice = (document.code.advice ?? []).map((each) => `${each.file}:${each.line}  ${each.message}`);
   const results = [
     ...document.failures,
     ...document.notVerified.map((each) => ({ ...each, problems: [] }))
   ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
   const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
-  return [...uncovered, ...code, ...outdated, ...notes, ...stories, document.summary].join("\n");
+  return [...uncovered, ...code, ...outdated, ...notes, ...advice, ...stories, document.summary].join("\n");
 };
 
 /**

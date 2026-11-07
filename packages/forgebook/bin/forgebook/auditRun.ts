@@ -10,10 +10,7 @@
  * @module
  */
 
-import { join } from "node:path";
-
 import {
-  type AuditFile,
   type AuditSite,
   type AuditSystem,
   type AuditValue,
@@ -21,12 +18,10 @@ import {
   valueAudit,
   valueSites
 } from "../../src/vite/appAudit.ts";
-import { listedFiles, repositoryOf, smallFileText } from "../../src/vite/appTokenFiles.ts";
 import { readAppTokens } from "../../src/vite/appTokens.ts";
-import { LEFT_ALONE } from "../../src/vite/checkCode.ts";
-import { type ScannedComponent, scannedComponents } from "../../src/vite/componentScan.ts";
+import { projectComponents } from "../../src/vite/componentScan.ts";
 import { type LookAlike, lookAlikes } from "../../src/vite/lookAlikes.ts";
-import { isInside } from "../../src/vite/sourceTokens.ts";
+import { projectFiles, UI_PATTERNS } from "../../src/vite/projectFiles.ts";
 
 /** The next step a report proposes. */
 export type AuditAction = {
@@ -73,22 +68,6 @@ export type AuditSitesDocument = {
   readonly notes: readonly string[];
 };
 
-/** What git is asked for. */
-const UI_PATTERNS = ["*.css", "*.scss", "*.sass", "*.less", "*.tsx", "*.jsx", "*.vue", "*.svelte", "*.astro"];
-
-/** The same, for a file's name. */
-const UI_FILE = /\.(?:css|scss|sass|less|tsx|jsx|vue|svelte|astro)$/;
-
-/** What is not the project's own code: copies, generated output and what a package brought. */
-const NOT_ITS_CODE =
-  /(?:^|\/)(?:node_modules|dist|build|out|coverage|vendor|vendors|public|static|\.next|\.nuxt|\.svelte-kit|\.astro|\.turbo|storybook-static)\//;
-
-/** Past this a project's files are not all read, and the report says so. */
-const MOST_FILES = 5000;
-
-/** Past this much text a report stops reading, rather than run out of memory on what no one wrote by hand. */
-const MOST_BYTES = 200_000_000;
-
 /** A value used this often is worth a name. */
 const WORTH_A_NAME = 3;
 
@@ -97,26 +76,6 @@ const MOST_ACTIONS = 20;
 
 /** A word as one word of a command, quoted: values come from the project's files. */
 const quoted = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
-
-/** The project's files to read. */
-const projectFiles = (dir: string, notes: string[]): AuditFile[] => {
-  const root = repositoryOf(dir);
-  let bytes = 0;
-  const listed = listedFiles(dir, UI_PATTERNS, UI_FILE, NOT_ITS_CODE).filter(
-    (file) => !NOT_ITS_CODE.test(file)
-  );
-  if (listed.length > MOST_FILES)
-    notes.push(`${listed.length - MOST_FILES} files past the first ${MOST_FILES} not read`);
-  const read = listed.slice(0, MOST_FILES).flatMap((file) => {
-    const path = join(dir, file);
-    // a tracked link may lead anywhere
-    const text = bytes > MOST_BYTES || !isInside(root, path) ? undefined : smallFileText(path);
-    bytes += text?.length ?? 0;
-    return text === undefined ? [] : [{ file, text }];
-  });
-  if (bytes > MOST_BYTES) notes.push(`files past the first ${MOST_BYTES} bytes not read`);
-  return read;
-};
 
 /** The step one value written by hand proposes, when it is used enough to act on. */
 const valueAction = (each: AuditValue, what: string, folder: string): AuditAction[] => {
@@ -182,11 +141,7 @@ export const auditDocument = (dir: string, top: number | undefined, folder = "."
   const notes = [...unread];
   const files = projectFiles(dir, notes);
   const values = valueAudit(files, tokens, top);
-  const components: ScannedComponent[] = files
-    .filter(({ file }) => !LEFT_ALONE.test(file))
-    .flatMap(({ file, text }) =>
-      /\.(?:tsx|jsx|vue|svelte|astro)$/.test(file) ? scannedComponents(file, text) : []
-    );
+  const components = projectComponents(files);
   const alike = lookAlikes(components);
   return {
     schema: 1,
@@ -223,7 +178,7 @@ export const auditSitesDocument = (dir: string, value: string): AuditSitesDocume
  * @param text - the text.
  */
 export const printable = (text: string): string =>
-  text.replaceAll(/[\p{Cc}]/gu, (character) => (character === "\n" ? "\n" : "?"));
+  text.replaceAll(/[\p{Cc}\p{Cf}]/gu, (character) => (character === "\n" ? "\n" : "?"));
 
 /** A value as a line of a list. */
 const valueLine = ({ value, count, files, hardCoded, token }: AuditValue): string =>

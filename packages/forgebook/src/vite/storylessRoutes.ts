@@ -14,6 +14,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { codeLiteral } from "../codeLiteral.ts";
 import type { CheckedCodeDocument } from "./agent.types.ts";
 import type { AgentAnswer } from "./agentRoutes.ts";
+import { smallFileText } from "./appTokenFiles.ts";
 import { type AppTokens, readAppTokens } from "./appTokens.ts";
 import {
   type AddedLine,
@@ -22,13 +23,23 @@ import {
   checkedCode,
   deletedTests,
   excusedValues,
-  fileLines
+  fileLines,
+  LEFT_ALONE
 } from "./checkCode.ts";
+import { currentComponents } from "./componentCache.ts";
+import { graphDocument } from "./componentGraph.ts";
+import { COMPONENT_FILE } from "./componentScan.ts";
+import { compositionFindings } from "./compositionCheck.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import type { DesignToken } from "./designTokens.ts";
-import { gitChange, gitOutput } from "./gitChange.ts";
+import { type GitChange, gitChange, gitOutput } from "./gitChange.ts";
+import { type ProjectFile, workspacePackages } from "./projectFiles.ts";
+import { type ReuseFindings, reuseFindings } from "./reuseCheck.ts";
 import { readTokenFiles, type SourceTokens, sourceTokensIn } from "./sourceTokens.ts";
 import { TOKEN_ANSWERS, type TokenReading, tokenSummary } from "./tokenAnswers.ts";
+
+/** How many component files a change may touch and still be compared: past this it is a move or a rewrite. */
+const MOST_REUSE_FILES = 300;
 
 /** Fewer colours than this in what an application declares is no palette to compare with. */
 const FEWEST_COLORS = 5;
@@ -194,6 +205,86 @@ const notCheckedLine = (hasColors: boolean, hasSizes: boolean, { tokens }: Token
   return [`${what} not checked: ${reason}`];
 };
 
+/** What a change's files were, at the commit it starts from: a file it adds has none. */
+const filesAtBase = async (
+  root: string,
+  base: string,
+  files: readonly string[]
+): Promise<readonly ProjectFile[]> => {
+  const read = await Promise.all(
+    files.map(async (file) => ({
+      file,
+      text: await gitOutput(root, "show", `${base}:${file}`).catch(() => undefined)
+    }))
+  );
+  return read.flatMap(({ file, text }) => (text === undefined ? [] : [{ file, text }]));
+};
+
+/**
+ * What a change adds against the project's components, read over the whole repository, since the one a new component
+ * copies may live in another package. Only a change to a component's file costs this reading.
+ */
+const reuseOf = async (
+  root: string,
+  change: GitChange,
+  added: readonly AddedLine[]
+): Promise<ReuseFindings & { readonly notes: readonly string[]; readonly hasRules: boolean }> => {
+  try {
+    return await readReuse(root, change, added);
+  } catch (error) {
+    // a crafted file past what a walk can take costs this part of the answer, and says so
+    const reason = error instanceof RangeError ? "a file nests too deep" : "it could not be read";
+    return {
+      problems: [],
+      advice: [],
+      excused: [],
+      hasRules: false,
+      notes: [`components not compared: ${reason}`]
+    };
+  }
+};
+
+/** What `reuseOf` reads. */
+const readReuse = async (
+  root: string,
+  change: GitChange,
+  added: readonly AddedLine[]
+): Promise<ReuseFindings & { readonly notes: readonly string[]; readonly hasRules: boolean }> => {
+  const isComponent = (file: string): boolean => COMPONENT_FILE.test(file) && !LEFT_ALONE.test(file);
+  const touched = new Set(added.flatMap(({ file }) => (isComponent(file) ? [file] : [])));
+  const empty = { problems: [], advice: [], excused: [], notes: [], hasRules: false };
+  if (touched.size === 0) return empty;
+  const deleted = change.deleted.filter(isComponent);
+  if (touched.size + deleted.length > MOST_REUSE_FILES) {
+    return {
+      ...empty,
+      notes: [`components not compared: the change touches more than ${MOST_REUSE_FILES} of them`]
+    };
+  }
+  const notes: string[] = [];
+  const components = currentComponents(root, notes);
+  const changed = [...touched].flatMap((file) => {
+    const text = smallFileText(join(root, file));
+    return text === undefined ? [] : [{ file, text }];
+  });
+  const packages = workspacePackages(root);
+  const composition = compositionFindings(added, changed, components, packages);
+  const findings = reuseFindings({
+    added,
+    changed,
+    previous: await filesAtBase(root, change.base, [...touched, ...deleted]),
+    components,
+    packages
+  });
+  return {
+    problems: [...findings.problems, ...composition.problems],
+    advice: findings.advice,
+    excused: [...findings.excused, ...composition.excused],
+    hasRules: components.some((each) => each.rules !== undefined),
+    notes: notes.map((note) => `components not all compared: ${note}`)
+  };
+};
+
 /**
  * What a change adds that breaks the design system. It needs nothing of the stories, like the tokens, so a story broken
  * mid-edit does not stop it; tokens that were asked for and cannot be read do, or a check would pass having checked less.
@@ -226,10 +317,16 @@ const checkCodeAnswer = async (
   const hasNamedFile = reading.sources.some((source) => source.kind === "tokens-file");
   const added = [...addedLines(change.diff), ...fresh.flat()];
   const folder = relative(root, await realpath(config.dir)).replaceAll("\\", "/");
-  const inFolder = (file: string): boolean =>
-    hasNamedFile || folder === "" || file === folder || file.startsWith(`${folder}/`);
+  const isInCatalogue = (file: string): boolean =>
+    folder === "" || file === folder || file.startsWith(`${folder}/`);
+  const inFolder = (file: string): boolean => hasNamedFile || isInCatalogue(file);
   const hasColors = tokens.some((token) => token.type === "color") || (hasNamedFile && tokens.length > 0);
   const hasSizes = tokens.some((token) => token.type === "dimension") || (hasNamedFile && tokens.length > 0);
+  const reuse = await reuseOf(
+    root,
+    change,
+    added.filter(({ file }) => isInCatalogue(file))
+  );
   const body: CheckedCodeDocument = {
     schema: 1,
     since,
@@ -237,20 +334,38 @@ const checkCodeAnswer = async (
       ...(hasColors ? (["raw-color"] as const) : []),
       ...(hasSizes ? (["raw-size"] as const) : []),
       "suppression",
-      "deleted-test"
+      "deleted-test",
+      "deprecated-component",
+      "duplicate-component",
+      ...(reuse.hasRules ? (["composition"] as const) : [])
     ],
     skipped: [
       ...notCheckedLine(hasColors, hasSizes, reading),
+      ...reuse.notes,
       ...unread.map((source) => `tokens of a source not checked: ${source}`)
     ],
-    problems: [...codeProblems(added, tokens, inFolder), ...deletedTests(change.deleted)],
+    problems: [...codeProblems(added, tokens, inFolder), ...deletedTests(change.deleted), ...reuse.problems],
+    advice: reuse.advice,
     tokenSources: reading.sources,
     tokenClashes: reading.clashes.length,
     tokenNotes: [...reading.notes],
     notCompared: [...new Set(added.flatMap(({ file }) => (inFolder(file) ? [] : [file])))],
-    excused: excusedValues(added.filter(({ file }) => inFolder(file)))
+    excused: [...excusedValues(added.filter(({ file }) => inFolder(file))), ...reuse.excused]
   };
   return { status: 200, body };
+};
+
+/** The map of the project, for a client with no shell. */
+const graphAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
+  const limit = Number(params.get("limit"));
+  return {
+    status: 200,
+    body: graphDocument(config.dir, {
+      component: params.get("component") || undefined,
+      intent: params.get("intent") || undefined,
+      limit: Number.isInteger(limit) && limit > 0 ? limit : undefined
+    })
+  };
 };
 
 /** The answers that need nothing of the stories, so a story broken mid-edit cannot take them down. */
@@ -270,5 +385,6 @@ export const STORYLESS_ROUTES: Readonly<
       ): Promise<AgentAnswer> => answer(await catalogueTokens(config, resolveSource), params)
     ])
   ),
-  "check-code": checkCodeAnswer
+  "check-code": checkCodeAnswer,
+  graph: graphAnswer
 };
