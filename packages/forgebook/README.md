@@ -276,7 +276,8 @@ too, with a warning.
   (`onClick: fn()`, `icon: <IconStar />`, a constant of the file) as written, spreads of the file's objects and of
   another story's args followed, and the plain values as they are now. A value set in the Props tab is written from
   that value. `forgebook story --json` gives the same text as `code`. Vue and Svelte bind such an arg as written
-  (`:on-close="fn()"`); Angular, HTML and Web Components still write the plain values only.
+  (`:on-close="fn()"`); Angular, HTML and Web Components still write the plain values only. A story made by a
+  helper, imported from another file or written in CSF 4 (`meta.story(…)`) is written from its values.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break, every number a huge one and every list many items, nested ones too, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
