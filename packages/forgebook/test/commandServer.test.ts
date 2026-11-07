@@ -4,11 +4,17 @@
  *
  * @module
  */
-import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { normalizePath, type Plugin, resolveConfig as resolveVite } from "vite";
+import {
+  createServer,
+  type InlineConfig,
+  normalizePath,
+  type Plugin,
+  resolveConfig as resolveVite
+} from "vite";
 import { describe, expect, it } from "vitest";
 
 import { catalogueVite } from "../bin/forgebook/catalogueVite.ts";
@@ -23,6 +29,13 @@ const catalogue = (framework: FrameworkAdapter): ResolvedConfig => {
   const dir = mkdtempSync(join(tmpdir(), "forgebook-command-cache-"));
   writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "app", private: true }));
   return resolveConfig({ framework, title: "Catalogue", sources: [] }, dir);
+};
+
+/** A command's server as `forgebook stories` starts it: no port, nothing watched. */
+const OWN_SERVER: InlineConfig = {
+  server: { middlewareMode: true, hmr: false, watch: null },
+  appType: "custom",
+  logLevel: "silent"
 };
 
 /** The cache folders Vite resolves for `forgebook dev` and for a command's own server, on one catalogue. */
@@ -46,5 +59,35 @@ describe("commandServerVite", () => {
     const { dev, command } = await cacheDirs(config);
     expect(dev).toBe(normalizePath(join(realpathSync(config.dir), ".cache", "vite")));
     expect(command).toBe(normalizePath(join(dev, COMMAND_CACHE_FOLDER)));
+  });
+
+  it("gives a second server running at once a cache folder of its own, and the shared one back once closed", async () => {
+    const config = catalogue(STUB_FRAMEWORK);
+    const dev = await resolveVite(await catalogueVite(config, {}), "serve");
+    const shared = normalizePath(join(dev.cacheDir, COMMAND_CACHE_FOLDER));
+    const first = await createServer(await commandServerVite(config, OWN_SERVER));
+    const second = await createServer(await commandServerVite(config, OWN_SERVER));
+    expect(first.config.cacheDir).toBe(shared);
+    expect(second.config.cacheDir).not.toBe(shared);
+    await second.close();
+    expect(existsSync(second.config.cacheDir)).toBe(false);
+    await first.close();
+    const third = await createServer(await commandServerVite(config, OWN_SERVER));
+    expect(third.config.cacheDir).toBe(shared);
+    await third.close();
+  });
+
+  it("keeps the cache folder through a restart", async () => {
+    const config = catalogue(STUB_FRAMEWORK);
+    const dev = await resolveVite(await catalogueVite(config, {}), "serve");
+    const shared = normalizePath(join(dev.cacheDir, COMMAND_CACHE_FOLDER));
+    const server = await createServer(await commandServerVite(config, OWN_SERVER));
+    await server.restart();
+    expect(server.config.cacheDir).toBe(shared);
+    // still held: a server started now runs apart
+    const other = await createServer(await commandServerVite(config, OWN_SERVER));
+    expect(other.config.cacheDir).not.toBe(shared);
+    await other.close();
+    await server.close();
   });
 });
