@@ -24,6 +24,8 @@ const run = promisify(execFile);
 
 /** A change. */
 export type GitChange = {
+  /** The commit it is measured from. */
+  readonly base: string;
   /** Its unified diff, with no context. */
   readonly diff: string;
   /** The files it deletes, relative to the repository. */
@@ -169,6 +171,7 @@ export const gitChange = async (dir: string, since: string): Promise<GitChange |
   ];
   const root = (await gitOutput(dir, "rev-parse", "--show-toplevel")).trim();
   return {
+    base,
     diff: await gitOutput(dir, "diff", ...form, "--unified=0", base, "--"),
     deleted: listed(
       await gitOutput(dir, "diff", ...form, "--name-only", "-z", "--diff-filter=D", base, "--")

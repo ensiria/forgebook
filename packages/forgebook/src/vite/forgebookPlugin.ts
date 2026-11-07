@@ -34,15 +34,10 @@ import { axeBuildAsset } from "./axeScript.ts";
 import { groupTexts, type TextSources } from "./builtTexts.ts";
 import { catalogueConfig } from "./catalogueConfig.ts";
 import { currentCloseWatch } from "./closeWatch.ts";
-import {
-  findConfigFile,
-  loadConfigFile,
-  packageResolver,
-  type ResolvedConfig,
-  sayEmptyStoryGlobs
-} from "./configFile.ts";
+import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
 import { createDocsExtractor, type DocsExtractor, NO_DOCS_EXTRACTOR } from "./docsExtractor.ts";
+import { sayEmptyStoryGlobs } from "./emptyStoryGlobs.ts";
 import { devServerAccess, VITEST_HOOKS } from "./fileAccess.ts";
 import { FORCED_STATES_VISITOR } from "./forcedStates.ts";
 import { builtPlacement } from "./framesConfig.ts";
@@ -334,7 +329,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       isTestRun ? undefined : extractor().warm,
       startTexts,
       access.isKept,
-      isForgiving()
+      isForgiving(),
+      config
     );
     filesModules.set(id, new Set([...files, ...refused].map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };

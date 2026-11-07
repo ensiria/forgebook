@@ -24,12 +24,30 @@ export type PlayStep = {
   readonly error?: string;
 };
 
+/** One thing a play did through the tools its context hands it, in the Interactions tab's log. */
+export type PlayAction = {
+  /** What it did, as a call: `userEvent.click(<button> "Save")`. */
+  readonly label: string;
+  /** Where it is. */
+  readonly status: PlayStatus;
+  /** How long it took, in ms, once over. */
+  readonly ms?: number;
+  /** Why it failed. */
+  readonly error?: string;
+  /** The named step it ran in, its place in `steps`; none outside one. */
+  readonly step?: number;
+};
+
 /** A play's trace. */
 export type PlayTrace = {
   /** Where the play is. */
   readonly status: PlayStatus;
   /** Its named steps, in order. */
   readonly steps: readonly PlayStep[];
+  /** What it did through its context's tools, in order; none when it did nothing through them. */
+  readonly actions?: readonly PlayAction[];
+  /** What it waits to do next, while it is stepped through; none otherwise. */
+  readonly pausedAt?: string;
   /** How long it took, in ms, once over. */
   readonly ms?: number;
   /** Why it failed. */
@@ -40,10 +58,11 @@ export type PlayTrace = {
 const isStatus = (value: unknown): value is PlayStatus =>
   value === "running" || value === "passed" || value === "failed";
 
-/** Whether a record's optional `ms` and `error` have their types. */
+/** Whether a record's optional `ms`, `error` and `pausedAt` have their types. */
 const hasOptionalEnd = (record: Readonly<Record<string, unknown>>): boolean =>
   (record["ms"] === undefined || typeof record["ms"] === "number") &&
-  (record["error"] === undefined || typeof record["error"] === "string");
+  (record["error"] === undefined || typeof record["error"] === "string") &&
+  (record["pausedAt"] === undefined || typeof record["pausedAt"] === "string");
 
 /** Whether a value is a step, as it arrives in a message. */
 const isStep = (value: unknown): value is PlayStep => {
@@ -51,6 +70,9 @@ const isStep = (value: unknown): value is PlayStep => {
   const record: Readonly<Record<string, unknown>> = { ...value };
   return typeof record["label"] === "string" && isStatus(record["status"]) && hasOptionalEnd(record);
 };
+
+/** Whether a value is a list of steps or actions, which share their shape. */
+const isStepList = (value: unknown): boolean => Array.isArray(value) && value.every(isStep);
 
 /**
  * Whether a value is a play's trace, as it arrives in a message.
@@ -60,6 +82,10 @@ const isStep = (value: unknown): value is PlayStep => {
 export const isPlayTrace = (value: unknown): value is PlayTrace => {
   if (typeof value !== "object" || value === null) return false;
   const record: Readonly<Record<string, unknown>> = { ...value };
-  const steps = record["steps"];
-  return isStatus(record["status"]) && Array.isArray(steps) && steps.every(isStep) && hasOptionalEnd(record);
+  return (
+    isStatus(record["status"]) &&
+    isStepList(record["steps"]) &&
+    (record["actions"] === undefined || isStepList(record["actions"])) &&
+    hasOptionalEnd(record)
+  );
 };

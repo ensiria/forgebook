@@ -149,8 +149,13 @@ const packageRoot = (file: string): string => {
   return start;
 };
 
-/** Whether a path, its links followed where it exists, is inside a folder. */
-const isInside = (root: string, path: string): boolean => {
+/**
+ * Whether a path, its links followed where it exists, is inside a folder.
+ *
+ * @param root - the folder.
+ * @param path - the path.
+ */
+export const isInside = (root: string, path: string): boolean => {
   const real = (each: string): string => (existsSync(each) ? realpathSync(each) : each);
   const fromRoot = relative(real(root), real(path));
   return fromRoot !== ".." && !fromRoot.startsWith(`..${sep}`) && !isAbsolute(fromRoot);
