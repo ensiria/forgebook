@@ -115,6 +115,8 @@ export type ForgebookPluginOptions = {
   readonly framework?: FrameworkAdapter;
   /** Folders outside the app the dev server watches for new story files, beside the configuration's `watch`. */
   readonly watch?: readonly string[];
+  /** Whether the dependency scan is a first start's quick one (`ScanFindings.isQuick`); off by default. */
+  readonly isQuickScan?: boolean;
 };
 
 /**
@@ -243,7 +245,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
    */
   let isTestRun = false;
-  const scripts = scriptProblems();
+  const scripts = { ...scriptProblems(), isQuick: options.isQuickScan === true };
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
   const jsxScripts = jsxInScripts(() => config?.framework ?? options.framework);
