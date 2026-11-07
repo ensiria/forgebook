@@ -1,6 +1,7 @@
 /**
  * The swipe list touch demo, one of a few realistic components to try the catalogue's Touch switch on (swipe, snap,
- * pinch and turn, drag a sheet, pull to refresh), each also usable with a mouse.
+ * pinch and turn, drag a sheet, pull to refresh), each also usable with a mouse. One story is experimental, a status of
+ * its own its component does not hold, and the component is deprecated in its TSDoc only.
  *
  * @module
  */
@@ -20,6 +21,7 @@ export const Inbox: Story<typeof SwipeList> = { parameters: { main: true, height
 
 /** The same list with touch on, whatever the toolbar says. */
 export const InboxTouch: Story<typeof SwipeList> = {
+  tags: ["experimental"],
   globals: { touch: "touch" },
   parameters: { height: 460 }
 };

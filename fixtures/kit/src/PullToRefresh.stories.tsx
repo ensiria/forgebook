@@ -1,5 +1,6 @@
 /**
- * The pull-to-refresh touch demo: pull the feed down from its top and let go.
+ * The pull-to-refresh touch demo: pull the feed down from its top and let go. It is deprecated by its meta's tag
+ * only, which its TSDoc does not say.
  *
  * @module
  */
@@ -9,6 +10,7 @@ import { PullToRefresh } from "./touchDemos/PullToRefresh";
 
 export default {
   title: "Touch demos/Pull to refresh",
+  tags: ["deprecated"],
   parameters: { touch: true },
   component: PullToRefresh,
   args: { title: "Friends" }

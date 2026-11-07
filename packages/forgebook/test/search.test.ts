@@ -49,6 +49,7 @@ const component = (
   design: undefined,
   propGroups: [],
   requiredFirst: undefined,
+  tags: [],
   stories,
   unlisted: [],
   alsoIn: [],

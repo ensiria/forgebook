@@ -129,6 +129,11 @@ export type StoryFileIndex = {
   readonly propGroups?: readonly string[];
   /** The meta's `parameters.docs.description.component`, when written plainly. */
   readonly description?: string;
+  /**
+   * The meta's own tags, when it writes any, with its `parameters.status` among them: what the file says of the
+   * component as a whole (`review`, `deprecated`), whatever each story adds or takes away.
+   */
+  readonly tags?: readonly string[];
   /** What the index noticed without refusing the file (a title written by code, placed by its path). */
   readonly notes?: readonly string[];
   /** Its stories, in the order of the file (or of its `__namedExportsOrder`). */

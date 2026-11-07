@@ -33,6 +33,10 @@ export type ShellPalette = {
   readonly "accent-text": string;
   /** Errors, as text. */
   readonly "danger-text": string;
+  /** A warning, as text: a status's badge in the `caution` tone. */
+  readonly "caution-text": string;
+  /** Something done or safe, as text: a status's badge in the `positive` tone. */
+  readonly "positive-text": string;
   /** Keywords in code. */
   readonly "code-keyword": string;
   /** Types in code. */

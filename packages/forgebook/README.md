@@ -1048,15 +1048,52 @@ hold it, press its other button to leave them out. A story stays when it holds a
 filter lives in the address (`?tag=beta&tag=!wip`), so a link keeps it, and it holds from page to page; a page opened by
 its address shows even if the filter leaves it out. `dev`, `test`, `autodocs`, `play-fn` and `test-fn` say what a tool
 does with a story, and are not offered. Agents ask the same way: `forgebook stories --tag beta --tag '!wip'`, or `tags`
-on `list_stories`.
+on `list_stories`. A tag can also be a [status](#statuses), shown as a badge.
+
+## Statuses
+
+A component's status (waiting for review, experimental, deprecated) is a tag the catalogue declares as a status. Write
+it on the file's meta for the component, or on a story for that story alone:
+
+```ts
+export default { component: Card, tags: ["review"] } satisfies Meta<typeof Card>;
+
+export const Flipped: StoryObj = { tags: ["experimental"] };
+```
+
+`review`, `experimental` and `deprecated` are declared by default. A catalogue restyles or renames one, declares its
+own, or turns one off with `false`; `tone` is `neutral`, `info`, `positive`, `caution` or `critical`:
+
+```ts
+export default defineConfig({
+  statuses: { review: { label: "In review" }, beta: { label: "Beta", tone: "positive" }, experimental: false }
+});
+```
+
+Once any story has a tag, a status shows as a badge in the component's sidebar entry and at the top of its page, and a
+story's own beside its example; a page without one looks as before, and a catalogue with no tags loads nothing for them.
+A component written in several files takes its first file's meta, as its docs do. The [tag filter](#tags) filters by a
+status as by any tag (`?tag=review`), and shows it as its badge. The default labels are shell texts
+(`strings: { "statuses.review": "In revisione" }`), and the `caution-text` and `positive-text` theme roles colour their
+tones. Storybook's status addons write `parameters.status` (`"beta"`, `{ type: "beta" }`): it is read as tags, so declare
+those statuses to show them.
+
+In a catalogue with tags, a component deprecated in its TSDoc (`@deprecated`) shows the `deprecated` badge on its page,
+with the reason in its tooltip, even without the tag. The sidebar reads tags only, so `forgebook story` and `get_story`
+name the component whose TSDoc and meta disagree: tag the meta so the sidebar and the filter say it, or write
+`@deprecated` so `check-code` warns where it is imported. Agents read `statuses` on each component and story of
+`forgebook stories --json`, `list_stories`, `forgebook story --json` and `get_story`, and filter with `--tag review` or
+`tags`.
 
 ## Coming from Storybook
 
 Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.bind({})`), titles of any depth and
 titles from the file's path, `args` and `argTypes` (with their controls), actions from `fn()` or an `argTypes` action,
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
-`tags` (`!dev`, `!test`, and your own for the [tag filter](#tags)), a story's `globals`, JSX in `.js` story files (listed and shown as code; Vite compiles JSX only in
-`.jsx` and `.tsx`, so such a library adds the plugin its own Storybook uses for them, through the framework's plugins),
+`tags` (`!dev`, `!test`, and your own for the [tag filter](#tags)), a story's `globals`, JSX in `.js` files, stories and components alike (Vite compiles JSX only in `.jsx` and
+`.tsx`; with React, Preact or Next.js, Forgebook compiles the catalogue's own `.js` files that hold JSX itself, with the
+project's JSX options, `jsxInject` and Fast Refresh, and leaves installed packages, the workspace's other packages and
+`?raw`, `?url` or `?worker` imports alone; a project that sets `oxc: false` compiles its scripts its own way),
 hooks in a `render` or a decorator (React and
 Preact, with the story's state kept when a decorator draws `<Story />`), Storybook's preview hooks from
 `storybook/preview-api` in a React story file (`useArgs`, whose update and reset change the story's args as the panel
@@ -1266,7 +1303,7 @@ is a state of the component: the same).
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
-| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change |
+| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change. `--repair` draws them in a browser and, when an error says a story must be drawn inside a component the application exports (`useSidebar must be used within a SidebarProvider`), draws them inside it, at most twice |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook check <id> --stress` | Draws the story in the states nobody wrote: long text, unbreakable words, huge numbers, empty, right to left, 200 % zoom, narrow, dark, more contrast, and reports what each breaks |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
@@ -1572,7 +1609,7 @@ shell: { theme: { fromTokens: { accent: "color.brand.primary", surface: "color.b
 
 Every role is optional, and typed by `ShellTheme` (`import type { ShellTheme } from "forgebook/shell-theme"`): the grounds
 `window`, `sidebar`, `surface`; `separator`, `hover`; the texts `text`, `text-secondary`, `text-tertiary`, `accent-text`,
-`danger-text`; `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
+`danger-text`, `caution-text`, `positive-text` (the last two colour the [status badges](#statuses)); `accent`; and the `code-*` colours. Renaming or removing a role is a breaking change. A preset can give a
 theme too, and the catalogue's wins role by role.
 
 The reader's Interface menu also offers **Follow the story**, where the catalogue has a theme switch: a dark story in a

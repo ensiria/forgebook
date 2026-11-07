@@ -5,6 +5,10 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
 - One file per component, beside it: `Badge.tsx` and `Badge.stories.tsx`, in CSF 3 (Storybook's format; Forgebook
   reads it, never MDX or addons). Files with the same title are one component, as in Storybook: each story keeps its
   own file (`file` in `forgebook stories --json`), and the component lists them all (`files`).
+- With React, Preact or Next.js, JSX in `.js` files (stories and components, as a library on Storybook's webpack
+  builder may write them) draws with no configuration: Forgebook compiles the catalogue's own `.js` files that hold
+  JSX, not installed or other workspace packages, and leaves `?raw`, `?url` and `?worker` imports alone. Other
+  frameworks need `.jsx`.
 - Every named export of a story file is a story; leave helpers and data out with the meta's `excludeStories`.
 - The catalogue lists the files its `stories` globs name in `forgebook.config.ts`; a glob that starts with `!` leaves
   files out (`"!src/**/drafts/**"`), whatever its place in the list. A new story file that `forgebook stories` does not
@@ -71,6 +75,8 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
 - Say when a component is for and when it is not, in its TSDoc: `@useWhen`, `@avoidWhen`, `@alternatives`, `@deprecated`,
   `@replacedBy`. `forgebook story` returns them as `docs.guidance`: read them before using a component, and never use a
   deprecated one.
+- A component's status is a tag on its meta (`tags: ["review"]`, `["experimental"]`, `["deprecated"]`; a story's own on
+  the story): the catalogue shows it as a badge. Deprecate in both places, the meta's tag and `@deprecated` in the TSDoc.
 - A component with many props names their groups in its TSDoc (`@group Paging`): `forgebook story` returns each
   prop's `group`, and a prop typed with a documented object (`texts?: FinderTexts`) its `members`, each with its type,
   default and TSDoc: read them to know every text a component takes before passing one.

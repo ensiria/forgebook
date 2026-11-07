@@ -15,5 +15,11 @@ start with plays off (a build does), so a link meant to show a story after its p
 `forgebook stories --tag beta --tag '!wip'` (or `tags` on `list_stories`) keeps the stories with any tag named and none
 left out, as the sidebar's filter does in the address (`?tag=beta&tag=!wip`).
 
+A component's and a story's `statuses` lists the tags the catalogue declares as statuses (`review`, `experimental`,
+`deprecated` by default): filter by one as by any tag (`--tag review`). Never use a component whose `statuses` holds
+`deprecated`. In `forgebook story` and `get_story` the component is deprecated when its TSDoc says `@deprecated` too, and
+`problems` names the component when the TSDoc and the meta's tags disagree: add `tags: ["deprecated"]` to the meta,
+or `@deprecated` (with `@replacedBy`) to the TSDoc, so the catalogue and `check-code` say the same.
+
 Each story also says whether a `play` function acts on it (`hasPlay`), and `tags` holds `!test` when the generated tests
 leave it out.

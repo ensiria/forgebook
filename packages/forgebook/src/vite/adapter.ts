@@ -91,6 +91,13 @@ export type FrameworkAdapter = {
    * program and leaves out the code Vite's plugins add to it (Angular's): an edit of its story files reloads the pages.
    */
   readonly redrawsEditedStories?: boolean;
+  /**
+   * Whether Forgebook compiles the JSX of the project's `.js` files with Vite's JSX options (`jsxInScripts.ts`), as
+   * Storybook's webpack builder lets a library write it: `true` for a framework whose JSX Vite's compiler writes
+   * (React's, Preact's). `false` by default: for one whose JSX is another compiler's (Solid's), or whose plugins compile
+   * such files themselves (React Native Web's, with Flow types).
+   */
+  readonly compilesJsxInScripts?: boolean;
 };
 
 /**

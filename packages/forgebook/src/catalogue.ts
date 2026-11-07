@@ -19,6 +19,7 @@ import { type Backdrop, BUILT_IN_BACKDROPS, type CustomBackdrop, customBackdrop 
 import { type ControlKeys, catalogueKeys } from "./controlKeys.ts";
 import { DEVICE_PARAMETER, type DeviceDefault, deviceDefaultOf, NO_DEVICE } from "./deviceView.ts";
 import type { CatalogueView } from "./namedViews.ts";
+import type { StatusSettings } from "./storyStatuses.ts";
 import { switchWithRole, type TouchChoice, touchChoiceOf, type ViewSwitch } from "./switches.ts";
 import { viewQuery } from "./viewWords.ts";
 
@@ -188,6 +189,13 @@ export type CatalogueLists = {
    * switch turns the ordering on or off over both.
    */
   readonly requiredFirst?: RequiredFirst;
+  /**
+   * The tags that are statuses, shown as a badge on the component's or the story's page and in the sidebar, by tag:
+   * `{ review: { label: "In review", tone: "caution" } }`. `review`, `experimental` and `deprecated` are declared by
+   * default; a catalogue's entry restyles or renames one, `false` turns one off. A meta's tags give the component's
+   * status, a story's the story's; the tag filter filters by them.
+   */
+  readonly statuses?: StatusSettings;
 };
 
 /** The shell's own appearance: light, dark, the system's, or the colour scheme of the story shown. */
@@ -255,6 +263,11 @@ export type CatalogueSettings = {
   readonly propGroups: readonly string[];
   /** Where the required props are listed when a component or a story does not say; `"in-groups"` by default. */
   readonly requiredFirst: RequiredFirst;
+  /**
+   * The statuses as the configuration declares them; the defaults are filled in where the badges are drawn
+   * (`storyStatuses.ts`), which load only for a catalogue whose stories have tags. None when it declares none.
+   */
+  readonly statuses: StatusSettings | undefined;
 };
 
 /** WCAG 2.2 at levels A and AA: the rules every story passes by default. */
@@ -467,7 +480,8 @@ export const catalogueSettings = (
     views: catalogueViews(switches, lists.views),
     // checked when the configuration loads (`configFile.ts`): a model that is none is left out here
     device: deviceDefaultOf(NO_DEVICE, lists.device),
-    requiredFirst: lists.requiredFirst ?? "in-groups"
+    requiredFirst: lists.requiredFirst ?? "in-groups",
+    statuses: lists.statuses
   };
 };
 
