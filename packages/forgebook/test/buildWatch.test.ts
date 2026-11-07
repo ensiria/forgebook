@@ -65,9 +65,16 @@ describe("forgebook build --watch", () => {
 
   /** Waits until the process printed a text a given number of times. */
   const printedTimes = async (text: string, times: number): Promise<void> => {
-    await expect
-      .poll(() => printed.split(text).length - 1, { timeout: 60_000, interval: 100 })
-      .toBeGreaterThanOrEqual(times);
+    try {
+      await expect
+        .poll(() => printed.split(text).length - 1, { timeout: 60_000, interval: 100 })
+        .toBeGreaterThanOrEqual(times);
+    } catch (error) {
+      // what the process printed is what tells why it never got there
+      throw new Error(`"${text}" never printed ${times} times; the process printed:\n${printed}`, {
+        cause: error
+      });
+    }
   };
 
   /** The text of the output's scripts and data. */

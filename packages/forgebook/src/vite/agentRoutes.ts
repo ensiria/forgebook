@@ -22,6 +22,7 @@ import { createIdResolver, type ViteDevServer } from "vite";
 
 import type { ValueSchema } from "../argControl.ts";
 import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
+import type { StoryCodeWriter } from "../frame/renderer.ts";
 import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
@@ -40,6 +41,7 @@ import {
   storyDocument
 } from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
+import { type AgentCodeParts, withStoryCode } from "./agentStoryCode.ts";
 import { changedAnswer } from "./changedRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
@@ -47,6 +49,7 @@ import { emptyStoryGlobs, emptyStoryGlobsMessage } from "./emptyStoryGlobs.ts";
 import { findAnswer } from "./findRoute.ts";
 import { framesOriginOf } from "./framesConfig.ts";
 import { hostOf } from "./framesServer.ts";
+import { hiddenStoryFolders, hiddenStoryFoldersMessage } from "./hiddenStoryFiles.ts";
 import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { PREVIEW_ROUTE } from "./previewRoute.ts";
 import { loadPreview } from "./previewRunner.ts";
@@ -237,8 +240,12 @@ export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer>
       : undefined;
   // read for each answer: the file an agent has just written ends the problem
   const globs = emptyStoryGlobs(config);
-  const listed =
-    globs.length === 0 ? tree : { ...tree, problems: [emptyStoryGlobsMessage(globs), ...tree.problems] };
+  const hidden = hiddenStoryFolders(config);
+  const said = [
+    ...(globs.length === 0 ? [] : [emptyStoryGlobsMessage(globs)]),
+    ...(hidden.length === 0 ? [] : [hiddenStoryFoldersMessage(hidden)])
+  ];
+  const listed = said.length === 0 ? tree : { ...tree, problems: [...said, ...tree.problems] };
   return { status: 200, body: storiesDocument(config.title, listed, pages, view, usage) };
 };
 
@@ -270,15 +277,54 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
         : await customControlsRead(customControlNames(storyModule, location), config, context.server),
     addressTexts: config.framework.addressTexts
   };
+  const code: AgentCodeParts | undefined =
+    context.server === undefined
+      ? undefined
+      : {
+          code: await settled(files.code[file]),
+          writer: await codeWriterOf(config, context.server),
+          namedValues: source.namedValues
+        };
   const index = offersUsedIn(config.lists) ? await sourceUsage(source) : undefined;
   // a usage that cannot be read leaves "Used in" out, never the story
   const usage = index === undefined || typeof index === "string" ? undefined : { tree, index };
-  const document = storyDocument(location, parts, pages, view, usage);
+  const module = "value" in storyModule ? storyModule.value : undefined;
+  const document = withStoryCode(storyDocument(location, parts, pages, view, usage), code, {
+    location,
+    module,
+    preview: loaded.preview
+  });
   // an agent must tell docs turned off from a story file that names no component
   const body: StoryDocument = readsComponentDocs(config.lists)
     ? document
     : { ...document, componentDocs: "off" };
   return { status: 200, body };
+};
+
+/** Whether a module's `codeOf` is a code writer: a function, as every framework's code module exports it. */
+const isCodeWriter = (value: unknown): value is StoryCodeWriter => typeof value === "function";
+
+/**
+ * The framework's code writer, loaded on the server as the shell imports it; none when it does not load there.
+ *
+ * @param config - the catalogue's configuration.
+ * @param server - what the answers ask of the dev server.
+ */
+const codeWriterOf = async (
+  config: ResolvedConfig,
+  server: AgentServer
+): Promise<StoryCodeWriter | undefined> => {
+  try {
+    const id = await server.resolveSource(config.framework.pages.code);
+    // loading a module that does not resolve would only have Vite log its failure
+    const loaded = id === undefined ? undefined : await server.load(id);
+    const writer =
+      typeof loaded === "object" && loaded !== null && "codeOf" in loaded ? loaded.codeOf : undefined;
+    return isCodeWriter(writer) ? writer : undefined;
+  } catch {
+    // a writer that touches the page as it loads has no code to give an agent; the story's answer stands without it
+    return undefined;
+  }
 };
 
 /** How long a control's module may take to load for an answer: one that hangs must not hold every answer with it. */
@@ -374,6 +420,8 @@ export const agentAnswer = async (
     if (route === "pages") return await pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context, server.resolveSource);
+    // loaded when asked: it reads syntax with TypeScript, which a dev server's thread must not pay for at start
+    if (route === "visibility") return await (await import("./visibilityRoute.ts")).visibilityAnswer(context);
     if (route === "agent-index")
       return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };

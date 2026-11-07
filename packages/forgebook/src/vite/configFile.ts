@@ -39,6 +39,7 @@ import { saysNoTokens, unknownKeysProblem } from "./configKeys.ts";
 import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
 import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
+import { realFolder } from "./realFolder.ts";
 import { filesProblem } from "./storyPatterns.ts";
 import { switchValuesProblem, withAbsoluteValueFiles } from "./switchValuesCheck.ts";
 import { tokenThemeOf } from "./themeFromTokens.ts";
@@ -606,5 +607,6 @@ export const loadConfigFile = async (file: string): Promise<ResolvedConfig> => {
   const config: unknown =
     typeof module === "object" && module !== null && "default" in module ? module.default : undefined;
   if (!isConfig(config)) throw new Error(`${file}: ${configProblem(config) ?? "it cannot be read"}`);
-  return resolveConfig(config, dirname(file));
+  // the folder as Vite makes its root, so the pages named under it compare with it
+  return resolveConfig(config, realFolder(dirname(file)));
 };
