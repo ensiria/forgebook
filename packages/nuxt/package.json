@@ -49,12 +49,12 @@
   "dependencies": {
     "@forgebook/story-format": "workspace:*",
     "@forgebook/vue": "workspace:*",
+    "magic-string": "1.4.5",
     "unimport": "7.0.2",
-    "magic-string": "1.4.5"
+    "vite": "^8.3.4"
   },
   "peerDependencies": {
     "forgebook": "workspace:^",
-    "vite": "^8.3.4",
     "vue": "^3.5.0",
     "vue-router": "^4.5.0 || ^5.0.0"
   },

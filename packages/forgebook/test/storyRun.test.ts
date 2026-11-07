@@ -6,6 +6,7 @@
  * @module
  */
 
+import type { StepFunction } from "@forgebook/story-format/csf";
 import { describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
@@ -143,6 +144,38 @@ describe("the play switch", () => {
       onTrace: (trace: PlayTrace): void => void statuses.push(trace.status)
     });
     expect(statuses).toEqual([]);
+  });
+});
+
+describe("stepping through a play", () => {
+  it("pauses only the mount it was asked for: Replay's next mount runs on its own", async () => {
+    let played = 0;
+    const paused: (string | undefined)[] = [];
+    const { reports } = await run(
+      badge({
+        play: async ({ step }: { readonly step: StepFunction }): Promise<void> => {
+          await step("first", () => {
+            played += 1;
+          });
+        }
+      }),
+      undefined,
+      undefined,
+      [],
+      { onTrace: (trace: PlayTrace): void => void paused.push(trace.pausedAt) }
+    );
+    expect(played).toBe(1);
+    const controls = controlsOf(reports);
+    controls.stepPlay("start");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(1);
+    expect(paused.at(-1)).toBe("first");
+    controls.stepPlay("next");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(2);
+    controls.restartClock();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(3);
   });
 });
 

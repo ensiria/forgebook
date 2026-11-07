@@ -12,5 +12,8 @@ npx forgebook story <id> --view audience=designer --json   # links.component ope
 A frame runs its story's `play` unless its address says `play=off`; tests and `check` never say it. A person's catalogue may
 start with plays off (a build does), so a link meant to show a story after its play says `play=on`.
 
+`forgebook stories --tag beta --tag '!wip'` (or `tags` on `list_stories`) keeps the stories with any tag named and none
+left out, as the sidebar's filter does in the address (`?tag=beta&tag=!wip`).
+
 Each story also says whether a `play` function acts on it (`hasPlay`), and `tags` holds `!test` when the generated tests
 leave it out.

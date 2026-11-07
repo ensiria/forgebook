@@ -49,7 +49,7 @@ export type ToolbarLayout = {
 };
 
 /** The person's keys a stored text holds; none for anything else. */
-const readKeys = (stored: string | null): ReaderKeys => {
+export const readKeys = (stored: string | null): ReaderKeys => {
   if (stored === null || stored === "") return {};
   try {
     const parsed: unknown = JSON.parse(stored);
@@ -65,7 +65,8 @@ const readKeys = (stored: string | null): ReaderKeys => {
 };
 
 /** The text the person's keys are stored as; empty for none. */
-const keysText = (keys: ReaderKeys): string => (Object.keys(keys).length === 0 ? "" : JSON.stringify(keys));
+export const keysText = (keys: ReaderKeys): string =>
+  Object.keys(keys).length === 0 ? "" : JSON.stringify(keys);
 
 /** The person's arrangement of the toolbar. */
 export const useToolbarLayout = (): ToolbarLayout => {

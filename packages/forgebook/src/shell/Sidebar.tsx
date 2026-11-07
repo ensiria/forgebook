@@ -12,10 +12,26 @@
  */
 
 import type { StorySource } from "@forgebook/story-format/source";
-import { type MouseEvent, type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type MouseEvent,
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 
 import type { SearchTarget } from "../search.ts";
-import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
+import { isFilterTag } from "../storyTagNames.ts";
+import {
+  type StoryTree,
+  storyLocations,
+  type TreeFamily,
+  type TreeGroup,
+  type TreeSource
+} from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
@@ -25,6 +41,7 @@ import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx
 import { SidebarHandle } from "./SidebarHandle.tsx";
 import { SidebarSearch } from "./SidebarSearch.tsx";
 import { STRINGS } from "./strings.ts";
+import type { TagFilterProps } from "./TagFilter.tsx";
 import type { ShownTree, shownTree } from "./treeSearch.ts";
 import type { AppearanceState } from "./useAppearance.ts";
 
@@ -48,6 +65,14 @@ const LoadedDocs = (props: SidebarDocsProps): ReactNode =>
     />
   );
 
+/**
+ * The tag filter, loaded only for a catalogue whose stories have tags; not through `Suspense`, which would hold it back
+ * 300 ms after it arrived (`lazyModule.tsx`). A chunk gone after a new deployment leaves the tree as it is.
+ */
+const TAG_FILTER = lazyModule<TagFilterProps>(() =>
+  import("./TagFilter.tsx").then((module) => module.TagFilter)
+);
+
 /** The sidebar's props. */
 export type SidebarProps = SidebarPageLinks & {
   /** The catalogue's name. */
@@ -56,8 +81,14 @@ export type SidebarProps = SidebarPageLinks & {
   readonly logo: string | undefined;
   /** Whether a catalogue without a logo shows Forgebook's mark. */
   readonly hasBranding: boolean;
-  /** The tree. */
+  /** The tree it lists: what the tag filter keeps. */
   readonly tree: StoryTree;
+  /** The whole tree, whose tags the filter offers. */
+  readonly wholeTree: StoryTree;
+  /** The tags on, each `name` or `!name`. */
+  readonly tags: readonly string[];
+  /** Called with the tags on, when they change. */
+  readonly onTagsChange: (tags: readonly string[]) => void;
   /** The sources, for the search's index. */
   readonly sources: readonly StorySource[];
   /** The address of a search's result. */
@@ -99,6 +130,8 @@ export type SidebarProps = SidebarPageLinks & {
   readonly onShow: () => void;
   /** The shell's appearance and its setter, for the menu at the foot. */
   readonly appearance: AppearanceState;
+  /** Opens the list of the shell's keys. */
+  readonly onShowKeys: () => void;
 };
 
 /** A family's key, unique across sources. */
@@ -138,7 +171,7 @@ const currentGroupOf = (tree: StoryTree, current: SidebarProps["current"]): stri
 };
 
 /** The tree as it is, with no search on. */
-const wholeTree = (tree: StoryTree): ShownTree => ({
+const unsearchedTree = (tree: StoryTree): ShownTree => ({
   sources: tree.sources.map((source) => ({ source, families: source.families })),
   pages: tree.sources
     .filter(({ pages }) => pages.length > 0)
@@ -148,6 +181,197 @@ const wholeTree = (tree: StoryTree): ShownTree => ({
 /** How many components a family holds. */
 const componentCount = (family: TreeFamily): number =>
   family.groups.reduce((count, group) => count + group.components.length, 0);
+
+/** Whether any listed story holds a tag a person can filter by. */
+const hasFilterTags = (tree: StoryTree): boolean =>
+  storyLocations(tree).some(({ story }) => story.tags.some(isFilterTag));
+
+/**
+ * The families and groups the user opened or closed, and the ones a shown component opened: once open, one stays open
+ * until the user closes it, so opening a component elsewhere never folds the list under the pointer.
+ *
+ * @param tree - the tree.
+ * @param current - the shown component, if one is.
+ */
+const useFoldChoices = (
+  tree: StoryTree,
+  current: SidebarProps["current"]
+): {
+  readonly foldChoices: ReadonlyMap<string, boolean>;
+  readonly setFoldOpen: (key: string, isOpen: boolean) => void;
+} => {
+  const [foldChoices, setFoldChoices] = useState<ReadonlyMap<string, boolean>>(new Map());
+  const currentFamilyKey = currentFamilyOf(tree, current);
+  const currentGroupKey = currentGroupOf(tree, current);
+  useEffect(() => {
+    const opened = [currentFamilyKey, currentGroupKey].filter((key): key is string => key !== undefined);
+    setFoldChoices((choices) =>
+      opened.every((key) => choices.has(key))
+        ? choices
+        : new Map([
+            ...choices,
+            ...opened.filter((key) => !choices.has(key)).map((key): [string, boolean] => [key, true])
+          ])
+    );
+  }, [currentFamilyKey, currentGroupKey]);
+  return {
+    foldChoices,
+    setFoldOpen: (key: string, isOpen: boolean): void =>
+      setFoldChoices((choices) => new Map(choices).set(key, isOpen))
+  };
+};
+
+/**
+ * The tag filter, where there is something to filter by, or on an address that names a tag: it is the way out of a list
+ * that tag emptied.
+ *
+ * @param props - the filter's props.
+ */
+const TagFilterSlot = (props: TagFilterProps): ReactNode => {
+  const hasTags = useMemo(() => hasFilterTags(props.tree), [props.tree]);
+  return hasTags || props.tags.length > 0 ? (
+    <LazyView module={TAG_FILTER} props={props} loading={null} failed={(): ReactNode => null} />
+  ) : null;
+};
+
+/** What a family's entry reads. */
+type FamilyEntryProps = {
+  /** The family's source. */
+  readonly source: TreeSource;
+  /** The family. */
+  readonly family: TreeFamily;
+  /** Whether a search or the tag filter is on: every family it finds something in is open. */
+  readonly isNarrowed: boolean;
+  /** The families and groups the user opened or closed. */
+  readonly foldChoices: ReadonlyMap<string, boolean>;
+  /** Opens or closes a family or a group, by its key. */
+  readonly onFoldChange: (key: string, isOpen: boolean) => void;
+  /** The shown component, if one is. */
+  readonly current: SidebarProps["current"];
+  /** How an entry links its page. */
+  readonly links: Pick<SidebarProps, "componentHref" | "onOpenComponent">;
+};
+
+/**
+ * A family: a button that folds it, and its groups.
+ *
+ * @param props - the family, its source, what the user chose to fold, the shown page and the links.
+ */
+const FamilyEntry = ({
+  source,
+  family,
+  isNarrowed,
+  foldChoices,
+  onFoldChange,
+  current,
+  links
+}: FamilyEntryProps): ReactNode => {
+  const key = familyKey(source, family);
+  const isCurrentFamily =
+    current?.sourceId === source.id &&
+    family.groups.some((group) => group.components.some((component) => component.title === current.title));
+  const isOpen = isNarrowed || (foldChoices.get(key) ?? isCurrentFamily);
+  return (
+    <div className="forgebook-tree__family">
+      <button
+        type="button"
+        className="forgebook-tree__family-button"
+        aria-expanded={isOpen}
+        onClick={(): void => onFoldChange(key, !isOpen)}
+      >
+        <span className="forgebook-tree__chevron" data-open={isOpen ? "" : undefined}>
+          <Icon name="chevronRight" size={12} />
+        </span>
+        <span className="forgebook-tree__family-name">{family.name}</span>
+        <span className="forgebook-tree__count">{componentCount(family)}</span>
+      </button>
+      <TreeFold
+        isOpen={isOpen}
+        isInstant={isNarrowed}
+        content={(): ReactNode =>
+          family.groups.map((group) => {
+            const groupOf = groupKey(key, group);
+            const isGroupOpen =
+              isNarrowed || (foldChoices.get(groupOf) ?? holdsCurrent(source.id, group, current));
+            return (
+              <FamilyGroup
+                key={group.name ?? ""}
+                sourceId={source.id}
+                group={group}
+                isOpen={isGroupOpen}
+                isInstant={isNarrowed}
+                onToggle={(): void => onFoldChange(groupOf, !isGroupOpen)}
+                current={current}
+                links={links}
+              />
+            );
+          })
+        }
+      />
+    </div>
+  );
+};
+
+/**
+ * A source: its name and its families; nothing when no family is left of it.
+ *
+ * @param props - the source, its families, and what each family reads.
+ */
+const SourceEntry = ({
+  source,
+  families,
+  ...family
+}: Omit<FamilyEntryProps, "family"> & { readonly families: readonly TreeFamily[] }): ReactNode =>
+  families.length === 0 ? null : (
+    <section className="forgebook-tree__source">
+      <h2 className="forgebook-tree__source-name">
+        {/* decorative: the name beside it says which library it is */}
+        {source.logo === undefined ? null : (
+          <img className="forgebook-source-logo" src={source.logo} alt="" width={14} height={14} />
+        )}
+        {source.name}
+      </h2>
+      {families.map((each) => (
+        <FamilyEntry key={familyKey(source, each)} source={source} family={each} {...family} />
+      ))}
+    </section>
+  );
+
+/**
+ * The catalogue's name and logo, the way home.
+ *
+ * @param props - the name, the logo's address if it has one, and the home's address.
+ */
+const SidebarBrand = ({
+  title,
+  mark,
+  isHome,
+  homeHref,
+  onOpenHome
+}: Pick<SidebarProps, "title" | "isHome" | "homeHref" | "onOpenHome"> & {
+  readonly mark: string | undefined;
+}): ReactNode => (
+  <>
+    {/* the logo is the way home, as on most sites */}
+    <a
+      className="forgebook-brand__home"
+      href={homeHref}
+      aria-current={isHome ? "page" : undefined}
+      title={STRINGS.home}
+      onClick={(event: MouseEvent<HTMLAnchorElement>): void => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+        event.preventDefault();
+        onOpenHome();
+      }}
+    >
+      {/* decorative: the name beside it says what it is */}
+      {mark === undefined ? null : (
+        <img className="forgebook-brand__logo" src={mark} alt="" width={28} height={28} />
+      )}
+      <span className="forgebook-brand__name">{title}</span>
+    </a>
+  </>
+);
 
 /**
  * The sidebar.
@@ -159,6 +383,9 @@ export const Sidebar = ({
   logo,
   hasBranding,
   tree,
+  wholeTree,
+  tags,
+  onTagsChange,
   sources: storySources,
   searchHref,
   onOpenResult,
@@ -178,12 +405,12 @@ export const Sidebar = ({
   onHide,
   onShow,
   appearance,
+  onShowKeys,
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
   const [filterTree, setFilterTree] = useState<typeof shownTree>();
   const showFiltered = useCallback((filter: typeof shownTree): void => setFilterTree(() => filter), []);
-  const mark = logo ?? (hasBranding ? FORGEBOOK_MARK_URL : undefined);
   const navRef = useRef<HTMLElement>(null);
   // the shown component stays in sight: a page opened by a key, the picker or the address scrolls the list to it
   const currentEntry = currentPageId ?? current?.title;
@@ -193,32 +420,15 @@ export const Sidebar = ({
       ?.querySelector(".forgebook-tree__item[aria-current]")
       ?.scrollIntoView({ block: "nearest" });
   }, [currentEntry]);
-  // the families and groups the user opened or closed, and the ones a shown component opened: once open, one stays
-  // open until the user closes it, so opening a component elsewhere never folds the list under the pointer
-  const [foldChoices, setFoldChoices] = useState<ReadonlyMap<string, boolean>>(new Map());
-  const currentFamilyKey = currentFamilyOf(tree, current);
-  const currentGroupKey = currentGroupOf(tree, current);
-  useEffect(() => {
-    const opened = [currentFamilyKey, currentGroupKey].filter((key): key is string => key !== undefined);
-    setFoldChoices((choices) =>
-      opened.every((key) => choices.has(key))
-        ? choices
-        : new Map([
-            ...choices,
-            ...opened.filter((key) => !choices.has(key)).map((key): [string, boolean] => [key, true])
-          ])
-    );
-  }, [currentFamilyKey, currentGroupKey]);
+  const { foldChoices, setFoldOpen } = useFoldChoices(tree, current);
+  // the tag filter opens what it keeps, as a search does
+  const isFiltered = tags.length > 0;
   const isSearching = query.trim() !== "";
-  const isCurrentFamily = (source: TreeSource, family: TreeFamily): boolean =>
-    current?.sourceId === source.id &&
-    family.groups.some((group) => group.components.some((component) => component.title === current.title));
-  const setFoldOpen = (key: string, isOpen: boolean): void =>
-    setFoldChoices((choices) => new Map(choices).set(key, isOpen));
+  const isNarrowed = isSearching || isFiltered;
 
   // the filter comes with the search's list; a moment before it, or with no words, the tree shows whole
   const { sources, pages } =
-    isSearching && filterTree !== undefined ? filterTree(tree, query) : wholeTree(tree);
+    isSearching && filterTree !== undefined ? filterTree(tree, query) : unsearchedTree(tree);
   const hasMatches = pages.length > 0 || sources.some(({ families }) => families.length > 0);
 
   return (
@@ -233,24 +443,13 @@ export const Sidebar = ({
       style={{ width, marginInlineStart: isOpen ? 0 : -width }}
     >
       <div className="forgebook-brand">
-        {/* the logo is the way home, as on most sites */}
-        <a
-          className="forgebook-brand__home"
-          href={homeHref}
-          aria-current={isHome ? "page" : undefined}
-          title={STRINGS.home}
-          onClick={(event: MouseEvent<HTMLAnchorElement>): void => {
-            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-            event.preventDefault();
-            onOpenHome();
-          }}
-        >
-          {/* decorative: the name beside it says what it is */}
-          {mark === undefined ? null : (
-            <img className="forgebook-brand__logo" src={mark} alt="" width={28} height={28} />
-          )}
-          <span className="forgebook-brand__name">{title}</span>
-        </a>
+        <SidebarBrand
+          title={title}
+          mark={logo ?? (hasBranding ? FORGEBOOK_MARK_URL : undefined)}
+          isHome={isHome}
+          homeHref={homeHref}
+          onOpenHome={onOpenHome}
+        />
         <button
           ref={hideButtonRef}
           type="button"
@@ -262,89 +461,46 @@ export const Sidebar = ({
           <Icon name="sidebar" size={14} />
         </button>
       </div>
-      <SidebarSearch
-        query={query}
-        onQueryChange={setQuery}
-        onFilterReady={showFiltered}
-        tree={tree}
-        sources={storySources}
-        sidebarWidth={width}
-        isSidebarOpen={isOpen}
-        onShowSidebar={onShow}
-        searchHref={searchHref}
-        onOpenResult={onOpenResult}
-      />
+      <div className="forgebook-search-row">
+        <SidebarSearch
+          query={query}
+          onQueryChange={setQuery}
+          onFilterReady={showFiltered}
+          tree={tree}
+          sources={storySources}
+          sidebarWidth={width}
+          isSidebarOpen={isOpen}
+          onShowSidebar={onShow}
+          searchHref={searchHref}
+          onOpenResult={onOpenResult}
+        />
+        <TagFilterSlot tree={wholeTree} tags={tags} onTagsChange={onTagsChange} />
+      </div>
       <nav ref={navRef} className="forgebook-tree" aria-label={STRINGS.componentsNav}>
-        {hasMatches || !isSearching ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}
+        {hasMatches || !isNarrowed ? null : <p className="forgebook-tree__empty">{STRINGS.noMatch}</p>}
         <LoadedDocs
           sources={pages}
           currentPageId={currentPageId}
-          isSearching={isSearching}
+          isSearching={isNarrowed}
           foldChoices={foldChoices}
           onFoldChange={setFoldOpen}
           pageHref={pageHref}
           onOpenPage={onOpenPage}
         />
-        {sources.map(({ source, families }) =>
-          families.length === 0 ? null : (
-            <section key={source.id} className="forgebook-tree__source">
-              <h2 className="forgebook-tree__source-name">
-                {/* decorative: the name beside it says which library it is */}
-                {source.logo === undefined ? null : (
-                  <img className="forgebook-source-logo" src={source.logo} alt="" width={14} height={14} />
-                )}
-                {source.name}
-              </h2>
-              {families.map((family) => {
-                const key = familyKey(source, family);
-                // a search opens every family it finds something in
-                const isOpen = isSearching || (foldChoices.get(key) ?? isCurrentFamily(source, family));
-                return (
-                  <div key={key} className="forgebook-tree__family">
-                    <button
-                      type="button"
-                      className="forgebook-tree__family-button"
-                      aria-expanded={isOpen}
-                      onClick={(): void => setFoldOpen(key, !isOpen)}
-                    >
-                      <span className="forgebook-tree__chevron" data-open={isOpen ? "" : undefined}>
-                        <Icon name="chevronRight" size={12} />
-                      </span>
-                      <span className="forgebook-tree__family-name">{family.name}</span>
-                      <span className="forgebook-tree__count">{componentCount(family)}</span>
-                    </button>
-                    <TreeFold
-                      isOpen={isOpen}
-                      isInstant={isSearching}
-                      content={(): ReactNode =>
-                        family.groups.map((group) => {
-                          const key = groupKey(familyKey(source, family), group);
-                          // shut by default; a search opens every group it finds something in
-                          const isGroupOpen =
-                            isSearching || (foldChoices.get(key) ?? holdsCurrent(source.id, group, current));
-                          return (
-                            <FamilyGroup
-                              key={group.name ?? ""}
-                              sourceId={source.id}
-                              group={group}
-                              isOpen={isGroupOpen}
-                              isInstant={isSearching}
-                              onToggle={(): void => setFoldOpen(key, !isGroupOpen)}
-                              current={current}
-                              links={links}
-                            />
-                          );
-                        })
-                      }
-                    />
-                  </div>
-                );
-              })}
-            </section>
-          )
-        )}
+        {sources.map(({ source, families }) => (
+          <SourceEntry
+            key={source.id}
+            source={source}
+            families={families}
+            isNarrowed={isNarrowed}
+            foldChoices={foldChoices}
+            onFoldChange={setFoldOpen}
+            current={current}
+            links={links}
+          />
+        ))}
       </nav>
-      <AppearanceMenu {...appearance} />
+      <AppearanceMenu {...appearance} onShowKeys={onShowKeys} />
       {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}
     </aside>
   );

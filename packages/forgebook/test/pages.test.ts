@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { codeLiteral } from "../src/codeLiteral.ts";
 import { SAME_ORIGIN } from "../src/frameOrigins.ts";
 import type { ForgebookPlugin } from "../src/plugin.ts";
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import {
@@ -51,7 +52,8 @@ const CONFIG: ResolvedConfig = {
   hasPlayTools: false,
   plugins: [],
   frames: ISOLATED_FRAMES,
-  build: { readableNames: false }
+  build: { readableNames: false },
+  appBuild: resolvedAppBuild(false)
 };
 
 describe("the generated pages", () => {

@@ -112,6 +112,7 @@ export type ViewSwitch = {
 const RESERVED_IDS: readonly string[] = [
   "embed",
   "play",
+  "tag",
   "story",
   "component",
   "backdrop",

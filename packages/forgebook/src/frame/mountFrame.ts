@@ -60,6 +60,7 @@ import type { PlayToolsLoader } from "./playStory.ts";
 import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
 import type { FrameRenderer, StoryDrawing } from "./renderer.ts";
 import { type ShellChannel, shellChannel } from "./shellChannel.ts";
+import { checkForShell } from "./shellCheck.ts";
 import { spillOutline } from "./spillOutline.ts";
 import { clearRetry, isStaleModuleError, markRetry, sessionStorageOf } from "./staleModule.ts";
 import type { StoryOutcome } from "./storyContent.ts";
@@ -191,29 +192,11 @@ const answerShell = (
   else if (message.type === "forgebook:args") controls.setPanelArgs(message.args);
   else if (message.type === "forgebook:events") controls.setEvents(message.names);
   else if (message.type === "forgebook:matrix") controls.setMatrix(message.matrix ?? undefined);
-  else if (message.type === "forgebook:play-again") controls.playAgain();
+  else if (message.type === "forgebook:play-step") controls.stepPlay(message.command);
   else if (message.type === "forgebook:clock") controls.setClock(message.state);
   else if (message.type === "forgebook:clock-restart") controls.restartClock();
-  else if (message.type === "forgebook:check") {
-    // loaded on the first check: a frame that is never checked, or one of a catalogue that checks nothing, never
-    // fetches the code that loads axe
-    const refusal =
-      pendingReason ??
-      (rules === undefined ? "The catalogue checks no accessibility (a11y: false)" : undefined);
-    const checked =
-      refusal !== undefined || rules === undefined
-        ? Promise.reject(new Error(refusal))
-        : import("./checkStory.ts").then((module) => module.checkStory(document, rules, axeUrl));
-    checked
-      .then((violations) => tellShell({ type: "forgebook:checked", storyId, violations }))
-      .catch((error: unknown) =>
-        tellShell({
-          type: "forgebook:check-error",
-          storyId,
-          message: error instanceof Error ? error.message : String(error)
-        })
-      );
-  }
+  else if (message.type === "forgebook:check")
+    checkForShell(storyId, pendingReason, rules, axeUrl, tellShell);
 };
 
 /**

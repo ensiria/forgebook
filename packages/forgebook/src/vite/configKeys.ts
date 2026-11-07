@@ -8,7 +8,7 @@
  * value of `framework` and `plugins`. So the lists are closed, and written as records of the types' own keys: a key added
  * to a type without being added here does not compile.
  *
- * The objects read here by key (`build`, `shell`, `a11y`, `backgrounds`, `widthRange`, `controls`) are checked one level
+ * The objects read here by key (`build`, `appBuild`, `shell`, `a11y`, `backgrounds`, `widthRange`, `controls`) are checked one level
  * down. `tabs` is not, since a plugin adds to its names; a device's fields have their own check (`configFile.ts`), and a
  * theme's values theirs (`shellTheme.ts`).
  *
@@ -18,6 +18,7 @@ import { didYouMean } from "@ensiria/cli-kit/suggest";
 
 import { type CatalogueLists, OWN_CONTROL_IDS, type TurnedOffControl } from "../catalogue.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
+import type { AppBuildOption } from "./appBuildOption.ts";
 import type { BuildOptions, ForgebookConfig, ForgebookPreset } from "./config.ts";
 
 /** A type's keys, as a record so that the compiler keeps it complete. */
@@ -72,7 +73,8 @@ const CONFIG_KEYS: KeysOf<ForgebookConfig> = {
   presets: true,
   plugins: true,
   frames: true,
-  build: true
+  build: true,
+  appBuild: true
 };
 
 /** A preset's keys. */
@@ -87,6 +89,14 @@ const PRESET_KEYS: KeysOf<ForgebookPreset> = {
 };
 
 const BUILD_KEYS: KeysOf<BuildOptions> = { readableNames: true };
+
+const APP_BUILD_KEYS: KeysOf<Exclude<AppBuildOption, false>> = {
+  viteConfig: true,
+  tsconfigPaths: true,
+  postcss: true,
+  skipPlugins: true,
+  keepPlugins: true
+};
 
 const SHELL_KEYS: KeysOf<ShellOptions> = { theme: true, css: true, branding: true };
 
@@ -105,6 +115,7 @@ const TURNED_OFF_CONTROLS: readonly TurnedOffControl[] = [...OWN_CONTROL_IDS, "d
 /** The objects of a configuration or a preset whose keys are known too, by the key that holds them. */
 const NESTED_KEYS: Readonly<Record<string, readonly string[]>> = {
   build: Object.keys(BUILD_KEYS),
+  appBuild: Object.keys(APP_BUILD_KEYS),
   shell: Object.keys(SHELL_KEYS),
   a11y: Object.keys(A11Y_KEYS),
   backgrounds: Object.keys(BACKGROUND_KEYS),
@@ -163,3 +174,11 @@ export const unknownKeysProblem = (config: object): string | undefined => {
   ];
   return problems.length === 0 ? undefined : problems.join(" ");
 };
+
+/**
+ * Whether a configuration says it has no design system (`tokens: []`), which leaving the key out does not.
+ *
+ * @param config - the configuration.
+ */
+export const saysNoTokens = ({ tokens }: { readonly tokens?: readonly unknown[] }): boolean =>
+  tokens?.length === 0;

@@ -62,9 +62,9 @@ const inputOf = (isLogic: boolean): DockTabsInput => ({
   calls: [],
   onClearCalls: (): undefined => undefined,
   trace: undefined,
-  onPlayAgain: (): undefined => undefined,
   view: DEFAULT_VIEW,
   onViewChange: (): undefined => undefined,
+  onPlayStep: (): undefined => undefined,
   check: { status: "idle" },
   onCheck: undefined,
   pluginTabs: []

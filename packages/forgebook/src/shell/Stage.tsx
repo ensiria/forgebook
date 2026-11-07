@@ -17,7 +17,7 @@ import { checkedArgsMessage } from "../addressArgs.ts";
 import type { AddressLink } from "../addressArgsParam.ts";
 import { panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import type { PanelArgs, ShellMessage } from "../messages.ts";
+import type { PanelArgs, PlayStepCommand, ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, withFixed, withOwnFixed } from "../storyGlobals.ts";
@@ -399,7 +399,8 @@ export const Stage = ({
     trace: isComparing(view) ? undefined : traces.get(story.id),
     view,
     onViewChange,
-    onPlayAgain: (): void => tellFrames(storyRef.current, { type: "forgebook:play-again" }),
+    onPlayStep: (command: PlayStepCommand): void =>
+      tellFrames(storyRef.current, { type: "forgebook:play-step", command }),
     check: storyCheck.check,
     onCheck: isComparing(view) ? undefined : storyCheck.run,
     pluginTabs

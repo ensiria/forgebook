@@ -97,7 +97,8 @@ describe("messages", () => {
       isShellMessage({ type: "forgebook:matrix", matrix: { rows: { name: "size", values: ["sm"] } } })
     ).toBe(true);
     expect(isShellMessage({ type: "forgebook:matrix", matrix: {} })).toBe(false);
-    expect(isShellMessage({ type: "forgebook:play-again" })).toBe(true);
+    expect(isShellMessage({ type: "forgebook:play-step", command: "again" })).toBe(true);
+    expect(isShellMessage({ type: "forgebook:play-step", command: "nope" })).toBe(false);
     expect(isShellMessage({ type: "forgebook:tools", tools: ["outline", "measure"] })).toBe(true);
     expect(isShellMessage({ type: "forgebook:tools", tools: ["ruler"] })).toBe(false);
     expect(isShellMessage({ type: "forgebook:spills", isOn: true })).toBe(true);
