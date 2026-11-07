@@ -963,6 +963,18 @@ describe("forgebook check-code", { timeout: SERVER_TIMEOUT }, () => {
       expect.objectContaining({ rule: "raw-color", file: "src/New.tsx", line: 1 })
     );
 
+    // a bare number in a style object is pixels: a failure in a style, advice where the object may be an option
+    writeFileSync(
+      join(project, "src", "Sized.tsx"),
+      "export const Sized = () => <p style={{ padding: 24 }} />;\nexport const fit = { margin: 8 };\n"
+    );
+    const sized = JSON.parse(check().stdout);
+    expect(sized.problems).toContainEqual(
+      expect.objectContaining({ rule: "raw-size", file: "src/Sized.tsx", line: 1, fix: "space.large" })
+    );
+    expect(sized.advice).toContainEqual(expect.objectContaining({ file: "src/Sized.tsx", line: 2 }));
+    rmSync(join(project, "src", "Sized.tsx"));
+
     // an option in the place of a commit reaches git as nothing, and a file stays as it is
     const precious = join(project, "precious.txt");
     writeFileSync(precious, "keep\n");

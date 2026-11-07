@@ -6,6 +6,7 @@
     "allowImportingTsExtensions": true
   },
   "include": ["."],
-  // each corpus's files are copied into a cloned library, the only place their imports resolve
-  "exclude": ["bench/corpora"]
+  // each corpus's files, and each evaluation task's probe stories, are copied into a cloned app or library, the only
+  // place their imports resolve
+  "exclude": ["bench/corpora", "eval/tasks"]
 }

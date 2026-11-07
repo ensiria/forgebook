@@ -507,4 +507,28 @@ describe("on a real Vite server", () => {
       await server.close();
     }
   }, 60_000);
+  it("leaves the project's PostCSS to Vite when the catalogue's CSS goes through PostCSS, so it runs once", async () => {
+    const dir = projectWith({
+      "postcss.config.cjs":
+        'module.exports = { plugins: [{ postcssPlugin: "count", Once: (root) => { root.append({ text: "ran" }); } }] };',
+      "src/look.css": "a { color: red; }"
+    });
+    const app = await read(catalogue(dir));
+    expect(app.report.postcss).toBe(true);
+    const server = await createServer({
+      root: dir,
+      configFile: false,
+      logLevel: "silent",
+      server: { middlewareMode: true, ws: false },
+      optimizeDeps: { noDiscovery: true },
+      css: { transformer: "postcss" },
+      plugins: [...app.plugins]
+    });
+    try {
+      const look = await server.transformRequest("/src/look.css");
+      expect(look?.code.match(/\/\* ran \*\//g)).toHaveLength(1);
+    } finally {
+      await server.close();
+    }
+  }, 60_000);
 });

@@ -143,7 +143,8 @@ export default defineConfig({
 
 A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
 says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
-Sass file goes through its own compiler alone.
+Sass file goes through its own compiler alone. When a framework plugin or the app's `vite.config` sets
+`css.transformer: "postcss"`, Vite runs the project's PostCSS itself and the catalogue does not run it a second time.
 
 ## A first catalogue
 
@@ -1303,6 +1304,14 @@ errors` and their MCP tools. Saving the fix is enough, with no restart: a story 
 is broken, and redraws in place. `forgebook build` and a test run still fail on it: a build ends with
 `src/Bad.stories.tsx:4:45 does not parse: …` and a non-zero exit, and only `--verbose` adds the bundler's stack.
 
+A component, or any other of the project's scripts, that does not parse is one problem too, named with its line and
+column on the page, in `forgebook stories`, `forgebook errors` and their MCP tools, before any frame loads it; the
+stories that import it say why in their frame and in `forgebook check`, and the others draw. Saving the fix takes the
+problem away. Neither it nor a story file stops Vite's dependency scan on a first start: the packages it imports are
+still pre-bundled with the others', and `forgebook prebundle` prints one line per such script
+(`The dependency scan skipped src/Broken.tsx:3:24 does not parse: Unexpected token`). What a scan found is kept for
+later starts; a script broken while no server ran is named once it is edited, or by the frames that import it.
+
 A story that loads but cannot be drawn says why in its frame and in `forgebook check`. On the dev server, the stack under
 the reason gives the lines of the files as written: the frame sends it, and the server maps it through the source maps of
 the modules it served, so the frame loads no map. `forgebook errors` and `recent_errors` give the error's `place`, the
@@ -1318,9 +1327,10 @@ the configuration:
 export default defineConfig({ /* … */ build: { readableNames: true } });
 ```
 
-A component's docs, a story file's code and a component's page are data, not scripts: a build writes each as a gzipped
-`.bin` file, which the page unpacks when it shows it, or in the story index itself when it is shorter than that file
-(a story file whose stories are all args has no code).
+A component's docs, a story file's code and a component's page are data, not scripts: a build writes them gzipped in
+`.bin` files, neighbouring texts together up to 64 KB of JSON each so they compress as one, which the page unpacks when
+it shows one; a text no longer than its loader goes in the story index itself (a story file whose stories are all args
+has no code).
 
 ## Mocking an API
 
@@ -1770,7 +1780,10 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 `judgements`, apart from the problems, as an opinion: it does not fail the check.
 
 `forgebook check-code` and `check_code` read what a change adds, new files included, from where it left `--since`: a colour
-written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
+written by hand, with the token to use when one clearly fits; a size that equals a token, in a sheet, a class's brackets
+or a React style object, where a bare number is pixels (`style={{ padding: 16 }}`, a `CSSProperties`, `styled.div({ … })`).
+A bare number on a line that does not say its object is a style is only `advice`, since an option has the same keys
+(`fitView({ padding: 16 })`). Then a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
 code to paste. It does not check props, which the type checker does. It exits non-zero on a problem, for CI.

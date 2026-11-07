@@ -1,0 +1,171 @@
+{
+  "id": "product-stock-warning",
+  "app": "next-shadcn-admin-dashboard",
+  "prompt": "In the product form (src/app/(main)/dashboard/products/_components/product-form.tsx, opened by \"Add product\" on the products page), show a warning under \"Stock quantity\" as the user types: below 10 it says \"Low stock: fewer than 10 left\", at 0 it says \"Out of stock\", and nothing at 10 or more. It is a warning, not an error: the form can still be saved.",
+  "scope": ["src/app/(main)/dashboard/products/_components/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built from the app's existing components (Field's description or message parts, Badge or Alert), not a new hand-made block."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Low, out, enough, in the dark theme and in a narrow window where the drawer fills the screen."
+    },
+    {
+      "id": "a11y",
+      "text": "The warning is tied to the field and announced as it changes; it is not shown by colour alone."
+    },
+    {
+      "id": "scope",
+      "text": "Only the product form changes; the products table and drawer are unchanged, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "form",
+      "description": "The add-product form as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/products"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Add product"
+          }
+        }
+      ]
+    },
+    {
+      "name": "low",
+      "description": "Stock 3.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/products"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Add product"
+          }
+        },
+        {
+          "fill": {
+            "label": "Stock quantity"
+          },
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "name": "out-dark",
+      "description": "Stock 0, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/dashboard/products"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Add product"
+          }
+        },
+        {
+          "fill": {
+            "label": "Stock quantity"
+          },
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "name": "low-narrow",
+      "description": "Stock 3, in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/products"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Add product"
+          }
+        },
+        {
+          "fill": {
+            "label": "Stock quantity"
+          },
+          "value": "3"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "low, out and enough stock",
+      "steps": [
+        {
+          "goto": "/dashboard/products"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Add product"
+          }
+        },
+        {
+          "fill": {
+            "label": "Stock quantity"
+          },
+          "value": "3"
+        },
+        {
+          "expectVisible": {
+            "text": "Low stock: fewer than 10 left"
+          }
+        },
+        {
+          "fill": {
+            "label": "Stock quantity"
+          },
+          "value": "0"
+        },
+        {
+          "expectVisible": {
+            "text": "Out of stock"
+          }
+        },
+        {
+          "fill": {
+            "label": "Stock quantity"
+          },
+          "value": "25"
+        },
+        {
+          "expectHidden": {
+            "text": "Low stock: fewer than 10 left"
+          }
+        },
+        {
+          "expectHidden": {
+            "text": "Out of stock"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

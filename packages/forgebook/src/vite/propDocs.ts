@@ -148,28 +148,40 @@ const writtenLiterals = (
 };
 
 /**
- * A choice's values in the order the source writes them: the checker's order follows the order it happened to meet
- * the types in, which a program kept between reads changes from one read to the next.
+ * What puts a choice's values in the order the source writes them: the checker's order follows the order it happened to
+ * meet the types in, which a program kept between reads changes from one read to the next.
  *
- * @param values - the values, in the checker's order.
+ * @remarks
+ * A prop's shape asks for the order of every union inside it, and a library's unions can hold hundreds of values (an
+ * icon's name): the declared values are read once per prop, on the first ask, and each value's place is looked up, not
+ * searched for.
+ *
  * @param declared - the prop's declared type nodes.
  * @param checker - the type checker.
- * @returns the values, those the source writes in its order first, any other after them in the checker's order.
+ * @returns the sorter: given values in the checker's order, those the source writes in its order first, any other
+ * after them in the checker's order.
  */
-const writtenOrder = (
-  values: readonly (string | number)[],
+const writtenOrderOf = (
   declared: readonly DeclaredType[],
   checker: ts.TypeChecker
-): (string | number)[] => {
-  const seen = new Set<ts.Node>();
-  const written = declared.flatMap((node) =>
-    ts.isMethodSignature(node) ? [] : writtenLiterals(node, checker, seen)
-  );
-  const rank = (value: string | number): number => {
-    const index = written.indexOf(value);
-    return index === -1 ? written.length : index;
+): ((values: readonly (string | number)[]) => (string | number)[]) => {
+  let places: Map<string | number, number> | undefined;
+  let unwritten = 0;
+  return (values: readonly (string | number)[]): (string | number)[] => {
+    if (places === undefined) {
+      const seen = new Set<ts.Node>();
+      const written = declared.flatMap((node) =>
+        ts.isMethodSignature(node) ? [] : writtenLiterals(node, checker, seen)
+      );
+      places = new Map();
+      unwritten = written.length;
+      // a value written twice keeps its first place, as a search from the start would find it
+      for (const [index, value] of written.entries()) if (!places.has(value)) places.set(value, index);
+    }
+    const known = places;
+    const rank = (value: string | number): number => known.get(value) ?? unwritten;
+    return [...values].sort((left, right) => rank(left) - rank(right));
   };
-  return [...values].sort((left, right) => rank(left) - rank(right));
 };
 
 /** A choice's type as TypeScript writes it, its members in the given order (`"md" | "sm"`). */
@@ -469,7 +481,7 @@ const choicesOf = (
   if (kind !== "choice") return undefined;
   const lists = types.map(literalValues);
   return lists.every((list) => list !== undefined)
-    ? writtenOrder([...new Set(lists.flat())], declared, checker)
+    ? writtenOrderOf(declared, checker)([...new Set(lists.flat())])
     : undefined;
 };
 
@@ -550,8 +562,7 @@ const editingOf = (
       ? shapeOfProp(type, canTakeText, {
           checker,
           node,
-          order: (values: readonly (string | number)[]): readonly (string | number)[] =>
-            writtenOrder(values, declared, checker),
+          order: writtenOrderOf(declared, checker),
           typeText: (member: ts.Symbol): string | undefined => writtenTypeText(declaredTypesOf(member)),
           description: (member: ts.Symbol): string => summaryOf(member, checker)
         })
