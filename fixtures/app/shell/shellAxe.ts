@@ -58,12 +58,31 @@ export const animationsDone = (page: Page): Promise<void> =>
   });
 
 /**
- * Scans the shell as it stands.
+ * Waits until the frames the window shows have settled: a frame's turn comes when another's ends, and the note over it
+ * fades in from then on, so waiting for the animations of the moment would read a later note halfway through its fade.
+ *
+ * @param page - the page.
+ */
+const framesSettled = async (page: Page): Promise<void> => {
+  await page.waitForFunction(() => {
+    const isInWindow = (element: Element): boolean => {
+      const { top, bottom } = element.getBoundingClientRect();
+      return bottom > 0 && top < window.innerHeight;
+    };
+    return (
+      document.querySelector(".forgebook-frame-loading") === null &&
+      ![...document.querySelectorAll(".forgebook-frame-placeholder")].some(isInWindow)
+    );
+  });
+};
+
+/**
+ * Scans the shell as it stands, whatever its frames are doing.
  *
  * @param page - the page, in the state to check.
  * @returns every element a rule failed on.
  */
-export const scanShell = async (page: Page): Promise<readonly AxeFinding[]> => {
+export const scanShellNow = async (page: Page): Promise<readonly AxeFinding[]> => {
   await page.addScriptTag({ path: AXE_SCRIPT });
   await animationsDone(page);
   return page.evaluate(async () => {
@@ -76,6 +95,17 @@ export const scanShell = async (page: Page): Promise<readonly AxeFinding[]> => {
       }))
     );
   });
+};
+
+/**
+ * Scans the shell once the frames in the window have settled.
+ *
+ * @param page - the page, in the state to check.
+ * @returns every element a rule failed on.
+ */
+export const scanShell = async (page: Page): Promise<readonly AxeFinding[]> => {
+  await framesSettled(page);
+  return scanShellNow(page);
 };
 
 /**
