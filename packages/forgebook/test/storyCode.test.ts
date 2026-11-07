@@ -171,4 +171,59 @@ export const Unread = { args: makeArgs() };`;
   it("says why a file cannot be read", () => {
     expect(storyCode("Broken.stories.tsx", "export const = ;")).toMatch(/does not parse/);
   });
+
+  it("reads args that spread their own story's, and stories that spread each other, without running away", () => {
+    const file = `export default { component: B };
+export const A = { args: { onClick: fn() } };
+A.args = { ...A.args, label: "x" };
+export const D = { ...E };
+export const E = { ...D, args: { icon: <Star /> } };
+D.args = { ...E.args };
+E.args = { ...D.args };
+export const C = { render: () => <B /> };`;
+    const code = storyCode("B.stories.tsx", file);
+    expect(typeof code === "string" ? code : code.renders).toEqual({ C: "() => <B />" });
+    expect(typeof code === "string" ? code : code.args["A"]).toEqual({ onClick: "fn()" });
+  });
+
+  it("reads what is assigned to a story after it when another story spreads it", () => {
+    const file = `export default { component: B };
+export const A = { args: { onClick: fn() } };
+A.args = { onClose: close };
+A.render = (args) => <Box><B {...args} /></Box>;
+export const C = { ...A };`;
+    const code = storyCode("B.stories.tsx", file);
+    expect(typeof code === "string" ? code : code.renders).toEqual({
+      A: "(args) => <Box><B {...args} /></Box>",
+      C: "(args) => <Box><B {...args} /></Box>"
+    });
+  });
+
+  it("writes a method as a function, takes `render: undefined` as none, and leaves a helper's story unknown", () => {
+    const file = `export default { component: B, render: (args) => <List><B {...args} /></List> };
+export const Method = {
+  render(args) {
+    return <B {...args} />;
+  }
+};
+export const Handler = { args: { onClick() { save(); } } };
+export const Unset = { render: undefined };
+export const Made = makeStory({ render: () => <B /> });
+export function Declared(args) {
+  return <B {...args} />;
+}`;
+    const code = storyCode("B.stories.tsx", file);
+    expect(typeof code === "string" ? code : code.renders).toEqual({
+      Method: "function (args) {\n  return <B {...args} />;\n}",
+      Handler: "(args) => <List><B {...args} /></List>",
+      Unset: "(args) => <List><B {...args} /></List>",
+      Declared: "function Declared(args) {\n  return <B {...args} />;\n}"
+    });
+  });
+
+  it("writes an arg written as a method as a function", () => {
+    const file = `export default { component: B };
+export const Handler = { args: { onClick() { save(); } } };`;
+    expect(argsOf("B.stories.tsx", file)).toEqual({ Handler: { onClick: "function () { save(); }" } });
+  });
 });

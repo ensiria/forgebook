@@ -75,4 +75,10 @@ describe("storyTemplate", () => {
       )
     ).toBe('<Dialog title="Hi" :on-close="fn(&quot;x&quot;)">Body</Dialog>');
   });
+
+  it("indents written code that spans lines under its attribute", () => {
+    expect(storyTemplate("Dialog", { title: "Hi" }, { onClose: "() => {\n  save();\n}" })).toBe(
+      '<Dialog\n  title="Hi"\n  :on-close="() => {\n    save();\n  }"\n/>'
+    );
+  });
 });

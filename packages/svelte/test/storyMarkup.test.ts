@@ -57,4 +57,10 @@ describe("a story's markup", () => {
       storyMarkup("Dialog", { title: "Hi", "#children": "Body" }, { onclose: "fn()", "#children": "body" })
     ).toBe('<Dialog title="Hi" onclose={fn()}>Body</Dialog>');
   });
+
+  it("indents written code that spans lines under its attribute", () => {
+    expect(storyMarkup("Dialog", { title: "Hi" }, { onclose: "() => {\n  save();\n}" })).toBe(
+      '<Dialog\n  title="Hi"\n  onclose={() => {\n    save();\n  }}\n/>'
+    );
+  });
 });
