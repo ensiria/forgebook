@@ -65,6 +65,8 @@ const PLACE = /(https?:\/\/[^\s()]+?):(\d+):(\d+)(?=\)|\s|$)/g;
  */
 const sourcePath = (source: string, file: string): string => {
   if (source.startsWith("file:")) return VITE_PATHS.normalize(fileURLToPath(source));
+  // an absolute source is taken as written: resolving it would give a path with no drive one on Windows
+  if (VITE_PATHS.isAbsolute(source)) return VITE_PATHS.normalize(source);
   return VITE_PATHS.resolve(VITE_PATHS.dirname(file), source);
 };
 
