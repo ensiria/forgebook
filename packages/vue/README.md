@@ -50,6 +50,25 @@ your `*.vue` shim; `vue-tsc` checks its args against the real component.
 | `@forgebook/vue` | `Meta`, `Story`, `Decorator`, `Preview`, `LogicMeta`: CSF 3 typed for Vue, the args from the component's props and slots |
 | `@forgebook/vue/vite` | `vue()`, the framework adapter of `forgebook.config.ts`, with Vue's Vite plugin |
 | `@forgebook/vue/texts`, `@forgebook/vue/clock` | A story's texts in the catalogue's language, and the story clock, as composables |
+| `@forgebook/vue/setup` | `setup((app) => …)`: what every story's app gets before it is drawn, as your `main.ts` does to its root |
+
+What your `main.ts` installs on the app (a store, a router, i18n, global components, a global mixin) goes in the
+preview with `setup`, which runs on each story's app before any component is made, in the page and in the server tests
+given the preview; a decorator runs too late for a plugin or a mixin. It is not the preview's own `setup` field, which runs
+once before any story. An edit to the preview applies to the next story drawn:
+
+```ts
+// forgebook.preview.ts
+import { setup } from "@forgebook/vue/setup";
+import { createPinia } from "pinia";
+
+import { i18n } from "./src/i18n";
+
+setup((app) => {
+  app.use(createPinia());
+  app.use(i18n);
+});
+```
 
 ## What the catalogue reads
 

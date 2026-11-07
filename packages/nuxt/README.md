@@ -112,7 +112,8 @@ leave the frame's head alone, `definePageMeta` and route middleware do nothing, 
 the story's `data`, or nothing.
 
 Nuxt's own build is not run, so the work of a Nuxt module or plugin is not done: a component that needs what one
-provides (a Pinia store, i18n) gets it from a decorator, and a module's components and composables are not
+provides (a Pinia store, i18n) gets it from the preview's `setup` of `@forgebook/vue/setup` (`setup((app) =>
+app.use(createPinia()))`, run after Nuxt prepares the story's app), and a module's components and composables are not
 auto-imported. `#build/…` modules are Nuxt's build's own and fail by name. Nuxt layers (`extends`) and
 `definePageMeta`'s `path` and `name` are not read. A Nuxt function this package does not stand in for is not given: a
 file that uses one fails on it by name.
