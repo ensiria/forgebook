@@ -450,6 +450,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
       const pages = config === undefined ? {} : catalogueConfig(config, userConfig, scripts);
       return {
         ...pages,
+        // composition's parts of the shell are removed from a catalogue that composes no other (`composition.ts`)
+        define: { __FORGEBOOK_REFS__: JSON.stringify((config?.refs.length ?? 0) > 0) },
         css: {
           transformer: "lightningcss",
           lightningcss: { visitor: FORCED_STATES_VISITOR },

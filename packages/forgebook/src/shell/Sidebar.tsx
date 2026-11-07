@@ -28,6 +28,7 @@ import type { SearchTarget } from "../search.ts";
 import { hasFilterTags } from "../storyTagNames.ts";
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
+import { HAS_REFS } from "./composition.ts";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
@@ -121,7 +122,7 @@ export type SidebarProps = SidebarPageLinks & {
   /** Opens the list of the shell's keys. */
   readonly onShowKeys: () => void;
   /** What is listed after this catalogue's stories when no search or tag narrows them: the composed catalogues. */
-  readonly composed: ReactNode;
+  readonly composed?: ReactNode;
 };
 
 /** A family's key, unique across sources. */
@@ -390,7 +391,6 @@ export const Sidebar = ({
   onShow,
   appearance,
   onShowKeys,
-  composed,
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
@@ -485,7 +485,8 @@ export const Sidebar = ({
           />
         ))}
         {/* the search and the tag filter read this catalogue only: another's list is not fetched to search it */}
-        {isNarrowed ? null : composed}
+        {/* read from the rest, not named above: a catalogue that composes none keeps not even its name */}
+        {HAS_REFS && !isNarrowed ? links.composed : null}
       </nav>
       <AppearanceMenu {...appearance} onShowKeys={onShowKeys} />
       {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}
