@@ -6,7 +6,7 @@
  */
 import { existsSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import {
   createServer,
@@ -79,14 +79,13 @@ describe("commandServerVite", () => {
 
   it("keeps the cache folder through a restart", async () => {
     const config = catalogue(STUB_FRAMEWORK);
-    const dev = await resolveVite(await catalogueVite(config, {}), "serve");
-    const shared = normalizePath(join(dev.cacheDir, COMMAND_CACHE_FOLDER));
     const server = await createServer(await commandServerVite(config, OWN_SERVER));
     await server.restart();
-    expect(server.config.cacheDir).toBe(shared);
+    // the folder's name, not its whole path: Windows may spell the temporary folder short (`RUNNER~1`) or long
+    expect(basename(server.config.cacheDir)).toBe(COMMAND_CACHE_FOLDER);
     // still held: a server started now runs apart
     const other = await createServer(await commandServerVite(config, OWN_SERVER));
-    expect(other.config.cacheDir).not.toBe(shared);
+    expect(basename(other.config.cacheDir)).toMatch(new RegExp(`^${COMMAND_CACHE_FOLDER}-own-`));
     await other.close();
     await server.close();
   });
