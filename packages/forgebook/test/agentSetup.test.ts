@@ -487,6 +487,11 @@ describe("what a failure is called", () => {
     ["[TSCONFIG_ERROR] Failed to load tsconfig", "generated-files"],
     ["Cannot read properties of undefined (reading 'id')", "needs-props"],
     ["useLocation() may be used only in the context of a <Router> component.", "provider"],
+    [
+      'Failed to resolve import "#nuxt-i18n/22dc84d9" from "forgebook-nuxt:kept:i18n-options.mjs"',
+      "nuxt-runtime"
+    ],
+    ["[TypeError: fetch failed] { [cause]: AggregateError [ETIMEDOUT]", "network"],
     ["Something nobody has met", "unknown"]
   ])("%s", (message, kind) => {
     expect(diagnosed(message).kind).toBe(kind);

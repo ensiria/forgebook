@@ -70,6 +70,8 @@ export const embedQuery = (
   switches: readonly ViewSwitch[]
 ): string => {
   const params = viewParams({ ...view, device: "auto", orientation: "auto" }, switches);
+  // said out loud: an embed has no switch to turn on what its catalogue's readers start without
+  if (view.play === "on") params.set("play", "on");
   const args = panelArgsParam(panelArgs);
   if (args !== "") params.set("args", args);
   return params.toString();

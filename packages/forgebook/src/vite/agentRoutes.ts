@@ -47,6 +47,7 @@ import { emptyStoryGlobs, emptyStoryGlobsMessage } from "./emptyStoryGlobs.ts";
 import { findAnswer } from "./findRoute.ts";
 import { framesOriginOf } from "./framesConfig.ts";
 import { hostOf } from "./framesServer.ts";
+import { hiddenStoryFolders, hiddenStoryFoldersMessage } from "./hiddenStoryFiles.ts";
 import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { PREVIEW_ROUTE } from "./previewRoute.ts";
 import { loadPreview } from "./previewRunner.ts";
@@ -237,8 +238,12 @@ export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer>
       : undefined;
   // read for each answer: the file an agent has just written ends the problem
   const globs = emptyStoryGlobs(config);
-  const listed =
-    globs.length === 0 ? tree : { ...tree, problems: [emptyStoryGlobsMessage(globs), ...tree.problems] };
+  const hidden = hiddenStoryFolders(config);
+  const said = [
+    ...(globs.length === 0 ? [] : [emptyStoryGlobsMessage(globs)]),
+    ...(hidden.length === 0 ? [] : [hiddenStoryFoldersMessage(hidden)])
+  ];
+  const listed = said.length === 0 ? tree : { ...tree, problems: [...said, ...tree.problems] };
   return { status: 200, body: storiesDocument(config.title, listed, pages, view, usage) };
 };
 

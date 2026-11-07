@@ -594,8 +594,8 @@ export type FinderProps = {
 
 - The API reference lists the props that name no group first, then each group under its name, in the order the
   groups first appear among the props; the events keep their own heading after them. The Props tab does the same: the
-  props that name no group by control, as before, then each group with its controls, its toggles and the props it
-  cannot set.
+  props that name no group in the order the source declares them, whatever their control, then each group with its
+  controls in that order and the props it cannot set.
 - Every group starts open; a reader folds one away from its name.
 - To show some groups first, name them in order: `propGroups: ["Selection", "Paging"]` in the configuration for every
   component, or `parameters: { propGroups: ["Texts"] }` in a component's meta, written as a list of plain strings.
@@ -982,6 +982,21 @@ blocks it uses Open in Figma. A catalogue published with a Content Security Poli
 `forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
 `address` of the Design tab to hand a person (it opens the story alone without the plugin). `list_stories` gives each component's, and `CATALOG.md` lists it.
 
+## Stepping through a play
+
+The Interactions tab lists a play's named steps and each action it took through the `canvas` and `userEvent` of its context,
+with its time and its failure. **Step through** mounts the story again and stops before each action and each `step`: **Next**
+does that one, **Continue** runs the rest. A `getBy…` query is logged but cannot stop, as it returns at once. What a play
+imports itself (`storybook/test`, `@testing-library/user-event`) runs unrecorded: use the context's tools to see it here.
+
+## Plays when a story opens
+
+A story's `play` runs when it opens on a dev server, where its author is checking it. In a build it waits: a reader of
+published docs did not ask for it, and the Interactions tab offers it with **Run**. A reader changes this for themself in
+that tab or the View menu (kept in their browser), an address says it for one link (`?play=off`, `?play=on`), and
+`play: "on"` or `"off"` in the configuration sets the default. Tests, `forgebook check` and `check_story` open a frame with
+no such word, so they run every play whatever a reader or a catalogue chose.
+
 ## Tags
 
 Tag stories as CSF does, in the preview, a file's meta or a story; a `!name` takes one away:
@@ -1166,6 +1181,11 @@ the plugin too, since each would otherwise give a catalogue that looks right and
   `forgebook dev` warns instead and opens a home that says where it looks, since you may be about to write the first story;
   saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
   may match nothing.
+- **Story files in a hidden folder**: a pattern's `**` does not enter a folder whose name starts with a dot
+  (`docs/.vitepress`). Files a pattern would match there are named, with the pattern that lists them
+  (`docs/.vitepress/**/*.stories.ts`): a warning from `forgebook dev`, a problem in `stories`, and the hint when a pattern
+  matches nothing. Nothing stops on them; a `!` pattern for the folder (`!docs/.vitepress/**`) says it is left out on
+  purpose and ends the notice.
 
 ## Stories that load
 
@@ -1205,6 +1225,7 @@ is a state of the component: the same).
 | Command | What it does |
 |---|---|
 | `forgebook dev` / `forgebook build` | Runs the catalogue of `forgebook.config.ts`, or builds it into static files; see [a story file that cannot be read](#a-story-file-that-cannot-be-read) |
+| `forgebook build --watch` | Builds again when a file the catalogue reads changes; see [building on every change](#building-on-every-change) |
 | `forgebook prebundle` | Pre-bundles the catalogue's dependencies, as `dev` does on a first start: before it, in CI or an image |
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
@@ -1313,6 +1334,14 @@ or translate its texts (`strings: { "plugin.figma.compare": "Confronta" }`). `fo
 say what a catalogue has.
 
 The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
+
+## Building on every change
+
+`forgebook build --watch` stays running and builds again when a file the catalogue reads changes, a new story file or
+docs page included, for a folder a host, an embedding app or another machine serves. A failed build says why on one line,
+leaves the last good output and waits for the next edit. A rebuild takes about two thirds of a whole `forgebook build`
+(2.2 to 2.9 s against 3 to 4 s on 5000 stories) and writes the whole folder again; the process holds about 2 GB there. Use
+`forgebook dev` to work on stories: it redraws in place.
 
 ## A preview for every pull request
 
