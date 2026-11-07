@@ -35,6 +35,11 @@ export type VerifyInput = {
   readonly since: string | undefined;
   /** Only the default view of each story. */
   readonly isQuick: boolean;
+  /**
+   * What is wrong with the catalogue's configuration that leaves the answer not verified, said with it: a story pattern
+   * that matches nothing. None by default.
+   */
+  readonly configProblems?: readonly string[];
 };
 
 /** What a catalogue answers when it runs an older version than this command. */
@@ -78,7 +83,7 @@ const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<St
  */
 export const runVerify = async (
   reach: VerifyReach,
-  { since, isQuick }: VerifyInput
+  { since, isQuick, configProblems = [] }: VerifyInput
 ): Promise<VerifyDocument | string> => {
   const named = since ?? (await branchStart(reach.dir));
   const base = await changeBase(reach.dir, named);
@@ -121,6 +126,7 @@ export const runVerify = async (
     report: typeof run === "object" ? run : undefined,
     notRun: typeof run === "string" ? run : undefined,
     isQuick,
-    isSinceNamed: since !== undefined
+    isSinceNamed: since !== undefined,
+    configProblems
   });
 };

@@ -9,9 +9,10 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { isVisibilityDocument } from "../../src/vite/agentVisibility.ts";
+import { emptyStoryGlobsProblems } from "../../src/vite/emptyStoryGlobs.ts";
 import { catalogueClient } from "./agentClient.ts";
 import { verifyText, visibilityText } from "./agentText.ts";
-import { COMMAND, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
+import { COMMAND, configOf, configWithStoriesOf, type ForgebookOptions } from "./catalogueCommands.ts";
 import { runStoriesCheck } from "./storyCheckRun.ts";
 import { errorOf, isVerifyFailure, runVerify } from "./verifyRun.ts";
 
@@ -51,7 +52,8 @@ export const verifyCommands = (
       { command: `${COMMAND} verify --quick`, description: "While you work: the default view of each story." }
     ],
     run: async ({ options, io, log, isJson, style }): Promise<void> => {
-      const config = await configWithStoriesOf(options.config);
+      // a pattern that matches nothing leaves the answer not verified, and the rest of it is still given
+      const config = await configOf(options.config);
       const client = await catalogueClient(config, options.url);
       try {
         const document = await runVerify(
@@ -60,7 +62,11 @@ export const verifyCommands = (
             ask: client.ask,
             check: (input) => runStoriesCheck(config, options.url, input)
           },
-          { since: options.since, isQuick: options.quick === true }
+          {
+            since: options.since,
+            isQuick: options.quick === true,
+            configProblems: emptyStoryGlobsProblems(config)
+          }
         );
         if (typeof document === "string") throw new ScriptError(document);
         io.stdout.write(isJson ? formatJson(document) : `${verifyText(document, style)}\n`);
