@@ -38,10 +38,21 @@ const commandCache = (): Plugin => ({
 });
 
 /**
+ * Sends what plugins log to stderr: a command's stdout is its answer (`--json`, the MCP protocol), and a plugin of the app's
+ * build that says what it fetches would break it. Nothing of the commands' own goes through `console`.
+ */
+const keepPluginsOffStdout = (): void => {
+  const { error } = console;
+  Object.assign(console, { log: error, info: error, debug: error });
+};
+
+/**
  * Vite's configuration for a server a command starts: the catalogue's, with a cache of its own.
  *
  * @param config - the catalogue's configuration, read.
  * @param overrides - what the command sets (the port, middleware mode).
  */
-export const commandServerVite = (config: ResolvedConfig, overrides: InlineConfig): Promise<InlineConfig> =>
-  catalogueVite(config, { ...overrides, plugins: [...(overrides.plugins ?? []), commandCache()] });
+export const commandServerVite = (config: ResolvedConfig, overrides: InlineConfig): Promise<InlineConfig> => {
+  keepPluginsOffStdout();
+  return catalogueVite(config, { ...overrides, plugins: [...(overrides.plugins ?? []), commandCache()] });
+};

@@ -19,6 +19,7 @@ import {
   viteConfigFile
 } from "../bin/forgebook/appBuild/appViteConfig.ts";
 import { hasTsconfigPaths, namedTsconfigs } from "../bin/forgebook/appBuild/tsconfigPaths.ts";
+import { commandServerVite } from "../bin/forgebook/commandServer.ts";
 import { type AppBuildOption, appBuildProblem, resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import { type ResolvedConfig, resolveConfig } from "../src/vite/configFile.ts";
 import { postcssConfigPlace } from "../src/vite/projectPostcss.ts";
@@ -319,6 +320,20 @@ describe("where a PostCSS configuration is", () => {
       file: join(dir, "package.json"),
       config: { plugins: {} }
     });
+  });
+});
+
+describe("a plugin that logs", () => {
+  it("stays off a command's stdout, which is its answer", async () => {
+    const { log, info, debug } = console;
+    const before = { log, info, debug };
+    try {
+      await commandServerVite(catalogue(projectWith({})), {});
+      const { log: logged, info: informed, debug: debugged, error } = console;
+      expect([logged, informed, debugged]).toEqual([error, error, error]);
+    } finally {
+      Object.assign(console, before);
+    }
   });
 });
 
