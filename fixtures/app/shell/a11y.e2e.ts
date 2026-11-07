@@ -11,7 +11,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { catalogueUrl } from "./ports";
-import { type AxeException, animationsDone, scanShell, unexcused } from "./shellAxe";
+import { type AxeException, animationsDone, scanShell, scanShellNow, unexcused } from "./shellAxe";
 
 /** How long a page waits for what the docs worker or the search index answers on a cold dev server. */
 const SLOW_ANSWER = { timeout: 30_000 };
@@ -297,5 +297,15 @@ test.describe("axe over the shell", () => {
         expect(left.stale).toEqual([]);
       });
     }
+
+    test(`the note over a frame that is still loading, once it has faded in (${colorScheme})`, async ({
+      page
+    }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+      await page.route(/\/frame\.html\?/, () => undefined);
+      await page.goto(story("overview"));
+      await expect(page.locator(".forgebook-frame-loading")).toBeVisible(SLOW_ANSWER);
+      expect(await scanShellNow(page)).toEqual([]);
+    });
   }
 });

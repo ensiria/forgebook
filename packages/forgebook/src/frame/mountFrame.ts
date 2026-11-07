@@ -44,6 +44,7 @@ import {
   type SheetsChoice
 } from "../viewState.ts";
 import { detailOf, previewValue } from "./callValues.ts";
+import { followCanvasScheme } from "./canvasScheme.ts";
 import { followTouch } from "./followTouch.ts";
 import { storyFrameClock } from "./frameClock.ts";
 import {
@@ -294,6 +295,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     tellShell({ type: "forgebook:size", storyId, height });
   };
   new ResizeObserver(reportSize).observe(document.body);
+  const reportScheme = followCanvasScheme(document, window, storyId, tellShell);
   const reportError = (message: string): void => {
     document.documentElement.setAttribute(STATUS_ATTRIBUTE, "error");
     tellShell({ type: "forgebook:error", storyId, message });
@@ -457,6 +459,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         // the height first: the shell sizes the frame to the drawn story before anything reads it as ready, instead of
         // waiting on the resize observer, which may report after the ready status
         reportSize();
+        reportScheme();
         pendingReason = showOutcome(outcome, storyId, story.suspense.isExpected);
         // the shell keeps an error it was told, and would read this as the story being fine again
         if (outcome.status !== "error") tellReady();
