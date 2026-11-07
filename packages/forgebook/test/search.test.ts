@@ -194,6 +194,25 @@ describe("searchCatalogue", () => {
     expect(searchCatalogue(searchables(TREE, new Map()), "disabled", { results: 10, hits: 3 }).total).toBe(0);
   });
 
+  it("reads the tree once: the index arriving after it adds its own, in the same order as read together", () => {
+    const before = searchables(TREE, new Map());
+    const after = searchables(TREE, new Map([["kit", INDEX]]));
+    const fresh = searchables(
+      { sources: [{ ...SOURCE, families: structuredClone(SOURCE.families) }], problems: [] },
+      new Map([["kit", INDEX]])
+    );
+    const kindsOf = (all: typeof after): readonly string[] =>
+      all.flatMap((each) => each.fields.map((field) => `${field.kind}:${field.label ?? field.text}`));
+    expect(kindsOf(after)).toEqual(kindsOf(fresh));
+    expect(kindsOf(after).length).toBeGreaterThan(kindsOf(before).length);
+    expect(searchCatalogue(after, "disabled", { results: 10, hits: 3 }).total).toBe(1);
+    // a sentence of several words is still found where it stands, read only when such a query asks
+    expect(searchCatalogue(after, "listbox", { results: 10, hits: 3 }).total).toBe(1);
+    expect(
+      searchCatalogue(after, "reads as a listbox", { results: 10, hits: 3 }).results[0]?.hits[0]?.kind
+    ).toBe("text");
+  });
+
   it("says why a result's name is there", () => {
     expect(search("select").results[0]?.reasons).toEqual([{ place: "name" }]);
     expect(search("tile").results[0]?.reasons).toEqual([{ place: "keyword" }]);
