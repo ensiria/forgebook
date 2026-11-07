@@ -3,7 +3,7 @@
 Svelte 5 for [Forgebook](https://www.npmjs.com/package/forgebook): the story types, the context helpers, the renderer the
 frame mounts a story with, and the adapter that reads a component's props, snippets and callback props from its types.
 
-**Requirements:** Svelte 5.46 · `forgebook` · Vite 8.3.4+ · React in the project, for the catalogue's own interface (the frames
+**Requirements:** Svelte 5.46 · `forgebook` · React 18.2 or 19 in the project, for the catalogue's own interface (the frames
 that draw your components load none) · [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/svelte/LICENSE)
 
 ```sh

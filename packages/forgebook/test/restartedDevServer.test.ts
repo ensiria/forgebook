@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { createServer, type Plugin, type ViteDevServer } from "vite";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { devServerAccess } from "../src/vite/fileAccess.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
@@ -63,7 +64,8 @@ describe("a dev server's first clients", () => {
     home: undefined,
     hasPlayTools: false,
     frames: resolvedFrames("same-origin"),
-    build: { readableNames: false }
+    build: { readableNames: false },
+    appBuild: resolvedAppBuild(false)
   });
 
   /** Starts a server over the project, with the disk's caches of the one before it. */

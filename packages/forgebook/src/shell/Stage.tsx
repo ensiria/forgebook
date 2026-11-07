@@ -17,7 +17,7 @@ import { checkedArgsMessage } from "../addressArgs.ts";
 import type { AddressLink } from "../addressArgsParam.ts";
 import { panelProps, settableProps } from "../argTypes.ts";
 import { matrixOf, matrixProps } from "../matrix.ts";
-import type { PanelArgs, ShellMessage } from "../messages.ts";
+import type { PanelArgs, PlayStepCommand, ShellMessage } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import { type FixedView, withFixed, withOwnFixed } from "../storyGlobals.ts";
@@ -392,8 +392,8 @@ export const Stage = ({
     calls: calls.filter((call) => call.storyId === story.id),
     onClearCalls: (): void => setCalls([]),
     trace: isComparing(view) ? undefined : traces.get(story.id),
-    onPlayAgain: (): void => {
-      const message: ShellMessage = { type: "forgebook:play-again" };
+    onPlayStep: (command: PlayStepCommand): void => {
+      const message: ShellMessage = { type: "forgebook:play-step", command };
       frameRef.current?.contentWindow?.postMessage(message, framesOrigin());
     },
     check: storyCheck.check,
