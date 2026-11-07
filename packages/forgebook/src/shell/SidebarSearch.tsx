@@ -8,9 +8,7 @@ import type { StorySource } from "@forgebook/story-format/source";
 import {
   type ChangeEvent,
   type KeyboardEvent,
-  lazy,
   type ReactNode,
-  Suspense,
   useEffect,
   useId,
   useRef,
@@ -21,18 +19,31 @@ import type { SearchTarget } from "../search.ts";
 import type { StoryTree } from "../storyTree.ts";
 import { Icon } from "./icons.tsx";
 import { isTyping } from "./keyboard.ts";
-import type { SearchPanelKeys } from "./SearchPanel.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
+import type { SearchPanelKeys, SearchPanelProps } from "./SearchPanel.tsx";
 import { STRINGS } from "./strings.ts";
 import type { shownTree } from "./treeSearch.ts";
 
-/** The results, loaded on first use: most visits never search. */
-const SearchPanel = lazy(() =>
-  import("./SearchPanel.tsx").then(
-    (module) => ({ default: module.SearchPanel }),
-    // a chunk gone after a new deployment must not take the page with it: the field simply finds nothing more
-    () => ({ default: (): ReactNode => null })
-  )
+/**
+ * The results, loaded on first use: most visits never search. Not through `Suspense`, which holds what it reveals back
+ * for 300 ms after its fallback, and that wait would be the first search's (`lazyModule.tsx`).
+ */
+const SEARCH_PANEL = lazyModule<SearchPanelProps>(() =>
+  import("./SearchPanel.tsx").then((module) => module.SearchPanel)
 );
+
+/**
+ * Fetches the results' code when the pointer comes to the field, ahead of a press: the list then draws with the first
+ * letter typed, where it would otherwise wait for its code. A failure is the field's to report when it is used.
+ */
+const preloadPanel = (): void => {
+  if (SEARCH_PANEL.loaded !== undefined) return;
+  SEARCH_PANEL.load()
+    .then((panel) => {
+      SEARCH_PANEL.loaded = panel;
+    })
+    .catch(() => undefined);
+};
 
 /** The field's props. */
 export type SidebarSearchProps = {
@@ -121,7 +132,7 @@ export const SidebarSearch = ({
 
   return (
     <>
-      <label className="forgebook-search">
+      <label className="forgebook-search" onPointerEnter={preloadPanel}>
         <Icon name="search" size={14} />
         <input
           type="search"
@@ -178,23 +189,27 @@ export const SidebarSearch = ({
         )}
       </label>
       {isUsed ? (
-        // the field works before the list arrives: the tree filters meanwhile
-        <Suspense fallback={null}>
-          <SearchPanel
-            id={listId}
-            tree={tree}
-            sources={sources}
-            query={query}
-            isOpen={isListOpen}
-            field={inputRef}
-            sidebarWidth={sidebarWidth}
-            onFilterReady={onFilterReady}
-            hrefOf={searchHref}
-            onOpen={openResult}
-            onActiveChange={setActiveId}
-            keysRef={keysRef}
-          />
-        </Suspense>
+        // the field works before the list arrives: the tree filters meanwhile; a chunk gone after a new deployment
+        // costs the list only
+        <LazyView
+          module={SEARCH_PANEL}
+          props={{
+            id: listId,
+            tree,
+            sources,
+            query,
+            isOpen: isListOpen,
+            field: inputRef,
+            sidebarWidth,
+            onFilterReady,
+            hrefOf: searchHref,
+            onOpen: openResult,
+            onActiveChange: setActiveId,
+            keysRef
+          }}
+          loading={null}
+          failed={(): ReactNode => null}
+        />
       ) : null}
     </>
   );
