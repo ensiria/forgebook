@@ -75,6 +75,65 @@ export type MemberDocs = {
   readonly isRequired: boolean;
 };
 
+/**
+ * Why a prop's type is not the one its source writes, or says nothing: a generic's type parameter and what it is shown
+ * as, a name the checker cannot find, an `any`.
+ */
+export type PropTypeNote =
+  | {
+      /** A type parameter of the props type, replaced in the prop's type. */
+      readonly reason: "generic";
+      /** Its name (`TItem`). */
+      readonly parameter: string;
+      /** What it is shown as: its constraint, its default when it has no constraint, `unknown` when it has neither. */
+      readonly shownAs: "constraint" | "default" | "unknown";
+      /** That type, as the source writes it. */
+      readonly type: string;
+    }
+  | {
+      /** A name in the prop's type that the checker cannot find (a missing import), so the type means `any`. */
+      readonly reason: "unresolved";
+      /** The name, as written. */
+      readonly name: string;
+    }
+  | {
+      /** The prop's type is `any`: nothing can be said of its values. */
+      readonly reason: "any";
+    };
+
+/**
+ * When a prop can be passed: the values of the discriminant that select the variants of the props that declare it
+ * (`href` only when `kind` is `"link"`).
+ */
+export type PropCondition = {
+  /** The discriminant: a prop every variant declares with a literal type. */
+  readonly prop: string;
+  /** Its values in the variants that declare the prop, in the order the variants come. */
+  readonly values: readonly (string | number | boolean)[];
+  /**
+   * Whether the prop also applies with the discriminant left out, since a variant that declares it takes it so
+   * (`mode?: "single"`). Left out when `false`.
+   */
+  readonly orOmitted?: boolean;
+};
+
+/** Why a component lists no props although it takes some. */
+export type PropsNote =
+  | {
+      /** Its props are typed `any` (or not typed): there is nothing to read. */
+      readonly reason: "untyped";
+    }
+  | {
+      /** Its type cannot be called or constructed with props, so it gives none to read. */
+      readonly reason: "no-signature";
+    }
+  | {
+      /** Every prop it takes is declared outside its package (an element's attributes), which the docs leave out. */
+      readonly reason: "outside-package";
+      /** How many props were left out. */
+      readonly count: number;
+    };
+
 /** One prop of a component. */
 export type PropDocs = {
   /** The prop's name. */
@@ -122,6 +181,14 @@ export type PropDocs = {
    * for none.
    */
   readonly token?: string;
+  /**
+   * For a prop only some variants of a union of props declare, when it can be passed: the discriminant's values that
+   * select them. Such a prop is never required. Left out for a prop every variant declares, and when the union has no
+   * discriminant.
+   */
+  readonly onlyWhen?: PropCondition;
+  /** Why its type is not the one its source writes, or says nothing, in source order. Left out when there is none. */
+  readonly notes?: readonly PropTypeNote[];
 };
 
 /** A part the component is used with, named in the meta's `subcomponents`: listed under it on its page. */
@@ -184,6 +251,8 @@ export type ComponentDocs = {
    * markup from it. Left out when the component is written by its name.
    */
   readonly selector?: string;
+  /** Why it lists no props although it takes some; left out when its props are read, or it takes none. */
+  readonly propsNote?: PropsNote;
 };
 
 /**
@@ -220,6 +289,9 @@ const isMemberDocs = (value: unknown): value is MemberDocs =>
   typeof value["isRequired"] === "boolean" &&
   (value["defaultValue"] === undefined || typeof value["defaultValue"] === "string");
 
+/** Whether a value is a note with a reason: what the reference reads first. */
+const isNote = (value: unknown): boolean => isRecord(value) && typeof value["reason"] === "string";
+
 /** Whether a value is one prop's docs. */
 const isPropDocs = (value: unknown): value is PropDocs =>
   isRecord(value) &&
@@ -235,7 +307,13 @@ const isPropDocs = (value: unknown): value is PropDocs =>
   (value["shape"] === undefined ||
     (isRecord(value["shape"]) && typeof value["shape"]["kind"] === "string")) &&
   (value["members"] === undefined ||
-    (Array.isArray(value["members"]) && value["members"].every(isMemberDocs)));
+    (Array.isArray(value["members"]) && value["members"].every(isMemberDocs))) &&
+  // the plugin's own answers, read by the reference, which loads later and draws only the reasons it knows
+  (value["onlyWhen"] === undefined ||
+    (isRecord(value["onlyWhen"]) &&
+      typeof value["onlyWhen"]["prop"] === "string" &&
+      Array.isArray(value["onlyWhen"]["values"]))) &&
+  (value["notes"] === undefined || (Array.isArray(value["notes"]) && value["notes"].every(isNote)));
 
 /** Whether a value is a subcomponent's docs. */
 const isSubcomponentDocs = (value: unknown): value is SubcomponentDocs =>
@@ -278,4 +356,5 @@ export const isComponentDocs = (value: unknown): value is ComponentDocs =>
   Array.isArray(value["subcomponents"]) &&
   value["subcomponents"].every(isSubcomponentDocs) &&
   (value["signature"] === undefined || isFunctionSignatureDocs(value["signature"])) &&
-  (value["selector"] === undefined || typeof value["selector"] === "string");
+  (value["selector"] === undefined || typeof value["selector"] === "string") &&
+  (value["propsNote"] === undefined || isNote(value["propsNote"]));

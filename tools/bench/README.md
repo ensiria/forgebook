@@ -52,7 +52,9 @@ configuration, so `--parity` takes the generated library only.
 
 Times are the median and range of `--runs` samples; HMR has `--edits` samples and a p95, which needs at least 20 to mean
 anything. A metric a tool cannot have is `n/a`, never a zero. A metric that fails is recorded, the run goes on, and the
-command exits non-zero at the end.
+command exits non-zero at the end. The report is written whole all the same, to its file and with `--json` to stdout,
+with what went wrong in its `problems`: a failed metric, a time that did not reproduce, a limit passed, stories not
+listed or not drawn.
 
 ## Being fair
 
