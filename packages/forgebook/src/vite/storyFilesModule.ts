@@ -413,13 +413,8 @@ export const storyFilesCode = (
   return [
     ...(hasTexts ? [`import texts from ${texts};`] : []),
     `const storyKeys = ${codeLiteral(keys)};`,
-    `const ${STORY_TABLE} = (rows) => rows.map((row) => {`,
-    "  const story = {};",
-    "  row.forEach((value, at) => {",
-    "    story[storyKeys[at]] = value;",
-    "  });",
-    "  return story;",
-    "});",
+    // `flatMap` passes over a row's holes, the keys its story lacks
+    `const ${STORY_TABLE} = (rows) => rows.map((row) => Object.fromEntries(row.flatMap((value, at) => [[storyKeys[at], value]])));`,
     // a build's texts are their module's rows, in the same order: each joins its file's
     `const rows = ${hasTexts ? `${written}.map((row, at) => row.concat(texts[at]))` : written};`,
     "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
