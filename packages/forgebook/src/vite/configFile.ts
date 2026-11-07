@@ -12,7 +12,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { StoryDeviceSetting } from "@forgebook/story-format/csf";
@@ -136,6 +136,26 @@ export type ResolvedConfig = {
 export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/user-event"] as const;
 
 /**
+ * Whether a package's folder is in the `node_modules` folders going up from a folder. Node also reads `NODE_PATH`, which
+ * pnpm's command shims point at its own store's hoisted packages, and Vite does not: a package found that way alone is one
+ * Vite then fails on, for every story.
+ *
+ * @param dir - the folder.
+ * @param name - the package or one of its subpaths.
+ */
+const isUnderNodeModules = (dir: string, name: string): boolean => {
+  const parts = name.split("/");
+  const packageName = parts.slice(0, name.startsWith("@") ? 2 : 1).join("/");
+  let current = resolve(dir);
+  while (true) {
+    if (existsSync(join(current, "node_modules", packageName))) return true;
+    const parent = dirname(current);
+    if (parent === current) return false;
+    current = parent;
+  }
+};
+
+/**
  * Resolves packages as Node does from a folder: a package's (or subpath's) file, or none when it is not there.
  *
  * @param dir - the folder, the configuration's.
@@ -143,6 +163,7 @@ export const PLAY_TOOLS_PACKAGES = ["@testing-library/dom", "@testing-library/us
 export const packageResolver =
   (dir: string) =>
   (name: string): string | undefined => {
+    if (!isUnderNodeModules(dir, name)) return undefined;
     const require = createRequire(resolve(dir, "package.json"));
     try {
       return require.resolve(name);
