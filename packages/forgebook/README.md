@@ -9,6 +9,11 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > and every change is in the
 > [changelog](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/CHANGELOG.md).
 
+New to it? The [documentation](https://github.com/ensiria/forgebook/blob/develop/docs/README.md) starts with
+[getting started](https://github.com/ensiria/forgebook/blob/develop/docs/getting-started.md) and has the how-to guides and
+[troubleshooting](https://github.com/ensiria/forgebook/blob/develop/docs/troubleshooting.md); this README is the full
+reference.
+
 **Requirements:** Node 22.18 or later (the catalogue is built on it; other bundlers are not supported) · React 19 through
 [`@forgebook/react`](https://www.npmjs.com/package/@forgebook/react), Vue 3.5 through
 [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) (a Nuxt project's through

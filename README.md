@@ -7,6 +7,9 @@ per story, switches for theme, contrast, motion and language, and a props table 
 
 > **Status:** 0.x, early. Its author's design system runs on it; the API may still change between minor versions.
 
+New to it? Read the [documentation](docs/README.md): [getting started](docs/getting-started.md), the how-to guides
+and [troubleshooting](docs/troubleshooting.md).
+
 This repository holds Forgebook's packages; each has its own README, which is also its npm page.
 
 | Package | What it is |
