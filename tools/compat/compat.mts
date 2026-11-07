@@ -37,7 +37,7 @@ const readManifest = (folder: string) =>
 const readRegistry = async (names: readonly string[]): Promise<Map<string, RegistryPackage>> => {
   const entries = await Promise.all(
     names.map(async (name): Promise<[string, RegistryPackage]> => {
-      const response = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}`, {
+      const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
         headers: { accept: "application/vnd.npm.install-v1+json" }
       });
       if (!response.ok) throw new ScriptError(`the npm registry answered ${response.status} for ${name}`);
