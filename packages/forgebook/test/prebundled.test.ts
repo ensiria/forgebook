@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ForgebookPlugin } from "../src/plugin.ts";
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import { prebundled, type Resolve, scannedEntries } from "../src/vite/prebundled.ts";
@@ -34,7 +35,8 @@ const CONFIG: ResolvedConfig = {
   plugins: [],
   hasPlayTools: false,
   frames: ISOLATED_FRAMES,
-  build: { readableNames: false }
+  build: { readableNames: false },
+  appBuild: resolvedAppBuild(false)
 };
 
 /**

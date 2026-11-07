@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { createServer, type ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
@@ -84,7 +85,8 @@ describe("a dev server's two ports", () => {
       home: undefined,
       hasPlayTools: false,
       frames: ISOLATED_FRAMES,
-      build: { readableNames: false }
+      build: { readableNames: false },
+      appBuild: resolvedAppBuild(false)
     };
     server = await createServer({
       root: project,

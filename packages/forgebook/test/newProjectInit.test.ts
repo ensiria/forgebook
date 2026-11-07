@@ -80,7 +80,13 @@ describe("forgebook init in a new project", () => {
     ["preact", "preact()", "src/**/*.stories.tsx", "forgebook.preview.tsx", "./src/index.css"],
     ["web-components", "webComponents()", "src/**/*.stories.ts", "forgebook.preview.ts", "./src/index.css"],
     ["angular", "angular()", "src/**/*.stories.ts", "forgebook.preview.ts", "./src/styles.css"],
-    ["nextjs", "nextjs()", "app/**/*.stories.tsx", "forgebook.preview.tsx", "./app/globals.css"],
+    [
+      "nextjs",
+      "nextjs()",
+      "{app,components,src,lib}/**/*.stories.tsx",
+      "forgebook.preview.tsx",
+      "./app/globals.css"
+    ],
     ["sveltekit", "sveltekit()", "src/**/*.stories.ts", "forgebook.preview.ts", "./src/app.css"]
   ])(
     "writes %s's configuration and a preview with its global style sheet",
@@ -104,7 +110,7 @@ describe("forgebook init in a new project", () => {
     const { document } = initJson(dir);
     expect(document["framework"]).toBe("nuxt");
     expect(document["written"]).toEqual(["forgebook.config.ts"]);
-    expect(document["stories"]).toEqual(["app/**/*.stories.ts", "components/**/*.stories.ts"]);
+    expect(document["stories"]).toEqual(["{app,components}/**/*.stories.ts"]);
     expect(stepKinds(document)).toContain("provider");
   }, 30_000);
 
@@ -134,25 +140,15 @@ describe("forgebook init in a new project", () => {
       "postcss.config.js": "export default {};\n"
     });
     const { document } = initJson(dir);
-    expect(stepKinds(document)).toEqual([
-      "style-sheet",
-      "provider",
-      "portal",
-      "head",
-      "vite-plugin",
-      "alias",
-      "alias",
-      "postcss"
-    ]);
+    expect(stepKinds(document)).toEqual(["style-sheet", "provider", "portal", "head"]);
+    expect(document["appBuild"]).toEqual({
+      viteConfig: "vite.config.ts",
+      tsconfigPaths: true,
+      postcss: "postcss.config.js",
+      runsCode: ["vite.config.ts", "postcss.config.js"]
+    });
     const text = JSON.stringify(document["nextSteps"]);
-    for (const name of [
-      "~/theme.css",
-      "QueryProvider",
-      "#modal-root",
-      "fonts.example",
-      "@tailwindcss/vite",
-      "@/*"
-    ])
+    for (const name of ["~/theme.css", "QueryProvider", "#modal-root", "fonts.example"])
       expect(text).toContain(name);
     expect(text).not.toContain("StrictMode");
     expect(text).not.toContain("@vitejs/plugin-react");
@@ -379,4 +375,46 @@ describe("forgebook init in a new project", () => {
     },
     SERVER_TIMEOUT
   );
+
+  it("sets up a project's coding agents with --agents, and keeps a catalogue on a second run", () => {
+    const dir = projectWith({ ...NEW_PROJECTS["react"], "CLAUDE.md": "" });
+    const { status, document } = initJson(dir, "--agents");
+    expect(status).toBe(0);
+    const agents = JSON.stringify(document["agents"]);
+    for (const file of [
+      ".mcp.json",
+      "AGENTS.md",
+      ".claude/settings.json",
+      ".agents/skills/forgebook/SKILL.md"
+    ])
+      expect(agents).toContain(file);
+    expect(JSON.stringify(document["install"])).toContain("@forgebook/testing");
+    const again = initJson(dir, "--agents");
+    expect(again.status).toBe(0);
+    expect(again.document["written"]).toEqual([]);
+    expect(JSON.stringify(again.document["agents"])).toContain("unchanged");
+  }, 30_000);
+
+  it("starts beside a Storybook with --agents, loading nothing of it", () => {
+    const dir = projectWith({
+      ...NEW_PROJECTS["react"],
+      ".storybook/main.ts": 'throw new Error("ran");\n'
+    });
+    const { status, document } = initJson(dir, "--agents");
+    expect(status).toBe(0);
+    expect(document["route"]).toBe("new-project");
+  }, 30_000);
+
+  it("refuses --hooks without --agents, and a hook it does not know", () => {
+    const dir = projectWith(NEW_PROJECTS["react"] ?? {});
+    expect(forgebook(dir, ["init", "--hooks", "claude"]).status).toBe(2);
+    expect(forgebook(dir, ["init", "--agents", "--hooks", "nope"]).status).toBe(2);
+    expect(existsSync(join(dir, "forgebook.config.ts"))).toBe(false);
+  }, 30_000);
+
+  it("says with --draw that nothing can be drawn before an install", () => {
+    const { status, document } = initJson(projectWith(NEW_PROJECTS["react"] ?? {}), "--draw");
+    expect(status).toBe(1);
+    expect(JSON.stringify(document["draw"])).toContain("not-run");
+  }, 30_000);
 });

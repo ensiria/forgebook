@@ -1,7 +1,7 @@
 /**
  * The tools `forgebook mcp` offers agents, each answered as the command of the same name answers: `list_stories`,
  * `find_component`, `changed_stories`, `get_story`, `story_address`, `new_stories`, `check_story`, `recent_errors`, `story_shot`, `check_code`, `verify`, `list_tokens`, `get_token`,
- * `nearest_token`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
+ * `nearest_token`, `component_graph`, `list_pages`, `get_page`, `search_catalogue`, `list_plugins` and `list_switches`; and `story_preview` (`mcpPreview.ts`),
  * for a client that renders apps. `visual_diff` and `get_guide` join them in `mcpCommand.mts`.
  *
  * @module
@@ -17,6 +17,7 @@ import { filteredStories, isStoriesDocument } from "../../src/vite/agentApi.ts";
 import type { AgentAnswer } from "../../src/vite/agentRoutes.ts";
 import type { McpTool, McpToolResult } from "../../src/vite/mcpProtocol.ts";
 import { askErrors } from "./errorsRun.ts";
+import { graphTool } from "./mcpGraph.ts";
 import { previewTool } from "./mcpPreview.ts";
 import { type Ask, resultOf, textOf, textsOf, VIEW } from "./mcpToolParts.ts";
 import { type Verify, verifyTool } from "./mcpVerify.ts";
@@ -166,7 +167,7 @@ export const catalogueTools = ({
   {
     name: "check_code",
     description:
-      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. It does not check props, imports or deprecated components, so a clean answer is not a review. `skipped` says what it could not check.",
+      "Check what your change adds, new files included, for colours and sizes written by hand, with the token to use, checks turned off with no reason, and deleted tests. With no tokens file it compares with what the application declares (CSS variables, Tailwind, components.json); `tokenSources` says what was read. It also names an added import of a component marked @deprecated or @replacedBy, and a new component that looks like one that exists; `advice` is what to weigh, not a failure. It does not check props, so a clean answer is not a review. `skipped` says what it could not check.",
     inputSchema: {
       type: "object",
       properties: {
@@ -181,10 +182,11 @@ export const catalogueTools = ({
       problemsResult(await ask("check-code", new URLSearchParams({ since: textOf(args, "since") ?? "" })))
   },
   verifyTool(verify),
+  graphTool(ask),
   {
     name: "list_tokens",
     description:
-      "The design tokens of this catalogue and of the libraries it shows, to use instead of a colour, size or duration written by hand: how many of each type, the first of them, and `clashes` where two authors disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
+      "The design tokens of this catalogue and of the libraries it shows or, with no tokens file, what the application declares (CSS variables, Tailwind, components.json), to use instead of a colour, size or duration written by hand: how many of each type, the first of them, `sources` (what was read), `notes` (what was not) and `clashes` where two files disagree. To replace a raw value, call nearest_token; for one token's description, get_token.",
     inputSchema: {
       type: "object",
       properties: {

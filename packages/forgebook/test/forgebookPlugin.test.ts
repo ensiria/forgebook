@@ -14,6 +14,7 @@ import type { UserConfig } from "vite";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { codeLiteral } from "../src/codeLiteral.ts";
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
@@ -208,7 +209,8 @@ describe("forgebookPlugin's pages", () => {
     home: undefined,
     hasPlayTools: false,
     frames: ISOLATED_FRAMES,
-    build: { readableNames: false }
+    build: { readableNames: false },
+    appBuild: resolvedAppBuild(false)
   };
 
   it("resolves the pages' entries by their address to their path in the folder, and answers them", async () => {

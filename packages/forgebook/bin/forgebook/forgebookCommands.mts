@@ -14,13 +14,17 @@ import { existsSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
+import { formatJson } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 import { build } from "vite";
 
 import { filteredStories, isStoriesDocument, isStoryDocument } from "../../src/vite/agentApi.ts";
+import { VITE_PATHS } from "../../src/vite/vitePaths.ts";
 import type { CatalogueDocsReport } from "../forgebook-docs/catalogueDocs.types.ts";
 import { agentLoopCommands } from "./agentLoopCommands.mts";
+import { agentSetupCommands } from "./agentSetupCommands.mts";
 import { storiesText, storyText } from "./agentText.ts";
+import { auditCommands } from "./auditCommand.mts";
 import { buildFailureText } from "./buildFailure.ts";
 import { settleAgentIndex } from "./builtCatalogue.ts";
 import {
@@ -32,7 +36,9 @@ import {
   printAnswer
 } from "./catalogueCommands.ts";
 import { catalogueVite, withReadableNames } from "./catalogueVite.ts";
+import { leaveAfterCommand } from "./commandServer.ts";
 import { devCommands } from "./devCommands.mts";
+import { graphCommands } from "./graphCommand.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
@@ -82,10 +88,14 @@ await defineCommands({
           options["readable-names"]
         );
         const outDir = resolve(config.dir, options.out ?? "dist");
-        const vite = await catalogueVite(config, {
-          ...(options.base === undefined ? {} : { base: options.base }),
-          build: { outDir }
-        });
+        const vite = await catalogueVite(
+          config,
+          {
+            ...(options.base === undefined ? {} : { base: options.base }),
+            build: { outDir }
+          },
+          "build"
+        );
         try {
           await build(vite);
         } catch (error) {
@@ -262,6 +272,7 @@ await defineCommands({
     new: forgebook.command({
       summary:
         "Write a component's first stories from its props: the main story, one per choice, the worst case.",
+      json: true,
       options: {
         export: {
           type: "string",
@@ -285,7 +296,7 @@ await defineCommands({
           description: "One of several, printed."
         }
       ],
-      run: async ({ args, options, io, log }): Promise<void> => {
+      run: async ({ args, options, io, log, isJson }): Promise<void> => {
         const written = await newStoriesFile(resolve(args.file), options.export, options.framework);
         if (options.print) {
           io.stdout.write(written.text);
@@ -297,6 +308,7 @@ await defineCommands({
             hint: "Give --force to replace it, or --print to see it"
           });
         writeFileSync(written.file, written.text);
+        if (isJson) io.stdout.write(formatJson({ schema: 1, file: VITE_PATHS.normalize(shown) }));
         log.success(`${shown} written`);
         log.info(
           `${COMMAND} stories --component ${written.text.match(/title: "([^"]*)"/)?.[1] ?? ""} lists them`
@@ -305,9 +317,12 @@ await defineCommands({
     }),
     ...agentLoopCommands(forgebook),
     ...guideCommands(forgebook),
+    ...auditCommands(forgebook),
+    ...graphCommands(forgebook),
     ...pagesCommands(forgebook),
     ...visualCommands(forgebook),
     ...initCommands(forgebook),
+    ...agentSetupCommands(forgebook),
     ...mcpCommands(forgebook),
     story: forgebook.command({
       summary:
@@ -359,4 +374,6 @@ await defineCommands({
       }
     })
   })
-}).run();
+})
+  .run()
+  .then(leaveAfterCommand);

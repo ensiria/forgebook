@@ -24,7 +24,6 @@ import {
   markupWrappers,
   pageFacts,
   styleSheetImports,
-  viteConfigFacts,
   vueInstalls
 } from "../bin/forgebook/newProject/projectEntries.ts";
 import {
@@ -223,8 +222,6 @@ describe("the package manager", () => {
 describe("what an entry says", () => {
   it("keeps a planted text from taking long", () => {
     const start = performance.now();
-    viteConfigFacts(`import${" ".repeat(200_000)}`);
-    viteConfigFacts(`from${" ".repeat(200_000)}`);
     pageFacts("<link ".repeat(40_000));
     isBelowFloor(" ".repeat(200_000), "19.0.0");
     expect(performance.now() - start).toBeLessThan(2000);
@@ -293,19 +290,5 @@ describe("what an entry says", () => {
       })
     ).toEqual(["a.css"]);
     expect(angularStyles(undefined)).toEqual([]);
-  });
-
-  it("names a vite.config's plugins, not the framework's own or Node's", () => {
-    expect(
-      viteConfigFacts(
-        'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\nimport path from "node:path";\nimport svgr from "vite-plugin-svgr";\nimport mine from "./mine";\nexport default defineConfig({ plugins: [react(), svgr()] });'
-      )
-    ).toEqual({ plugins: ["vite-plugin-svgr"], hasAlias: false });
-    expect(
-      viteConfigFacts(
-        'import path from "path";\nimport {\n  visualizer\n} from "rollup-plugin-visualizer";\n/* import old from "old-plugin"; */\n'
-      ).plugins
-    ).toEqual(["rollup-plugin-visualizer"]);
-    expect(viteConfigFacts("resolve: { alias: {} }").hasAlias).toBe(true);
   });
 });
