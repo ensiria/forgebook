@@ -67,6 +67,10 @@ await defineCommands({
           type: "boolean",
           description:
             "Name each script after its module as well as its hash (build.readableNames in the configuration)."
+        },
+        watch: {
+          type: "boolean",
+          description: "Stay running, and build again when a file the catalogue reads changes."
         }
       },
       examples: [
@@ -74,9 +78,13 @@ await defineCommands({
         {
           command: `${COMMAND} build --base /pr-12/`,
           description: "For a host that serves it under a sub-path."
+        },
+        {
+          command: `${COMMAND} build --watch --out site`,
+          description: "Keep site up to date as files change, for a host that serves the folder."
         }
       ],
-      run: async ({ options, log }): Promise<void> => {
+      run: async ({ options, log, onInterrupt }): Promise<void> => {
         const config = withReadableNames(
           await configWithStoriesOf(options.config),
           options["readable-names"]
@@ -86,13 +94,22 @@ await defineCommands({
           ...(options.base === undefined ? {} : { base: options.base }),
           build: { outDir }
         });
+        const settle = (): Promise<void> =>
+          settleAgentIndex(config, outDir, options["agent-index"] === true, log);
+        if (options.watch === true) {
+          const { watchBuild } = await import("./buildWatch.ts");
+          const stop = new AbortController();
+          onInterrupt(() => stop.abort());
+          await watchBuild({ vite, log, onBuilt: settle, signal: stop.signal });
+          return;
+        }
         try {
           await build(vite);
         } catch (error) {
           if (error instanceof Error && error.stack !== undefined) log.debug(error.stack);
           throw new ScriptError(buildFailureText(error));
         }
-        await settleAgentIndex(config, outDir, options["agent-index"] === true, log);
+        await settle();
         log.success(`${config.title} built`);
       }
     }),
