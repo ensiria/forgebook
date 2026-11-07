@@ -110,7 +110,7 @@ describe("the framework a project says", () => {
 describe("the floors", () => {
   it("are the adapters' own required peers", () => {
     for (const name of FRAMEWORK_NAMES) expect(PROJECT_FRAMEWORKS[name].peers).toEqual(requiredPeers(name));
-    expect(FORGEBOOK_PEERS).toEqual(requiredPeers("forgebook"));
+    expect(FORGEBOOK_PEERS).toEqual({ react: "18.2.0", "react-dom": "18.2.0" });
   });
 
   it.each([
@@ -145,8 +145,9 @@ describe("the floors", () => {
     expect(installSpecifier("vite", declared)).toBe("vite");
   });
 
-  it("keeps the higher of forgebook's floor and the adapter's", () => {
-    expect(requiredPackages("react", []).get("react")).toBe("19.0.0");
+  it("asks for the adapter's floor, and nothing of a project's Vite", () => {
+    expect(requiredPackages("react", []).get("react")).toBe("18.2.0");
+    expect(requiredPackages("react", []).has("vite")).toBe(false);
     expect(requiredPackages("react-native-web", ["@babel/core"]).has("@babel/core")).toBe(true);
   });
 
@@ -165,7 +166,7 @@ describe("the floors", () => {
       requiredPackages("web-components", [])
     );
     expect(state.tooOld).toEqual([{ name: "lit", found: "2.0.0", floor: "3.2.0" }]);
-    expect(state.missing).toEqual(["forgebook", "@forgebook/web-components", "react-dom", "vite"]);
+    expect(state.missing).toEqual(["forgebook", "@forgebook/web-components", "react-dom"]);
     expect(state.hasUninstalled).toBe(true);
   });
 });

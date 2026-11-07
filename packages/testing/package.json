@@ -48,13 +48,18 @@
   "dependencies": {
     "@axe-core/playwright": "4.14.0",
     "@ensiria/cli-kit": "^0.1.1",
-    "@forgebook/story-format": "workspace:*"
+    "@forgebook/story-format": "workspace:*",
+    "vite": "^8.3.4"
   },
   "peerDependencies": {
     "@playwright/test": "^1.64.0",
     "forgebook": "workspace:^",
-    "vite": "^8.3.4",
     "vitest": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@forgebook/tools": "workspace:*",
