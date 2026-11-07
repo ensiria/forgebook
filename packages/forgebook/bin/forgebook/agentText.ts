@@ -107,8 +107,17 @@ export const checkText = (report: StoryCheckReport, style: OutputStyle): string 
   (report.a11y === "off" ? "Accessibility is not checked: the catalogue sets a11y: false.\n" : "") +
   table(
     report.results.flatMap((result) => [
-      ...(result.problems.length === 0
-        ? [[result.storyId, result.view || "default", "passes"]]
+      ...(result.notVerified === undefined
+        ? []
+        : [[result.storyId, result.view || "default", `not verified: ${result.notVerified}`]]),
+      ...(result.problems.length === 0 && result.notVerified === undefined
+        ? [
+            [
+              result.storyId,
+              result.view || "default",
+              result.isNotAwaited === true ? "passes, as drawn: parameters.suspense.expected" : "passes"
+            ]
+          ]
         : result.problems.map((problem) => [
             result.storyId,
             result.view || "default",
@@ -166,8 +175,20 @@ export const shotText = (
   style: OutputStyle
 ): string =>
   table(
-    report.shots.map((shot) => [shot.storyId, shot.view || "default", shownFile(shot.file)]),
-    { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Picture" }] },
+    report.shots.map((shot) => [
+      shot.storyId,
+      shot.view || "default",
+      shownFile(shot.file),
+      shot.status === undefined ? "" : `not of the story: ${shot.status}`
+    ]),
+    {
+      columns: [
+        { header: "Story" },
+        { header: "View", tone: "muted" },
+        { header: "Picture" },
+        { header: "Status" }
+      ]
+    },
     uncut(style)
   );
 
@@ -318,7 +339,10 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
   const notes = document.code.notes.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
   );
-  const results = document.failures.map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
+  const results = [
+    ...document.failures,
+    ...document.notVerified.map((each) => ({ ...each, problems: [] }))
+  ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
   const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
   return [...uncovered, ...code, ...notes, ...stories, document.summary].join("\n");
 };

@@ -24,9 +24,17 @@ import type { FrameClock } from "./frameClock.ts";
 import { ERROR_MESSAGE_CLASS } from "./frameStatus.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type PlayTools, type PlayToolsLoader, playStory } from "./playStory.ts";
-import type { ArgsChange, FrameRenderer, MountedStory, StoryDrawing, StoryIdentity } from "./renderer.ts";
+import type {
+  ArgsChange,
+  ContentState,
+  FrameRenderer,
+  MountedStory,
+  StoryDrawing,
+  StoryIdentity
+} from "./renderer.ts";
 import { animationsSettled } from "./settle.ts";
 import { storyCanvas } from "./storyCanvas.ts";
+import { contentBeforePlay, contentOf, outcomeOf, type StoryOutcome } from "./storyContent.ts";
 import { type PreparedStory, prepareStory } from "./storyHooks.ts";
 import type { LoadedArgs, LoadedBeforeEach, LoadedStory } from "./storyModule.ts";
 
@@ -76,10 +84,10 @@ export type StoryRunOptions = {
   /** The panel's values as the story takes them (a named value turned back into the value). */
   readonly resolveArgs: (args: PanelArgs) => Readonly<Record<string, unknown>>;
   /**
-   * Called once with the controls, when the story is first drawn and its play function is over (the frame's ready
-   * status waits for it, so no check reads a half-played story).
+   * Called once with the controls and how the story ended, when the story is first drawn, what it loads came and its
+   * play function is over (the frame's status waits for it, so no check reads a half-played or half-loaded story).
    */
-  readonly onControlsReady: (controls: StoryControls) => void;
+  readonly onControlsReady: (controls: StoryControls, outcome: StoryOutcome) => void;
   /** Called on every call of a recorded event, with its arguments. */
   readonly onEvent: (name: string, values: readonly unknown[]) => void;
   /** What the panel can show of values: those it cannot (a function, an object) stay the frame's alone. */
@@ -372,14 +380,23 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     container.append(canvas);
     const alone = renderer.mount(canvas, drawing({}), showError);
     mounted = [{ story: alone, values: {} }];
-    void alone.drawn.then(async () => {
+    // a play drives the story, not its fallback; one that shows only the fallback has nothing for it to find
+    void contentBeforePlay(alone, story).then(async (loaded) => {
       // a later mount (Replay, the matrix) replaced this one before it was drawn: its play would drive a gone story
       if (count !== mountCount) return;
+      const isStuck = loaded.state === "waiting" || shownError !== undefined;
       const tools = await playTools();
       if (count !== mountCount || tools instanceof Error) return;
+      const finish = (content: ContentState): void => {
+        // a later mount took over meanwhile: it says how the story ended
+        if (hasPlayed || count !== mountCount) return;
+        hasPlayed = true;
+        const outcome = outcomeOf(content, shownError !== undefined, story.suspense.timeout);
+        options.onControlsReady(controls, outcome);
+      };
       // a failed play still ends the wait; its rejection reaches the page as an error the tests record
       void playStory(
-        story.play,
+        isStuck ? undefined : story.play,
         {
           ...options.identity,
           args: shownArgs(),
@@ -391,9 +408,9 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
           parameters: story.parameters
         },
         (): void => {
-          if (hasPlayed) return;
-          hasPlayed = true;
-          options.onControlsReady(controls);
+          // what a play did may load something in turn (a tab it opened), which its checks must see too
+          if (isStuck || story.play === undefined || loaded.state === "unknown") finish(loaded);
+          else void contentOf(alone, story).then(finish);
         },
         options.onTrace,
         tools

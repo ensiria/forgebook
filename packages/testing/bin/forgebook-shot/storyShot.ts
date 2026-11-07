@@ -9,11 +9,11 @@
  * @module
  */
 import { AxeBuilder } from "@axe-core/playwright";
-import { chromium } from "@playwright/test";
+import { chromium, type Page } from "@playwright/test";
 import type { Violation } from "forgebook/a11y";
 import { DEFAULT_A11Y_TAGS } from "forgebook/catalogue";
 import { codeLiteral } from "forgebook/code-literal";
-import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
+import { PENDING_REASON_ATTRIBUTE, STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import { frameAddressOf } from "forgebook/view-state";
 
 import type { ShotStatus, StoryShot } from "./storyShot.types.ts";
@@ -48,6 +48,20 @@ export const shotAddress = (catalogue: string, story: string, view: string): str
     .href;
 
 /**
+ * What the frame says of a story it did not show.
+ *
+ * @param page - the frame's page.
+ * @param status - how it ended.
+ * @returns its message; none for a story shown or a frame with no answer.
+ */
+const reasonOf = async (page: Page, status: ShotStatus): Promise<string | undefined> => {
+  if (status === "pending")
+    return (await page.locator("html").getAttribute(PENDING_REASON_ATTRIBUTE)) ?? undefined;
+  if (status !== "error") return undefined;
+  return (await page.locator(".forgebook-frame-error__message").first().textContent()) ?? undefined;
+};
+
+/**
  * Opens a story's frame, waits for it, and reports what it shows.
  *
  * @param request - the story, the view and what to do.
@@ -71,29 +85,29 @@ export const takeShot = async (request: ShotRequest): Promise<StoryShot> => {
       .waitForFunction(`document.documentElement.getAttribute(${codeLiteral(STATUS_ATTRIBUTE)})`, undefined, {
         timeout: request.timeout
       })
-      .then(
-        async (handle): Promise<ShotStatus> => ((await handle.jsonValue()) === "ready" ? "ready" : "error")
-      )
+      .then(async (handle): Promise<ShotStatus> => {
+        const said = await handle.jsonValue();
+        return said === "ready" || said === "pending" ? said : "error";
+      })
       .catch((): ShotStatus => "timeout");
-    const error =
-      status === "error"
-        ? ((await page.locator(".forgebook-frame-error__message").first().textContent()) ?? undefined)
-        : undefined;
+    const error = await reasonOf(page, status);
     const box = await page.locator("body").boundingBox();
     const size = { width: Math.ceil(box?.width ?? 0), height: Math.ceil(box?.height ?? 0) };
     if (request.out !== undefined)
       await page.screenshot({ path: request.out, fullPage: true, animations: "disabled" });
-    const violations: Violation[] | undefined = request.isA11y
-      ? (await new AxeBuilder({ page }).withTags([...DEFAULT_A11Y_TAGS]).analyze()).violations.map(
-          (violation) => ({
-            id: violation.id,
-            help: violation.help,
-            impact: violation.impact ?? undefined,
-            helpUrl: violation.helpUrl,
-            targets: violation.nodes.map((node) => node.target.map(String).join(" "))
-          })
-        )
-      : undefined;
+    // axe on a fallback would say nothing of the story
+    const violations: Violation[] | undefined =
+      request.isA11y && status !== "pending"
+        ? (await new AxeBuilder({ page }).withTags([...DEFAULT_A11Y_TAGS]).analyze()).violations.map(
+            (violation) => ({
+              id: violation.id,
+              help: violation.help,
+              impact: violation.impact ?? undefined,
+              helpUrl: violation.helpUrl,
+              targets: violation.nodes.map((node) => node.target.map(String).join(" "))
+            })
+          )
+        : undefined;
     return {
       story: request.story,
       address,

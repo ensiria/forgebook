@@ -329,6 +329,73 @@ describe("verifyDocument", () => {
     expect(document.skipped).toEqual(["stories not run: Playwright is missing"]);
   });
 
+  it("reads a story its frame gave up on as not verified, never as passed", () => {
+    const document = verifyDocument(
+      findings({
+        report: {
+          schema: 1,
+          results: [{ storyId: STORY, view: "light", frame: "f", problems: [], notVerified: "still loading" }]
+        }
+      })
+    );
+    expect(document).toMatchObject({
+      verdict: "not-verified",
+      ran: 0,
+      failures: [],
+      notVerified: [{ storyId: STORY, view: "light", notVerified: "still loading" }]
+    });
+    expect(document.uiFiles[0]).toMatchObject({ coverage: "none", stories: 0 });
+    expect(document.summary).toContain("not verified");
+    expect(document.summary).toContain("1 not seen in its final state: the frame gave up");
+    expect(document.summary).not.toContain("verified in");
+  });
+
+  it("is not verified when one view of a story was not seen, though another passed", () => {
+    const document = verifyDocument(
+      findings({
+        report: {
+          schema: 1,
+          results: [
+            { storyId: STORY, view: "light", frame: "f", problems: [] },
+            { storyId: STORY, view: "dark", frame: "f", problems: [], notVerified: "still loading" }
+          ]
+        }
+      })
+    );
+    expect(document).toMatchObject({ verdict: "not-verified", ran: 1 });
+    expect(verifyText(document, { color: false, unicode: true, width: 200 })).toContain(
+      "not verified: still loading"
+    );
+  });
+
+  it("names a story it did not wait for, as asked, in what was not checked", () => {
+    const document = verifyDocument(
+      findings({
+        report: {
+          schema: 1,
+          results: [{ storyId: STORY, view: "light", frame: "f", problems: [], isNotAwaited: true }]
+        }
+      })
+    );
+    expect(document.verdict).toBe("partly-verified");
+    expect(document.skipped[0]).toContain("parameters.suspense.expected");
+  });
+
+  it("fails rather than not verifies when something was found as well", () => {
+    const document = verifyDocument(
+      findings({
+        report: {
+          schema: 1,
+          results: [
+            { storyId: STORY, view: "light", frame: "f", problems: [{ kind: "axe", message: "m" }] },
+            { storyId: STORY, view: "dark", frame: "f", problems: [], notVerified: "still loading" }
+          ]
+        }
+      })
+    );
+    expect(document.verdict).toBe("failed");
+  });
+
   it("is the shape's second version, with only what failed listed", () => {
     const document = verifyDocument(findings({}));
     expect(document).toMatchObject({ schema: 2, verdict: "verified", ran: 1, failures: [], problems: 0 });

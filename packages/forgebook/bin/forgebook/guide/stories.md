@@ -50,6 +50,9 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   `label:Hello+world;count:5;open:!true`; what a story cannot take is listed above it, by name). The catalogue applies only the
   props the story's panel can set, with a value of their type; to show a story with other values, write a story with
   those args rather than a link.
+- `parameters.suspense` says how the frame waits for a `Suspense` boundary: `{ expected: true }` for a story meant to stay
+  in its fallback, a loading state; `{ timeout: 15000 }` to wait longer than the 10 s by default. Past the wait a story is
+  `pending`, which `check` and `verify` read as not verified.
 - `parameters.height` gives the frame the room an overlay the story opens needs (a menu, a popover), in CSS px.
 - A hook or a function gets stories about logic: `parameters: { logic: true }` on the meta, its `component` the hook
   (`satisfies LogicMeta<typeof useUndo>` in React), each story a `render` with a small scene using it and a `play`

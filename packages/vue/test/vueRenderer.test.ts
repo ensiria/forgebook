@@ -11,6 +11,7 @@ import { type LoadedArgs, readStory } from "forgebook/story-module";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type App,
+  type Component,
   defineComponent,
   h,
   inject,
@@ -19,11 +20,13 @@ import {
   onMounted,
   ref,
   type SetupContext,
+  Suspense,
   type VNode
 } from "vue";
 
 import { useStoryClock, useStoryNow } from "../src/clock.ts";
 import { useStoryText } from "../src/texts.ts";
+import { contentOfCanvas, isReadingSound } from "../src/vnodeContent.ts";
 import { createVueRenderer, vueRenderer } from "../src/vueRenderer.ts";
 
 /** What a decorator's `story()` gave, typed `unknown` by the frame. */
@@ -417,5 +420,75 @@ describe("the composables", () => {
   it("give a key in brackets and the epoch outside a catalogue", async () => {
     const html = await vueRenderer.renderToString(drawing({ render: () => h(Reader) }));
     expect(html).toContain("0 0");
+  });
+});
+
+describe("what a story waits for", () => {
+  /** An async component that shows its text once a promise comes, and the promise's end. */
+  const awaiting = (): { readonly component: Component; readonly give: () => void } => {
+    let give = (): void => undefined;
+    const promise = new Promise<void>((resolve) => {
+      give = resolve;
+    });
+    const component = defineComponent({
+      setup: async () => {
+        await promise;
+        return (): VNode => h("b", "Content");
+      }
+    });
+    return { component, give };
+  };
+
+  it("waits for nothing in a plain story, at the first look", async () => {
+    const story = vueRenderer.mount(canvas(), drawing({ render: () => "Words" }), () => undefined);
+    await story.drawn;
+    expect(await story.settled?.(0)).toEqual({ state: "settled" });
+    story.unmount();
+  });
+
+  it("waits for a boundary the story wrote inside the one around it", async () => {
+    const { component, give } = awaiting();
+    const element = canvas();
+    const story = vueRenderer.mount(
+      element,
+      drawing({
+        render: () =>
+          h("section", [
+            h(Suspense, null, {
+              default: () => h(component),
+              fallback: () => h("i", "Loading")
+            })
+          ])
+      }),
+      () => undefined
+    );
+    await story.drawn;
+    expect(await story.settled?.(0)).toMatchObject({
+      state: "waiting",
+      reason: "1 Vue Suspense boundary is still pending"
+    });
+    expect(element.querySelector("i")?.textContent).toBe("Loading");
+    give();
+    expect(await story.settled?.(5000)).toEqual({ state: "settled" });
+    expect(element.querySelector("b")?.textContent).toBe("Content");
+    story.unmount();
+  });
+
+  it("waits for an async setup in the boundary around the story, and gives up in time", async () => {
+    const { component } = awaiting();
+    const story = vueRenderer.mount(canvas(), drawing({ render: () => h(component) }), () => undefined);
+    expect((await story.settled?.(30))?.state).toBe("waiting");
+    story.unmount();
+    expect(await story.settled?.(60_000)).toEqual({ state: "settled" });
+  });
+
+  it("says it cannot tell when the canvas holds no tree it can read", () => {
+    expect(contentOfCanvas(document.createElement("div")).state).toBe("unknown");
+  });
+
+  it("holds the reading sound on this Vue, and finds a blind one unsound", () => {
+    expect(isReadingSound(contentOfCanvas)).toBe(true);
+    expect(isReadingSound(() => ({ state: "settled" }))).toBe(false);
+    expect(isReadingSound(() => ({ state: "waiting", reason: "always" }))).toBe(false);
   });
 });

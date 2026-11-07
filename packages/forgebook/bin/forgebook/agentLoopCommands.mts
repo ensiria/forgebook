@@ -310,6 +310,10 @@ export const agentLoopCommands = (
       io.stdout.write(
         isJson ? formatJson(report) : `${shotText(report, (file) => relative(process.cwd(), file), style)}\n`
       );
+      // a picture of an error or of a fallback was taken, and is not of the story: never a success
+      const notShown = report.shots.filter((shot) => shot.status !== undefined).length;
+      if (notShown > 0)
+        throw new ScriptError(`${notShown} not of the story`, { exitCode: EXIT.failure, isReported: true });
     }
   }),
   agents: forgebook.command({
