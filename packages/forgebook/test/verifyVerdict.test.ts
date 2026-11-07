@@ -206,6 +206,36 @@ describe("verifyDocument", () => {
     expect(document.summary).toContain(says);
   });
 
+  it("answers not verified on a configuration problem, and still gives what the stories found", () => {
+    const document = verifyDocument(
+      findings({ configProblems: ['No story file matches "docs/*.stories.tsx"'] })
+    );
+    expect(document.verdict).toBe("not-verified");
+    expect(document.skipped).toContain('No story file matches "docs/*.stories.tsx"');
+    expect(document.summary).not.toContain("give --since");
+    expect(document.ran).toBe(1);
+    expect(document.uiFiles[0]?.coverage).toBe("own");
+  });
+
+  it("fails on a problem found with a configuration problem too, and says not verified with no UI file", () => {
+    const configProblems = ['No story file matches "docs/*.stories.tsx"'];
+    const failing = verifyDocument(
+      findings({
+        configProblems,
+        report: {
+          schema: 1,
+          results: [{ storyId: STORY, view: "", frame: "f", problems: [{ kind: "error", message: "x" }] }]
+        }
+      })
+    );
+    expect(failing.verdict).toBe("failed");
+    const noUi = verifyDocument(
+      findings({ configProblems, changed: changedOf([], { files: ["README.md"] }), report: undefined })
+    );
+    expect(noUi.verdict).toBe("not-verified");
+    expect(noUi.summary).toContain("not verified");
+  });
+
   it("has a false-green rate of zero on the seeded set", () => {
     const greens = NOT_DONE.filter(({ seed }) => !isVerifyFailure(verifyDocument(seed)));
     expect(greens).toEqual([]);

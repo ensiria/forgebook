@@ -29,6 +29,22 @@ export const emptyStoryGlobsMessage = (globs: readonly string[]): string =>
   `No story file matches ${globs.map((glob) => `"${glob}"`).join(", ")} (\`stories\` in the configuration)`;
 
 /**
+ * What `verify` says of the patterns of `emptyStoryGlobs`, as problems of the catalogue that leave its answer not
+ * verified while the rest of it is still given.
+ *
+ * @param config - the catalogue's folder and stories.
+ * @returns one problem naming every such pattern; none when each matches a file.
+ */
+export const emptyStoryGlobsProblems = (config: Pick<ResolvedConfig, "dir" | "stories">): string[] => {
+  const globs = emptyStoryGlobs(config);
+  return globs.length === 0
+    ? []
+    : [
+        `${emptyStoryGlobsMessage(globs)}: correct the pattern, or write the first story (npx forgebook new <component file>)`
+      ];
+};
+
+/**
  * Says what the plugin has to say of the patterns of `emptyStoryGlobs`, and of story files in hidden folders they pass
  * over (`hiddenStoryFolders.ts`), which only warn: a hidden folder may be left out on purpose.
  *
