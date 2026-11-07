@@ -26,6 +26,7 @@ import { newStoriesFile } from "./newStoriesFile.ts";
 import { SEMANTIC_OPTIONS, semanticModelOf } from "./semanticOptions.ts";
 import { runPageCheck, runStoriesCheck, runStoryCheck, runStoryDiff, runStoryShot } from "./storyCheckRun.ts";
 import { runStoryStress } from "./stressRun.ts";
+import { runOnBase } from "./verifyBase.ts";
 import { runVerify } from "./verifyRun.ts";
 import { baselinesOf, visualDiffTool } from "./visualCommands.mts";
 
@@ -110,7 +111,8 @@ export const mcpCommands = (
                 {
                   dir: config.dir,
                   ask: client.ask,
-                  check: (stories) => runStoriesCheck(config, options.url, stories)
+                  check: (stories) => runStoriesCheck(config, options.url, stories),
+                  checkBase: (base, stories) => runOnBase(config, base, stories.ids, stories.isAllVariants)
                 },
                 {
                   ...input,
