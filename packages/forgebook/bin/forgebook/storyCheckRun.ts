@@ -37,6 +37,7 @@ import { formerIdOf, namedComponent, namedStory } from "../../src/vite/agentIds.
 import { AGENT_API } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { servedCatalogue } from "./agentClient.ts";
+import { idsOfFiles } from "./storyFileIds.ts";
 
 /** What the project installs to run the stories in a browser, and how. */
 const INSTALL =
@@ -49,6 +50,10 @@ const STORIES_AT_ONCE = 4;
 export type StoriesCheckInput = {
   /** The stories' ids. */
   readonly ids: readonly string[];
+  /** Story files, absolute, whose stories run too: a file just written has no id a caller knows yet. */
+  readonly files?: readonly string[];
+  /** Serve the catalogue for the run even when a dev server runs: a file just written must be read as it is now. */
+  readonly isOwnServer?: boolean;
   /** Run every variant the catalogue's browser tests check; else the default view. */
   readonly isAllVariants: boolean;
 };
@@ -200,12 +205,13 @@ const runOnStories = async (
   if (typeof views === "string") return views;
   const served =
     run.exactOrigin === undefined
-      ? await servedCatalogue(config, url)
+      ? await servedCatalogue(config, url, "ids" in input && input.isOwnServer === true)
       : { origin: run.exactOrigin, close: async (): Promise<void> => undefined };
   try {
     const document = await storiesAt(served.origin);
     if (typeof document === "string") return document;
-    const ids = "ids" in input ? input.ids : [input.id];
+    const ids =
+      "ids" in input ? [...input.ids, ...idsOfFiles(document, config.dir, input.files ?? [])] : [input.id];
     const stories = ids.flatMap((id) =>
       storiesNamed(document, id, deviceDefaultOf(NO_DEVICE, config.lists.device))
     );

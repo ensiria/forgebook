@@ -208,11 +208,15 @@ const ownListening = async (config: ResolvedConfig, port: number): Promise<Serve
  *
  * @param config - the catalogue's configuration.
  * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param isOwn - serve it for the run whatever runs at the address; `false` by default.
  */
 export const servedCatalogue = async (
   config: ResolvedConfig,
-  url: string | undefined
+  url: string | undefined,
+  isOwn = false
 ): Promise<ServedCatalogue> => {
+  // a run that has just written a file serves it itself: a running server may still answer with its earlier module
+  if (isOwn) return ownListening(config, 0);
   const origin = withoutTrailingSlashes(url ?? DEFAULT_ORIGIN);
   const running = await runningClient(origin, config);
   if (running !== undefined) return { origin, runningAt: origin, close: async () => undefined };
