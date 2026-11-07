@@ -1303,7 +1303,7 @@ is a state of the component: the same).
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
-| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change |
+| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change. `--repair` draws them in a browser and, when an error says a story must be drawn inside a component the application exports (`useSidebar must be used within a SidebarProvider`), draws them inside it, at most twice |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook check <id> --stress` | Draws the story in the states nobody wrote: long text, unbreakable words, huge numbers, empty, right to left, 200 % zoom, narrow, dark, more contrast, and reports what each breaks |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
@@ -1923,6 +1923,12 @@ src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Bad
   another catalogue of the repository can answer for. None of these fails. A UI file nothing reaches in a package with no
   catalogue of its own does: it is this catalogue's to show. So does a package whose types point at its build, since
   imports stop there.
+- **Only what the change brought fails.** The stories that found something run again on the commit the change starts
+  from, checked out in a worktree beside the repository (`.<repository>-forgebook-base-<commit>-<process>`) and removed
+  after, the working tree untouched; the base's configuration and stories run there, as yours do. A problem
+  they had there too is set apart in `existing` and said in the line ("2 problems the stories had before the change not
+  counted"), so an application whose stories already break a rule can still be verified. `--all-problems` fails on
+  every problem. When the base cannot run, every problem counts and `skipped` says why.
 - **Stories written for other props fail.** A story file `forgebook new` wrote says which props it was written for
   (`// forgebook-props: 1a2b3c4d`). When a change reaches it and the component's props no longer match, `verify` lists the
   file in `outdated` and fails, since a framework ignores a prop that is gone and never shows one that is new: check the
