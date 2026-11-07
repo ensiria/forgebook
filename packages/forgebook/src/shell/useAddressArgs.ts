@@ -176,10 +176,11 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
   }, [acceptedParam, frames]);
   // said with the check's: the note's button keeps what the story accepts, which is not known before
   const unread = (link?.unread ?? []).map((name): DroppedArg => ({ name, reason: "unreadable" }));
+  const refused = (link?.refused ?? []).map((name): DroppedArg => ({ name, reason: "markup" }));
   return {
     accepted: checked?.accepted ?? NO_ARGS,
     checked: checked?.sealed,
-    dropped: checked === undefined ? NOTHING_DROPPED : [...unread, ...checked.dropped],
+    dropped: checked === undefined ? NOTHING_DROPPED : [...unread, ...refused, ...checked.dropped],
     acceptedParam,
     acceptedFor: (message: ReadyDeclaration): AcceptedArgs | undefined => {
       const ready = declarationOf(docs, message, namedValues);

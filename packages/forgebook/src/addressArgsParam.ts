@@ -29,6 +29,8 @@ export type AddressLink = {
   readonly typeValue?: (prop: PanelProp, value: ArgValue) => ArgValue;
   /** The names of the values that could not be read; `args` for a parameter that could not be read at all. */
   readonly unread: readonly string[];
+  /** The names of the values the framework's stories cannot take from an address (`addressTexts.ts`); none by default. */
+  readonly refused?: readonly string[];
 };
 
 /** An address's `args` once read. */

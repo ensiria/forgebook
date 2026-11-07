@@ -243,6 +243,31 @@ test.describe("arg types and actions", () => {
     await expect(page.getByRole("combobox", { name: "icon" })).toBeVisible();
   });
 
+  test("a Storybook link's path opens the story, and is checked as any other story's name", async ({
+    page
+  }) => {
+    await page.goto("/?path=/story/inputs-selection-select--small&args=hint:From+a+link");
+    await expect(page).toHaveTitle("Select · Fixture catalogue");
+    await expect(page.locator("iframe.forgebook-frame-view").first()).toHaveAttribute(
+      "src",
+      /story=kit%3Ainputs-selection-select--small|story=kit:inputs-selection-select--small/
+    );
+    const frame = page.frameLocator("iframe.forgebook-frame-view").first();
+    await expect(frame.locator("small")).toHaveText("From a link");
+    await page.goto(`/?path=/story/${encodeURIComponent("<img src=x>--nowhere")}`);
+    await expect(page.getByRole("alert")).toContainText("<img src=x>--nowhere");
+    await expect(page.locator("iframe.forgebook-frame-view")).toHaveCount(0);
+    await expect(page.locator("main img")).toHaveCount(0);
+  });
+
+  test("a Storybook link's path opens the story alone in an embed", async ({ page }) => {
+    await page.goto("/?embed&path=/story/inputs-selection-select--small");
+    await expect(page.frameLocator("iframe.forgebook-frame-view").locator("html")).toHaveAttribute(
+      "data-forgebook-status",
+      "ready"
+    );
+  });
+
   test("a Storybook link's args are read and typed by the props, and stay in the address", async ({
     page
   }) => {
