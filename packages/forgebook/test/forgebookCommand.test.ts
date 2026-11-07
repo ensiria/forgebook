@@ -956,6 +956,14 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     if (written !== undefined) writeFileSync(config, written);
     writeFileSync(join(project, ".gitignore"), "node_modules/\n.vite/\n");
     writeFileSync(join(project, "src", "a.css"), sheet);
+    writeFileSync(
+      join(project, "src", "Button.tsx"),
+      'export const Button = ({ size, tone }) => <button className="a" />;\n'
+    );
+    writeFileSync(
+      join(project, "src", "OldCard.tsx"),
+      "/** @deprecated Too plain. @replacedBy Card */\nexport const OldCard = () => <div />;\n"
+    );
     const git = (...args: readonly string[]): void => {
       spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], {
         cwd: project
@@ -982,7 +990,14 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     expect(run.exitCode).not.toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({
       skipped: [],
-      checked: ["raw-color", "raw-size", "suppression", "deleted-test"],
+      checked: [
+        "raw-color",
+        "raw-size",
+        "suppression",
+        "deleted-test",
+        "deprecated-component",
+        "duplicate-component"
+      ],
       tokenSources: [{ kind: "css-variables", file: "src/a.css", tokens: 6 }],
       tokenClashes: 0,
       problems: [{ rule: "raw-color", file: "src/New.tsx", fix: "--brand" }]
@@ -1026,7 +1041,7 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     const run = forgebook(config, ["check-code", "--json"]);
     expect(run.exitCode).toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({
-      checked: ["suppression", "deleted-test"],
+      checked: ["suppression", "deleted-test", "deprecated-component", "duplicate-component"],
       skipped: ["colours and sizes not checked: too few tokens of that kind in the application (1)"],
       problems: []
     });
@@ -1050,6 +1065,24 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     const answer = JSON.parse(forgebook(inner, ["check-code", "--json"]).stdout);
     expect(answer.problems.map((each: { file: string }) => each.file)).toEqual(["packages/ui/src/Own.tsx"]);
     expect(answer.notCompared).toContain("src/Other.tsx");
+  });
+
+  it("names an import of what is deprecated and a new component that copies one, with no tags needed for the second", () => {
+    const config = appProject("app-reuse", ":root { --a: 1px; }\n");
+    const project = join(root, "app-reuse");
+    writeFileSync(
+      join(project, "src", "New.tsx"),
+      'import { OldCard } from "./OldCard";\nexport const PrimaryButton = ({ size, tone }) => <button className="b" />;\n'
+    );
+    const run = forgebook(config, ["check-code", "--json"]);
+    expect(run.exitCode).not.toBe(0);
+    const { problems } = JSON.parse(run.stdout);
+    expect(problems).toContainEqual(
+      expect.objectContaining({ rule: "deprecated-component", value: "OldCard", fix: "Card" })
+    );
+    expect(problems).toContainEqual(
+      expect.objectContaining({ rule: "duplicate-component", value: "PrimaryButton", fix: "Button" })
+    );
   });
 
   it("reads nothing when the configuration says there is no system", () => {

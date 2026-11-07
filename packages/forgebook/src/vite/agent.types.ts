@@ -24,6 +24,7 @@ import type { CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
 import type { DesignToken, TokenSource } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
+import type { ReuseAdvice } from "./reuseCheck.ts";
 import type { TokenClash } from "./tokenClashes.ts";
 
 /** The version of the documents' shape. */
@@ -508,6 +509,8 @@ export type VerifyDocument = {
     readonly tokenNotes?: readonly string[];
     /** The values a comment in the change says are meant. */
     readonly excused?: readonly ExcusedValue[];
+    /** What it found to weigh and not to fail on. */
+    readonly advice?: readonly ReuseAdvice[];
   };
   /** How many problems there are, in `failures` and `code.problems` together. */
   readonly problems: number;
@@ -531,12 +534,14 @@ export type CheckedCodeDocument = {
   readonly schema: AgentSchema;
   /** What the change is measured from. */
   readonly since: string;
-  /** What was checked. Props, imports and deprecated components never are: a clean answer says no more than this. */
+  /** What was checked. Props never are, since the type checker does: a clean answer says no more than this. */
   readonly checked: readonly CodeRule[];
   /** What was not, and why: an agent must not read an empty list as all clear when these were skipped. */
   readonly skipped: readonly string[];
   /** What it found, by file and line. */
   readonly problems: readonly CodeProblem[];
+  /** What it found to weigh and not to fail on: a component that may be one that exists, what `@useWhen` says of an import. */
+  readonly advice?: readonly ReuseAdvice[];
   /** What the values were compared with, each file with how many tokens it gives; none from an older catalogue. */
   readonly tokenSources?: readonly TokenSource[];
   /** How many tokens two files give different values: `forgebook tokens` names them. */

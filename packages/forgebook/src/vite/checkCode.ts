@@ -8,7 +8,7 @@
  * output), and it does not read a `#` as a colour unless it stands as a value. A raw colour is named whether or not a
  * token is close; a size only when it equals a token, since most sizes are not the design system's. A fix is the token's
  * name, not code to paste, and it is offered only when one token clearly fits: forcing the nearest is how a wrong colour
- * gets a token's name. Props, imports and deprecated components are not checked here.
+ * gets a token's name. Props are the type checker's; what a change reuses is `reuseCheck.ts`'s.
  *
  * A token read from an application says less than one in a tokens file, which someone wrote for this use: a project's
  * `--sidebar-width: 16px` does not make every `16px` a mistake. So a size is compared with those of the same role only:
@@ -30,7 +30,13 @@ export type AddedLine = {
 };
 
 /** The rules. */
-export type CodeRule = "raw-color" | "raw-size" | "suppression" | "deleted-test";
+export type CodeRule =
+  | "raw-color"
+  | "raw-size"
+  | "suppression"
+  | "deleted-test"
+  | "deprecated-component"
+  | "duplicate-component";
 
 /** A value a comment says is meant. */
 export type ExcusedValue = {
@@ -39,7 +45,7 @@ export type ExcusedValue = {
   /** The comment's line. */
   readonly line: number;
   /** The rule it excuses. */
-  readonly rule: "raw-color" | "raw-size";
+  readonly rule: "raw-color" | "raw-size" | "duplicate-component";
   /** Why, as the comment says. */
   readonly reason: string;
 };
