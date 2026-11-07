@@ -17,7 +17,7 @@ import type { ReactNode } from "react";
 import { isArgShown } from "../argConditions.ts";
 import { type PanelArgTypes, type PanelProp, panelProps } from "../argTypes.ts";
 import { type ComponentDocs, codeNameOf, type PropDocs } from "../componentDocs.ts";
-import type { ArgValue, PanelArgs } from "../messages.ts";
+import type { ArgValue, PanelArgs, PlayStepCommand } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import type { PlayTrace } from "../playTrace.ts";
 import type { TreeStory } from "../storyTree.ts";
@@ -105,8 +105,8 @@ export type DockTabsInput = {
   readonly onClearCalls: () => void;
   /** The play function's trace; none for a story without a play (or before it ran). */
   readonly trace: PlayTrace | undefined;
-  /** Runs the play again. */
-  readonly onPlayAgain: () => void;
+  /** Runs the play again, or steps through it. */
+  readonly onPlayStep: (command: PlayStepCommand) => void;
   /** The accessibility check. */
   readonly check: CheckState;
   /** Runs it; none when it cannot run. */
@@ -210,7 +210,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
     return [
       ...propsTab(input, panelProps([], input.argTypes, input.storyArgs)),
       ...eventsTab(input, eventsOf([], input.actions)),
-      ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)])
+      ...(input.trace === undefined ? [] : [interactionsTab(input.trace, input)])
     ];
   }
   // the docs' place while they load or fail: the tab the story opens on once they are read
@@ -219,7 +219,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
     : { id: "props", label: STRINGS.tabs.props };
   // the play's trace comes from the frame, not from the docs: a first read of a project's docs can take seconds, and a
   // play that finished meanwhile is shown without waiting for them, or when they fail
-  const played = input.trace === undefined ? [] : [interactionsTab(input.trace, input.onPlayAgain)];
+  const played = input.trace === undefined ? [] : [interactionsTab(input.trace, input)];
   if (docs.status === "loading")
     return [{ ...docsTab, content: notice(STRINGS.docsLoading, false) }, ...played];
   if (docs.status === "error") {
@@ -231,7 +231,7 @@ const docsTabs = (input: DockTabsInput): DockTab[] => {
   const tabs: DockTab[] = [];
   tabs.push(...propsTab(input, panelProps(component.props, input.argTypes, input.storyArgs)));
   tabs.push(...eventsTab(input, events));
-  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
+  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input));
   if (component.parts.length > 0 || styleHooks(component).length > 0) {
     tabs.push({
       id: "parts",
@@ -267,16 +267,16 @@ const logicTabs = (input: DockTabsInput, component: ComponentDocs): DockTab[] =>
       )
     });
   }
-  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input.onPlayAgain));
+  if (input.trace !== undefined) tabs.push(interactionsTab(input.trace, input));
   return tabs;
 };
 
 /** The Interactions tab of a story whose play ran. */
-const interactionsTab = (trace: PlayTrace, onPlayAgain: () => void): DockTab => ({
+const interactionsTab = (trace: PlayTrace, { onPlayStep }: Pick<DockTabsInput, "onPlayStep">): DockTab => ({
   id: "play",
   label: STRINGS.tabs.play,
   hint: interactionsHint(trace),
-  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayAgain }} />
+  content: <LazyTab module={INTERACTIONS_TAB} tabProps={{ trace, onPlayStep }} />
 });
 
 /** The Code tab, when the story file has code: loading, loaded, or failed to load. */

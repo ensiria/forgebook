@@ -982,6 +982,13 @@ blocks it uses Open in Figma. A catalogue published with a Content Security Poli
 `forgebook story` and `get_story` return `design`: the link, the `fileKey` and `nodeId` a Figma tool takes, and the
 `address` of the Design tab to hand a person (it opens the story alone without the plugin). `list_stories` gives each component's, and `CATALOG.md` lists it.
 
+## Stepping through a play
+
+The Interactions tab lists a play's named steps and each action it took through the `canvas` and `userEvent` of its context,
+with its time and its failure. **Step through** mounts the story again and stops before each action and each `step`: **Next**
+does that one, **Continue** runs the rest. A `getBy…` query is logged but cannot stop, as it returns at once. What a play
+imports itself (`storybook/test`, `@testing-library/user-event`) runs unrecorded: use the context's tools to see it here.
+
 ## Tags
 
 Tag stories as CSF does, in the preview, a file's meta or a story; a `!name` takes one away:
