@@ -97,13 +97,20 @@ const postcssPlugin = (dir: string, inlinePlugins: readonly unknown[] | undefine
   const run = projectPostcss(dir, inlinePlugins === undefined ? {} : { plugins: inlinePlugins });
   if (run === undefined) return undefined;
   let isSaid = false;
+  // Vite runs the project's PostCSS itself when the catalogue's CSS goes through PostCSS rather than Lightning CSS (an
+  // app's configuration may ask for it): a second run would cost every style sheet as much again, for the same output
+  let isRunByVite = false;
+  const isLeftAlone = (id: string): boolean => isRunByVite || NOT_COMPILED.test(id);
   return {
     name: "forgebook:app-postcss",
     enforce: "pre",
+    configResolved(resolved: ResolvedViteConfig): void {
+      isRunByVite = resolved.css.transformer !== "lightningcss";
+    },
     transform: {
       filter: { id: CSS_FILE },
       async handler(code: string, id: string): Promise<{ code: string; map: null } | undefined> {
-        if (NOT_COMPILED.test(id)) return undefined;
+        if (isLeftAlone(id)) return undefined;
         if (isUnseenOnServer(this.environment.config.consumer, id)) return { code: "", map: null };
         let result: Processed;
         try {

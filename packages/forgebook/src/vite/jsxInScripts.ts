@@ -23,6 +23,7 @@ import { readFile } from "node:fs/promises";
 
 import { type ResolvedConfig, type Rollup, transformWithOxc } from "vite";
 
+import type { FrameworkAdapter } from "./adapter.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** A script whose extension says nothing about JSX, as a browser loads it. */
@@ -155,10 +156,12 @@ export type JsxInScripts = {
  * The file is compiled as it is loaded, not in a `transform` hook, so the plugin's other transforms (a story file's
  * hot code, `hotSnippets.ts`) read JavaScript and stay the plugin's one `transform`.
  *
- * @param isAsked - whether the catalogue's framework asks for it (`compilesJsxInScripts`), read on each module since the
- * catalogue's configuration is read once Vite starts.
+ * @param frameworkOf - the catalogue's framework, whose adapter asks for it (`compilesJsxInScripts`); read on each module
+ * since the catalogue's configuration is read once Vite starts.
  */
-export const jsxInScripts = (isAsked: () => boolean): JsxInScripts => {
+export const jsxInScripts = (
+  frameworkOf: () => Pick<FrameworkAdapter, "compilesJsxInScripts"> | undefined
+): JsxInScripts => {
   let viteConfig: ResolvedConfig | undefined;
   const packageOf = packageFinder();
   return {
@@ -166,7 +169,8 @@ export const jsxInScripts = (isAsked: () => boolean): JsxInScripts => {
       viteConfig = config;
     },
     load: async (id: string): Promise<CompiledScript | null> => {
-      if (viteConfig === undefined || viteConfig.oxc === false || !isAsked()) return null;
+      if (viteConfig === undefined || viteConfig.oxc === false) return null;
+      if (frameworkOf()?.compilesJsxInScripts !== true) return null;
       const file = ownScriptOf(id, VITE_PATHS.normalize(viteConfig.root), packageOf);
       if (file === undefined) return null;
       // a file that cannot be read is Vite's to report

@@ -127,7 +127,7 @@ describe("jsxInScripts", () => {
     const file = join(ROOT, "Loaded.js");
     writeFileSync(file, CARD);
     let isAsked = true;
-    const hooks = jsxInScripts(() => isAsked);
+    const hooks = jsxInScripts(() => ({ compilesJsxInScripts: isAsked }));
     expect(await hooks.load(file)).toBeNull();
     hooks.remember(await resolveConfig({ root: ROOT, configFile: false, logLevel: "silent" }, "serve"));
     expect((await hooks.load(`${file}?v=1`))?.code).not.toContain("<p");
@@ -155,7 +155,10 @@ describe("Vite's dependency scan", () => {
         configFile: false,
         logLevel: "silent",
         cacheDir: join(ROOT, ".vite"),
-        optimizeDeps: { entries: ["src/*.stories.js"], rolldownOptions: scanOptions(true) }
+        optimizeDeps: {
+          entries: ["src/*.stories.js"],
+          rolldownOptions: scanOptions({ isJsxInScripts: true })
+        }
       },
       "serve"
     );

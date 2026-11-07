@@ -319,6 +319,7 @@ export const storyFilesModule = (
  * @param hasTexts - a build's: whether each file's docs, code and page come from the group's texts module, in the
  * rows' order (`TEXTS_PREFIX`), and not each from its query.
  * @param refused - the story files it lists that cannot be indexed, which the catalogue names among its problems.
+ * @param scriptProblems - the project's other scripts that do not parse, named among them too.
  */
 export const storyFilesCode = (
   root: string,
@@ -326,7 +327,8 @@ export const storyFilesCode = (
   files: readonly IndexedStoryFile[],
   loaders: GroupLoaders,
   hasTexts = false,
-  refused: readonly RefusedStoryFile[] = []
+  refused: readonly RefusedStoryFile[] = [],
+  scriptProblems: readonly string[] = []
 ): string => {
   const { hasDocs = true, hasUsage, hasReach } = loaders;
   // the group's id in Vite's form, as the plugin names the declaring module's folder
@@ -367,7 +369,9 @@ export const storyFilesCode = (
     hasDocs ? "docs: column(3)," : "docs: {},",
     "code: column(4),",
     "pages: column(5),",
-    ...(refused.length === 0 ? [] : [`problems: ${codeLiteral(refused.map(({ problem }) => problem))},`]),
+    ...(refused.length === 0 && scriptProblems.length === 0
+      ? []
+      : [`problems: ${codeLiteral([...refused.map(({ problem }) => problem), ...scriptProblems])},`]),
     `search: () => import(${search}).then((module) => module.default),`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasReach ? [`reach: () => import(${reach}).then((module) => module.default),`] : []),
