@@ -1020,8 +1020,9 @@ Forgebook reads Storybook's story files as they are: CSF 3 and CSF 2 (`Template.
 titles from the file's path, `args` and `argTypes` (with their controls), actions from `fn()` or an `argTypes` action,
 `play` with Testing Library (`@testing-library/dom` and `@testing-library/user-event`, optional peers), `loaders`,
 `tags` (`!dev`, `!test`, and your own for the [tag filter](#tags)), a story's `globals`, JSX in `.js` files, stories and components alike (Vite compiles JSX only in `.jsx` and
-`.tsx`; Forgebook compiles a project's `.js` file that holds JSX itself, with the project's JSX options and Fast Refresh,
-and leaves installed packages alone; a project that sets `oxc: false` compiles its scripts its own way),
+`.tsx`; with React, Preact or Next.js, Forgebook compiles the catalogue's own `.js` files that hold JSX itself, with the
+project's JSX options, `jsxInject` and Fast Refresh, and leaves installed packages, the workspace's other packages and
+`?raw`, `?url` or `?worker` imports alone; a project that sets `oxc: false` compiles its scripts its own way),
 hooks in a `render` or a decorator (React and
 Preact, with the story's state kept when a decorator draws `<Story />`), Storybook's preview hooks from
 `storybook/preview-api` in a React story file (`useArgs`, whose update and reset change the story's args as the panel

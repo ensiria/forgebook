@@ -6,18 +6,24 @@
  * Vite compiles JSX only in `.jsx` and `.tsx` files, and its `oxc` option takes one language for every file it
  * includes, so a configuration cannot add `.js` without breaking TypeScript. Forgebook's plugin compiles such a file
  * itself as it loads it, with the project's own JSX options (`oxc.jsx`: the runtime and the import
- * source), before Vite's plugins read it. Only the project's files that hold a closing tag (`</` or `/>`) are compiled: every JSX
- * element has one, an installed package is never touched, and a plain `.js` file costs one search of its text. JSX
- * is a superset of what a `.js` module may hold, so a file the search takes wrongly compiles to the same program. A
+ * source, `jsxInject`), before Vite's plugins read it. Only the catalogue's own files that hold a closing tag (`</`
+ * or `/>`) are compiled: every JSX element has one, and a plain `.js` file costs one search of its text. Its own: in
+ * its folder and in its package, so an installed package, or another package of a workspace (whose built files keep
+ * their own source maps), is never touched. A module asked for with a query that wants something else of the file
+ * (`?raw`, `?url`, `?worker`) is left to Vite. JSX is a superset of what a `.js` module may hold, so a file the search
+ * takes wrongly compiles to the same program. A
  * project that turns `oxc` off compiles its scripts its own way, and none is compiled here; neither is any for a
  * framework whose adapter does not ask for it (`compilesJsxInScripts`). Vite's dependency scan
  * reads `.js` files as JSX too (`prebundled.ts`).
  *
  * @module
  */
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 import { type ResolvedConfig, type Rollup, transformWithOxc } from "vite";
+
+import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** A script whose extension says nothing about JSX, as a browser loads it. */
 const PLAIN_SCRIPT = /\.m?js$/;
@@ -39,23 +45,62 @@ export type CompiledScript = {
 /** Vite's options of its JSX and TypeScript compiler, when the project leaves it on. */
 type OxcOptions = Exclude<ResolvedConfig["oxc"], false>;
 
-/**
- * Whether a module is one of the project's `.js` files that may hold JSX.
- *
- * @param id - the module's id, with any query Vite gave it.
- * @param code - its text.
- */
-export const mayHoldJsx = (id: string, code: string): boolean => isProjectScript(id) && TAG_END.test(code);
+/** The queries that still ask for the module itself: Vite's version stamp, its edit stamp, an import's mark. */
+const MODULE_QUERIES = new Set(["v", "t", "import"]);
 
 /**
- * Whether a module is one of the project's `.js` files, by its id alone.
+ * The folder of the package a file belongs to: the nearest folder with a `package.json`; none outside any.
+ *
+ * @param file - the file, absolute in Vite's form.
+ */
+export type PackageOf = (file: string) => string | undefined;
+
+/** Finds a file's package on disk, each folder looked at once. */
+export const packageFinder = (): PackageOf => {
+  const known = new Map<string, string | undefined>();
+  const packageOf = (folder: string): string | undefined => {
+    if (known.has(folder)) return known.get(folder);
+    const parent = VITE_PATHS.dirname(folder);
+    let found: string | undefined;
+    if (existsSync(`${folder}/package.json`)) found = folder;
+    // the system's root has no parent
+    else if (parent !== folder) found = packageOf(parent);
+    known.set(folder, found);
+    return found;
+  };
+  return (file: string): string | undefined => packageOf(VITE_PATHS.dirname(file));
+};
+
+/**
+ * The file of one of the catalogue's own `.js` files asked for as a module, from its id; none for any other id: an
+ * installed package's, another package's, one outside the catalogue's folder, a virtual module's, or one whose query
+ * asks for something else than the module (`?raw`).
  *
  * @param id - the module's id, with any query Vite gave it.
+ * @param root - the catalogue's folder, in Vite's form.
+ * @param packageOf - finds a file's package.
+ * @param paths - the path functions, the running system's by default.
  */
-const isProjectScript = (id: string): boolean => {
-  const [file = id] = id.split("?");
-  return !id.startsWith("\0") && PLAIN_SCRIPT.test(file) && !INSTALLED.test(file);
+export const ownScriptOf = (
+  id: string,
+  root: string,
+  packageOf: PackageOf,
+  paths: Pick<VitePaths, "normalize"> = VITE_PATHS
+): string | undefined => {
+  if (id.startsWith("\0")) return undefined;
+  const [path = id, query = ""] = id.split("?");
+  if ([...new URLSearchParams(query).keys()].some((key) => !MODULE_QUERIES.has(key))) return undefined;
+  const file = paths.normalize(path);
+  if (!PLAIN_SCRIPT.test(file) || INSTALLED.test(file) || !file.startsWith(`${root}/`)) return undefined;
+  return packageOf(file) === packageOf(`${root}/package.json`) ? file : undefined;
 };
+
+/**
+ * Whether a file's text may hold JSX: it has a closing tag.
+ *
+ * @param code - the text.
+ */
+export const mayHoldJsx = (code: string): boolean => TAG_END.test(code);
 
 /**
  * The compiler's options for a `.js` file read as JSX: the project's own, without what only chooses Vite's files, and
@@ -71,31 +116,34 @@ const jsxOptions = (oxc: OxcOptions): Parameters<typeof transformWithOxc>[2] => 
 };
 
 /**
- * Compiles one of the project's `.js` files that holds JSX; leaves any other module to Vite.
+ * Compiles a `.js` file's JSX, with the code the project's `jsxInject` puts first (a classic runtime's `React` import),
+ * as Vite does for its `.jsx` files; leaves a file with no closing tag, and any file of a project that turns `oxc` off,
+ * to Vite.
  *
  * @param config - Vite's resolved configuration, for the project's JSX options.
- * @param code - the module's text.
- * @param id - its id.
- * @returns the compiled module, or none when it is not such a file.
+ * @param code - the file's text.
+ * @param file - the file, absolute.
+ * @returns the compiled module, or none when it is not compiled.
  */
 export const jsxInScript = async (
   config: ResolvedConfig,
   code: string,
-  id: string
+  file: string
 ): Promise<CompiledScript | null> => {
-  if (config.oxc === false || !mayHoldJsx(id, code)) return null;
-  const [file = id] = id.split("?");
+  if (config.oxc === false || !mayHoldJsx(code)) return null;
   const result = await transformWithOxc(code, file, jsxOptions(config.oxc), undefined, config);
-  return { code: result.code, map: result.map ?? null };
+  const inject = config.oxc.jsxInject;
+  // on the compiled code's first line, so the source map's lines stay where they were
+  return { code: inject === undefined ? result.code : `${inject};${result.code}`, map: result.map ?? null };
 };
 
 /** The plugin's hooks for JSX in the project's `.js` files. */
 export type JsxInScripts = {
-  /** Keeps Vite's resolved configuration, for the project's JSX options. */
+  /** Keeps Vite's resolved configuration, for the project's JSX options and folder. */
   readonly remember: (config: ResolvedConfig) => void;
   /**
-   * Loads one of the project's `.js` files that holds JSX, compiled; none for any other module, and for all before
-   * `remember`, which Vite then loads itself.
+   * Loads one of the catalogue's own `.js` files that holds JSX, compiled; none for any other module, and for all
+   * before `remember`, which Vite then loads itself.
    */
   readonly load: (id: string) => Promise<CompiledScript | null>;
 };
@@ -112,16 +160,18 @@ export type JsxInScripts = {
  */
 export const jsxInScripts = (isAsked: () => boolean): JsxInScripts => {
   let viteConfig: ResolvedConfig | undefined;
+  const packageOf = packageFinder();
   return {
     remember: (config: ResolvedConfig): void => {
       viteConfig = config;
     },
     load: async (id: string): Promise<CompiledScript | null> => {
-      if (viteConfig === undefined || !isAsked() || !isProjectScript(id)) return null;
-      const [file = id] = id.split("?");
+      if (viteConfig === undefined || viteConfig.oxc === false || !isAsked()) return null;
+      const file = ownScriptOf(id, VITE_PATHS.normalize(viteConfig.root), packageOf);
+      if (file === undefined) return null;
       // a file that cannot be read is Vite's to report
       const code = await readFile(file, "utf8").catch(() => undefined);
-      return code === undefined ? null : jsxInScript(viteConfig, code, id);
+      return code === undefined ? null : jsxInScript(viteConfig, code, file);
     }
   };
 };

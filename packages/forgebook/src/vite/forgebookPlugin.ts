@@ -243,7 +243,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   let isTestRun = false;
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
-  const jsxScripts = jsxInScripts(() => config?.framework.compilesJsxInScripts === true);
+  const jsxScripts = jsxInScripts(
+    () => (config?.framework ?? options.framework)?.compilesJsxInScripts === true
+  );
   /** The stamp of the plugin's own code, which makes the kept indexes and code: another version is a miss. */
   let pluginCode: string | undefined;
   const keptCache = <TValue>(
