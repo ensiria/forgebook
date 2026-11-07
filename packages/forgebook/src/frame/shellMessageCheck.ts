@@ -39,11 +39,12 @@ export const isShellMessage = (value: unknown): value is ShellMessage => {
   if (
     value["type"] === "forgebook:replay" ||
     value["type"] === "forgebook:check" ||
-    value["type"] === "forgebook:play-again" ||
     value["type"] === "forgebook:clock-restart"
   ) {
     return true;
   }
+  if (value["type"] === "forgebook:play-step")
+    return ["again", "start", "next", "continue"].includes(String(value["command"]));
   if (value["type"] === "forgebook:args") return isPanelArgs(value["args"]);
   if (value["type"] === "forgebook:view") return isLiveView(value["view"]);
   if (value["type"] === "forgebook:clock") return isClockState(value["state"]);

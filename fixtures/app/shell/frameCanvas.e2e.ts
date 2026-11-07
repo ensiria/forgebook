@@ -68,10 +68,16 @@ const colourBehind = (frame: Locator): Promise<string> =>
     return "none";
   });
 
+/**
+ * How long a frame may take to draw its story: the first load of a story's modules on a cold Windows runner takes
+ * seconds, longer than an assertion's default wait, and Compare loads four frames at once.
+ */
+const SLOW_ANSWER = { timeout: 30_000 };
+
 /** Waits until the shell has heard that every frame of the page is drawn. */
 const settled = async (page: Page): Promise<void> => {
-  await expect(page.locator("iframe.forgebook-frame-view").first()).toBeVisible();
-  await expect(page.locator("[data-loading]")).toHaveCount(0);
+  await expect(page.locator("iframe.forgebook-frame-view").first()).toBeVisible(SLOW_ANSWER);
+  await expect(page.locator("[data-loading]")).toHaveCount(0, SLOW_ANSWER);
 };
 
 test.describe("what shows behind a story", () => {

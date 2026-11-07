@@ -9,5 +9,8 @@ and no code, `coder` the API first with the code open, `tester` what the stories
 npx forgebook story <id> --view audience=designer --json   # links.component opens the page for a designer
 ```
 
+`forgebook stories --tag beta --tag '!wip'` (or `tags` on `list_stories`) keeps the stories with any tag named and none
+left out, as the sidebar's filter does in the address (`?tag=beta&tag=!wip`).
+
 Each story also says whether a `play` function acts on it (`hasPlay`), and `tags` holds `!test` when the generated tests
 leave it out.

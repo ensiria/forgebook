@@ -104,6 +104,8 @@ export type StoryCheckResult = {
    * `problems` holds.
    */
   readonly notVerified?: string;
+  /** Whether the story drew nothing a reader could see: no text, and no element with a size. Absent otherwise. */
+  readonly isBlank?: boolean;
   /**
    * Whether the frame did not wait for what the story loads, as it asks (`parameters.suspense.expected`): the checks read
    * it as it first drew. Absent otherwise.

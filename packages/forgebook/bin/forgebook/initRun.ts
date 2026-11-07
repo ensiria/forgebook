@@ -12,51 +12,40 @@
  *
  * @module
  */
-import { existsSync, lstatSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { EXIT } from "@ensiria/cli-kit/constants";
-import { exec } from "@ensiria/cli-kit/exec";
-import { formatJson } from "@ensiria/cli-kit/files";
-import type { ScriptIo } from "@ensiria/cli-kit/io.types";
-import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
 import { CONFIG_FILES, PREVIEW_FILES } from "../../src/vite/configFile.ts";
-import {
-  findStorybookDir,
-  type ImportedConfig,
-  importStorybook,
-  projectManifest
-} from "./importers/storybook.ts";
+import { projectFrameworks } from "./agentGuide.ts";
+import { HOOK_NAMES } from "./agentSetup/hookNames.ts";
+import { type AgentSteps, runAgentSteps } from "./agentSetup/initAgentSteps.ts";
+import { appBuildPlan } from "./appBuild/appBuild.ts";
+import { findStorybookDir, type ImportedConfig, importStorybook } from "./importers/storybook.ts";
 import { frameworkPeers, type ImportedFramework } from "./importers/storybookFrameworks.ts";
 import { CONFIG_FILE, initConfigText } from "./initConfig.ts";
-import { planNewProject } from "./newProject/newProject.ts";
-import type {
-  InitCommand,
-  InitDocument,
-  InitInstall,
-  InitRefusal,
-  InitRoute,
-  NextStep
-} from "./newProject/newProject.types.ts";
+import { settleInstall } from "./initInstall.ts";
+import { printInit } from "./initPrint.ts";
 import {
-  type DetectedPackageManager,
-  detectPackageManager,
-  forgebookRunner,
-  installArguments,
-  spawnedCommand,
-  workspaceRootFlags
-} from "./newProject/packageManagers.ts";
+  type InitContext,
+  isThere,
+  refuse,
+  refuseBrokenManifest,
+  refuseExisting,
+  refuseTooOld,
+  tooOldText
+} from "./initRefusals.ts";
+import { planNewProject } from "./newProject/newProject.ts";
+import type { InitCommand, InitInstall, InitRoute, NextStep } from "./newProject/newProject.types.ts";
+import { detectPackageManager, forgebookRunner } from "./newProject/packageManagers.ts";
 import { printable } from "./newProject/projectEntries.ts";
 import { detectFramework, FRAMEWORK_NAMES, PROJECT_FRAMEWORKS } from "./newProject/projectFrameworks.ts";
-import {
-  declaredPackages,
-  installSpecifier,
-  type PackageState,
-  packageState,
-  requiredPackages
-} from "./newProject/projectPackages.ts";
+import { declaredPackages, packageState, requiredPackages } from "./newProject/projectPackages.ts";
+
+/** What a browser's checks need besides the catalogue's own packages. */
+const TESTING_PACKAGES = ["@forgebook/testing", "@playwright/test"];
 
 /** What the command was given. */
 export type InitRequest = {
@@ -66,18 +55,16 @@ export type InitRequest = {
   readonly framework: string | undefined;
   /** `--force`. */
   readonly isForced: boolean;
-  /** `--install`. */
+  /** `--install`, or `--browser`, which needs it. */
   readonly shouldInstall: boolean;
-};
-
-/** Where the command prints. */
-export type InitContext = {
-  /** The run's streams. */
-  readonly io: ScriptIo;
-  /** The run's logger. */
-  readonly log: Logger;
-  /** Whether stdout carries JSON. */
-  readonly isJson: boolean;
+  /** `--agents`. */
+  readonly isForAgents: boolean;
+  /** `--hooks`. */
+  readonly hooks: readonly string[] | undefined;
+  /** `--browser`. */
+  readonly shouldInstallBrowser: boolean;
+  /** `--draw`. */
+  readonly shouldDraw: boolean;
 };
 
 /** What a route will write. */
@@ -94,29 +81,6 @@ type InitPlan = {
   readonly nextSteps: readonly NextStep[];
   /** The packages the project's setup asks for, beyond the adapter's. */
   readonly extraPeers: readonly string[];
-};
-
-/** A refusal's document without what is always the same. */
-type Refusal = Pick<InitRefusal, "refused" | "message"> & Partial<InitRefusal>;
-
-/**
- * Stops the command: its document on stdout under `--json`, the error otherwise. Never returns.
- *
- * @param refusal - why.
- * @param context - where it prints.
- */
-const refuse = (refusal: Refusal, context: InitContext): never => {
-  const message = printable(refusal.message);
-  const document: InitRefusal = {
-    schema: 1,
-    hint: undefined,
-    supported: undefined,
-    concerned: undefined,
-    ...refusal,
-    message
-  };
-  if (context.isJson) context.io.stdout.write(formatJson(document));
-  throw new ScriptError(message, { hint: refusal.hint, isReported: context.isJson });
 };
 
 /**
@@ -181,10 +145,6 @@ const storybookPlan = async (projectDir: string, context: InitContext): Promise<
   };
 };
 
-/** The sentence and the document's entry for packages too old, on the route that goes on regardless. */
-const tooOldText = ({ tooOld }: PackageState): string =>
-  tooOld.map(({ name, found, floor }) => `${name} ${found} is below ${floor}`).join(", ");
-
 /** The commands to run next. */
 const nextCommands = (
   runner: string,
@@ -218,41 +178,6 @@ const nextCommands = (
   }
 ];
 
-/** Runs the install command, the program's lines on stderr so stdout stays the result's. */
-const runInstall = async (
-  projectDir: string,
-  manager: DetectedPackageManager,
-  args: readonly string[],
-  io: ScriptIo
-): Promise<string | undefined> => {
-  const { program, args: spawnArgs, env } = spawnedCommand(manager.name, args, io.env);
-  try {
-    await exec(program, spawnArgs, { cwd: projectDir, env, output: "prefix", prefix: manager.name, io });
-    return undefined;
-  } catch (error) {
-    if (error instanceof ScriptError) return error.message;
-    throw error;
-  }
-};
-
-/** Prints the outcome: the document under `--json`, sentences for a person otherwise. */
-const print = (document: InitDocument, { io, log, isJson }: InitContext): void => {
-  if (isJson) {
-    io.stdout.write(formatJson(document));
-    return;
-  }
-  const { detectedFrom, name } = document.packageManager;
-  if (document.route === "new-project") {
-    const from = detectedFrom === undefined ? "no lock file: assumed" : detectedFrom;
-    log.success(`${PROJECT_FRAMEWORKS[document.framework].label} project, ${name} (${from})`);
-  }
-  const count = document.stories.length;
-  log.success(`${CONFIG_FILE} written: ${count} story ${count === 1 ? "glob" : "globs"}`);
-  for (const file of document.written.slice(1)) log.success(`${file} written`);
-  for (const step of document.nextSteps) log.warn(step.message);
-  for (const { command, description } of document.commands) log.info(`${command}: ${description}`);
-};
-
 /**
  * The plan of the route the command takes.
  *
@@ -263,7 +188,8 @@ const print = (document: InitDocument, { io, log, isJson }: InitContext): void =
 const planOf = async (projectDir: string, request: InitRequest, context: InitContext): Promise<InitPlan> => {
   if (request.from === "storybook") return storybookPlan(projectDir, context);
   const storybookDir = findStorybookDir(projectDir);
-  if (request.framework === undefined && storybookDir !== undefined) {
+  // an agent's setup runs beside a Storybook, on the same stories, and loads nothing of it
+  if (request.framework === undefined && storybookDir !== undefined && !request.isForAgents) {
     const folder = basename(storybookDir);
     return refuse(
       {
@@ -296,46 +222,6 @@ const planOf = async (projectDir: string, request: InitRequest, context: InitCon
   };
 };
 
-/** Whether a path holds anything, a dangling link included. */
-const isThere = (path: string): boolean => lstatSync(path, { throwIfNoEntry: false }) !== undefined;
-
-/**
- * Refuses a file the catalogue reads that is there already, unless asked to replace it, and a link at any time.
- *
- * @param projectDir - the project's folder.
- * @param name - the file found; none when there is none.
- * @param isForced - `--force`.
- * @param context - where a refusal prints.
- */
-const refuseExisting = (
-  projectDir: string,
-  name: string | undefined,
-  isForced: boolean,
-  context: InitContext
-): void => {
-  if (name === undefined) return;
-  if (lstatSync(join(projectDir, name)).isSymbolicLink())
-    refuse(
-      {
-        refused: "symlink",
-        message: `${name} is a link: writing through it would change a file elsewhere`,
-        hint: "Remove the link, then run forgebook init again",
-        concerned: [name]
-      },
-      context
-    );
-  if (isForced) return;
-  refuse(
-    {
-      refused: "existing-files",
-      message: `${name} is already there`,
-      hint: "Give --force to replace it",
-      concerned: [name]
-    },
-    context
-  );
-};
-
 /** The step for a file of another name left behind: the catalogue now reads the one written. */
 const shadowedStep = (shadowed: string | undefined, written: string | undefined): readonly NextStep[] =>
   shadowed === undefined || written === undefined || shadowed === written
@@ -348,147 +234,168 @@ const shadowedStep = (shadowed: string | undefined, written: string | undefined)
         }
       ];
 
-/** The install's state, from what is needed, what was asked and how it went. */
-const installStatus = (
-  needsInstall: boolean,
-  shouldInstall: boolean,
-  failure: string | undefined
-): InitInstall["status"] => {
-  if (!needsInstall) return "not-needed";
-  if (!shouldInstall) return "to-run";
-  return failure === undefined ? "ran" : "failed";
-};
-
-/**
- * Stops on a `package.json` that cannot be parsed: everything after this reads it.
- *
- * @param projectDir - the project's folder.
- * @param context - where a refusal prints.
- */
-const refuseBrokenManifest = (projectDir: string, context: InitContext): void => {
-  try {
-    projectManifest(projectDir);
-  } catch (error) {
-    refuse(
-      {
-        refused: "unreadable-package",
-        message: `package.json cannot be read: ${error instanceof Error ? error.message : String(error)}`
-      },
-      context
-    );
-  }
-};
-
 /** Writes the plan's files: a file is replaced only when one was found and `--force` allowed it. */
 const writePlan = (
   projectDir: string,
   plan: InitPlan,
   previewFile: string | undefined,
-  replaced: readonly string[]
+  replaced: readonly string[],
+  keepsCatalogue: boolean
 ): void => {
   const write = (name: string, text: string): void =>
     writeFileSync(join(projectDir, name), text, { flag: replaced.includes(name) ? "w" : "wx" });
-  write(CONFIG_FILE, initConfigText(plan.config, plan.tool));
+  if (!keepsCatalogue) write(CONFIG_FILE, initConfigText(plan.config, plan.tool));
   if (plan.preview !== undefined && previewFile !== undefined) write(previewFile, plan.preview.text);
 };
 
-/** What the configuration needs installed: the command, run when asked. */
-const settleInstall = async (
+/** Stops on options that cannot go together, which is a wrong command line and no document. */
+const refuseWrongOptions = ({ from, framework, hooks, isForAgents }: InitRequest): void => {
+  if (from !== undefined && framework !== undefined)
+    throw new ScriptError("--from and --framework choose two different routes: give one", {
+      exitCode: EXIT.usage
+    });
+  if (hooks === undefined) return;
+  if (!isForAgents) throw new ScriptError("--hooks goes with --agents", { exitCode: EXIT.usage });
+  const unknown = hooks.filter((name) => !HOOK_NAMES.includes(name));
+  if (unknown.length > 0)
+    throw new ScriptError(`--hooks has no ${unknown.join(", ")}`, {
+      hint: `It takes ${HOOK_NAMES.join(", ")}`,
+      exitCode: EXIT.usage
+    });
+};
+
+/** A configuration the catalogue would read, and whether this run keeps it. */
+type ExistingCatalogue = { readonly file: string | undefined; readonly isKept: boolean };
+
+/**
+ * The configuration already there: any the catalogue would read, not only the file written, as a new `.ts` would win over
+ * a `.mts`. Set up again, or added to a catalogue a person wrote, `--agents` keeps it; otherwise it is a refusal.
+ */
+const existingCatalogue = (
   projectDir: string,
-  manager: DetectedPackageManager,
-  state: PackageState,
-  declared: ReadonlyMap<string, string>,
-  shouldInstall: boolean,
-  io: ScriptIo
-): Promise<InitInstall> => {
-  const needsInstall = state.missing.length > 0 || state.hasUninstalled;
-  const args = installArguments(
-    manager.name,
-    state.missing.map((name) => installSpecifier(name, declared)),
-    workspaceRootFlags(manager.name, projectDir)
-  );
-  const failure = needsInstall && shouldInstall ? await runInstall(projectDir, manager, args, io) : undefined;
+  request: InitRequest,
+  context: InitContext
+): ExistingCatalogue => {
+  const file = CONFIG_FILES.find((name) => isThere(join(projectDir, name)));
+  const isKept = request.isForAgents && !request.isForced && file !== undefined;
+  if (!isKept) refuseExisting(projectDir, file, request.isForced, context);
+  return { file, isKept };
+};
+
+/** The request with the framework a kept catalogue names: its adapter says more than the dependencies do. */
+const withKeptFramework = (
+  projectDir: string,
+  request: InitRequest,
+  { file, isKept }: ExistingCatalogue
+): InitRequest =>
+  isKept && file !== undefined
+    ? { ...request, framework: request.framework ?? projectFrameworks(join(projectDir, file), projectDir)[0] }
+    : request;
+
+/** The preview to write, and the one found there; a run for agents keeps one found. */
+const choosePreview = (
+  projectDir: string,
+  plan: InitPlan,
+  request: InitRequest,
+  keepsCatalogue: boolean,
+  context: InitContext
+): { readonly previewFile: string | undefined; readonly previewClash: string | undefined } => {
+  const previewClash = PREVIEW_FILES.find((name) => isThere(join(projectDir, name)));
+  // a catalogue kept keeps its look too: a preview here would load for every story of a catalogue that has none on purpose
+  const isKept = request.isForAgents && !request.isForced && (previewClash !== undefined || keepsCatalogue);
+  if (plan.preview !== undefined && !isKept)
+    refuseExisting(projectDir, previewClash, request.isForced, context);
+  // the first of the names is the one read, so a preview replaced keeps the name it has
   return {
-    missing: state.missing,
-    command: needsInstall ? [manager.name, ...args].join(" ") : undefined,
-    status: installStatus(needsInstall, shouldInstall, failure),
-    error: failure === undefined ? undefined : printable(failure)
+    previewFile: plan.preview === undefined || isKept ? undefined : (previewClash ?? plan.preview.file),
+    previewClash
   };
 };
 
-/** Refuses what the project has too old for a new catalogue to draw. */
-const refuseTooOld = (state: PackageState, context: InitContext): void => {
-  if (state.tooOld.length === 0) return;
-  refuse(
-    {
-      refused: "versions",
-      message: `Forgebook cannot draw this project yet: ${tooOldText(state)}`,
-      hint: "Upgrade them, then run forgebook init again. Nothing was written",
-      concerned: state.tooOld.map(({ name }) => name)
-    },
-    context
-  );
+/** Fails the command on what did not work: the document has said so already under `--json`. */
+const stopOnFailure = (install: InitInstall, steps: AgentSteps, { isJson }: InitContext): void => {
+  if (install.error !== undefined)
+    throw new ScriptError(install.error, {
+      hint: `Run it yourself: ${install.command}`,
+      isReported: isJson
+    });
+  if (steps.browser?.status === "failed")
+    throw new ScriptError(steps.browser.error ?? "The browser did not install", { isReported: isJson });
+  if (steps.draw !== undefined && steps.draw.status !== "drawn")
+    throw new ScriptError(steps.draw.stoppedBecause ?? "No story drew", { isReported: isJson });
 };
 
 /** Does the work of `runInit`. */
 const initProject = async (request: InitRequest, context: InitContext): Promise<void> => {
   const { io } = context;
   const projectDir = process.cwd();
-  if (request.from !== undefined && request.framework !== undefined)
-    throw new ScriptError("--from and --framework choose two different routes: give one", {
-      exitCode: EXIT.usage
-    });
-  // any configuration the catalogue would read, not only the file written: a new .ts would win over a .mts
-  const existing = CONFIG_FILES.find((name) => isThere(join(projectDir, name)));
-  refuseExisting(projectDir, existing, request.isForced, context);
+  refuseWrongOptions(request);
+  const existing = existingCatalogue(projectDir, request, context);
   refuseBrokenManifest(projectDir, context);
-  const plan = await planOf(projectDir, request, context);
+  const plan = await planOf(projectDir, withKeptFramework(projectDir, request, existing), context);
   const { framework, frameworkOptions } = plan.config;
   const declared = declaredPackages(projectDir);
   const state = packageState(
     projectDir,
     declared,
-    requiredPackages(framework, [...frameworkPeers(framework, frameworkOptions), ...plan.extraPeers])
+    requiredPackages(framework, [
+      ...frameworkPeers(framework, frameworkOptions),
+      ...plan.extraPeers,
+      // the workflow's and the hook's `verify` runs stories through it, so agents' setup asks for it, whether or not it installs
+      ...(request.shouldInstallBrowser || request.isForAgents ? TESTING_PACKAGES : [])
+    ])
   );
   if (plan.route === "new-project") refuseTooOld(state, context);
-  const previewClash = PREVIEW_FILES.find((name) => isThere(join(projectDir, name)));
-  if (plan.preview !== undefined) refuseExisting(projectDir, previewClash, request.isForced, context);
-  // the first of the names is the one read, so a preview replaced keeps the name it has
-  const previewFile = plan.preview === undefined ? undefined : (previewClash ?? plan.preview.file);
+  const { previewFile, previewClash } = choosePreview(projectDir, plan, request, existing.isKept, context);
   const replaced = [
-    ...(existing === CONFIG_FILE ? [CONFIG_FILE] : []),
+    ...(existing.file === CONFIG_FILE && !existing.isKept ? [CONFIG_FILE] : []),
     ...(previewFile !== undefined && previewFile === previewClash ? [previewFile] : [])
   ];
-  writePlan(projectDir, plan, previewFile, replaced);
+  writePlan(projectDir, plan, previewFile, replaced, existing.isKept);
   const nextSteps: readonly NextStep[] = [
     ...plan.nextSteps,
     ...(state.tooOld.length === 0
       ? []
       : [{ kind: "version" as const, file: "package.json", message: `Upgrade: ${tooOldText(state)}` }]),
-    ...shadowedStep(existing, CONFIG_FILE)
+    ...(existing.isKept ? [] : shadowedStep(existing.file, CONFIG_FILE))
   ].map((step) => ({ ...step, message: printable(step.message) }));
   const manager = detectPackageManager(projectDir);
   const install = await settleInstall(projectDir, manager, state, declared, request.shouldInstall, io);
-  print(
+  const steps = await runAgentSteps(
+    {
+      projectDir,
+      framework,
+      manager: manager.name,
+      install,
+      isForAgents: request.isForAgents,
+      hooks: request.hooks,
+      shouldInstallBrowser: request.shouldInstallBrowser,
+      shouldDraw: request.shouldDraw,
+      stories: existing.isKept ? undefined : plan.config.stories
+    },
+    io
+  );
+  printInit(
     {
       schema: 1,
       route: plan.route,
       framework,
       packageManager: { name: manager.name, detectedFrom: manager.detectedFrom },
-      written: [CONFIG_FILE, ...(previewFile === undefined ? [] : [previewFile])],
+      written: [
+        ...(existing.isKept ? [] : [CONFIG_FILE]),
+        ...(previewFile === undefined ? [] : [previewFile])
+      ],
       replaced,
-      stories: plan.config.stories,
+      stories: existing.isKept ? [] : plan.config.stories,
       install,
-      nextSteps,
-      commands: nextCommands(forgebookRunner(manager.name), install, framework)
+      appBuild: appBuildPlan(projectDir, framework),
+      nextSteps: [...nextSteps, ...(steps.agents?.nextSteps ?? [])],
+      commands: nextCommands(forgebookRunner(manager.name), install, framework),
+      ...steps
     },
     context
   );
-  if (install.error !== undefined)
-    throw new ScriptError(install.error, {
-      hint: `Run it yourself: ${install.command}`,
-      isReported: context.isJson
-    });
+  stopOnFailure(install, steps, context);
 };
 
 /**

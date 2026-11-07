@@ -515,6 +515,7 @@ export const codeGlobalsOf = (
 
 /** The parameters only the shell reads: a frame's address leaves them out. */
 const SHELL_PARAMETERS: readonly string[] = [
+  "tag",
   "compare",
   "width",
   "height",

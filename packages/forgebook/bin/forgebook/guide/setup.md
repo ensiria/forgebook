@@ -17,3 +17,7 @@ with `forgebook dev --poll`.
 A client that renders MCP Apps also gets `story_preview`, which shows a story to the person, live, inside the conversation.
 You do not see what it shows: to look at a story yourself, use `shot` (`story_shot`). Where the tool is not listed, the
 client cannot show one: give the person the story's link, or its picture.
+
+A catalogue draws with the app's own build: `tsconfig.json`'s `paths`, its `vite.config` (aliases, plugins except the
+framework's and an app's own) and its PostCSS. When a story fails on an import or a class the app resolves, read what
+`forgebook dev` printed about it; `appBuild` in the configuration turns each part off or names a plugin to skip or keep.

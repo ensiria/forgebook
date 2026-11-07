@@ -18,6 +18,7 @@ import type { ForgebookPlugin } from "../plugin.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
+import type { AppBuildOption } from "./appBuildOption.ts";
 import type { FramesOption } from "./framesConfig.ts";
 
 /** What a library's preset gives a catalogue. */
@@ -79,7 +80,9 @@ export type ForgebookConfig = CatalogueLists & {
   /**
    * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of
    * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from,
-   * after each source's: a name given twice takes the catalogue's value, and tools report the clash.
+   * after each source's: a name given twice takes the catalogue's value, and tools report the clash. With none named here
+   * or on a source, what the application already declares is read instead (custom properties, Tailwind, `components.json`);
+   * `[]` says there is no system, so nothing is.
    */
   readonly tokens?: readonly TokensFile[];
   /**
@@ -106,6 +109,13 @@ export type ForgebookConfig = CatalogueLists & {
   readonly frames?: FramesOption;
   /** How `forgebook build` writes the catalogue. */
   readonly build?: BuildOptions;
+  /**
+   * How much of the app's own build its stories are drawn with: `tsconfig.json`'s `paths`, the `vite.config` beside this
+   * file (its aliases, its plugins except the framework's and those only an app's build needs) and its PostCSS. All by
+   * default; loading a `vite.config` or a `postcss.config` runs its code, as the app's build does. `false` reads none,
+   * and each part can be turned off.
+   */
+  readonly appBuild?: AppBuildOption;
 };
 
 /** How `forgebook build` writes the catalogue. */

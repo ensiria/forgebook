@@ -40,8 +40,8 @@ export const settleAgentIndex = async (
     return;
   }
   const client = await catalogueClient(config, undefined);
-  const answer = await client.ask("agent-index", new URLSearchParams());
-  await client.close();
+  // its server closes whatever the answer: a watch asks again after every build
+  const answer = await client.ask("agent-index", new URLSearchParams()).finally(() => client.close());
   if (answer.status !== 200 || !isAgentIndex(answer.body)) {
     throw new ScriptError(`The catalogue's index could not be read: ${JSON.stringify(answer.body)}`);
   }

@@ -58,6 +58,12 @@ export const LATER_STRINGS = lateStrings({
   playTitle: "Play function",
   playTime: (ms: number): string => `${ms} ms`,
   playAgain: "Run again",
+  playStepThrough: "Step through",
+  playNext: "Next",
+  playContinue: "Continue",
+  playPaused: (action: string): string => `Next: ${action}`,
+  playActionsNote:
+    "The log and the stepping follow the canvas and userEvent of the play's context; what a play imports itself runs unrecorded.",
   playNoSteps: "The play names no steps: wrap its parts in step(label, run) to see them here.",
   codeFromArgs: "from the args",
   codeRender: "the story's render",
