@@ -1797,7 +1797,8 @@ npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whet
 `forgebook mcp` offers the same as `list_tokens`, `get_token` and `nearest_token`. References (`{a.b}`, `$ref`), `$extends`
 and `$root` are followed, and a base alias follows what a theme overrides. Deprecated tokens are never suggested. Colours
 in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed but counted as `uncompared`. A theme can
-reference the base; a `$ref` reaches only its own file.
+reference the base; a `$ref` reaches only its own file. A token whose aliases lead back to it, lead nowhere, or come to an
+empty value is named in `problems` and left out, since a browser would draw it with nothing.
 
 An agent that cannot find a component writes a new one, often because the code and the designers use different words.
 `forgebook build --agent-index` adds `forgebook-agent.json` to the built catalogue, and `forgebook mcp --from <address or
@@ -1840,7 +1841,14 @@ name; not through a third party.
 run: custom properties at the root and in theme selectors (`.dark`, `[data-theme]`, a colour-scheme query), and a selector
 holding a dozen or more of them, as a library's root does; Tailwind 4's `@theme` and default theme; a Tailwind configuration
 and its presets, as far as they are written plainly; the sheet and the configuration `components.json` names. `tokenSources`
-says which files were read and `tokenNotes` what needs running to know. Fewer than five colours is not a palette, so colours
+says which files were read and `tokenNotes` what needs running to know. A token a browser would give no value is a problem,
+as a broken tokens file is: one whose references lead back to itself, or one that reads a name with no fallback that
+nothing declares: no sheet read, no `@property`, no package sheet it imports, and no file of the repository that sets it
+(in quotes, as `next/font`'s `variable: "--font-sans"`, or as a declaration in a template or a `.vue` style block).
+Tailwind's `@theme inline { --font-sans: var(--font-sans); }` reads the name set elsewhere, which is no cycle. Where that
+cannot be known (a package sheet not read, names a Sass loop builds, a cycle only inside a theme, which depends on the
+element the theme is set on), the token is a note instead, which fails nothing. A name only code builds (`` `--${key}` ``)
+is not seen: give such a reference a fallback. Fewer than five colours is not a palette, so colours
 are then left to `skipped`. A value it cannot judge takes a comment on its line or the one above, with the reason:
 `/* forgebook-ignore raw-color: a brand's own colour */`; the answer lists each one in `excused`, with its reason. Only files
 in the catalogue's folder are compared (`notCompared` names the others), since another package has its own system. Nothing
