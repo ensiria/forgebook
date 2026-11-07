@@ -80,7 +80,8 @@ describe("a repository's checkout watch", () => {
   };
 
   beforeEach(() => {
-    repo = realpathSync(mkdtempSync(join(tmpdir(), "forgebook-checkout-")));
+    // the long form git gives: Windows' temporary folder is named in its short form (`RUNNER~1`)
+    repo = realpathSync.native(mkdtempSync(join(tmpdir(), "forgebook-checkout-")));
     git("init", "-q", "-b", "main");
     git("config", "user.email", "test@example.com");
     git("config", "user.name", "Test");
