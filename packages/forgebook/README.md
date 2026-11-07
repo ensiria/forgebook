@@ -1179,6 +1179,11 @@ the plugin too, since each would otherwise give a catalogue that looks right and
   `forgebook dev` warns instead and opens a home that says where it looks, since you may be about to write the first story;
   saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
   may match nothing.
+- **Story files in a hidden folder**: a pattern's `**` does not enter a folder whose name starts with a dot
+  (`docs/.vitepress`). Files a pattern would match there are named, with the pattern that lists them
+  (`docs/.vitepress/**/*.stories.ts`): a warning from `forgebook dev`, a problem in `stories`, and the hint when a pattern
+  matches nothing. Nothing stops on them; a `!` pattern for the folder (`!docs/.vitepress/**`) says it is left out on
+  purpose and ends the notice.
 
 ## Stories that load
 
@@ -1235,6 +1240,7 @@ is a state of the component: the same).
 | `forgebook changed` | Lists the stories a change touches, through what they import |
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
 | `forgebook proof` | Compares a change's states with where it started, both drawn in one run, for a pull request's comment |
+| `forgebook visibility` | Lists the published components an agent cannot see, with the fix for each |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
 | `forgebook graph` | A map of the components and tokens, generated from the source: what exists, what each is for, how to choose |
@@ -1804,6 +1810,17 @@ src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Bad
   committed counts. A branch cut from another, as `develop`, gives it with `--since`. With no `--since`, an empty change
   is `not-verified`: the work may be committed where this cannot see, as in a shallow clone. CI gives `--since` and the
   history: `fetch-depth: 0`.
+- **A published component an agent cannot see fails.** A component a package's entries export, when the change edits it or
+  starts exporting it, needs a story about it (its meta names it, or a search finds it by name), one story not tagged
+  `!dev`, props an agent can read, and TSDoc on it or a `docs.description.component`. Each finding names its fix. A part
+  named after its component (`DialogTrigger`) is seen on that page, and a provider owes no story. An application publishes
+  nothing, so this asks nothing of it. `forgebook visibility` lists every such component in the repository, for a first look:
+
+  ```sh
+  $ npx forgebook visibility
+  src/Avatar.tsx  agents cannot see it: no story is about Avatar, so a search for it finds nothing. Fix: npx forgebook new src/Avatar.tsx
+  12 published component files, 1 agents cannot see.
+  ```
 - **Every variant by default**, each story in light, dark, both at more contrast, the structure only, and narrow, on one
   browser, four pages at once. `--quick` runs the default view, and the verdict says so.
 
