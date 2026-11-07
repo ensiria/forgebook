@@ -13,11 +13,9 @@
 
 import type { StorySource } from "@forgebook/story-format/source";
 import {
-  lazy,
   type MouseEvent,
   type ReactNode,
   type Ref,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -37,6 +35,7 @@ import {
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { SidebarDocs, type SidebarPageLinks } from "./SidebarDocs.tsx";
 import { FamilyGroup, type ShownComponent, TreeFold } from "./SidebarEntries.tsx";
 import { SidebarHandle } from "./SidebarHandle.tsx";
@@ -46,13 +45,12 @@ import type { TagFilterProps } from "./TagFilter.tsx";
 import type { ShownTree, shownTree } from "./treeSearch.ts";
 import type { AppearanceState } from "./useAppearance.ts";
 
-/** The tag filter, loaded only for a catalogue whose stories have tags. */
-const TagFilter = lazy(() =>
-  import("./TagFilter.tsx").then(
-    (module) => ({ default: module.TagFilter }),
-    // a chunk gone after a new deployment must not take the page with it: the tree simply stays as it is
-    () => ({ default: (): ReactNode => null })
-  )
+/**
+ * The tag filter, loaded only for a catalogue whose stories have tags; not through `Suspense`, which would hold it back
+ * 300 ms after it arrived (`lazyModule.tsx`). A chunk gone after a new deployment leaves the tree as it is.
+ */
+const TAG_FILTER = lazyModule<TagFilterProps>(() =>
+  import("./TagFilter.tsx").then((module) => module.TagFilter)
 );
 
 /** The sidebar's props. */
@@ -210,9 +208,7 @@ const useFoldChoices = (
 const TagFilterSlot = (props: TagFilterProps): ReactNode => {
   const hasTags = useMemo(() => hasFilterTags(props.tree), [props.tree]);
   return hasTags || props.tags.length > 0 ? (
-    <Suspense fallback={null}>
-      <TagFilter {...props} />
-    </Suspense>
+    <LazyView module={TAG_FILTER} props={props} loading={null} failed={(): ReactNode => null} />
   ) : null;
 };
 
