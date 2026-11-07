@@ -1,0 +1,138 @@
+{
+  "id": "apps-empty-state",
+  "app": "shadcn-admin",
+  "prompt": "On the Apps page (src/features/apps/index.tsx), when the search filter or the connection type leaves no app to show, the grid is simply empty. Show an empty state there instead: a short message saying that no app matches, and a button labelled \"Clear filters\" that clears the search text and resets the type to all apps, so every app shows again. Keep it consistent with the rest of the app.",
+  "scope": ["src/features/apps/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built from the app's existing components (Button and the others in src/components/ui), not new hand-made ones."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Shown for both causes (a search with no match, a type with no app), right in a narrow window and in the dark theme; the normal grid unchanged."
+    },
+    {
+      "id": "a11y",
+      "text": "The message is announced to screen readers when it appears; the button is a real button named \"Clear filters\"."
+    },
+    {
+      "id": "scope",
+      "text": "Only the Apps feature changes; nothing else in the app, and no test removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "The page as it opens: every app.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/apps"
+        }
+      ]
+    },
+    {
+      "name": "no-match",
+      "description": "A search that matches no app.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/apps?filter=zzzz"
+        }
+      ]
+    },
+    {
+      "name": "no-match-dark",
+      "description": "The same, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/apps?filter=zzzz"
+        }
+      ]
+    },
+    {
+      "name": "no-match-narrow",
+      "description": "The same, in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/apps?filter=zzzz"
+        }
+      ]
+    },
+    {
+      "name": "type-and-search",
+      "description": "Connected apps only, searching for an app that is not connected.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/apps?type=connected&filter=telegram"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "a search with no match offers a way back to every app",
+      "steps": [
+        {
+          "goto": "/apps?filter=zzzz"
+        },
+        {
+          "expectVisible": {
+            "role": "button",
+            "name": "Clear filters"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Clear filters"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Telegram"
+          }
+        },
+        {
+          "expectValue": {
+            "placeholder": "Filter apps..."
+          },
+          "value": ""
+        }
+      ]
+    },
+    {
+      "name": "the normal grid shows no empty state",
+      "steps": [
+        {
+          "goto": "/apps"
+        },
+        {
+          "expectVisible": {
+            "text": "Notion"
+          }
+        },
+        {
+          "expectHidden": {
+            "role": "button",
+            "name": "Clear filters"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

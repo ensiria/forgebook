@@ -1,0 +1,131 @@
+{
+  "id": "tasks-no-results",
+  "app": "nuxt-shadcn-dashboard",
+  "prompt": "In the tasks table (app/components/tasks/components/DataTable.vue), a filter that matches nothing shows the bare text \"No results.\". Replace it with an empty state built on the app's Empty component: the title \"No tasks found\", a short hint, and a \"Clear filters\" button that empties the filter box and resets the status and priority filters.",
+  "scope": ["app/components/tasks/components/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built on the app's Empty component (app/components/ui/empty) and Button, not a new hand-made block."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Right for a long filter text, in the dark theme and in a narrow window; the table with results unchanged."
+    },
+    {
+      "id": "a11y",
+      "text": "The empty state is announced when it appears; \"Clear filters\" is a real button."
+    },
+    {
+      "id": "scope",
+      "text": "Only the tasks table's components change; the Empty component itself is unchanged, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "The tasks table as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/tasks"
+        }
+      ]
+    },
+    {
+      "name": "no-match",
+      "description": "A filter that matches nothing.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/tasks"
+        },
+        {
+          "fill": {
+            "placeholder": "Filter tasks..."
+          },
+          "value": "zzzzqq"
+        }
+      ]
+    },
+    {
+      "name": "no-match-dark",
+      "description": "The same, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/tasks"
+        },
+        {
+          "fill": {
+            "placeholder": "Filter tasks..."
+          },
+          "value": "zzzzqq"
+        }
+      ]
+    },
+    {
+      "name": "no-match-narrow",
+      "description": "The same, in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/tasks"
+        },
+        {
+          "fill": {
+            "placeholder": "Filter tasks..."
+          },
+          "value": "zzzzqq"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "a filter with no match offers a way back",
+      "steps": [
+        {
+          "goto": "/tasks"
+        },
+        {
+          "fill": {
+            "placeholder": "Filter tasks..."
+          },
+          "value": "zzzzqq"
+        },
+        {
+          "expectVisible": {
+            "text": "No tasks found"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Clear filters"
+          }
+        },
+        {
+          "expectValue": {
+            "placeholder": "Filter tasks..."
+          },
+          "value": ""
+        },
+        {
+          "expectHidden": {
+            "text": "No tasks found"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

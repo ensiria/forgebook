@@ -241,6 +241,32 @@ describe("verifyDocument", () => {
     expect(greens).toEqual([]);
   });
 
+  it("fails on a story file written for other props, naming the file and the fix", () => {
+    const outdated = {
+      file: "src/Badge.stories.tsx",
+      path: "src/Badge.stories.tsx",
+      story: "kit:badge--default",
+      component: "Badge",
+      written: "0a1b2c3d",
+      current: "4e5f6a7b",
+      fix: "set the file's forgebook-props line to 4e5f6a7b"
+    };
+    const document = verifyDocument(
+      findings({ changed: changedOf([covered("src/Badge.tsx")], { outdated: [outdated] }) })
+    );
+    expect(document.verdict).toBe("failed");
+    expect(document.problems).toBe(1);
+    expect(document.summary).toContain("1 story file written for other props");
+    expect(document.outdated).toEqual([outdated]);
+    expect(verifyText(document, { color: false, unicode: true, width: 200 })).toContain(
+      "src/Badge.stories.tsx  out of date: written for props 0a1b2c3d, now 4e5f6a7b"
+    );
+  });
+
+  it("leaves outdated out of the answer when every story file is current", () => {
+    expect(verifyDocument(findings({})).outdated).toBeUndefined();
+  });
+
   it("names the fix of a storyless component: the command that writes its stories", () => {
     const document = verifyDocument(
       findings({

@@ -17,14 +17,13 @@ import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
-import type { StoryCheckResult } from "../storyCheck.ts";
+import type { StoryCheckResult, StoryDiffStatus } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
-import type { CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
+import type { CodeAdvice, CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
 import type { DesignToken, TokenSource } from "./designTokens.ts";
 import type { FoundComponent } from "./findComponent.ts";
 import type { NearestTokens } from "./nearestToken.ts";
-import type { ReuseAdvice } from "./reuseCheck.ts";
 import type { TokenClash } from "./tokenClashes.ts";
 
 /** The version of the documents' shape. */
@@ -184,6 +183,13 @@ export type StoryDocument = {
   readonly design?: AgentDesign;
   /** The story's args once its module ran, the meta's under its own; only what can be written as JSON. */
   readonly args: Readonly<Record<string, unknown>>;
+  /**
+   * The story's code, as its Code tab shows and copies it: its `render` as written, or the component in the
+   * framework's code with the args its file writes as code (functions, elements) as written and the rest from their
+   * values, those set through `args` from theirs. None when it cannot be written: the story file did not load, or
+   * the framework's code writer does not load on the server.
+   */
+  readonly code?: string;
   /**
    * The props its values can set, as the panel sets them: each one's control and what its value looks like, its
    * `argTypes` taken into account. Give values through `args` of `forgebook story` or of the tools, or in the address's
@@ -390,6 +396,27 @@ export type AgentChangedStory = {
 /** How a changed UI file is covered: by stories of its own, only through another component's, or by none. */
 export type UiFileCoverage = "own" | "through" | "none";
 
+/**
+ * A story file `forgebook new` wrote for props its component no longer has: its args may pass a prop that is gone or miss
+ * one that is now required, which neither the frame nor a check would say.
+ */
+export type OutdatedStoryFile = {
+  /** The story file, relative to the repository. */
+  readonly file: string;
+  /** The same file, relative to the catalogue's folder: what a command run there names. */
+  readonly path: string;
+  /** One of its stories' ids, whose `story` answer lists the component's props. */
+  readonly story: string;
+  /** Its component's name. */
+  readonly component: string;
+  /** The props' signature the file says it was written for. */
+  readonly written: string;
+  /** The props' signature now. */
+  readonly current: string;
+  /** What to do. */
+  readonly fix: string;
+};
+
 /** A changed file a person sees (`changeCoverage.ts`), and the stories that show it. */
 export type ChangedUiFile = {
   /** The file, relative to the repository. */
@@ -420,6 +447,8 @@ export type ChangedStoriesDocument = {
   readonly problems: readonly string[];
   /** The story files that cannot be read, whose stories no change can reach: a check of a change fails on them. */
   readonly unread?: readonly string[];
+  /** The story files the change reaches that were written for other props; absent when there are none. */
+  readonly outdated?: readonly OutdatedStoryFile[];
 };
 
 /** How `verify` ended. */
@@ -510,9 +539,11 @@ export type VerifyDocument = {
     /** The values a comment in the change says are meant. */
     readonly excused?: readonly ExcusedValue[];
     /** What it found to weigh and not to fail on. */
-    readonly advice?: readonly ReuseAdvice[];
+    readonly advice?: readonly CodeAdvice[];
   };
-  /** How many problems there are, in `failures` and `code.problems` together. */
+  /** The story files the change reaches that were written for other props, each with its fix; absent when none. */
+  readonly outdated?: readonly OutdatedStoryFile[];
+  /** How many problems there are, in `failures`, `code.problems` and `outdated` together. */
   readonly problems: number;
   /** The changed published components an agent cannot see: these leave the change not verified. */
   readonly unseen: readonly UnseenComponent[];
@@ -557,6 +588,52 @@ export type VisibilityDocument = {
   readonly skipped: readonly string[];
 };
 
+/** One state a change touches, as `proof` compares it with where the change started. */
+export type ProofState = {
+  /** The story's id. */
+  readonly storyId: string;
+  /** The view's name; empty for the default. */
+  readonly view: string;
+  /**
+   * How it compares: as a comparison says, or `unstable` when two pictures of the same code differ here too, so the
+   * difference proves nothing.
+   */
+  readonly status: Exclude<StoryDiffStatus, "same"> | "unstable";
+  /** The share of the picture that changed, 0 to 100. */
+  readonly percent: number;
+  /** The pictures, relative to the proof's folder; those a state has. */
+  readonly pictures: {
+    /** Where the change started. */
+    readonly before?: string;
+    /** With the change. */
+    readonly after?: string;
+    /** With the change, what moved marked. */
+    readonly marked?: string;
+  };
+};
+
+/** What `forgebook proof` answers and what a pull request's comment is written from. */
+export type ProofDocument = {
+  /** The shape's version. */
+  readonly schema: AgentSchema;
+  /** The commit compared with: where the checked-out commit left the ref named. */
+  readonly base: string;
+  /** The commit shown: on a pull request's run, the commit that merges it. */
+  readonly head: string;
+  /** `verify`'s verdict on the change. */
+  readonly verdict: VerifyVerdict;
+  /** `verify`'s line. */
+  readonly summary: string;
+  /** The states that differ, are new, were removed or did not draw. */
+  readonly states: readonly ProofState[];
+  /** How many states were compared and are the same. */
+  readonly same: number;
+  /** What was checked, in words. */
+  readonly checked: readonly string[];
+  /** What was not, in words: never read an empty list of states as all clear when these are named. */
+  readonly notChecked: readonly string[];
+};
+
 /** A story and view whose checks did not run, since its frame gave up on what the story loads. */
 export type VerifyNotVerified = {
   /** The story's id. */
@@ -581,8 +658,8 @@ export type CheckedCodeDocument = {
   readonly skipped: readonly string[];
   /** What it found, by file and line. */
   readonly problems: readonly CodeProblem[];
-  /** What it found to weigh and not to fail on: a component that may be one that exists, what `@useWhen` says of an import. */
-  readonly advice?: readonly ReuseAdvice[];
+  /** What it found to weigh and not to fail on: a component that may be one that exists, what `@useWhen` says of an import, a bare number in an object that may be a style. */
+  readonly advice?: readonly CodeAdvice[];
   /** What the values were compared with, each file with how many tokens it gives; none from an older catalogue. */
   readonly tokenSources?: readonly TokenSource[];
   /** How many tokens two files give different values: `forgebook tokens` names them. */

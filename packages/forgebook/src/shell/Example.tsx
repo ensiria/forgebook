@@ -9,6 +9,7 @@ import { type ChangeEvent, type MouseEvent, type ReactNode, useId, useState } fr
 
 import { deviceDefaultOf, type StoryDevice, shownDevice } from "../deviceView.ts";
 import type { PanelArgs } from "../messages.ts";
+import { type StoryCodeSource, storyCodeText } from "../storyCodeText.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
 import { frameAddress, schemeOf, type ViewState } from "../viewState.ts";
@@ -29,7 +30,7 @@ import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { StageViewport } from "./StageViewport.tsx";
-import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
+import { StoryCodeBlock } from "./StoryCodeBlock.tsx";
 import { type StoryTouches, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { useCopy } from "./useCopy.ts";

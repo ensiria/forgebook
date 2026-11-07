@@ -1,0 +1,131 @@
+{
+  "id": "users-no-results",
+  "app": "next-shadcn-admin-dashboard",
+  "prompt": "In the users table (src/app/(main)/dashboard/users/_components/), a search that matches no one shows the bare text \"No results.\" in a table cell. Replace it with a proper empty state built on the app's Empty component: the title \"No users found\", a line that repeats what was searched, and a \"Clear search\" button that empties the search box so every user shows again.",
+  "scope": ["src/app/(main)/dashboard/users/_components/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built on the app's Empty component (src/components/ui/empty.tsx) and Button, not a new hand-made block."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Right for a long search text, in the dark theme and in a narrow window; the table with results unchanged."
+    },
+    {
+      "id": "a11y",
+      "text": "The empty state is announced when it appears; \"Clear search\" is a real button."
+    },
+    {
+      "id": "scope",
+      "text": "Only the users page's components change; the Empty component itself is unchanged, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "The users table as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/users"
+        }
+      ]
+    },
+    {
+      "name": "no-match",
+      "description": "A search that matches no one.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/users"
+        },
+        {
+          "fill": {
+            "placeholder": "Search users..."
+          },
+          "value": "zzzzqq"
+        }
+      ]
+    },
+    {
+      "name": "no-match-dark",
+      "description": "The same, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/dashboard/users"
+        },
+        {
+          "fill": {
+            "placeholder": "Search users..."
+          },
+          "value": "zzzzqq"
+        }
+      ]
+    },
+    {
+      "name": "long-search-narrow",
+      "description": "A very long search, in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/dashboard/users"
+        },
+        {
+          "fill": {
+            "placeholder": "Search users..."
+          },
+          "value": "a-very-long-search-text-that-nobody-matches-at-all-0123456789"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "a search with no match offers a way back",
+      "steps": [
+        {
+          "goto": "/dashboard/users"
+        },
+        {
+          "fill": {
+            "placeholder": "Search users..."
+          },
+          "value": "zzzzqq"
+        },
+        {
+          "expectVisible": {
+            "text": "No users found"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Clear search"
+          }
+        },
+        {
+          "expectValue": {
+            "placeholder": "Search users..."
+          },
+          "value": ""
+        },
+        {
+          "expectHidden": {
+            "text": "No users found"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

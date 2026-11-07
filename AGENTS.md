@@ -23,7 +23,7 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   `fixtures/angular`, `fixtures/react-native`) and small
   SvelteKit, Next.js and Nuxt apps (`fixtures/sveltekit`, `fixtures/nextjs`, `fixtures/nuxt`) whose catalogues they
   open beside it.
-- `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
+- `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`, `eval`).
 
 ## Before you say a change is done
 

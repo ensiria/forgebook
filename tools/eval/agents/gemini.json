@@ -1,0 +1,7 @@
+{
+  "name": "gemini",
+  "command": ["gemini", "--yolo", "--prompt", "{prompt}"],
+  "env": ["GEMINI_API_KEY"],
+  "timeoutMinutes": 45,
+  "hooks": "gemini"
+}

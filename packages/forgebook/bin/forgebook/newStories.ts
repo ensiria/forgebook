@@ -1,11 +1,13 @@
 /**
  * The first stories of a component, written from its props as the docs extractor reads them (`forgebook new`): the
  * meta, the main story with the required props filled, one story per value of its first choice prop, and the worst
- * case. Args only, so the file is the same for any framework but its type import. Pure: docs in, text out.
+ * case. Args only, so the file is the same for any framework but its type import. The file carries the signature of
+ * the props it was written for (`propsSignature.ts`), so `verify` can say when they change. Pure: docs in, text out.
  *
  * @module
  */
 import type { ComponentDocs, PropDocs } from "../../src/componentDocs.ts";
+import { propsMarkerLine, propsSignature } from "../../src/propsSignature.ts";
 import { WORST_NUMBER, WORST_TEXT } from "../../src/worstCase.ts";
 
 /** A place the application draws the component, as the file is written from it. */
@@ -231,6 +233,7 @@ export const newStories = (input: NewStoriesInput): string => {
     " *",
     " * @module",
     " */",
+    propsMarkerLine(propsSignature(docs.props)),
     `import type { Meta, Story } from ${JSON.stringify(input.typesModule)};`,
     "",
     input.importStatement,

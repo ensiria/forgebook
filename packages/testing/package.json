@@ -35,6 +35,7 @@
     "./conformance": "./src/conformance.ts",
     "./diff": "./src/diffStories.ts",
     "./shot": "./src/shotStories.ts",
+    "./stress": "./src/stressStories.ts",
     "./touch": "./src/touchWindow.ts",
     "./fonts.css": "./src/fonts/fonts.css"
   },
@@ -122,6 +123,10 @@
       "./shot": {
         "types": "./dist/src/shotStories.d.ts",
         "default": "./dist/src/shotStories.js"
+      },
+      "./stress": {
+        "types": "./dist/src/stressStories.d.ts",
+        "default": "./dist/src/stressStories.js"
       },
       "./touch": {
         "types": "./dist/src/touchWindow.d.ts",
