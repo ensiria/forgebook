@@ -7,6 +7,7 @@
 import type { Logger } from "vite";
 
 import type { ResolvedConfig } from "./configFile.ts";
+import { hiddenStoryFolders, hiddenStoryFoldersMessage } from "./hiddenStoryFiles.ts";
 import { unmatchedPatterns } from "./storyPatterns.ts";
 
 /**
@@ -28,7 +29,8 @@ export const emptyStoryGlobsMessage = (globs: readonly string[]): string =>
   `No story file matches ${globs.map((glob) => `"${glob}"`).join(", ")} (\`stories\` in the configuration)`;
 
 /**
- * Says what the plugin has to say of the patterns of `emptyStoryGlobs`.
+ * Says what the plugin has to say of the patterns of `emptyStoryGlobs`, and of story files in hidden folders they pass
+ * over (`hiddenStoryFolders.ts`), which only warn: a hidden folder may be left out on purpose.
  *
  * @param config - the catalogue's folder and stories.
  * @param isServing - whether a dev server runs: whoever runs one may be about to write the first story, while a build's
@@ -41,6 +43,8 @@ export const sayEmptyStoryGlobs = (
   isServing: boolean,
   logger: Pick<Logger, "warn">
 ): void => {
+  const hidden = hiddenStoryFolders(config);
+  if (hidden.length > 0) logger.warn(`Forgebook: ${hiddenStoryFoldersMessage(hidden)}.`);
   const globs = emptyStoryGlobs(config);
   if (globs.length === 0) return;
   if (!isServing) throw new Error(emptyStoryGlobsMessage(globs));
