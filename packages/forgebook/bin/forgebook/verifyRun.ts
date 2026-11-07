@@ -12,7 +12,11 @@
  */
 import type { StoryCheckReport } from "../../src/storyCheck.ts";
 import type { CheckedCodeDocument, VerifyDocument } from "../../src/vite/agent.types.ts";
-import { isChangedStoriesDocument, isCheckedCodeDocument } from "../../src/vite/agentApi.ts";
+import {
+  isChangedStoriesDocument,
+  isCheckedCodeDocument,
+  isVisibilityDocument
+} from "../../src/vite/agentApi.ts";
 import { branchStart, changeBase, noBaseReason } from "../../src/vite/gitChange.ts";
 import type { Ask } from "./mcpToolParts.ts";
 import type { StoriesCheckInput } from "./storyCheckRun.ts";
@@ -40,8 +44,13 @@ export type VerifyInput = {
 const UNEXPECTED_SHAPE =
   "The catalogue's answer has an unexpected shape: restart forgebook dev if it runs another version";
 
-/** The message of an answer that is an error. */
-const errorOf = (body: unknown, status: number): string =>
+/**
+ * The message of an answer that is an error.
+ *
+ * @param body - the answer's body.
+ * @param status - its status.
+ */
+export const errorOf = (body: unknown, status: number): string =>
   typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
     ? body.error
     : `The catalogue answered ${status}`;
@@ -83,6 +92,8 @@ export const runVerify = async (
   const changed = await reach.ask("changed", params);
   if (changed.status !== 200) return errorOf(changed.body, changed.status);
   if (!isChangedStoriesDocument(changed.body)) return UNEXPECTED_SHAPE;
+  const seen = await reach.ask("visibility", params);
+  if (seen.status === 200 && !isVisibilityDocument(seen.body)) return UNEXPECTED_SHAPE;
   const ids = changed.body.stories.map((story) => story.id);
   const run = ids.length === 0 ? undefined : await checked(reach, { ids, isAllVariants: !isQuick });
   // tokens that cannot be read leave the code unchecked, which the verdict says, and do not stop the rest
@@ -100,6 +111,16 @@ export const runVerify = async (
     base,
     changed: changed.body,
     code: codeBody,
+    // what cannot be told of agents does not stop the rest, and the verdict says it
+    visibility: isVisibilityDocument(seen.body)
+      ? seen.body
+      : {
+          schema: 1,
+          packages: [],
+          checked: 0,
+          unseen: [],
+          skipped: [`what agents see not checked: ${errorOf(seen.body, seen.status)}`]
+        },
     report: typeof run === "object" ? run : undefined,
     notRun: typeof run === "string" ? run : undefined,
     isQuick,

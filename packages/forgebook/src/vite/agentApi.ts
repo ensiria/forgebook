@@ -46,7 +46,8 @@ import type {
   StoryDocument,
   StoryLinks,
   TokenDocument,
-  TokensDocument
+  TokensDocument,
+  VisibilityDocument
 } from "./agent.types.ts";
 
 /** Where the catalogue is served, for the links: its page and its frame page. */
@@ -536,6 +537,18 @@ export const isChangedStoriesDocument = (value: unknown): value is ChangedStorie
   Array.isArray(value["files"]) &&
   Array.isArray(value["uiFiles"]) &&
   Array.isArray(value["outside"]);
+
+/**
+ * Whether a value is the answer on what agents cannot see, as a client receives it over HTTP.
+ *
+ * @param value - the answer's body.
+ */
+export const isVisibilityDocument = (value: unknown): value is VisibilityDocument =>
+  isRecord(value) &&
+  value["schema"] === 1 &&
+  Array.isArray(value["packages"]) &&
+  Array.isArray(value["unseen"]) &&
+  Array.isArray(value["skipped"]);
 
 /**
  * Whether a value is the code check's document, as a client receives it over HTTP.

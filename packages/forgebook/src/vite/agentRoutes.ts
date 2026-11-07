@@ -373,6 +373,8 @@ export const agentAnswer = async (
     if (route === "pages") return await pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
     if (route === "changed") return await changedAnswer(context, server.resolveSource);
+    // loaded when asked: it reads syntax with TypeScript, which a dev server's thread must not pay for at start
+    if (route === "visibility") return await (await import("./visibilityRoute.ts")).visibilityAnswer(context);
     if (route === "agent-index")
       return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };

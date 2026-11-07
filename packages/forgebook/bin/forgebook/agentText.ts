@@ -31,7 +31,9 @@ import type {
   StoryDocument,
   SwitchesDocument,
   TokensDocument,
-  VerifyDocument
+  UnseenComponent,
+  VerifyDocument,
+  VisibilityDocument
 } from "../../src/vite/agent.types.ts";
 import type { DesignToken } from "../../src/vite/designTokens.ts";
 import type { TokenClash } from "../../src/vite/tokenClashes.ts";
@@ -319,6 +321,25 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
   ].join("\n");
 };
 
+/** A published component an agent cannot see, a line for each thing that hides it. */
+const unseenLines = ({ file, reasons }: UnseenComponent): readonly string[] =>
+  reasons.map(({ reason, fix }) => `${file}  agents cannot see it: ${reason}. Fix: ${fix}`);
+
+/**
+ * The published components an agent cannot see, what was not looked at, and how many were.
+ *
+ * @param document - the answer.
+ */
+export const visibilityText = (document: VisibilityDocument): string => {
+  const scope = document.since === undefined ? "" : ` changed since ${document.since}`;
+  const count = `${document.checked} published component file${document.checked === 1 ? "" : "s"}${scope}`;
+  const ending =
+    document.packages.length === 0 && document.skipped.length === 0
+      ? "No package here publishes a component: nothing to hold to this."
+      : `${count}, ${document.unseen.length} agents cannot see.`;
+  return [...document.unseen.flatMap(unseenLines), ...document.skipped, ending].join("\n");
+};
+
 /**
  * What `verify` found, each with its fix, and the verdict in one line, last: what a person reads first at a prompt.
  *
@@ -333,6 +354,7 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
         ]
       : []
   );
+  const unseen = document.unseen.flatMap(unseenLines);
   const code = document.code.problems.map(
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
   );
@@ -344,7 +366,7 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
     ...document.notVerified.map((each) => ({ ...each, problems: [] }))
   ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
   const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
-  return [...uncovered, ...code, ...notes, ...stories, document.summary].join("\n");
+  return [...uncovered, ...unseen, ...code, ...notes, ...stories, document.summary].join("\n");
 };
 
 /**

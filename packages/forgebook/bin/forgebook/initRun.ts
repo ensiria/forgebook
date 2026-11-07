@@ -22,6 +22,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { printable } from "../../src/printable.ts";
 import { CONFIG_FILES, PREVIEW_FILES } from "../../src/vite/configFile.ts";
 import {
   findStorybookDir,
@@ -48,7 +49,6 @@ import {
   spawnedCommand,
   workspaceRootFlags
 } from "./newProject/packageManagers.ts";
-import { printable } from "./newProject/projectEntries.ts";
 import { detectFramework, FRAMEWORK_NAMES, PROJECT_FRAMEWORKS } from "./newProject/projectFrameworks.ts";
 import {
   declaredPackages,
