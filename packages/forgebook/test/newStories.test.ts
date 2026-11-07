@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { newStories } from "../bin/forgebook/newStories.ts";
 import type { ComponentDocs, PropDocs } from "../src/componentDocs.ts";
+import { propsSignature, writtenSignature } from "../src/propsSignature.ts";
 import { WORST_NUMBER, WORST_TEXT } from "../src/worstCase.ts";
 
 /** A prop, required unless said. */
@@ -53,6 +54,10 @@ describe("newStories", () => {
     expect(TEXT).toContain(
       'export default { title: "Actions/Badge", component: Badge } satisfies Meta<typeof Badge>;'
     );
+  });
+
+  it("says which props it was written for, so verify can tell when they change", () => {
+    expect(writtenSignature(TEXT)).toBe(propsSignature(BADGE.props));
   });
 
   it("fills the required props from their kind, a list with nothing, and leaves a TODO where only a person knows", () => {

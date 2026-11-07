@@ -61,7 +61,10 @@ type VerifyAnswer = {
   }[];
   readonly code: { readonly problems: readonly { readonly rule: string; readonly fix?: string }[] };
   readonly uiFiles: readonly { readonly coverage: string; readonly fix?: string }[];
+  readonly outdated?: readonly { readonly file: string; readonly fix: string }[];
 };
+
+const TAG = "export const Tag = ({ label }: { label: string }) => <span>{label}</span>;\n";
 
 const SEEDS: readonly Seed[] = [
   {
@@ -109,6 +112,30 @@ const SEEDS: readonly Seed[] = [
       expect(document.failures.flatMap((each) => each.problems).map((each) => each.rule)).toContain(
         "color-contrast"
       );
+    }
+  },
+  {
+    name: "a prop added to a component whose stories forgebook new wrote",
+    files: {
+      "src/Tag.tsx":
+        'export const Tag = ({ label, tone }: { label: string; tone: "info" | "alert" }) => <span className={tone}>{label}</span>;\n'
+    },
+    verdict: "failed",
+    isGreen: false,
+    check: (document) => {
+      expect(document.outdated?.map((each) => each.file)).toEqual(["src/Tag.stories.tsx"]);
+      expect(document.outdated?.[0]?.fix).toContain("set its forgebook-props line to");
+    }
+  },
+  {
+    name: "a markup change to a component whose stories forgebook new wrote, its props the same",
+    files: {
+      "src/Tag.tsx": "export const Tag = ({ label }: { label: string }) => <strong>{label}</strong>;\n"
+    },
+    verdict: "verified",
+    isGreen: true,
+    check: (document) => {
+      expect(document.outdated).toBeUndefined();
     }
   },
   {
@@ -166,6 +193,13 @@ test.describe("forgebook verify on a real browser", () => {
     );
     writeFileSync(join(dir, "src", "Button.tsx"), BUTTON);
     writeFileSync(join(dir, "src", "Button.stories.tsx"), STORIES);
+    writeFileSync(join(dir, "src", "Tag.tsx"), TAG);
+    // the stories forgebook new writes, carrying the signature of the props they were written for
+    const written = spawnSync(process.execPath, [ENTRY, "new", "src/Tag.tsx"], {
+      cwd: dir,
+      encoding: "utf8"
+    });
+    expect(written.status, written.stderr).toBe(0);
     git("init", "-q", "-b", "main");
     git("add", "-A");
     git("commit", "-q", "-m", "first");

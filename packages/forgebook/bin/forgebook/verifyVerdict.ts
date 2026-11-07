@@ -13,6 +13,7 @@
  *
  * @module
  */
+import { shellWord } from "../../src/shellWord.ts";
 import type { StoryCheckReport } from "../../src/storyCheck.ts";
 import type {
   ChangedStoriesDocument,
@@ -36,15 +37,6 @@ const TEMPLATE_FILE = /\.html$/;
 
 /** How many stories an answer lists. */
 const STORIES_LISTED = 20;
-
-/**
- * A file's name as one word of a command an agent will run: a name comes from a branch that may not be trusted, and
- * `$(…)` in it must stay text.
- */
-const shellWord = (path: string): string => {
-  const named = path.startsWith("-") ? `./${path}` : path;
-  return /^[\w./@+-]+$/.test(named) ? named : `'${named.replaceAll("'", `'\\''`)}'`;
-};
 
 /** What to do about a file no story reaches. */
 const fixOf = (file: ChangedUiFile): string => {
@@ -189,7 +181,8 @@ const outcomeWords = (
     problems,
     variants,
     ran,
-    notVerified: unseen
+    notVerified: unseen,
+    outdated
   }: Omit<VerifyDocument, "summary" | "schema">,
   catalogueProblems: readonly string[]
 ): string => {
@@ -200,6 +193,7 @@ const outcomeWords = (
     ...(notVerified ? ["not verified"] : []),
     ...(unseen.length > 0 ? [`${unseen.length} not seen in its final state: the frame gave up`] : []),
     ...(problems > 0 ? [counted(problems, "problem")] : []),
+    ...(outdated === undefined ? [] : [`${counted(outdated.length, "story file")} written for other props`]),
     ...(verdict === "verified" || verdict === "partly-verified"
       ? [`verified ${where} (${counted(ran, "check")})`]
       : [])
@@ -266,7 +260,12 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const codeProblems = code.problems.filter((problem) => seen.has(problem.file));
   const outside = new Set(changed.outside);
   const notes = code.problems.filter((problem) => !seen.has(problem.file) && !outside.has(problem.file));
-  const problems = failures.reduce((sum, each) => sum + each.problems.length, codeProblems.length);
+  // stories written for props the component no longer has pass a check they no longer mean: each is a problem
+  const outdated = changed.outdated ?? [];
+  const problems = failures.reduce(
+    (sum, each) => sum + each.problems.length,
+    codeProblems.length + outdated.length
+  );
   const skipped = skippedOf(input, notRun);
   // a story file that cannot be read may be the change, whatever else changed
   const catalogueProblems = changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []);
@@ -294,6 +293,7 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
       ...(code.excused === undefined ? {} : { excused: code.excused }),
       ...(code.advice === undefined ? {} : { advice: code.advice })
     },
+    ...(outdated.length === 0 ? {} : { outdated }),
     problems
   };
   const summary = summaryOf({ ...body, verdict, skipped: allSkipped }, catalogueProblems);
