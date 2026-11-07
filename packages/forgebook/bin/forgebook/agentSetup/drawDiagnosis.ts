@@ -8,7 +8,7 @@
  * @module
  */
 
-import { printable } from "../newProject/projectEntries.ts";
+import { printable } from "../../../src/printable.ts";
 
 /** What stopped a story from drawing. */
 export type DrawFailureKind =

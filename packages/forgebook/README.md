@@ -270,6 +270,14 @@ too, with a warning.
   the fields its type declares; anything else (`onclick`, `innerHTML`, a text for a number) is left out and listed above
   the story, with a button that removes it from the address, as is one that cannot be read at all. A value that is code
   never comes from a link.
+- **Code as you wrote it**: the Code tab and Show code give a story's `render` as written in its file (its own, else
+  the meta's; one kept in a constant or a function of the file shows as that code), with its hooks and compound
+  components as they are. A story drawn from its args shows its component with each arg the file writes as code
+  (`onClick: fn()`, `icon: <IconStar />`, a constant of the file) as written, spreads of the file's objects and of
+  another story's args followed, and the plain values as they are now. A value set in the Props tab is written from
+  that value. `forgebook story --json` gives the same text as `code`. Vue and Svelte bind such an arg as written
+  (`:on-close="fn()"`); Angular, HTML and Web Components still write the plain values only. A story made by a
+  helper, imported from another file or written in CSF 4 (`meta.story(…)`) is written from its values.
 - **The worst case in one press**: the Props tab's Worst case button gives every text prop a long text with a word too
   long to break, every number a huge one and every list many items, nested ones too, kept in the address; the elements that then spill out of their parents
   are outlined and counted, as the browser tests find them. Reset undoes it.
@@ -605,6 +613,33 @@ export type FinderProps = {
   level, and only once unfolded, so large text types cost the page nothing until read.
 - With `eslint-plugin-tsdoc`, declare the tag in your `tsdoc.json`:
   `{ "tagName": "@group", "syntaxKind": "block", "allowMultiple": false }`.
+
+## Props a type cannot list plainly
+
+Some props types say more than a list of props. The API reference reads them as TypeScript does, and says what it
+could not read:
+
+```tsx
+export type ActionProps<TItem> = (
+  | { readonly kind: "link"; readonly href: string }
+  | { readonly kind: "button"; readonly onClick: () => void }
+) & { readonly label: string; readonly items?: readonly TItem[] };
+```
+
+- **A union of variants** lists every variant's props, not only the ones they share. A prop only some variants declare
+  is never marked required, and says when it applies: `href` reads "Only when `kind` is `"link"`". The discriminant is
+  the shared prop each variant gives one literal value (or leaves out), the one with the most values when several do.
+  A prop of a variant that takes the discriminant left out (`mode?: "single"`) says "or left out".
+  A prop the variants type differently shows all their types (`Date | Date[] | DateRange`).
+- **A generic component** writes each type parameter it leaves open as the component's constraint, else its default,
+  else `unknown`, and says which under the prop: `items` is `readonly unknown[]`, "`TItem` is generic, with no
+  constraint". A props type the component fills in (`BaseProps<string>`) is read with what it was given.
+- **A type it cannot read** says so instead of showing nothing: a name the checker cannot find (a missing import), a
+  prop typed `any`, props typed `any`, or a component whose props all come from outside its package (an element's
+  attributes, which the reference leaves out).
+- `forgebook story --json` and `get_story` carry the same as `onlyWhen`, `notes` on a prop and `propsNote` on the
+  component; `forgebook story` writes `href (when kind is link)`, and `CATALOG.md` `href:string[kind=link]` (`[mode?=single]`
+  when it also applies with `mode` left out).
 
 ## Required props first
 
@@ -1176,11 +1211,18 @@ the plugin too, since each would otherwise give a catalogue that looks right and
 - **A toolbar, a key or a view the shell cannot use**, as [the toolbar](#the-toolbar) says.
 - **A file that does not load.** A syntax error is named as `/path/forgebook.config.ts:3:3: …`, in the configuration or in a
   TypeScript file it imports. In a JavaScript file it imports, Node gives no place, and the message names the configuration.
-- **A story pattern that matches nothing**, for `forgebook build`, `stories`, `check` and `verify`: each pattern is read on
-  its own, so a mistaken one beside one that works is named as well, and what a `!` pattern leaves out does not count.
+- **A story pattern that matches nothing**, for `forgebook build`, `stories` and `check`: each pattern is read on its own,
+  so a mistaken one beside one that works is named as well, and what a `!` pattern leaves out does not count. `verify`
+  answers `not-verified` with the pattern in `skipped`, and still gives the rest of its answer (what changed, the stories
+  that ran, what they found), so the empty pattern never hides a failure.
   `forgebook dev` warns instead and opens a home that says where it looks, since you may be about to write the first story;
   saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
   may match nothing.
+- **Story files in a hidden folder**: a pattern's `**` does not enter a folder whose name starts with a dot
+  (`docs/.vitepress`). Files a pattern would match there are named, with the pattern that lists them
+  (`docs/.vitepress/**/*.stories.ts`): a warning from `forgebook dev`, a problem in `stories`, and the hint when a pattern
+  matches nothing. Nothing stops on them; a `!` pattern for the folder (`!docs/.vitepress/**`) says it is left out on
+  purpose and ends the notice.
 
 ## Stories that load
 
@@ -1236,6 +1278,7 @@ is a state of the component: the same).
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
+| `forgebook visibility` | Lists the published components an agent cannot see, with the fix for each |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
 | `forgebook graph` | A map of the components and tokens, generated from the source: what exists, what each is for, how to choose |
@@ -1244,7 +1287,7 @@ is a state of the component: the same).
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
 | `forgebook init --agents` | What a project's coding agents need too: `.mcp.json`, instructions and skill, CI, a hook running `verify`; `--browser` installs the testing package and its browser, `--draw` draws a story ([more](#set-a-project-up-in-one-prompt)) |
 | `forgebook hook <assistant>` | What an assistant's hook runs when it is about to finish: `verify` on the change, sending the agent back on red |
-| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; `--with-deps` also installs what it needs of the system |
+| `forgebook browser` | Installs the browser the checks run on, with the Playwright that will open it, whatever other Playwright the project has; it adds that one build and never removes another project's; `--with-deps` also installs what it needs of the system |
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
@@ -1260,8 +1303,11 @@ errors` and their MCP tools. Saving the fix is enough, with no restart: a story 
 is broken, and redraws in place. `forgebook build` and a test run still fail on it: a build ends with
 `src/Bad.stories.tsx:4:45 does not parse: …` and a non-zero exit, and only `--verbose` adds the bundler's stack.
 
-A story that loads but cannot be drawn says why in its frame and in `forgebook check`. A frame's stack gives the lines of
-the code the browser runs, not those of the file; the browser's console maps them.
+A story that loads but cannot be drawn says why in its frame and in `forgebook check`. On the dev server, the stack under
+the reason gives the lines of the files as written: the frame sends it, and the server maps it through the source maps of
+the modules it served, so the frame loads no map. `forgebook errors` and `recent_errors` give the error's `place`, the
+first of those lines outside `node_modules` (`src/Button.stories.tsx:3:11`). A static build's stack keeps the lines of the
+built code.
 
 `forgebook build` names each script it writes by its hash alone (`assets/3f9a1c2b.js`): a catalogue names every story
 file's scripts once per loader, so shorter names make a smaller build. To read what a build holds, name each script after
@@ -1774,6 +1820,17 @@ src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Bad
   committed counts. A branch cut from another, as `develop`, gives it with `--since`. With no `--since`, an empty change
   is `not-verified`: the work may be committed where this cannot see, as in a shallow clone. CI gives `--since` and the
   history: `fetch-depth: 0`.
+- **A published component an agent cannot see fails.** A component a package's entries export, when the change edits it or
+  starts exporting it, needs a story about it (its meta names it, or a search finds it by name), one story not tagged
+  `!dev`, props an agent can read, and TSDoc on it or a `docs.description.component`. Each finding names its fix. A part
+  named after its component (`DialogTrigger`) is seen on that page, and a provider owes no story. An application publishes
+  nothing, so this asks nothing of it. `forgebook visibility` lists every such component in the repository, for a first look:
+
+  ```sh
+  $ npx forgebook visibility
+  src/Avatar.tsx  agents cannot see it: no story is about Avatar, so a search for it finds nothing. Fix: npx forgebook new src/Avatar.tsx
+  12 published component files, 1 agents cannot see.
+  ```
 - **Every variant by default**, each story in light, dark, both at more contrast, the structure only, and narrow, on one
   browser, four pages at once. `--quick` runs the default view, and the verdict says so.
 

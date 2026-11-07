@@ -2813,6 +2813,14 @@
     min-width: 10rem;
   }
 
+  // under a prop's description, when a variant's prop can be passed or why its type is not as written; alone, why a
+  // component lists no props
+  .forgebook-api__note {
+    display: block;
+    margin: $space-1 0 0;
+    color: $text-secondary;
+  }
+
   // a part named in the meta's `subcomponents`: its name as code, its summary, its tables, spaced like the section
   .forgebook-api__subcomponent {
     display: grid;

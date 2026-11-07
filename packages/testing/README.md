@@ -110,7 +110,7 @@ export default storyTestViteConfig(import.meta.dirname, react());
 The config holds the framework's own Vite plugins (React's, or Solid's that compiles the stories' JSX), as the catalogue
 does: don't add them again.
 
-Then `npx playwright install chromium` once, and `playwright test -c test/stories/playwright.config.ts` starts the
+Then `npx forgebook browser` once (it installs only the build this Playwright needs and removes no other project's), and `playwright test -c test/stories/playwright.config.ts` starts the
 frame page and runs one test per story and variant (light, dark, both with more contrast, a narrow width, and the
 structure view), starting Vite through the package manager that runs them (`vite` in `testServer.ts` names
 another command). A story that breaks a rule fails all its variants; `storyBrowserTests` also takes `check`, a rule of
