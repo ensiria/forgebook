@@ -9,8 +9,8 @@
  * @module
  */
 
-/** Where a play or one of its steps is. */
-export type PlayStatus = "running" | "passed" | "failed";
+/** Where a play or one of its steps is; `off`: the reader's switch kept it from running when the story opened. */
+export type PlayStatus = "running" | "passed" | "failed" | "off";
 
 /** One step a play named. */
 export type PlayStep = {
@@ -56,7 +56,7 @@ export type PlayTrace = {
 
 /** Whether a value is a status. */
 const isStatus = (value: unknown): value is PlayStatus =>
-  value === "running" || value === "passed" || value === "failed";
+  value === "running" || value === "passed" || value === "failed" || value === "off";
 
 /** Whether a record's optional `ms`, `error` and `pausedAt` have their types. */
 const hasOptionalEnd = (record: Readonly<Record<string, unknown>>): boolean =>
