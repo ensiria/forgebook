@@ -1,0 +1,189 @@
+{
+  "id": "login-validation",
+  "app": "nuxt-shadcn-dashboard",
+  "prompt": "The sign-in form (app/components/auth/SignIn.vue, at /login) submits anything. Validate it on submit: an empty or malformed email shows \"Enter a valid email address\" under the Email field, and a password shorter than 8 characters shows \"Password must be at least 8 characters\" under the Password field. Each error goes away as soon as its field is fixed. A valid form behaves as today.",
+  "scope": ["app/components/auth/SignIn.vue"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Validated the way the app's other forms are (its form components with a schema), shown with the app's own field and message styles."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "Both errors, one fixed, in the dark theme and in a narrow window."
+    },
+    {
+      "id": "a11y",
+      "text": "Each error is tied to its field and announced; the fields keep their labels; focus goes to the first field in error."
+    },
+    {
+      "id": "scope",
+      "text": "Only the sign-in form changes; the sign-up form is unchanged, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "The sign-in form as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/login"
+        }
+      ]
+    },
+    {
+      "name": "errors",
+      "description": "Submitted with a bad email and a short password.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/login"
+        },
+        {
+          "fill": {
+            "label": "Email"
+          },
+          "value": "not-an-email"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "123"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "errors-dark",
+      "description": "The same, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/login"
+        },
+        {
+          "fill": {
+            "label": "Email"
+          },
+          "value": "not-an-email"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "123"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "errors-narrow",
+      "description": "The same, in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/login"
+        },
+        {
+          "fill": {
+            "label": "Email"
+          },
+          "value": "not-an-email"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "123"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Login"
+          }
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "bad input shows both errors, and fixing them clears them",
+      "steps": [
+        {
+          "goto": "/login"
+        },
+        {
+          "fill": {
+            "label": "Email"
+          },
+          "value": "not-an-email"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "123"
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Login"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Enter a valid email address"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "Password must be at least 8 characters"
+          }
+        },
+        {
+          "fill": {
+            "label": "Email"
+          },
+          "value": "ada@example.com"
+        },
+        {
+          "expectHidden": {
+            "text": "Enter a valid email address"
+          }
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "long-enough-1"
+        },
+        {
+          "expectHidden": {
+            "text": "Password must be at least 8 characters"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

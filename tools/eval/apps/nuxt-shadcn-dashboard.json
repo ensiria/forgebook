@@ -1,0 +1,15 @@
+{
+  "name": "nuxt-shadcn-dashboard",
+  "repository": "https://github.com/dianprata/nuxt-shadcn-dashboard",
+  "commit": "54988681e50feaa4935828882da93faff06cf042",
+  "framework": "nuxt",
+  "packageManager": "pnpm",
+  "install": ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"],
+  "prepare": [["pnpm", "exec", "nuxt", "prepare"]],
+  "dev": ["pnpm", "exec", "nuxt", "dev", "--port", "{port}", "--host", "localhost"],
+  "readyPath": "/",
+  "checks": {
+    "typecheck": ["pnpm", "exec", "vue-tsc", "--noEmit"],
+    "lint": ["pnpm", "exec", "eslint", "."]
+  }
+}

@@ -143,7 +143,8 @@ export default defineConfig({
 
 A plugin's name is the one `forgebook dev` prints, not its package's. A PostCSS configuration in YAML is not read (`init`
 says so). PostCSS runs on plain CSS and on a component's `<style>` block, with the sheets they import by relative path; a
-Sass file goes through its own compiler alone.
+Sass file goes through its own compiler alone. When a framework plugin or the app's `vite.config` sets
+`css.transformer: "postcss"`, Vite runs the project's PostCSS itself and the catalogue does not run it a second time.
 
 ## A first catalogue
 
@@ -1276,6 +1277,7 @@ is a state of the component: the same).
 | `forgebook check-page` | Runs the checks on a real page of the application, by its address |
 | `forgebook changed` | Lists the stories a change touches, through what they import |
 | `forgebook verify` | Says whether a change is done: every changed UI file in stories that ran, in every variant, and `check-code`, with one exit code |
+| `forgebook proof` | Compares a change's states with where it started, both drawn in one run, for a pull request's comment |
 | `forgebook visibility` | Lists the published components an agent cannot see, with the fix for each |
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
@@ -1324,9 +1326,10 @@ the configuration:
 export default defineConfig({ /* … */ build: { readableNames: true } });
 ```
 
-A component's docs, a story file's code and a component's page are data, not scripts: a build writes each as a gzipped
-`.bin` file, which the page unpacks when it shows it, or in the story index itself when it is shorter than that file
-(a story file whose stories are all args has no code).
+A component's docs, a story file's code and a component's page are data, not scripts: a build writes them gzipped in
+`.bin` files, neighbouring texts together up to 64 KB of JSON each so they compress as one, which the page unpacks when
+it shows one; a text no longer than its loader goes in the story index itself (a story file whose stories are all args
+has no code).
 
 ## Mocking an API
 
@@ -1430,6 +1433,37 @@ jobs:
 ```
 
 A pull request from a fork gets no secrets, so a step that deploys only works for branches of your own repository.
+
+## Proof in the pull request, made by CI
+
+`forgebook proof --base origin/main` draws the states a change touches twice in one run, from the commit it is compared with and
+with the change, and writes `comment.md`, `proof.json`, `index.html` and the pictures. `forgebook proof
+--write-workflow` writes a GitHub workflow that posts that comment, one per pull request, replaced on each push. Nothing runs
+outside GitHub, and the pictures are the run's artefact.
+
+- **No baseline, so nothing for an agent to approve.** The "before" is drawn in this run from where the change left the base (on a pull request's run, the base's tip), in a checkout
+  with its own install and server, and thrown away. `forgebook-baselines` is never read, and `proof` has no `--update`.
+- **What differs is pictured again.** A state that also differs between two pictures of the same code is `unstable`, and its
+  difference proves nothing. `forgebook proof --base HEAD --all` shows whether a project's pictures hold still between two
+  builds of one commit.
+- **It says what it did not check:** what `verify` skipped, UI files no story reaches, stories past `--max-stories`, a state
+  that did not draw, and real pages, which no story shows.
+- **A changed picture is for a person to judge.** The command exits zero once it has a proof, unless `--fail-on-verdict`
+  holds it to `verify`'s verdict, as the workflow does.
+- **It cannot defend against the code it runs.** The branch's code runs in the comparing job, and a `postinstall` before it,
+  so a hostile branch can forge the result or edit the workflow: no baseline can be approved, but a result can be faked. So
+  that job holds no write token and keeps no credential. The posting job runs nothing of the branch, writes the comment
+  itself from `proof.json` with every name in a code span or a fence, and lists from GitHub which files shape the run
+  (`.github/`, `patches/`, `package.json`, lockfiles, `.npmrc`, the catalogue's configuration and preview). The comment says
+  this at its top. Protect `.github/` with code owners if agents push to your repository, and treat `index.html` in a
+  stranger's artefact as any download.
+- **A fork's pull request gets no comment.** GitHub gives its run a read-only token, so posting fails and the job goes on:
+  the proof stays in the run's summary and its artefact. Never run this on `pull_request_target`, which would hand a fork's
+  code a write token.
+- **A picture needs a download.** GitHub cannot show an artefact's picture in a comment, so the comment links the artefact:
+  open `index.html` in it.
+- **A picture with something from the network proves little.** A story loading a random image reads as `unstable`, or as
+  changed when it differs only between the two sides. Mock what a story fetches.
 
 ## Stories on an origin of their own
 
@@ -1722,7 +1756,10 @@ when it needs one, `FORGEBOOK_SEMANTIC_KEY`. No model comes with Forgebook and n
 `judgements`, apart from the problems, as an opinion: it does not fail the check.
 
 `forgebook check-code` and `check_code` read what a change adds, new files included, from where it left `--since`: a colour
-written by hand, with the token to use when one clearly fits; a size that equals a token; a check turned off with no
+written by hand, with the token to use when one clearly fits; a size that equals a token, in a sheet, a class's brackets
+or a React style object, where a bare number is pixels (`style={{ padding: 16 }}`, a `CSSProperties`, `styled.div({ … })`).
+A bare number on a line that does not say its object is a style is only `advice`, since an option has the same keys
+(`fitView({ padding: 16 })`). Then a check turned off with no
 reason (`@ts-ignore`, `eslint-disable`, `biome-ignore`, `stylelint-disable`); a test deleted. Only styles and components
 are read for values: stories, tests, token definitions and generated files are left alone. A fix is a token's name, not
 code to paste. It does not check props, which the type checker does. It exits non-zero on a problem, for CI.

@@ -401,12 +401,24 @@ describe("forgebookPlugin in a build", () => {
     expect(at).toBeGreaterThan(-1);
     const rows = (texts ?? "").split("export default [")[1]?.split(",\n") ?? [];
     expect(rows).toHaveLength(rowKeys(code).length);
-    // its stories have a render and its component a page: both worth a file
-    const files = [...(rows[at] ?? "").matchAll(/packedText\(("assets\\u002f[0-9a-f]{12}\.bin")\)/g)].map(
-      (match) => String(JSON.parse(match[1] ?? ""))
+    // its docs, its stories' render and its component's page: all longer than a loader, packed in the files named
+    const packs = new Map(
+      [
+        ...(texts ?? "").matchAll(
+          /^const (packedTexts\d+) = packedText\(("assets\\u002f[0-9a-f]{12}\.bin")\);$/gm
+        )
+      ].map(([, name = "", file = ""]) => [
+        name,
+        gunzipSync(emitted.get(JSON.parse(file)) ?? new Uint8Array()).toString()
+      ])
     );
-    expect(files).toHaveLength(2);
-    const written = files.map((file) => gunzipSync(emitted.get(file) ?? new Uint8Array()).toString());
+    const written = [...(rows[at] ?? "").matchAll(/packedPart\((packedTexts\d+),(\d+)\)/g)].map(
+      ([, name = "", place]) => {
+        const pack: unknown = JSON.parse(packs.get(name) ?? "[]");
+        return JSON.stringify(Array.isArray(pack) ? pack[Number(place)] : undefined);
+      }
+    );
+    expect(written).toHaveLength(3);
     expect(written.some((text) => text.includes("select.inRow.caption"))).toBe(true);
     expect(written.some((text) => text.includes("Lets the user pick one value"))).toBe(true);
   });

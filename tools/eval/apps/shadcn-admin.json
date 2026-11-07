@@ -1,0 +1,16 @@
+{
+  "name": "shadcn-admin",
+  "repository": "https://github.com/satnaing/shadcn-admin",
+  "commit": "e16c87f213a5ba5e45964e9b67c792105ec74d26",
+  "framework": "react",
+  "packageManager": "pnpm",
+  "install": ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"],
+  "prepare": [["pnpm", "exec", "playwright", "install", "chromium"]],
+  "dev": ["pnpm", "exec", "vite", "--port", "{port}", "--strictPort", "--host", "localhost"],
+  "readyPath": "/",
+  "checks": {
+    "typecheck": ["pnpm", "exec", "tsc", "-b"],
+    "test": ["pnpm", "exec", "vitest", "run", "--browser.headless"],
+    "lint": ["pnpm", "exec", "eslint", "."]
+  }
+}
