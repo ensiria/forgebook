@@ -1266,7 +1266,7 @@ is a state of the component: the same).
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
-| `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change |
+| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook check <id> --stress` | Draws the story in the states nobody wrote: long text, unbreakable words, huge numbers, empty, right to left, 200 % zoom, narrow, dark, more contrast, and reports what each breaks |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |

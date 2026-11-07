@@ -5,12 +5,18 @@
  * @module
  */
 import {
+  extractCallSites as extractVueCallSites,
   extractFileComponent as extractVueFileComponent,
   extractStoryComponent as extractVueStoryComponent,
   sourcesChanged as vueSourcesChanged,
   storyFileShape as vueStoryFileShape
 } from "@forgebook/vue/docs";
-import type { ExtractFileComponent, ExtractStoryComponent, StoryFileShape } from "forgebook/vite/adapter";
+import type {
+  ExtractCallSites,
+  ExtractFileComponent,
+  ExtractStoryComponent,
+  StoryFileShape
+} from "forgebook/vite/adapter";
 
 /** The module a new story file imports its types from. */
 export const storyTypesModule = "@forgebook/nuxt";
@@ -33,3 +39,7 @@ export const storyFileShape = (name: string, file: string): StoryFileShape => vu
 
 /** The worker heard that a source changed: Vue's checkers read again on their next read. */
 export const sourcesChanged = (): void => vueSourcesChanged();
+
+/** Finds where the application draws a component, as Vue's adapter reads it: the values `forgebook new` writes. */
+export const extractCallSites: ExtractCallSites = (file: string, name: string) =>
+  extractVueCallSites(file, name);
