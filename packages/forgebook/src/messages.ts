@@ -141,6 +141,17 @@ export type FrameMessage =
       readonly message: string;
     }
   | {
+      /**
+       * The colour scheme the frame's document draws in: the browser paints an opaque canvas behind a document whose
+       * scheme differs from its frame element's, so the shell gives the element the same one (`canvasScheme.ts`).
+       */
+      readonly type: "forgebook:scheme";
+      /** The story's id. */
+      readonly storyId: string;
+      /** The scheme. */
+      readonly scheme: "light" | "dark";
+    }
+  | {
       /** The story could not be shown. */
       readonly type: "forgebook:error";
       /** The story's id. */
@@ -382,6 +393,8 @@ export const isFrameMessage = (value: unknown): value is FrameMessage => {
       return typeof value["height"] === "number";
     case "forgebook:spills":
       return typeof value["count"] === "number";
+    case "forgebook:scheme":
+      return value["scheme"] === "light" || value["scheme"] === "dark";
     case "forgebook:call":
       return (
         typeof value["name"] === "string" &&

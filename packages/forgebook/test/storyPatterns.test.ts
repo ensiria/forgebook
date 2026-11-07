@@ -11,7 +11,12 @@ import path, { dirname, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { storyFilesGroupOf, storyFilesGroupText } from "../src/vite/storyFilesModule.ts";
-import { isNegated, listedFiles, patternsProblem } from "../src/vite/storyPatterns.ts";
+import {
+  isNegated,
+  listedFiles,
+  patternsProblem,
+  withoutTrailingSlashes
+} from "../src/vite/storyPatterns.ts";
 import { vitePathsOf } from "../src/vite/vitePaths.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "forgebook-story-patterns-"));
@@ -141,5 +146,15 @@ describe("a group's patterns in a module's id", () => {
     expect(storyFilesGroupText("/repo/app", ["../src/*.stories.tsx"])).toBe(
       "/repo/app::1::src/*.stories.tsx"
     );
+  });
+});
+
+describe("withoutTrailingSlashes", () => {
+  it("takes every trailing slash and no other, however many", () => {
+    expect(withoutTrailingSlashes("http://127.0.0.1:6006/")).toBe("http://127.0.0.1:6006");
+    expect(withoutTrailingSlashes(`src/drafts${"/".repeat(200_000)}`)).toBe("src/drafts");
+    const inside = `${"/".repeat(200_000)}x`;
+    expect(withoutTrailingSlashes(inside)).toBe(inside);
+    expect(withoutTrailingSlashes("/".repeat(3))).toBe("");
   });
 });

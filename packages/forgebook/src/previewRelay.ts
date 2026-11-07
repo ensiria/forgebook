@@ -50,7 +50,7 @@ export const previewRelay = (frameAddress: string, title: string): void => {
   const framesOrigin = new URL(frameAddress, window.location.href).origin;
   const frame = document.createElement("iframe");
   frame.title = title;
-  frame.style.cssText = "display:block;width:100%;height:100vh;border:0";
+  frame.style.cssText = "display:block;width:100%;height:100vh;border:0;color-scheme:light";
   const tell = (message: PreviewRelayMessage): void => {
     window.parent.postMessage(message, "*");
   };
@@ -63,11 +63,17 @@ export const previewRelay = (frameAddress: string, title: string): void => {
       frame.src = frameAddress;
     }, reloadAfterMs);
   });
+  // the frame element takes the scheme the story's document draws in, or the browser paints an opaque canvas behind it
+  const followScheme = (data: object): void => {
+    if (!("type" in data) || data.type !== "forgebook:scheme" || !("scheme" in data)) return;
+    if (data.scheme === "light" || data.scheme === "dark") frame.style.colorScheme = data.scheme;
+  };
   window.addEventListener("message", (event: MessageEvent<unknown>) => {
     if (event.origin !== framesOrigin || event.source !== frame.contentWindow) return;
     const { data } = event;
     if (typeof data !== "object" || data === null || !("type" in data)) return;
     hasHeard = true;
+    followScheme(data);
     if (data.type === "forgebook:ready" || data.type === "forgebook:error")
       tell({ type: "forgebook:preview-ready" });
     if (

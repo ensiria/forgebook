@@ -31,14 +31,14 @@ import {
   readArgsParam,
   readStorybookLink
 } from "../addressArgsParam.ts";
-import { type AddressTexts, addressArgsFor } from "../addressTexts.ts";
+import { type AddressTexts, addressArgsRead } from "../addressTexts.ts";
 import { EMBED_SIZE_TYPE, type EmbedSizeMessage } from "../embed.ts";
 import type { PanelArgs } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import { storyBackground } from "../storyBackground.ts";
 import { type FixedView, NOT_FIXED, withFixed } from "../storyGlobals.ts";
-import { findStory, type StoryLocation, storyTree } from "../storyTree.ts";
+import { findStory, type StoryLocation, storyOfAddress, storyTree } from "../storyTree.ts";
 import { frameAddress, parseView, STAGE_HEIGHT_RANGE, type ViewState } from "../viewState.ts";
 import { CatalogueContext, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
 import { DroppedArgsNote } from "./DroppedArgsNote.tsx";
@@ -187,7 +187,7 @@ const EmbedStory = ({
   const storyRef = useRef<HTMLDivElement>(null);
   const note = useRef<HTMLDivElement>(null);
   // the docs only serve the check: an embed whose address names no value does not load them
-  const hasValues = Object.keys(panelArgs).length > 0;
+  const hasValues = Object.keys(panelArgs).length > 0 || link?.refused !== undefined;
   const docs = usePanelDocs(
     hasValues ? loadDocs : undefined,
     component.name,
@@ -293,7 +293,7 @@ const EmbedContent = ({
   const tree = useMemo(() => storyTree(sources), [sources]);
   // the address is read once: an embed has nowhere to go, so nothing rewrites it
   const [params] = useState(() => new URLSearchParams(window.location.search));
-  const storyId = params.get("story");
+  const storyId = storyOfAddress(params);
   const location = storyId === null ? undefined : findStory(tree, storyId);
   const name = location?.component.name;
   const [read, setRead] = useState<ArgsParamRead>(() => readArgsParam(params.get("args")));
@@ -303,7 +303,10 @@ const EmbedContent = ({
     void readStorybookLink(waiting, ({ readStorybookArgs }, param) => readStorybookArgs(param)).then(setRead);
   }, [waiting]);
   // one object for as long as the address is read: the check is not run again for each render
-  const panelArgs = useMemo(() => addressArgsFor(read.args, addressTexts), [read, addressTexts]);
+  const { panelArgs, link } = useMemo(
+    () => addressArgsRead(read, params.get("args"), addressTexts),
+    [read, params, addressTexts]
+  );
   useEffect(() => {
     document.title = name === undefined ? title : `${name} · ${title}`;
   }, [name, title]);
@@ -323,7 +326,7 @@ const EmbedContent = ({
     <EmbedStory
       location={location}
       view={parseView(params.toString(), catalogue)}
-      link={read.link}
+      link={link}
       panelArgs={panelArgs}
       loadDocs={source === undefined ? undefined : sourceFiles(source).docs[location.story.file]}
       namedValues={source?.namedValues}

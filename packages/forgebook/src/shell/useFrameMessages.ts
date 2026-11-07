@@ -111,6 +111,9 @@ const onFrameMessage = (message: FrameMessage, frame: HTMLIFrameElement, targets
     case "forgebook:size":
       if (address !== undefined) targets.setHeight(address, message.height);
       return;
+    case "forgebook:scheme":
+      frame.style.colorScheme = message.scheme;
+      return;
     case "forgebook:error":
       handlers.onFailed?.(message.storyId, message.message);
       return;
