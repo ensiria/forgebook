@@ -18,6 +18,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { codeLiteral } from "forgebook/code-literal";
+import { type PostcssRunner, projectPostcss, watchedFiles } from "forgebook/vite/project-postcss";
 import {
   type ConfigEnv,
   type HtmlTagDescriptor,
@@ -34,7 +35,6 @@ import { type FontCall, findFontCalls, replaceFontCalls } from "./fonts/fontCall
 import { buildFontModule, shortHash } from "./fonts/fontModule.ts";
 import { loadNextConfig, type NextProjectConfig, nextConfigFile } from "./nextConfig.ts";
 import type { NextjsOptions } from "./nextjs.ts";
-import { type PostcssRunner, projectPostcss, watchedFiles } from "./postcss.ts";
 import { staticImages } from "./staticImages.ts";
 
 /** The modules a story gets Forgebook's stand-in for, by the stand-in's export of this package. */
@@ -291,7 +291,7 @@ export const nextPlugins = (options: NextjsOptions = {}): PluginOption[] => {
     name: "forgebook:next-postcss",
     enforce: "pre",
     configResolved: (): void => {
-      runPostcss = projectPostcss(dir);
+      runPostcss = projectPostcss(dir, { bringsPostcss: "next" });
     },
     transform: {
       filter: { id: CSS_FILE },

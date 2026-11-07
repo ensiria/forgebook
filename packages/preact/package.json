@@ -36,7 +36,8 @@
   "dependencies": {
     "@forgebook/story-format": "workspace:*",
     "@prefresh/vite": "4.0.1",
-    "preact-render-to-string": "6.8.2"
+    "preact-render-to-string": "6.8.2",
+    "vite": "^8.3.4"
   },
   "peerDependencies": {
     "forgebook": "workspace:^",

@@ -28,12 +28,16 @@ import { lazyModule } from "./lazyModule.tsx";
 import { LazyTab } from "./lazyTab.tsx";
 import type { TextArgNote } from "./PropRows.tsx";
 import { PropsTab } from "./PropsTab.tsx";
-import { SignatureReference } from "./SignatureReference.tsx";
 import { STRINGS } from "./strings.ts";
 import { a11yHint, interactionsHint, styleHooks } from "./tabSummaries.ts";
 import type { EventCall } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
 import type { WorstCaseState } from "./worstArgs.ts";
+
+/** The Signature tab's reference, loaded when a story about logic first shows it. */
+const SIGNATURE_TAB = lazyModule(() =>
+  import("./SignatureReference.tsx").then((module) => module.SignatureReference)
+);
 
 /** The Events tab, its module, loaded when the tab is first chosen. */
 const EVENTS_TAB = lazyModule(() => import("./EventsTab.tsx").then((module) => module.EventsTab));
@@ -255,7 +259,10 @@ const logicTabs = (input: DockTabsInput, component: ComponentDocs): DockTab[] =>
       label: STRINGS.tabs.signature,
       content: (
         <div className="forgebook-signature-tab">
-          <SignatureReference name={component.name} signature={component.signature} />
+          <LazyTab
+            module={SIGNATURE_TAB}
+            tabProps={{ name: component.name, signature: component.signature }}
+          />
         </div>
       )
     });
