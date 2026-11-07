@@ -1170,6 +1170,7 @@ is a state of the component: the same).
 | `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
 | `forgebook new <file>` | Writes a component's first stories from its props: the main story, one per choice, the worst case |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
+| `forgebook check <id> --stress` | Draws the story in the states nobody wrote: long text, unbreakable words, huge numbers, empty, right to left, 200 % zoom, narrow, dark, more contrast, and reports what each breaks |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
 | `forgebook shot <id>` | Takes a story's pictures, one PNG per view, at the view's width and the story's height (framed in a device a view names); with `@forgebook/testing` |
 | `forgebook pages` | Lists the docs pages with their ids and addresses; fails when the index has problems |
@@ -1267,6 +1268,29 @@ or translate its texts (`strings: { "plugin.figma.compare": "Confronta" }`). `fo
 say what a catalogue has.
 
 The contract, with how to write one and what it leaves out, is [PLUGINS.md](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/PLUGINS.md).
+
+## The states nobody wrote a story for
+
+`forgebook check <id> --stress` draws a story, then draws it again in each case below, with no story written and nothing
+saved to the project. Each case lists only what it finds that the plain story does not, so a problem the story already
+has is not blamed on the case. `check_story` with `stress: true` does the same for an agent.
+
+| Case | What it gives the story |
+|---|---|
+| `long-text`, `unbreakable`, `empty` | every text prop: a long text, a word with no place to break, nothing |
+| `huge-number` | every number prop: its highest value, or 123,456,789,012 |
+| `rtl` | text in a right-to-left script, drawn right to left |
+| `zoom-200` | the story laid out at half the window's width, as a browser at 200 % lays it out |
+| `narrow` | long text at 320 px |
+| `dark`, `contrast` | the catalogue's dark scheme and more contrast, when it has them |
+
+Values reach the story from a page on the catalogue's origin, as the props panel gives them, since a frame takes no values
+from its address. A case with nothing to set (no text prop, no dark scheme) is in `skipped`, never counted as passed.
+Overlays and focus order are left to `forgebook check`: no case changes them. A text prop that names something rather
+than shows it (an id, a class, an address, an icon's slot) is left alone, and in `empty` a missing accessible name is the
+value's doing and not reported. A frame that does not answer the page (its catalogue set on another origin with
+`frames.origins`) is reported as not judged, never as passed. It exits non-zero when a case adds a problem or cannot be
+judged; `--stress` takes no `--view`, `--all-variants` or `--semantic`.
 
 ## A preview for every pull request
 

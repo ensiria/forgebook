@@ -77,6 +77,7 @@ export const builtCatalogueServer = async (from: string, version: string): Promi
     ask,
     writeNew: unreachable,
     check: unreachable,
+    stress: unreachable,
     checkPage: unreachable,
     shot: unreachable,
     verify: unreachable,

@@ -285,6 +285,7 @@ describe("the verify tool", () => {
       ask: () => Promise.reject(new Error("not asked")),
       writeNew: () => Promise.reject(new Error("not asked")),
       check: async () => "unused",
+      stress: async () => "unused",
       checkPage: async () => "unused",
       shot: async () => "unused",
       servePreview: async () => "unused",
