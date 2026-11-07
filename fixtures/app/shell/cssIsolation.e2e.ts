@@ -218,6 +218,12 @@ test.describe("a story's global CSS", () => {
     mkdirSync(join(dir, "src"));
     mkdirSync(join(dir, "docs"));
     writeFileSync(join(dir, "forgebook.config.ts"), CONFIG);
+    // a package of its own, so its dev server keeps Vite's cache in it: with none, Vite takes the fixture app's
+    // `node_modules/.vite`, and the suite's own server of the app loses the dependencies it prepared there
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "css-isolation", private: true, type: "module" })
+    );
     writeFileSync(
       join(dir, "tsconfig.json"),
       JSON.stringify({
