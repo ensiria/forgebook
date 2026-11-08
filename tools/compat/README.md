@@ -19,7 +19,11 @@ for:
 A tool made of several packages (React and React DOM, Angular's seven) installs the same version of each, or, for a
 package that ships patches of its own, its newest release of that minor. A line whose own peer range excludes what the fixtures pin
 gets that package at a line it accepts, named in the matrix and shown beside the version on the page (Angular 20 with
-TypeScript 5.9, since the fixtures pin TypeScript 6).
+TypeScript 5.9, since the fixtures pin TypeScript 6). A line the package's fixture is not written for, and the tool
+refuses as written, runs on a fixture of its own, named by line in the matrix: SvelteKit 2 runs on `fixtures/sveltekit2`,
+since `fixtures/sveltekit` is a SvelteKit 3 app. The page then names the commands that line ran. Since the overrides
+reach the whole workspace, the other lines' cells hold that fixture at the version it pins, through an override scoped
+to it (`@fixture/sveltekit2>@sveltejs/kit`), so its own install does not fail on a line it was not written for.
 
 A range with anything but carets joined by `||` stops the plan instead of being guessed. A line nobody has released
 stops it too.

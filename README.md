@@ -9,6 +9,9 @@ per story, switches for theme, contrast, motion and language, and a props table 
 > break in the changelog and, where the rewrite is mechanical, in `forgebook migrate`
 > ([version policy and the path to 1.0](CONTRIBUTING.md#version-policy)).
 
+New to it? Read the [documentation](docs/README.md): [getting started](docs/getting-started.md), the how-to guides
+and [troubleshooting](docs/troubleshooting.md).
+
 This repository holds Forgebook's packages; each has its own README, which is also its npm page.
 
 | Package | What it is |
