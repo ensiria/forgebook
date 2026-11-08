@@ -138,7 +138,8 @@ await defineCommands({
         "forgebook-version": {
           type: "string",
           valueName: "version",
-          description: "Evaluate this published release instead of this checkout, packed."
+          description:
+            "Evaluate the published release of this forgebook version, each other package at its version in that release, instead of this checkout, packed."
         },
         fresh: { type: "boolean", description: "Run again the runs already measured." },
         keep: { type: "boolean", description: "Keep each run's copies of the app, to look into a run." }
