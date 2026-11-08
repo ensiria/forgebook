@@ -112,7 +112,8 @@ export const mcpCommands = (
                   dir: config.dir,
                   ask: client.ask,
                   check: (stories) => runStoriesCheck(config, options.url, stories),
-                  checkBase: (base, stories) => runOnBase(config, base, stories.ids, stories.isAllVariants)
+                  checkBase: (base, stories) =>
+                    runOnBase(config, base, stories.ids, stories.isAllVariants, io.env)
                 },
                 {
                   ...input,

@@ -67,7 +67,7 @@ export const verifyCommands = (
             dir: config.dir,
             ask: client.ask,
             check: (input) => runStoriesCheck(config, options.url, input),
-            checkBase: (base, input) => runOnBase(config, base, input.ids, input.isAllVariants)
+            checkBase: (base, input) => runOnBase(config, base, input.ids, input.isAllVariants, io.env)
           },
           {
             since: options.since,
