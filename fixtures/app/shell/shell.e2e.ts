@@ -375,8 +375,9 @@ test.describe("aliases and related pages", () => {
     await fields.click();
     const alias = tree.getByRole("link", { name: "Select in Inputs" });
     await expect(alias.locator("xpath=..")).toHaveAttribute("title", /Lives in Inputs › Selection › Select/);
-    // the alias is not counted as one of the family's components
-    await expect(tree.getByRole("button", { name: /^Forms/ })).toHaveText("Forms0");
+    // the alias is not counted as one of the family's components, and a family of aliases alone shows no 0
+    await expect(tree.getByRole("button", { name: /^Forms/ })).toHaveText("Forms");
+    await expect(fields).toHaveText("Fields");
     await alias.click();
     await expect(page).toHaveURL(/component=kit%3Ainputs-selection-select/);
     await expect(page.locator(".forgebook-header__path")).toHaveText(
