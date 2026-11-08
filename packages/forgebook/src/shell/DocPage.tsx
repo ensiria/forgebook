@@ -39,10 +39,10 @@ import {
 } from "./DocBlocks.tsx";
 import { DocContents } from "./DocContents.tsx";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { PAGE_STRINGS } from "./pageStrings.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
-import { STRINGS } from "./strings.ts";
 import { useAnchorScroll } from "./useAnchorScroll.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import { usePageFrames } from "./usePageFrames.ts";
@@ -157,7 +157,7 @@ const PageFoot = ({
       </a>
     );
   return previous === undefined && next === undefined ? null : (
-    <nav className="forgebook-docs__foot" aria-label={STRINGS.docsNav}>
+    <nav className="forgebook-docs__foot" aria-label={LATER_STRINGS.docsNav}>
       {link(previous, PAGE_STRINGS.previousPage, "previous")}
       {link(next, PAGE_STRINGS.nextPage, "next")}
     </nav>

@@ -122,8 +122,8 @@ $shadow-card: 0 0 0 1px var(--forgebook-card-edge), 0 1px 3px var(--forgebook-sh
 $shadow-card-hover: 0 0 0 1px var(--forgebook-card-edge-hover), 0 4px 14px var(--forgebook-shadow-lift);
 $shadow-popover: 0 0 0 1px var(--forgebook-edge), 0 18px 48px var(--forgebook-shadow-deep), 0 4px 12px var(--forgebook-shadow-lift);
 $shadow-knob: 0 1px 2px var(--forgebook-shadow-deep);
-$focus-edge: inset 0 0 0 1px $accent;
-$focus-halo: color-mix(in srgb, $accent 35%, transparent);
+$focus-edge: var(--forgebook-focus-edge);
+$focus-halo: var(--forgebook-focus-halo);
 $focus-width: 2px;
 
 // corners
@@ -157,13 +157,30 @@ $look: (
 );
 $font-sans: var(--forgebook-font-sans);
 $font-mono: var(--forgebook-font-mono);
-$text-display: 700 1.375rem / 1.2 $font-sans;
-$text-card-title: 600 0.875rem / 1.3 $font-sans;
-$text-body: 400 0.8125rem / 1.4 $font-sans;
-$text-row-label: 500 0.8125rem / 1.35 $font-sans;
-$text-row-compact: 400 0.78125rem / 1.4 $font-sans;
-$text-control: 500 0.75rem / 1.3 $font-sans;
-$text-caption: 400 0.6875rem / 1.35 $font-sans;
-$text-label: 600 0.6875rem / 1.3 $font-sans;
-$text-mono: 400 0.71875rem / 1.4 $font-mono;
-$text-mono-small: 400 0.6875rem / 1.6 $font-mono;
+
+// values a hundred rules repeat, declared once on the page's root beside `$look` (`mixins.look`) and read as variables:
+// written out in every rule, the type and the focus ring were a tenth of the catalogue's style sheet
+$repeated: (
+  focus-edge: inset 0 0 0 1px $accent,
+  focus-halo: color-mix(in srgb, $accent 35%, transparent),
+  text-display: 700 1.375rem / 1.2 $font-sans,
+  text-card-title: 600 0.875rem / 1.3 $font-sans,
+  text-body: 400 0.8125rem / 1.4 $font-sans,
+  text-row-label: 500 0.8125rem / 1.35 $font-sans,
+  text-row-compact: 400 0.78125rem / 1.4 $font-sans,
+  text-control: 500 0.75rem / 1.3 $font-sans,
+  text-caption: 400 0.6875rem / 1.35 $font-sans,
+  text-label: 600 0.6875rem / 1.3 $font-sans,
+  text-mono: 400 0.71875rem / 1.4 $font-mono,
+  text-mono-small: 400 0.6875rem / 1.6 $font-mono
+);
+$text-display: var(--forgebook-text-display);
+$text-card-title: var(--forgebook-text-card-title);
+$text-body: var(--forgebook-text-body);
+$text-row-label: var(--forgebook-text-row-label);
+$text-row-compact: var(--forgebook-text-row-compact);
+$text-control: var(--forgebook-text-control);
+$text-caption: var(--forgebook-text-caption);
+$text-label: var(--forgebook-text-label);
+$text-mono: var(--forgebook-text-mono);
+$text-mono-small: var(--forgebook-text-mono-small);

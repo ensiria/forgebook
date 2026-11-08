@@ -22,12 +22,15 @@ import { unresolvedImports } from "./viteCache.ts";
  * @param overrides - what the command sets (the port, the output folder); its plugins run after the catalogue's.
  * @param command - what it runs for: a `vite.config` may be a function of it, and of the mode that follows from it.
  * @param isOneShot - whether the server is a one-shot command's, whose app plugins start nothing of their own.
+ * @param isQuickScan - whether the dependency scan reads only the story files itself (`ScanFindings.isQuick`): a first
+ * start's pre-bundling, which scans again without it when a script stops the scan.
  */
 export const catalogueVite = async (
   config: ResolvedConfig,
   overrides: InlineConfig,
   command: "serve" | "build" = "serve",
-  isOneShot = false
+  isOneShot = false,
+  isQuickScan = false
 ): Promise<InlineConfig> => {
   // what a first start's pre-bundling left out, left out here too: it is part of the pre-bundle's hash, and a server
   // whose hash differed would pre-bundle everything again itself
@@ -51,7 +54,7 @@ export const catalogueVite = async (
     // the configuration file is Forgebook's: of a vite.config beside it, `appBuildOf` takes what stories need
     configFile: false,
     plugins: [
-      forgebookPlugin({ config }),
+      forgebookPlugin({ config, isQuickScan }),
       ...((await config.framework.vitePlugins?.({ readsAppBuild: config.appBuild.viteConfig !== false })) ??
         []),
       ...app.plugins,
