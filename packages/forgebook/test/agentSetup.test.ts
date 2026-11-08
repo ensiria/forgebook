@@ -31,6 +31,7 @@ import { chosenExport, resultProblem, runDraw } from "../bin/forgebook/agentSetu
 import { liftedProviders } from "../bin/forgebook/agentSetup/liftedProviders.ts";
 import {
   forgebookCommandLine,
+  forgebookInstalledLine,
   isPlainFolder,
   mcpServerOf
 } from "../bin/forgebook/agentSetup/projectRunner.ts";
@@ -177,6 +178,16 @@ describe("how the root reaches a package's catalogue", () => {
       "--config",
       "apps/web/forgebook.config.ts"
     ]);
+  });
+
+  it("asks npx for the installed command's version, not its own", () => {
+    expect(forgebookInstalledLine("npm", "")).toBe("npx --no -- forgebook --version");
+    expect(forgebookInstalledLine("npm", "apps/web")).toBe(
+      'cd "apps/web" && npx --no -- forgebook --version'
+    );
+    expect(forgebookInstalledLine("pnpm", "")).toBe("pnpm exec forgebook --version");
+    expect(forgebookInstalledLine("yarn", "")).toBe("yarn --silent forgebook --version");
+    expect(forgebookInstalledLine("bun", "")).toBe("bunx --no-install forgebook --version");
   });
 });
 
@@ -344,7 +355,7 @@ describe("the files written", () => {
     const { hooks } = writeAgentFiles({ ...request, projectDir: root, hooks: ["pre-commit"] });
     expect(hooks[0]).toEqual({ name: "pre-commit", file: ".git/hooks/pre-commit", effect: "blocks-commit" });
     expect(readFileSync(join(root, ".git/hooks/pre-commit"), "utf8")).toContain(
-      "if npx --no forgebook --version >/dev/null 2>&1; then"
+      "if npx --no -- forgebook --version >/dev/null 2>&1; then"
     );
     expect(readFileSync(join(root, ".git/hooks/pre-commit"), "utf8")).toContain(
       "npx --no forgebook verify --quick"
