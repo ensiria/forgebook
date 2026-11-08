@@ -165,7 +165,7 @@ const shellStrings = {
   docsLoading: "Reading the component…",
   tabLoading: "Loading the tab…",
   tabError: "The tab could not be loaded",
-  pageLoadError: "The page could not be loaded",
+  pageLoadError: "The page could not be loaded: reload the page to try again",
   docsError: "The component could not be read",
   indexProblems: "Some story files could not be read or placed"
 };

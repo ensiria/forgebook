@@ -34,7 +34,16 @@ export type Summary = {
 
 /** A metric's outcome for one tool: its summary, why this tool has no such number, or what went wrong. */
 export type MetricResult =
-  | { readonly kind: "measured"; readonly unit: "ms" | "bytes" | "count"; readonly summary: Summary }
+  | {
+      readonly kind: "measured";
+      readonly unit: "ms" | "bytes" | "count";
+      readonly summary: Summary;
+      /**
+       * Every sample, in the order taken: a spread in two places (a peak that sometimes lands a hundred megabytes
+       * higher) shows here, where the median hides it. Absent from a report written before the bench kept them.
+       */
+      readonly values?: readonly number[];
+    }
   | { readonly kind: "absent"; readonly reason: string }
   | { readonly kind: "failed"; readonly reason: string };
 

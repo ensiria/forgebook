@@ -155,7 +155,25 @@ export type ScanFindings = {
    * parses as nothing else is.
    */
   readonly isJsxInScripts?: boolean;
+  /**
+   * Whether the scan reads only the story files here and leaves every other script to the scanner, which parses it
+   * itself: a first start's pre-bundling tries that first, since reading and parsing every component a second time in
+   * JavaScript costs a large library a quarter of a second, and scans again without it only when a script stops the
+   * scan (`prebundleRun.ts`). A server's own scan reads them all.
+   */
+  readonly isQuick?: boolean;
 };
+
+/**
+ * Whether the scan reads a script here rather than leave it to the scanner: a quick scan reads the story files alone,
+ * whose problems the catalogue names as they are edited, and an id that names no file (a plugin's own module) is not
+ * the scan's to answer.
+ *
+ * @param id - the module's id.
+ * @param isQuick - whether the scan is a quick one (`ScanFindings.isQuick`).
+ */
+const isReadHere = (id: string, isQuick: boolean): boolean =>
+  (!isQuick || STORY_FILE.test(id)) && existsSync(id);
 
 /**
  * The warnings this process wrote: a first start's pre-bundling scans again after leaving out an import it could not
@@ -186,8 +204,7 @@ export const scanOptions = (findings: ScanFindings = {}): ScanOptions => {
         load: {
           filter: { id: { include: SCRIPT, exclude: INSTALLED } },
           handler: (id: string): ScanModule | null => {
-            // an id that names no file (a plugin's own module) is not this hook's to answer
-            if (!existsSync(id)) return null;
+            if (!isReadHere(id, findings.isQuick === true)) return null;
             const file = VITE_PATHS.normalize(id);
             const { module, problem } = scannedScript(file, readFileSync(id, "utf8"));
             if (STORY_FILE.test(id)) return module ?? null;

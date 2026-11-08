@@ -1,11 +1,11 @@
 /**
- * The order tools take their turns in.
+ * The order tools take their turns in, and what the report keeps of a metric's samples.
  *
  * @module
  */
 import { describe, expect, it } from "vitest";
 
-import { roundOrder } from "./runBench.ts";
+import { measured, roundOrder } from "./runBench.ts";
 
 const TOOLS = ["a", "b", "c"];
 const ROUNDS = [1, 2, 3, 4, 5, 6].map((run) => roundOrder(TOOLS, run));
@@ -28,5 +28,17 @@ describe("roundOrder", () => {
       });
     }
     for (const tool of TOOLS) expect(after.get(tool)?.size).toBe(2);
+  });
+});
+
+describe("measured", () => {
+  it("keeps every sample in the order taken beside the median, so a spread in two places shows", () => {
+    const peaks = [630, 760, 640, 650, 770, 620, 645];
+    expect(measured("bytes", peaks)).toEqual({
+      kind: "measured",
+      unit: "bytes",
+      summary: expect.objectContaining({ median: 645, min: 620, max: 770, samples: 7 }),
+      values: peaks
+    });
   });
 });
