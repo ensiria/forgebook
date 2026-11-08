@@ -18,6 +18,28 @@ import type { StoryProblem } from "forgebook/story-check";
 
 import { findOverlaysPastFrame } from "./overlays.ts";
 
+/** How Chromium's console begins the error for a file the page could not load, whose text names no file. */
+const LOAD_FAILURE = "Failed to load resource";
+
+/**
+ * A console error as a problem reads it: a file the page could not load is named by its path, which the console gives
+ * apart from the text, so a story's missing image says which one it is.
+ *
+ * @param text - the console message's text.
+ * @param location - the address the console gives for it; empty when none.
+ */
+export const consoleErrorText = (text: string, location: string): string => {
+  if (!text.startsWith(LOAD_FAILURE) || location === "") return text;
+  let path: string;
+  try {
+    const url = new URL(location);
+    path = `${url.pathname}${url.search}`;
+  } catch {
+    path = location;
+  }
+  return `${text}: ${path}`;
+};
+
 /**
  * The page's errors from now on: uncaught ones and the console's, in the order they come.
  *
@@ -28,7 +50,7 @@ export const watchedErrors = (page: Page): string[] => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    if (message.type() === "error") errors.push(consoleErrorText(message.text(), message.location().url));
   });
   return errors;
 };
