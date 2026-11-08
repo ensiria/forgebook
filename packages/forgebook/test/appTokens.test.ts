@@ -327,3 +327,169 @@ describe("components.json", () => {
     expect(namesOf(join(dir, "app"))).toEqual(["--own"]);
   });
 });
+
+describe("tokens that come to nothing", () => {
+  it("names a cycle and a reference nothing declares, with the file and line", () => {
+    const { tokens, problems, unread } = readAppTokens(
+      project({
+        "src/a.css":
+          ":root {\n  --a: var(--b);\n  --b: var(--a);\n  --ink: var(--undefined);\n  --fine: #111;\n}\n"
+      })
+    );
+    expect(tokens.map((each) => each.name)).toEqual(["--a", "--b", "--ink", "--fine"]);
+    expect(problems).toEqual([
+      "src/a.css:2: --a leads back to itself through --b, so a browser gives it no value",
+      "src/a.css:3: --b leads back to itself through --a, so a browser gives it no value",
+      "src/a.css:4: --ink reads var(--undefined), which nothing declares, so a browser gives it no value: declare --undefined or give it a fallback"
+    ]);
+    expect(unread).toEqual([]);
+  });
+
+  it("takes a name another rule, an installed package's sheet or the code sets as declared", () => {
+    const { problems, unread } = readAppTokens(
+      project({
+        "src/a.css": [
+          '@import "@acme/palette";',
+          ":root { --brand: var(--acme-blue); --sans: var(--font-geist-sans); --gap: var(--card-gap); }",
+          ".card { --card-gap: 4px; }"
+        ].join("\n"),
+        "src/layout.tsx":
+          'const geist = Geist({ variable: "--font-geist-sans" });\nconst x = "var(--nope)";\n',
+        "node_modules/@acme/palette/package.json": '{"name":"@acme/palette","style":"palette.css"}',
+        "node_modules/@acme/palette/palette.css": ":root { --acme-blue: #00f; }"
+      })
+    );
+    expect(problems).toEqual([]);
+    expect(unread).toEqual([]);
+  });
+
+  it("does not take reading a name in code for setting it", () => {
+    const { problems } = readAppTokens(
+      project({
+        "src/a.css": ":root { --ink: var(--nope); }",
+        "src/app.tsx": 'const style = { color: "var(--nope)" };\n'
+      })
+    );
+    expect(problems).toEqual([
+      "src/a.css:1: --ink reads var(--nope), which nothing declares, so a browser gives it no value: declare --nope or give it a fallback"
+    ]);
+  });
+
+  it("says it cannot tell, and fails nothing, when an imported package's sheet cannot be read", () => {
+    const { problems, unread } = readAppTokens(
+      project({
+        "src/a.css": '@import "@acme/gone/styles.css";\n:root { --ink: var(--acme-ink); }',
+        "node_modules/@acme/gone/package.json": '{"name":"@acme/gone"}'
+      })
+    );
+    expect(problems).toEqual([]);
+    expect(unread).toContain(
+      'src/a.css:2: --ink reads var(--acme-ink): nothing read declares it; it may come from "@acme/gone/styles.css", which could not be read'
+    );
+  });
+});
+
+describe("tokens that come to nothing, against what declares a name elsewhere", () => {
+  it("takes a name set anywhere in the repository: a template, a .vue style block, @property, a sheet not read", () => {
+    const dir = project({
+      "packages/ui/a.css": [
+        "@property --angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }",
+        ":root { --a: var(--angle); --b: var(--gap); --c: var(--font-geist-sans); --d: var(--hidden); --e: var(--vue); }"
+      ].join("\n"),
+      "packages/ui/forgebook.config.ts": "export default {};\n",
+      "apps/web/app/layout.tsx": 'const geist = Geist({ variable: "--font-geist-sans" });\n',
+      "apps/web/index.html": '<main style="--gap: 4px">x</main>\n',
+      "apps/web/src/App.vue": "<style>\n:root { --vue: red; }\n</style>\n",
+      "apps/web/public/extra.css": ":root { --hidden: blue; }\n"
+    });
+    const { problems, unread } = readAppTokens(join(dir, "packages", "ui"));
+    expect(problems).toEqual([]);
+    expect(unread).toEqual([]);
+  });
+
+  it("does not take a declaration that only reads its own name for one that sets it", () => {
+    const { problems } = readAppTokens(
+      project({
+        "src/a.css": ":root { --ink: var(--brand); }",
+        "src/b.css": ".x { --brand: var(--brand); }"
+      })
+    );
+    expect(problems).toEqual([
+      "src/a.css:1: --ink reads var(--brand), which nothing declares, so a browser gives it no value: declare --brand or give it a fallback"
+    ]);
+  });
+
+  it("calls a cycle only inside a theme a note, since it depends on where the theme is set", () => {
+    const { problems, unread } = readAppTokens(
+      project({
+        "src/a.css": ":root { --a: var(--b); --b: #000; }\n[data-theme='dark'] { --b: var(--a); }\n"
+      })
+    );
+    expect(problems).toEqual([]);
+    expect(unread).toEqual([
+      "src/a.css:1: --a leads back to itself through --b in the dark theme: a browser gives it no value if the theme is set on the root, as its base is",
+      "src/a.css:2: --b leads back to itself through --a in the dark theme: a browser gives it no value if the theme is set on the root, as its base is"
+    ]);
+  });
+
+  it("does not let a font service's sheet or a Sass module silence the check", () => {
+    const { problems } = readAppTokens(
+      project({
+        "src/a.css": [
+          '@import url("https://fonts.googleapis.com/css2?family=Inter");',
+          '@use "sass:math";',
+          ":root { --ink: var(--nope); }"
+        ].join("\n")
+      })
+    );
+    expect(problems).toHaveLength(1);
+  });
+
+  it("says it cannot tell when a sheet builds names with Sass", () => {
+    const { problems, unread } = readAppTokens(
+      project({
+        "src/a.scss":
+          "$keys: (ink: #111);\n@each $k, $v in $keys { :root { --#{$k}: #{$v}; } }\n:root { --text: var(--ink); }\n"
+      })
+    );
+    expect(problems).toEqual([]);
+    expect(unread.join("\n")).toContain("a sheet builds names with Sass or Less");
+  });
+
+  it("never reads a sheet outside the repository, whatever an import or a manifest names", () => {
+    const outside = project(
+      { "leak.css": ":root { --secret: 1; }", "pkg.css": ":root { --secret: 1; }" },
+      false
+    );
+    const inside = project({
+      "src/a.css": `@import "x/../../${outside.split("/").at(-1)}/leak";\n@import "evil";\n:root { --ink: var(--secret); }`,
+      "node_modules/evil/package.json": JSON.stringify({
+        name: "evil",
+        style: `../../../${outside.split("/").at(-1)}/pkg.css`
+      })
+    });
+    const { problems, unread } = readAppTokens(inside);
+    expect(problems).toEqual([]);
+    expect(unread.join("\n")).toContain("--ink reads var(--secret)");
+  });
+});
+
+describe("a package's sheet linked in by the package manager", () => {
+  it("reads it where the link leads, inside the repository", () => {
+    const dir = project({
+      "src/a.css": '@import "@acme/linked";\n:root { --brand: var(--acme-blue); }',
+      "node_modules/.pnpm/acme/node_modules/@acme/linked/package.json":
+        '{"name":"@acme/linked","style":"a.css"}',
+      "node_modules/.pnpm/acme/node_modules/@acme/linked/a.css": ":root { --acme-blue: #00f; }"
+    });
+    mkdirSync(join(dir, "node_modules", "@acme"), { recursive: true });
+    symlinkSync(
+      join(dir, "node_modules", ".pnpm", "acme", "node_modules", "@acme", "linked"),
+      join(dir, "node_modules", "@acme", "linked"),
+      "junction"
+    );
+    const { problems, unread } = readAppTokens(dir);
+    expect(problems).toEqual([]);
+    expect(unread).toEqual([]);
+  });
+});
