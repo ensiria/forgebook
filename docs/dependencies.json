@@ -1,0 +1,194 @@
+{
+  "date": "2026-11-08",
+  "npm": "11.9.0",
+  "packages": [
+    {
+      "name": "@forgebook/angular",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 3,
+      "installed": 34,
+      "platformOnly": 22,
+      "peers": 328,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/html",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 2,
+      "installed": 2,
+      "platformOnly": 0,
+      "peers": 47,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/nextjs",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 2,
+      "installed": 4,
+      "platformOnly": 0,
+      "peers": 94,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/nuxt",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 4,
+      "installed": 59,
+      "platformOnly": 0,
+      "peers": 72,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/plugin-figma",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 1,
+      "installed": 1,
+      "platformOnly": 0,
+      "peers": 48,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/plugin-msw",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 0,
+      "installed": 0,
+      "platformOnly": 0,
+      "peers": 98,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/preact",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 3,
+      "installed": 38,
+      "platformOnly": 22,
+      "peers": 49,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/react",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 2,
+      "installed": 3,
+      "platformOnly": 0,
+      "peers": 47,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/react-native-web",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 4,
+      "installed": 16,
+      "platformOnly": 0,
+      "peers": 269,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/solid",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 2,
+      "installed": 57,
+      "platformOnly": 0,
+      "peers": 51,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/story-format",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 0,
+      "installed": 0,
+      "platformOnly": 0,
+      "peers": 0,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/svelte",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 4,
+      "installed": 11,
+      "platformOnly": 0,
+      "peers": 66,
+      "advisories": [
+        {
+          "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+          "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+          "severity": "low",
+          "package": "deepmerge",
+          "range": ">=4.2.0 <=4.3.1",
+          "isThroughPeer": false
+        }
+      ]
+    },
+    {
+      "name": "@forgebook/sveltekit",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 2,
+      "installed": 12,
+      "platformOnly": 0,
+      "peers": 66,
+      "advisories": [
+        {
+          "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+          "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+          "severity": "low",
+          "package": "deepmerge",
+          "range": ">=4.2.0 <=4.3.1",
+          "isThroughPeer": false
+        }
+      ]
+    },
+    {
+      "name": "@forgebook/testing",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 3,
+      "installed": 4,
+      "platformOnly": 0,
+      "peers": 69,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/vue",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 5,
+      "installed": 29,
+      "platformOnly": 0,
+      "peers": 54,
+      "advisories": []
+    },
+    {
+      "name": "@forgebook/web-components",
+      "status": "measured",
+      "version": "0.2.4",
+      "direct": 2,
+      "installed": 2,
+      "platformOnly": 0,
+      "peers": 53,
+      "advisories": []
+    },
+    {
+      "name": "forgebook",
+      "status": "measured",
+      "version": "0.3.3",
+      "direct": 6,
+      "installed": 18,
+      "platformOnly": 11,
+      "peers": 30,
+      "advisories": []
+    }
+  ]
+}

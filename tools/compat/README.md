@@ -61,6 +61,7 @@ reaches develop without a maintainer's merge.
 - `versions.ts`: version order and caret ranges, the only range form the matrix reads.
 - `cell.ts`: one cell, run for real in a disposable checkout.
 - `table.ts`: the page and the list of changed cells, pure.
-- `publish.ts`: the commit and the pull request through GitHub's API.
+- `../github-pull-request/pullRequest.ts`: the commit and the pull request through GitHub's API, shared with the
+  `dependencies` command.
 - `documents.ts`: every JSON the command reads, checked field by field.
 - `*.test.ts`: each part on small inputs; the real matrix against the real manifests; the real page against its report.
