@@ -37,7 +37,7 @@ import {
   withStopHook
 } from "./assistantHooks.ts";
 import { WORKFLOW_FILE, workflowText } from "./ciWorkflow.ts";
-import { forgebookCommandLine, isPlainFolder, mcpServerOf } from "./projectRunner.ts";
+import { forgebookCommandLine, forgebookInstalledLine, isPlainFolder, mcpServerOf } from "./projectRunner.ts";
 
 /** A hook `--hooks` names: an assistant's, or the commit's. */
 export type HookName = AssistantName | "pre-commit";
@@ -261,28 +261,36 @@ const gitHooksFolder = (root: string): string | undefined => {
   }
 };
 
+/** What a pre-commit hook runs: `verify`, once a check says the project has installed it. */
+type PreCommitCommands = {
+  /** The line that succeeds only when `forgebook` is installed. */
+  readonly installed: string;
+  /** The line that runs `verify`. */
+  readonly verify: string;
+};
+
 /** The text of a pre-commit hook. */
-const preCommitLines = (command: string): string =>
+const preCommitLines = ({ installed, verify }: PreCommitCommands): string =>
   "# Written by forgebook init --agents: a change whose UI is red does not get committed\n" +
   // a teammate who has not installed yet commits as before: a hook that cannot run must not stop every commit
-  `if ${command.replace(" verify --quick", " --version")} >/dev/null 2>&1; then\n  ${command}\nfi\n`;
+  `if ${installed} >/dev/null 2>&1; then\n  ${verify}\nfi\n`;
 
 /** Adds `verify` to Husky's hook, which the repository keeps under version control. */
-const writeHusky = (root: string, command: string, done: Written): WrittenHook | undefined => {
+const writeHusky = (root: string, commands: PreCommitCommands, done: Written): WrittenHook | undefined => {
   const name = ".husky/pre-commit";
   const file = join(root, name);
   if (isLink(root, name)) {
     done.nextSteps.push({
       kind: "setup",
       file: name,
-      message: `${name} is a link, so it was left as it is: add \`${command}\` to it`
+      message: `${name} is a link, so it was left as it is: add \`${commands.verify}\` to it`
     });
     return undefined;
   }
   const text = readIfThere(file) ?? "";
   if (OWN_PRE_COMMIT.test(text)) done.unchanged.push(name);
   else {
-    writeInto(file, `${text.replace(/\n*$/, text === "" ? "" : "\n")}${preCommitLines(command)}`);
+    writeInto(file, `${text.replace(/\n*$/, text === "" ? "" : "\n")}${preCommitLines(commands)}`);
     chmodSync(file, 0o755);
     done.written.push(name);
   }
@@ -290,8 +298,12 @@ const writeHusky = (root: string, command: string, done: Written): WrittenHook |
 };
 
 /** Writes the commit's hook where the repository's tools keep it, or says why it did not. */
-const writePreCommit = (root: string, command: string, done: Written): WrittenHook | undefined => {
-  if (existsSync(join(root, ".husky"))) return writeHusky(root, command, done);
+const writePreCommit = (
+  root: string,
+  commands: PreCommitCommands,
+  done: Written
+): WrittenHook | undefined => {
+  if (existsSync(join(root, ".husky"))) return writeHusky(root, commands, done);
   const other = ["lefthook.yml", ".lefthook.yml", ".pre-commit-config.yaml"].find((name) =>
     existsSync(join(root, name))
   );
@@ -315,11 +327,11 @@ const writePreCommit = (root: string, command: string, done: Written): WrittenHo
     done.nextSteps.push({
       kind: "setup",
       file: other,
-      message: `The repository's commits have a hook setup of their own${other === undefined ? "" : ` (${other})`}, which was left as it is: add \`${command}\` to it`
+      message: `The repository's commits have a hook setup of their own${other === undefined ? "" : ` (${other})`}, which was left as it is: add \`${commands.verify}\` to it`
     });
     return undefined;
   }
-  writeInto(file, `#!/bin/sh\n${preCommitLines(command)}`);
+  writeInto(file, `#!/bin/sh\n${preCommitLines(commands)}`);
   chmodSync(file, 0o755);
   const shown = VITE_PATHS.normalize(relative(realpathSync.native(root), file));
   done.written.push(shown);
@@ -340,7 +352,14 @@ const writeHook = (
   done: Written
 ): WrittenHook | undefined => {
   if (name === "pre-commit")
-    return writePreCommit(root, forgebookCommandLine(manager, folder, "verify --quick"), done);
+    return writePreCommit(
+      root,
+      {
+        installed: forgebookInstalledLine(manager, folder),
+        verify: forgebookCommandLine(manager, folder, "verify --quick")
+      },
+      done
+    );
   const assistant = ASSISTANTS[name];
   // these two name their project's root, so a hook started from another folder still finds the package
   const base = PROJECT_ROOT_VARIABLE[name] ?? "";
