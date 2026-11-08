@@ -327,3 +327,34 @@ test.describe("the panel's order", () => {
     ]);
   });
 });
+
+test.describe("the panel's actions", () => {
+  test("Reset and Worst case stay at the bottom of the panel while the props scroll, the last prop above them", async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await open(page, story("filled", "tab=props"));
+    const body = page.locator(".forgebook-dock__body");
+    const foot = page.locator(".forgebook-tab-foot");
+    const lastGroup = page.locator(".forgebook-tab-props > :nth-last-child(2)");
+    await expect(foot.getByRole("button", { name: "Reset" })).toBeVisible();
+    // the story's props must be more than the panel holds, or nothing here scrolls
+    expect(await body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    /** How far the bar's bottom is from the panel's visible bottom, in pixels. */
+    const gapBelowFoot = (): Promise<number> =>
+      page.evaluate(() => {
+        const scroller = document.querySelector(".forgebook-dock__body");
+        const bar = document.querySelector(".forgebook-tab-foot");
+        if (scroller === null || bar === null) return Number.NaN;
+        return Math.abs(scroller.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom);
+      });
+    await expect(foot).toBeInViewport({ ratio: 1 });
+    expect(await gapBelowFoot()).toBeLessThan(1);
+    await body.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    await expect(foot).toBeInViewport({ ratio: 1 });
+    expect(await gapBelowFoot()).toBeLessThan(1);
+    const footTop = (await foot.boundingBox())?.y ?? 0;
+    const lastBox = await lastGroup.boundingBox();
+    expect((lastBox?.y ?? Number.POSITIVE_INFINITY) + (lastBox?.height ?? 0)).toBeLessThanOrEqual(footTop);
+  });
+});

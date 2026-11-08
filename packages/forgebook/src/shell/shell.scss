@@ -690,11 +690,18 @@
     color: $text-secondary;
   }
 
+  // the Props tab's actions, the tab's last child: it stays at the bottom of the panel's scroller while the props
+  // scroll under it, and as it keeps its place in the flow the last prop always ends above it
   .forgebook-tab-foot {
+    position: sticky;
+    bottom: 0;
+    // over the controls that make their own layer (a swatch, a range)
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: $space-3;
     padding: $space-2-5 $space-3-5;
+    background: $surface;
     box-shadow: $line-top;
   }
 
