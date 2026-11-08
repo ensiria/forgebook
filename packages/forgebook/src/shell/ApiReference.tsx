@@ -169,9 +169,9 @@ const PropTable = ({
         <thead>
           <tr>
             <th scope="col">{NAME_HEADINGS[kind]()}</th>
-            <th scope="col">{kind === "events" ? LATER_STRINGS.apiSignature : STRINGS.apiType}</th>
+            <th scope="col">{kind === "events" ? LATER_STRINGS.apiSignature : LATER_STRINGS.apiType}</th>
             {hasDefaults ? <th scope="col">{LATER_STRINGS.apiDefault}</th> : null}
-            <th scope="col">{STRINGS.apiWhat}</th>
+            <th scope="col">{LATER_STRINGS.apiWhat}</th>
           </tr>
         </thead>
         <tbody>
