@@ -1,5 +1,5 @@
 /**
- * The table's pull request, against a recorded GitHub: a first run makes the branch from the base and opens the pull
+ * A page's pull request, against a recorded GitHub: a first run makes the branch from the base and opens the pull
  * request; with one open, a commit goes on top without forcing and its description is replaced; a branch left with no
  * pull request starts again from the base; a commit that changes nothing is not made.
  *
@@ -7,7 +7,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { COMMIT_MESSAGE, type GitHubAccess, publishTable, TABLE_BRANCH } from "./publish.ts";
+import { type GitHubAccess, publishPage, type ReviewTarget } from "./pullRequest.ts";
+
+const TARGET: ReviewTarget = { branch: "pages/table", message: "docs: update the table" };
 
 /** A recorded request. */
 type Call = { method: string; path: string; body: unknown };
@@ -28,8 +30,8 @@ const fakeGitHub = (routes: Record<string, unknown>): { access: GitHubAccess; ca
   return { access: { repository: "o/r", token: "t", base: "develop", fetch: fake }, calls };
 };
 
-const FILES = [{ path: "docs/compatibility.md", content: "# Compatibility\n" }];
-const PULLS = `/pulls?state=open&base=develop&head=${encodeURIComponent(`o:${TABLE_BRANCH}`)}`;
+const FILES = [{ path: "docs/table.md", content: "# Table\n" }];
+const PULLS = `/pulls?state=open&base=develop&head=${encodeURIComponent(`o:${TARGET.branch}`)}`;
 
 /** The routes of a base branch whose tree the new files change. */
 const FROM_BASE = {
@@ -41,17 +43,17 @@ const FROM_BASE = {
   "POST /pulls": { html_url: "https://github.com/o/r/pull/9" }
 };
 
-describe("publishTable", () => {
+describe("publishPage", () => {
   it("makes the branch from the base and opens the pull request on a first run", async () => {
     const { access, calls } = fakeGitHub({ ...FROM_BASE, [`GET ${PULLS}`]: [] });
-    expect(await publishTable(access, FILES, "body")).toBe("https://github.com/o/r/pull/9");
+    expect(await publishPage(access, TARGET, FILES, "body")).toBe("https://github.com/o/r/pull/9");
     expect(calls.find((call) => call.path === "/git/commits")?.body).toEqual({
-      message: COMMIT_MESSAGE,
+      message: TARGET.message,
       tree: "tree",
       parents: ["base"]
     });
     expect(calls.find((call) => call.path === "/git/refs")?.body).toEqual({
-      ref: `refs/heads/${TABLE_BRANCH}`,
+      ref: `refs/heads/${TARGET.branch}`,
       sha: "commit"
     });
     expect(calls.some((call) => call.method === "DELETE")).toBe(false);
@@ -61,24 +63,24 @@ describe("publishTable", () => {
     const { access, calls } = fakeGitHub({
       ...FROM_BASE,
       [`GET ${PULLS}`]: [],
-      [`GET /git/ref/heads/${TABLE_BRANCH}`]: { object: { sha: "old" } }
+      [`GET /git/ref/heads/${TARGET.branch}`]: { object: { sha: "old" } }
     });
-    await publishTable(access, FILES, "body");
-    expect(calls.find((call) => call.method === "DELETE")?.path).toBe(`/git/refs/heads/${TABLE_BRANCH}`);
+    await publishPage(access, TARGET, FILES, "body");
+    expect(calls.find((call) => call.method === "DELETE")?.path).toBe(`/git/refs/heads/${TARGET.branch}`);
     expect(calls.find((call) => call.path === "/git/commits")?.body).toMatchObject({ parents: ["base"] });
   });
 
   it("adds a commit on top of an open pull request's branch without forcing, and replaces its description", async () => {
     const { access, calls } = fakeGitHub({
       [`GET ${PULLS}`]: [{ number: 7, html_url: "https://github.com/o/r/pull/7" }],
-      [`GET /git/ref/heads/${TABLE_BRANCH}`]: { object: { sha: "head" } },
+      [`GET /git/ref/heads/${TARGET.branch}`]: { object: { sha: "head" } },
       "GET /git/commits/head": { tree: { sha: "head-tree" } },
       "POST /git/trees": { sha: "tree" },
       "POST /git/commits": { sha: "commit" },
-      [`PATCH /git/refs/heads/${TABLE_BRANCH}`]: {},
+      [`PATCH /git/refs/heads/${TARGET.branch}`]: {},
       "PATCH /pulls/7": {}
     });
-    expect(await publishTable(access, FILES, "new body")).toBe("https://github.com/o/r/pull/7");
+    expect(await publishPage(access, TARGET, FILES, "new body")).toBe("https://github.com/o/r/pull/7");
     expect(calls.find((call) => call.path.startsWith("/git/refs/"))?.body).toEqual({
       sha: "commit",
       force: false
@@ -86,7 +88,7 @@ describe("publishTable", () => {
     expect(calls.find((call) => call.path === "/pulls/7")?.body).toEqual({ body: "new body" });
     expect(calls.find((call) => call.path === "/git/trees")?.body).toEqual({
       base_tree: "head-tree",
-      tree: [{ path: "docs/compatibility.md", mode: "100644", type: "blob", content: "# Compatibility\n" }]
+      tree: [{ path: "docs/table.md", mode: "100644", type: "blob", content: "# Table\n" }]
     });
     expect(
       calls.some((call) => call.method === "DELETE" || (call.path === "/pulls" && call.method === "POST"))
@@ -96,12 +98,12 @@ describe("publishTable", () => {
   it("makes no commit when the files are already on the branch", async () => {
     const { access, calls } = fakeGitHub({
       [`GET ${PULLS}`]: [{ number: 7, html_url: "https://github.com/o/r/pull/7" }],
-      [`GET /git/ref/heads/${TABLE_BRANCH}`]: { object: { sha: "head" } },
+      [`GET /git/ref/heads/${TARGET.branch}`]: { object: { sha: "head" } },
       "GET /git/commits/head": { tree: { sha: "same" } },
       "POST /git/trees": { sha: "same" },
       "PATCH /pulls/7": {}
     });
-    await publishTable(access, FILES, "body");
+    await publishPage(access, TARGET, FILES, "body");
     expect(calls.some((call) => call.path === "/git/commits")).toBe(false);
     expect(calls.some((call) => call.path.startsWith("/git/refs/"))).toBe(false);
   });

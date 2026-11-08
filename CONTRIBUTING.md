@@ -59,6 +59,10 @@ a pull request when a result changed (`tools/compat/README.md`). A package that 
 `tools/compat/matrix.ts`; a range widened to a new major is tested from the next run, and is not supported until its
 cell passes.
 
+`docs/dependencies.md` says what each published package brings into a project and what `npm audit` finds in it. Nobody
+writes it either: the weekly `dependencies` workflow installs each package's `latest` alone, audits it, and opens a pull
+request when a result changed (`tools/dependencies/README.md`).
+
 ## The rules of the code
 
 - **The core stays light.** No new dependency of `forgebook` without an issue first; a heavy tool (Playwright, Testing

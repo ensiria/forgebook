@@ -14,12 +14,12 @@ import { writeIfChanged } from "@ensiria/cli-kit/files";
 import { codeSpan } from "@ensiria/cli-kit/markdown";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
+import { fileOnBranch, publishPage, type ReviewTarget } from "../github-pull-request/pullRequest.ts";
 import { runCell } from "./cell.ts";
 import type { CompatReport, PlannedCell, RegistryPackage } from "./compat.types.ts";
 import { parseCell, parseManifest, parsePlannedCell, parseRegistry, parseReport } from "./documents.ts";
 import { COMPAT_MATRIX } from "./matrix.ts";
 import { packagesToRead, planCells } from "./plan.ts";
-import { fileOnBranch, publishTable } from "./publish.ts";
 import { changedCells, renderTable, TABLE_COMMAND, withMissingCells } from "./table.ts";
 
 /** The repository's root, from this file. */
@@ -28,6 +28,12 @@ const ROOT = resolve(import.meta.dirname, "../..");
 /** The report the page is drawn from, and the page, from the root. */
 const REPORT_PATH = "docs/compatibility.json";
 const PAGE_PATH = "docs/compatibility.md";
+
+/** The branch the table's pull request comes from, and its commit's subject. */
+const TABLE_TARGET: ReviewTarget = {
+  branch: "compat/table",
+  message: "docs(compat): update the compatibility table"
+};
 
 /** A folder's manifest, from the root. */
 const readManifest = (folder: string) =>
@@ -251,7 +257,7 @@ await defineCommands({
           path,
           content: readFileSync(join(ROOT, path), "utf8")
         }));
-        const pullRequest = await publishTable(access, files, body);
+        const pullRequest = await publishPage(access, TABLE_TARGET, files, body);
         log.success(`${changes.length} changed results: ${pullRequest}`);
         return { changes, pullRequest };
       }
