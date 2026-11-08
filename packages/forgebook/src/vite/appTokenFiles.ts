@@ -306,6 +306,112 @@ const importedSheet = (dir: string, from: string, specifier: string): { file?: s
   return target !== "third-party" && SHEET_FILE.test(target.file) ? { file: target.file } : {};
 };
 
+/** A field of an object, when the value is one. */
+const fieldOf = (value: unknown, key: string): unknown =>
+  typeof value === "object" && value !== null && key in value ? Reflect.get(value, key) : undefined;
+
+/**
+ * The sheet a package's manifest gives for `@import` of its bare name, as a bundler looks for it: `exports` (a path, or
+ * its `style` condition), then `style`, then `main`; the first that is a sheet.
+ */
+const manifestStyle = (manifest: string): string | undefined => {
+  const text = smallFileText(manifest);
+  if (text === undefined) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    const exported = fieldOf(parsed, "exports");
+    const main = fieldOf(exported, ".") ?? exported;
+    const named = [main, fieldOf(main, "style"), fieldOf(parsed, "style"), fieldOf(parsed, "main")].find(
+      (each): each is string => typeof each === "string" && SHEET_FILE.test(each)
+    );
+    return named === undefined ? undefined : resolve(dirname(manifest), named);
+  } catch {
+    return undefined;
+  }
+};
+
+/** What an `@import` brings that declares no custom property: Sass's own modules, a font service's sheet. */
+const DECLARES_NOTHING = /^sass:|^(?:https?:)?\/\/(?:fonts\.|use\.typekit\.net\/)/;
+
+/** A package's name and a path in it, with nothing that climbs or starts elsewhere: `@scope/name/dist/x.css`. */
+const BARE_SPECIFIER = /^(?:@[\w-][\w.-]*\/)?[\w-][\w.-]*(?:\/[\w-][\w.@-]*)*$/;
+
+/** A file's real path when it is a sheet inside a folder, the folder's links followed too; none otherwise. */
+const sheetInside = (file: string | undefined, folder: string): string | undefined => {
+  if (file === undefined || !SHEET_FILE.test(file) || !isFile(file)) return undefined;
+  const real = realpathSync(file);
+  return isInside(realpathSync(folder), real) ? real : undefined;
+};
+
+/**
+ * An installed package's sheet that an `@import` names, found on disk as a bundler would; none when it is not one. Only a
+ * bare name is followed, and only to a sheet inside its package, itself inside the repository: a manifest's field or a
+ * name that climbs (`x/../../y`) must not make the check read a file of the machine.
+ */
+const installedSheet = (from: string, specifier: string, root: string): string | undefined => {
+  if (!BARE_SPECIFIER.test(specifier)) return undefined;
+  const folder = dirname(from);
+  const nameLength = specifier.startsWith("@") ? 2 : 1;
+  const name = specifier.split("/").slice(0, nameLength).join("/");
+  const packageDir = packageFile(folder, name);
+  // a package manager links packages in (pnpm), so the folder is where the link leads, and it stays in the repository
+  if (
+    packageDir === undefined ||
+    !statSync(packageDir).isDirectory() ||
+    !isInside(root, realpathSync(packageDir))
+  ) {
+    return undefined;
+  }
+  if (name === "tailwindcss") return sheetInside(join(packageDir, "theme.css"), packageDir);
+  if (name !== specifier) {
+    // a path in a package, written whole or without the sheet's extension, as bundlers allow
+    const path = join(packageDir, specifier.slice(name.length));
+    return sheetInside(path, packageDir) ?? sheetInside(`${path}.css`, packageDir);
+  }
+  return sheetInside(manifestStyle(join(packageDir, "package.json")), packageDir);
+};
+
+/** An imported package sheet's text; `read` when it is a sheet of the workspace, read with the application's own. */
+const packageSheetText = (from: string, specifier: string, root: string): string | "read" | undefined => {
+  // what is missing may still be a package's, so only a sheet of the workspace is passed over
+  const isRead =
+    !/^tailwindcss(?:$|\/)/.test(specifier) && typeof resolvedName(from, specifier, root) === "object";
+  if (isRead) return "read";
+  const sheet = installedSheet(from, specifier, root);
+  return sheet === undefined ? undefined : smallFileText(sheet);
+};
+
+/**
+ * The sheets of installed packages that the application's sheets import, for the custom properties they declare: a
+ * reference to one of those has a value, though it is no token of this application's.
+ *
+ * @param dir - the catalogue's folder.
+ * @param sheets - the sheets read.
+ * @returns the texts found, and what each import that could not be read was called, a missing one included.
+ */
+export const importedPackageSheets = (
+  dir: string,
+  sheets: readonly ReadSheet[]
+): { readonly texts: readonly string[]; readonly unreadable: readonly string[] } => {
+  const root = repositoryOf(dir);
+  const texts: string[] = [];
+  const unreadable = new Set<string>();
+  const seen = new Set<string>();
+  const imports = sheets.flatMap(({ file, reading }) =>
+    reading.imports.map((specifier) => ({ file, specifier }))
+  );
+  for (const { file, specifier } of imports) {
+    // each package once, and a sheet that imports thousands reads no more than the sheets themselves do
+    const key = `${dirname(file)}\0${specifier}`;
+    if (seen.has(key) || seen.size >= MOST_SHEETS || DECLARES_NOTHING.test(specifier)) continue;
+    seen.add(key);
+    const text = packageSheetText(file, specifier, root);
+    if (text === undefined) unreadable.add(specifier);
+    else if (text !== "read") texts.push(text);
+  }
+  return { texts, unreadable: [...unreadable] };
+};
+
 /**
  * Reads a catalogue's sheets, the one `components.json` names first, and what they import from the workspace, each once.
  *

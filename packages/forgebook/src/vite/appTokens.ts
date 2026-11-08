@@ -30,6 +30,7 @@ import { colorWrappers, resolvedTokens, type TokenDeclaration } from "./cssToken
 import type { DesignToken, TokenOrigin, TokenOriginKind, TokenSource } from "./designTokens.ts";
 import { type ConfigToken, readTailwindPalette } from "./tailwindConfigTokens.ts";
 import { type TokenClash, tokenClashes } from "./tokenClashes.ts";
+import { unresolvedTokens } from "./unresolvedTokens.ts";
 
 /** What an application's files gave. */
 export type AppTokens = {
@@ -39,6 +40,8 @@ export type AppTokens = {
   readonly clashes: readonly TokenClash[];
   /** What was read. */
   readonly sources: readonly TokenSource[];
+  /** Tokens a browser gives no value, one line each with its file. */
+  readonly problems: readonly string[];
   /** What could not be read, which leaves tokens unknown; none of it stops a check. */
   readonly unread: readonly string[];
   /** Every file read, absolute. */
@@ -348,7 +351,9 @@ export const readAppTokens = (folder: string): AppTokens => {
   const own = declared.filter((each) => each.isScoped !== true || !onDocument.has(each.name));
   const lowest = defaultDeclarations(dir, sheets, configs, own, unread);
   const wrappers = colorWrappers([...sheets, ...configs].map(({ text }) => text));
-  const tokens = resolvedTokens([...lowest, ...own], wrappers);
+  const declarations = [...lowest, ...own];
+  const tokens = resolvedTokens(declarations, wrappers);
+  const unresolved = unresolvedTokens(dir, { sheets, configs, declarations });
   const isDefault = (token: DesignToken): boolean => token.origin?.kind === "tailwind-default";
   const ordered = [...tokens.filter((token) => !isDefault(token)), ...tokens.filter(isDefault)];
   return {
@@ -360,7 +365,8 @@ export const readAppTokens = (folder: string): AppTokens => {
         : [{ kind: "components-json" as const, file: toPosix(relative(dir, shadcn.file)), tokens: 0 }]),
       ...sourcesOf(ordered)
     ],
-    unread,
+    problems: unresolved.problems,
+    unread: [...unread, ...unresolved.unread],
     files: [...sheets, ...configs].map(({ file }) => file).concat(shadcn === undefined ? [] : [shadcn.file])
   };
 };
