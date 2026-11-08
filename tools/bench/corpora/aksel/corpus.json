@@ -24,6 +24,20 @@
     "files": 117,
     "stories": 986
   },
+  "failsInStorybook": [
+    {
+      "story": "stories:ds-react-data-resize--resize-default-dynamic-width",
+      "reason": "No render function, so Storybook draws the meta's component, DataGridTable, with the args alone; DataGridTable reads DataGrid's context and throws \"DataGrid hooks must be used within a <DataGrid />\" in Storybook 10.6.3 at this commit as well"
+    },
+    {
+      "story": "stories:ds-react-data-resize--resize-default-static-width",
+      "reason": "No render function, so Storybook draws the meta's component, DataGridTable, with the args alone; DataGridTable reads DataGrid's context and throws \"DataGrid hooks must be used within a <DataGrid />\" in Storybook 10.6.3 at this commit as well"
+    },
+    {
+      "story": "stories:ds-react-data-resize--resize-min-max",
+      "reason": "No render function, so Storybook draws the meta's component, DataGridTable, with the args alone; DataGridTable reads DataGrid's context and throws \"DataGrid hooks must be used within a <DataGrid />\" in Storybook 10.6.3 at this commit as well"
+    }
+  ],
   "measured": {
     "forgebookStory": "stories:ds-react-read-more--default",
     "forgebookComponent": "stories:ds-react-read-more",
