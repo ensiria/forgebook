@@ -24,6 +24,19 @@ const RUNNER: Readonly<Record<PackageManagerName, string>> = {
 };
 
 /**
+ * The same, for a line whose arguments `npx` would take for its own: it reads `--version` as its option wherever it
+ * stands, and prints npm's version with exit code 0 when nothing is installed, so its arguments follow `--`.
+ */
+const OWN_ARGUMENTS_RUNNER: Readonly<Record<PackageManagerName, string>> = {
+  ...RUNNER,
+  npm: "npx --no -- forgebook"
+};
+
+/** A runner's command with its arguments, from the repository's root. */
+const lineOf = (runner: string, folder: string, args: string, folderBase: string): string =>
+  folder === "" ? `${runner} ${args}` : `cd "${folderBase}${folder}" && ${runner} ${args}`;
+
+/**
  * Whether a folder's name can go into a shell's line, a workflow and a client's arguments as it is. Anything else is a
  * repository's name for a folder that a shell or GitHub Actions would read as code, so nothing is written with it.
  *
@@ -46,10 +59,18 @@ export const forgebookCommandLine = (
   folder: string,
   args: string,
   folderBase = ""
-): string => {
-  const command = `${RUNNER[manager]} ${args}`;
-  return folder === "" ? command : `cd "${folderBase}${folder}" && ${command}`;
-};
+): string => lineOf(RUNNER[manager], folder, args, folderBase);
+
+/**
+ * The shell command that succeeds only when the project has installed `forgebook`, from the repository's root: what a
+ * hook asks before it runs `verify`, so that a clone not yet installed still commits.
+ *
+ * @param manager - the package manager.
+ * @param folder - the catalogue's folder from the root, with forward slashes, plain (`isPlainFolder`); empty when it is
+ * the root.
+ */
+export const forgebookInstalledLine = (manager: PackageManagerName, folder: string): string =>
+  lineOf(OWN_ARGUMENTS_RUNNER[manager], folder, "--version", "");
 
 /**
  * How an MCP client starts Forgebook's server from the repository's root: a client takes a program and its arguments, no
