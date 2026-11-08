@@ -59,8 +59,12 @@ const EDIT_REPORT_EVERY = 5;
 /** How many stories the sweep opens between two lines of the status file. */
 const SWEEP_REPORT_EVERY = 25;
 
-/** Runs of the memory metrics: a peak is steadier than a time. */
-const MEMORY_RUNS = 3;
+/**
+ * Runs of the memory metrics. A server's peak falls in one of two places from run to run, about a fifth of the runs
+ * some hundred megabytes higher (Carbon: 13 of 34 local runs, on two commits alike); the median of 3 lands on the high
+ * one one time in ten, and the median of 7 one time in thirty.
+ */
+const MEMORY_RUNS = 7;
 
 /** What a benchmark is asked to do. */
 export type BenchRequest = {
@@ -110,11 +114,17 @@ const groupSteps = (group: MetricGroup, runs: number, hasPage: boolean, isForgeb
   return runs + 1;
 };
 
-/** A measured result of a unit, from its samples. */
-const measured = (unit: "ms" | "bytes" | "count", values: readonly number[]): MetricResult => ({
+/**
+ * A metric's samples as the report keeps them: their summary, and every sample in the order taken.
+ *
+ * @param unit - what the samples count.
+ * @param values - the samples, at least one.
+ */
+export const measured = (unit: "ms" | "bytes" | "count", values: readonly number[]): MetricResult => ({
   kind: "measured",
   unit,
-  summary: summary(values)
+  summary: summary(values),
+  values
 });
 
 /** The steps a group goes through: a sample taken of each tool in turn. */
