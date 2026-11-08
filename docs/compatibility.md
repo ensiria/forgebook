@@ -6,7 +6,7 @@ Which versions of the tools around it each package is tested with. Every week, a
 
 A version this page does not list is not tested. One marked ✗ is known to break; a prerelease that breaks is a warning of work to do, not a supported setup.
 
-Results of 2026-11-07, on Node 24.22.2, [the run](https://github.com/ensiria/forgebook/actions/runs/42411664482). The page changes only when a result does; every run is in the repository's Actions, under `compat`.
+Results of 2026-11-08, on Node 24.22.2, [the run](https://github.com/ensiria/forgebook/actions/runs/42441596442). The page changes only when a result does; every run is in the repository's Actions, under `compat`.
 
 ## forgebook
 
@@ -25,7 +25,7 @@ React here is the catalogue's own interface, which every adapter's catalogue loa
 
 | Tool | Range it claims | Line | Version tested | Result |
 |---|---|---|---|---|
-| React | `^18.2.0 \|\| ^19.0.0` | 18 | `18.3.1` | ✗ fails (failed: pnpm --filter @forgebook/react test) |
+| React | `^18.2.0 \|\| ^19.0.0` | 18 | `18.3.1` | ✓ passes |
 | React | `^18.2.0 \|\| ^19.0.0` | 19 | `19.3.1` | ✓ passes |
 | React | `^18.2.0 \|\| ^19.0.0` | next (canary) | `19.3.0-canary-5b610964-20261106` | ✓ passes |
 | Vite | `^8.3.4` | 8 | `8.3.6` | ✓ passes |
@@ -106,7 +106,7 @@ Each cell runs `pnpm --filter @forgebook/angular test`, `pnpm --filter @fixture/
 |---|---|---|---|---|
 | Next.js | `^15.0.0 \|\| ^16.0.0` | 15 | `15.5.29` | ✓ passes |
 | Next.js | `^15.0.0 \|\| ^16.0.0` | 16 | `16.4.5` | ✓ passes |
-| Next.js | `^15.0.0 \|\| ^16.0.0` | next (canary) | `16.5.0-canary.43` | ✓ passes |
+| Next.js | `^15.0.0 \|\| ^16.0.0` | next (canary) | `16.5.0-canary.44` | ✓ passes |
 | Vite | `^8.3.4` | 8 | `8.3.6` | ✓ passes |
 
 Each cell runs `pnpm --filter @forgebook/nextjs test`, `pnpm --filter @fixture/nextjs test`, `pnpm --filter @fixture/nextjs build`.
@@ -129,18 +129,20 @@ Nuxt itself is not installed: the package gives a component what Nuxt would (aut
 
 | Tool | Range it claims | Line | Version tested | Result |
 |---|---|---|---|---|
-| SvelteKit | `^2.0.0 \|\| ^3.0.0` | 2 | `2.70.4` | ✗ fails (failed: pnpm --filter @forgebook/sveltekit test; pnpm --filter @fixture/sveltekit test) |
+| SvelteKit | `^2.0.0 \|\| ^3.0.0` | 2 | `2.70.4` | ✓ passes |
 | SvelteKit | `^2.0.0 \|\| ^3.0.0` | 3 | `3.1.1` | ✓ passes |
 | Vite | `^8.3.4` | 8 | `8.3.6` | ✓ passes |
 
-Each cell runs `pnpm --filter @forgebook/sveltekit test`, `pnpm --filter @fixture/sveltekit test`, `pnpm --filter @fixture/sveltekit build`.
+The SvelteKit 2 cell runs `pnpm --filter @forgebook/sveltekit test`, `pnpm --filter @fixture/sveltekit2 test`, `pnpm --filter @fixture/sveltekit2 build`.
+
+Every other cell runs `pnpm --filter @forgebook/sveltekit test`, `pnpm --filter @fixture/sveltekit test`, `pnpm --filter @fixture/sveltekit build`.
 
 ## @forgebook/react-native-web
 
 | Tool | Range it claims | Line | Version tested | Result |
 |---|---|---|---|---|
 | React Native Web | `^0.21.0` | 0.21 | `0.21.4` | ✓ passes |
-| React | `^18.2.0 \|\| ^19.0.0` | 18 | `18.3.1` | ✗ fails (failed: pnpm --filter @forgebook/react-native-web test) |
+| React | `^18.2.0 \|\| ^19.0.0` | 18 | `18.3.1` | ✓ passes |
 | React | `^18.2.0 \|\| ^19.0.0` | 19 | `19.3.1` | ✓ passes |
 | React | `^18.2.0 \|\| ^19.0.0` | next (canary) | `19.3.0-canary-5b610964-20261106` | ✓ passes |
 | Vite | `^8.3.4` | 8 | `8.3.6` | ✓ passes |

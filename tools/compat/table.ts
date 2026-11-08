@@ -34,6 +34,36 @@ const cellOrder =
   (a: CellResult, b: CellResult): number =>
     hosts.indexOf(a.host) - hosts.indexOf(b.host) || Number(a.line === "next") - Number(b.line === "next");
 
+/** A list of commands as the page writes it. */
+const commandList = (commands: readonly string[]): string =>
+  commands.map((command) => codeSpan(command).markdown).join(", ");
+
+/**
+ * What a package's cells ran: one sentence when every cell ran the same commands; else one for the cells most of them
+ * share and one for each line that ran others (a line with a fixture of its own).
+ */
+const commandSentences = (matrix: CompatMatrix, cells: readonly CellResult[]): string[] => {
+  const ran = cells.filter((cell) => cell.commands.length > 0);
+  const groups = new Map<string, CellResult[]>();
+  for (const cell of ran) {
+    const key = cell.commands.map((command) => command.command).join("\n");
+    groups.set(key, [...(groups.get(key) ?? []), cell]);
+  }
+  const ordered = [...groups.values()].sort((a, b) => b.length - a.length);
+  const [most, ...others] = ordered;
+  if (most === undefined) return [];
+  const commandsOf = (group: readonly CellResult[]): string[] =>
+    group[0]?.commands.map((command) => command.command) ?? [];
+  if (others.length === 0) return [`Each cell runs ${commandList(commandsOf(most))}.`];
+  return [
+    ...others.map((group) => {
+      const lines = group.map((cell) => `${hostOf(matrix, cell.host).label} ${cell.line}`).join(", ");
+      return `The ${lines} ${group.length === 1 ? "cell runs" : "cells run"} ${commandList(commandsOf(group))}.`;
+    }),
+    `Every other cell runs ${commandList(commandsOf(most))}.`
+  ];
+};
+
 /** One package's section: its table, its tools no run reached, and its note. */
 const adapterSection = (matrix: CompatMatrix, report: CompatReport, name: string): string => {
   const adapter = matrix.adapters.find((entry) => entry.name === name);
@@ -63,9 +93,7 @@ const adapterSection = (matrix: CompatMatrix, report: CompatReport, name: string
       )
     );
   }
-  const commands = [...new Set(cells.flatMap((cell) => cell.commands.map((command) => command.command)))];
-  if (commands.length > 0)
-    parts.push(`Each cell runs ${commands.map((command) => codeSpan(command).markdown).join(", ")}.`);
+  parts.push(...commandSentences(matrix, cells));
   if (untested.length > 0) {
     const labels = untested.map((host) => hostOf(matrix, host).label).join(", ");
     parts.push(`Not tested yet: ${labels}.`);

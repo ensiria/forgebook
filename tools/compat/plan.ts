@@ -83,6 +83,50 @@ export const hostOf = (matrix: CompatMatrix, key: string): HostDefinition => {
   return host;
 };
 
+/**
+ * The fixture catalogue a cell runs: its line's own when the package names one for that tool, else the package's.
+ *
+ * @param adapter - the package.
+ * @param cell - the cell, by its tool and line.
+ */
+export const cellFixture = (adapter: AdapterDefinition, cell: Pick<PlannedCell, "host" | "line">): string =>
+  adapter.hosts.find((entry) => entry.host === cell.host)?.fixtures?.[cell.line] ?? adapter.fixture;
+
+/**
+ * The overrides that keep the tool's other fixtures at the versions they pin, beside the cell's: pnpm's overrides reach
+ * every project of the workspace, and a fixture written for another line of the tool fails its own install there (the
+ * SvelteKit 2 app's `svelte-kit sync` on SvelteKit 3). Each is scoped to that fixture (`@fixture/kit2>@sveltejs/kit`).
+ *
+ * @param adapter - the package.
+ * @param cell - the cell: its tool, line and pinned packages.
+ * @param readManifest - reads a folder's manifest.
+ * @throws when such a fixture pins one of the cell's packages by anything but an exact version.
+ */
+export const heldFixtureOverrides = (
+  adapter: AdapterDefinition,
+  cell: Pick<PlannedCell, "host" | "line" | "packages">,
+  readManifest: ReadManifest
+): Record<string, string> => {
+  const entry = adapter.hosts.find((each) => each.host === cell.host);
+  if (entry?.fixtures === undefined) return {};
+  const own = cellFixture(adapter, cell);
+  const others = [...new Set([adapter.fixture, ...Object.values(entry.fixtures)])].filter(
+    (folder) => folder !== own
+  );
+  return Object.fromEntries(
+    others.flatMap((folder) => {
+      const fixture = readManifest(folder);
+      return Object.keys(cell.packages).flatMap((name) => {
+        const pinned = fixture.devDependencies[name] ?? fixture.dependencies[name];
+        if (pinned === undefined) return [];
+        if (parseVersion(pinned) === undefined)
+          throw new Error(`${folder} pins ${name} as ${pinned}, not an exact version a cell can hold it at`);
+        return [[`${fixture.name}>${name}`, pinned]];
+      });
+    })
+  );
+};
+
 /** The first npm package of a tool: the one whose versions and dist-tags are read. */
 export const primaryPackage = (host: HostDefinition): string => {
   const [first] = host.packages;

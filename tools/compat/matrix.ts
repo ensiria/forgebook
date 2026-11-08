@@ -118,7 +118,9 @@ export const COMPAT_MATRIX: CompatMatrix = {
           range: {
             range: "^2.0.0 || ^3.0.0",
             why: "the package's README; SvelteKit is no peer dependency, its modules are given by the package"
-          }
+          },
+          // the package's fixture is a SvelteKit 3 app, which SvelteKit 2 refuses as written: its line has an app of its own
+          fixtures: { "2": "fixtures/sveltekit2" }
         },
         { host: "vite" }
       ]

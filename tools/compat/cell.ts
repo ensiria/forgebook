@@ -11,9 +11,9 @@ import { dirname, join } from "node:path";
 import { exec } from "@ensiria/cli-kit/exec";
 import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
-import type { CellCommand, CellResult, CompatMatrix, PlannedCell } from "./compat.types.ts";
+import type { CellCommand, CellResult, CompatMatrix, Manifest, PlannedCell } from "./compat.types.ts";
 import { parseManifest } from "./documents.ts";
-import { cellCommands, hostOf } from "./plan.ts";
+import { cellCommands, cellFixture, heldFixtureOverrides, hostOf } from "./plan.ts";
 
 /** How long one command may run before it is stopped: a fixture's build is about a minute on a runner. */
 const COMMAND_TIMEOUT_MS = 20 * 60_000;
@@ -120,7 +120,10 @@ export const runCell = async (
   const missing = host.packages.filter((name) => asked[name] === undefined);
   if (missing.length > 0) throw new Error(`the cell pins no version of ${missing.join(", ")}`);
   const rootManifest = join(root, "package.json");
-  writeFileSync(rootManifest, withOverrides(readFileSync(rootManifest, "utf8"), asked));
+  const readManifest = (folder: string): Manifest =>
+    parseManifest(readFileSync(join(root, folder, "package.json"), "utf8"), folder);
+  const held = heldFixtureOverrides(adapter, cell, readManifest);
+  writeFileSync(rootManifest, withOverrides(readFileSync(rootManifest, "utf8"), { ...asked, ...held }));
 
   const notRun = (reason: string, installed: Record<string, string> = {}): CellResult => ({
     ...cell,
@@ -139,7 +142,8 @@ export const runCell = async (
     return notRun("the install failed");
   }
 
-  const folders = [join(root, adapter.folder), join(root, adapter.fixture)];
+  const fixture = cellFixture(adapter, cell);
+  const folders = [join(root, adapter.folder), join(root, fixture)];
   const installed = Object.fromEntries(
     Object.keys(asked).flatMap((name) => {
       const version = installedVersion(name, folders);
@@ -154,10 +158,7 @@ export const runCell = async (
     readFileSync(join(root, adapter.folder, "package.json"), "utf8"),
     adapter.folder
   );
-  const fixtureManifest = parseManifest(
-    readFileSync(join(root, adapter.fixture, "package.json"), "utf8"),
-    adapter.fixture
-  );
+  const fixtureManifest = parseManifest(readFileSync(join(root, fixture, "package.json"), "utf8"), fixture);
   const planned = cellCommands(adapterManifest, fixtureManifest);
   if (planned.length === 0)
     return notRun("the package and its fixture have no test or build to run", installed);
