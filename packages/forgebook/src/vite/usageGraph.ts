@@ -284,7 +284,7 @@ const reachedImports = (
 };
 
 /**
- * The facts of the story files one configuration holds, read with that configuration's whole program.
+ * The facts of the story files one configuration holds, read with the program of what they all reach.
  *
  * @param group - the story files, in Vite's form, each held by the same configuration.
  * @returns the facts, or why a story file's program could not be read.
@@ -293,8 +293,8 @@ const groupGraph = (group: readonly UsageRequestFile[]): UsageGraph | string => 
   const files: StoryFileUsage[] = [];
   const programs = new Set<ts.Program>();
   for (const request of group) {
-    // what every story of the configuration reaches: its whole program, built once
-    const docsProgram = programFor(request.storyFile, { reach: "whole" });
+    // what every story of the configuration reaches, in one program built once
+    const docsProgram = programFor(request.storyFile, { reach: "stories" });
     if (typeof docsProgram === "string") return docsProgram;
     programs.add(docsProgram.program);
     const usage = fileUsage(request, docsProgram.program);

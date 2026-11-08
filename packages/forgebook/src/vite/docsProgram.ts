@@ -18,6 +18,9 @@
  * - a dev server's programs hold the files asked for and what they import (`readAskedFilesOnly`), with the files that
  *   hold for every file (declarations, augmentations), not every file of the configuration, until enough are asked
  *   that the whole is cheaper (`MOST_ASKED`);
+ * - a build's programs hold its story files and what they import (`readStoryFilesOnly`), with the same files that hold
+ *   for every file: a monorepo's root configuration lists every package, its website and its tools, and one story it
+ *   holds would otherwise parse them all;
  * - parsed files are kept between programs and shared by every configuration that parses alike (`parsedFiles.ts`),
  *   the standard library's and `@types` without their documentation;
  * - only the programs read last are kept (`KEPT_PROGRAMS`), with the parses they hold.
@@ -166,22 +169,45 @@ export const readAskedFilesOnly = (): void => {
   checkFileChanges();
 };
 
+/** A build's story files, in TypeScript's form; none until a build names them, and every file is read then. */
+let storyFiles: Set<string> | undefined;
+
+/** The files a build asked for that its story files do not reach, by program: they stay roots, or it would be rebuilt. */
+const addedRoots = new Map<string, Set<string>>();
+
+/**
+ * From now on a program holds the given story files its configuration lists and what they import, not its whole
+ * configuration: a build reads every story's docs and "Used in", which need nothing the stories do not reach. Each
+ * program is then built once, its roots known from the start. Called again, it adds to the files.
+ *
+ * @param files - the story files, absolute.
+ */
+export const readStoryFilesOnly = (files: readonly string[]): void => {
+  storyFiles ??= new Set();
+  for (const file of files) storyFiles.add(file.replaceAll("\\", "/"));
+};
+
 /**
  * The files asked for before a program takes all its configuration's files: each new root makes a new type checker,
  * so a session that walks a whole library would pay more than the whole program costs at once.
  */
 const MOST_ASKED = 16;
 
-/** What a program is read for: what the asked file reaches, or every file of its configuration. */
-export type ProgramReach = "asked" | "whole";
+/**
+ * What a program is read for: what the asked file reaches; what every story file of its configuration reaches (a
+ * group's "Used in"), which is every file of it unless a build named its story files (`readStoryFilesOnly`); or every
+ * file of its configuration (where an application draws a component).
+ */
+export type ProgramReach = "asked" | "stories" | "whole";
 
 /** How a file's program is read. */
 export type ProgramOptions = {
   /** The files read in place of a framework's components; none for a plain program. */
   readonly sources?: ProgramSources;
   /**
-   * What the reader needs: what the file reaches (a component's docs, the default), or every file of its
-   * configuration (a group's "Used in"); either way a build's programs hold every file.
+   * What the reader needs: what the file reaches (a component's docs, the default), what the stories reach (a group's
+   * "Used in"), or every file of its configuration; a build's programs hold what its stories reach, or every file
+   * when it named none.
    */
   readonly reach?: ProgramReach;
 };
@@ -209,8 +235,31 @@ const ambientOf = (read: ReadConfiguration): readonly string[] => {
 };
 
 /**
- * The root files of a configuration's program: all of them, or, once only what is asked for is read, its ambient
- * files and the files asked for so far, until enough are asked that the whole is cheaper.
+ * The root files of a build's program once it named its story files: the configuration's ambient files, the story files
+ * it lists, and the files asked for that none of them reached, kept so the roots stay the same.
+ *
+ * @param key - the program's key.
+ * @param read - its configuration.
+ * @param stories - the build's story files.
+ * @param asked - a file asked for that the program does not hold yet, which the configuration lists; none otherwise.
+ */
+const storyRootsOf = (
+  key: string,
+  read: ReadConfiguration,
+  stories: ReadonlySet<string>,
+  asked: string | undefined
+): readonly string[] => {
+  const added = addedRoots.get(key) ?? new Set<string>();
+  addedRoots.set(key, added);
+  if (asked !== undefined && !stories.has(asked)) added.add(asked);
+  const listed = read.parsed.fileNames.filter((each) => stories.has(each));
+  return [...new Set([...ambientOf(read), ...listed, ...added])];
+};
+
+/**
+ * The root files of a configuration's program: all of them; or, once a build named its story files, its ambient files,
+ * the story files it lists and a file asked for that none of them reaches; or, once only what is asked for is read, its
+ * ambient files and the files asked for so far, until enough are asked that the whole is cheaper.
  *
  * @param key - the program's key.
  * @param read - its configuration.
@@ -224,16 +273,20 @@ const rootsOf = (
   reach: ProgramReach
 ): readonly string[] => {
   const { fileNames } = read.parsed;
-  if (askedFiles === undefined) return fileNames;
-  const asked = askedFiles.get(key) ?? new Set<string>();
-  askedFiles.set(key, asked);
-  // a program read whole stays whole: going back and forth would build it again each time
-  if (reach === "whole") for (const name of fileNames) asked.add(name);
-  if (asked.size >= MOST_ASKED) return fileNames;
   // a file the kept program reaches through an import needs no root of its own, while that program is current
   const name = file.replaceAll("\\", "/");
   const isHeld = !outdated.has(key) && programs.get(key)?.getSourceFile(name) !== undefined;
-  if (!isHeld && read.fileSet.has(name)) asked.add(name);
+  const isOwnRoot = !isHeld && read.fileSet.has(name);
+  if (askedFiles === undefined) {
+    if (storyFiles === undefined || reach === "whole") return fileNames;
+    return storyRootsOf(key, read, storyFiles, isOwnRoot ? name : undefined);
+  }
+  const asked = askedFiles.get(key) ?? new Set<string>();
+  askedFiles.set(key, asked);
+  // a program read whole stays whole: going back and forth would build it again each time
+  if (reach !== "asked") for (const each of fileNames) asked.add(each);
+  if (asked.size >= MOST_ASKED) return fileNames;
+  if (isOwnRoot) asked.add(name);
   return [...new Set([...ambientOf(read), ...asked])];
 };
 

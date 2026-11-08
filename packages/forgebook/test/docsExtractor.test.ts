@@ -112,7 +112,7 @@ describe("createDocsExtractor ending a worker that is still loading", () => {
   it("waits for the modules on close, as Node aborts a process whose worker is ended loading one", async () => {
     const { url, marker } = docsModuleWriting("");
     const extractor = createDocsExtractor(url);
-    extractor.warm(join(KIT, "Select.stories.tsx"));
+    extractor.warm([join(KIT, "Select.stories.tsx")]);
     await extractor.close();
     expect(existsSync(marker)).toBe(true);
   }, 60_000);
@@ -120,7 +120,7 @@ describe("createDocsExtractor ending a worker that is still loading", () => {
   it("waits for them on a second close as well, which a server's two ways of closing make", async () => {
     const { url, marker } = docsModuleWriting("");
     const extractor = createDocsExtractor(url);
-    extractor.warm(join(KIT, "Select.stories.tsx"));
+    extractor.warm([join(KIT, "Select.stories.tsx")]);
     void extractor.close();
     await extractor.close();
     expect(existsSync(marker)).toBe(true);
@@ -140,7 +140,7 @@ describe("createDocsExtractor ending a worker that is still loading", () => {
   it("closes anyway past the limit, when the loading never ends", async () => {
     const { url, marker } = docsModuleWriting("await new Promise(() => undefined);");
     const extractor = createDocsExtractor(url, { loadWaitMs: 50 });
-    extractor.warm(join(KIT, "Select.stories.tsx"));
+    extractor.warm([join(KIT, "Select.stories.tsx")]);
     // past the compiler's import, which the abort comes from, before the limit is put to the test
     await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 30_000 });
     const closing = Date.now();
