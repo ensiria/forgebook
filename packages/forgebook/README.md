@@ -1551,6 +1551,10 @@ catalogue as before; `forgebook dev --frames same-origin` does the same for one 
 worker, the clipboard, full screen, the camera and the microphone. A story's link can no longer take the catalogue's
 tab to another address.
 
+A story's style sheets never leave its frame, on any origin: every story draws in a document of its own, so a story
+file that styles `body` or every `button` leaves the next story, the catalogue's page and the other frames of a docs page
+as they were, on the dev server and in a static build. What one origin changes is scripts, as above.
+
 What stays reachable from a frame: the code it runs (your stories, their components, what the catalogue imports), the
 errors Vite sends every page while you edit, and `forgebook errors`, where a frame reports its own errors. If the
 default port is taken, the frames move to the next free one, so their storage moves with them; give `--frame-port` to
