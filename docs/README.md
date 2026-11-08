@@ -27,3 +27,5 @@ description: Where to start, the how-to guides, and troubleshooting.
 - The [`forgebook` README](../packages/forgebook/README.md) describes every feature and configuration key.
 - `npx forgebook --help` lists the commands, and `npx forgebook <command> --help` each one's options.
 - Each adapter's README, linked from [frameworks](./how-to/frameworks.md), covers its framework.
+- [Compatibility](./compatibility.md) and [dependencies](./dependencies.md): the versions each package is tested with,
+  and what each installs and what `npm audit` finds in it, both written by CI.

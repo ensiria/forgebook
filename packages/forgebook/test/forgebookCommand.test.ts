@@ -1331,6 +1331,55 @@ describe("forgebook audit", () => {
     expect(existsSync(join(dir, "ran"))).toBe(false);
   });
 
+  it("lists the components with no story, and those whose stories nothing else uses", () => {
+    const storied = (manifest: object): string => {
+      const dir = mkdtempSync(join(root, "audit-stories-"));
+      writeFileSync(join(dir, "package.json"), JSON.stringify(manifest));
+      for (const name of ["Button", "Card", "Badge"]) {
+        writeFileSync(join(dir, `${name}.tsx`), `export const ${name} = () => <div />;\n`);
+      }
+      writeFileSync(join(dir, "Button.stories.ts"), 'import { Button } from "./Button";\n');
+      writeFileSync(join(dir, "Card.stories.tsx"), 'import { Card } from "./Card";\n');
+      writeFileSync(join(dir, "Screen.tsx"), "export const Screen = () => <Button />;\n");
+      writeFileSync(join(dir, "Screen.stories.tsx"), 'import { Screen } from "./Screen";\n');
+      return dir;
+    };
+    const app = storied({ name: "app", private: true });
+    const document = JSON.parse(runScriptProcess(ENTRY, ["audit", app, "--json"]).stdout);
+    expect(document.components).toMatchObject({
+      storyFileCount: 3,
+      withStories: 3,
+      withoutStories: [{ name: "Badge", file: "Badge.tsx", line: 1 }],
+      storiesUnused: [{ name: "Card", storyFiles: ["Card.stories.tsx"] }, { name: "Screen" }],
+      publishedWithStories: 0
+    });
+    expect(document.actions).toContainEqual(
+      expect.objectContaining({
+        kind: "write-stories",
+        count: 1,
+        args: ["new", "--", join(app, "Badge.tsx")]
+      })
+    );
+    expect(document.actions).toContainEqual(expect.objectContaining({ kind: "check-unused", count: 2 }));
+    const text = runScriptProcess(ENTRY, ["audit", app]).stdout;
+    expect(text).toContain("Stories: 3 files, about 3 components; 1 exported component without.");
+    expect(text).toContain("  Card  Card.tsx:1  (Card.stories.tsx)");
+    const library = JSON.parse(
+      runScriptProcess(ENTRY, ["audit", storied({ name: "@acme/ui" }), "--json"]).stdout
+    );
+    expect(library.components).toMatchObject({ storiesUnused: [], publishedWithStories: 2 });
+    // a workspace's own package is used inside the repository, so the audit judges it
+    const workspace = JSON.parse(
+      runScriptProcess(ENTRY, [
+        "audit",
+        storied({ name: "@acme/ui", private: true, exports: "./index.ts" }),
+        "--json"
+      ]).stdout
+    );
+    expect(workspace.components).toMatchObject({ publishedWithStories: 0 });
+    expect(workspace.components.storiesUnused).toHaveLength(2);
+  });
+
   it("refuses a value that is neither a colour nor a size, rather than say it is not there", () => {
     expect(runScriptProcess(ENTRY, ["audit", ".", "--value", "red"]).exitCode).not.toBe(0);
   });
