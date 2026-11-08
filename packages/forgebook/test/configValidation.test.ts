@@ -17,7 +17,7 @@ import { loadConfigFile, resolveConfig } from "../src/vite/configFile.ts";
 import { unknownKeysProblem } from "../src/vite/configKeys.ts";
 import { placeInStack } from "../src/vite/configLoadError.ts";
 import { emptyStoryGlobs } from "../src/vite/emptyStoryGlobs.ts";
-import { unmatchedPatterns } from "../src/vite/storyPatterns.ts";
+import { hasMatchingFile, unmatchedPatterns } from "../src/vite/storyPatterns.ts";
 import { STUB_FRAMEWORK } from "./fixtures/stubFramework.ts";
 
 /** A new folder holding files, by name. */
@@ -187,6 +187,30 @@ describe("the story patterns that match nothing", () => {
       "drafts/*.stories.tsx"
     ]);
     expect(unmatchedPatterns(dir, ["src/**/*.stories.tsx", "!src/old/**"])).toEqual([]);
+  });
+});
+
+describe("the quick walk that tells a pattern matches", () => {
+  // the walk answers alone when it finds a file, so a folder it leaves out wrongly would cost the full listing
+  const dir = folderOf({
+    "packages/@a/one/stories/One.stories.tsx": "",
+    "packages/@a/one/src/deep/Two.stories.tsx": "",
+    "packages/@b/two/stories/nested/Three.stories.tsx": "",
+    "packages/@b/two/Root.stories.tsx": ""
+  });
+
+  it("finds a file through groups, extglobs and `**`", () => {
+    expect(hasMatchingFile(dir, "packages/@{a,c}/*/stories/*.stories.tsx")).toBe(true);
+    expect(hasMatchingFile(dir, "packages/@!(c)/*/stories/*.stories.tsx")).toBe(true);
+    expect(hasMatchingFile(dir, "packages/**/deep/*.stories.tsx")).toBe(true);
+    expect(hasMatchingFile(dir, "packages/@b/**/*.stories.tsx")).toBe(true);
+    expect(hasMatchingFile(dir, "./packages/{@a/one,@b/two}/stories/*.stories.tsx")).toBe(true);
+  });
+
+  it("finds none deeper or shallower than the pattern's files", () => {
+    expect(hasMatchingFile(dir, "packages/@b/*/stories/*.stories.tsx")).toBe(false);
+    expect(hasMatchingFile(dir, "packages/*/*.stories.tsx")).toBe(false);
+    expect(hasMatchingFile(dir, "packages/@a/*/*/*.stories.tsx")).toBe(true);
   });
 });
 
