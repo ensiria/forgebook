@@ -109,6 +109,7 @@ export const searchAnswer = async ({
     query,
     total: answer.total,
     results: answer.results.map((result) => agentResult(result, pages, view)),
+    corrections: answer.corrections,
     problems: read.flatMap(({ index, problems }) => [...problems, ...(index.problems ?? [])])
   };
   return { status: 200, body };

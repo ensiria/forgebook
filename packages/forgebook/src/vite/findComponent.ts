@@ -7,11 +7,11 @@
  * (`keywords` in the meta, the way to say "radio tile group" of `OptionCards`), then its title and its stories' text. A
  * short list of synonyms bridges the words designers and code use for the same thing (`searchMatch.ts`, which the
  * catalogue's text search reads too). The answer says which words matched, so an agent can tell a strong result from a
- * guess.
+ * guess, and which words nothing held as typed and were read as a name a letter or two away.
  *
  * @module
  */
-import { wordsOf, worthOf } from "../searchMatch.ts";
+import { correctedWords, correctionsOf, type SearchCorrection, wordsOf, worthOf } from "../searchMatch.ts";
 
 /** What the search reads of a component. */
 export type FindableComponent = {
@@ -39,6 +39,14 @@ export type FoundComponent = {
   readonly missed: readonly string[];
 };
 
+/** What a query finds. */
+export type FoundComponents = {
+  /** Up to five, best first; none when no word matches. */
+  readonly components: readonly FoundComponent[];
+  /** The words nothing held as typed, and what each was read as; empty when the query was read as typed. */
+  readonly corrections: readonly SearchCorrection[];
+};
+
 /** How many components an answer gives. */
 const LIMIT = 5;
 
@@ -58,18 +66,10 @@ const partsOf = (component: FindableComponent): Parts => ({
   story: component.stories.flatMap(wordsOf)
 });
 
-/**
- * The components a query describes, best first.
- *
- * @param components - the catalogue's components.
- * @param query - what is being looked for, in any words.
- * @returns up to five; none when no word matches.
- */
-export const findComponents = (components: readonly FindableComponent[], query: string): FoundComponent[] => {
-  const words = wordsOf(query);
-  return components
-    .flatMap((component): FoundComponent[] => {
-      const parts = partsOf(component);
+/** Each component holding a word, best first. */
+const ranked = (components: readonly Parted[], words: readonly string[]): FoundComponent[] =>
+  components
+    .flatMap(({ component, parts }): FoundComponent[] => {
       const scores = words.map((word) => ({ word, score: worthOf(parts, word) }));
       const score = scores.reduce((sum, each) => sum + each.score, 0);
       if (score === 0) return [];
@@ -83,6 +83,27 @@ export const findComponents = (components: readonly FindableComponent[], query: 
         }
       ];
     })
-    .toSorted((first, second) => second.score - first.score)
-    .slice(0, LIMIT);
+    .toSorted((first, second) => second.score - first.score);
+
+/** A component with its words. */
+type Parted = { readonly component: FindableComponent; readonly parts: Parts };
+
+/**
+ * The components a query describes, best first.
+ *
+ * @param components - the catalogue's components.
+ * @param query - what is being looked for, in any words.
+ * @returns up to five, and the words read as others.
+ */
+export const findComponents = (components: readonly FindableComponent[], query: string): FoundComponents => {
+  const typed = [...new Set(wordsOf(query))];
+  const parted = components.map((component) => ({ component, parts: partsOf(component) }));
+  const strict = ranked(parted, typed);
+  const missing = typed.filter((word) => !strict.some((each) => each.matched.includes(word)));
+  const corrections = correctionsOf(
+    missing,
+    parted.map(({ parts }) => parts)
+  );
+  const found = corrections.length === 0 ? strict : ranked(parted, correctedWords(typed, corrections));
+  return { components: found.slice(0, LIMIT), corrections };
 };

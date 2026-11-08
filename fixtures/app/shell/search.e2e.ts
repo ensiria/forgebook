@@ -211,6 +211,21 @@ test.describe("the search", () => {
     await expect(page.locator(".forgebook-result__note").first()).toContainText("Without: zzzqqq");
   });
 
+  test("reads a typo as the nearest name, says so, and agents get the same reading", async ({
+    page,
+    request
+  }) => {
+    await page.goto("/");
+    await page.getByRole("searchbox").fill("selcet");
+    await expect(page.getByRole("status").filter({ hasText: "results" })).toContainText(
+      "Showing results for “select”"
+    );
+    await expect(results(page).getByRole("option").first()).toHaveAttribute("href", /select/);
+    await expect(results(page).locator("mark").first()).toHaveText(/select/i);
+    const answer = await request.get("/__forgebook/api/search?query=selcet&limit=1");
+    expect(await answer.json()).toMatchObject({ corrections: [{ typed: "selcet", read: "select" }] });
+  });
+
   test("its search key reaches the field from a hidden sidebar, and a press with the key opens a new tab", async ({
     page,
     context

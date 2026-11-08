@@ -526,7 +526,8 @@ export const isFoundComponentsDocument = (value: unknown): value is FoundCompone
   isRecord(value) &&
   value["schema"] === 1 &&
   typeof value["query"] === "string" &&
-  Array.isArray(value["components"]);
+  Array.isArray(value["components"]) &&
+  Array.isArray(value["corrections"]);
 
 /**
  * Whether a value is a search's document, as a client receives it over HTTP.
@@ -539,6 +540,7 @@ export const isSearchDocument = (value: unknown): value is SearchDocument =>
   typeof value["query"] === "string" &&
   typeof value["total"] === "number" &&
   Array.isArray(value["results"]) &&
+  Array.isArray(value["corrections"]) &&
   Array.isArray(value["problems"]);
 
 /**

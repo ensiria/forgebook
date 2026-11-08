@@ -402,16 +402,21 @@ const PanelStatus = ({
   total,
   query,
   isLoading,
-  hasFailed
+  hasFailed,
+  corrections
 }: {
   readonly total: number;
   readonly query: string;
   readonly isLoading: boolean;
   readonly hasFailed: boolean;
+  readonly corrections: SearchAnswer["corrections"];
 }): ReactNode => (
   <p className="forgebook-search-panel__status" role="status">
     {total === 0 && !isLoading ? <span>{SEARCH_STRINGS.nothing(query.trim())}</span> : null}
     {total > 0 ? <span>{SEARCH_STRINGS.count(total)}</span> : null}
+    {total > 0 && corrections.length > 0 ? (
+      <span>{SEARCH_STRINGS.readAs(corrections.map(({ read }) => `“${read}”`).join(", "))}</span>
+    ) : null}
     {isLoading ? <span>{SEARCH_STRINGS.reading}</span> : null}
     {hasFailed ? <span>{SEARCH_STRINGS.unreadable}</span> : null}
   </p>
@@ -487,7 +492,13 @@ export const SearchPanel = ({
       // the focus stays in the field: a press here would take it away and close the list before it opens anything
       onMouseDown={(event: MouseEvent): void => event.preventDefault()}
     >
-      <PanelStatus total={answer.total} query={query} isLoading={isLoading} hasFailed={hasFailed} />
+      <PanelStatus
+        total={answer.total}
+        query={query}
+        isLoading={isLoading}
+        hasFailed={hasFailed}
+        corrections={answer.corrections}
+      />
       <div
         id={id}
         ref={listRef}

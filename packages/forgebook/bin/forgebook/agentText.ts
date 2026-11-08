@@ -12,6 +12,7 @@ import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
 import type { ComponentDocs, PropCondition, PropsNote } from "../../src/componentDocs.ts";
+import type { SearchCorrection } from "../../src/searchMatch.ts";
 import type {
   StoryCheckReport,
   StoryCheckResult,
@@ -45,6 +46,12 @@ const uncut = (style: OutputStyle): OutputStyle => ({ ...style, width: Number.PO
 /** Statuses in brackets after a name (` [review]`); nothing for none. */
 const statusMark = (status: readonly string[] | undefined): string =>
   status === undefined ? "" : ` [${status.join(", ")}]`;
+
+/** The words read as others, as the first line of an answer; none when the query was read as typed. */
+const correctionLines = (corrections: readonly SearchCorrection[]): string[] =>
+  corrections.length === 0
+    ? []
+    : [`Read as: ${corrections.map(({ typed, read }) => `"${read}" for "${typed}"`).join(", ")}`];
 
 /**
  * The stories as a table: one row per story, its id first (what `forgebook story` takes, never cut), then its
@@ -357,12 +364,13 @@ export const nearestTokensText = (document: NearestTokensDocument): string => {
 export const foundComponentsText = (document: FoundComponentsDocument): string =>
   document.components.length === 0
     ? `Nothing in this catalogue holds "${document.query}".`
-    : document.components
-        .map((each) => {
+    : [
+        ...correctionLines(document.corrections),
+        ...document.components.map((each) => {
           const missed = each.missed.length === 0 ? "" : `  (no "${each.missed.join('", "')}")`;
           return `${each.title}${missed}${each.guidance?.deprecated === undefined ? "" : "  deprecated"}`;
         })
-        .join("\n");
+      ].join("\n");
 
 /**
  * What a change broke as a person reads it, a line a problem.
@@ -506,8 +514,9 @@ export const pageText = (document: PageDocument): string =>
 export const searchText = (document: SearchDocument): string =>
   document.results.length === 0
     ? `Nothing in the catalogue holds "${document.query}".`
-    : document.results
-        .flatMap((result) => [
+    : [
+        ...correctionLines(document.corrections),
+        ...document.results.flatMap((result) => [
           `${result.name} (${result.place})${result.missed.length === 0 ? "" : `, missing: ${result.missed.join(", ")}`}`,
           `  ${result.address}`,
           ...result.hits.flatMap((hit) => [
@@ -515,7 +524,7 @@ export const searchText = (document: SearchDocument): string =>
             `    ${hit.address}`
           ])
         ])
-        .join("\n");
+      ].join("\n");
 
 /**
  * The catalogue's switches, one per line, each with its values and what they bring with them.

@@ -189,6 +189,14 @@ describe("searchCatalogue", () => {
     expect(answer.results[0]).toMatchObject({ matched: ["select", "danger"], missed: [] });
   });
 
+  it("reads a word nothing holds as the nearest name, marks what it found, and says so", () => {
+    const answer = search("selcet danger");
+    expect(answer.corrections).toEqual([{ typed: "selcet", read: "select" }]);
+    expect(answer.results[0]).toMatchObject({ target: { id: "kit:inputs-select" }, missed: [] });
+    expect(answer.results[0]?.name.some((part) => part.isMatch)).toBe(true);
+    expect(search("select").corrections).toEqual([]);
+  });
+
   it("finds names from the tree alone, before the index arrives", () => {
     const answer = searchCatalogue(searchables(TREE, new Map()), "select", { results: 10, hits: 3 });
     expect(answer.results[0]?.target.id).toBe("kit:inputs-select");
@@ -285,7 +293,7 @@ describe("searchCatalogue", () => {
       stories: []
     }));
     for (const query of ["select", "modal", "radio tile group", "picker"]) {
-      const found = findComponents(findable ?? [], query)[0];
+      const found = findComponents(findable ?? [], query).components[0];
       const searched = searchCatalogue(searchables(TREE, new Map()), query, { results: 1, hits: 0 });
       expect(plain(searched.results[0]?.name ?? [])).toBe(found?.title.split("/").at(-1));
       // a sentence found whole counts more here: a person pastes one, and `find` is asked in words

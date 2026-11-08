@@ -18,8 +18,11 @@ import type { TreePage } from "./pageTree.ts";
 import type { SearchComponent, SearchIndex, SearchSection } from "./searchIndex.ts";
 import { type MarkedQuery, type MarkedText, markedText, snippetOf } from "./searchMarks.ts";
 import {
+  correctedWords,
+  correctionsOf,
   foldedText,
   meaningsOf,
+  type SearchCorrection,
   type SearchPlace,
   WEIGHTS,
   wordMatch,
@@ -112,6 +115,8 @@ export type SearchAnswer = {
   readonly results: readonly SearchResult[];
   /** How many there are, those past the limit included. */
   readonly total: number;
+  /** The words nothing held as typed, and what each was read as; empty when the query was read as typed. */
+  readonly corrections: readonly SearchCorrection[];
 };
 
 /** How much of an answer to give. */
@@ -530,12 +535,25 @@ const resultOf = ({ found, score, matched, missed }: Scored, query: Query, limit
   };
 };
 
+/** Everything that holds a word of the query, the result holding most of it first. */
+const scoredAll = (all: readonly Searchable[], read: Query): Scored[] =>
+  all
+    .flatMap((each) => scored(each, read) ?? [])
+    .toSorted(
+      (first, second) =>
+        first.missed.length - second.missed.length ||
+        second.score - first.score ||
+        first.found.name.localeCompare(second.found.name)
+    );
+
 /**
  * What a query finds.
  *
  * @remarks
  * Where something holds every word, what holds much less is left out: `the` must not bring the whole catalogue along
  * with a sentence copied from a page. Nothing holding every word, the nearest are given, each saying what it missed.
+ * A word nothing holds as typed is read as the nearest name a letter or two away (`correctionsOf`), and the answer
+ * says which.
  *
  * @param all - everything that can be found (`searchables`).
  * @param query - what was typed.
@@ -546,19 +564,21 @@ export const searchCatalogue = (
   query: string,
   limits: SearchLimits
 ): SearchAnswer => {
-  const read = queryOf(query);
-  const found = all
-    .flatMap((each) => scored(each, read) ?? [])
-    .toSorted(
-      (first, second) =>
-        first.missed.length - second.missed.length ||
-        second.score - first.score ||
-        first.found.name.localeCompare(second.found.name)
-    );
+  const typed = queryOf(query);
+  const strict = scoredAll(all, typed);
+  const missing = typed.words.filter((word) => !strict.some((each) => each.matched.includes(word)));
+  const corrections = correctionsOf(
+    missing,
+    all.map((each) => each.parts)
+  );
+  const read =
+    corrections.length === 0 ? typed : { ...typed, words: correctedWords(typed.words, corrections) };
+  const found = corrections.length === 0 ? strict : scoredAll(all, read);
   const hasWhole = found.some((each) => each.missed.length === 0);
   const kept = found.filter((each) => !hasWhole || each.matched.length >= read.words.length * NEAR_SHARE);
   return {
     results: kept.slice(0, limits.results).map((each) => resultOf(each, read, limits.hits)),
-    total: kept.length
+    total: kept.length,
+    corrections
   };
 };
