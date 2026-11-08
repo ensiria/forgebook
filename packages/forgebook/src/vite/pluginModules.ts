@@ -9,6 +9,8 @@
  * @module
  */
 
+import type { ViteDevServer } from "vite";
+
 import { codeLiteral } from "../codeLiteral.ts";
 import { packedUsage } from "../usedIn.ts";
 import type { DiskCache } from "./diskCache.ts";
@@ -381,4 +383,19 @@ export const searchIndexes = (read: {
       return search.module;
     }
   };
+};
+
+/**
+ * Renews modules in every environment that loaded them: the agents' routes load them on the server too.
+ *
+ * @param server - the dev server.
+ * @param ids - the modules' ids.
+ */
+export const invalidateEverywhere = (server: ViteDevServer, ids: Iterable<string>): void => {
+  for (const environment of Object.values(server.environments)) {
+    for (const id of ids) {
+      const module = environment.moduleGraph.getModuleById(id);
+      if (module !== undefined) environment.moduleGraph.invalidateModule(module);
+    }
+  }
 };

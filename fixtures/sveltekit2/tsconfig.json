@@ -1,0 +1,13 @@
+// The SvelteKit 2 fixture: its app checked by `svelte-check` with the types `svelte-kit sync` writes in .svelte-kit
+// (`./$types`, the `$app` modules), and its stories with them.
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "types": ["node", "vite/client", "@forgebook/story-format/client"],
+    "allowImportingTsExtensions": true
+  }
+}

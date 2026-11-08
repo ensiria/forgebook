@@ -1,0 +1,156 @@
+# Which versions of the tools around it each package works with, tested rather than claimed: every line a package's
+# range claims (the newest release of each major) and each tool's prerelease when one is ahead, one cell per package,
+# tool and version, each installed alone over the lockfile; then docs/compatibility.md written from the results only.
+# Weekly and by hand, because a cell is a full install and the matrix is about forty of them; on a pull request only when
+# the matrix itself changes, and then the table is kept as an artefact, never published. See tools/compat/README.md.
+# Actions are pinned to a commit, as in `checks.yml`.
+name: compat
+
+on:
+  schedule:
+    # Monday 04:17 UTC: after the weekend's releases, off the hour most schedules start on
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "tools/compat/**"
+      - ".github/workflows/compat.yml"
+
+# a newer run of the same ref replaces the one before it
+concurrency:
+  group: compat-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # one line, as an output must be; the plan kept too, so the table can tell a cell that left no result
+      - id: plan
+        run: |
+          node tools/compat/compat.mts plan --json > "$RUNNER_TEMP/plan.json"
+          echo "matrix=$(jq -c . "$RUNNER_TEMP/plan.json")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compat-plan
+          path: ${{ runner.temp }}/plan.json
+          retention-days: 30
+
+  cell:
+    needs: plan
+    name: ${{ matrix.cell.adapter }} · ${{ matrix.cell.host }} ${{ matrix.cell.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      # every cell runs: one that fails is a result, not a reason to stop the others
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      # the lockfile's install first, for the command's own dependencies; then the cell's: the version pinned through
+      # the overrides, the lockfile rewritten
+      - run: pnpm install --frozen-lockfile
+      - run: node tools/compat/compat.mts run --out "$RUNNER_TEMP/compat/$ID.json"
+        env:
+          COMPAT_CELL: ${{ toJSON(matrix.cell) }}
+          ID: ${{ matrix.cell.id }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: compat-result-${{ matrix.cell.id }}
+          path: ${{ runner.temp }}/compat/${{ matrix.cell.id }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  table:
+    needs: [plan, cell]
+    # a failed cell is in the table; only a plan that never ran leaves nothing to write
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: compat-plan
+          path: ${{ runner.temp }}/plan
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: compat-result-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/compat
+      - run: node tools/compat/compat.mts table --plan "$RUNNER_TEMP/plan/plan.json" --results "$RUNNER_TEMP/compat"
+        env:
+          COMPAT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - run: cat docs/compatibility.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compatibility-table
+          path: |
+            docs/compatibility.json
+            docs/compatibility.md
+          retention-days: 30
+
+  # develop takes no direct push: a changed table becomes a pull request a maintainer merges. Its own job, which runs
+  # nothing a cell touched: the lockfile's install and the table the job before wrote. The release app's token, made for
+  # this job and revoked at its end, because a pull request opened with the workflow's own token starts no checks, so
+  # it could never pass the rules merging asks for; only from develop, so a run started by hand on another branch
+  # publishes nothing
+  publish:
+    needs: table
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: compatibility-table
+          path: docs
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - run: node tools/compat/compat.mts publish
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}

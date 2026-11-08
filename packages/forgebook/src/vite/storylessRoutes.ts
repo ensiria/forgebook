@@ -110,7 +110,14 @@ const appTokensOf = (dir: string): AppTokens => {
     return readAppTokens(dir);
   } catch (error) {
     const code = error instanceof Error && "code" in error ? String(error.code) : "an error";
-    return { tokens: [], clashes: [], sources: [], files: [], unread: [`the application's files: ${code}`] };
+    return {
+      tokens: [],
+      clashes: [],
+      sources: [],
+      files: [],
+      problems: [],
+      unread: [`the application's files: ${code}`]
+    };
   }
 };
 
@@ -135,6 +142,7 @@ export const catalogueTokens = async (
   return {
     ...named,
     tokens: app.tokens,
+    problems: app.problems,
     clashes: app.clashes,
     isConfigured: app.tokens.length > 0,
     sources: app.sources,
