@@ -1,0 +1,1357 @@
+{
+  "date": "2026-11-07",
+  "runUrl": "https://github.com/ensiria/forgebook/actions/runs/42411664482",
+  "cells": [
+    {
+      "id": "forgebook-angular-angular-20",
+      "adapter": "@forgebook/angular",
+      "host": "angular",
+      "range": "^20.0.0 || ^21.0.0 || ^22.0.0",
+      "line": "20",
+      "version": "20.3.35",
+      "packages": {
+        "@angular/core": "20.3.35",
+        "@angular/common": "20.3.35",
+        "@angular/compiler": "20.3.35",
+        "@angular/compiler-cli": "20.3.35",
+        "@angular/platform-browser": "20.3.35",
+        "@angular/platform-server": "20.3.35",
+        "@angular/build": "20.3.35",
+        "typescript": "5.9.3"
+      },
+      "status": "passed",
+      "installed": {
+        "@angular/core": "20.3.35",
+        "@angular/common": "20.3.35",
+        "@angular/compiler": "20.3.35",
+        "@angular/compiler-cli": "20.3.35",
+        "@angular/platform-browser": "20.3.35",
+        "@angular/platform-server": "20.3.35",
+        "@angular/build": "20.3.35",
+        "typescript": "5.9.3"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-angular-angular-21",
+      "adapter": "@forgebook/angular",
+      "host": "angular",
+      "range": "^20.0.0 || ^21.0.0 || ^22.0.0",
+      "line": "21",
+      "version": "21.2.26",
+      "packages": {
+        "@angular/core": "21.2.26",
+        "@angular/common": "21.2.26",
+        "@angular/compiler": "21.2.26",
+        "@angular/compiler-cli": "21.2.26",
+        "@angular/platform-browser": "21.2.26",
+        "@angular/platform-server": "21.2.26",
+        "@angular/build": "21.2.26"
+      },
+      "status": "passed",
+      "installed": {
+        "@angular/core": "21.2.26",
+        "@angular/common": "21.2.26",
+        "@angular/compiler": "21.2.26",
+        "@angular/compiler-cli": "21.2.26",
+        "@angular/platform-browser": "21.2.26",
+        "@angular/platform-server": "21.2.26",
+        "@angular/build": "21.2.26"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-angular-angular-22",
+      "adapter": "@forgebook/angular",
+      "host": "angular",
+      "range": "^20.0.0 || ^21.0.0 || ^22.0.0",
+      "line": "22",
+      "version": "22.2.5",
+      "packages": {
+        "@angular/core": "22.2.5",
+        "@angular/common": "22.2.5",
+        "@angular/compiler": "22.2.5",
+        "@angular/compiler-cli": "22.2.5",
+        "@angular/platform-browser": "22.2.5",
+        "@angular/platform-server": "22.2.5",
+        "@angular/build": "22.2.5"
+      },
+      "status": "passed",
+      "installed": {
+        "@angular/core": "22.2.5",
+        "@angular/common": "22.2.5",
+        "@angular/compiler": "22.2.5",
+        "@angular/compiler-cli": "22.2.5",
+        "@angular/platform-browser": "22.2.5",
+        "@angular/platform-server": "22.2.5",
+        "@angular/build": "22.2.5"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-angular-angular-next",
+      "adapter": "@forgebook/angular",
+      "host": "angular",
+      "range": "^20.0.0 || ^21.0.0 || ^22.0.0",
+      "line": "next",
+      "version": "22.3.0-next.4",
+      "packages": {
+        "@angular/core": "22.3.0-next.4",
+        "@angular/common": "22.3.0-next.4",
+        "@angular/compiler": "22.3.0-next.4",
+        "@angular/compiler-cli": "22.3.0-next.4",
+        "@angular/platform-browser": "22.3.0-next.4",
+        "@angular/platform-server": "22.3.0-next.4",
+        "@angular/build": "22.3.0-next.4"
+      },
+      "tag": "next",
+      "status": "failed",
+      "reason": "failed: pnpm --filter @fixture/angular build",
+      "installed": {
+        "@angular/core": "22.3.0-next.4",
+        "@angular/common": "22.3.0-next.4",
+        "@angular/compiler": "22.3.0-next.4",
+        "@angular/compiler-cli": "22.3.0-next.4",
+        "@angular/platform-browser": "22.3.0-next.4",
+        "@angular/platform-server": "22.3.0-next.4",
+        "@angular/build": "22.3.0-next.4"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular build",
+          "code": 1
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-angular-vite-8",
+      "adapter": "@forgebook/angular",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/angular build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-html-vite-8",
+      "adapter": "@forgebook/html",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/html test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/html test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/html build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nextjs-next-15",
+      "adapter": "@forgebook/nextjs",
+      "host": "next",
+      "range": "^15.0.0 || ^16.0.0",
+      "line": "15",
+      "version": "15.5.29",
+      "packages": {
+        "next": "15.5.29"
+      },
+      "status": "passed",
+      "installed": {
+        "next": "15.5.29"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nextjs-next-16",
+      "adapter": "@forgebook/nextjs",
+      "host": "next",
+      "range": "^15.0.0 || ^16.0.0",
+      "line": "16",
+      "version": "16.4.5",
+      "packages": {
+        "next": "16.4.5"
+      },
+      "status": "passed",
+      "installed": {
+        "next": "16.4.5"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nextjs-next-next",
+      "adapter": "@forgebook/nextjs",
+      "host": "next",
+      "range": "^15.0.0 || ^16.0.0",
+      "line": "next",
+      "version": "16.5.0-canary.43",
+      "packages": {
+        "next": "16.5.0-canary.43"
+      },
+      "tag": "canary",
+      "status": "passed",
+      "installed": {
+        "next": "16.5.0-canary.43"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nextjs-vite-8",
+      "adapter": "@forgebook/nextjs",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nextjs build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nuxt-vite-8",
+      "adapter": "@forgebook/nuxt",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nuxt-vue-3",
+      "adapter": "@forgebook/nuxt",
+      "host": "vue",
+      "range": "^3.5.0",
+      "line": "3",
+      "version": "3.5.45",
+      "packages": {
+        "vue": "3.5.45"
+      },
+      "status": "passed",
+      "installed": {
+        "vue": "3.5.45"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nuxt-vue-next",
+      "adapter": "@forgebook/nuxt",
+      "host": "vue",
+      "range": "^3.5.0",
+      "line": "next",
+      "version": "3.6.0-rc.14",
+      "packages": {
+        "vue": "3.6.0-rc.14"
+      },
+      "tag": "rc",
+      "status": "failed",
+      "reason": "failed: pnpm --filter @forgebook/nuxt test; pnpm --filter @fixture/nuxt test",
+      "installed": {
+        "vue": "3.6.0-rc.14"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nuxt test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nuxt-vueRouter-4",
+      "adapter": "@forgebook/nuxt",
+      "host": "vueRouter",
+      "range": "^4.5.0 || ^5.0.0",
+      "line": "4",
+      "version": "4.6.4",
+      "packages": {
+        "vue-router": "4.6.4"
+      },
+      "status": "passed",
+      "installed": {
+        "vue-router": "4.6.4"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-nuxt-vueRouter-5",
+      "adapter": "@forgebook/nuxt",
+      "host": "vueRouter",
+      "range": "^4.5.0 || ^5.0.0",
+      "line": "5",
+      "version": "5.4.0",
+      "packages": {
+        "vue-router": "5.4.0"
+      },
+      "status": "passed",
+      "installed": {
+        "vue-router": "5.4.0"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/nuxt build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-preact-preact-10",
+      "adapter": "@forgebook/preact",
+      "host": "preact",
+      "range": "^10.19.0 || ^11.0.0",
+      "line": "10",
+      "version": "10.29.8",
+      "packages": {
+        "preact": "10.29.8"
+      },
+      "status": "passed",
+      "installed": {
+        "preact": "10.29.8"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/preact test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/preact test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/preact build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-preact-preact-11",
+      "adapter": "@forgebook/preact",
+      "host": "preact",
+      "range": "^10.19.0 || ^11.0.0",
+      "line": "11",
+      "version": "11.2.0",
+      "packages": {
+        "preact": "11.2.0"
+      },
+      "status": "passed",
+      "installed": {
+        "preact": "11.2.0"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/preact test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/preact test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/preact build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-preact-vite-8",
+      "adapter": "@forgebook/preact",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/preact test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/preact test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/preact build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-18",
+      "adapter": "forgebook",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "18",
+      "version": "18.3.1",
+      "packages": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+      },
+      "status": "passed",
+      "installed": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter forgebook test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-19",
+      "adapter": "forgebook",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "19",
+      "version": "19.3.1",
+      "packages": {
+        "react": "19.3.1",
+        "react-dom": "19.3.1"
+      },
+      "status": "passed",
+      "installed": {
+        "react": "19.3.1",
+        "react-dom": "19.3.1"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter forgebook test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-native-web-react-18",
+      "adapter": "@forgebook/react-native-web",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "18",
+      "version": "18.3.1",
+      "packages": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+      },
+      "status": "failed",
+      "reason": "failed: pnpm --filter @forgebook/react-native-web test",
+      "installed": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react-native-web test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/react-native build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-native-web-react-19",
+      "adapter": "@forgebook/react-native-web",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "19",
+      "version": "19.3.1",
+      "packages": {
+        "react": "19.3.1",
+        "react-dom": "19.3.1"
+      },
+      "status": "passed",
+      "installed": {
+        "react": "19.3.1",
+        "react-dom": "19.3.1"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react-native-web test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/react-native build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-native-web-react-next",
+      "adapter": "@forgebook/react-native-web",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "next",
+      "version": "19.3.0-canary-5b610964-20261106",
+      "packages": {
+        "react": "19.3.0-canary-5b610964-20261106",
+        "react-dom": "19.3.0-canary-5b610964-20261106"
+      },
+      "tag": "canary",
+      "status": "passed",
+      "installed": {
+        "react": "19.3.0-canary-5b610964-20261106",
+        "react-dom": "19.3.0-canary-5b610964-20261106"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react-native-web test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/react-native build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-native-web-reactNativeWeb-0-21",
+      "adapter": "@forgebook/react-native-web",
+      "host": "reactNativeWeb",
+      "range": "^0.21.0",
+      "line": "0.21",
+      "version": "0.21.4",
+      "packages": {
+        "react-native-web": "0.21.4"
+      },
+      "status": "passed",
+      "installed": {
+        "react-native-web": "0.21.4"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react-native-web test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/react-native build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-native-web-vite-8",
+      "adapter": "@forgebook/react-native-web",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react-native-web test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/react-native build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-next",
+      "adapter": "forgebook",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "next",
+      "version": "19.3.0-canary-5b610964-20261106",
+      "packages": {
+        "react": "19.3.0-canary-5b610964-20261106",
+        "react-dom": "19.3.0-canary-5b610964-20261106"
+      },
+      "tag": "canary",
+      "status": "passed",
+      "installed": {
+        "react": "19.3.0-canary-5b610964-20261106",
+        "react-dom": "19.3.0-canary-5b610964-20261106"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter forgebook test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-react-18",
+      "adapter": "@forgebook/react",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "18",
+      "version": "18.3.1",
+      "packages": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+      },
+      "status": "failed",
+      "reason": "failed: pnpm --filter @forgebook/react test",
+      "installed": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-react-19",
+      "adapter": "@forgebook/react",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "19",
+      "version": "19.3.1",
+      "packages": {
+        "react": "19.3.1",
+        "react-dom": "19.3.1"
+      },
+      "status": "passed",
+      "installed": {
+        "react": "19.3.1",
+        "react-dom": "19.3.1"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-react-next",
+      "adapter": "@forgebook/react",
+      "host": "react",
+      "range": "^18.2.0 || ^19.0.0",
+      "line": "next",
+      "version": "19.3.0-canary-5b610964-20261106",
+      "packages": {
+        "react": "19.3.0-canary-5b610964-20261106",
+        "react-dom": "19.3.0-canary-5b610964-20261106"
+      },
+      "tag": "canary",
+      "status": "passed",
+      "installed": {
+        "react": "19.3.0-canary-5b610964-20261106",
+        "react-dom": "19.3.0-canary-5b610964-20261106"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-react-vite-8",
+      "adapter": "@forgebook/react",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/react test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-solid-solid-1",
+      "adapter": "@forgebook/solid",
+      "host": "solid",
+      "range": "^1.9.0",
+      "line": "1",
+      "version": "1.9.18",
+      "packages": {
+        "solid-js": "1.9.18"
+      },
+      "status": "passed",
+      "installed": {
+        "solid-js": "1.9.18"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/solid test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/solid test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/solid build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-solid-solid-next",
+      "adapter": "@forgebook/solid",
+      "host": "solid",
+      "range": "^1.9.0",
+      "line": "next",
+      "version": "2.0.0-rc.21",
+      "packages": {
+        "solid-js": "2.0.0-rc.21"
+      },
+      "tag": "next",
+      "status": "failed",
+      "reason": "failed: pnpm --filter @forgebook/solid test; pnpm --filter @fixture/solid test; pnpm --filter @fixture/solid build",
+      "installed": {
+        "solid-js": "2.0.0-rc.21"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/solid test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/solid test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/solid build",
+          "code": 1
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-solid-vite-8",
+      "adapter": "@forgebook/solid",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/solid test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/solid test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/solid build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-svelte-svelte-5",
+      "adapter": "@forgebook/svelte",
+      "host": "svelte",
+      "range": "^5.46.4",
+      "line": "5",
+      "version": "5.57.3",
+      "packages": {
+        "svelte": "5.57.3"
+      },
+      "status": "passed",
+      "installed": {
+        "svelte": "5.57.3"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/svelte test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/svelte test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/svelte build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-svelte-vite-8",
+      "adapter": "@forgebook/svelte",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/svelte test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/svelte test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/svelte build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-sveltekit-sveltekit-2",
+      "adapter": "@forgebook/sveltekit",
+      "host": "sveltekit",
+      "range": "^2.0.0 || ^3.0.0",
+      "line": "2",
+      "version": "2.70.4",
+      "packages": {
+        "@sveltejs/kit": "2.70.4"
+      },
+      "status": "failed",
+      "reason": "failed: pnpm --filter @forgebook/sveltekit test; pnpm --filter @fixture/sveltekit test",
+      "installed": {
+        "@sveltejs/kit": "2.70.4"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/sveltekit test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/sveltekit test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/sveltekit build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-sveltekit-sveltekit-3",
+      "adapter": "@forgebook/sveltekit",
+      "host": "sveltekit",
+      "range": "^2.0.0 || ^3.0.0",
+      "line": "3",
+      "version": "3.1.1",
+      "packages": {
+        "@sveltejs/kit": "3.1.1"
+      },
+      "status": "passed",
+      "installed": {
+        "@sveltejs/kit": "3.1.1"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/sveltekit test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/sveltekit test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/sveltekit build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-sveltekit-vite-8",
+      "adapter": "@forgebook/sveltekit",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/sveltekit test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/sveltekit test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/sveltekit build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-vite-8",
+      "adapter": "forgebook",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter forgebook test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/app build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-vue-vite-8",
+      "adapter": "@forgebook/vue",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/vue test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/vue test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/vue build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-vue-vue-3",
+      "adapter": "@forgebook/vue",
+      "host": "vue",
+      "range": "^3.5.0",
+      "line": "3",
+      "version": "3.5.45",
+      "packages": {
+        "vue": "3.5.45"
+      },
+      "status": "passed",
+      "installed": {
+        "vue": "3.5.45"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/vue test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/vue test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/vue build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-vue-vue-next",
+      "adapter": "@forgebook/vue",
+      "host": "vue",
+      "range": "^3.5.0",
+      "line": "next",
+      "version": "3.6.0-rc.14",
+      "packages": {
+        "vue": "3.6.0-rc.14"
+      },
+      "tag": "rc",
+      "status": "failed",
+      "reason": "failed: pnpm --filter @forgebook/vue test; pnpm --filter @fixture/vue test",
+      "installed": {
+        "vue": "3.6.0-rc.14"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/vue test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/vue test",
+          "code": 1
+        },
+        {
+          "command": "pnpm --filter @fixture/vue build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-web-components-lit-3",
+      "adapter": "@forgebook/web-components",
+      "host": "lit",
+      "range": "^3.2.0",
+      "line": "3",
+      "version": "3.3.3",
+      "packages": {
+        "lit": "3.3.3"
+      },
+      "status": "passed",
+      "installed": {
+        "lit": "3.3.3"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/web-components test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/web-components test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/web-components build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    },
+    {
+      "id": "forgebook-web-components-vite-8",
+      "adapter": "@forgebook/web-components",
+      "host": "vite",
+      "range": "^8.3.4",
+      "line": "8",
+      "version": "8.3.6",
+      "packages": {
+        "vite": "8.3.6"
+      },
+      "status": "passed",
+      "installed": {
+        "vite": "8.3.6"
+      },
+      "commands": [
+        {
+          "command": "pnpm --filter @forgebook/web-components test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/web-components test",
+          "code": 0
+        },
+        {
+          "command": "pnpm --filter @fixture/web-components build",
+          "code": 0
+        }
+      ],
+      "node": "24.22.2"
+    }
+  ]
+}

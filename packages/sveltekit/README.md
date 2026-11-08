@@ -123,11 +123,11 @@ function `use:enhance` takes runs as in the app. A POST form without `use:enhanc
 | `$app/paths` | `base`, `assets`, `asset`, `resolve`, `resolveRoute`, `match`, from the app's `paths` and routes |
 | `$app/env`, `$app/environment` | `browser` (false in a server test), `dev`, `building` (false), `version` |
 | `$app/manifest` | The routes and the static files |
-| `$app/env/public` (SvelteKit 3) | The variables `src/env.ts` declares public, checked by their schema (one with none must be set) |
-| `$env/static/public`, `$env/dynamic/public` (SvelteKit 2) | The variables with the public prefix, from the environment and the `.env` files, fixed when a static build is made |
+| `$app/env/public` (SvelteKit 3, or 2 with `experimental.explicitEnvironmentVariables`) | The variables `src/env.ts` declares public, checked by their schema (one with none must be set) |
+| `$env/static/public`, `$env/dynamic/public` (SvelteKit 2 without that flag) | The variables with the public prefix, from the environment and the `.env` files, fixed when a static build is made |
 | `$lib`, the `alias` option | As SvelteKit resolves them; SvelteKit 3's `#lib` is the app's own `imports` |
 | `$app/env/private`, `$env/*/private`, `$app/server`, `$service-worker` | Refused: the story fails with why, and the value never reaches the page |
-| The other SvelteKit's environment | Refused too: SvelteKit 3 has no `$env/*`, so no variable reaches its page by its prefix alone; SvelteKit 2 has no `$app/env/public` |
+| The other environment's modules | Refused too: SvelteKit 3, and SvelteKit 2 with the flag, have no `$env/*`, so no variable reaches the page by its prefix alone; SvelteKit 2 without it has no `$app/env/public` |
 
 Generated server tests take `kitRenderer` from `@forgebook/sveltekit/renderer`: a page's `load` runs first, and a server
 render never reaches the network for the page's own origin. A load's `fetch` of a path, or of an address on the story's

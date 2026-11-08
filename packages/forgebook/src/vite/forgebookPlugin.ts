@@ -33,6 +33,7 @@ import { STORY_FILE } from "./autoTitle.ts";
 import { axeBuildAsset } from "./axeScript.ts";
 import { groupTexts, type TextSources } from "./builtTexts.ts";
 import { catalogueConfig } from "./catalogueConfig.ts";
+import { currentCheckoutWatch } from "./checkoutWatch.ts";
 import { currentCloseWatch } from "./closeWatch.ts";
 import { findConfigFile, loadConfigFile, packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { codeStamp, type DiskCache, diskCache } from "./diskCache.ts";
@@ -61,6 +62,7 @@ import {
   docsModule,
   docsValue,
   FILES_PREFIX,
+  invalidateEverywhere,
   listingRenewals,
   patternModule,
   REACH_ID_PREFIX,
@@ -115,21 +117,8 @@ export type ForgebookPluginOptions = {
   readonly framework?: FrameworkAdapter;
   /** Folders outside the app the dev server watches for new story files, beside the configuration's `watch`. */
   readonly watch?: readonly string[];
-};
-
-/**
- * Renews modules in every environment that loaded them: the agents' routes load them on the server too.
- *
- * @param server - the dev server.
- * @param ids - the modules' ids.
- */
-const invalidateEverywhere = (server: ViteDevServer, ids: Iterable<string>): void => {
-  for (const environment of Object.values(server.environments)) {
-    for (const id of ids) {
-      const module = environment.moduleGraph.getModuleById(id);
-      if (module !== undefined) environment.moduleGraph.invalidateModule(module);
-    }
-  }
+  /** Whether the dependency scan is a first start's quick one (`ScanFindings.isQuick`); off by default. */
+  readonly isQuickScan?: boolean;
 };
 
 /**
@@ -220,6 +209,8 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   };
   /** The files followed one by one, so an edit reaches the dev server at once. */
   const watching = currentCloseWatch();
+  /** Git's checkouts, so the files a branch switch rewrites reach the dev server when the system's events do not. */
+  const checkouts = currentCheckoutWatch();
   /** Whether a dev server runs, or a build: tools ask only the former. */
   let command: ConfigEnv["command"] = "serve";
   const isServing = (): boolean => command === "serve";
@@ -243,7 +234,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
    * still loading TypeScript when the tests end is stopped by Node mid-parse, which aborts the process.
    */
   let isTestRun = false;
-  const scripts = scriptProblems();
+  const scripts = { ...scriptProblems(), isQuick: options.isQuickScan === true };
   /** Where answers are kept between starts (`diskCache.ts`): in Vite's cache folder, so what clears it clears them. */
   let cacheFolder: string | undefined;
   const jsxScripts = jsxInScripts(() => config?.framework ?? options.framework);
@@ -487,7 +478,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         access.settle(request.url ?? "/").then(() => next(), next);
       });
       // no person waits for a page in a test run
-      watching.serve(isTestRun ? undefined : server);
+      const followed = isTestRun ? undefined : server;
+      watching.serve(followed);
+      checkouts.serve(followed);
       server.httpServer?.on("close", (): void => void docs?.close());
       // first: the frames' own origin, and the guard that keeps every other origin's page from reading this one
       if (config !== undefined)
@@ -547,7 +540,10 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
     },
     // a dev server without an HTTP server of its own (middleware mode) ends its close watch here only
     closeServer: (context: { readonly reason: "restart" | "close" }): void => {
-      if (context.reason === "close") watching.close();
+      if (context.reason === "close") {
+        watching.close();
+        checkouts.close();
+      }
     },
     closeBundle: async (): Promise<void> => {
       await docs?.close();
