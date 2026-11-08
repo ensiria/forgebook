@@ -13,7 +13,7 @@
 import { resolve } from "node:path";
 
 import { defineCommands } from "@ensiria/cli-kit/commands";
-import { formatJson } from "@ensiria/cli-kit/files";
+import { formatJson, readPackageVersion } from "@ensiria/cli-kit/files";
 import { ScriptError } from "@ensiria/cli-kit/script";
 import { build } from "vite";
 
@@ -53,6 +53,8 @@ await defineCommands({
   summary:
     "Run a catalogue of stories from its forgebook.config.ts, build it, or answer tools and agents about it.",
   icon: "docs",
+  // the commit hook `init --agents` writes asks `--version` whether Forgebook is installed before it runs `verify`
+  version: readPackageVersion(import.meta.dirname),
   options: FORGEBOOK_OPTIONS,
   commands: (forgebook) => ({
     ...devCommands(forgebook),
