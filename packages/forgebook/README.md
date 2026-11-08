@@ -1944,9 +1944,10 @@ notation counted as one, how many go through tokens and how many are written by 
 components that look like one, by name and by what they render, take and carry, never by name alone. It also says where
 a catalogue rots: exported components no story file imports (`withoutStories`), and components with stories that nothing
 but stories and tests imports or draws (`storiesUnused`), each with its story files. Pages, layouts and routes are in
-neither list, and a published package's components are never called unused, since their users are elsewhere. An import it
-cannot follow (a barrel, an alias, a package's name) counts for every component of that name, so a listed component is one
-nothing in the project could be. It exits 0: it is a report, and `check-code` is what fails. With `--json`, `actions` lists the next steps, the largest first, each with the
+neither list. A package that goes to a registry (named and not private) never has its components called unused, since
+their users are elsewhere; a workspace's private package is judged by what the repository does with it, so audit the
+repository's root to see its users. An import it cannot follow (a barrel, an alias, a package's name) counts for every
+component of that name, so a listed component is one nothing in the project could be. It exits 0: it is a report, and `check-code` is what fails. With `--json`, `actions` lists the next steps, the largest first, each with the
 command that lists what to edit:
 
 ```sh

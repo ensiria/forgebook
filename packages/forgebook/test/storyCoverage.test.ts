@@ -38,7 +38,7 @@ describe("components without stories", () => {
       )
     ]);
     expect(names(coverage.withoutStories)).toEqual(["Badge"]);
-    expect(coverage).toMatchObject({ storyFiles: 1, withStories: 1 });
+    expect(coverage).toMatchObject({ storyFileCount: 1, withStories: 1 });
   });
 
   it("follows a default import, an alias and a story in a script", () => {
@@ -139,5 +139,95 @@ describe("stories nobody uses", () => {
     const coverage = coverageOf([BUTTON, CARD, ...stories], (path) => path === "src/Card.tsx");
     expect(names(coverage.storiesUnused)).toEqual(["Button"]);
     expect(coverage.published).toBe(1);
+  });
+});
+
+describe("imports written other ways", () => {
+  const Ui = file("src/ui/Button.tsx", "export const Button = () => <button type='button' />;");
+  const Barrel = file("src/ui/index.ts", 'export * from "./Button";');
+  const Story = file("src/ui/Button.stories.tsx", 'import { Button } from "./Button";');
+
+  it("follows a namespace's members through a barrel, in a story and in a use", () => {
+    const used = coverageOf([
+      Ui,
+      Barrel,
+      Story,
+      file("src/Home.tsx", 'import * as UI from "./ui";', "export const Home = () => <UI.Button />;")
+    ]);
+    expect(used.storiesUnused).toEqual([]);
+    const storied = coverageOf([
+      Ui,
+      Barrel,
+      file(
+        "src/ui/Button.stories.tsx",
+        'import * as UI from ".";',
+        "export default { component: UI.Button };"
+      )
+    ]);
+    expect(storied.withoutStories).toEqual([]);
+  });
+
+  it("reads an ES module's .js extension, comments in braces and a require", () => {
+    const coverage = coverageOf([
+      file("src/ui/Button.tsx", "const Button = () => <button />;", "export default Button;"),
+      file("src/ui/Card.tsx", "export const Card = () => <div />;"),
+      file("src/ui/Badge.tsx", "export const Badge = () => <span />;"),
+      file("src/ui/Button.stories.tsx", 'import Btn from "./Button.js";'),
+      file("src/ui/Card.stories.tsx", 'import {\n  Card, // the main one\n} from "./Card";'),
+      file("src/ui/Badge.stories.tsx", 'import { Badge } from "./Badge";'),
+      file(
+        "src/legacy.js",
+        'const { Badge: B } = require("./ui/Badge");',
+        'const card = require("./ui/Card");'
+      )
+    ]);
+    expect(coverage.withoutStories).toEqual([]);
+    expect(names(coverage.storiesUnused)).toEqual(["Button"]);
+  });
+
+  it("knows a component exported under another name by the name its file declares", () => {
+    const coverage = coverageOf([
+      file("src/Dialog.tsx", "const Root = () => <div />;", "export { Root as Dialog };"),
+      file("src/Dialog.stories.tsx", 'import { Dialog } from "./Dialog";'),
+      file("src/Screen.tsx", 'import { Dialog } from "./Dialog";', "export const Screen = () => <Dialog />;")
+    ]);
+    expect(coverage.withoutStories.map(({ name }) => name)).toEqual(["Screen"]);
+    expect(coverage.storiesUnused).toEqual([]);
+  });
+
+  it("takes a folder named tests as the application's own, and only test files as tests", () => {
+    const coverage = coverageOf([
+      Ui,
+      Story,
+      file(
+        "src/tests/Quiz.tsx",
+        'import { Button } from "../ui/Button";',
+        "export const Quiz = () => <Button />;"
+      )
+    ]);
+    expect(coverage.storiesUnused).toEqual([]);
+  });
+
+  it("finds an alias's file by the end of its path", () => {
+    const coverage = coverageOf([
+      file("src/a/Item.tsx", "export const Item = () => <li />;"),
+      file("src/b/Item.tsx", "export const Item = () => <li />;"),
+      file("src/a/Item.stories.tsx", 'import { Item } from "@/a/Item";'),
+      file("src/b/Item.stories.tsx", 'import { Item } from "@/b/Item";'),
+      file("src/List.tsx", 'import { Item } from "@/a/Item";', "export const List = () => <ul />;")
+    ]);
+    expect(coverage.storiesUnused.map(({ file: path }) => path)).toEqual(["src/b/Item.tsx"]);
+  });
+
+  it("reads crafted files in linear time", () => {
+    const crafted = [
+      `import${" ".repeat(999_990)}`,
+      "import a ".repeat(111_000),
+      `${"x".repeat(190)} =require('x')`.repeat(4800),
+      `import * as UI from "./ui";\n${"UI.".repeat(330_000)}`
+    ];
+    const started = performance.now();
+    coverageOf(crafted.map((text, index) => file(`src/f${index}.ts`, text)));
+    expect(performance.now() - started).toBeLessThan(3000);
   });
 });

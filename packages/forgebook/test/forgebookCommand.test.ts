@@ -1347,14 +1347,18 @@ describe("forgebook audit", () => {
     const app = storied({ name: "app", private: true });
     const document = JSON.parse(runScriptProcess(ENTRY, ["audit", app, "--json"]).stdout);
     expect(document.components).toMatchObject({
-      storyFiles: 3,
+      storyFileCount: 3,
       withStories: 3,
       withoutStories: [{ name: "Badge", file: "Badge.tsx", line: 1 }],
       storiesUnused: [{ name: "Card", storyFiles: ["Card.stories.tsx"] }, { name: "Screen" }],
       publishedWithStories: 0
     });
     expect(document.actions).toContainEqual(
-      expect.objectContaining({ kind: "write-stories", count: 1, args: ["new", join(app, "Badge.tsx")] })
+      expect.objectContaining({
+        kind: "write-stories",
+        count: 1,
+        args: ["new", "--", join(app, "Badge.tsx")]
+      })
     );
     expect(document.actions).toContainEqual(expect.objectContaining({ kind: "check-unused", count: 2 }));
     const text = runScriptProcess(ENTRY, ["audit", app]).stdout;
@@ -1364,6 +1368,16 @@ describe("forgebook audit", () => {
       runScriptProcess(ENTRY, ["audit", storied({ name: "@acme/ui" }), "--json"]).stdout
     );
     expect(library.components).toMatchObject({ storiesUnused: [], publishedWithStories: 2 });
+    // a workspace's own package is used inside the repository, so the audit judges it
+    const workspace = JSON.parse(
+      runScriptProcess(ENTRY, [
+        "audit",
+        storied({ name: "@acme/ui", private: true, exports: "./index.ts" }),
+        "--json"
+      ]).stdout
+    );
+    expect(workspace.components).toMatchObject({ publishedWithStories: 0 });
+    expect(workspace.components.storiesUnused).toHaveLength(2);
   });
 
   it("refuses a value that is neither a colour nor a size, rather than say it is not there", () => {

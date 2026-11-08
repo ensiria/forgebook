@@ -26,8 +26,7 @@ import { repositoryOf, smallFileText } from "../../src/vite/appTokenFiles.ts";
 import { readAppTokens } from "../../src/vite/appTokens.ts";
 import { projectComponents } from "../../src/vite/componentScan.ts";
 import { type LookAlike, lookAlikes } from "../../src/vite/lookAlikes.ts";
-import { isPublished } from "../../src/vite/packageEntries.ts";
-import { projectFiles, projectScripts, UI_PATTERNS } from "../../src/vite/projectFiles.ts";
+import { projectFiles, projectFilesAndScripts, UI_PATTERNS } from "../../src/vite/projectFiles.ts";
 import {
   type CoverageComponent,
   type StoryCoverage,
@@ -70,7 +69,7 @@ export type AuditDocument = ValueAudit & {
     /** Those that look like one, the surest first. */
     readonly lookAlikes: readonly LookAlike[];
     /** How many story files were read. */
-    readonly storyFiles: StoryCoverage["storyFiles"];
+    readonly storyFileCount: StoryCoverage["storyFileCount"];
     /** How many exported components some story is about. */
     readonly withStories: StoryCoverage["withStories"];
     /** Exported components no story file is about; pages, layouts and routes left out. */
@@ -170,8 +169,8 @@ const writeStoriesAction = (withoutStories: readonly CoverageComponent[], folder
       kind: "write-stories",
       message: `No story is about ${plural(withoutStories.length, "exported component")}, so nobody sees what exists before writing it again: start with ${first.name}.`,
       count: withoutStories.length,
-      command: `forgebook new ${quoted(file)}`,
-      args: ["new", file],
+      command: `forgebook new -- ${quoted(file)}`,
+      args: ["new", "--", file],
       members: withoutStories.slice(0, MOST_MEMBERS)
     }
   ];
@@ -191,7 +190,21 @@ const checkUnusedAction = (storiesUnused: readonly UnusedStoriedComponent[]): Au
       ];
 
 /**
- * Whether a file belongs to a package that is published, by the nearest manifest above it inside the repository.
+ * Whether a manifest is one of a package that goes to a registry: named, and not private. A private package with
+ * `exports` is a workspace's own, whose users are in the repository, so the audit judges what it reads of them, as it does
+ * an application's components (application templates mark themselves private).
+ *
+ * @param manifest - the parsed `package.json`.
+ */
+const isOnTheRegistry = (manifest: unknown): boolean =>
+  typeof manifest === "object" &&
+  manifest !== null &&
+  "name" in manifest &&
+  typeof manifest.name === "string" &&
+  !("private" in manifest && manifest.private === true);
+
+/**
+ * Whether a file belongs to a package that goes to a registry, by the nearest manifest above it inside the repository.
  *
  * @param dir - the project's folder, which the files are relative to.
  */
@@ -205,7 +218,7 @@ const publishedPackageOf = (dir: string): ((file: string) => boolean) => {
     let answer: boolean;
     if (text !== undefined) {
       try {
-        answer = isPublished(JSON.parse(text));
+        answer = isOnTheRegistry(JSON.parse(text));
       } catch {
         answer = false;
       }
@@ -227,15 +240,11 @@ const publishedPackageOf = (dir: string): ((file: string) => boolean) => {
 export const auditDocument = (dir: string, top: number | undefined, folder = "."): AuditDocument => {
   const { tokens, sources, unread } = readAppTokens(dir);
   const notes = [...unread];
-  const files = projectFiles(dir, notes);
+  const { files, scripts } = projectFilesAndScripts(dir, notes);
   const values = valueAudit(files, tokens, top);
   const components = projectComponents(files);
   const alike = lookAlikes(components);
-  const coverage = storyCoverage(
-    components,
-    [...files, ...projectScripts(dir, notes)],
-    publishedPackageOf(dir)
-  );
+  const coverage = storyCoverage(components, [...files, ...scripts], publishedPackageOf(dir));
   return {
     schema: 1,
     system: {
@@ -248,7 +257,7 @@ export const auditDocument = (dir: string, top: number | undefined, folder = "."
     components: {
       count: components.length,
       lookAlikes: alike,
-      storyFiles: coverage.storyFiles,
+      storyFileCount: coverage.storyFileCount,
       withStories: coverage.withStories,
       withoutStories: coverage.withoutStories,
       storiesUnused: coverage.storiesUnused,
@@ -299,14 +308,14 @@ const LISTED = 10;
 
 /** The stories' part of the report: what has none, and what has some and no use. */
 const storyLines = (components: AuditDocument["components"]): string[] => {
-  const { storyFiles, withStories, withoutStories, storiesUnused, publishedWithStories } = components;
-  if (storyFiles === 0) return ["Stories: no story file, so no exported component has any."];
+  const { storyFileCount, withStories, withoutStories, storiesUnused, publishedWithStories } = components;
+  if (storyFileCount === 0) return ["Stories: no story file, so no exported component has any."];
   const more = (count: number): string[] =>
     count > LISTED ? [`    and ${count - LISTED} more (--json)`] : [];
   const published =
     publishedWithStories === 0 ? "" : `, ${publishedWithStories} of a published package not judged`;
   return [
-    `Stories: ${plural(storyFiles, "file")}, about ${plural(withStories, "component")}; ${plural(withoutStories.length, "exported component")} without.`,
+    `Stories: ${plural(storyFileCount, "file")}, about ${plural(withStories, "component")}; ${plural(withoutStories.length, "exported component")} without.`,
     ...withoutStories.slice(0, LISTED).map(({ name, file, line }) => `  ${name}  ${file}:${line}`),
     ...more(withoutStories.length),
     `With stories and no use outside stories and tests: ${storiesUnused.length}${published}.`,

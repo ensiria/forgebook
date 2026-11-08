@@ -15,6 +15,7 @@
  * @module
  */
 import type { ScannedComponent } from "./componentScan.ts";
+import { exportAliasesOf, type ImportedName, importsOf } from "./importedNames.ts";
 import type { ProjectFile } from "./projectFiles.ts";
 
 /** A component as a list of the report names it. */
@@ -29,7 +30,7 @@ export type UnusedStoriedComponent = CoverageComponent & {
 /** Which components have stories, and which of those the project draws. */
 export type StoryCoverage = {
   /** How many story files were read. */
-  readonly storyFiles: number;
+  readonly storyFileCount: number;
   /** How many exported components some story is about. */
   readonly withStories: number;
   /** Exported components no story file is about, pages and layouts left out. */
@@ -43,9 +44,12 @@ export type StoryCoverage = {
 /** A story file, in any language a catalogue reads. */
 export const STORY_FILE = /\.(?:stories|story)\.[cm]?[jt]sx?$|\.(?:stories|story)\.(?:vue|svelte|astro)$/;
 
-/** What is never the project's own use of a component: stories, tests and their folders. */
+/**
+ * What is never the project's own use of a component: test files by their names, and the folders only tools read. A folder
+ * merely named `tests` may be the application's own (a quiz's `tests/`), so only a file's name says it is a test.
+ */
 const NOT_A_USE =
-  /\.(?:stories|story|test|spec|e2e|cy)\.|(?:^|\/)(?:__tests__|__stories__|__mocks__|tests?|e2e|stories|\.storybook|\.forgebook)\//;
+  /\.(?:test|spec|e2e|cy)\.|(?:^|\/)(?:__tests__|__stories__|__mocks__|\.storybook|\.forgebook)\//;
 
 /**
  * A file a framework loads by its place: a route, a page, a layout, an application's entry. Nothing imports it, and no one
@@ -60,52 +64,11 @@ const EXTENSIONS = ["", ".tsx", ".ts", ".jsx", ".js", ".mts", ".mjs", ".vue", ".
 /** A prefix projects give their source folder in imports: `@/components/Button`. */
 const ALIAS = /^(?:@|~|~~|@@|#|\$lib)\//;
 
-/**
- * An import of values, with what it takes: `import A, { B as C } from "x"`; types only are left out. One space before
- * `from`, the clause taking the rest: a run of spaces matched twice would make a crafted file slow to read.
- */
-const STATIC_IMPORT = /\bimport\s+(?!type\s)([\w$\s{},*]{1,2000}?)\sfrom\s*["']([^"'\n]{1,500})["']/g;
-
-/** A dynamic import, which takes the whole module. */
-const DYNAMIC_IMPORT = /\bimport\(\s*["']([^"'\n]{1,500})["']\s*\)/g;
-
-/** A tag written in markup: `<Button`, `<Dialog.Title`, `<my-button`. */
+/** A tag written in markup: `<Button`, `<my-button`; a namespace's `<UI.Button>` is read with its import. */
 const TAG = /<([A-Z][\w$]*|[a-z][\w]*(?:-[\w]+)+)/g;
 
-/** One name an import takes: its name in the module (`default`, `*`) and in the file. */
-type ImportedName = { readonly imported: string; readonly local: string };
-
-/** What a file imports: each module's name and the names it takes. */
-type FileImport = { readonly specifier: string; readonly names: readonly ImportedName[] };
-
-/** The names an import's clause takes. */
-const clauseNames = (clause: string): ImportedName[] => {
-  const names: ImportedName[] = [];
-  const braces = /\{([^}]*)\}/.exec(clause);
-  for (const part of (braces?.[1] ?? "").split(",")) {
-    const words = part.trim().split(/\s+/);
-    if (words[0] === "type" || words[0] === "" || words[0] === undefined) continue;
-    const imported = words[0];
-    names.push({ imported, local: words[1] === "as" ? (words[2] ?? imported) : imported });
-  }
-  const namespace = /\*\s*as\s+([\w$]+)/.exec(clause);
-  if (namespace?.[1] !== undefined) names.push({ imported: "*", local: namespace[1] });
-  const first = /^\s*([\w$]+)\s*(?:,|$)/.exec(clause.replace(/\{[^}]*\}/, ""));
-  if (first?.[1] !== undefined) names.push({ imported: "default", local: first[1] });
-  return names;
-};
-
-/** What a file's text imports. */
-const importsOf = (text: string): FileImport[] => [
-  ...[...text.matchAll(STATIC_IMPORT)].map((match) => ({
-    specifier: match[2] ?? "",
-    names: clauseNames(match[1] ?? "")
-  })),
-  ...[...text.matchAll(DYNAMIC_IMPORT)].map((match) => ({
-    specifier: match[1] ?? "",
-    names: [{ imported: "*", local: "" }]
-  }))
-];
+/** An extension an ES module's import writes for a TypeScript file: `./Button.js` is `Button.tsx`. */
+const WRITTEN_EXTENSION = /\.[cm]?jsx?$/;
 
 /** A path with its `.` and `..` folded away. */
 const folded = (path: string): string => {
@@ -126,31 +89,42 @@ const bare = (file: string): string => file.replace(/\.[^./]+$/, "").replace(/\/
  * @param specifier - the import's module.
  * @param from - the importing file.
  * @param known - the project's files.
- * @param byBare - the project's files by their path without extension.
- * @param aliased - what an alias's path was found to be, kept since every file of a project writes the same ones.
+ * @param bySuffix - the project's files by every tail of their path without extension.
  */
 const resolved = (
   specifier: string,
   from: string,
   known: ReadonlySet<string>,
-  byBare: ReadonlyMap<string, readonly string[]>,
-  aliased: Map<string, string | undefined>
+  bySuffix: ReadonlyMap<string, readonly string[]>
 ): string | undefined => {
   if (specifier.startsWith(".")) {
-    const base = folded(`${from.split("/").slice(0, -1).join("/")}/${specifier}`);
-    for (const form of [base, `${base}/index`]) {
+    const written = folded(`${from.split("/").slice(0, -1).join("/")}/${specifier}`);
+    const bases = WRITTEN_EXTENSION.test(written)
+      ? [written, written.replace(WRITTEN_EXTENSION, "")]
+      : [written];
+    for (const form of bases.flatMap((base) => [base, `${base}/index`])) {
       for (const extension of EXTENSIONS) if (known.has(`${form}${extension}`)) return `${form}${extension}`;
     }
     return undefined;
   }
   if (!ALIAS.test(specifier)) return undefined;
-  const rest = bare(specifier.replace(ALIAS, ""));
-  if (aliased.has(rest)) return aliased.get(rest);
-  const found = [...byBare].filter(([path]) => path === rest || path.endsWith(`/${rest}`));
-  const files = found.flatMap(([, each]) => each);
-  const file = files.length === 1 ? files[0] : undefined;
-  aliased.set(rest, file);
-  return file;
+  const files = bySuffix.get(bare(specifier.replace(ALIAS, "").replace(WRITTEN_EXTENSION, ""))) ?? [];
+  return files.length === 1 ? files[0] : undefined;
+};
+
+/** The project's files by every tail of their path without extension, `a/b/c` under `a/b/c`, `b/c` and `c`. */
+const suffixIndex = (files: Iterable<string>): Map<string, string[]> => {
+  const index = new Map<string, string[]>();
+  for (const file of files) {
+    const parts = bare(file).split("/");
+    for (let start = 0; start < parts.length; start += 1) {
+      const suffix = parts.slice(start).join("/");
+      const listed = index.get(suffix);
+      if (listed === undefined) index.set(suffix, [file]);
+      else if (!listed.includes(file)) listed.push(file);
+    }
+  }
+  return index;
 };
 
 /** A key for a component: its file and name. */
@@ -167,15 +141,16 @@ const pascal = (tag: string): string =>
 const reached = (
   name: ImportedName,
   target: string | undefined,
-  inFile: ReadonlyMap<string, readonly ScannedComponent[]>,
-  byName: ReadonlyMap<string, readonly ScannedComponent[]>
+  lookup: Lookup
 ): readonly ScannedComponent[] => {
+  const { inFile, byName } = lookup;
   const declared = target === undefined ? [] : (inFile.get(target) ?? []);
   if (name.imported === "*" && declared.length > 0) return declared;
+  // `export { Root as Dialog }`: the scan knows the component as Root
+  const local =
+    (target === undefined ? undefined : lookup.aliasesOf(target).get(name.imported)) ?? name.imported;
   const own = declared.filter((each) =>
-    name.imported === "default"
-      ? each.isDefault === true || declared.length === 1
-      : each.name === name.imported
+    name.imported === "default" ? each.isDefault === true || declared.length === 1 : each.name === local
   );
   if (own.length > 0) return own;
   // a barrel, an alias or a package: the name stands for every exported component of that name
@@ -198,21 +173,21 @@ const grouped = <T>(items: readonly T[], key: (item: T) => string): Map<string, 
 type Lookup = {
   /** The files read. */
   readonly known: ReadonlySet<string>;
-  /** The same, by their path without extension. */
-  readonly byBare: ReadonlyMap<string, readonly string[]>;
+  /** The same, by every tail of their path without extension. */
+  readonly bySuffix: ReadonlyMap<string, readonly string[]>;
   /** The components, by their file. */
   readonly inFile: ReadonlyMap<string, readonly ScannedComponent[]>;
   /** The exported components, by their name. */
   readonly byName: ReadonlyMap<string, readonly ScannedComponent[]>;
-  /** What each alias's path was found to be. */
-  readonly aliased: Map<string, string | undefined>;
+  /** The names a file exports its declarations under, when they differ from the declared ones. */
+  readonly aliasesOf: (file: string) => ReadonlyMap<string, string>;
 };
 
 /** The components a file imports. */
 const importedComponents = (file: string, text: string, lookup: Lookup): ScannedComponent[] =>
   importsOf(text).flatMap(({ specifier, names }) => {
-    const target = resolved(specifier, file, lookup.known, lookup.byBare, lookup.aliased);
-    return names.flatMap((name) => reached(name, target, lookup.inFile, lookup.byName));
+    const target = resolved(specifier, file, lookup.known, lookup.bySuffix);
+    return names.flatMap((name) => reached(name, target, lookup));
   });
 
 /** The components a file writes the tag of, among those exported and its own. */
@@ -262,21 +237,28 @@ export const storyCoverage = (
   isPublished: (file: string) => boolean
 ): StoryCoverage => {
   const known = new Set(files.map(({ file }) => file));
+  const texts = new Map(files.map(({ file, text }) => [file, text]));
+  const aliases = new Map<string, ReadonlyMap<string, string>>();
+  const aliasesOf = (file: string): ReadonlyMap<string, string> => {
+    const found = aliases.get(file) ?? exportAliasesOf(texts.get(file) ?? "");
+    aliases.set(file, found);
+    return found;
+  };
   const { storiedBy, used } = readUses(files, {
     known,
-    byBare: grouped([...known], bare),
+    bySuffix: suffixIndex(known),
+    aliasesOf,
     inFile: grouped(components, ({ file }) => file),
     byName: grouped(
       components.filter(({ isExported }) => isExported),
       ({ name }) => name
-    ),
-    aliased: new Map()
+    )
   });
   const hasStories = (each: ScannedComponent): boolean => storiedBy.has(keyOf(each));
   const placed = components.filter(({ file }) => !LOADED_BY_PLACE.test(file));
   const unused = placed.filter((each) => hasStories(each) && !used.has(keyOf(each)));
   return {
-    storyFiles: files.filter(({ file }) => STORY_FILE.test(file)).length,
+    storyFileCount: files.filter(({ file }) => STORY_FILE.test(file)).length,
     withStories: components.filter((each) => each.isExported && hasStories(each)).length,
     withoutStories: placed.filter((each) => each.isExported && !hasStories(each)).map(listed),
     storiesUnused: unused

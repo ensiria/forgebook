@@ -101,24 +101,35 @@ const SCRIPT_PATTERNS: readonly string[] = ["*.ts", "*.mts", "*.cts", "*.js", "*
 /** The same, for a file's name; a type declaration imports nothing that runs. */
 const SCRIPT_FILE = /(?<!\.d)\.[cm]?[jt]s$/;
 
+/** A project's files and its scripts, read under one bound of files and bytes. */
+export type FilesAndScripts = {
+  /** Its styles and components, as {@link projectFiles} reads them. */
+  readonly files: readonly ProjectFile[];
+  /** Its scripts, read with what room the files left. */
+  readonly scripts: readonly ProjectFile[];
+};
+
 /**
- * Reads a project's scripts, the files {@link projectFiles} leaves out, under the same bounds.
+ * Reads a project's files and then its scripts, the two together held to the bounds {@link projectFiles} keeps alone.
  *
  * @param dir - its folder.
  * @param notes - told of what is left out.
  */
-export const projectScripts = (dir: string, notes: string[]): ProjectFile[] => {
+export const projectFilesAndScripts = (dir: string, notes: string[]): FilesAndScripts => {
   const root = repositoryOf(dir);
+  const ui = listedProjectFiles(dir, notes);
   const listed = listedFiles(dir, SCRIPT_PATTERNS, SCRIPT_FILE, NOT_ITS_CODE).filter(
     (file) => SCRIPT_FILE.test(file) && !NOT_ITS_CODE.test(file)
   );
-  if (listed.length > MOST_FILES)
-    notes.push(`${listed.length - MOST_FILES} scripts past the first ${MOST_FILES} not read`);
-  return readFiles(
-    dir,
-    listed.slice(0, MOST_FILES).filter((file) => isInside(root, join(dir, file))),
-    notes
-  );
+  const room = Math.max(0, MOST_FILES - ui.length);
+  if (listed.length > room)
+    notes.push(`${listed.length - room} scripts past the first ${MOST_FILES} files not read`);
+  const scripts = new Set(listed.slice(0, room).filter((file) => isInside(root, join(dir, file))));
+  const read = readFiles(dir, [...ui, ...scripts], notes);
+  return {
+    files: read.filter(({ file }) => !scripts.has(file)),
+    scripts: read.filter(({ file }) => scripts.has(file))
+  };
 };
 
 /**
