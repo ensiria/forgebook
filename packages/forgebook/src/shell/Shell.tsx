@@ -51,7 +51,7 @@ import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewPar
 import type { WrittenHomeProps } from "./AuthoredHome.tsx";
 import type { ComponentPageProps } from "./ComponentPage.tsx";
 import { CatalogueContext, NO_PLUGINS, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
-import { HAS_REFS } from "./composition.ts";
+import { HAS_REFS, shellRefs } from "./composition.ts";
 import type { ArgControlLoaders } from "./customControls.ts";
 import type { DocPageProps } from "./DocPage.tsx";
 import { filesCodeLoader } from "./filesCode.ts";
@@ -935,8 +935,7 @@ const ShellPage = ({
   loadTokens,
   loadSwitchPreviews,
   argControls,
-  home,
-  refs
+  home
 }: ShellConfig): ReactNode => {
   const tree = useMemo(() => storyTree(sources), [sources]);
   const problems = useEditedProblems(tree.problems);
@@ -998,6 +997,7 @@ const ShellPage = ({
   // what composition adds to the page; the build removes this whole block from a catalogue that composes none
   let refSlots: RefSlots | undefined;
   if (HAS_REFS) {
+    const refs = shellRefs();
     shown = shownRef(tree, address.page, refs, shown);
     refSlots = refSlotsOf(
       refs,

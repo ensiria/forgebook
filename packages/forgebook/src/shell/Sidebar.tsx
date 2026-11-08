@@ -28,6 +28,7 @@ import type { SearchTarget } from "../search.ts";
 import { hasFilterTags } from "../storyTagNames.ts";
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
+import { HAS_REFS } from "./composition.ts";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
@@ -393,7 +394,7 @@ export const Sidebar = ({
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
-  const [filterTree, setFilterTree] = useState<typeof shownTree>();
+  const [filterTree, setFilterTree] = useState<typeof shownTree>(() => unsearchedTree);
   const showFiltered = useCallback((filter: typeof shownTree): void => setFilterTree(() => filter), []);
   const navRef = useRef<HTMLElement>(null);
   // the shown component stays in sight: a page opened by a key, the picker or the address scrolls the list to it
@@ -411,8 +412,7 @@ export const Sidebar = ({
   const isNarrowed = isSearching || isFiltered;
 
   // the filter comes with the search's list; a moment before it, or with no words, the tree shows whole
-  const { sources, pages } =
-    isSearching && filterTree !== undefined ? filterTree(tree, query) : unsearchedTree(tree);
+  const { sources, pages } = isSearching ? filterTree(tree, query) : unsearchedTree(tree);
   const hasMatches = pages.length > 0 || sources.some(({ families }) => families.length > 0);
 
   return (
@@ -484,7 +484,7 @@ export const Sidebar = ({
           />
         ))}
         {/* the search and the tag filter read this catalogue only: another's list is not fetched to search it */}
-        {isNarrowed ? null : links.composed}
+        {HAS_REFS && !isNarrowed ? links.composed : null}
       </nav>
       <AppearanceMenu {...appearance} onShowKeys={onShowKeys} />
       {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}
