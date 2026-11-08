@@ -1303,7 +1303,7 @@ is a state of the component: the same).
 | `forgebook stories` | Lists every story with its id and links; fails when the story index has problems |
 | `forgebook story <id>` | One story: its args, its component's props, its links in a view (`--view theme=dark`) |
 | `forgebook init` | Writes `forgebook.config.ts`, and a preview with the app's global style sheets, from the project's framework; names what it could not work out; `--install` installs, `--json` answers for agents ([more](#start-with-one-command)). `--from storybook` reads a project's `.storybook` (or on-device `.rnstorybook`) folder instead: framework, story globs, preview and toolbar globals |
-| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change |
+| `forgebook new <file>` | Writes a component's first stories from its props and from where the application draws it: the main story with the values the application gives most, one story per other way it is drawn, one per choice, the worst case; the file says which props it was written for, and `verify` fails when they change. `--repair` draws them in a browser and, when an error says a story must be drawn inside a component the application exports (`useSidebar must be used within a SidebarProvider`), draws them inside it, at most twice |
 | `forgebook check <id>` | Runs the catalogue's browser checks on a story (or a component's stories): accessibility, spills, overlays, errors; with `@forgebook/testing` |
 | `forgebook check <id> --stress` | Draws the story in the states nobody wrote: long text, unbreakable words, huge numbers, empty, right to left, 200 % zoom, narrow, dark, more contrast, and reports what each breaks |
 | `forgebook errors` | Lists what the open frames reported while you edited (a story that could not be shown, a failed play); `--follow` keeps listing |
@@ -1551,6 +1551,10 @@ catalogue as before; `forgebook dev --frames same-origin` does the same for one 
 worker, the clipboard, full screen, the camera and the microphone. A story's link can no longer take the catalogue's
 tab to another address.
 
+A story's style sheets never leave its frame, on any origin: every story draws in a document of its own, so a story
+file that styles `body` or every `button` leaves the next story, the catalogue's page and the other frames of a docs page
+as they were, on the dev server and in a static build. What one origin changes is scripts, as above.
+
 What stays reachable from a frame: the code it runs (your stories, their components, what the catalogue imports), the
 errors Vite sends every page while you edit, and `forgebook errors`, where a frame reports its own errors. If the
 default port is taken, the frames move to the next free one, so their storage moves with them; give `--frame-port` to
@@ -1741,7 +1745,9 @@ example `.mcp.json` for Claude Code:
 It offers 23 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `component_graph`, a map of the components and tokens to read instead of opening files, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, `list_switches`, its switches and each value's view, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
-`node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
+`node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder; a second
+command's server running at the same time (a `verify` while the MCP server serves) uses a folder of its own beside it,
+removed when it stops. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
 
 `get_story` gives a story's design too (`design`, [above](#design-links)), so an agent can read the node with a Figma tool
@@ -1927,6 +1933,12 @@ src/Badge.tsx  not verified: no story reaches it. Fix: npx forgebook new src/Bad
   another catalogue of the repository can answer for. None of these fails. A UI file nothing reaches in a package with no
   catalogue of its own does: it is this catalogue's to show. So does a package whose types point at its build, since
   imports stop there.
+- **Only what the change brought fails.** The stories that found something run again on the commit the change starts
+  from, checked out in a worktree beside the repository (`.<repository>-forgebook-base-<commit>-<process>`) and removed
+  after, the working tree untouched; the base's configuration and stories run there, as yours do. A problem
+  they had there too is set apart in `existing` and said in the line ("2 problems the stories had before the change not
+  counted"), so an application whose stories already break a rule can still be verified. `--all-problems` fails on
+  every problem. When the base cannot run, every problem counts and `skipped` says why.
 - **Stories written for other props fail.** A story file `forgebook new` wrote says which props it was written for
   (`// forgebook-props: 1a2b3c4d`). When a change reaches it and the component's props no longer match, `verify` lists the
   file in `outdated` and fails, since a framework ignores a prop that is gone and never shows one that is new: check the

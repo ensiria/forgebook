@@ -553,8 +553,18 @@ export type VerifyDocument = {
   };
   /** The story files the change reaches that were written for other props, each with its fix; absent when none. */
   readonly outdated?: readonly OutdatedStoryFile[];
-  /** How many problems there are, in `failures`, `code.problems` and `outdated` together. */
+  /** How many problems there are, in `failures`, `code.problems` and `outdated` together: those the change brought. */
   readonly problems: number;
+  /**
+   * The problems the stories had on the base as well, which the verdict does not count: present when the stories that
+   * found something ran again on the base. `--all-problems` counts them.
+   */
+  readonly existing?: {
+    /** How many. */
+    readonly problems: number;
+    /** The pairs that had them, with the links that open the story. */
+    readonly failures: readonly VerifyFailure[];
+  };
   /** The changed published components an agent cannot see: these leave the change not verified. */
   readonly unseen: readonly UnseenComponent[];
 };

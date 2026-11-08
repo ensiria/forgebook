@@ -17,6 +17,7 @@ import { isVisibilityDocument } from "../../src/vite/agentVisibility.ts";
 import { branchStart, changeBase, noBaseReason } from "../../src/vite/gitChange.ts";
 import type { Ask } from "./mcpToolParts.ts";
 import type { StoriesCheckInput } from "./storyCheckRun.ts";
+import type { BaseRun } from "./verifyBase.ts";
 import { verifyDocument } from "./verifyVerdict.ts";
 
 /** What a verification reaches the catalogue through. */
@@ -27,6 +28,8 @@ export type VerifyReach = {
   readonly ask: Ask;
   /** Runs the checks on stories: the report, or why it could not run. */
   readonly check: (input: StoriesCheckInput) => Promise<StoryCheckReport | string>;
+  /** Runs stories on the base commit, for the problems that were there before; none to count every problem. */
+  readonly checkBase?: (base: string, input: StoriesCheckInput) => Promise<BaseRun>;
 };
 
 /** What a verification is asked. */
@@ -35,6 +38,8 @@ export type VerifyInput = {
   readonly since: string | undefined;
   /** Only the default view of each story. */
   readonly isQuick: boolean;
+  /** Count every problem the stories have, not only those the change brought (`--all-problems`). */
+  readonly isAllProblems?: boolean;
   /**
    * What is wrong with the catalogue's configuration that leaves the answer not verified, said with it: a story pattern
    * that matches nothing. None by default.
@@ -65,6 +70,11 @@ export const errorOf = (body: unknown, status: number): string =>
 export const isVerifyFailure = (document: VerifyDocument): boolean =>
   document.verdict === "failed" || document.verdict === "not-verified";
 
+/** The stories with a problem in a report, each once. */
+const failingIds = (report: StoryCheckReport): string[] => [
+  ...new Set(report.results.filter((result) => result.problems.length > 0).map((result) => result.storyId))
+];
+
 /** Runs the stories' check, a thrown failure (a browser that will not start) being a reason as any other. */
 const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<StoryCheckReport | string> => {
   try {
@@ -72,6 +82,26 @@ const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<St
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
+};
+
+/**
+ * The stories that found something run again on the base: a change with none needs no base.
+ *
+ * @param reach - what it reaches the catalogue through.
+ * @param base - the base commit.
+ * @param run - the stories' check on the change.
+ * @param isAllVariants - whether every variant runs, as on the change.
+ */
+const baseRunOf = async (
+  reach: VerifyReach,
+  base: string,
+  run: StoryCheckReport | string | undefined,
+  isAllVariants: boolean
+): Promise<BaseRun | undefined> => {
+  const failing = typeof run === "object" ? failingIds(run) : [];
+  return failing.length === 0 || reach.checkBase === undefined
+    ? undefined
+    : reach.checkBase(base, { ids: failing, isAllVariants });
 };
 
 /**
@@ -83,7 +113,7 @@ const checked = async (reach: VerifyReach, input: StoriesCheckInput): Promise<St
  */
 export const runVerify = async (
   reach: VerifyReach,
-  { since, isQuick, configProblems = [] }: VerifyInput
+  { since, isQuick, isAllProblems = false, configProblems = [] }: VerifyInput
 ): Promise<VerifyDocument | string> => {
   const named = since ?? (await branchStart(reach.dir));
   const base = await changeBase(reach.dir, named);
@@ -98,6 +128,7 @@ export const runVerify = async (
   if (seen.status === 200 && !isVisibilityDocument(seen.body)) return UNEXPECTED_SHAPE;
   const ids = changed.body.stories.map((story) => story.id);
   const run = ids.length === 0 ? undefined : await checked(reach, { ids, isAllVariants: !isQuick });
+  const baseRun = isAllProblems ? undefined : await baseRunOf(reach, base, run, !isQuick);
   // tokens that cannot be read leave the code unchecked, which the verdict says, and do not stop the rest
   const codeBody: CheckedCodeDocument = isCheckedCodeDocument(code.body)
     ? code.body
@@ -127,6 +158,7 @@ export const runVerify = async (
     notRun: typeof run === "string" ? run : undefined,
     isQuick,
     isSinceNamed: since !== undefined,
-    configProblems
+    configProblems,
+    ...(baseRun === undefined ? {} : { baseRun: { base, run: baseRun } })
   });
 };
