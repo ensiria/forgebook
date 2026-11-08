@@ -16,7 +16,7 @@
     "@forgebook/story-format": "workspace:*",
     "@forgebook/sveltekit": "workspace:*",
     "@forgebook/testing": "workspace:*",
-    "@sveltejs/kit": "2.70.4",
+    "@sveltejs/kit": "3.1.1",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@types/node": "24.19.2",
     "forgebook": "workspace:*",
