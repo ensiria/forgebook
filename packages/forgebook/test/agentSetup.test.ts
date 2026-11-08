@@ -44,6 +44,7 @@ import {
   sayAnswer
 } from "../bin/forgebook/agentSetup/stopHook.ts";
 import { isUniformPicture } from "../bin/forgebook/agentSetup/uniformPicture.ts";
+import { CHECKOUT, SETUP_BUN, SETUP_NODE } from "../bin/forgebook/workflowActions.ts";
 import type { VerifyDocument } from "../src/vite/agent.types.ts";
 
 const made: string[] = [];
@@ -202,6 +203,19 @@ describe("the workflow", () => {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: this is GitHub Actions' syntax, in the file it reads
     expect(text).toContain("BASE_BRANCH: ${{ github.base_ref }}");
     expect(text.split("\n").filter((line) => line.includes("run:") && line.includes("${{"))).toEqual([]);
+  });
+
+  it("pins every action to a commit of its current release, as the proof's workflow does", () => {
+    const uses = (["npm", "pnpm", "yarn", "bun"] as const).flatMap((manager) =>
+      workflowText(manager, "")
+        .split("\n")
+        .filter((line) => line.includes("uses:"))
+    );
+    expect(uses.length).toBeGreaterThan(0);
+    for (const line of uses) expect(line).toMatch(/uses: [\w-]+\/[\w-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
+    expect(workflowText("npm", "")).toContain(`- uses: ${CHECKOUT}`);
+    expect(workflowText("npm", "")).toContain(`- uses: ${SETUP_NODE}`);
+    expect(workflowText("bun", "")).toContain(`- uses: ${SETUP_BUN}`);
   });
 
   it("runs in a package's folder", () => {

@@ -14,6 +14,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { CHECKOUT, DOWNLOAD, SETUP_BUN, SETUP_NODE, SETUP_PNPM, UPLOAD } from "./workflowActions.ts";
+
 /** Where the workflow is written, from the repository's folder. */
 export const WORKFLOW_FILE = ".github/workflows/forgebook-proof.yml";
 
@@ -22,15 +24,6 @@ const MAKES_THE_PROOF_TEXT: string = String.raw`^(\.github/|patches/)|(^|/)(forg
 
 /** What finds the comment again, so a new push replaces it. */
 export const COMMENT_MARKER = "<!-- forgebook-proof -->";
-
-/** Actions by the commit they are pinned to: a tag can be moved under a workflow that holds a token. */
-const CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1";
-const SETUP_NODE = "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0";
-const UPLOAD = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2";
-/** The action that fetches the proof in the posting job. */
-export const DOWNLOAD = "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2";
-const SETUP_PNPM = "pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1";
-const SETUP_BUN = "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0";
 
 /** A package manager, by the lockfile that names it, and how it installs exactly what is locked. */
 const MANAGERS: readonly {

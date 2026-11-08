@@ -12,13 +12,8 @@ import { describe, expect, it } from "vitest";
 
 import { orderedByName } from "../bin/forgebook/proofCommand.mts";
 import { ARTIFACT_PLACEHOLDER, codeSpan, proofComment, proofPage } from "../bin/forgebook/proofText.ts";
-import {
-  COMMENT_FILTER,
-  COMMENT_MARKER,
-  commentJob,
-  DOWNLOAD,
-  proofWorkflow
-} from "../bin/forgebook/proofWorkflow.ts";
+import { COMMENT_FILTER, COMMENT_MARKER, commentJob, proofWorkflow } from "../bin/forgebook/proofWorkflow.ts";
+import { DOWNLOAD } from "../bin/forgebook/workflowActions.ts";
 import type { ProofDocument, ProofState } from "../src/vite/agent.types.ts";
 
 const STATE: ProofState = {
