@@ -28,12 +28,20 @@ export const verifyTool = (verify: Verify): McpTool => ({
         description:
           "The commit to compare with, from where the branch left it, as origin/develop in a pull request; the default branch when none."
       },
-      quick: { type: "boolean", description: "Only the default view of each story: faster, and said so." }
+      quick: { type: "boolean", description: "Only the default view of each story: faster, and said so." },
+      allProblems: {
+        type: "boolean",
+        description: "Fail on every problem the stories have, not only those the change brought."
+      }
     },
     additionalProperties: false
   },
   call: async (args: Readonly<Record<string, unknown>>): Promise<McpToolResult> => {
-    const document = await verify({ since: textOf(args, "since"), isQuick: args["quick"] === true });
+    const document = await verify({
+      since: textOf(args, "since"),
+      isQuick: args["quick"] === true,
+      isAllProblems: args["allProblems"] === true
+    });
     if (typeof document === "string") return { structured: { error: document }, isError: true };
     return { structured: document, isError: isVerifyFailure(document) };
   }

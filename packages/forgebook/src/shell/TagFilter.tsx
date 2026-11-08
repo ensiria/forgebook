@@ -4,13 +4,14 @@
  *
  * @module
  */
-import { type ChangeEvent, type MouseEvent, type ReactNode, useMemo } from "react";
+import { type ChangeEvent, type MouseEvent, type ReactNode, useEffect, useMemo } from "react";
 
-import { catalogueTags } from "../storyTags.ts";
+import { catalogueTags, taggedTree } from "../storyTags.ts";
 import type { StoryTree } from "../storyTree.ts";
 import { StatusBadge, useStatuses } from "./StatusBadges.tsx";
 import "./tagFilter.scss";
 import { textsOfGroup } from "./strings.ts";
+import { loadedTagFilter } from "./useListedTree.ts";
 import { usePopover } from "./usePopover.ts";
 
 /** The filter's texts, as shown: Forgebook's, with the catalogue's replacements. */
@@ -39,6 +40,10 @@ export type TagFilterProps = {
  */
 export const TagFilter = ({ tree, tags, onTagsChange }: TagFilterProps): ReactNode => {
   const { isOpen, isDrawn, setIsOpen, buttonRef, panelRef, panelId } = usePopover();
+  // the filter's code came with this chunk: handed over, a checked tag filters the tree in the render that adds it
+  useEffect(() => {
+    loadedTagFilter.current = taggedTree;
+  }, []);
   const offered = useMemo(() => catalogueTags(tree), [tree]);
   const statuses = useStatuses();
   const set = (tag: string, written: string | undefined): void =>

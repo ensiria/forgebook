@@ -136,6 +136,26 @@ test.describe("docs pages", () => {
     await expect(page).toHaveURL(/story=kit%3Ainputs-selection-select--in-row/);
   });
 
+  test("an example's code enters the page when it is first shown, and stays for its closing", async ({
+    page
+  }) => {
+    await page.goto("/?component=kit:inputs-selection-select");
+    const examples = page.locator(".forgebook-example:not([data-demo])");
+    const example = examples.first();
+    // the button comes with the file's code, so the blocks would be written by now
+    await expect(example.getByRole("button", { name: "Show code" })).toBeVisible();
+    // a page of fifty stories would otherwise hold fifty coloured blocks nobody opened
+    await expect(page.locator(".forgebook-example__code pre")).toHaveCount(0);
+    await example.getByRole("button", { name: "Show code" }).click();
+    const code = example.locator(".forgebook-example__code");
+    await expect(code).not.toHaveAttribute("inert");
+    await expect(code.locator("pre")).toContainText("<Select");
+    await expect(page.locator(".forgebook-example__code pre")).toHaveCount(1);
+    await example.getByRole("button", { name: "Hide code" }).click();
+    await expect(code).toHaveAttribute("inert");
+    await expect(code.locator("pre")).toHaveCount(1);
+  });
+
   test("the contents go to a heading, mark it as it is read, and keep it in the address", async ({
     page
   }) => {
