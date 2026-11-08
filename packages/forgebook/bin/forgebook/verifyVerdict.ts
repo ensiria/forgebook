@@ -163,7 +163,10 @@ export type VerifyFindings = {
   readonly isSinceNamed: boolean;
   /** The failing stories run again on the base, when they were: what the base had too is not the change's. */
   readonly baseRun?: { readonly base: string; readonly run: BaseRun };
-  /** What is wrong with the catalogue's configuration: the answer is not verified, whatever else it found. */
+  /**
+   * What is wrong with the catalogue's configuration: the answer is not verified when the change has a UI file, whatever
+   * else it found, and only says it when the change has none.
+   */
   readonly configProblems?: readonly string[];
 };
 
@@ -344,12 +347,19 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
     codeProblems.length + outdated.length
   );
   const existingProblems = compared.existing.reduce((sum, each) => sum + each.problems.length, 0);
-  const skipped = [...skippedOf(input, notRun), ...baseSkips(compared)];
-  // a story file that cannot be read may be the change, whatever else changed
-  const catalogueProblems = [
-    ...(input.configProblems ?? []),
-    ...(changed.uiFiles.length > 0 ? changed.problems : (changed.unread ?? []))
+  const hasUiFiles = changed.uiFiles.length > 0;
+  // a change with no UI file is not the gate's business: a configuration problem, a story pattern that matches nothing
+  // in a catalogue with no story yet, is said and does not stop it; a story file the pattern misses is a UI file itself
+  const configProblems = input.configProblems ?? [];
+  const skipped = [
+    ...skippedOf(input, notRun),
+    ...baseSkips(compared),
+    ...(hasUiFiles ? [] : configProblems)
   ];
+  // a story file that cannot be read may be the change, whatever else changed
+  const catalogueProblems = hasUiFiles
+    ? [...configProblems, ...changed.problems]
+    : [...(changed.unread ?? [])];
   const isBlind = changed.files.length === 0 && !isSinceNamed;
   const { unseen } = visibility;
   const verdict = verdictOf(
