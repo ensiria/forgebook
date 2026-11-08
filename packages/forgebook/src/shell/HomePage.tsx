@@ -21,9 +21,9 @@ import {
   type TreeFamily,
   type TreeSource
 } from "../storyTree.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
 import { PAGE_STRINGS } from "./pageStrings.ts";
-import { STRINGS } from "./strings.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import type { RecentPage } from "./useRecentPages.ts";
 
@@ -228,8 +228,8 @@ export const DocsCard = ({
   hrefOf,
   onOpen
 }: Pick<HomePageProps, "hrefOf" | "onOpen"> & { readonly source: TreeSource }): ReactNode => (
-  <article className="forgebook-home__card" aria-label={STRINGS.docsNav}>
-    <h3 className="forgebook-home__card-title">{STRINGS.docsNav}</h3>
+  <article className="forgebook-home__card" aria-label={LATER_STRINGS.docsNav}>
+    <h3 className="forgebook-home__card-title">{LATER_STRINGS.docsNav}</h3>
     <ul className="forgebook-home__components">
       {source.pages.map((page) => (
         <li key={page.id}>
