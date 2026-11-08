@@ -5,7 +5,9 @@
 See every component in every theme, contrast, language and width. Write CSF stories, run `forgebook dev`: one frame
 per story, switches for theme, contrast, motion and language, and a props table from the components' types.
 
-> **Status:** 0.x, early. Its author's design system runs on it; the API may still change between minor versions.
+> **Status:** 0.x, early. Its author's design system runs on it; the API may still change between minor versions, each
+> break in the changelog and, where the rewrite is mechanical, in `forgebook migrate`
+> ([version policy and the path to 1.0](CONTRIBUTING.md#version-policy)).
 
 This repository holds Forgebook's packages; each has its own README, which is also its npm page.
 

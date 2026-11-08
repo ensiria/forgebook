@@ -1331,6 +1331,7 @@ is a state of the component: the same).
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
+| `forgebook migrate` | Rewrites a project for a breaking change: lists the changes (exit 1 while unwritten), writes them with `--write` ([more](#upgrading)) |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
@@ -1981,6 +1982,39 @@ package's `package.json`:
 
 `forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed, a file that does not parse) or a
 docs page that names what is not there, and its JSON lists every story for a script.
+
+## Upgrading
+
+While Forgebook is 0.x, a minor version (0.3 to 0.4) may break, and a patch never does. Every breaking change is in the
+package's changelog with what to do, and where the rewrite is mechanical, `forgebook migrate` makes it:
+
+```sh
+npx forgebook migrate --from 0.3.3          # lists what changes since 0.3.3, writes nothing
+npx forgebook migrate --from 0.3.3 --write  # makes the changes
+npx forgebook migrate src/preset.ts         # a library's preset module too, beside the configuration
+```
+
+It reads the configuration and the files given as text, runs none of their code, and keeps their formatting: only what a
+codemod rewrites moves, and each file is written whole or not at all. A file given must be inside the folder it runs in
+and outside `node_modules`. Run twice, it finds nothing the second time. It exits 1 while it lists changes it has not
+written, and 0 otherwise: `advice` (what a codemod could not see into, such as a configuration built by a function) and
+`notes` (the breaking changes no codemod can make) are to read, and leave the exit code at 0. `--json` answers `changes`,
+`advice`, `skipped` and `notes`. With no `--from` it runs only the rewrites of what no longer works; a codemod that keeps
+an old behaviour (`play: "on"`) runs when `--from` says the project comes from before it, or by name with `--only`.
+`--from` names `forgebook`'s version; a note of another package says that package's version and is always listed.
+
+| From forgebook 0.3 to 0.4 | `forgebook migrate` |
+|---|---|
+| The strings `propGroups.choice`, `.text`, `.structured` and `.toggle` are gone: the Props tab lists props in their source's order | removes them from `strings` (`prop-group-strings`) |
+| A built catalogue no longer runs a story's play when it opens | writes `play: "on"` to keep it (`play-on-in-builds`); leave it out for the new default |
+| A configuration key nothing reads, a toolbar naming no control and a story pattern matching no file stop the commands, which name them | in `notes`; fix what they name |
+| The catalogue draws stories with the app's own build: tsconfig paths, the `vite.config` beside it (its code runs) and PostCSS | in `notes`; `appBuild: false`, or one part off, for a catalogue that set them up by hand |
+| `verify` fails on a changed UI file with no story that ran, its JSON is schema 2, and it fails on a published component agents cannot see | in `notes` |
+| `check-code` reads the application's design system with no tokens file, compares bare sizes in React style objects, and fails on duplicate and deprecated components | in `notes`; `tokens: []` says there is no system |
+| `@forgebook/story-format` 0.3: a story file's code entries are `StoryCode \| StoryArgsCode` | in `notes`; narrow with `"text" in entry` |
+
+What counts as breaking, how long a deprecation lasts and what must be true before 1.0:
+[the version policy](https://github.com/ensiria/forgebook/blob/develop/CONTRIBUTING.md#version-policy).
 
 ## Packages
 
