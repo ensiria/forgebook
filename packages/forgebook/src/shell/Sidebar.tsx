@@ -268,7 +268,8 @@ const FamilyEntry = ({
           <Icon name="chevronRight" size={12} />
         </span>
         <span className="forgebook-tree__family-name">{family.name}</span>
-        <span className="forgebook-tree__count">{componentCount(family)}</span>
+        {/* a family of aliases alone holds none of its own, and a 0 beside entries reads as empty */}
+        <span className="forgebook-tree__count">{componentCount(family) || null}</span>
       </button>
       <TreeFold
         isOpen={isOpen}

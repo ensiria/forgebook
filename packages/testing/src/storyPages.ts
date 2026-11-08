@@ -19,6 +19,7 @@ import { heldClockAddress } from "forgebook/story-clock";
 import { defaultView, frameAddress, parseView, type ViewState } from "forgebook/view-state";
 
 import { storyVariants } from "./browserTests.ts";
+import { isFrameSettled } from "./frameSettled.ts";
 import { LOGIC_VARIANT } from "./storyTestPlan.ts";
 
 /** The window's size when a view sets no width, in CSS px: the browser tests' own. */
@@ -152,12 +153,7 @@ export const openedStory = async (page: Page, storyPage: StoryPage): Promise<Fra
   );
   await page.goto(storyPage.frame);
   try {
-    await page.waitForFunction(
-      (attribute) =>
-        ["ready", "error", "pending"].includes(document.documentElement.getAttribute(attribute) ?? ""),
-      STATUS_ATTRIBUTE,
-      { timeout: READY_MS }
-    );
+    await page.waitForFunction(isFrameSettled, STATUS_ATTRIBUTE, { timeout: READY_MS });
   } catch {
     return "silent";
   }

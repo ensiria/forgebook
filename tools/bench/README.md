@@ -62,7 +62,10 @@ listed or not drawn.
   on one tool, and forward then backward, so no tool always follows the same one. Install and HMR run in a block per tool.
 - **The story measured** sits in the middle of the library, at the end of a chain of four components. The start, HMR and
   page metrics load that story, so what the size of the library changes in them is the index, not the story.
-- **Memory** is resident memory summed over the process tree, so a tool of several processes reads a little high.
+- **Memory** is resident memory summed over the process tree, so a tool of several processes reads a little high. A
+  server's peak lands in one of two places from run to run, about a fifth of the runs some hundred megabytes higher, so
+  each memory metric takes 7 runs, and the report keeps every sample (`values`) beside the median, where such a spread
+  shows.
 - **The library** is generated without a clock or random numbers, so two machines measure the same files. It is a
   TypeScript project with a `tsconfig.json`, as the README describes one. Forgebook and Storybook get identical CSF 3
   stories. Ladle gets the same stories as functions with `.args`, without play functions,

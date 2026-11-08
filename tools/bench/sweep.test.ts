@@ -7,10 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import { failuresOf, HAS_STATUS, hasGivenUp, storiesOfDocument, sweepProblems } from "./sweep.ts";
 
-/** The wait's expression, run on a frame with this status, as a page runs it. */
-const hasStatus = (status: string | null): unknown =>
+/** The wait's expression, run on a frame with this status, or with no root at all, as a page runs it. */
+const hasStatus = (status: string | null | undefined): unknown =>
   new Function("document", `return ${HAS_STATUS};`)({
-    documentElement: { getAttribute: (): string | null => status }
+    documentElement: status === undefined ? null : { getAttribute: (): string | null => status }
   });
 
 describe("storiesOfDocument", () => {
@@ -43,6 +43,10 @@ describe("hasGivenUp", () => {
 describe("HAS_STATUS", () => {
   it("is false until the frame says something: a wait that returns at once would count every story as drawn", () => {
     expect(hasStatus(null)).toBe(false);
+  });
+
+  it("is false, and does not throw, while a reloading frame has no root: a throw would end the wait at once", () => {
+    expect(hasStatus(undefined)).toBe(false);
   });
 
   it("is true once the story is ready, or failed", () => {

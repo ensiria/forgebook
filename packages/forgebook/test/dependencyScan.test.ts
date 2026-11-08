@@ -53,4 +53,29 @@ describe("Vite's dependency scan", () => {
       "The dependency scan skipped src/Broken.tsx:2:25 does not parse: Unexpected token"
     ]);
   });
+
+  it("stops a quick scan on a component that does not parse, which the careful scan then reads past", async () => {
+    const root = join(ROOT, "quick");
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/Broken.tsx"), 'import "lightningcss";\nexport const Broken = ( => 1;\n');
+    writeFileSync(
+      join(root, "src/Broken.stories.tsx"),
+      'import { Broken } from "./Broken";\nexport default { component: Broken };\nexport const Main = {};\n'
+    );
+    const scan = async (isQuick: boolean): Promise<readonly string[]> => {
+      const config = await resolveConfig(
+        {
+          root,
+          configFile: false,
+          logLevel: "silent",
+          cacheDir: join(root, isQuick ? ".vite-quick" : ".vite"),
+          optimizeDeps: { entries: ["src/*.stories.tsx"], rolldownOptions: scanOptions({ root, isQuick }) }
+        },
+        "serve"
+      );
+      return Object.keys((await optimizeDeps(config, true)).optimized);
+    };
+    await expect(scan(true)).rejects.toThrow("Failed to scan for dependencies");
+    expect(await scan(false)).toContain("lightningcss");
+  });
 });
