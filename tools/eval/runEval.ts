@@ -25,6 +25,7 @@ import { parseApp, parseProfile, parseTask } from "./definitions.ts";
 import type { AgentProfile, EvalApp, EvalTask, RunMeasures } from "./eval.types.ts";
 import { packagesFor, setUpForgebook } from "./forgebookSetup.ts";
 import { seeded } from "./random.ts";
+import { packageName, releasePackages } from "./releasePackages.ts";
 import { runFolder, runOne } from "./runOne.ts";
 import { type PlannedRun, planRuns } from "./runPlan.ts";
 import { parseMeasures } from "./storedDocuments.ts";
@@ -108,7 +109,7 @@ export type EvaluationRequest = {
   readonly work: string;
   /** The repository, whose Forgebook is packed when no version is named. */
   readonly repository: string;
-  /** A published release to evaluate instead of this checkout. */
+  /** A published release to evaluate instead of this checkout: the `forgebook` package's version. */
   readonly version?: string;
   /** The first of the three ports a measurement takes. */
   readonly port: number;
@@ -129,25 +130,24 @@ export type RunEnd =
 
 /** The Forgebook under test: each package's specifier by name, and a label naming exactly that build. */
 type ForgebookUnderTest = {
-  /** Each package's specifier, by name: `file:` tarballs or the release's version. */
+  /** Each package's specifier, by name: `file:` tarballs or each package's version in the release. */
   readonly packages: Readonly<Record<string, string>>;
   /** The release's version, or `sha256:` of the tarballs' bytes, so two runs of different builds never mix. */
   readonly label: string;
 };
-
-/** The package name of a folder under `packages/`. */
-const packageName = (folder: string): string => (folder === "forgebook" ? folder : `@forgebook/${folder}`);
 
 /** Forgebook's packages for every framework of the apps, packed once from this checkout or named by release. */
 const forgebookUnderTest = async (request: EvaluationRequest): Promise<ForgebookUnderTest> => {
   const frameworks = new Set(request.tasks.map((task) => request.apps.get(task.app)?.framework ?? "react"));
   const folders = [...new Set([...frameworks].flatMap(packagesFor))];
   if (request.version !== undefined) {
-    const version = request.version;
-    return {
-      packages: Object.fromEntries(folders.map((folder) => [packageName(folder), version])),
-      label: version
-    };
+    const packages = await releasePackages({
+      repository: request.repository,
+      version: request.version,
+      folders,
+      io: request.io
+    });
+    return { packages, label: request.version };
   }
   const packages = await packForgebook(
     { repository: request.repository, work: request.work },

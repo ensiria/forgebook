@@ -143,7 +143,9 @@ node tools/eval/eval.mts score --work /tmp/eval --key /tmp/eval/key/key.json --s
 Forgebook build (`sha256:` of the packed tarballs, or the release's version) and a fingerprint of its definition: a run
 made under any other is run again, never resumed, and `blind` refuses a work folder that mixes agents or builds. Give
 each agent and each build a `--work` of its own. `--forgebook-version` evaluates a published release instead of this
-checkout, packed. `--port` sets the first of the
+checkout, packed: it names the `forgebook` package's version, and every other package comes in at its version in that
+release, read from the manifests of the release's tag `forgebook@<version>` (the packages are versioned
+independently, so the checkout needs the release tags: `git fetch --tags origin`). `--port` sets the first of the
 three ports a measurement takes; two evaluations at once need their own `--work` and `--port`. `--keep` keeps each run's
 copies of the app, to look into one.
 
@@ -182,6 +184,7 @@ runs with no hook, monitor, external diff or text conversion, so nothing the age
 | `definitions.ts` | apps, tasks and profiles read and checked |
 | `runEval.ts`, `runOne.ts` | the runs, and one run end to end |
 | `workspace.ts`, `forgebookSetup.ts` | the bases, and Forgebook set up as a user would |
+| `releasePackages.ts` | each package's version in the release `--forgebook-version` names |
 | `agentRun.ts`, `servers.ts` | the agent, and the dev servers |
 | `pageRun.ts`, `forgebookMeasures.ts`, `appChecks.ts` | the pictures, axe and acceptance; Forgebook's verdicts; the app's checks |
 | `changedFiles.ts`, `outcome.ts` | the change's files and the judges' diff; the claim |
