@@ -1,0 +1,68 @@
+// The statuses' badges, loaded with them (`StatusBadges.tsx`): a word in its tone's colour on a tint of it, so the
+// word reads at text contrast in both appearances and the colour is only a second sign.
+@use "../styles/tokens" as *;
+
+@layer catalogue {
+  .forgebook-status-badges {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: $space-1;
+    min-width: 0;
+  }
+
+  .forgebook-status {
+    --forgebook-status-tone: #{$text-secondary};
+    display: inline-block;
+    // a long label is cut, not the row: the whole word stays in the page for a screen reader
+    max-width: 7rem;
+    padding: 0 $space-1-5;
+    overflow: hidden;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--forgebook-status-tone) 45%, transparent);
+    background: color-mix(in srgb, var(--forgebook-status-tone) 9%, transparent);
+    font: $text-caption;
+    font-weight: 500;
+    color: var(--forgebook-status-tone);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .forgebook-status[data-tone="info"] {
+    --forgebook-status-tone: #{$accent-text};
+  }
+
+  .forgebook-status[data-tone="positive"] {
+    --forgebook-status-tone: #{$positive-text};
+  }
+
+  .forgebook-status[data-tone="caution"] {
+    --forgebook-status-tone: #{$caution-text};
+  }
+
+  .forgebook-status[data-tone="critical"] {
+    --forgebook-status-tone: #{$danger-text};
+  }
+
+  // at the top of a component's page, over its lead: a larger word, as the page's text is
+  .forgebook-status-badges--page {
+    display: flex;
+    flex-wrap: wrap;
+
+    .forgebook-status {
+      max-width: none;
+      line-height: 1.6;
+    }
+  }
+
+  // after a story's name in its example's title
+  .forgebook-status-badges--story {
+    margin-inline-start: $space-2;
+    vertical-align: middle;
+  }
+
+  // the tag filter's list: a status in its tag's place
+  .forgebook-tag-filter__name .forgebook-status {
+    vertical-align: middle;
+  }
+}

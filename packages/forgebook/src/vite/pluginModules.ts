@@ -9,21 +9,28 @@
  * @module
  */
 
+import type { ViteDevServer } from "vite";
+
 import { codeLiteral } from "../codeLiteral.ts";
 import { packedUsage } from "../usedIn.ts";
+import type { ResolvedConfig } from "./configFile.ts";
 import type { DiskCache } from "./diskCache.ts";
 import type { DocsExtractor, DocsResult, UsageResult } from "./docsExtractor.ts";
 import type { PackJson } from "./packedModule.ts";
+import { DOCS_PAGES_PREFIX } from "./pluginIds.ts";
+import { previewTagsOf, withPreviewTags } from "./previewTags.ts";
 import {
   EVERY_FILE,
   FILES_SPECIFIER_PREFIX,
   type GroupLoaders,
   type IndexedStoryFile,
   type IsFileKept,
-  indexedStoryFiles,
   type KeptIndex,
   PAGES_SEARCH_PREFIX,
   REACH_PREFIX,
+  type RefusedStoryFile,
+  readStoryFiles,
+  refusalError,
   SEARCH_PREFIX,
   storyFileKeys,
   storyFilesCode,
@@ -32,6 +39,7 @@ import {
   USAGE_PREFIX
 } from "./storyFilesModule.ts";
 import { storyReach } from "./storyReach.ts";
+import { DOCS_PAGE_QUERY, HOME_QUERY } from "./textQueries.ts";
 import { joinedUsage } from "./usageModule.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -93,63 +101,174 @@ export const docsModule = (
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param loaders - the group's loaders besides its story files'.
  * @param cache - the pattern's index kept between starts; none reads every file.
- * @param warm - starts reading the docs of a story file ahead of its request; none in a test run.
+ * @param warm - starts reading the docs of the group's story files ahead of their requests; none in a test run.
  * @param startTexts - a build's: starts reading the files' docs, code and pages, which the module imports from the
  * group's texts module (`builtTexts.ts`); none imports each from its query.
  * @param isKept - whether a listed file may be read; every one by default.
- * @throws when a story file cannot be indexed.
+ * @param isForgiving - whether a file that cannot be indexed is named among the catalogue's problems while the others
+ * draw (a person at a dev server), rather than failing the module (a build, a test run).
+ * @param catalogue - the catalogue, whose previews' tags every story takes; none has none.
+ * @param scriptProblems - the project's scripts that do not parse, named among the catalogue's problems with the files
+ * that cannot be indexed (`scriptProblems.ts`), where those are (a dev server); none by default.
+ * @throws when a story file cannot be indexed, unless it is forgiven.
  */
 export const patternModule = (
   id: string,
   watch: (file: string) => void,
   loaders: GroupLoaders,
   cache: DiskCache<KeptIndex> | undefined,
-  warm: ((storyFile: string) => void) | undefined,
+  warm: ((storyFiles: readonly string[]) => void) | undefined,
   startTexts?: (files: readonly IndexedStoryFile[]) => void,
-  isKept: IsFileKept = EVERY_FILE
-): { code: string; moduleType: "js"; files: readonly IndexedStoryFile[] } => {
+  isKept: IsFileKept = EVERY_FILE,
+  isForgiving = false,
+  catalogue?: { readonly previews: readonly string[] },
+  scriptProblems: readonly string[] = []
+): {
+  code: string;
+  moduleType: "js";
+  files: readonly IndexedStoryFile[];
+  refused: readonly RefusedStoryFile[];
+} => {
   const { root, patterns } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
-  const files = indexedStoryFiles(root, patterns, watch, cache, isKept);
-  const [first] = files;
-  if (first !== undefined) warm?.(first.file);
+  const { files, refused } = readStoryFiles(root, patterns, watch, cache, isKept);
+  if (refused.length > 0 && !isForgiving) throw refusalError(refused);
+  warm?.(files.map(({ file }) => file));
   startTexts?.(files);
-  const code = storyFilesCode(root, patterns, files, loaders, startTexts !== undefined);
-  return { code, moduleType: "js", files };
+  const code = storyFilesCode(
+    root,
+    patterns,
+    withPreviewTags(files, previewTagsOf(catalogue, watch)),
+    loaders,
+    startTexts !== undefined,
+    refused,
+    isForgiving ? scriptProblems : []
+  );
+  return { code, moduleType: "js", files, refused };
 };
 
 /**
- * Whether a story file added or removed changes what a group of story files lists: listed now and not when its module
- * was served, or the other way round. A file no pattern lists, or one a `!` pattern leaves out, changes nothing, so
- * the pages need no reload for it.
+ * The versions of a group's module served since the pages last reloaded: a page holds one of them, or loads the module
+ * after the next change.
+ */
+export type ServedListings = {
+  /** The files any of those versions listed. */
+  readonly some: ReadonlySet<string>;
+  /** The files every one of them listed; none when no version was served since. */
+  readonly every: ReadonlySet<string> | undefined;
+};
+
+/**
+ * Whether a story file added or removed changes what a page may hold of a group of story files: listed now and missing
+ * from a version served since the pages last reloaded, or gone and listed by one. A file no pattern lists, or one a
+ * `!` pattern leaves out, changes nothing, so the pages need no reload for it.
+ *
+ * @remarks
+ * The module's last version is no measure: another reader (a second tab, a frame, the agents' API) may load it again
+ * between the change on the disk and the file's event, and a page that loaded it before would then never reload. A
+ * branch switch makes that window wide, as its events arrive after the files are written. Every version since the last
+ * reload counts, and no earlier one: that reload renewed the pages that held those.
  *
  * @param id - the group's module's id (`FILES_PREFIX`, then the group).
- * @param listed - the files its module listed when served, absolute in Vite's form; none when it could not be made.
+ * @param served - the versions served since the pages last reloaded; none when the module could not be made.
  * @param file - the file added or removed.
  * @param isKept - whether a listed file may be read; every one by default.
  */
 export const isListingChanged = (
   id: string,
-  listed: ReadonlySet<string> | undefined,
+  served: ServedListings | undefined,
   file: string,
   isKept: IsFileKept = EVERY_FILE
 ): boolean => {
-  if (listed === undefined) return true;
+  if (served === undefined) return true;
   const { root, patterns } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
   const isListed = storyFileKeys(root, patterns, isKept).includes(VITE_PATHS.relativeKey(root, file));
-  return isListed !== listed.has(VITE_PATHS.normalize(file));
+  const key = VITE_PATHS.normalize(file);
+  return isListed ? served.every !== undefined && !served.every.has(key) : served.some.has(key);
+};
+
+/**
+ * A docs pages' module, when the id is a pattern's, a page's or the written home's. The Markdown reader loads with the
+ * first: a catalogue may have no docs pages, and a story's page reads none.
+ *
+ * @param id - the module's id.
+ * @param watch - adds a file whose edit renews the module.
+ * @param isServing - whether a dev server runs.
+ * @param plugins - the catalogue's plugins, whose fences a page may draw.
+ * @param isKept - whether a page its group lists may be read.
+ */
+export const docsModuleOf = async (
+  id: string,
+  watch: (file: string) => void,
+  isServing: boolean,
+  plugins: ResolvedConfig["plugins"],
+  isKept: IsFileKept
+): Promise<{ code: string; moduleType: "js" } | undefined> => {
+  const isHome = id.endsWith(HOME_QUERY);
+  const isPage = id.endsWith(DOCS_PAGE_QUERY);
+  if (!isHome && !isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
+  const { docPageModule, docPagesModule, homeModule } = await import("./docPagesModule.ts");
+  if (isHome)
+    return { code: homeModule(id.slice(0, -HOME_QUERY.length), watch, isServing, plugins), moduleType: "js" };
+  if (isPage) {
+    const file = id.slice(0, -DOCS_PAGE_QUERY.length);
+    return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
+  }
+  const { root, patterns } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
+  return { code: docPagesModule(root, patterns, watch, isServing, plugins, isKept), moduleType: "js" };
+};
+
+/**
+ * Makes a group's module and adds the version to those served since the pages last reloaded (`isListingChanged`).
+ * While it is made, and when making it fails, the list is unknown.
+ *
+ * @param listings - the groups' modules, with the versions served.
+ * @param id - the group's module's id.
+ * @param make - makes the module.
+ * @returns the module made.
+ */
+export const keptListing = <
+  TModule extends {
+    readonly files: readonly { readonly file: string }[];
+    readonly refused: readonly { readonly file: string }[];
+  }
+>(
+  listings: Map<string, ServedListings | undefined>,
+  id: string,
+  make: () => TModule
+): TModule => {
+  const before = listings.get(id);
+  listings.set(id, undefined);
+  const made = make();
+  const listed = new Set([...made.files, ...made.refused].map(({ file }) => file));
+  const every = before?.every;
+  listings.set(id, {
+    some: new Set([...(before?.some ?? []), ...listed]),
+    every: every === undefined ? listed : new Set([...every].filter((file) => listed.has(file)))
+  });
+  return made;
+};
+
+/**
+ * Forgets the versions served before a reload the pages were sent: each page loads the module again.
+ *
+ * @param listings - the groups' modules, with the versions served.
+ */
+export const pagesReloaded = (listings: Map<string, ServedListings | undefined>): void => {
+  for (const [id, served] of listings)
+    if (served !== undefined) listings.set(id, { some: new Set(), every: undefined });
 };
 
 /**
  * The modules a story file added or removed renews: the groups whose list it changes (`isListingChanged`) and, with
  * them, the modules that read their files; none when it changes no list.
  *
- * @param served - the groups' modules, with the files each listed when served.
+ * @param served - the groups' modules, with the versions served since the pages last reloaded.
  * @param file - the file added or removed.
  * @param readers - the modules that read the groups' files: their "Used in" and search indexes.
  * @param isKept - whether a listed file may be read; every one by default.
  */
 export const listingRenewals = (
-  served: ReadonlyMap<string, ReadonlySet<string> | undefined>,
+  served: ReadonlyMap<string, ServedListings | undefined>,
   file: string,
   readers: readonly string[],
   isKept: IsFileKept = EVERY_FILE
@@ -169,7 +288,8 @@ type GroupUsage = {
 };
 
 /**
- * A group's facts: its story files indexed, what their stories render read in the docs worker.
+ * A group's facts: its story files indexed, what their stories render read in the docs worker. A file that cannot be
+ * indexed adds nothing here: the group's own module names it.
  *
  * @param group - the group (`storyFilesGroupText`).
  * @param watch - adds a file whose edit renews the module (each story file).
@@ -185,7 +305,7 @@ const groupUsage = async (
   isKept: IsFileKept
 ): Promise<GroupUsage> => {
   const { root, patterns } = storyFilesGroupOf(group);
-  const files = indexedStoryFiles(root, patterns, watch, cache, isKept);
+  const { files } = readStoryFiles(root, patterns, watch, cache, isKept);
   const graph = await usage(
     files.map((file) => ({
       storyFile: file.file,
@@ -250,9 +370,10 @@ export const reachModule = async (
   isKept: IsFileKept = EVERY_FILE
 ): Promise<{ code: string; moduleType: "js" }> => {
   const { files, graph } = await groupUsage(id.slice(REACH_ID_PREFIX.length), watch, usage, cache, isKept);
+  // the reason, not an empty list: no story reached and no story found are different answers
   const reach =
     typeof graph === "string"
-      ? []
+      ? graph
       : storyReach(
           graph,
           files.map((file) => ({ storyFile: file.file, title: file.index.title }))
@@ -354,4 +475,19 @@ export const searchIndexes = (read: {
       return search.module;
     }
   };
+};
+
+/**
+ * Renews modules in every environment that loaded them: the agents' routes load them on the server too.
+ *
+ * @param server - the dev server.
+ * @param ids - the modules' ids.
+ */
+export const invalidateEverywhere = (server: ViteDevServer, ids: Iterable<string>): void => {
+  for (const environment of Object.values(server.environments)) {
+    for (const id of ids) {
+      const module = environment.moduleGraph.getModuleById(id);
+      if (module !== undefined) environment.moduleGraph.invalidateModule(module);
+    }
+  }
 };

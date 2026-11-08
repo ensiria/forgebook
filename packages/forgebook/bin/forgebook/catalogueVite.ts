@@ -1,7 +1,7 @@
 /**
  * The Vite configuration the `forgebook` command runs a catalogue with: its folder as the root, Forgebook's plugin
- * with the configuration already read, the framework's own plugins, and the server's export conditions taken from the
- * pages'; and where the command line puts the frames.
+ * with the configuration already read, the framework's own plugins, what the app's own build adds, and the server's
+ * export conditions taken from the pages'; and where the command line puts the frames.
  *
  * @module
  */
@@ -12,6 +12,7 @@ import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../../src/vite/framesConfig.ts";
 import { serverConditions } from "../../src/vite/serverConditions.ts";
+import { appBuildOf } from "./appBuild/appBuild.ts";
 import { unresolvedImports } from "./viteCache.ts";
 
 /**
@@ -19,14 +20,26 @@ import { unresolvedImports } from "./viteCache.ts";
  *
  * @param config - the catalogue's configuration, read.
  * @param overrides - what the command sets (the port, the output folder); its plugins run after the catalogue's.
+ * @param command - what it runs for: a `vite.config` may be a function of it, and of the mode that follows from it.
+ * @param isOneShot - whether the server is a one-shot command's, whose app plugins start nothing of their own.
+ * @param isQuickScan - whether the dependency scan reads only the story files itself (`ScanFindings.isQuick`): a first
+ * start's pre-bundling, which scans again without it when a script stops the scan.
  */
 export const catalogueVite = async (
   config: ResolvedConfig,
-  overrides: InlineConfig
+  overrides: InlineConfig,
+  command: "serve" | "build" = "serve",
+  isOneShot = false,
+  isQuickScan = false
 ): Promise<InlineConfig> => {
   // what a first start's pre-bundling left out, left out here too: it is part of the pre-bundle's hash, and a server
   // whose hash differed would pre-bundle everything again itself
   const unresolved = unresolvedImports(config.dir);
+  const app = await appBuildOf(
+    config,
+    { command, mode: overrides.mode ?? (command === "build" ? "production" : "development") },
+    isOneShot
+  );
   return {
     ...overrides,
     ...(unresolved.length === 0
@@ -38,11 +51,13 @@ export const catalogueVite = async (
           }
         }),
     root: config.dir,
-    // the configuration file is Forgebook's: a vite.config beside it is not read
+    // the configuration file is Forgebook's: of a vite.config beside it, `appBuildOf` takes what stories need
     configFile: false,
     plugins: [
-      forgebookPlugin({ config }),
-      ...((await config.framework.vitePlugins?.()) ?? []),
+      forgebookPlugin({ config, isQuickScan }),
+      ...((await config.framework.vitePlugins?.({ readsAppBuild: config.appBuild.viteConfig !== false })) ??
+        []),
+      ...app.plugins,
       ...(overrides.plugins ?? []),
       // the server loads the stories and previews for tools: it resolves them as the pages do
       serverConditions()

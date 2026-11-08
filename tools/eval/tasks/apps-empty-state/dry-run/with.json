@@ -1,0 +1,29 @@
+{
+  "say": "Scripted stand-in, arm with Forgebook: an empty-state component built from Button and theme tokens, with a story, wired into the Apps page.",
+  "edits": [
+    {
+      "file": "src/features/apps/components/apps-empty-state.tsx",
+      "write": "import { SearchX } from 'lucide-react'\nimport { Button } from '@/components/ui/button'\n\ntype AppsEmptyStateProps = {\n  onClear: () => void\n}\n\nexport function AppsEmptyState({ onClear }: AppsEmptyStateProps) {\n  return (\n    <div\n      role='status'\n      className='flex flex-col items-center gap-3 py-16 text-center'\n    >\n      <SearchX className='size-8 text-muted-foreground' aria-hidden='true' />\n      <p className='font-medium'>No app matches your filters</p>\n      <p className='text-sm text-muted-foreground'>\n        Try another search, or show every app again.\n      </p>\n      <Button variant='outline' size='sm' onClick={onClear}>\n        Clear filters\n      </Button>\n    </div>\n  )\n}\n"
+    },
+    {
+      "file": "src/features/apps/components/apps-empty-state.stories.tsx",
+      "write": "import type { Meta, Story } from '@forgebook/react'\nimport { AppsEmptyState } from './apps-empty-state'\n\nexport default {\n  title: 'features/apps/AppsEmptyState',\n  component: AppsEmptyState,\n} satisfies Meta<typeof AppsEmptyState>\n\nexport const Default: Story<typeof AppsEmptyState> = {\n  args: { onClear: () => undefined },\n  parameters: { main: true },\n}\n"
+    },
+    {
+      "file": "src/features/apps/index.tsx",
+      "find": "import { apps } from './data/apps'",
+      "replace": "import { AppsEmptyState } from './components/apps-empty-state'\nimport { apps } from './data/apps'"
+    },
+    {
+      "file": "src/features/apps/index.tsx",
+      "find": "  const handleSortChange = (sort: 'asc' | 'desc') => {",
+      "replace": "  const handleClearFilters = () => {\n    setSearchTerm('')\n    setAppType('all')\n    navigate({\n      search: (prev) => ({ ...prev, filter: undefined, type: undefined }),\n    })\n  }\n\n  const handleSortChange = (sort: 'asc' | 'desc') => {"
+    },
+    {
+      "file": "src/features/apps/index.tsx",
+      "find": "        <ul className='faded-bottom no-scrollbar grid gap-4 overflow-auto pt-4 pb-16 md:grid-cols-2 lg:grid-cols-3'>",
+      "replace": "        {filteredApps.length === 0 ? (\n          <AppsEmptyState onClear={handleClearFilters} />\n        ) : null}\n        <ul className='faded-bottom no-scrollbar grid gap-4 overflow-auto pt-4 pb-16 md:grid-cols-2 lg:grid-cols-3'>"
+    }
+  ],
+  "result": "done"
+}

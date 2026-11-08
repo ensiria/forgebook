@@ -12,6 +12,7 @@ import { isEmbedAddress } from "../embed.ts";
 import type { StoryCodeWriter } from "../frame/renderer.ts";
 import { type FramesPlacement, framePageAddress, pageOrigins, SAME_ORIGIN } from "../frameOrigins.ts";
 import { CodeWriterContext } from "./codeWriter.ts";
+import { HAS_REFS, setShellRefs } from "./composition.ts";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { setFramesOrigin } from "./framesOrigin.ts";
 import { Shell, type ShellConfig } from "./Shell.tsx";
@@ -68,6 +69,7 @@ export const mountShell = (container: HTMLElement, config: MountShellConfig): vo
   // set before anything renders, the embed included: its story's frame runs on the frames' origin too
   const origins = pageOrigins(frames, window.location, "catalogue");
   setFramesOrigin(origins.frames);
+  if (HAS_REFS) setShellRefs(config.refs);
   const shell: ShellConfig = {
     ...page,
     frameUrl: framePageAddress(page.frameUrl, origins.frames, window.location.pathname)

@@ -60,6 +60,7 @@ describe("storyText", () => {
       component,
       docs: undefined,
       args: {},
+      controls: [],
       problems: [],
       design: {
         figma: "https://www.figma.com/design/File1",
@@ -84,11 +85,41 @@ describe("storyText", () => {
       component,
       docs: undefined,
       args: {},
+      controls: [],
       problems: []
     };
     const wide: OutputStyle = { ...NARROW, width: 120 };
     expect(storyText(document, wide)).toMatch(/Required\s+options, onValueChange/);
     expect(storyText({ ...document, requiredProps: [] }, wide)).toMatch(/Required\s+none/);
+  });
+
+  it("says why a component lists no props, and marks a variant's prop with when it can be passed", () => {
+    const [component] = DOCUMENT.components;
+    const story = component?.stories[0];
+    if (component === undefined || story === undefined) throw new Error("the fixture's story is missing");
+    const docs = { name: "Plain", description: "", summary: "", parts: [], subcomponents: [] };
+    const document: StoryDocument = {
+      schema: 1,
+      requiredProps: [],
+      story,
+      component,
+      docs: { ...docs, props: [], propsNote: { reason: "outside-package", count: 3 } },
+      args: {},
+      controls: [],
+      problems: []
+    };
+    const wide: OutputStyle = { ...NARROW, width: 120 };
+    expect(storyText(document, wide)).toMatch(/Props\s+none: all 3 come from outside the package/);
+    const href = { name: "href", kind: "text", type: "string", description: "", isRequired: false } as const;
+    const variant = { ...docs, props: [{ ...href, onlyWhen: { prop: "kind", values: ["link"] } }] };
+    expect(storyText({ ...document, docs: variant }, wide)).toMatch(/Props\s+href \(when kind is link\)/);
+    const optional = {
+      ...docs,
+      props: [{ ...href, onlyWhen: { prop: "mode", values: ["one"], orOmitted: true } }]
+    };
+    expect(storyText({ ...document, docs: optional }, wide)).toContain(
+      "href (when mode is one, or left out)"
+    );
   });
 });
 
@@ -118,5 +149,17 @@ describe("checkText", () => {
       /^Accessibility is not checked: the catalogue sets a11y: false\.\n/
     );
     expect(checkText(report, NARROW)).not.toContain("Accessibility");
+  });
+
+  it("says a story its frame gave up on is not verified, and never that it passes", () => {
+    const text = checkText(
+      {
+        schema: 1,
+        results: [{ storyId: "kit:a--b", view: "", frame: "f", problems: [], notVerified: "still loading" }]
+      },
+      { ...NARROW, width: 200 }
+    );
+    expect(text).toContain("not verified: still loading");
+    expect(text).not.toContain("passes");
   });
 });

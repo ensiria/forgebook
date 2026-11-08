@@ -10,6 +10,11 @@ import { lateStrings } from "./strings.ts";
 /** The texts of the home and the docs pages, the catalogue's replacements applied. */
 export const PAGE_STRINGS = lateStrings({
   homeEmpty: "No stories yet: a source with story files shows its families here.",
+  homeNoStoryTitle: "No stories yet",
+  homeNoStoryLead: "This catalogue lists the story files these patterns match, and none is there yet:",
+  homeNoStoryHelp:
+    "Save a file one of them matches, and it shows here. To have one written from a component, run:",
+  homeNoStoryCommand: "npx forgebook new src/Button.tsx",
   homeSummary: (components: number, sources: number): string =>
     `${components} ${components === 1 ? "component" : "components"} in ${sources} ${sources === 1 ? "library" : "libraries"}.`,
   homeIntroError: "The library's introduction could not be read",

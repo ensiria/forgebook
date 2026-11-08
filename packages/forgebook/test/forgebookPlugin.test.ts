@@ -14,6 +14,7 @@ import type { UserConfig } from "vite";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { codeLiteral } from "../src/codeLiteral.ts";
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { forgebookPlugin } from "../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
@@ -190,6 +191,7 @@ describe("forgebookPlugin's pages", () => {
     dir: "C:/Users/ada/app",
     framework: STUB_FRAMEWORK,
     title: "Catalogue",
+    argControls: {},
     logo: undefined,
     heights: undefined,
     stories: ["src/**/*.stories.tsx"],
@@ -207,7 +209,9 @@ describe("forgebookPlugin's pages", () => {
     home: undefined,
     hasPlayTools: false,
     frames: ISOLATED_FRAMES,
-    build: { readableNames: false }
+    build: { readableNames: false },
+    refs: [],
+    appBuild: resolvedAppBuild(false)
   };
 
   it("resolves the pages' entries by their address to their path in the folder, and answers them", async () => {
@@ -300,8 +304,27 @@ describe("forgebookPlugin in the dev server", () => {
     hooks.configureServer(fake.server);
     renameSync(join(dir, "src", "Old.stories.tsx"), join(dir, "src", "New.stories.tsx"));
     fake.emit("unlink", join(dir, "src", "Old.stories.tsx"));
+    // the pages reload, and load the list after the rename: the new file needs no reload of its own
     fake.emit("add", join(dir, "src", "New.stories.tsx"));
     expect(fake.added).toEqual([]);
+    expect(fake.invalidated).toEqual([id]);
+    expect(fake.reloads).toBe(1);
+  });
+
+  it("reloads again for a file added after a page loaded the list without it, since the last reload", async () => {
+    const dir = storyFolder(["src/Old.stories.tsx"]);
+    const fake = fakeServer();
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
+    const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(dir, "stories.ts")));
+    await hooks.load(id);
+    await hooks.closeBundle();
+    hooks.configureServer(fake.server);
+    rmSync(join(dir, "src", "Old.stories.tsx"));
+    fake.emit("unlink", join(dir, "src", "Old.stories.tsx"));
+    // a page loads the list between the removal and the next file, which it does not hold
+    await hooks.load(id);
+    writeStory(dir, "src/New.stories.tsx");
+    fake.emit("add", join(dir, "src", "New.stories.tsx"));
     expect(fake.invalidated).toEqual([id, id]);
     expect(fake.reloads).toBe(2);
   });
@@ -398,12 +421,24 @@ describe("forgebookPlugin in a build", () => {
     expect(at).toBeGreaterThan(-1);
     const rows = (texts ?? "").split("export default [")[1]?.split(",\n") ?? [];
     expect(rows).toHaveLength(rowKeys(code).length);
-    // its stories have a render and its component a page: both worth a file
-    const files = [...(rows[at] ?? "").matchAll(/packedText\(("assets\\u002f[0-9a-f]{12}\.bin")\)/g)].map(
-      (match) => String(JSON.parse(match[1] ?? ""))
+    // its docs, its stories' render and its component's page: all longer than a loader, packed in the files named
+    const packs = new Map(
+      [
+        ...(texts ?? "").matchAll(
+          /^const (packedTexts\d+) = packedText\(("assets\\u002f[0-9a-f]{12}\.bin")\);$/gm
+        )
+      ].map(([, name = "", file = ""]) => [
+        name,
+        gunzipSync(emitted.get(JSON.parse(file)) ?? new Uint8Array()).toString()
+      ])
     );
-    expect(files).toHaveLength(2);
-    const written = files.map((file) => gunzipSync(emitted.get(file) ?? new Uint8Array()).toString());
+    const written = [...(rows[at] ?? "").matchAll(/packedPart\((packedTexts\d+),(\d+)\)/g)].map(
+      ([, name = "", place]) => {
+        const pack: unknown = JSON.parse(packs.get(name) ?? "[]");
+        return JSON.stringify(Array.isArray(pack) ? pack[Number(place)] : undefined);
+      }
+    );
+    expect(written).toHaveLength(3);
     expect(written.some((text) => text.includes("select.inRow.caption"))).toBe(true);
     expect(written.some((text) => text.includes("Lets the user pick one value"))).toBe(true);
   });

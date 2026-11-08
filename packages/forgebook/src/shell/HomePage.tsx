@@ -21,9 +21,9 @@ import {
   type TreeFamily,
   type TreeSource
 } from "../storyTree.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
 import { PAGE_STRINGS } from "./pageStrings.ts";
-import { STRINGS } from "./strings.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import type { RecentPage } from "./useRecentPages.ts";
 
@@ -38,6 +38,8 @@ export type HomePageProps = {
   readonly tree: StoryTree;
   /** The sources, for their introductions. */
   readonly sources: readonly StorySource[];
+  /** The catalogue's own story patterns, for a home with no story to say where it looks; none by default. */
+  readonly storyGlobs?: readonly string[] | undefined;
   /** The pages opened last, the newest first. */
   readonly recent: readonly RecentPage[];
   /** A page's address, for its link. */
@@ -47,6 +49,28 @@ export type HomePageProps = {
   /** What stays above the home: the index's problems, when it has some. */
   readonly header: ReactNode;
 };
+
+/**
+ * What the home says before the first story: where the catalogue looks, and how to write one.
+ *
+ * @param props - the catalogue's story patterns.
+ */
+const NoStoryYet = ({ globs }: { readonly globs: readonly string[] }): ReactNode => (
+  <section className="forgebook-home__no-story" data-testid="forgebook-no-story">
+    <p>{PAGE_STRINGS.homeNoStoryLead}</p>
+    <ul>
+      {globs.map((glob) => (
+        <li key={glob}>
+          <code>{glob}</code>
+        </li>
+      ))}
+    </ul>
+    <p>{PAGE_STRINGS.homeNoStoryHelp}</p>
+    <pre>
+      <code>{PAGE_STRINGS.homeNoStoryCommand}</code>
+    </pre>
+  </section>
+);
 
 /** A link to a page, opened in place unless the user asks for another tab. */
 export const PageLink = ({
@@ -204,8 +228,8 @@ export const DocsCard = ({
   hrefOf,
   onOpen
 }: Pick<HomePageProps, "hrefOf" | "onOpen"> & { readonly source: TreeSource }): ReactNode => (
-  <article className="forgebook-home__card" aria-label={STRINGS.docsNav}>
-    <h3 className="forgebook-home__card-title">{STRINGS.docsNav}</h3>
+  <article className="forgebook-home__card" aria-label={LATER_STRINGS.docsNav}>
+    <h3 className="forgebook-home__card-title">{LATER_STRINGS.docsNav}</h3>
     <ul className="forgebook-home__components">
       {source.pages.map((page) => (
         <li key={page.id}>
@@ -322,11 +346,16 @@ export const HomePage = ({
   title,
   tree,
   sources,
+  storyGlobs = [],
   recent,
   hrefOf,
   onOpen,
   header
 }: HomePageProps): ReactNode => {
+  // a catalogue that names patterns and lists nothing is one about to get its first story: a build never gets here, since
+  // it stops on a pattern that matches nothing
+  const listingGlobs = storyGlobs.filter((glob) => !glob.startsWith("!") || glob.startsWith("!("));
+  const isWaiting = listingGlobs.length > 0 && componentCount(tree) === 0;
   return (
     <div className="forgebook-workspace">
       {header}
@@ -335,11 +364,14 @@ export const HomePage = ({
           <header className="forgebook-home__head">
             <h1 className="forgebook-home__title">{title}</h1>
             <p className="forgebook-doc__lead">
-              {tree.sources.length === 0
-                ? PAGE_STRINGS.homeEmpty
-                : PAGE_STRINGS.homeSummary(componentCount(tree), libraryCount(tree))}
+              {isWaiting ? PAGE_STRINGS.homeNoStoryTitle : null}
+              {!isWaiting && tree.sources.length === 0 ? PAGE_STRINGS.homeEmpty : null}
+              {!isWaiting && tree.sources.length > 0
+                ? PAGE_STRINGS.homeSummary(componentCount(tree), libraryCount(tree))
+                : null}
             </p>
           </header>
+          {isWaiting ? <NoStoryYet globs={listingGlobs} /> : null}
           <RecentSection tree={tree} recent={recent} hrefOf={hrefOf} onOpen={onOpen} />
           {tree.sources.map((source) => (
             <LibrarySection

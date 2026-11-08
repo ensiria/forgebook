@@ -11,8 +11,9 @@
  * story over. The rest of what a story reads (the language, the switches, the clock) is reactive too, each on its own: a
  * render is called again only for what it read, so drawing again keeps the state of a story written as a component.
  *
- * A `Suspense` around the story waits for an `async setup` (a `<script setup>` with a top-level `await`), so the
- * frame's play function finds the story drawn.
+ * A `Suspense` around the story waits for an `async setup` (a `<script setup>` with a top-level `await`), and the frame's
+ * wait (`settled`, `vnodeContent.ts`) covers it as it covers a story's own `Suspense`, so the frame's play function finds
+ * the story drawn.
  *
  * The server render is imported when it is asked for: the page never loads it, and only Node ever runs it.
  *
@@ -26,7 +27,7 @@ import type { StoryClock } from "@forgebook/story-format/clock";
 import type { StoryContext } from "@forgebook/story-format/csf";
 import { type StoryTextFunction, type StoryTextTable, storyTextOf } from "@forgebook/story-format/texts";
 import type { MountedStory, StoryDrawing, StoryRenderer } from "forgebook/renderer";
-import { storyContextOf, untracedStep } from "forgebook/renderer";
+import { contentSettled, storyContextOf, untracedStep } from "forgebook/renderer";
 import type { LoadedArgs } from "forgebook/story-module";
 import {
   type App,
@@ -44,9 +45,11 @@ import {
   shallowRef
 } from "vue";
 
+import { setUpApp } from "./appSetups.ts";
 import { STORY_CLOCK } from "./clock.ts";
 import { storyVNode } from "./storyVnode.ts";
 import { STORY_TEXTS } from "./texts.ts";
+import { checkedContent, contentOfCanvas, SETTLED } from "./vnodeContent.ts";
 
 /**
  * What Vue says of an error in an event handler: its words in development, its error code's page in production. Such an
@@ -193,6 +196,12 @@ export const createVueRenderer = (options: VueRendererOptions = {}): StoryRender
       name: "ForgebookStory",
       setup: () => () => storyVNode(scene.value.story, context, scene.value.decorators)
     });
+    // after the flush that runs `onMounted`: a story that throws there is not drawn
+    const markWhenFlushed = (): void => {
+      void nextTick().then(() => {
+        if (!hasFailed.value) markDrawn();
+      });
+    };
     const Boundary = defineComponent({
       name: "ForgebookBoundary",
       setup: () => {
@@ -202,16 +211,14 @@ export const createVueRenderer = (options: VueRendererOptions = {}): StoryRender
           hasFailed.value = true;
           return false;
         });
-        // after the flush that runs `onMounted`: a story that throws there is not drawn
-        const onResolve = (): void => {
-          void nextTick().then(() => {
-            if (!hasFailed.value) markDrawn();
-          });
-        };
         return () =>
           hasFailed.value
             ? null
-            : h(Suspense, { onResolve }, { default: () => h(Story, { key: attempt.value }) });
+            : h(
+                Suspense,
+                { onResolve: markWhenFlushed },
+                { default: () => h(Story, { key: attempt.value }) }
+              );
       }
     });
     const app = createApp(Boundary);
@@ -221,9 +228,18 @@ export const createVueRenderer = (options: VueRendererOptions = {}): StoryRender
       computed(() => view.clock)
     );
     options.prepareApp?.(app, first, "page");
+    setUpApp(app);
     app.mount(canvas);
+    // a story meant to stay in its fallback is drawn as it is: what it awaits is not coming
+    if (first.story.suspense.isExpected) markWhenFlushed();
+    let isGone = false;
     return {
       drawn,
+      settled: async (timeout: number) =>
+        checkedContent(
+          await contentSettled(() => (isGone ? SETTLED : contentOfCanvas(canvas)), timeout),
+          isGone
+        ),
       update: (next: StoryDrawing): void => {
         assignArgs(args, next.args);
         assignView(view, next);
@@ -233,7 +249,10 @@ export const createVueRenderer = (options: VueRendererOptions = {}): StoryRender
           hasFailed.value = false;
         }
       },
-      unmount: (): void => app.unmount()
+      unmount: (): void => {
+        isGone = true;
+        app.unmount();
+      }
     };
   },
   renderToString: async (drawing: StoryDrawing): Promise<string> => {
@@ -242,6 +261,7 @@ export const createVueRenderer = (options: VueRendererOptions = {}): StoryRender
     const app = createSSRApp({ render: () => storyVNode(drawing.story, context, drawing.decorators) });
     provideDrawing(app, shallowRef(drawing.texts), shallowRef(drawing.clock));
     options.prepareApp?.(app, drawing, "server");
+    setUpApp(app);
     // the server keeps going after a render error, with an empty comment in its place: without this it would not fail
     const failures: unknown[] = [];
     app.config.errorHandler = (error: unknown): void => {

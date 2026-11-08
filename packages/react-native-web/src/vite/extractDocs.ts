@@ -9,10 +9,11 @@
  * @module
  */
 import {
+  extractCallSites as extractReactCallSites,
   extractFileComponent as extractReactFileComponent,
   extractStoryComponent as extractReactStoryComponent
 } from "@forgebook/react/docs";
-import type { ExtractFileComponent, ExtractStoryComponent } from "forgebook/vite/adapter";
+import type { ExtractCallSites, ExtractFileComponent, ExtractStoryComponent } from "forgebook/vite/adapter";
 
 /** The module a new story file imports its types from. */
 export const storyTypesModule = "@forgebook/react-native-web";
@@ -24,3 +25,7 @@ export const extractStoryComponent: ExtractStoryComponent = (storyFile: string) 
 /** Reads a component a file exports, as React's adapter reads it. */
 export const extractFileComponent: ExtractFileComponent = (file: string, exportName?: string) =>
   extractReactFileComponent(file, exportName);
+
+/** Finds where the application draws a component, as React's adapter reads it: the values `forgebook new` writes. */
+export const extractCallSites: ExtractCallSites = (file: string, name: string) =>
+  extractReactCallSites(file, name);

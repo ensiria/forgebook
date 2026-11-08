@@ -9,6 +9,8 @@ import { type ChangeEvent, type MouseEvent, type ReactNode, useId, useState } fr
 
 import { deviceDefaultOf, type StoryDevice, shownDevice } from "../deviceView.ts";
 import type { PanelArgs } from "../messages.ts";
+import { type StoryCodeSource, storyCodeText } from "../storyCodeText.ts";
+import { isFilterTag } from "../storyTagNames.ts";
 import type { TreeComponent, TreeStory } from "../storyTree.ts";
 import type { ViewSwitch } from "../switches.ts";
 import { frameAddress, schemeOf, type ViewState } from "../viewState.ts";
@@ -28,8 +30,9 @@ import {
 import { FrameView } from "./FrameView.tsx";
 import { Icon } from "./icons.tsx";
 import { LATER_STRINGS } from "./laterStrings.ts";
+import { PageTagView } from "./pageTagView.tsx";
 import { StageViewport } from "./StageViewport.tsx";
-import { StoryCodeBlock, type StoryCodeSource, storyCodeText } from "./StoryCodeBlock.tsx";
+import { StoryCodeBlock } from "./StoryCodeBlock.tsx";
 import { type StoryTouches, touchedView } from "./storyTouch.ts";
 import { STRINGS } from "./strings.ts";
 import { useCopy } from "./useCopy.ts";
@@ -56,6 +59,9 @@ export type ExampleReading = {
   /** Whether the demo is drawn larger, with more room around it. */
   readonly isDemoLarge: boolean;
 };
+
+/** The heading an example's title is: the level under the heading above it, so no level is skipped. */
+type ExampleTitleTag = "h3" | "h4";
 
 /** What every example of the page shares: the frames' address, view and reports, the code, how to open a story. */
 export type ExampleContext = {
@@ -140,20 +146,28 @@ const ExampleCode = ({
 }): ReactNode => {
   const { isCopied, copy } = useCopy();
   const write = useCodeWriter();
+  // a page of fifty stories would hold fifty coloured blocks nobody opened: the code is written when first shown, then
+  // kept, so closing it plays the same transition as opening it
+  const [wasShown, setWasShown] = useState(isShown);
+  if (isShown && !wasShown) setWasShown(true);
   return (
-    // the code stays in the page while closed, so it opens with a transition; inert keeps it out of Tab and
+    // the box stays in the page while closed, so it opens with a transition; inert keeps it out of Tab and
     // screen readers until then
     <div id={id} className="forgebook-example__code" data-open={isShown ? "" : undefined} inert={!isShown}>
       <div className="forgebook-example__code-inner">
-        <button
-          type="button"
-          className="forgebook-example__copy"
-          onClick={(): void => copy(storyCodeText(source, write))}
-          aria-live="polite"
-        >
-          {isCopied ? STRINGS.copied : LATER_STRINGS.copy}
-        </button>
-        <StoryCodeBlock {...source} />
+        {wasShown || isShown ? (
+          <>
+            <button
+              type="button"
+              className="forgebook-example__copy"
+              onClick={(): void => copy(storyCodeText(source, write))}
+              aria-live="polite"
+            >
+              {isCopied ? STRINGS.copied : LATER_STRINGS.copy}
+            </button>
+            <StoryCodeBlock {...source} />
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -169,23 +183,28 @@ const sceneHeightOf = (story: TreeStory, stageHeight: number | undefined): numbe
   stageHeight === undefined ? story.height : Math.max(story.height ?? 0, stageHeight);
 
 /**
- * An example's title, a link to its story's page, and its description.
+ * An example's title, a link to its story's page with the statuses the story holds of its own, and its description.
  *
  * @param props - the story and how its link opens it.
  */
 const ExampleHead = ({
   story,
+  titleTag: Title,
   context
 }: {
   readonly story: TreeStory;
-  readonly context: Pick<ExampleContext, "hrefOf" | "onOpen">;
+  readonly titleTag: ExampleTitleTag;
+  readonly context: Pick<ExampleContext, "hrefOf" | "onOpen" | "component">;
 }): ReactNode => (
   <header className="forgebook-example__head">
-    <h4 className="forgebook-example__title">
+    <Title className="forgebook-example__title">
       <StoryLink story={story} hrefOf={context.hrefOf} onOpen={context.onOpen} className="forgebook-link">
         {story.name}
       </StoryLink>
-    </h4>
+      {story.tags.some(isFilterTag) ? (
+        <PageTagView place="story" story={story} component={context.component} />
+      ) : null}
+    </Title>
     {story.description === undefined ? null : (
       <p className="forgebook-example__description">
         <CodeText text={story.description} />
@@ -401,12 +420,14 @@ const exampleHeights = (
 export const Example = ({
   story,
   isDemo,
+  titleTag = "h3",
   isMounted,
   observe,
   ...context
 }: ExampleContext & {
   readonly story: TreeStory;
   readonly isDemo: boolean;
+  readonly titleTag?: ExampleTitleTag;
   readonly isMounted: boolean;
   readonly observe?: (element: HTMLElement | null) => void;
 }): ReactNode => {
@@ -417,7 +438,7 @@ export const Example = ({
   const { shown, framed, scheme } = useExampleDevice(story, context);
   // the frame loads with the story's finger as it is then; a change after reaches it live, keeping the story's state
   const loadedView = useLoadedView(
-    context.frameView.sheets,
+    `${context.frameView.sheets}|${context.frameView.play}`,
     touchedView(context.frameView, story.id, context.touches, touch)
   );
   const boxWidth = useBoxWidth(full.isOver, context.view.width);
@@ -429,7 +450,7 @@ export const Example = ({
       data-demo={isDemo ? "" : undefined}
       aria-label={isDemo ? STRINGS.frameTitle(context.component.name, story.name) : story.name}
     >
-      {isDemo ? null : <ExampleHead story={story} context={context} />}
+      {isDemo ? null : <ExampleHead story={story} titleTag={titleTag} context={context} />}
       {full.isOver ? <FullPageSlot full={full} /> : null}
       <div
         ref={full.boxRef}

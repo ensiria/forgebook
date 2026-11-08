@@ -1,6 +1,6 @@
 /**
- * Tests for a build's story-file texts: a text worth packing goes to a gzipped file the texts module names, one that
- * weighs less than that is written in the module, the loaders answer each text as its query's module did, and the
+ * Tests for a build's story-file texts: the texts worth packing go together to gzipped files the texts module names,
+ * one that weighs no more than its loader is written in the module, the loaders answer each text as its query's module did, and the
  * reading starts with the group's module without holding it back.
  *
  * @module
@@ -11,11 +11,11 @@ import { gunzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { codeLiteral } from "../src/codeLiteral.ts";
 import {
   type FileTexts,
   type GroupTexts,
   groupTexts,
+  PACK_LIMIT,
   type TextSources,
   textsModuleCode
 } from "../src/vite/builtTexts.ts";
@@ -29,6 +29,9 @@ const LONG_DOCS = {
   name: "Select",
   props: Array.from({ length: 12 }, (_, at) => ({ name: `prop${at}`, description: "What it sets." }))
 };
+
+/** A component with no page. */
+const NO_PAGE = { html: "", summary: "" };
 
 /** A file's texts with nothing to say: no code, an empty page. */
 const EMPTY: FileTexts = [{}, {}, { html: "", summary: "" }];
@@ -47,36 +50,99 @@ const rowsOf = (code: string): string[][] => {
     .map((row) => row.slice(1, -1).split(", "));
 };
 
+/**
+ * The texts each packed file of a texts module holds, by the name of its loader in the module.
+ *
+ * @param code - the module's code.
+ * @param written - the files the module wrote, by name.
+ */
+const packsOf = (code: string, written: ReadonlyMap<string, Uint8Array>): Map<string, unknown[]> =>
+  new Map(
+    [...code.matchAll(/^const (packedTexts\d+) = packedText\(("[^"]+")\);$/gm)].map(
+      ([, name = "", file = ""]) => {
+        const texts: unknown = JSON.parse(
+          gunzipSync(written.get(JSON.parse(file)) ?? new Uint8Array()).toString()
+        );
+        return [name, Array.isArray(texts) ? texts : []];
+      }
+    )
+  );
+
 describe("textsModuleCode", () => {
-  it("packs a text worth a file, and writes in the module one that weighs less than its file", () => {
-    const written: { fileName: string; source: Uint8Array }[] = [];
-    const code = textsModuleCode([[LONG_DOCS, {}, { html: "", summary: "" }]], (asset) =>
-      written.push(asset)
+  it("packs the texts worth a file together, and writes in the module one that weighs no more than its loader", () => {
+    const written = new Map<string, Uint8Array>();
+    const other = { ...LONG_DOCS, name: "Combobox" };
+    const code = textsModuleCode(
+      [
+        [LONG_DOCS, {}, { html: "", summary: "" }],
+        [other, {}, { html: "", summary: "" }]
+      ],
+      (asset) => written.set(asset.fileName, asset.source)
     );
-    expect(written).toHaveLength(1);
-    expect(written[0]?.fileName).toMatch(/^assets\/[0-9a-f]{12}\.bin$/);
-    expect(JSON.parse(gunzipSync(written[0]?.source ?? new Uint8Array()).toString())).toEqual(LONG_DOCS);
+    expect([...written.keys()]).toHaveLength(1);
+    expect([...written.keys()][0]).toMatch(/^assets\/[0-9a-f]{12}\.bin$/);
+    expect(packsOf(code, written).get("packedTexts0")).toEqual([LONG_DOCS, other]);
     expect(rowsOf(code)).toEqual([
-      [`packedText(${codeLiteral(written[0]?.fileName)})`, "writtenText0", "writtenText1"]
+      ["packedPart(packedTexts0,0)", "writtenText0", "writtenText1"],
+      ["packedPart(packedTexts0,1)", "writtenText0", "writtenText1"]
     ]);
   });
 
-  it("answers a text written in the module as its query's module did: docs that cannot be read too", async () => {
+  it("starts another packed file when the next text would take one past its limit", () => {
+    const written = new Map<string, Uint8Array>();
+    const half = (name: string): unknown => ({ name, description: "x".repeat(PACK_LIMIT / 2) });
     const code = textsModuleCode(
-      [[{ error: "Select.tsx could not be read" }, {}, { html: "", summary: "" }]],
-      () => 0
+      [
+        [half("A"), {}, NO_PAGE],
+        [half("B"), {}, NO_PAGE]
+      ],
+      (asset) => written.set(asset.fileName, asset.source)
     );
+    expect(written.size).toBe(2);
+    expect(rowsOf(code).map(([docs]) => docs)).toEqual([
+      "packedPart(packedTexts0,0)",
+      "packedPart(packedTexts1,0)"
+    ]);
+  });
+
+  it("answers each text of a packed file from its place", async () => {
+    const written = new Map<string, Uint8Array>();
+    const other = { ...LONG_DOCS, name: "Combobox" };
+    const code = textsModuleCode(
+      [
+        [LONG_DOCS, {}, NO_PAGE],
+        [other, {}, NO_PAGE]
+      ],
+      (asset) => written.set(asset.fileName, asset.source)
+    );
+    // the packed files' maker reads `import.meta`, which only a module has: a stand-in reads the files written
+    const body = code
+      .split("\n")
+      .filter((line) => line.startsWith("const ") && !line.startsWith("const packedText ="));
+    const packedText =
+      (file: string): (() => Promise<unknown>) =>
+      (): Promise<unknown> =>
+        Promise.resolve(JSON.parse(gunzipSync(written.get(file) ?? new Uint8Array()).toString()));
+    const rows: unknown = runInNewContext(`${body.join("\n")}\n[${rowsOf(code).map((row) => `[${row}]`)}]`, {
+      packedText
+    });
+    if (!Array.isArray(rows)) throw new Error("no rows");
+    const docs = rows.map((row: unknown) => (Array.isArray(row) ? row[0] : undefined));
+    const [first, second] = docs;
+    if (typeof first !== "function" || typeof second !== "function") throw new Error("no loaders");
+    expect(JSON.parse(JSON.stringify(await second()))).toEqual(other);
+    expect(JSON.parse(JSON.stringify(await first()))).toEqual(LONG_DOCS);
+  });
+
+  it("answers a text written in the module as its query's module did: docs that cannot be read too", async () => {
+    const code = textsModuleCode([[{ error: "unread" }, {}, { html: "", summary: "" }]], () => 0);
     // the packed files' maker reads `import.meta`, which only a module has: the texts written here need only theirs
     const writing = code.split("\n").filter((line) => line.startsWith("const writtenText"));
     const [row = []] = rowsOf(code);
     const loaded: unknown = runInNewContext(`${writing.join("\n")}\n[${row.join(", ")}]`);
     if (!Array.isArray(loaded)) throw new Error("no loaders");
     const answers: unknown[] = await Promise.all(loaded.map((load: () => Promise<unknown>) => load()));
-    expect(JSON.parse(JSON.stringify(answers))).toEqual([
-      { error: "Select.tsx could not be read" },
-      {},
-      { html: "", summary: "" }
-    ]);
+    expect(JSON.parse(JSON.stringify(answers))).toEqual([{ error: "unread" }, {}, { html: "", summary: "" }]);
   });
 
   it("writes a text once however many files share it, and names the files' texts by their content", () => {

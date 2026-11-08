@@ -30,6 +30,8 @@ import {
   loadConfigFile,
   type ResolvedConfig
 } from "../../src/vite/configFile.ts";
+import { emptyStoryGlobs, emptyStoryGlobsMessage } from "../../src/vite/emptyStoryGlobs.ts";
+import { hiddenStoryFolders, hiddenStoryFoldersMessage } from "../../src/vite/hiddenStoryFiles.ts";
 import { catalogueClient } from "./agentClient.ts";
 
 /** The options every `forgebook` command takes: the configuration file. */
@@ -76,6 +78,29 @@ export const configOf = async (file: string | undefined): Promise<ResolvedConfig
   } catch (error) {
     throw new ScriptError(error instanceof Error ? error.message : String(error));
   }
+};
+
+/**
+ * The catalogue's configuration, for a command that reads its stories: a pattern that matches nothing is a mistake there,
+ * and answering "no stories" with success hides it from a person and from CI alike. `forgebook dev` only warns, since
+ * whoever runs it may be about to write the first story.
+ *
+ * @param file - the configuration file given; none to look in the current folder.
+ * @throws a `ScriptError` when there is none, it cannot be used, or one of its story patterns matches nothing.
+ */
+export const configWithStoriesOf = async (file: string | undefined): Promise<ResolvedConfig> => {
+  const config = await configOf(file);
+  const globs = emptyStoryGlobs(config);
+  if (globs.length > 0) {
+    const hidden = hiddenStoryFolders(config);
+    throw new ScriptError(emptyStoryGlobsMessage(globs), {
+      hint:
+        hidden.length > 0
+          ? hiddenStoryFoldersMessage(hidden)
+          : `Correct the pattern, or write the first story: ${COMMAND} new <component file>`
+    });
+  }
+  return config;
 };
 
 /**

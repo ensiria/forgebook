@@ -1,0 +1,9 @@
+/* The look of the fixture's Paper theme. */
+:root {
+  --fixture-look: paper;
+  --fixture-look-paper: on;
+}
+
+body {
+  background: #f6f0e2;
+}

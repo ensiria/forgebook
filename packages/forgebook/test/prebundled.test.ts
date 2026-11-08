@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ForgebookPlugin } from "../src/plugin.ts";
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import { prebundled, type Resolve, scannedEntries } from "../src/vite/prebundled.ts";
@@ -28,12 +29,15 @@ const CONFIG: ResolvedConfig = {
   head: "",
   shell: { themeCss: "", frameCss: "", hasBranding: true, styleSheets: [], problems: [] },
   tokens: [],
+  argControls: {},
   watch: [],
   lists: {},
   plugins: [],
   hasPlayTools: false,
   frames: ISOLATED_FRAMES,
-  build: { readableNames: false }
+  build: { readableNames: false },
+  refs: [],
+  appBuild: resolvedAppBuild(false)
 };
 
 /**
@@ -85,6 +89,13 @@ describe("prebundled", () => {
       plugins: [{ apiVersion: 1, id: "acme", tabs: [{ id: "acme", label: "Acme", view: "@acme/tab" }] }]
     };
     expect(prebundled(withTab, installed)).toContain("forgebook/shell/plugin-hosts");
+  });
+
+  it("names the composed catalogues' code only for a catalogue that composes one", () => {
+    const installed = (name: string): string => `/project/node_modules/${name}/index.js`;
+    expect(prebundled(CONFIG, installed)).not.toContain("forgebook/shell/refs");
+    const withRefs = { ...CONFIG, refs: [{ id: "ds", title: "DS", url: "https://ds.example.com/" }] };
+    expect(prebundled(withRefs, installed)).toContain("forgebook/shell/refs");
   });
 
   it("adds the written home's module only for a catalogue with a written home", () => {

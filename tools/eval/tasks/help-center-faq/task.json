@@ -1,0 +1,157 @@
+{
+  "id": "help-center-faq",
+  "app": "shadcn-admin",
+  "prompt": "The Help Center route (src/routes/_authenticated/help-center/index.tsx) only shows a coming-soon page. Replace it with a Help Center page in src/features/help-center/: a heading \"Help Center\", a search field labelled \"Search questions\", and these five questions, each opening to show its answer when clicked: \"How do I reset my password?\" — \"Use \"Forgot password\" on the sign-in page and follow the link we email you.\" \"Can I change my email address?\" — \"Yes, in Settings › Account.\" \"How do I invite a teammate?\" — \"Open Users and choose \"Invite User\".\" \"Where can I download invoices?\" — \"Invoices are emailed to the account owner each month.\" \"How do I delete my account?\" — \"Write to support and we will do it within two working days.\". The search filters the questions as the user types; when none matches, show \"No answer matches your search\" with a \"Clear search\" button. Use the same page layout as the other pages (header, main).",
+  "scope": ["src/routes/_authenticated/help-center/", "src/features/help-center/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built from the app's existing components (Collapsible, Input, Button, the layout's Header and Main), not new hand-made ones."
+    },
+    {
+      "id": "tokens",
+      "text": "No colour, size or spacing typed by hand: the theme's tokens and Tailwind's scale only."
+    },
+    {
+      "id": "states",
+      "text": "All closed, one open, a search with results, a search with none, in the dark theme and in a narrow window."
+    },
+    {
+      "id": "a11y",
+      "text": "Each question is a button that says whether it is expanded; the search field has its label; the no-match message is announced."
+    },
+    {
+      "id": "scope",
+      "text": "Only the Help Center's route and its new feature folder change; the coming-soon component stays for the pages that use it, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "default",
+      "description": "The Help Center as it opens.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/help-center"
+        }
+      ]
+    },
+    {
+      "name": "open",
+      "description": "One question opened.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/help-center"
+        },
+        {
+          "click": {
+            "text": "How do I reset my password?"
+          }
+        }
+      ]
+    },
+    {
+      "name": "no-match-dark",
+      "description": "A search with no match, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/help-center"
+        },
+        {
+          "fill": {
+            "label": "Search questions"
+          },
+          "value": "zzzz"
+        }
+      ]
+    },
+    {
+      "name": "narrow",
+      "description": "The page in a phone-sized window, one question opened.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/help-center"
+        },
+        {
+          "click": {
+            "text": "How do I invite a teammate?"
+          }
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "a question opens to its answer",
+      "steps": [
+        {
+          "goto": "/help-center"
+        },
+        {
+          "click": {
+            "text": "How do I reset my password?"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "follow the link we email you"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the search filters, and clears",
+      "steps": [
+        {
+          "goto": "/help-center"
+        },
+        {
+          "fill": {
+            "label": "Search questions"
+          },
+          "value": "invoice"
+        },
+        {
+          "expectVisible": {
+            "text": "Where can I download invoices?"
+          }
+        },
+        {
+          "expectHidden": {
+            "text": "How do I reset my password?"
+          }
+        },
+        {
+          "fill": {
+            "label": "Search questions"
+          },
+          "value": "zzzz"
+        },
+        {
+          "expectVisible": {
+            "text": "No answer matches your search"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Clear search"
+          }
+        },
+        {
+          "expectVisible": {
+            "text": "How do I delete my account?"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": []
+}

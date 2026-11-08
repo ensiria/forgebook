@@ -15,46 +15,48 @@
  *
  * @module
  */
-import { realpath } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { StorySource } from "@forgebook/story-format/source";
 import { createIdResolver, type ViteDevServer } from "vite";
 
+import type { ValueSchema } from "../argControl.ts";
 import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
+import type { StoryCodeWriter } from "../frame/renderer.ts";
 import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
 import { sourceFiles } from "../sourceFiles.ts";
-import { findComponentByTitle, findStory, type StoryTree, storyTree } from "../storyTree.ts";
+import type { CustomControlsRead } from "../storyControls.ts";
+import { catalogueStatuses } from "../storyStatuses.ts";
+import { findStory, type StoryTree, storyTree } from "../storyTree.ts";
 import { sourceUsage, type UsageIndex } from "../usedIn.ts";
+import { isValueSchema } from "../valueSchema.ts";
 import { frameAddressOf } from "../viewState.ts";
-import type {
-  AgentChangedStory,
-  ChangedStoriesDocument,
-  ErrorsDocument,
-  StoryDocument
-} from "./agent.types.ts";
+import type { ErrorsDocument, StoryDocument } from "./agent.types.ts";
 import {
   type CataloguePages,
+  customControlNames,
   type LoadedStoryParts,
   storiesDocument,
-  storyDocument,
-  storyLinks
+  storyDocument
 } from "./agentApi.ts";
 import { agentIndexAnswer } from "./agentIndexRoute.ts";
+import { storiesWithStatus, storyWithStatus } from "./agentStatuses.ts";
+import { type AgentCodeParts, withStoryCode } from "./agentStoryCode.ts";
+import { changedAnswer } from "./changedRoute.ts";
 import type { ResolvedConfig } from "./configFile.ts";
 import { pageAnswer, pagesAnswer } from "./docPagesRoute.ts";
+import { emptyStoryGlobs, emptyStoryGlobsMessage } from "./emptyStoryGlobs.ts";
 import { findAnswer } from "./findRoute.ts";
 import { framesOriginOf } from "./framesConfig.ts";
 import { hostOf } from "./framesServer.ts";
-import { catalogueChangedFiles, changeBase, changedFiles } from "./gitChange.ts";
+import { hiddenStoryFolders, hiddenStoryFoldersMessage } from "./hiddenStoryFiles.ts";
 import { AGENT_SOURCES_FILE, pageModulePath } from "./pages.ts";
 import { PREVIEW_ROUTE } from "./previewRoute.ts";
 import { loadPreview } from "./previewRunner.ts";
 import { searchAnswer } from "./searchRoute.ts";
 import { catalogueTokens, STORYLESS_ROUTES } from "./storylessRoutes.ts";
-import { affectedStories, type ReachedStory } from "./storyReach.ts";
 
 /** The path the answers live under. */
 export const AGENT_API = "/__forgebook/api/";
@@ -194,6 +196,8 @@ export const rootHeaderValue = (dir: string): string => encodeURIComponent(dir);
 
 /** What every route reads: the catalogue's sources and tree, its configuration, the query and the links' pages. */
 export type RouteContext = {
+  /** What the answers ask of the dev server; none reads no custom control. */
+  readonly server?: AgentServer;
   /** The sources and the preview, as the dev server loaded them. */
   readonly loaded: AgentModule;
   /** The sources' story tree. */
@@ -236,59 +240,19 @@ export const storiesAnswer = async (context: RouteContext): Promise<AgentAnswer>
     offersUsedIn(config.lists) && params.get("usedIn") === "true"
       ? await usageBySource(loaded.sources)
       : undefined;
-  return { status: 200, body: storiesDocument(config.title, tree, pages, view, usage) };
-};
-
-/** Whether a value is a list of stories with what they reach. */
-const isReach = (value: unknown): value is readonly ReachedStory[] => Array.isArray(value);
-
-/**
- * The stories a change touches, read from the files git names and the import graph "Used in" reads.
- *
- * @param context - what the routes read.
- */
-const changedAnswer = async ({
-  config,
-  loaded,
-  tree,
-  params,
-  pages,
-  view
-}: RouteContext): Promise<AgentAnswer> => {
-  const since = params.get("since") || "HEAD";
-  const base = await changeBase(config.dir, since);
-  if (base === undefined) return { status: 400, body: { error: `"${since}" names no commit here` } };
-  const { root, files } = await changedFiles(config.dir, base);
-  const reaches = await Promise.all(
-    loaded.sources.flatMap((source) =>
-      source.files.map(async (group) => {
-        const reach = await group.reach?.();
-        return { source: source.id, reach: isReach(reach) ? reach : [] };
-      })
-    )
-  );
-  const changed = catalogueChangedFiles(config.dir, await realpath(config.dir), root, files);
-  const stories = reaches.flatMap(({ source, reach }) =>
-    affectedStories(reach, changed).flatMap((story): AgentChangedStory[] => {
-      const component = findComponentByTitle(tree, source, story.title)?.component;
-      const found = [...(component?.stories ?? []), ...(component?.unlisted ?? [])].find(
-        (each) => each.exportName === story.exportName
-      );
-      return found === undefined
-        ? []
-        : [{ id: found.id, title: story.title, links: storyLinks(pages, found.id, view) }];
-    })
-  );
-  // without the import graph no story is found, which must not read as a change that touches none
-  const problems = offersUsedIn(config.lists)
-    ? []
-    : [
-        readsComponentDocs(config.lists)
-          ? "No story is found through the imports: the catalogue turns Used in off (usedIn: false), whose import graph this reads"
-          : "No story is found through the imports: the catalogue reads no component docs (componentDocs: false), whose programs read the import graph"
-      ];
-  const body: ChangedStoriesDocument = { schema: 1, since, files, stories, problems };
-  return { status: 200, body };
+  // read for each answer: the file an agent has just written ends the problem
+  const globs = emptyStoryGlobs(config);
+  const hidden = hiddenStoryFolders(config);
+  const said = [
+    ...(globs.length === 0 ? [] : [emptyStoryGlobsMessage(globs)]),
+    ...(hidden.length === 0 ? [] : [hiddenStoryFoldersMessage(hidden)])
+  ];
+  const listed = said.length === 0 ? tree : { ...tree, problems: [...said, ...tree.problems] };
+  const statuses = catalogueStatuses(config.lists.statuses);
+  return {
+    status: 200,
+    body: storiesWithStatus(storiesDocument(config.title, listed, pages, view, usage), listed, statuses)
+  };
 };
 
 /**
@@ -306,20 +270,118 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
   const files = sourceFiles(source);
   // the story's own file: its module, and the docs of the component its meta names, which its args are for
   const file = location.story.file;
+  const storyModule = await settled(files.stories[file]);
   const parts: LoadedStoryParts = {
-    module: await settled(files.stories[file]),
+    module: storyModule,
     docs: await settled(files.docs[file]),
-    preview: loaded.preview
+    preview: loaded.preview,
+    namedValues: source.namedValues,
+    setArgs: params.get("args") ?? undefined,
+    customControls:
+      context.server === undefined
+        ? undefined
+        : await customControlsRead(customControlNames(storyModule, location), config, context.server),
+    addressTexts: config.framework.addressTexts
   };
+  const code: AgentCodeParts | undefined =
+    context.server === undefined
+      ? undefined
+      : {
+          code: await settled(files.code[file]),
+          writer: await codeWriterOf(config, context.server),
+          namedValues: source.namedValues
+        };
   const index = offersUsedIn(config.lists) ? await sourceUsage(source) : undefined;
   // a usage that cannot be read leaves "Used in" out, never the story
   const usage = index === undefined || typeof index === "string" ? undefined : { tree, index };
-  const document = storyDocument(location, parts, pages, view, usage);
+  const module = "value" in storyModule ? storyModule.value : undefined;
+  const document = storyWithStatus(
+    withStoryCode(storyDocument(location, parts, pages, view, usage), code, {
+      location,
+      module,
+      preview: loaded.preview
+    }),
+    location.component,
+    catalogueStatuses(config.lists.statuses)
+  );
   // an agent must tell docs turned off from a story file that names no component
   const body: StoryDocument = readsComponentDocs(config.lists)
     ? document
     : { ...document, componentDocs: "off" };
   return { status: 200, body };
+};
+
+/** Whether a module's `codeOf` is a code writer: a function, as every framework's code module exports it. */
+const isCodeWriter = (value: unknown): value is StoryCodeWriter => typeof value === "function";
+
+/**
+ * The framework's code writer, loaded on the server as the shell imports it; none when it does not load there.
+ *
+ * @param config - the catalogue's configuration.
+ * @param server - what the answers ask of the dev server.
+ */
+const codeWriterOf = async (
+  config: ResolvedConfig,
+  server: AgentServer
+): Promise<StoryCodeWriter | undefined> => {
+  try {
+    const id = await server.resolveSource(config.framework.pages.code);
+    // loading a module that does not resolve would only have Vite log its failure
+    const loaded = id === undefined ? undefined : await server.load(id);
+    const writer =
+      typeof loaded === "object" && loaded !== null && "codeOf" in loaded ? loaded.codeOf : undefined;
+    return isCodeWriter(writer) ? writer : undefined;
+  } catch {
+    // a writer that touches the page as it loads has no code to give an agent; the story's answer stands without it
+    return undefined;
+  }
+};
+
+/** How long a control's module may take to load for an answer: one that hangs must not hold every answer with it. */
+const CONTROL_LOAD_MS = 5000;
+
+/** A control's schema, loaded on the server; a text says why there is none. */
+const controlSchemaOf = async (module: string, server: AgentServer): Promise<ValueSchema | string> => {
+  try {
+    const id = await server.resolveSource(module);
+    const timeout = new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`no answer in ${CONTROL_LOAD_MS} ms`)), CONTROL_LOAD_MS).unref();
+    });
+    const loaded = await Promise.race([server.load(id ?? module), timeout]);
+    const schema =
+      typeof loaded === "object" && loaded !== null && "schema" in loaded ? loaded.schema : undefined;
+    return isValueSchema(schema) ? schema : "its module exports no schema Forgebook can read";
+  } catch (error) {
+    return `its module cannot be read on the server: ${error instanceof Error ? error.message : String(error)}`;
+  }
+};
+
+/**
+ * The custom controls a story names, as an agent reads them: only those, each module loaded on the server for its schema.
+ * A module that cannot load there (it touches the page as it is imported) has no schema to say, and no value of it can be
+ * checked. Its import runs on the dev server, as a story file's does.
+ *
+ * @param names - the controls the story names.
+ * @param config - the catalogue's configuration.
+ * @param server - what the answers ask of the dev server.
+ */
+const customControlsRead = async (
+  names: readonly string[],
+  config: ResolvedConfig,
+  server: AgentServer
+): Promise<CustomControlsRead> => {
+  const known = names.filter((name) => Object.hasOwn(config.argControls, name));
+  const read = await Promise.all(
+    known.map(async (name) => [name, await controlSchemaOf(config.argControls[name] ?? "", server)] as const)
+  );
+  return {
+    schemas: Object.fromEntries(
+      read.flatMap(([name, each]) => (typeof each === "string" ? [] : [[name, each]]))
+    ),
+    problems: Object.fromEntries(
+      read.flatMap(([name, each]) => (typeof each === "string" ? [[name, each]] : []))
+    )
+  };
 };
 
 /**
@@ -328,7 +390,7 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
  * @param server - what the answers ask of the dev server.
  * @param config - the catalogue's configuration.
  * @param route - the path under `AGENT_API` (`stories`, `story`).
- * @param params - the query: `id` for a story, `view` for the links, `category`, `name`, `value` and `type` for the
+ * @param params - the query: `id` for a story, `view` for the links, `args` for the values to set, `category`, `name`, `value` and `type` for the
  *   tokens, `query` and `limit` for a search, `usedIn=true` for the list's "Used in" (a
  *   story's comes with it when the catalogue offers it).
  * @param origins - where the catalogue is served (`http://localhost:5173`) and where its frames are, for the links.
@@ -357,7 +419,8 @@ export const agentAnswer = async (
       config,
       params,
       pages: { page: `${origins.catalogue}/`, frame: `${origins.frames}/frame.html` },
-      view: params.get("view") ?? ""
+      view: params.get("view") ?? "",
+      server
     };
     if (route === "errors") return errorsAnswer(context, live);
     if (route === "stories") return await storiesAnswer(context);
@@ -366,7 +429,9 @@ export const agentAnswer = async (
     if (route === "search") return await searchAnswer(context);
     if (route === "pages") return await pagesAnswer(context);
     if (route === "page") return await pageAnswer(context);
-    if (route === "changed") return await changedAnswer(context);
+    if (route === "changed") return await changedAnswer(context, server.resolveSource);
+    // loaded when asked: it reads syntax with TypeScript, which a dev server's thread must not pay for at start
+    if (route === "visibility") return await (await import("./visibilityRoute.ts")).visibilityAnswer(context);
     if (route === "agent-index")
       return await agentIndexAnswer(context, await catalogueTokens(config, server.resolveSource));
     return { status: 404, body: { error: `No answer at ${AGENT_API}${route}` } };

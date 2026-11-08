@@ -14,8 +14,8 @@
  * `FORGEBOOK_SHELL_GROUP=<index>/<count>` runs one group of catalogues and their specs instead of all of them at once
  * (`catalogueGroups.ts`), for a machine whose memory does not hold every dev server together.
  *
- * The specs that edit fixture files run in a project of their own, `story file edits`, on one worker; every other spec
- * runs in `catalogues`, in parallel.
+ * The specs that edit fixture files run in a project of their own, `story file edits`, on one worker, once the other
+ * specs are over; every other spec runs in `catalogues`, in parallel.
  *
  * @module
  */
@@ -68,10 +68,14 @@ const SERVERS: Readonly<Record<Catalogue, { folder: string; configFile?: string 
   angular: { folder: join(import.meta.dirname, "..", "..", "angular") },
   sveltekit: { folder: join(import.meta.dirname, "..", "..", "sveltekit") },
   "react-native": { folder: join(import.meta.dirname, "..", "..", "react-native") },
+  // a catalogue with several visual themes, for its gallery and what a value brings with it (`gallery.e2e.ts`)
+  themes: { folder: join(import.meta.dirname, ".."), configFile: "themes/forgebook.config.ts" },
   // the fixture app without its written home, for the home every catalogue without one keeps (`home.e2e.ts`)
   "generated-home": { folder: join(import.meta.dirname, ".."), configFile: "forgebook.generated.config.ts" },
   // the kit with accessibility checks and component docs off, for what a catalogue offers without them (`parity.e2e.ts`)
-  parity: { folder: join(import.meta.dirname, ".."), configFile: "parity/forgebook.config.ts" }
+  parity: { folder: join(import.meta.dirname, ".."), configFile: "parity/forgebook.config.ts" },
+  // the kit composing a built catalogue with `refs`, served by its spec (`refs.e2e.ts`)
+  refs: { folder: join(import.meta.dirname, ".."), configFile: "refs/forgebook.config.ts" }
 };
 
 /** The catalogues and specs this run takes: all of them, or one group (`catalogueGroups.ts`). */
@@ -93,7 +97,18 @@ export default defineConfig({
   testDir: import.meta.dirname,
   projects: [
     ...(otherSpecs.length === 0 ? [] : [{ name: "catalogues", testMatch: otherSpecs }]),
-    ...(editingSpecs.length === 0 ? [] : [{ name: "story file edits", testMatch: editingSpecs, workers: 1 }])
+    ...(editingSpecs.length === 0
+      ? []
+      : [
+          {
+            name: "story file edits",
+            testMatch: editingSpecs,
+            workers: 1,
+            // after the others: a story file left broken shows Vite's overlay on every open page of the catalogue, and
+            // its fix reloads the pages opened meanwhile, which another spec's test may be reading
+            ...(otherSpecs.length === 0 ? {} : { dependencies: ["catalogues"] })
+          }
+        ])
   ],
   // a group keeps its results apart, so the next group's run does not clear a failure before it
   ...(group.place === undefined

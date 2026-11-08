@@ -42,6 +42,13 @@ const STORY_IDS = [
   "components-button--unlisted",
   "components-button--untested",
   "storybook-arg-types--controls",
+  "storybook-prop-types--link",
+  "storybook-arg-types--conditional",
+  "storybook-custom-controls--rated",
+  "storybook-value-props--filled",
+  "storybook-value-props--empty",
+  "storybook-value-props--with-tokens",
+  "storybook-value-props--named-controls",
   "storybook-csf-2--primary",
   "storybook-csf-2--large",
   "storybook-meta-render-and-play--from-meta",
@@ -62,7 +69,9 @@ const STORY_IDS = [
   "storybook-merged--wrapping",
   "storybook-merged--reexported",
   "storybook-plain-javascript--untyped",
-  "storybook-preview-hooks--synced"
+  "storybook-preview-hooks--synced",
+  "storybook-status-addon--plain",
+  "storybook-status-addon--in-review"
 ];
 
 test("every story written the Storybook way is ready in its frame, without a page error", async ({
@@ -107,6 +116,11 @@ test.describe("files written the Storybook way", () => {
     await isReady(page);
     await expect(frameOf(page).locator("p")).toHaveText("From the meta: Badge");
     await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
+  });
+
+  test("Code shows the meta's render for a story without one of its own", async ({ page }) => {
+    await page.goto(story("storybook-meta-render-and-play--from-meta", "tab=code"));
+    await expect(page.locator(".forgebook-code-block")).toContainText("From the meta: <Badge {...args} />");
   });
 
   test("loaders and beforeEach run before the story is drawn", async ({ page }) => {
@@ -173,6 +187,22 @@ test.describe("a title written in several files, and ids", () => {
     await expect(page.locator(".forgebook-api__table").first().locator("tbody th")).toContainText(["label"]);
   });
 
+  test("the reference lists a variant's props with when they apply, and says what a type parameter is", async ({
+    page
+  }) => {
+    await page.goto("/?component=sb:storybook-prop-types");
+    const reference = page.locator(".forgebook-api__table");
+    // the first read of a component's types builds its program: the answer can take longer than an assertion's default
+    await expect(reference.locator('tr[data-prop="href"]')).toContainText('Only when kind is "link".', {
+      timeout: 20_000
+    });
+    await expect(reference.locator('tr[data-prop="onClick"]')).toContainText('Only when kind is "button".');
+    await expect(reference.locator('tr[data-prop="items"]')).toContainText("readonly unknown[]");
+    await expect(reference.locator('tr[data-prop="items"]')).toContainText(
+      "TItem is generic, with no constraint: shown as unknown."
+    );
+  });
+
   test("a story a helper makes, another constant and a re-export are drawn", async ({ page }) => {
     await page.goto(story("storybook-merged--made"));
     await isReady(page);
@@ -206,7 +236,7 @@ test.describe("arg types and actions", () => {
     await page.goto(story("storybook-arg-types--controls"));
     await isReady(page);
     // a hidden arg has no control; the others have the control their arg type names
-    await expect(page.getByLabel("secret")).toHaveCount(0);
+    await expect(page.getByLabel("secret", { exact: true })).toHaveCount(0);
     await page.getByRole("combobox", { name: "tone" }).selectOption("loud");
     await expect.poll(async () => (await shownArgs(page))["tone"]).toBe("loud");
     await page.getByRole("radio", { name: "Large" }).check({ force: true });
@@ -215,10 +245,107 @@ test.describe("arg types and actions", () => {
     await expect.poll(async () => (await shownArgs(page))["sides"]).toEqual(["top", "end"]);
     await page.getByRole("slider", { name: "volume" }).fill("8");
     await expect.poll(async () => (await shownArgs(page))["volume"]).toBe(8);
-    await expect(page.getByLabel("When")).toHaveAttribute("type", "datetime-local");
+    await expect(page.getByLabel("When", { exact: true })).toHaveAttribute("type", "datetime-local");
     // a mapping's key chosen in the panel reaches the story as its value
     await page.getByRole("combobox", { name: "icon" }).selectOption("heart");
     await expect.poll(async () => (await shownArgs(page))["icon"]).toBe("♥");
+  });
+
+  test("the panel follows an arg's `if`: another arg's value, and a global's", async ({ page }) => {
+    await page.goto(story("storybook-arg-types--conditional", "theme=light"));
+    await isReady(page);
+    await expect(page.getByRole("textbox", { name: "secret" })).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "icon" })).toHaveCount(0);
+    await page.getByRole("combobox", { name: "tone" }).selectOption("loud");
+    await expect(page.getByRole("textbox", { name: "secret" })).toBeVisible();
+    // hiding the control leaves the value alone, as Storybook's does
+    await page.getByRole("combobox", { name: "tone" }).selectOption("calm");
+    await expect(page.getByRole("textbox", { name: "secret" })).toHaveCount(0);
+    await expect.poll(async () => (await shownArgs(page))["secret"]).toBe("hidden");
+    await page.goto(story("storybook-arg-types--conditional", "theme=dark"));
+    await isReady(page);
+    await expect(page.getByRole("combobox", { name: "icon" })).toBeVisible();
+  });
+
+  test("a Storybook link's path opens the story, and is checked as any other story's name", async ({
+    page
+  }) => {
+    await page.goto("/?path=/story/inputs-selection-select--small&args=hint:From+a+link");
+    await expect(page).toHaveTitle("Select · Fixture catalogue");
+    await expect(page.locator("iframe.forgebook-frame-view").first()).toHaveAttribute(
+      "src",
+      /story=kit%3Ainputs-selection-select--small|story=kit:inputs-selection-select--small/
+    );
+    const frame = page.frameLocator("iframe.forgebook-frame-view").first();
+    await expect(frame.locator("small")).toHaveText("From a link");
+    await page.goto(`/?path=/story/${encodeURIComponent("<img src=x>--nowhere")}`);
+    await expect(page.getByRole("alert")).toContainText("<img src=x>--nowhere");
+    await expect(page.locator("iframe.forgebook-frame-view")).toHaveCount(0);
+    await expect(page.locator("main img")).toHaveCount(0);
+  });
+
+  test("a Storybook link's path opens the story alone in an embed", async ({ page }) => {
+    await page.goto("/?embed&path=/story/inputs-selection-select--small");
+    await expect(page.frameLocator("iframe.forgebook-frame-view").locator("html")).toHaveAttribute(
+      "data-forgebook-status",
+      "ready"
+    );
+  });
+
+  test("a Storybook link's args are read and typed by the props, and stay in the address", async ({
+    page
+  }) => {
+    const args =
+      "tone:loud;volume:6;sides[0]:end;sides[1]:start;color:!hex(ff0000);size:l;missing:x;style.a:b";
+    await page.goto(story("storybook-arg-types--controls", `args=${args}`));
+    await isReady(page);
+    await expect
+      .poll(async () => shownArgs(page))
+      .toMatchObject({ tone: "loud", volume: 6, sides: ["end", "start"], color: "#ff0000", size: "l" });
+    // what cannot be taken is said, by name and reason, never dropped silently
+    const note = page.locator(".forgebook-dropped-args");
+    await expect(note.getByRole("listitem").filter({ hasText: "style" })).toContainText("could not be read");
+    await expect(note.getByRole("listitem").filter({ hasText: "missing" })).toContainText(
+      "not one of its props"
+    );
+    // the address goes on saying the same, so a reload reads it again
+    await page.reload();
+    await isReady(page);
+    await expect.poll(async () => (await shownArgs(page))["volume"]).toBe(6);
+    // a change starts from what the story takes, typed, in Forgebook's own form
+    await page.getByRole("combobox", { name: "tone" }).selectOption("angry");
+    await expect(page).toHaveURL(/args=%7B/);
+    await expect(note).toHaveCount(0);
+    await page.reload();
+    await isReady(page);
+    await expect
+      .poll(async () => shownArgs(page))
+      .toMatchObject({ tone: "angry", volume: 6, sides: ["end", "start"], color: "#ff0000", size: "l" });
+  });
+
+  test("a link's non-ASCII text and lists reach the story in either form", async ({ page }) => {
+    const text = "Perché 日本語 🎉";
+    await page.goto(
+      story(
+        "storybook-arg-types--controls",
+        `args=${encodeURIComponent(JSON.stringify({ tone: "loud", sides: ["end"], color: text }))}`
+      )
+    );
+    await isReady(page);
+    await expect
+      .poll(async () => shownArgs(page))
+      .toMatchObject({ tone: "loud", sides: ["end"], color: text });
+    await page.goto(
+      story("storybook-arg-types--controls", `args=sides[]:end;color:${encodeURIComponent(text)}`)
+    );
+    await isReady(page);
+    await expect.poll(async () => shownArgs(page)).toMatchObject({ sides: ["end"], color: text });
+  });
+
+  test("a JSON address that cannot be read says so", async ({ page }) => {
+    await page.goto(story("storybook-arg-types--controls", "args=%7Bnot-json"));
+    await isReady(page);
+    await expect(page.locator(".forgebook-dropped-args")).toContainText("could not be read");
   });
 
   test("a story changes its own args with Storybook's useArgs, and the panel and the address follow", async ({
@@ -252,6 +379,16 @@ test.describe("arg types and actions", () => {
     await isReady(page);
     await frameOf(page).getByRole("button", { name: "Close" }).click();
     await expect(page.locator(".forgebook-calls__item")).toContainText(["onClose"]);
+  });
+
+  test("Code shows a spy as the file writes it, and a value the panel set from that value", async ({
+    page
+  }) => {
+    await page.goto(story("storybook-actions--spy", "tab=code"));
+    const code = page.locator(".forgebook-code-block");
+    await expect(code).toHaveText('<Button label="Press" onClick={fn()} />');
+    await page.goto(story("storybook-actions--spy", "tab=code&args=label:Pressed"));
+    await expect(code).toHaveText('<Button label="Pressed" onClick={fn()} />');
   });
 });
 

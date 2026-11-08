@@ -6,16 +6,16 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { panelProps } from "../src/argTypes.ts";
+import type { PropDocs } from "../src/componentDocs.ts";
 import {
   actionNames,
   controlsOfParameter,
   excludedControls,
   mappedArgs,
   mergedArgTypes,
-  panelArgTypesOf,
-  panelProps
-} from "../src/argTypes.ts";
-import type { PropDocs } from "../src/componentDocs.ts";
+  panelArgTypesOf
+} from "../src/storyArgTypes.ts";
 
 /** The props the types of a button give. */
 const PROPS: readonly PropDocs[] = [
@@ -70,15 +70,14 @@ describe("panelProps", () => {
     });
   });
 
-  it("hides what table.disable and controls.exclude name, and lists an object control for reading", () => {
+  it("hides what table.disable and controls.exclude name, and edits an object control as JSON with nothing to read", () => {
     const argTypes = panelArgTypesOf(
       { label: { table: { disable: true } }, icon: { control: "object" } },
       excludedControls({ exclude: ["tone"] })
     );
     const props = panelProps(PROPS, argTypes);
     expect(props.map((prop) => prop.name)).toEqual(["icon", "onPress"]);
-    expect(props[0]).toMatchObject({ kind: "other", control: "none" });
-    expect(props[0]).not.toHaveProperty("canTakeText");
+    expect(props[0]).toMatchObject({ kind: "other", control: "object", shape: { kind: "json" } });
   });
 
   it("adds the args only the argTypes name, as a story without a typed component has", () => {
@@ -159,5 +158,57 @@ describe("actionNames", () => {
       "onPress",
       "onClose"
     ]);
+  });
+});
+
+describe("a custom control's name", () => {
+  it("is any name that is none of the panel's, never reached through a prototype", () => {
+    const argTypes = panelArgTypesOf(
+      {
+        score: { control: { type: "rating", settings: { stars: 7 } } },
+        other: { control: "constructor" },
+        kept: { control: "select", options: ["a"] }
+      },
+      []
+    );
+    expect(argTypes["score"]).toMatchObject({ customControl: "rating", settings: { stars: 7 } });
+    expect(argTypes["other"]).toMatchObject({ customControl: "constructor" });
+    expect(argTypes["kept"]).not.toHaveProperty("customControl");
+  });
+
+  it("is none for a control turned off, and keeps out settings that are no data", () => {
+    const cycle: Record<string, unknown> = {};
+    cycle["self"] = cycle;
+    const argTypes = panelArgTypesOf(
+      {
+        off: { control: { type: "rating", disable: true } },
+        odd: { control: { type: "rating", settings: { run: (): number => 1 } } },
+        loop: { control: { type: "rating", settings: cycle } }
+      },
+      []
+    );
+    expect(argTypes["off"]).toMatchObject({ control: "none" });
+    expect(argTypes["off"]).not.toHaveProperty("customControl");
+    expect(argTypes["odd"]).not.toHaveProperty("settings");
+    expect(argTypes["loop"]).not.toHaveProperty("settings");
+  });
+
+  it("makes a prop one the panel sets, without its type's shape", () => {
+    const argTypes = panelArgTypesOf({ tags: { control: "rating" } }, []);
+    const [prop] = panelProps(
+      [
+        {
+          name: "tags",
+          kind: "other",
+          type: "string[]",
+          description: "",
+          isRequired: false,
+          shape: { kind: "list", of: { kind: "text" } }
+        }
+      ],
+      argTypes
+    );
+    expect(prop).toMatchObject({ kind: "other", customControl: "rating" });
+    expect(prop).not.toHaveProperty("shape");
   });
 });

@@ -45,15 +45,15 @@ const openView = async (page: Page): Promise<void> => {
 };
 
 /**
- * Picks an appearance in the open Appearance menu, and waits until the menu's button shows it.
+ * Picks an appearance in the open Interface menu, and waits until the menu's button shows it.
  *
  * @remarks
  * The menu closes on a choice. `check()` reads the radio again after its click, so on a busy page, where the menu is
  * gone by then, it waits for a radio that never comes back: a click, and the button's name, say the choice was made.
  */
 const chooseAppearance = async (page: Page, name: string): Promise<void> => {
-  await page.getByRole("dialog", { name: "Appearance" }).getByRole("radio", { name, exact: true }).click();
-  await expect(page.getByRole("button", { name: `Appearance: ${name}` })).toBeVisible();
+  await page.getByRole("dialog", { name: "Interface" }).getByRole("radio", { name, exact: true }).click();
+  await expect(page.getByRole("button", { name: `Interface: ${name}` })).toBeVisible();
 };
 
 /** Waits until the shown story's frame says it is ready (or failed). */
@@ -202,7 +202,7 @@ test.describe("the shell following the story", () => {
       page.evaluate(() => document.documentElement.getAttribute("data-forgebook-appearance"));
     await expect.poll(appearance).toBe("light");
 
-    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await page.getByRole("button", { name: /^Interface/ }).click();
     await chooseAppearance(page, "Follow the story");
     await expect.poll(appearance).toBe("dark");
 
@@ -211,7 +211,7 @@ test.describe("the shell following the story", () => {
 
     await page.goto(story("overview", "theme=dark"));
     await expect.poll(appearance).toBe("dark");
-    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await page.getByRole("button", { name: /^Interface/ }).click();
     await chooseAppearance(page, "Light");
     await expect.poll(appearance).toBe("light");
   });
@@ -375,8 +375,9 @@ test.describe("aliases and related pages", () => {
     await fields.click();
     const alias = tree.getByRole("link", { name: "Select in Inputs" });
     await expect(alias.locator("xpath=..")).toHaveAttribute("title", /Lives in Inputs › Selection › Select/);
-    // the alias is not counted as one of the family's components
-    await expect(tree.getByRole("button", { name: /^Forms/ })).toHaveText("Forms0");
+    // the alias is not counted as one of the family's components, and a family of aliases alone shows no 0
+    await expect(tree.getByRole("button", { name: /^Forms/ })).toHaveText("Forms");
+    await expect(fields).toHaveText("Fields");
     await alias.click();
     await expect(page).toHaveURL(/component=kit%3Ainputs-selection-select/);
     await expect(page.locator(".forgebook-header__path")).toHaveText(
@@ -476,8 +477,8 @@ test.describe("the stage", () => {
   }) => {
     await page.goto(story("overview"));
     await frameStatus(page);
-    await page.getByLabel("Width in px").fill("420");
-    await page.getByLabel("Width in px").press("Enter");
+    await page.getByLabel("Width in px", { exact: true }).fill("420");
+    await page.getByLabel("Width in px", { exact: true }).press("Enter");
     await expect(page).toHaveURL(/width=420/);
     await expect(page.locator(".forgebook-viewport__room")).toHaveJSProperty("offsetWidth", 420);
     await page.locator('.forgebook-viewport__handle[data-side="end"]').dblclick();
@@ -533,7 +534,7 @@ test.describe("the stage", () => {
     const roomWidth = await page
       .locator(".forgebook-viewport__room")
       .evaluate((room) => (room as HTMLElement).offsetWidth);
-    await expect(page.getByLabel("Width in px")).toHaveValue(String(roomWidth));
+    await expect(page.getByLabel("Width in px", { exact: true })).toHaveValue(String(roomWidth));
     const tools = page.getByRole("toolbar", { name: "Zoom and measuring tools" });
     await tools.getByRole("button", { name: "Zoom in" }).click();
     await expect(page).toHaveURL(/zoom=125/);
@@ -1546,7 +1547,7 @@ test.describe("the panel", () => {
   test("a value set in Props reaches the frame and stays in the address", async ({ page }) => {
     await page.goto(story("overview"));
     await frameStatus(page);
-    await page.getByRole("radio", { name: "lg" }).check({ force: true });
+    await page.locator(".forgebook-segmented__option", { hasText: /^lg$/ }).click();
     await expect(page).toHaveURL(/args=/);
     await expect(frameOf(page).locator("select")).toHaveAttribute("data-size", "lg");
     await page.reload();
@@ -1568,8 +1569,6 @@ test.describe("the panel", () => {
     await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
     await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
     await expect(frameOf(page).locator("select")).toBeDisabled();
-    // the toggles that name no group stay under Toggles; Select has none left there
-    await expect(tab.locator(".forgebook-prop-group__title", { hasText: "Toggles" })).toHaveCount(0);
   });
 
   test("Props puts the required props where the story says, over its meta's section", async ({ page }) => {
@@ -1580,17 +1579,17 @@ test.describe("the panel", () => {
     await expect(tab.locator(".forgebook-prop-group[data-required] .forgebook-prop__name")).toHaveText([
       "options*"
     ]);
-    await expect(
-      tab.locator(".forgebook-prop-group", { hasText: "Other props" }).locator(".forgebook-prop__name")
-    ).toHaveText(["classNames"]);
-    // Hinted asks for them first in each group instead: no section, options first among the props it cannot set
+    // the props with no group of their own, as the source declares them
+    const ungrouped = tab.locator(
+      ":scope > .forgebook-prop-group:not([data-required]) > .forgebook-prop-grid .forgebook-prop__name"
+    );
+    await expect(ungrouped).toHaveText(["value", "size", "hint", "classNames"]);
+    // Hinted asks for them first in each group instead: no section, options first among the rest
     await page.goto(story("hinted"));
     await frameStatus(page);
     await expect(tab.locator(".forgebook-fold__name")).toHaveText(["Texts", "Behaviour"]);
     await expect(tab.locator(".forgebook-prop-group[data-required]")).toHaveCount(0);
-    await expect(
-      tab.locator(".forgebook-prop-group", { hasText: "Other props" }).locator(".forgebook-prop__name")
-    ).toHaveText(["options*", "classNames"]);
+    await expect(ungrouped).toHaveText(["options*", "value", "size", "hint", "classNames"]);
   });
 
   test("a shared link's values reach the frame only for the story's props, with their types; the rest are reported", async ({
@@ -1694,11 +1693,11 @@ test.describe("the panel", () => {
     await frameStatus(page);
     const root = page.locator("html");
     await expect(root).toHaveAttribute("data-forgebook-appearance", "dark");
-    await page.getByRole("button", { name: "Appearance: System" }).click();
+    await page.getByRole("button", { name: "Interface: System" }).click();
     await popoversSettled(page);
     await chooseAppearance(page, "Light");
     await expect(root).toHaveAttribute("data-forgebook-appearance", "light");
-    await expect(page.getByRole("button", { name: "Appearance: Light" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Interface: Light" })).toBeVisible();
     await page.reload();
     await frameStatus(page);
     await expect(root).toHaveAttribute("data-forgebook-appearance", "light");

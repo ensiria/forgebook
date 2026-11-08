@@ -8,7 +8,8 @@
  * half ones. A word is worth what it is worth where it counts most in the result (`searchMatch.ts`), so the ranking is
  * `findComponents`' with more places. A result that holds every word comes before one that does not, which says what it
  * missed. Everything is read from the tree and the index (`searchIndex.ts`), with no server, so the same code answers
- * in the page and on the dev server. Pure.
+ * in the page and on the dev server; the dev server also reads typos (`searchTypos.ts`), which the page leaves out to
+ * stay light. Pure.
  *
  * @module
  */
@@ -134,8 +135,6 @@ type Field = {
   readonly labelWords: readonly string[];
   /** Its text's words. */
   readonly textWords: readonly string[];
-  /** Its name's and its text's words in order, each between spaces, as the words of a query are looked for in them. */
-  readonly sentences: readonly string[];
   /** Where it goes. */
   readonly target: SearchTarget;
 };
@@ -200,7 +199,6 @@ const fieldOf = (
     text,
     labelWords: label === undefined ? [] : labelWordsOf(label),
     textWords: [...new Set(wordsOf(text))],
-    sentences: [sentenceOf(label ?? ""), sentenceOf(text)],
     target
   };
 };
@@ -226,24 +224,77 @@ const sectionField = (section: SearchSection, target: ComponentTarget | PageTarg
   return fieldOf(section.heading === undefined ? "text" : "heading", section.heading, section.text, opened);
 };
 
+/**
+ * What the search reads of each component from the tree, and of each component's index, kept as long as they are: the
+ * tree is read once, and the index's groups arrive one after another, which must not read the tree again each time.
+ */
+const TREE_FIELDS = new WeakMap<TreeComponent, Map<string, readonly Field[]>>();
+const INDEX_FIELDS = new WeakMap<SearchComponent, Map<string, IndexFields>>();
+
+/** What a component's index adds, before and after its stories, so the fields keep their order. */
+type IndexFields = { readonly lead: readonly Field[]; readonly sections: readonly Field[] };
+
+/** A value made once per key and owner, kept while the owner is. */
+const cachedIn = <TOwner extends object, TValue>(
+  cache: WeakMap<TOwner, Map<string, TValue>>,
+  owner: TOwner,
+  key: string,
+  make: () => TValue
+): TValue => {
+  const byKey = cache.get(owner) ?? new Map<string, TValue>();
+  cache.set(owner, byKey);
+  const known = byKey.get(key);
+  if (known !== undefined) return known;
+  const made = make();
+  byKey.set(key, made);
+  return made;
+};
+
+/** What the search reads of a component in the tree: its name, its place, its search words and its stories. */
+const treeFields = (component: TreeComponent, target: ComponentTarget): readonly Field[] =>
+  cachedIn(TREE_FIELDS, component, target.id, () => [
+    fieldOf("name", component.name, "", target),
+    fieldOf("title", component.title.split("/").slice(0, -1).join(" "), "", target),
+    ...component.keywords.map((keyword) => fieldOf("keyword", keyword, "", target))
+  ]);
+
+/** What the search reads of a component's stories. */
+const storyFields = (component: TreeComponent, target: ComponentTarget): readonly Field[] =>
+  cachedIn(TREE_FIELDS, component, `${target.id}\nstories`, () =>
+    component.stories.map((story) =>
+      fieldOf("story", story.name, story.description ?? "", { kind: "story", id: story.id })
+    )
+  );
+
+/** What a component's index adds: its lead and props, and the sections of its docs. */
+const indexFields = (index: SearchComponent, target: ComponentTarget): IndexFields =>
+  cachedIn(INDEX_FIELDS, index, target.id, () => ({
+    lead: [
+      ...(index.lead === undefined ? [] : [fieldOf("description", undefined, index.lead, target)]),
+      ...(index.props ?? []).map(({ name, text, part, isEvent }) =>
+        fieldOf(isEvent === true ? "event" : "prop", name, text, {
+          ...target,
+          anchor: propAnchor(name, part)
+        })
+      )
+    ],
+    sections: (index.sections ?? []).map((section) => sectionField(section, target))
+  }));
+
 /** What the search reads of a component. */
 const componentFields = (
   component: TreeComponent,
   target: ComponentTarget,
   index: SearchComponent | undefined
-): Field[] => [
-  fieldOf("name", component.name, "", target),
-  fieldOf("title", component.title.split("/").slice(0, -1).join(" "), "", target),
-  ...component.keywords.map((keyword) => fieldOf("keyword", keyword, "", target)),
-  ...(index?.lead === undefined ? [] : [fieldOf("description", undefined, index.lead, target)]),
-  ...(index?.props ?? []).map(({ name, text, part, isEvent }) =>
-    fieldOf(isEvent === true ? "event" : "prop", name, text, { ...target, anchor: propAnchor(name, part) })
-  ),
-  ...component.stories.map((story) =>
-    fieldOf("story", story.name, story.description ?? "", { kind: "story", id: story.id })
-  ),
-  ...(index?.sections ?? []).map((section) => sectionField(section, target))
-];
+): Field[] => {
+  const added = index === undefined ? undefined : indexFields(index, target);
+  return [
+    ...treeFields(component, target),
+    ...(added?.lead ?? []),
+    ...storyFields(component, target),
+    ...(added?.sections ?? [])
+  ];
+};
 
 /** A component, read for the search. */
 const searchableComponent = (
@@ -310,7 +361,7 @@ export const searchables = (
   });
 
 /** The query, read. */
-type Query = MarkedQuery & {
+export type Query = MarkedQuery & {
   /** Its words as a sentence (`sentenceOf`), when there are several: copied from a page, it finds that page first. */
   readonly sentence: string | undefined;
 };
@@ -321,8 +372,12 @@ const NEAR_SHARE = 0.75;
 /** The most of a query that is read: a page pasted by mistake must not hold the tab for seconds. */
 export const MAX_QUERY = 200;
 
-/** A query's words and phrase. */
-const queryOf = (typed: string): Query => {
+/**
+ * A query's words and phrase.
+ *
+ * @param typed - what was typed.
+ */
+export const queryOf = (typed: string): Query => {
   const query = typed.slice(0, MAX_QUERY);
   const words = wordsOf(query);
   const isSeveral = words.length > 1;
@@ -340,7 +395,7 @@ const isHeldIn = (words: readonly string[], word: string): boolean => {
 };
 
 /** A found thing, before its hits are worked out. */
-type Scored = {
+export type Scored = {
   /** The thing. */
   readonly found: Searchable;
   /** Its score. */
@@ -351,9 +406,22 @@ type Scored = {
   readonly missed: readonly string[];
 };
 
+/**
+ * Each field's name and text as sentences (`sentenceOf`), made the first time a query of several words asks: most
+ * queries are one word, and making them for every field of a large catalogue is most of the first search's time.
+ */
+const SENTENCES = new WeakMap<Field, readonly string[]>();
+
 /** Whether a field holds a query's sentence, in its name or its text. */
-const holdsSentence = (field: Field, sentence: string | undefined): boolean =>
-  sentence !== undefined && field.sentences.some((each) => each.includes(sentence));
+const holdsSentence = (field: Field, sentence: string | undefined): boolean => {
+  if (sentence === undefined) return false;
+  let sentences = SENTENCES.get(field);
+  if (sentences === undefined) {
+    sentences = [sentenceOf(field.label ?? ""), sentenceOf(field.text)];
+    SENTENCES.set(field, sentences);
+  }
+  return sentences.some((each) => each.includes(sentence));
+};
 
 /** How a thing answers the query; none when it holds no word of it. */
 const scored = (found: Searchable, { words, sentence }: Query): Scored | undefined => {
@@ -468,11 +536,43 @@ const resultOf = ({ found, score, matched, missed }: Scored, query: Query, limit
 };
 
 /**
- * What a query finds.
+ * Everything that holds a word of the query, the result holding most of it first.
+ *
+ * @param all - everything that can be found (`searchables`).
+ * @param read - the query, read (`queryOf`).
+ */
+export const scoredAll = (all: readonly Searchable[], read: Query): Scored[] =>
+  all
+    .flatMap((each) => scored(each, read) ?? [])
+    .toSorted(
+      (first, second) =>
+        first.missed.length - second.missed.length ||
+        second.score - first.score ||
+        first.found.name.localeCompare(second.found.name)
+    );
+
+/**
+ * The answer from what was found.
  *
  * @remarks
  * Where something holds every word, what holds much less is left out: `the` must not bring the whole catalogue along
  * with a sentence copied from a page. Nothing holding every word, the nearest are given, each saying what it missed.
+ *
+ * @param found - what holds a word of the query, best first (`scoredAll`).
+ * @param read - the query, read.
+ * @param limits - how much of the answer to give.
+ */
+export const answerOf = (found: readonly Scored[], read: Query, limits: SearchLimits): SearchAnswer => {
+  const hasWhole = found.some((each) => each.missed.length === 0);
+  const kept = found.filter((each) => !hasWhole || each.matched.length >= read.words.length * NEAR_SHARE);
+  return {
+    results: kept.slice(0, limits.results).map((each) => resultOf(each, read, limits.hits)),
+    total: kept.length
+  };
+};
+
+/**
+ * What a query finds, each word read as typed: `searchTypos.ts` reads a word nothing holds as a near name.
  *
  * @param all - everything that can be found (`searchables`).
  * @param query - what was typed.
@@ -484,18 +584,5 @@ export const searchCatalogue = (
   limits: SearchLimits
 ): SearchAnswer => {
   const read = queryOf(query);
-  const found = all
-    .flatMap((each) => scored(each, read) ?? [])
-    .toSorted(
-      (first, second) =>
-        first.missed.length - second.missed.length ||
-        second.score - first.score ||
-        first.found.name.localeCompare(second.found.name)
-    );
-  const hasWhole = found.some((each) => each.missed.length === 0);
-  const kept = found.filter((each) => !hasWhole || each.matched.length >= read.words.length * NEAR_SHARE);
-  return {
-    results: kept.slice(0, limits.results).map((each) => resultOf(each, read, limits.hits)),
-    total: kept.length
-  };
+  return answerOf(scoredAll(all, read), read, limits);
 };

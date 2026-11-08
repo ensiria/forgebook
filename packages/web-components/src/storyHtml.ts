@@ -33,8 +33,8 @@ const contentText = (text: string): string =>
 const attribute = (name: string, value: ArgValue): string | undefined => {
   if (value === false || value === null || isNamedArg(value) || !isAttributeName(name)) return undefined;
   if (value === true) return name;
-  // a list as JSON in single quotes, so its own double quotes need no escaping
-  if (Array.isArray(value))
+  // a list or an object as JSON in single quotes, so its own double quotes need no escaping
+  if (typeof value === "object")
     return `${name}='${JSON.stringify(value).replace(/&/g, "&amp;").replace(/'/g, "&#39;")}'`;
   return `${name}="${attributeText(String(value))}"`;
 };
@@ -49,7 +49,8 @@ const ONE_LINE = 80;
  */
 const slotContent = (value: ArgValue): string | undefined => {
   if (value === null || value === false || isNamedArg(value)) return undefined;
-  return contentText(Array.isArray(value) ? value.join(" ") : String(value));
+  if (typeof value !== "object") return contentText(String(value));
+  return Array.isArray(value) ? contentText(value.join(" ")) : undefined;
 };
 
 /**

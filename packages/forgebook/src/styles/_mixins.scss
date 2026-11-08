@@ -38,11 +38,20 @@
   text-transform: uppercase;
 }
 
+/// The values many rules repeat (`$repeated`), declared where their inputs are: a custom property's `var()` is read where
+/// it is declared, so an element a theme gives its own fonts (a frame's error box) declares them again for itself.
+@mixin repeated {
+  @each $name, $value in $repeated {
+    --forgebook-#{$name}: #{meta.inspect($value)};
+  }
+}
+
 /// What a catalogue's theme can replace, as custom properties: fonts and corners, the same in both appearances.
 @mixin look {
   @each $name, $value in $look {
     --forgebook-#{$name}: #{meta.inspect($value)};
   }
+  @include repeated;
 }
 
 /// A palette written as the custom properties the colour tokens read (`--forgebook-text`…).

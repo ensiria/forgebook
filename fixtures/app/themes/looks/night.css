@@ -1,0 +1,8 @@
+/* The look of the fixture's Night theme, drawn only for dark. */
+:root {
+  --fixture-look: night;
+}
+
+body {
+  background: #0b1020;
+}

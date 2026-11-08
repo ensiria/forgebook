@@ -9,8 +9,8 @@ import type { ReactNode } from "react";
 import { type PageGroup, pageGroups, type TreePage } from "../pageTree.ts";
 import type { TreeSource } from "../storyTree.ts";
 import { Icon } from "./icons.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { PageLink, TreeFold } from "./SidebarEntries.tsx";
-import { STRINGS } from "./strings.ts";
 
 /** How the section links its pages. */
 export type SidebarPageLinks = {
@@ -110,7 +110,7 @@ const PageGroupEntries = ({
 export const SidebarDocs = ({ sources, ...shared }: SidebarDocsProps): ReactNode =>
   sources.length === 0 ? null : (
     <section className="forgebook-tree__source">
-      <h2 className="forgebook-tree__source-name">{STRINGS.docsNav}</h2>
+      <h2 className="forgebook-tree__source-name">{LATER_STRINGS.docsNav}</h2>
       {sources.map(({ source, pages }) => (
         <div key={source.id}>
           {/* a single library's pages need no name: the section is theirs */}

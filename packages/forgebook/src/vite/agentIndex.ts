@@ -20,9 +20,6 @@ import type { AgentAnswer } from "./agentRoutes.ts";
 import { type FindableComponent, findComponents } from "./findComponent.ts";
 import { TOKEN_ANSWERS, type TokenReading } from "./tokenAnswers.ts";
 
-/** The file's name in the built catalogue. */
-export const AGENT_INDEX_FILE = "forgebook-agent.json";
-
 /** A component as a search finds it, with what its answer carries. */
 export type IndexedComponent = FindableComponent & {
   /** Its first story's id. */
@@ -118,17 +115,18 @@ const findAnswer = (
 ): AgentAnswer => {
   const query = params.get("query") ?? "";
   if (query.trim() === "") return { status: 400, body: { error: "No words to look for" } };
-  const components = findComponents(findable, query).map((found): AgentFoundComponent => {
-    const component = findable.find((each) => each.id === found.id);
+  const { components: found, corrections } = findComponents(findable, query);
+  const components = found.map((match): AgentFoundComponent => {
+    const component = findable.find((each) => each.id === match.id);
     const story = component?.story;
     return {
-      ...found,
+      ...match,
       story,
       links: story === undefined ? undefined : storyLinks(pages, story, ""),
       ...(component?.guidance === undefined ? {} : { guidance: component.guidance })
     };
   });
-  const body: FoundComponentsDocument = { schema: 1, query, components };
+  const body: FoundComponentsDocument = { schema: 1, query, components, corrections };
   return { status: 200, body };
 };
 

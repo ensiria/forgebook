@@ -148,7 +148,8 @@ export const nextFrameRenderer: FrameRenderer = {
     // `notFound`), as React's renderer does not count one that throws at once; new args are a new drawing, so a story
     // that threw is drawn when other args draw it
     const onCommit = (): void => {
-      void settled().then(() => {
+      // a story meant to stay in its fallback is drawn as it is: nothing it waits for is coming
+      void (first.story.suspense.isExpected ? Promise.resolve() : settled()).then(() => {
         if (!hasFailed) markDrawn();
       });
     };
@@ -158,6 +159,7 @@ export const nextFrameRenderer: FrameRenderer = {
     });
     return {
       drawn,
+      ...(mounted.settled === undefined ? {} : { settled: mounted.settled }),
       update: (next: StoryDrawing): void => {
         hasFailed = false;
         mounted.update(withNext(next, onCommit));

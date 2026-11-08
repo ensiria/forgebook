@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { type RefObject, useEffect, useMemo, useRef } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type AcceptedArgs,
@@ -17,11 +17,16 @@ import {
   type CheckedArgs,
   checkedAddressArgs,
   checkedArgsMessage,
-  type DroppedArg
+  type DroppedArg,
+  declaredArgProps,
+  needsShapeChecks
 } from "../addressArgs.ts";
+import type { AddressLink } from "../addressArgsParam.ts";
 import type { ComponentDocs } from "../componentDocs.ts";
 import { type PanelArgs, panelArgsParam } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
+import type { LoadedChecks } from "./argChecks.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
 import { tellFrames } from "./FrameView.tsx";
 import type { ReadyMessage } from "./useFrameMessages.ts";
 import type { Loaded } from "./useLoaded.ts";
@@ -65,6 +70,8 @@ const NO_NAMED_VALUES: NamedValues = {};
 export type AddressArgsInput = {
   /** The values the address names. */
   readonly panelArgs: PanelArgs;
+  /** What else the address says of them: how to type them, and which could not be read. */
+  readonly link: AddressLink | undefined;
   /** The component's docs. */
   readonly docs: Loaded<ComponentDocs>;
   /** The story's own args its frame reported; none before it is ready. */
@@ -75,6 +82,8 @@ export type AddressArgsInput = {
   readonly controls: ReadyDeclaration["controls"];
   /** The source's named values; none when it has none. */
   readonly namedValues: NamedValues | undefined;
+  /** The catalogue's custom controls; none when it has none. */
+  readonly argControls: ArgControlLoaders | undefined;
   /** The element that holds the story's frames, which hear each change of the checked values. */
   readonly frames: RefObject<HTMLElement | null>;
 };
@@ -97,6 +106,43 @@ export type AddressArgs = {
    * updates after; none while the docs load.
    */
   readonly acceptedFor: (ready: ReadyDeclaration) => AcceptedArgs | undefined;
+  /** Gives a prop with a shape its worst value, once a prop that needs the checks asked for them. */
+  readonly worstOfShape: LoadedChecks["worstOfShape"] | undefined;
+};
+
+/** No custom control registered. */
+const NO_ARG_CONTROLS: ArgControlLoaders = {};
+
+/**
+ * What checks a story's structured values, loaded when a story first has a prop that needs it. Until it arrives such a
+ * prop's value waits, whichever its story.
+ *
+ * @param declaration - what the story declares.
+ * @param loaders - the catalogue's custom controls.
+ */
+const useArgChecks = (
+  declaration: ArgDeclaration | undefined,
+  loaders: ArgControlLoaders | undefined
+): LoadedChecks | undefined => {
+  const props = declaration === undefined ? [] : declaredArgProps(declaration);
+  const names = props.flatMap((prop) => prop.customControl ?? []).join("\n");
+  const isNeeded = props.some(needsShapeChecks);
+  const [loaded, setLoaded] = useState<{ readonly names: string; readonly checks: LoadedChecks }>();
+  useEffect(() => {
+    if (!isNeeded) return;
+    let isCurrent = true;
+    void import("./argChecks.ts")
+      .then(({ loadedChecks }) =>
+        loadedChecks(names === "" ? [] : names.split("\n"), loaders ?? NO_ARG_CONTROLS)
+      )
+      .then((checks) => {
+        if (isCurrent) setLoaded({ names, checks });
+      });
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [isNeeded, names, loaders]);
+  return loaded?.names === names ? loaded.checks : undefined;
 };
 
 /**
@@ -105,13 +151,20 @@ export type AddressArgs = {
  * @param input - the address's values and what the stage knows of the story.
  */
 export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
-  const { panelArgs, docs, storyArgs, argTypes, controls, frames } = input;
+  const { panelArgs, link, docs, storyArgs, argTypes, controls, frames } = input;
+  const typeValue = link?.typeValue;
   const namedValues = input.namedValues ?? NO_NAMED_VALUES;
-  const checked = useMemo((): CheckedArgs | undefined => {
+  const declaration = useMemo(() => {
     const ready = storyArgs === undefined ? undefined : { args: storyArgs, argTypes, controls };
-    const declaration = declarationOf(docs, ready, namedValues);
-    return declaration === undefined ? undefined : checkedAddressArgs(panelArgs, declaration);
-  }, [panelArgs, docs, storyArgs, argTypes, controls, namedValues]);
+    return declarationOf(docs, ready, namedValues);
+  }, [docs, storyArgs, argTypes, controls, namedValues]);
+  const checks = useArgChecks(declaration, input.argControls);
+  const checked = useMemo((): CheckedArgs | undefined => {
+    if (declaration === undefined) return undefined;
+    const read = checkedAddressArgs(panelArgs, declaration, typeValue, checks);
+    // nothing is told of the address until all of it can be: a story must not draw half a link
+    return read.isWaiting ? undefined : read;
+  }, [panelArgs, typeValue, declaration, checks]);
   const acceptedParam = checked === undefined ? undefined : panelArgsParam(checked.accepted);
   // the values reach the frames from the address, so going back in the history sets them too; compared as text, so a
   // frame is told again only when they change
@@ -121,14 +174,20 @@ export const useAddressArgs = (input: AddressArgsInput): AddressArgs => {
     if (acceptedParam === undefined || sealedRef.current === undefined) return;
     tellFrames(frames.current, checkedArgsMessage(sealedRef.current));
   }, [acceptedParam, frames]);
+  // said with the check's: the note's button keeps what the story accepts, which is not known before
+  const unread = (link?.unread ?? []).map((name): DroppedArg => ({ name, reason: "unreadable" }));
+  const refused = (link?.refused ?? []).map((name): DroppedArg => ({ name, reason: "markup" }));
   return {
     accepted: checked?.accepted ?? NO_ARGS,
     checked: checked?.sealed,
-    dropped: checked?.dropped ?? NOTHING_DROPPED,
+    dropped: checked === undefined ? NOTHING_DROPPED : [...unread, ...refused, ...checked.dropped],
     acceptedParam,
     acceptedFor: (message: ReadyDeclaration): AcceptedArgs | undefined => {
-      const declaration = declarationOf(docs, message, namedValues);
-      return declaration === undefined ? undefined : checkedAddressArgs(panelArgs, declaration).sealed;
-    }
+      const ready = declarationOf(docs, message, namedValues);
+      if (ready === undefined) return undefined;
+      const read = checkedAddressArgs(panelArgs, ready, typeValue, checks);
+      return read.isWaiting ? undefined : read.sealed;
+    },
+    worstOfShape: checks?.worstOfShape
   };
 };

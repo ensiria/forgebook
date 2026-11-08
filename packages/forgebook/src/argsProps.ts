@@ -4,8 +4,8 @@
  *
  * @remarks
  * An arg's kind is read from its value: a text, a number, a toggle, an event for an arg the frame records as an
- * action. A list or a value the source names (`namedValues`) is listed for reading, unless its type is one the source
- * names values for. Nothing is said of a prop the story gives no arg: without the types there is no way to know it.
+ * action, fields for an object or a list. A value the source names (`namedValues`) is listed for
+ * reading, unless its type is one the source names values for. Nothing is said of a prop the story gives no arg: without the types there is no way to know it.
  * The story's `argTypes` are laid over these as over the types' props (`argTypes.ts`). A shared link's values are
  * checked against these kinds (`addressArgs.ts`): without the types, a text arg takes any text, so a prop of a few
  * values keeps a link to them only through its `argTypes` options. Pure.
@@ -14,7 +14,7 @@
  */
 
 import type { ComponentDocs, PropDocs } from "./componentDocs.ts";
-import type { ArgValue, PanelArgs } from "./messages.ts";
+import { type ArgValue, isArgList, isNamedArg, type PanelArgs } from "./messages.ts";
 
 /**
  * The prop an arg stands for, its kind and type read from its value.
@@ -30,9 +30,14 @@ const propOfArg = (name: string, value: ArgValue, isAction: boolean): PropDocs =
   if (typeof value === "number") return { ...prop, kind: "number", type: "number" };
   if (typeof value === "boolean") return { ...prop, kind: "toggle", type: "boolean" };
   if (value === null) return { ...prop, kind: "other", type: "null" };
-  if (Array.isArray(value)) return { ...prop, kind: "other", type: "array" };
   // a value the source names: its type, so the panel offers the source's values for it
-  return { ...prop, kind: "other", type: "of" in value ? value.of : "unknown" };
+  if (isNamedArg(value)) return { ...prop, kind: "other", type: value.of };
+  return {
+    ...prop,
+    kind: "other",
+    type: isArgList(value) ? "array" : "object",
+    shape: { kind: "like", value }
+  };
 };
 
 /**

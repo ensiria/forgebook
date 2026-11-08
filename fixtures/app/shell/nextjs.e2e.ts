@@ -39,6 +39,7 @@ const STORY_IDS = [
   "site-navigation--goes-to-about",
   "site-hero--default",
   "site-hero--low-tide",
+  "quotes-late-quote--default",
   "site-search--empty",
   "site-search--with-results",
   "blog-post-page--first-visit",
@@ -180,6 +181,13 @@ test.describe("server components and variables", () => {
     await reaches(page, "ready");
     await expect(page.getByRole("heading", { name: "First light on the pier" })).toBeVisible();
     await expect(page.getByText("Welcome back, Ada")).toBeVisible();
+  });
+
+  test("a boundary inside a story is waited for: at ready its content is there", async ({ page }) => {
+    await page.goto(frame("quotes-late-quote--default"));
+    await reaches(page, "ready");
+    expect(await page.getByTestId("quote").count()).toBe(1);
+    expect(await page.getByTestId("fallback").count()).toBe(0);
   });
 
   test("notFound() stops the story with what Next.js would have done", async ({ page }) => {

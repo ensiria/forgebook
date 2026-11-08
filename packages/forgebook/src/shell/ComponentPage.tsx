@@ -1,5 +1,5 @@
 /**
- * A component's page, as a library documents a component: what it is, its demo (the story marked `main`) with
+ * A component's page, as a library documents a component: its status, what it is, its demo (the story marked `main`) with
  * its code, the text of its documentation file, its API reference drawn from its types, then every other story as an
  * example.
  *
@@ -18,6 +18,7 @@ import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef } from "reac
 
 import { groupLabel } from "../catalogue.ts";
 import { type ComponentDocs, codeNameOf } from "../componentDocs.ts";
+import { hasFilterTags } from "../storyTagNames.ts";
 import {
   groupedStories,
   isLogicComponent,
@@ -37,6 +38,7 @@ import { Example, type ExampleContext, type ExampleReading } from "./Example.tsx
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
+import { PageTagView } from "./pageTagView.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
 import { useComponentDocs } from "./useComponentDocs.ts";
@@ -270,6 +272,8 @@ export const ComponentPage = ({
     [component, demo]
   );
   const catalogue = useCatalogue();
+  // statuses are tags: a catalogue with none draws none, and loads nothing for them
+  const hasTags = useMemo(() => hasFilterTags(tree), [tree]);
   // the demo first in the queue, at the top of the page, and counted in it: a frame of a library served as source asks
   // for thousands of modules, and one more beside those the queue allows makes the browser refuse some of them
   const queued = useMemo(
@@ -357,6 +361,7 @@ export const ComponentPage = ({
           className="forgebook-doc"
           data-audience={view.audience === "everyone" ? undefined : view.audience}
         >
+          {hasTags ? <PageTagView place="page" component={component} loadDocs={loadDocs} /> : null}
           <AudienceSlot place="beforeDemo" audience={audienceProps}>
             <Lead page={page} docs={componentDocs} />
           </AudienceSlot>
@@ -397,6 +402,7 @@ export const ComponentPage = ({
                       {...context}
                       story={story}
                       isDemo={false}
+                      titleTag={section.group === undefined ? "h3" : "h4"}
                       isMounted={queue.mounted.has(story.id)}
                       observe={queue.observerOf(story.id)}
                     />

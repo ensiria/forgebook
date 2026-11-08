@@ -7,11 +7,13 @@
  * (`label={"a {b}"}`); a number, `null`, `false` or a list as an expression (`count={3}`, `options={["a", "b"]}`); `true`
  * the bare name; a named value by its name (`icon={IconFolder}`). A snippet's text goes between the tags: `#children` as
  * the content, any other in a `{#snippet name()}` block. Only the values that cross from the frame are known (texts,
- * numbers, booleans, `null`, lists of texts and numbers, named values): a function the story passes is left out. Pure.
+ * numbers, booleans, `null`, lists of texts and numbers, named values): a function or other code the story file writes
+ * comes as written (`written`) and is set as an expression (`onclick={fn()}`). Pure.
  *
  * @module
  */
-import { type ArgValue, isNamedArg, type PanelArgs } from "forgebook/messages";
+import { argExpression } from "forgebook/arg-expression";
+import { type ArgValue, isNamedArg, type NamedArg, type PanelArgs } from "forgebook/messages";
 import type { StoryCodeWriter } from "forgebook/renderer";
 
 import { snippetOfArg } from "./snippetArgs.ts";
@@ -35,9 +37,8 @@ const attribute = (name: string, value: ArgValue): string => {
     return isPlainText(value) ? `${name}="${value}"` : `${name}={${expression(value)}}`;
   // a named value is written by its name, as the source's module exports it (`icon={IconFolder}`)
   if (isNamedArg(value)) return `${name}={${value.named}}`;
-  // a multiple choice's values, as the source writes a list
-  if (Array.isArray(value)) return `${name}={[${value.map(expression).join(", ")}]}`;
-  return `${name}={${String(value)}}`;
+  // a list or an object, as the source writes one; a number, `null` and `false` read as themselves
+  return `${name}={${argExpression(value, { text: expression, named: (named: NamedArg): string => named.named })}}`;
 };
 
 /** A text as Svelte's markup holds it: a tag or an expression it writes stays text. */
@@ -77,12 +78,24 @@ const contentOf = (snippets: readonly (readonly [string, ArgValue])[]): string |
  *
  * @param component - the component's name (`IconTile`).
  * @param args - the values, in the order they are written.
+ * @param written - the args the story file writes as code, each as written, bound as an expression; after the values.
  */
-export const storyMarkup = (component: string, args: PanelArgs): string => {
+export const storyMarkup = (
+  component: string,
+  args: PanelArgs,
+  written: Readonly<Record<string, string>> = {}
+): string => {
   const entries = Object.entries(args);
-  const attributes = entries
-    .filter(([name]) => snippetOfArg(name) === undefined)
-    .map(([name, value]) => attribute(name, value));
+  // a slot's written code is not markup: only the attributes take it
+  const names = [...new Set([...Object.keys(args), ...Object.keys(written)])].filter(
+    (name) => snippetOfArg(name) === undefined
+  );
+  const attributes = names.flatMap((name): string[] => {
+    const code = written[name];
+    if (code !== undefined) return [`${name}={${code}}`];
+    const value = args[name];
+    return value === undefined ? [] : [attribute(name, value)];
+  });
   const content = contentOf(
     entries.flatMap(([name, value]): [string, ArgValue][] => {
       const snippet = snippetOfArg(name);
@@ -90,10 +103,10 @@ export const storyMarkup = (component: string, args: PanelArgs): string => {
     })
   );
   const oneLine = [component, ...attributes].join(" ");
-  const isOneLine = oneLine.length + 2 <= ONE_LINE;
+  const isOneLine = oneLine.length + 2 <= ONE_LINE && !oneLine.includes("\n");
   const opening = isOneLine
     ? `<${oneLine}`
-    : `<${component}\n${attributes.map((text) => `  ${text}`).join("\n")}\n`;
+    : `<${component}\n${attributes.map((text) => `  ${text.replace(/\n/g, "\n  ")}`).join("\n")}\n`;
   if (content === undefined) return `${opening}${isOneLine ? " " : ""}/>`;
   return `${opening}>${content}</${component}>`;
 };

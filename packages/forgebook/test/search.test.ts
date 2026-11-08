@@ -11,6 +11,7 @@ import type { TreePage } from "../src/pageTree.ts";
 import { type SearchAnswer, type SearchHit, searchables, searchCatalogue } from "../src/search.ts";
 import { isSearchIndex, mergedSearchIndex, type SearchIndex } from "../src/searchIndex.ts";
 import { markedText, snippetOf } from "../src/searchMarks.ts";
+import { correctedSearch } from "../src/searchTypos.ts";
 import { sourceSearchLoaders } from "../src/sourceFiles.ts";
 import type { StoryTree, TreeComponent, TreeSource, TreeStory } from "../src/storyTree.ts";
 import { findComponents } from "../src/vite/findComponent.ts";
@@ -49,6 +50,7 @@ const component = (
   design: undefined,
   propGroups: [],
   requiredFirst: undefined,
+  tags: [],
   stories,
   unlisted: [],
   alsoIn: [],
@@ -188,10 +190,40 @@ describe("searchCatalogue", () => {
     expect(answer.results[0]).toMatchObject({ matched: ["select", "danger"], missed: [] });
   });
 
+  it("reads a word nothing holds as the nearest name only when asked, marks what it found, and says so", () => {
+    const answer = correctedSearch(searchables(TREE, new Map([["kit", INDEX]])), "selcet danger", {
+      results: 10,
+      hits: 3
+    });
+    expect(answer.corrections).toEqual([{ typed: "selcet", read: "select" }]);
+    expect(answer.results[0]).toMatchObject({ target: { id: "kit:inputs-select" }, missed: [] });
+    expect(answer.results[0]?.name.some((part) => part.isMatch)).toBe(true);
+    expect(search("selcet").total).toBe(0);
+  });
+
   it("finds names from the tree alone, before the index arrives", () => {
     const answer = searchCatalogue(searchables(TREE, new Map()), "select", { results: 10, hits: 3 });
     expect(answer.results[0]?.target.id).toBe("kit:inputs-select");
     expect(searchCatalogue(searchables(TREE, new Map()), "disabled", { results: 10, hits: 3 }).total).toBe(0);
+  });
+
+  it("reads the tree once: the index arriving after it adds its own, in the same order as read together", () => {
+    const before = searchables(TREE, new Map());
+    const after = searchables(TREE, new Map([["kit", INDEX]]));
+    const fresh = searchables(
+      { sources: [{ ...SOURCE, families: structuredClone(SOURCE.families) }], problems: [] },
+      new Map([["kit", INDEX]])
+    );
+    const kindsOf = (all: typeof after): readonly string[] =>
+      all.flatMap((each) => each.fields.map((field) => `${field.kind}:${field.label ?? field.text}`));
+    expect(kindsOf(after)).toEqual(kindsOf(fresh));
+    expect(kindsOf(after).length).toBeGreaterThan(kindsOf(before).length);
+    expect(searchCatalogue(after, "disabled", { results: 10, hits: 3 }).total).toBe(1);
+    // a sentence of several words is still found where it stands, read only when such a query asks
+    expect(searchCatalogue(after, "listbox", { results: 10, hits: 3 }).total).toBe(1);
+    expect(
+      searchCatalogue(after, "reads as a listbox", { results: 10, hits: 3 }).results[0]?.hits[0]?.kind
+    ).toBe("text");
   });
 
   it("says why a result's name is there", () => {
@@ -265,7 +297,7 @@ describe("searchCatalogue", () => {
       stories: []
     }));
     for (const query of ["select", "modal", "radio tile group", "picker"]) {
-      const found = findComponents(findable ?? [], query)[0];
+      const found = findComponents(findable ?? [], query).components[0];
       const searched = searchCatalogue(searchables(TREE, new Map()), query, { results: 1, hits: 0 });
       expect(plain(searched.results[0]?.name ?? [])).toBe(found?.title.split("/").at(-1));
       // a sentence found whole counts more here: a person pastes one, and `find` is asked in words

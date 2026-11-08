@@ -20,8 +20,8 @@ import { diskUsage } from "./diskUsage.ts";
 import { execProgram, TIME_LIMITS } from "./programs.ts";
 import type { Target } from "./targets.ts";
 
-/** Forgebook's packages a catalogue installs. */
-const FORGEBOOK_PACKAGES = ["story-format", "forgebook", "react"] as const;
+/** Forgebook's packages a catalogue installs, by folder under `packages/`. */
+const FORGEBOOK_PACKAGES: readonly string[] = ["story-format", "forgebook", "react"];
 
 /** A target's installed state. */
 export type InstallResult = {
@@ -44,11 +44,13 @@ export type BenchFolders = {
  *
  * @param folders - where to work.
  * @param io - the script's streams.
+ * @param names - the packages, by folder under `packages/`: the core, the story format and React's by default.
  * @returns the tarball of each package, by name.
  */
 export const packForgebook = async (
   { repository, work }: BenchFolders,
-  io: ScriptIo
+  io: ScriptIo,
+  names: readonly string[] = FORGEBOOK_PACKAGES
 ): Promise<Readonly<Record<string, string>>> => {
   const packs = join(work, "packs");
   await rm(packs, { recursive: true, force: true });
@@ -59,7 +61,7 @@ export const packForgebook = async (
     output: "capture",
     timeoutMs: TIME_LIMITS.pack
   });
-  for (const name of FORGEBOOK_PACKAGES) {
+  for (const name of names) {
     await execProgram("pnpm", ["pack", "--pack-destination", packs], {
       cwd: join(repository, "packages", name),
       io,
@@ -73,11 +75,13 @@ export const packForgebook = async (
     if (file === undefined) throw new Error(`no tarball for ${prefix}`);
     return `file:${join(packs, file)}`;
   };
-  return {
-    forgebook: tarball("forgebook"),
-    "@forgebook/react": tarball("forgebook-react"),
-    "@forgebook/story-format": tarball("forgebook-story-format")
-  };
+  return Object.fromEntries(
+    names.map((name) =>
+      name === "forgebook"
+        ? ["forgebook", tarball("forgebook")]
+        : [`@forgebook/${name}`, tarball(`forgebook-${name}`)]
+    )
+  );
 };
 
 /**

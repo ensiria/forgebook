@@ -12,8 +12,10 @@
  *
  * @module
  */
-import { globSync } from "node:fs";
+import { type Dirent, globSync, readdirSync, statSync } from "node:fs";
+import { posix } from "node:path";
 
+import { patternBase } from "./autoTitle.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** What starts a pattern that leaves files out. */
@@ -76,12 +78,12 @@ const isLeftOut = (key: string, left: ReadonlySet<string>): boolean => {
 };
 
 /**
- * A pattern without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them. A loop,
- * not a regular expression, whose backtracking a long run of slashes would make quadratic.
+ * A pattern or an address without its trailing slashes (`src/drafts/`): the glob gives the folder it names without them.
+ * A loop, not a regular expression, whose backtracking a long run of slashes would make quadratic.
  *
- * @param pattern - the pattern.
+ * @param pattern - the pattern or the address.
  */
-const withoutTrailingSlashes = (pattern: string): string => {
+export const withoutTrailingSlashes = (pattern: string): string => {
   let end = pattern.length;
   while (end > 0 && pattern[end - 1] === "/") end -= 1;
   return pattern.slice(0, end);
@@ -133,4 +135,149 @@ export const listedFiles = (
   return [...listed]
     .sort(([first], [second]) => (first < second ? -1 : 1))
     .map(([key, pattern]) => ({ key, pattern }));
+};
+
+/**
+ * The patterns of a list that list no file, left out by the `!` ones as they are when the catalogue lists its files. Each
+ * is read on its own: a mistaken pattern beside one that works is as silent as a list that lists nothing.
+ *
+ * @param root - the folder the patterns are relative to.
+ * @param patterns - the patterns.
+ */
+export const unmatchedPatterns = (root: string, patterns: readonly string[]): readonly string[] => {
+  const leftOut = patterns.filter(isNegated);
+  // a pattern can match folders alone (`stories/**` over empty ones), which hold no story
+  const isFile = ({ key }: ListedFile): boolean =>
+    statSync(VITE_PATHS.resolve(root, key), { throwIfNoEntry: false })?.isFile() === true;
+  // a `!` pattern left out of a pattern that lists nothing anyway changes nothing, so the walk ignores them: with any,
+  // the full listing decides
+  return patterns
+    .filter((pattern) => !isNegated(pattern))
+    .filter(
+      (pattern) =>
+        !(leftOut.length === 0 && hasMatchingFile(root, pattern)) &&
+        !listedFiles(root, [pattern, ...leftOut]).some(isFile)
+    );
+};
+
+/**
+ * A folder's entries, none when it cannot be read (gone, or not a folder): the walk goes on with the others.
+ *
+ * @param root - the folder the path is relative to.
+ * @param folder - the folder, relative to the root; `""` for the root itself.
+ */
+const folderEntries = (root: string, folder: string): readonly Dirent[] => {
+  try {
+    return readdirSync(VITE_PATHS.resolve(root, folder === "" ? "." : folder), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Whether a pattern matches a file, the walk from the pattern's static folder ending at the first one: telling that a
+ * pattern lists something should not cost a walk of the whole tree, which on a large library is a tenth of a second
+ * on the thread that starts the server, before anything is drawn. It finds only files the glob would list (the same
+ * matching, the dependencies left out); finding none decides nothing, and the full listing is asked then.
+ *
+ * @param root - the folder the pattern is relative to.
+ * @param pattern - the pattern, without a `!`.
+ */
+export const hasMatchingFile = (root: string, pattern: string): boolean => {
+  const plain = pattern.replace(/^(?:\.\/)+/, "");
+  const isDependencyNamed = pattern.includes(DEPENDENCIES);
+  // the glob enters no hidden folder (`.git`) unless the pattern names one, and nor does the walk
+  const isHiddenNamed = plain.split("/").some((segment) => segment.startsWith(".") && segment !== "..");
+  const isWalked = (entry: Dirent): boolean =>
+    (isDependencyNamed || entry.name !== DEPENDENCIES) && (isHiddenNamed || !entry.name.startsWith("."));
+  const shape = patternShape(plain);
+  const folders = [patternBase(plain)];
+  while (folders.length > 0) {
+    const folder = folders.pop() ?? "";
+    for (const entry of folderEntries(root, folder)) {
+      const path = folder === "" ? entry.name : `${folder}/${entry.name}`;
+      if (entry.isFile() && shape.isFileDepth(path) && posix.matchesGlob(path, plain)) return true;
+      if (entry.isDirectory() && isWalked(entry) && shape.couldHold(path)) folders.push(path);
+    }
+  }
+  return false;
+};
+
+/** Whether a pattern has a `/` inside a group (`{a,b/c}`, `@(a|b/c)`), which splitting it at its slashes would cut. */
+const hasSlashInGroup = (pattern: string): boolean => {
+  let depth = 0;
+  for (const character of pattern) {
+    if (character === "{" || character === "(") depth += 1;
+    else if ((character === "}" || character === ")") && depth > 0) depth -= 1;
+    else if (character === "/" && depth > 0) return true;
+  }
+  return false;
+};
+
+/** Where in the tree a pattern's files can be, so the walk reads no folder and tests no file the glob would not. */
+type PatternShape = {
+  /** Whether a folder may hold a matching file: its path matches as many of the pattern's segments as it has. */
+  readonly couldHold: (folder: string) => boolean;
+  /** Whether a file is as deep as the pattern's files are, before its name is matched. */
+  readonly isFileDepth: (file: string) => boolean;
+};
+
+/**
+ * Where a pattern's files can be. Without it the walk reads every folder under the pattern's static one and matches
+ * every file there: in a monorepo whose pattern names packages by a group (`packages/@{a,b}/*\/stories/*`), that is
+ * every package's sources, most of a second, longer than the full listing the walk is there to spare. A pattern with
+ * `**` reaches any depth past it; one with a `/` inside a group cannot be cut at its slashes, and lets everything through.
+ *
+ * @param pattern - the pattern, without a `!` or a leading `./`.
+ */
+const patternShape = (pattern: string): PatternShape => {
+  if (hasSlashInGroup(pattern)) return { couldHold: () => true, isFileDepth: () => true };
+  const segments = pattern.split("/");
+  const globstar = segments.indexOf("**");
+  const isAnyDepth = (depth: number): boolean => globstar !== -1 && globstar < depth;
+  return {
+    couldHold: (folder: string): boolean => {
+      const depth = folder.split("/").length;
+      if (isAnyDepth(depth)) return true;
+      return depth < segments.length && posix.matchesGlob(folder, segments.slice(0, depth).join("/"));
+    },
+    isFileDepth: (file: string): boolean => {
+      const depth = file.split("/").length;
+      return isAnyDepth(depth) || depth === segments.length;
+    }
+  };
+};
+
+/** Whether a configuration's list has something in it. */
+const isListed = (config: object, key: string): boolean => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list) && list.length > 0;
+};
+
+/**
+ * Why a configuration's list of globs lists nothing by construction (only `!` patterns), or none.
+ *
+ * @param config - what the file exports by default.
+ * @param key - the list's key.
+ */
+const globsProblem = (config: object, key: string): string | undefined => {
+  const list: unknown = Reflect.get(config, key);
+  return Array.isArray(list)
+    ? patternsProblem(list.filter((item: unknown): item is string => typeof item === "string"))
+    : undefined;
+};
+
+/**
+ * Why what a configuration lists to show cannot be used, or none.
+ *
+ * @param config - what the file exports by default.
+ */
+export const filesProblem = (config: object): string | undefined => {
+  if (!["stories", "sources", "docs"].some((key) => isListed(config, key)))
+    return 'it names no stories (`stories: ["src/**/*.stories.tsx"]`) and no sources';
+  for (const key of ["stories", "docs"]) {
+    const problem = globsProblem(config, key);
+    if (problem !== undefined) return `its ${key} list nothing: ${problem}`;
+  }
+  return undefined;
 };

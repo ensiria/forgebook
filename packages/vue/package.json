@@ -19,6 +19,7 @@
   "exports": {
     ".": "./src/stories.ts",
     "./clock": "./src/clock.ts",
+    "./setup": "./src/appSetup.ts",
     "./texts": "./src/texts.ts",
     "./renderer": "./src/vueRenderer.ts",
     "./frame": "./src/mountFrame.ts",
@@ -38,6 +39,7 @@
     "@vitejs/plugin-vue": "6.0.10",
     "@vue/language-core": "3.3.14",
     "typescript-6": "npm:typescript@6.0.3",
+    "vite": "^8.3.4",
     "vue-component-meta": "3.3.14"
   },
   "peerDependencies": {
@@ -65,6 +67,10 @@
       "./clock": {
         "types": "./dist/src/clock.d.ts",
         "default": "./dist/src/clock.js"
+      },
+      "./setup": {
+        "types": "./dist/src/appSetup.d.ts",
+        "default": "./dist/src/appSetup.js"
       },
       "./texts": {
         "types": "./dist/src/texts.d.ts",

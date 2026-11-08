@@ -16,7 +16,7 @@ import { AUDIENCE_IDS, type AudienceId } from "../audiences.ts";
 import type { OwnControlId } from "../catalogue.ts";
 import { DEVICE_PARAMETER, type DeviceDefault, shownDevice } from "../deviceView.ts";
 import type { FixedView } from "../storyGlobals.ts";
-import { switchControl, type ViewSwitch } from "../switches.ts";
+import { impliedSwitches, switchControl, type ViewSwitch } from "../switches.ts";
 import type { ToolbarControl as Control } from "../toolbarLayout.ts";
 import {
   isComparing,
@@ -29,10 +29,18 @@ import {
 import { useCatalogue } from "./catalogueContext.ts";
 import { DeviceControl } from "./DeviceControl.tsx";
 import { Icon, type IconName } from "./icons.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { Segmented, type SegmentOption } from "./Segmented.tsx";
+import type { SwitchGalleryProps } from "./SwitchGallery.tsx";
+import type { SwitchPreviews } from "./SwitchGalleryPanel.tsx";
 import { STRINGS } from "./strings.ts";
 import { switchValueIn, withSwitch } from "./switchView.ts";
 import { WidthField } from "./WidthField.tsx";
+
+/** A switch's gallery, loaded with the first catalogue's switch that has one: most catalogues have none. */
+const SWITCH_GALLERY = lazyModule<SwitchGalleryProps>(() =>
+  import("./SwitchGallery.tsx").then((module) => module.SwitchGallery)
+);
 
 /** Where a control is drawn: on the toolbar, or in a row of the View menu. */
 export type ControlForm = "bar" | "row";
@@ -53,6 +61,8 @@ export type ControlContext = {
   readonly shownWidth: number | undefined;
   /** The page's default device: the shown story's, or the catalogue's on a component's page. */
   readonly deviceDefault: DeviceDefault;
+  /** Loads the catalogue's previews for a gallery; none when it gives none. */
+  readonly loadSwitchPreviews: (() => Promise<SwitchPreviews>) | undefined;
 };
 
 /** The icon of each scheme a colour scheme switch's values draw in. */
@@ -169,15 +179,41 @@ const SwitchControl = ({
   view,
   onViewChange,
   isStoryPage,
-  fixed
+  fixed,
+  loadSwitchPreviews
 }: ControlContext & { readonly each: ViewSwitch; readonly form: ControlForm }): ReactNode => {
+  const { switches } = useCatalogue();
+  const implied = impliedSwitches(view.switches, switches).get(each.id);
   const isFixed = fixed.switches[each.id] !== undefined;
-  const isDisabled = (isStoryPage && view.compare.includes(each.id)) || isFixed;
-  const disabledNote = isFixed ? STRINGS.setByStory : undefined;
-  const value = switchValueIn(view, each);
+  const isDisabled = (isStoryPage && view.compare.includes(each.id)) || isFixed || implied !== undefined;
+  const storyNote = isFixed ? STRINGS.setByStory : undefined;
+  const disabledNote = implied === undefined ? storyNote : STRINGS.setBy.replace("{value}", implied.by.label);
+  const value = implied?.value ?? switchValueIn(view, each);
   const choose = (chosen: string): void => onViewChange(withSwitch(view, each, chosen));
   const more = each.values.find((option) => option.isMore === true);
   const standard = each.values.find((option) => option.isMore !== true);
+  if (switchControl(each) === "gallery") {
+    return (
+      <LazyView
+        module={SWITCH_GALLERY}
+        props={{
+          each,
+          isOnBar: form === "bar",
+          value,
+          onValueChange: choose,
+          isDisabled,
+          disabledNote,
+          loadPreviews: loadSwitchPreviews
+        }}
+        loading={null}
+        failed={(message: string): ReactNode => (
+          <p className="forgebook-problems" role="alert">
+            {message}
+          </p>
+        )}
+      />
+    );
+  }
   if (form === "bar" && each.role === "colorScheme") {
     return (
       <Segmented
@@ -199,7 +235,7 @@ const SwitchControl = ({
       <button
         type="button"
         className="forgebook-button"
-        title={isFixed ? STRINGS.setByStory : each.label}
+        title={disabledNote ?? each.label}
         aria-pressed={value === more.value}
         disabled={isDisabled}
         onClick={(): void => choose(value === more.value ? standard.value : more.value)}

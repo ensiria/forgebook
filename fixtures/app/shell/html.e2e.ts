@@ -160,6 +160,11 @@ test.describe("a shared link's args", () => {
     await expect(frameOf(page).locator("img")).toHaveCount(0);
     await frameOf(page).getByTestId("tile").hover();
     expect(dialogs).toEqual([]);
+    // what the rule left out is said, by name and reason, never dropped silently
+    const left = page.locator(".forgebook-dropped-args").getByRole("listitem");
+    await expect(left).toHaveCount(3);
+    await expect(left.locator("code")).toHaveText(["text", "size", "x><img src=x onerror=alert(2)>"]);
+    await expect(left.first()).toContainText("only plain text");
   });
 
   test("follow the same rule in an embedded story, whose address the page around it writes", async ({
@@ -171,6 +176,18 @@ test.describe("a shared link's args", () => {
     await expect(frameOf(page).getByTestId("tile")).toHaveText("A tile");
     await expect(frameOf(page).getByTestId("tile")).toHaveAttribute("data-size", "large");
     await expect(frameOf(page).locator("img")).toHaveCount(0);
+    await expect(page.locator(".forgebook-dropped-args").getByRole("listitem")).toContainText(
+      "only plain text"
+    );
+  });
+
+  test("say what the rule left out in an embed even when nothing is left", async ({ page }) => {
+    const args = { text: "<img src=x>" };
+    await page.goto(story("cards-tile--default", `embed&args=${encodeURIComponent(JSON.stringify(args))}`));
+    await isReady(page);
+    await expect(page.locator(".forgebook-dropped-args").getByRole("listitem")).toContainText(
+      "only plain text"
+    );
   });
 });
 

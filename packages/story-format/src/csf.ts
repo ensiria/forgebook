@@ -109,15 +109,19 @@ export type ArgControlType =
   | "color"
   | "date"
   | "object"
-  | "file";
+  | "file"
+  | "textarea"
+  | "token";
 
 /** An arg's control: its type, or `false` for none, or the type with its settings. */
 export type ArgControl =
   | ArgControlType
+  // a custom control's name, of those `argControls` registers in `forgebook.config`
+  | (string & {})
   | false
   | {
-      /** The control; from the arg's type when left out. */
-      readonly type?: ArgControlType;
+      /** The control, or a custom control's name; from the arg's type when left out. */
+      readonly type?: ArgControlType | (string & {});
       /** The names the panel shows for the options, by option. */
       readonly labels?: Readonly<Record<string, string>>;
       /** A range's or a number's lowest value. */
@@ -128,6 +132,19 @@ export type ArgControl =
       readonly step?: number;
       /** Whether the control is off: the arg is shown, not set. */
       readonly disable?: boolean;
+      /**
+       * A `token` control's tokens: a token's type (`color`, `dimension`) or a part of its name (`space`, `radius`).
+       */
+      readonly of?: string;
+      /**
+       * What a `token` control gives the story, with `{name}` for the token's name in CSS's form and `{value}` for its
+       * value (`var(--{name})`); its value by default.
+       */
+      readonly format?: string;
+      /** The files a `file` control takes, as `<input accept>` writes it (`image/*`). */
+      readonly accept?: string;
+      /** A custom control's own settings, as JSON: its `mount` reads them in `argType.settings`. */
+      readonly settings?: unknown;
     };
 
 /**
@@ -149,6 +166,32 @@ export type ArgType = {
   readonly table?: { readonly disable?: boolean };
   /** Records the arg's calls in the Events tab, under this name (Storybook's actions); a spy (`fn()`) is recorded too. */
   readonly action?: string;
+  /** When the panel shows the arg, from another arg's value or a global's: always by default. */
+  readonly if?: ArgCondition;
+};
+
+/**
+ * When the panel shows an arg (Storybook's conditional args): it reads one arg or one global, and applies one test,
+ * that it is truthy by default.
+ */
+export type ArgCondition = (
+  | {
+      /** The arg to read. */
+      readonly arg: string;
+    }
+  | {
+      /** The global to read: a switch's id. */
+      readonly global: string;
+    }
+) & {
+  /** Whether the value should be truthy or falsy. */
+  readonly truthy?: boolean;
+  /** Whether the value should be set, or not set. */
+  readonly exists?: boolean;
+  /** What the value should be: a text, a number, a toggle's value, `null`, or a list of texts and numbers. */
+  readonly eq?: unknown;
+  /** What the value should not be, in the same forms. */
+  readonly neq?: unknown;
 };
 
 /** A story's or a meta's `argTypes`, by arg. */
@@ -202,6 +245,14 @@ export type StoryParameters = {
    * reads it).
    */
   readonly height?: number;
+  /**
+   * How the frame waits for what the story loads (a React or Vue `Suspense` boundary still showing its fallback) before
+   * it says the story is ready, so no check reads the fallback for the story. `expected: true` is for a story meant to
+   * stay there, a loading state: it is ready at once, and its play function may look at the fallback. `timeout` is the
+   * most to wait, in milliseconds, 10000 by default; past it the story is `pending`, which every check reads as not
+   * verified. The wait may run twice, before and after a play; `forgebook check` stops listening at 30000 and a generated test at 25000. In a catalogue's preview, for every story.
+   */
+  readonly suspense?: { readonly expected?: boolean; readonly timeout?: number };
   /**
    * Whether the story is meant for a phone: it starts touched with the catalogue's simulated finger, whatever the
    * toolbar's Touch switch says, and its example and its page offer to turn that off for it. On a meta, for every

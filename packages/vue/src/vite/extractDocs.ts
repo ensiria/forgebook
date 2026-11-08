@@ -16,7 +16,7 @@ import { basename, dirname, extname, join } from "node:path";
 
 import { codeLiteral } from "forgebook/code-literal";
 import type { ComponentDocs, NoComponentDocs, PropDocs, SubcomponentDocs } from "forgebook/component-docs";
-import type { StoryComponentResult, StoryFileShape } from "forgebook/vite/adapter";
+import type { ExtractCallSites, StoryComponentResult, StoryFileShape } from "forgebook/vite/adapter";
 import { chosenExport, summaryOf } from "forgebook/vite/docs-program";
 import { moduleSummaryOf } from "forgebook/vite/module-summary";
 import { declarationOrder, declaredSymbol, isForeign, partsOf, propDocs } from "forgebook/vite/prop-docs";
@@ -30,6 +30,7 @@ import { inferComponentProps } from "vue-component-meta/lib/helpers.js";
 
 import { type ComponentChecker, checkerFor, markCheckersChanged } from "./componentChecker.ts";
 import { eventDocs, slotDocs } from "./eventDocs.ts";
+import { sfcCallSites } from "./sfcCallSites.ts";
 import { emitComments, scriptComment } from "./sfcComment.ts";
 import { scriptOf, scriptsOf } from "./sfcScript.ts";
 
@@ -367,6 +368,9 @@ const readStoryComponent = (storyFile: string): StoryComponentResult => {
   if (typeof subcomponents === "string") return subcomponents;
   return componentOf(expression.getText(source), symbol, checker, program, storyFile, subcomponents);
 };
+
+/** Finds where the application draws a single-file component, for the values its first stories take (`forgebook new`). */
+export const extractCallSites: ExtractCallSites = sfcCallSites;
 
 /**
  * A component a file exports, for writing its first stories (`forgebook new`): a single-file component is its default

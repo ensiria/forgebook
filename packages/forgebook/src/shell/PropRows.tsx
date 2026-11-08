@@ -7,9 +7,14 @@
 import { type ChangeEvent, type ReactNode, useId } from "react";
 
 import { isColorProp, type PanelProp } from "../argTypes.ts";
-import { type ArgValue, isNamedArg } from "../messages.ts";
-import { ChoiceControl, NumberField, type OnValueChange, textOf } from "./PropFields.tsx";
+import { type ArgValue, isUnsetArg, UNSET_ARG } from "../messages.ts";
+import type { NamedValues } from "../namedValues.ts";
+import type { ArgControlLoaders } from "./customControls.ts";
+import { Icon, type IconName } from "./icons.tsx";
+import { LazyView, lazyModule } from "./lazyModule.tsx";
+import { ChoiceControl, MOST_PLAIN_OPTIONS, NumberField, type OnValueChange, textOf } from "./PropFields.tsx";
 import { STRINGS } from "./strings.ts";
+import type { PropEditorProps } from "./valueEditors/PropEditor.tsx";
 
 /** A prop the story gives a text by its key (`storyText("key")`): the key, and whether the panel wrote over it. */
 export type TextArgNote = {
@@ -18,6 +23,11 @@ export type TextArgNote = {
   /** Whether the panel holds a value of its own for the prop. */
   readonly isChanged: boolean;
 };
+
+/** The editors a catalogue's plain props never load: nested fields, a searchable list, the tokens, the files. */
+const PROP_EDITOR = lazyModule(() =>
+  import("./valueEditors/PropEditor.tsx").then((module) => module.PropEditor)
+);
 
 /** A CSS colour as the colour picker takes it (`#rrggbb`), or black when the value is not one. */
 const pickerColor = (value: ArgValue | undefined): string =>
@@ -33,17 +43,68 @@ const GroupName = ({
 }): ReactNode =>
   showsGroup && prop.group !== undefined ? <span className="forgebook-prop__group">{prop.group}</span> : null;
 
+/** What a field says of its value, and the two ways back from it. */
+export type FieldState = {
+  /** The value shown: the story's own, or the panel's over it. */
+  readonly value: ArgValue | undefined;
+  /** The panel's own value; none when the story's own is shown. */
+  readonly panelValue: ArgValue | undefined;
+  /** Called with a changed value. */
+  readonly onValueChange: OnValueChange;
+};
+
 /**
- * A prop's name, whether it is required, its group when asked, and its type (whole in the tooltip when it is cut).
+ * The way back from a prop's value: to no value at all, and to the story's own, each offered only when it changes
+ * something.
  *
- * @param props - the prop, and whether it names its group.
+ * @param props - the prop and its state.
+ */
+const FieldActions = ({
+  prop,
+  value,
+  panelValue,
+  onValueChange
+}: FieldState & { readonly prop: PanelProp }): ReactNode => {
+  const label = prop.label ?? prop.name;
+  const action = (text: string, icon: IconName, next: ArgValue | undefined): ReactNode => (
+    <button
+      type="button"
+      className="forgebook-prop__action"
+      aria-label={text}
+      title={text}
+      onClick={(): void => onValueChange(prop.name, next)}
+    >
+      <Icon name={icon} size={12} />
+    </button>
+  );
+  return (
+    <span className="forgebook-prop__actions">
+      {value === undefined ? null : action(STRINGS.unsetProp(label), "noValue", UNSET_ARG)}
+      {panelValue === undefined ? null : action(STRINGS.resetProp(label), "replay", undefined)}
+    </span>
+  );
+};
+
+/** What a prop's value is when its field alone cannot say: no value over the story's own, or an empty text. */
+const stateNote = (state: FieldState): string | undefined => {
+  if (isUnsetArg(state.panelValue)) return STRINGS.stateUnset;
+  return state.value === "" ? STRINGS.stateEmpty : undefined;
+};
+
+/**
+ * A prop's name, whether it is required, its group when asked, its type (whole in the tooltip when it is cut), what its
+ * value is and the ways back from it.
+ *
+ * @param props - the prop, whether it names its group, and its state.
  */
 const PropHead = ({
   prop,
-  showsGroup
+  showsGroup,
+  state
 }: {
   readonly prop: PanelProp;
   readonly showsGroup: boolean;
+  readonly state?: FieldState;
 }): ReactNode => (
   <div className="forgebook-prop__head">
     <code className="forgebook-prop__name">
@@ -58,6 +119,14 @@ const PropHead = ({
     <code className="forgebook-prop__type" title={prop.type}>
       {prop.type}
     </code>
+    {state === undefined ? null : (
+      <>
+        {stateNote(state) === undefined ? null : (
+          <span className="forgebook-prop__state">{stateNote(state)}</span>
+        )}
+        <FieldActions prop={prop} {...state} />
+      </>
+    )}
   </div>
 );
 
@@ -104,12 +173,27 @@ const TextArgLine = ({
   </p>
 );
 
+/** Whether a prop is drawn by the editors that load on use, not by the first screen's fields. */
+const usesEditors = (prop: PanelProp, named: Readonly<Record<string, unknown>> | undefined): boolean =>
+  named !== undefined ||
+  prop.shape !== undefined ||
+  prop.customControl !== undefined ||
+  prop.control === "token" ||
+  prop.control === "file" ||
+  (prop.kind === "choice" &&
+    (prop.control === undefined || prop.control === "select") &&
+    (prop.choices?.length ?? 0) > MOST_PLAIN_OPTIONS);
+
 /** One adjustable prop with its control. */
 export const PropControl = ({
   prop,
   showsGroup,
   value,
+  panelValue,
   named,
+  namedValues,
+  loadTokens,
+  argControls,
   textArg,
   onValueChange
 }: {
@@ -117,8 +201,16 @@ export const PropControl = ({
   /** Whether it names its group: in the "Required" group. */
   readonly showsGroup: boolean;
   readonly value: ArgValue | undefined;
+  /** The panel's own value; none when the story's own is shown. */
+  readonly panelValue: ArgValue | undefined;
   /** The values the source names for the prop's type, when it names some. */
   readonly named: Readonly<Record<string, unknown>> | undefined;
+  /** The source's named values, for the parts of a value they fill. */
+  readonly namedValues: NamedValues;
+  /** Loads the catalogue's design tokens; none when it has none. */
+  readonly loadTokens: (() => Promise<unknown>) | undefined;
+  /** Loads each custom control the catalogue registers, by name; none when it registers none. */
+  readonly argControls?: ArgControlLoaders | undefined;
   /** Where the story's text for the prop comes from, when the story names one by its key. */
   readonly textArg: TextArgNote | undefined;
   readonly onValueChange: OnValueChange;
@@ -126,26 +218,31 @@ export const PropControl = ({
   // the description is shown under the control and named by it, so the control's name is the prop alone
   const descriptionId = useId();
   const label = prop.label ?? prop.name;
-  if (named !== undefined) {
+  const state: FieldState = { value, panelValue, onValueChange };
+  if (usesEditors(prop, named)) {
+    const editorProps: PropEditorProps = {
+      prop,
+      value,
+      descriptionId,
+      namedValues,
+      loadTokens,
+      argControls,
+      onValueChange
+    };
+    const isWide = (prop.shape !== undefined || prop.customControl !== undefined) && named === undefined;
     return (
-      <div className="forgebook-prop">
-        <PropHead prop={prop} showsGroup={showsGroup} />
-        <select
-          aria-label={label}
-          aria-describedby={descriptionId}
-          value={isNamedArg(value) ? value.named : ""}
-          onChange={(event: ChangeEvent<HTMLSelectElement>): void => {
-            const chosen = event.target.value;
-            onValueChange(prop.name, chosen === "" ? undefined : { of: prop.type, named: chosen });
-          }}
-        >
-          <option value="">{STRINGS.unset}</option>
-          {Object.keys(named).map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+      <div className="forgebook-prop" data-wide={isWide || undefined}>
+        <PropHead prop={prop} showsGroup={showsGroup} state={state} />
+        <LazyView
+          module={PROP_EDITOR}
+          props={editorProps}
+          loading={null}
+          failed={(message: string): ReactNode => (
+            <p className="forgebook-prop__description" role="alert">
+              {message}
+            </p>
+          )}
+        />
         <PropNote id={descriptionId} prop={prop} />
       </div>
     );
@@ -153,7 +250,7 @@ export const PropControl = ({
   if (prop.kind === "choice") {
     return (
       <div className="forgebook-prop">
-        <PropHead prop={prop} showsGroup={showsGroup} />
+        <PropHead prop={prop} showsGroup={showsGroup} state={state} />
         <ChoiceControl
           prop={prop}
           value={value}
@@ -167,7 +264,7 @@ export const PropControl = ({
   if (prop.kind === "number") {
     return (
       <div className="forgebook-prop">
-        <PropHead prop={prop} showsGroup={showsGroup} />
+        <PropHead prop={prop} showsGroup={showsGroup} state={state} />
         <div className="forgebook-prop__field">
           <NumberField
             prop={prop}
@@ -180,19 +277,21 @@ export const PropControl = ({
       </div>
     );
   }
+  // a text with a line break keeps it: an `<input>` would drop it, from the field and from the link
+  const isMultiline = prop.control === "textarea" || (typeof value === "string" && value.includes("\n"));
+  const TextControl = isMultiline ? "textarea" : "input";
   return (
     <div className="forgebook-prop">
-      <PropHead prop={prop} showsGroup={showsGroup} />
+      <PropHead prop={prop} showsGroup={showsGroup} state={state} />
       <div className="forgebook-prop__field">
-        <input
-          type="text"
+        <TextControl
           aria-label={label}
           aria-describedby={descriptionId}
+          {...(isMultiline ? { rows: 4 } : { type: "text" })}
           value={textOf(value)}
-          onChange={(event: ChangeEvent<HTMLInputElement>): void => {
-            const text = event.target.value;
-            onValueChange(prop.name, text === "" ? undefined : text);
-          }}
+          onChange={(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void =>
+            onValueChange(prop.name, event.target.value)
+          }
         />
         {/* a colour picker beside the text: the field still takes any CSS colour, a token's var() included */}
         {isColorProp(prop) ? (
@@ -220,32 +319,39 @@ export const Toggle = ({
   prop,
   showsGroup,
   value,
+  panelValue,
   onValueChange
 }: {
   readonly prop: PanelProp;
   /** Whether it names its group: in the "Required" group. */
   readonly showsGroup: boolean;
   readonly value: ArgValue | undefined;
+  /** The panel's own value; none when the story's own is shown. */
+  readonly panelValue: ArgValue | undefined;
   readonly onValueChange: OnValueChange;
 }): ReactNode => {
   const descriptionId = useId();
   return (
-    <label className="forgebook-toggle" title={prop.description}>
-      <input
-        type="checkbox"
-        aria-label={prop.label ?? prop.name}
-        checked={value === true}
-        aria-describedby={descriptionId}
-        onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-          onValueChange(prop.name, event.target.checked)
-        }
-      />
-      <code>{prop.label ?? prop.name}</code>
-      <GroupName prop={prop} showsGroup={showsGroup} />
-      <span id={descriptionId} className="forgebook-visually-hidden">
-        {prop.description}
-      </span>
-    </label>
+    <span className="forgebook-toggle-row">
+      <label className="forgebook-toggle" title={prop.description}>
+        <input
+          type="checkbox"
+          aria-label={prop.label ?? prop.name}
+          checked={value === true}
+          aria-describedby={descriptionId}
+          onChange={(event: ChangeEvent<HTMLInputElement>): void =>
+            onValueChange(prop.name, event.target.checked)
+          }
+        />
+        <code>{prop.label ?? prop.name}</code>
+        <GroupName prop={prop} showsGroup={showsGroup} />
+        <span id={descriptionId} className="forgebook-visually-hidden">
+          {prop.description}
+        </span>
+      </label>
+      {isUnsetArg(panelValue) ? <span className="forgebook-prop__state">{STRINGS.stateUnset}</span> : null}
+      <FieldActions prop={prop} value={value} panelValue={panelValue} onValueChange={onValueChange} />
+    </span>
   );
 };
 

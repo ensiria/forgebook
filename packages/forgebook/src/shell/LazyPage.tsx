@@ -42,7 +42,8 @@ export const LazyPage = <TProps extends object>({
       <div className="forgebook-workspace">
         {header}
         <p className="forgebook-problems" role="alert">
-          {STRINGS.pageLoadError}: {message}
+          {/* a page left open across a new build asks for code the host no longer has: a reload gets the new one */}
+          {STRINGS.pageLoadError}. {message}
         </p>
       </div>
     )}

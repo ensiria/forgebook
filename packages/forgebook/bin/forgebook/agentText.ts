@@ -11,6 +11,8 @@ import { formatJson } from "@ensiria/cli-kit/files";
 import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
+import type { ComponentDocs, PropCondition, PropsNote } from "../../src/componentDocs.ts";
+import type { SearchCorrection } from "../../src/searchTypos.ts";
 import type {
   StoryCheckReport,
   StoryCheckResult,
@@ -29,17 +31,31 @@ import type {
   SearchDocument,
   StoriesDocument,
   StoryDocument,
-  TokensDocument
+  SwitchesDocument,
+  TokensDocument,
+  UnseenComponent,
+  VerifyDocument,
+  VisibilityDocument
 } from "../../src/vite/agent.types.ts";
-import type { DesignToken } from "../../src/vite/designTokens.ts";
+import type { DesignToken, TokenSource } from "../../src/vite/designTokens.ts";
 import type { TokenClash } from "../../src/vite/tokenClashes.ts";
 
 /** The style with no width to fit, so no cell is cut. */
 const uncut = (style: OutputStyle): OutputStyle => ({ ...style, width: Number.POSITIVE_INFINITY });
 
+/** Statuses in brackets after a name (` [review]`); nothing for none. */
+const statusMark = (status: readonly string[] | undefined): string =>
+  status === undefined ? "" : ` [${status.join(", ")}]`;
+
+/** The words read as others, as the first line of an answer; none when the query was read as typed. */
+const correctionLines = (corrections: readonly SearchCorrection[]): string[] =>
+  corrections.length === 0
+    ? []
+    : [`Read as: ${corrections.map(({ typed, read }) => `"${read}" for "${typed}"`).join(", ")}`];
+
 /**
  * The stories as a table: one row per story, its id first (what `forgebook story` takes, never cut), then its
- * component's title and its name.
+ * component's title and its name, with its statuses in brackets.
  *
  * @param document - the stories document.
  * @param style - colours, glyphs and width.
@@ -49,15 +65,46 @@ export const storiesText = (document: StoriesDocument, style: OutputStyle): stri
     document.components.flatMap((component) =>
       component.stories.map((story) => [
         story.id,
-        `${component.title} › ${story.name}${story.isUnlisted ? " (unlisted)" : ""}`
+        `${component.title} › ${story.name}${story.isUnlisted ? " (unlisted)" : ""}${statusMark(story.statuses)}`
       ])
     ),
     { columns: [{ header: "Id" }, { header: "Story", tone: "muted" }] },
     uncut(style)
   );
 
+/** Why a component lists no props, as the `Props` line says it. */
+const PROPS_NOTES: Readonly<Record<PropsNote["reason"], (count: number) => string>> = {
+  untyped: (): string => "none: its props are typed any",
+  "no-signature": (): string => "none: its type cannot be called with props",
+  "outside-package": (count: number): string => `none: all ${count} come from outside the package`
+};
+
+/** When a variant's prop applies, as the `Props` line says it (`mode is single, or left out`). */
+const conditionText = ({ prop, values, orOmitted }: PropCondition): string => {
+  if (values.length === 0) return `${prop} is left out`;
+  return `${prop} is ${values.map(String).join(" or ")}${orOmitted === true ? ", or left out" : ""}`;
+};
+
 /**
- * One story's facts: where it is, where it opens, its args, its component's props and those every use must set.
+ * A component's props in one line: each name, a variant's with when it can be passed, or why there are none.
+ *
+ * @param docs - the component's docs.
+ */
+const propsLine = (docs: ComponentDocs): string => {
+  const { propsNote } = docs;
+  if (docs.props.length === 0 && propsNote !== undefined) {
+    return PROPS_NOTES[propsNote.reason](propsNote.reason === "outside-package" ? propsNote.count : 0);
+  }
+  return docs.props
+    .map((prop) =>
+      prop.onlyWhen === undefined ? prop.name : `${prop.name} (when ${conditionText(prop.onlyWhen)})`
+    )
+    .join(", ");
+};
+
+/**
+ * One story's facts: where it is, where it opens, its args, its component's props and those every use must set, then
+ * its code.
  *
  * @param document - the story document.
  * @param style - colours, glyphs and width.
@@ -71,12 +118,18 @@ export const storyText = (document: StoryDocument, style: OutputStyle): string =
     ["Frame", document.story.links.frame],
     ["Embed", document.story.links.embed],
     ["Args", JSON.stringify(document.args)],
-    ["Props", document.docs === undefined ? "none" : document.docs.props.map((prop) => prop.name).join(", ")],
+    ["Props", document.docs === undefined ? "none" : propsLine(document.docs)],
     ["Required", document.requiredProps.length === 0 ? "none" : document.requiredProps.join(", ")]
   ];
   if (document.story.description !== undefined) entries.push(["About", document.story.description]);
+  // the story's own, which may take its meta's away, and the deprecation its component's TSDoc adds
+  const fromDocs = document.component.statuses?.includes("deprecated") ? ["deprecated"] : [];
+  const statuses = [...new Set([...(document.story.statuses ?? []), ...fromDocs])];
+  if (statuses.length > 0) entries.push(["Status", statuses.join(", ")]);
   if (document.design !== undefined) entries.push(["Design", document.design.figma]);
-  return keyValue(entries, uncut(style));
+  const fields = keyValue(entries, uncut(style));
+  // the code spans lines: under the fields, as it is copied
+  return document.code === undefined ? fields : `${fields}\n\n${document.code}`;
 };
 
 /** What a model judged, each line saying it is an opinion. */
@@ -105,8 +158,17 @@ export const checkText = (report: StoryCheckReport, style: OutputStyle): string 
   (report.a11y === "off" ? "Accessibility is not checked: the catalogue sets a11y: false.\n" : "") +
   table(
     report.results.flatMap((result) => [
-      ...(result.problems.length === 0
-        ? [[result.storyId, result.view || "default", "passes"]]
+      ...(result.notVerified === undefined
+        ? []
+        : [[result.storyId, result.view || "default", `not verified: ${result.notVerified}`]]),
+      ...(result.problems.length === 0 && result.notVerified === undefined
+        ? [
+            [
+              result.storyId,
+              result.view || "default",
+              result.isNotAwaited === true ? "passes, as drawn: parameters.suspense.expected" : "passes"
+            ]
+          ]
         : result.problems.map((problem) => [
             result.storyId,
             result.view || "default",
@@ -128,7 +190,11 @@ export const errorsText = (document: ErrorsDocument, style: OutputStyle): string
   document.errors.length === 0
     ? ""
     : table(
-        document.errors.map((error) => [String(error.n), error.storyId, `${error.kind}: ${error.message}`]),
+        document.errors.map((error) => [
+          String(error.n),
+          error.storyId,
+          `${error.kind}: ${error.place === undefined ? "" : `${error.place}: `}${error.message}`
+        ]),
         { columns: [{ header: "#", tone: "muted" }, { header: "Story" }, { header: "Error" }] },
         uncut(style)
       );
@@ -164,8 +230,20 @@ export const shotText = (
   style: OutputStyle
 ): string =>
   table(
-    report.shots.map((shot) => [shot.storyId, shot.view || "default", shownFile(shot.file)]),
-    { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Picture" }] },
+    report.shots.map((shot) => [
+      shot.storyId,
+      shot.view || "default",
+      shownFile(shot.file),
+      shot.status === undefined ? "" : `not of the story: ${shot.status}`
+    ]),
+    {
+      columns: [
+        { header: "Story" },
+        { header: "View", tone: "muted" },
+        { header: "Picture" },
+        { header: "Status" }
+      ]
+    },
     uncut(style)
   );
 
@@ -208,14 +286,28 @@ export const diffText = (
  */
 export const tokensText = (document: TokensDocument): string => {
   if (!document.isConfigured)
-    return 'No tokens file: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
+    return 'No tokens file, and none found in the application: name one in forgebook.config.ts (`tokens: ["tokens.json"]`) or on a source.';
   if (document.total === 0) return "No tokens here.";
   const lines = document.tokens.map((token) => tokenLine(token));
   const more = document.total - document.tokens.length;
   return [
     ...lines,
-    ...(more > 0 ? [`… and ${more} more: narrow it with --category, or raise --limit.`] : [])
+    ...(more > 0 ? [`… and ${more} more: narrow it with --category, or raise --limit.`] : []),
+    ...tokenSourceLines(document.sources ?? [], document.notes ?? [])
   ].join("\n");
+};
+
+/** What tokens were read from, on one line, and what could not be, as a person reads them. */
+const tokenSourceLines = (sources: readonly TokenSource[], notes: readonly string[]): string[] => {
+  const read = sources.filter((source) => source.kind !== "tokens-file");
+  return [
+    ...(read.length === 0
+      ? []
+      : [
+          `Read from: ${read.map(({ kind, file, tokens }) => `${file} (${kind}, ${tokens ?? 0})`).join(", ")}`
+        ]),
+    ...notes.map((note) => `Not read: ${note}`)
+  ];
 };
 
 /** A token on one line, its themes and any deprecation beside it. */
@@ -272,12 +364,13 @@ export const nearestTokensText = (document: NearestTokensDocument): string => {
 export const foundComponentsText = (document: FoundComponentsDocument): string =>
   document.components.length === 0
     ? `Nothing in this catalogue holds "${document.query}".`
-    : document.components
-        .map((each) => {
+    : [
+        ...correctionLines(document.corrections),
+        ...document.components.map((each) => {
           const missed = each.missed.length === 0 ? "" : `  (no "${each.missed.join('", "')}")`;
           return `${each.title}${missed}${each.guidance?.deprecated === undefined ? "" : "  deprecated"}`;
         })
-        .join("\n");
+      ].join("\n");
 
 /**
  * What a change broke as a person reads it, a line a problem.
@@ -289,8 +382,77 @@ export const checkedCodeText = (document: CheckedCodeDocument): string => {
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
   );
   return [
-    ...(lines.length === 0 ? ["Nothing to report."] : lines),
-    ...document.skipped.map((each) => `Not checked: ${each}`)
+    ...(lines.length > 0
+      ? lines
+      : [document.skipped.length > 0 ? "Nothing to report in what was checked." : "Nothing to report."]),
+    ...document.skipped,
+    ...(document.advice ?? []).map(({ file, line, message }) => `${file}:${line}  ${message}`),
+    ...(document.excused ?? []).map(
+      ({ file, line, rule, reason }) => `${file}:${line}  ${rule} excused by a comment: ${reason}`
+    ),
+    ...tokenSourceLines(document.tokenSources ?? [], document.tokenNotes ?? [])
+  ].join("\n");
+};
+
+/** A published component an agent cannot see, a line for each thing that hides it. */
+const unseenLines = ({ file, reasons }: UnseenComponent): readonly string[] =>
+  reasons.map(({ reason, fix }) => `${file}  agents cannot see it: ${reason}. Fix: ${fix}`);
+
+/**
+ * The published components an agent cannot see, what was not looked at, and how many were.
+ *
+ * @param document - the answer.
+ */
+export const visibilityText = (document: VisibilityDocument): string => {
+  const scope = document.since === undefined ? "" : ` changed since ${document.since}`;
+  const count = `${document.checked} published component file${document.checked === 1 ? "" : "s"}${scope}`;
+  const ending =
+    document.packages.length === 0 && document.skipped.length === 0
+      ? "No package here publishes a component: nothing to hold to this."
+      : `${count}, ${document.unseen.length} agents cannot see.`;
+  return [...document.unseen.flatMap(unseenLines), ...document.skipped, ending].join("\n");
+};
+
+/**
+ * What `verify` found, each with its fix, and the verdict in one line, last: what a person reads first at a prompt.
+ *
+ * @param document - the answer.
+ * @param style - colours, glyphs and width.
+ */
+export const verifyText = (document: VerifyDocument, style: OutputStyle): string => {
+  const uncovered = document.uiFiles.flatMap((each) =>
+    each.coverage === "none"
+      ? [
+          `${each.file}  not verified: ${each.reason ?? ""}${each.fix === undefined ? "" : ` Fix: ${each.fix}`}`
+        ]
+      : []
+  );
+  const unseen = document.unseen.flatMap(unseenLines);
+  const code = document.code.problems.map(
+    (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  ${each.message}`
+  );
+  const outdated = (document.outdated ?? []).map(
+    (each) =>
+      `${each.file}  out of date: written for props ${each.written}, now ${each.current}. Fix: ${each.fix}`
+  );
+  const notes = document.code.notes.map(
+    (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
+  );
+  const advice = (document.code.advice ?? []).map((each) => `${each.file}:${each.line}  ${each.message}`);
+  const results = [
+    ...document.failures,
+    ...document.notVerified.map((each) => ({ ...each, problems: [] }))
+  ].map((each) => ({ ...each, frame: each.links?.frame ?? "" }));
+  const stories = results.length === 0 ? [] : [checkText({ schema: 1, results }, style)];
+  return [
+    ...uncovered,
+    ...unseen,
+    ...code,
+    ...outdated,
+    ...notes,
+    ...advice,
+    ...stories,
+    document.summary
   ].join("\n");
 };
 
@@ -352,8 +514,9 @@ export const pageText = (document: PageDocument): string =>
 export const searchText = (document: SearchDocument): string =>
   document.results.length === 0
     ? `Nothing in the catalogue holds "${document.query}".`
-    : document.results
-        .flatMap((result) => [
+    : [
+        ...correctionLines(document.corrections),
+        ...document.results.flatMap((result) => [
           `${result.name} (${result.place})${result.missed.length === 0 ? "" : `, missing: ${result.missed.join(", ")}`}`,
           `  ${result.address}`,
           ...result.hits.flatMap((hit) => [
@@ -361,4 +524,20 @@ export const searchText = (document: SearchDocument): string =>
             `    ${hit.address}`
           ])
         ])
-        .join("\n");
+      ].join("\n");
+
+/**
+ * The catalogue's switches, one per line, each with its values and what they bring with them.
+ *
+ * @param document - the answer.
+ */
+export const switchesText = (document: SwitchesDocument): string =>
+  document.switches
+    .map((each) => {
+      const values = each.values.map(({ value, implies }) => {
+        const implied = Object.entries(implies ?? {}).map(([id, other]) => `${id}=${other}`);
+        return implied.length === 0 ? value : `${value} (implies ${implied.join(", ")})`;
+      });
+      return `${each.id} (${each.control}): ${values.join(", ")}`;
+    })
+    .join("\n");

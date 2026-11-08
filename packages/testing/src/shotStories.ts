@@ -56,25 +56,35 @@ export const shotStories = async (request: StoryShotRequest): Promise<StoryShotR
       // a story's scheme of `system` is pictured light, as the held window has no system to follow
       const scheme = schemeOf(storyPage.view, request.switches) === "dark" ? "dark" : "light";
       await framedShot(page, storyPage.device, storyPage.isEdgeToEdge, scheme, file);
-      return { storyId: storyPage.story.id, view: storyPage.name, frame: storyPage.frame, file };
+      return {
+        storyId: storyPage.story.id,
+        view: storyPage.name,
+        frame: storyPage.frame,
+        file,
+        ...(status === "ready" ? {} : { status })
+      };
     }
     // the story at its own height, not the window's: the body's, as the shell sizes a frame
     const size = await page.evaluate(() => ({
       width: document.documentElement.clientWidth,
       height: Math.max(1, Math.ceil(document.body.getBoundingClientRect().height))
     }));
-    await page.screenshot({
-      path: file,
-      fullPage: true,
-      clip: { x: 0, y: 0, ...size },
-      animations: "disabled"
-    });
+    // a story that never lets the picture be taken (its fonts, an endless animation) is one story that did not draw,
+    // and must not end the run for all the others
+    const isTaken = await page
+      .screenshot({ path: file, fullPage: true, clip: { x: 0, y: 0, ...size }, animations: "disabled" })
+      .then(
+        () => true,
+        () => false
+      );
+    const said = status === "ready" ? undefined : status;
+    const shown = isTaken ? said : "silent";
     return {
       storyId: storyPage.story.id,
       view: storyPage.name,
       frame: storyPage.frame,
       file,
-      ...(status === "ready" ? {} : { status })
+      ...(shown === undefined ? {} : { status: shown })
     };
   });
   return { schema: 1, shots };

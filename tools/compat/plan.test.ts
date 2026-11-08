@@ -1,0 +1,342 @@
+/**
+ * The plan: lines from the ranges packages claim, the prerelease each tool's policy picks, the commands a cell runs;
+ * and the real matrix kept readable against the real manifests.
+ *
+ * @module
+ */
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import type { CompatMatrix, Manifest, RegistryPackage } from "./compat.types.ts";
+import { parseManifest } from "./documents.ts";
+import { COMPAT_MATRIX } from "./matrix.ts";
+import {
+  cellCommands,
+  cellFixture,
+  claimedRange,
+  companionVersion,
+  heldFixtureOverrides,
+  hostOf,
+  newestInLine,
+  packagesToRead,
+  pickPrerelease,
+  planCells
+} from "./plan.ts";
+
+/** A manifest with only what a test sets. */
+const manifest = (fields: Partial<Manifest>): Manifest => ({
+  name: "x",
+  scripts: {},
+  peerDependencies: {},
+  dependencies: {},
+  devDependencies: {},
+  ...fields
+});
+
+const MATRIX: CompatMatrix = {
+  hosts: {
+    react: { label: "React", packages: ["react", "react-dom"], prerelease: { tag: "canary" } },
+    vite: { label: "Vite", packages: ["vite"], range: { field: "dependencies", folder: "packages/core" } },
+    kit: { label: "Kit", packages: ["kit"], prerelease: "none" }
+  },
+  adapters: [
+    {
+      name: "@x/react",
+      folder: "packages/react",
+      fixture: "fixtures/react",
+      hosts: [
+        { host: "react" },
+        { host: "vite" },
+        { host: "kit", range: { range: "^2.0.0", why: "its README" } }
+      ]
+    }
+  ]
+};
+
+const MANIFESTS: Record<string, Manifest> = {
+  "packages/react": manifest({ name: "@x/react", peerDependencies: { react: "^18.2.0 || ^19.0.0" } }),
+  "packages/core": manifest({ name: "core", dependencies: { vite: "^8.3.4" } })
+};
+
+const readManifest = (folder: string): Manifest => {
+  const found = MANIFESTS[folder];
+  if (found === undefined) throw new Error(`no manifest for ${folder}`);
+  return found;
+};
+
+const REGISTRY = new Map<string, RegistryPackage>([
+  [
+    "react",
+    {
+      versions: ["18.2.0", "18.3.1", "19.0.0", "19.3.1", "19.3.0-canary-abc-20261106"],
+      distTags: { latest: "19.3.1", canary: "19.3.0-canary-abc-20261106" }
+    }
+  ],
+  [
+    "vite",
+    {
+      versions: ["8.3.4", "8.3.6", "9.0.0-beta.1"],
+      distTags: {
+        latest: "8.3.6",
+        beta: "9.0.0-beta.1",
+        alpha: "6.0.0-alpha.24",
+        experimental: "10.0.0-exp.1"
+      }
+    }
+  ],
+  [
+    "react-dom",
+    {
+      versions: ["18.3.1", "19.3.0", "19.3.2", "19.3.0-canary-abc-20261106"],
+      distTags: { latest: "19.3.2" }
+    }
+  ],
+  [
+    "kit",
+    { versions: ["2.0.0", "2.5.0", "3.0.0-next.1"], distTags: { latest: "2.5.0", next: "3.0.0-next.1" } }
+  ]
+]);
+
+describe("planCells", () => {
+  it("tests the newest release of each line the range claims, then the prerelease its policy picks", () => {
+    expect(planCells(MATRIX, readManifest, REGISTRY)).toEqual([
+      {
+        id: "x-react-react-18",
+        adapter: "@x/react",
+        host: "react",
+        range: "^18.2.0 || ^19.0.0",
+        line: "18",
+        version: "18.3.1",
+        packages: { react: "18.3.1", "react-dom": "18.3.1" }
+      },
+      {
+        id: "x-react-react-19",
+        adapter: "@x/react",
+        host: "react",
+        range: "^18.2.0 || ^19.0.0",
+        line: "19",
+        version: "19.3.1",
+        packages: { react: "19.3.1", "react-dom": "19.3.2" }
+      },
+      {
+        id: "x-react-react-next",
+        adapter: "@x/react",
+        host: "react",
+        range: "^18.2.0 || ^19.0.0",
+        line: "next",
+        version: "19.3.0-canary-abc-20261106",
+        packages: { react: "19.3.0-canary-abc-20261106", "react-dom": "19.3.0-canary-abc-20261106" },
+        tag: "canary"
+      },
+      {
+        id: "x-react-vite-8",
+        adapter: "@x/react",
+        host: "vite",
+        range: "^8.3.4",
+        line: "8",
+        version: "8.3.6",
+        packages: { vite: "8.3.6" }
+      },
+      {
+        id: "x-react-vite-next",
+        adapter: "@x/react",
+        host: "vite",
+        range: "^8.3.4",
+        line: "next",
+        version: "9.0.0-beta.1",
+        packages: { vite: "9.0.0-beta.1" },
+        tag: "beta"
+      },
+      {
+        id: "x-react-kit-2",
+        adapter: "@x/react",
+        host: "kit",
+        range: "^2.0.0",
+        line: "2",
+        version: "2.5.0",
+        packages: { kit: "2.5.0" }
+      }
+    ]);
+  });
+
+  it("stops on a line nobody released, rather than leave it out of the table quietly", () => {
+    const registry = new Map(REGISTRY);
+    registry.set("react", { versions: ["19.3.1"], distTags: { latest: "19.3.1" } });
+    expect(() => planCells(MATRIX, readManifest, registry)).toThrow("react has no release in 18.2.0");
+  });
+});
+
+describe("companionVersion", () => {
+  it("takes the same version, else the newest of the same minor, else the same version", () => {
+    const published = { versions: ["22.2.4", "22.2.6", "22.3.0-next.1"], distTags: {} };
+    expect(companionVersion("22.2.4", published)).toBe("22.2.4");
+    expect(companionVersion("22.2.5", published)).toBe("22.2.6");
+    expect(companionVersion("23.0.0", published)).toBe("23.0.0");
+    expect(companionVersion("22.3.0-next.1", published)).toBe("22.3.0-next.1");
+  });
+});
+
+describe("newestInLine", () => {
+  it("takes the newest release of a major or of a minor", () => {
+    const versions = ["5.8.3", "5.9.2", "5.9.3", "6.0.3", "5.10.0-beta"];
+    expect(newestInLine(versions, "5.9")).toBe("5.9.3");
+    expect(newestInLine(versions, "5")).toBe("5.9.3");
+    expect(newestInLine(versions, "7")).toBeUndefined();
+  });
+});
+
+describe("pickPrerelease", () => {
+  it("takes the newest prerelease ahead of latest, and none behind it", () => {
+    const host = { label: "Vite", packages: ["vite"] };
+    expect(
+      pickPrerelease(host, { versions: [], distTags: { latest: "8.3.6", beta: "8.3.0-beta.1" } })
+    ).toBeUndefined();
+    expect(
+      pickPrerelease(host, {
+        versions: [],
+        distTags: { latest: "3.5.45", beta: "3.6.0-beta.17", rc: "3.6.0-rc.14" }
+      })
+    ).toEqual({ version: "3.6.0-rc.14", tag: "rc" });
+  });
+});
+
+describe("claimedRange", () => {
+  it("names the manifest and field that lack the range", () => {
+    const [adapter] = MATRIX.adapters;
+    if (adapter === undefined) throw new Error("no adapter");
+    const noPeer = (): Manifest => manifest({});
+    expect(() => claimedRange(adapter, { host: "react" }, hostOf(MATRIX, "react"), noPeer)).toThrow(
+      "packages/react/package.json has no react in its peerDependencies"
+    );
+  });
+});
+
+describe("cellCommands", () => {
+  it("runs the package's tests, the fixture's tests, then the fixture's build, each only when it exists", () => {
+    const adapter = manifest({ name: "@x/react", scripts: { test: "vitest run" } });
+    expect(
+      cellCommands(adapter, manifest({ name: "@fixture/a", scripts: { test: "t", build: "b" } }))
+    ).toEqual([
+      ["pnpm", "--filter", "@x/react", "test"],
+      ["pnpm", "--filter", "@fixture/a", "test"],
+      ["pnpm", "--filter", "@fixture/a", "build"]
+    ]);
+    expect(
+      cellCommands(manifest({ name: "y" }), manifest({ name: "@fixture/b", scripts: { build: "b" } }))
+    ).toEqual([["pnpm", "--filter", "@fixture/b", "build"]]);
+  });
+});
+
+describe("cellFixture", () => {
+  const adapter = {
+    name: "@x/kit",
+    folder: "packages/kit",
+    fixture: "fixtures/kit3",
+    hosts: [{ host: "kit", fixtures: { "2": "fixtures/kit2" } }, { host: "vite" }]
+  };
+
+  it("runs a line on its own fixture when the package names one, and every other cell on the package's", () => {
+    expect(cellFixture(adapter, { host: "kit", line: "2" })).toBe("fixtures/kit2");
+    expect(cellFixture(adapter, { host: "kit", line: "3" })).toBe("fixtures/kit3");
+    expect(cellFixture(adapter, { host: "kit", line: "next" })).toBe("fixtures/kit3");
+    expect(cellFixture(adapter, { host: "vite", line: "2" })).toBe("fixtures/kit3");
+  });
+});
+
+describe("heldFixtureOverrides", () => {
+  const adapter = {
+    name: "@x/kit",
+    folder: "packages/kit",
+    fixture: "fixtures/kit3",
+    hosts: [{ host: "kit", fixtures: { "2": "fixtures/kit2" } }, { host: "vite" }]
+  };
+  const pins: Readonly<Record<string, Manifest>> = {
+    "fixtures/kit2": manifest({ name: "@fixture/kit2", devDependencies: { "@x/kit-core": "2.70.4" } }),
+    "fixtures/kit3": manifest({ name: "@fixture/kit3", devDependencies: { "@x/kit-core": "3.1.1" } })
+  };
+  const read = (folder: string): Manifest => {
+    const found = pins[folder];
+    if (found === undefined) throw new Error(`no manifest for ${folder}`);
+    return found;
+  };
+
+  it("keeps the other line's fixture at the version it pins, and touches nothing for a tool with one fixture", () => {
+    const packages = { "@x/kit-core": "3.1.1" };
+    expect(heldFixtureOverrides(adapter, { host: "kit", line: "3", packages }, read)).toEqual({
+      "@fixture/kit2>@x/kit-core": "2.70.4"
+    });
+    expect(
+      heldFixtureOverrides(adapter, { host: "kit", line: "2", packages: { "@x/kit-core": "2.70.4" } }, read)
+    ).toEqual({ "@fixture/kit3>@x/kit-core": "3.1.1" });
+    expect(
+      heldFixtureOverrides(adapter, { host: "vite", line: "8", packages: { vite: "8.3.6" } }, read)
+    ).toEqual({});
+  });
+
+  it("refuses to hold a fixture at a range", () => {
+    const ranged = (): Manifest =>
+      manifest({ name: "@fixture/kit2", devDependencies: { "@x/kit-core": "^2.0.0" } });
+    expect(() =>
+      heldFixtureOverrides(adapter, { host: "kit", line: "3", packages: { "@x/kit-core": "3.1.1" } }, ranged)
+    ).toThrow("not an exact version");
+  });
+});
+
+describe("the repository's matrix", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const readReal = (folder: string): Manifest =>
+    parseManifest(readFileSync(join(root, folder, "package.json"), "utf8"), folder);
+
+  it("names folders that exist and tools it defines, and reads every range it claims", () => {
+    for (const adapter of COMPAT_MATRIX.adapters) {
+      expect(readReal(adapter.folder).name).toBe(adapter.name);
+      expect(existsSync(join(root, adapter.fixture, "package.json"))).toBe(true);
+      expect("build" in readReal(adapter.fixture).scripts).toBe(true);
+      for (const entry of adapter.hosts) {
+        expect(claimedRange(adapter, entry, hostOf(COMPAT_MATRIX, entry.host), readReal)).not.toBe("");
+        for (const fixture of Object.values(entry.fixtures ?? {}))
+          expect("build" in readReal(fixture).scripts, fixture).toBe(true);
+      }
+    }
+    expect(packagesToRead(COMPAT_MATRIX)).toContain("vite");
+  });
+
+  it("runs SvelteKit 2 on a SvelteKit 2 app, and SvelteKit 3 on the package's own", () => {
+    const kit = COMPAT_MATRIX.adapters.find((adapter) => adapter.name === "@forgebook/sveltekit");
+    if (kit === undefined) throw new Error("the matrix tests the SvelteKit package");
+    expect(cellFixture(kit, { host: "sveltekit", line: "2" })).toBe("fixtures/sveltekit2");
+    expect(cellFixture(kit, { host: "sveltekit", line: "3" })).toBe("fixtures/sveltekit");
+    expect(readReal("fixtures/sveltekit2").name).toBe("@fixture/sveltekit2");
+    // the SvelteKit 3 cell keeps the SvelteKit 2 app on its own SvelteKit, whose install refuses SvelteKit 3
+    expect(
+      heldFixtureOverrides(
+        kit,
+        { host: "sveltekit", line: "3", packages: { "@sveltejs/kit": "3.1.1" } },
+        readReal
+      )
+    ).toEqual({
+      "@fixture/sveltekit2>@sveltejs/kit": readReal("fixtures/sveltekit2").devDependencies["@sveltejs/kit"]
+    });
+  });
+
+  it("covers every published package that draws stories", () => {
+    const tested = new Set(COMPAT_MATRIX.adapters.map((adapter) => adapter.folder));
+    const renderers = [
+      "react",
+      "vue",
+      "svelte",
+      "solid",
+      "preact",
+      "web-components",
+      "html",
+      "angular",
+      "nextjs",
+      "nuxt",
+      "sveltekit",
+      "react-native-web"
+    ];
+    for (const folder of renderers) expect(tested).toContain(`packages/${folder}`);
+  });
+});

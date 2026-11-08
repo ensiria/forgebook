@@ -103,6 +103,17 @@ export const judgementsOf = (body: unknown): readonly StoryJudgement[] | string 
 };
 
 /**
+ * An address without its trailing slashes. A loop, as a pattern anchored at the end backtracks on a long run of slashes.
+ *
+ * @param url - the address.
+ */
+const withoutTrailingSlashes = (url: string): string => {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end -= 1;
+  return url.slice(0, end);
+};
+
+/**
  * Asks a model about a story.
  *
  * @param model - the endpoint, the model's name and its key.
@@ -113,7 +124,7 @@ export const askModel = async (
   model: SemanticModel,
   sight: StorySight
 ): Promise<readonly StoryJudgement[] | string> => {
-  const address = `${model.url.replace(/\/+$/, "")}/chat/completions`;
+  const address = `${withoutTrailingSlashes(model.url)}/chat/completions`;
   try {
     const response = await fetch(address, {
       method: "POST",

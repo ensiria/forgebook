@@ -1,0 +1,7 @@
+{
+  "name": "claude-code",
+  "command": ["claude", "--print", "--permission-mode", "bypassPermissions", "{prompt}"],
+  "env": ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"],
+  "timeoutMinutes": 45,
+  "hooks": "claude"
+}

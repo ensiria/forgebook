@@ -14,6 +14,68 @@ const row = (page: Page, text: string | RegExp): Locator =>
   results(page).getByRole("option").filter({ hasText: text });
 
 test.describe("the search", () => {
+  test("keeps the row a person chose while later answers change the list, and Enter opens it", async ({
+    page
+  }) => {
+    // the answer of the stories' index comes last, once a person has moved through the list the names give
+    let release = (): void => undefined;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/forgebook-search:/, async (route) => {
+      await released;
+      await route.continue();
+    });
+    await page.goto("/");
+    await page.getByRole("searchbox").focus();
+    await page.keyboard.type("select overview");
+    const options = results(page).getByRole("option");
+    await expect(options.nth(1)).toBeVisible({ timeout: 30_000 });
+    await page.keyboard.press("ArrowDown");
+    await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
+    const href = await options.nth(1).getAttribute("href");
+    release();
+    await expect(page.locator(".forgebook-search-panel[data-ready]")).toBeVisible({ timeout: 30_000 });
+    await expect(results(page).locator('[aria-selected="true"]')).toHaveAttribute("href", href ?? "");
+    await page.keyboard.press("Enter");
+    await expect(results(page)).toBeHidden();
+    expect(new URL(page.url()).search).toBe(href);
+  });
+
+  test("a key pressed before the list has caught up with the words acts on the list of those words", async ({
+    page
+  }) => {
+    await page.goto("/");
+    const box = page.getByRole("searchbox");
+    await box.fill("select");
+    await expect(page.locator(".forgebook-search-panel[data-ready]")).toBeVisible({ timeout: 30_000 });
+    await expect(results(page).getByRole("option").first()).toHaveAttribute(
+      "href",
+      /guides-choosing-a-select/
+    );
+    // the words and the keys in one task: the list drawn for the new words cannot come in between
+    await box.evaluate((field: HTMLInputElement) => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setValue?.call(field, "select overview");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      for (const key of ["ArrowDown", "Enter"])
+        field.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    });
+    await expect(page).toHaveURL(/[?&]story=kit%3Ainputs-selection-select--overview/);
+  });
+
+  test("new words start from the first row again", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("searchbox").focus();
+    await page.keyboard.type("select");
+    await expect(page.locator(".forgebook-search-panel[data-ready]")).toBeVisible({ timeout: 30_000 });
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.type(" overview");
+    await expect(row(page, "Overview").first()).toBeVisible();
+    await expect(results(page).getByRole("option").first()).toHaveAttribute("aria-selected", "true");
+  });
+
   test("loads nothing before it is used, and its index only when something is typed", async ({ page }) => {
     const asked: string[] = [];
     page.on("request", (request) => asked.push(decodeURIComponent(request.url())));
@@ -89,7 +151,7 @@ test.describe("the search", () => {
     await page.goto("/");
     const field = page.getByRole("searchbox");
     await field.fill("value");
-    // the whole index first: its arrival brings new rows, and the choice starts again at the best one
+    // the whole index first: its arrival brings new rows, above the first one too
     await expect(page.locator(".forgebook-search-panel[data-ready]")).toBeVisible({ timeout: 30_000 });
     const options = results(page).getByRole("option");
     await expect(options.first()).toHaveAttribute("aria-selected", "true");
@@ -147,6 +209,20 @@ test.describe("the search", () => {
     await expect(page.getByRole("status").filter({ hasText: "Nothing found" })).toContainText("zzzqqq");
     await field.fill("select zzzqqq");
     await expect(page.locator(".forgebook-result__note").first()).toContainText("Without: zzzqqq");
+  });
+
+  test("agents get a typo read as the nearest name, and the page reads words as typed", async ({
+    page,
+    request
+  }) => {
+    const answer = await request.get("/__forgebook/api/search?query=selcet&limit=1");
+    expect(await answer.json()).toMatchObject({
+      corrections: [{ typed: "selcet", read: "select" }],
+      results: [{ name: expect.stringMatching(/select/i) }]
+    });
+    await page.goto("/");
+    await page.getByRole("searchbox").fill("selcet");
+    await expect(page.getByRole("status").filter({ hasText: "Nothing found" })).toContainText("selcet");
   });
 
   test("its search key reaches the field from a hidden sidebar, and a press with the key opens a new tab", async ({

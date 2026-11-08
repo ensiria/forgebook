@@ -53,6 +53,16 @@ the Storybook-style stories, the catalogue the tests run on, a catalogue for eac
 Preact, Web Components, plain HTML, Angular, React Native), and small SvelteKit, Next.js and Nuxt apps with their catalogues, `tools/`
 the repository's own commands (`package-build`, `check-commits`).
 
+`docs/compatibility.md` says which versions of Vite, React and each framework every package is tested with. Nobody
+writes it: the weekly `compat` workflow tests each line a package's range claims, and each tool's prerelease, then opens
+a pull request when a result changed (`tools/compat/README.md`). A package that draws stories is listed in
+`tools/compat/matrix.ts`; a range widened to a new major is tested from the next run, and is not supported until its
+cell passes.
+
+`docs/dependencies.md` says what each published package brings into a project and what `npm audit` finds in it. Nobody
+writes it either: the weekly `dependencies` workflow installs each package's `latest` alone, audits it, and opens a pull
+request when a result changed (`tools/dependencies/README.md`).
+
 ## The rules of the code
 
 - **The core stays light.** No new dependency of `forgebook` without an issue first; a heavy tool (Playwright, Testing
@@ -68,6 +78,8 @@ the repository's own commands (`package-build`, `check-commits`).
   `publishConfig` npm installs from them, and the CI checks it is up to date.
 - **Self-contained comments.** A comment says its reason in full: it never points at a decision index, a numbered
   note or another repository a reader cannot open (`pnpm refs:check`, part of `pnpm checks`, fails on them).
+- **Samples that work.** Every fence in a Markdown file closes, a YAML or JSON sample parses and a link to a heading
+  finds it (`pnpm blocks:check`, part of `pnpm checks`).
 - **A public API changes on purpose.** A renamed or removed export, option or behaviour is a breaking change: say so
   in the issue and in the commit (below).
 
@@ -92,6 +104,70 @@ branch's commits, their type and these references; the CI checks them too.
 
 Each package gets its own version, from the commits that touch its folder; a package whose dependency was released
 gets a patch.
+
+## Version policy
+
+### What is public
+
+A change to any of these is breaking:
+
+- **The configuration:** the keys of `forgebook.config.*` and of a preset, the values they take and their defaults.
+- **The story format:** `@forgebook/story-format`, each adapter's story types, and what a story's fields mean.
+- **The commands:** their names, options and exit codes, and the documents `--json` prints. A field added is not
+  breaking. Some documents carry `schema`, raised when a field is removed or changes meaning; before 1.0 every one
+  will.
+- **The MCP tools:** their names, inputs and answers.
+- **Each package's exports** and their types, the adapter contract (`FrameworkAdapter`) and the plugin contract.
+- **What a link says:** the catalogue's addresses and their parameters, and the names `strings` replaces.
+- **What the gates fail on:** `verify`, `check-code`, `check` and the other commands with an exit code for CI. Failing
+  where they passed is breaking, even when the old answer was wrong, since a pipeline turns red. The exception is a gate
+  that passed what it exists to catch (a security hole, a check that never ran): fixing it ships in a patch or a minor
+  as a fix, says so in its commit, and gets its note all the same.
+
+Not public: anything a package does not export, the shell's markup and class names (the theme's variables and roles are
+public), the look, the layout of a build's files, and the wording of messages (agents read fields, not sentences).
+
+### Breaking in 0.x
+
+While the packages are 0.x, a breaking change bumps the minor version (0.3 to 0.4) and a patch never breaks. A breaking
+change is a `feat!` or `fix!` commit, or one with a `BREAKING CHANGE:` footer, that says what breaks and what to do: the
+changelog is written from it. A check that starts refusing what it accepted is breaking too.
+
+### Deprecation
+
+An option with a replacement is deprecated before it is removed. While 0.x, it keeps working for at least one minor
+version. From 1.0, it is removed only in a major version, and only once at least three months have passed since the
+release that deprecated it. Its TSDoc says `@deprecated` with the replacement. Before 1.0, Forgebook will also warn once
+per run, in the dev server and in the commands, naming the replacement and the version that removes it: that warning is
+not built yet, since nothing is deprecated today. An option removed with no replacement goes straight to the next minor
+while 0.x, with its note.
+
+### Codemods
+
+A breaking change ships in the same pull request with:
+
+- **its codemod, when the rewrite is mechanical** (a key renamed or gone, a string removed, a default flipped that a
+  project may want to keep): a module in `packages/forgebook/bin/forgebook/migrate/`, pure and idempotent, tested on files
+  before and after, listed in `codemods.ts` with the version that breaks. `forgebook migrate` runs it. A codemod that keeps
+  an old behaviour is of kind `keep`, and runs only for a project coming from before the change;
+- **its note, when it is not** (a gate stricter, a JSON shape): an entry in `MIGRATION_NOTES` in the same file, keyed
+  on the package and version that break (each package has its own versions), which `forgebook migrate` prints;
+- **its row** in the Upgrading table of `packages/forgebook/README.md`.
+
+### The path to 1.0
+
+1.0 says the public surface above holds until 2.0. It ships when all of this is true:
+
+- **A compatibility table generated by CI**, per adapter, of the host versions tested, the next major or prerelease
+  among them where published, and green.
+- **Every breaking change since 0.3** made by `forgebook migrate` or written in its notes, and two minor releases in a row
+  with no breaking change the policy did not plan.
+- **The shapes settled:** the configuration's keys reviewed once more, every `--json` document and MCP answer given a
+  `schema`, the story format's types and the adapter contract unchanged for those two releases.
+- **The deprecation warnings** built as written above, with a test.
+- **The documentation** published: getting started for people and for agents, the main how-tos, and troubleshooting from
+  the errors the code prints.
+- **More than one person** able to review and release, so that the project does not stop when one does.
 
 ## Releases
 

@@ -12,7 +12,9 @@
 import { type RefObject, useEffect, useMemo, useState } from "react";
 
 import type { PanelProp } from "../argTypes.ts";
-import type { PanelArgs, ShellMessage } from "../messages.ts";
+import type { ArgValue, PanelArgs, ShellMessage } from "../messages.ts";
+import type { NamedValues } from "../namedValues.ts";
+import type { ValueShape } from "../valueShape.ts";
 import { tellFrames } from "./FrameView.tsx";
 import { framesOrigin } from "./framesOrigin.ts";
 import { isWorstCase, type WorstCaseState, worstArgs } from "./worstArgs.ts";
@@ -29,6 +31,10 @@ export type WorstCaseInput = {
   readonly values: PanelArgs;
   /** The panel's own values. */
   readonly panelArgs: PanelArgs;
+  /** The source's named values, for a required part only they can fill. */
+  readonly namedValues: NamedValues | undefined;
+  /** Gives a prop with a shape its worst value, once its module loaded. */
+  readonly worstOfShape: ((shape: ValueShape, namedValues: NamedValues) => ArgValue | undefined) | undefined;
   /** Sets the panel's values. */
   readonly onPanelArgsChange: (args: PanelArgs) => void;
 };
@@ -62,9 +68,14 @@ export const useWorstCase = ({
   settable,
   values,
   panelArgs,
+  namedValues,
+  worstOfShape,
   onPanelArgsChange
 }: WorstCaseInput): WorstCase => {
-  const args = useMemo(() => worstArgs(settable), [settable]);
+  const args = useMemo(
+    () => worstArgs(settable, namedValues, worstOfShape),
+    [settable, namedValues, worstOfShape]
+  );
   const isOn = isWorstCase(args, values);
   // each frame's count, by story then by frame: the compare view draws a story in several
   const [counts, setCounts] = useState<ReadonlyMap<string, ReadonlyMap<string, number>>>(new Map());

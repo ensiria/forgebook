@@ -6,8 +6,8 @@
  */
 import type { Violation } from "forgebook/a11y";
 
-/** How the frame ended: its story shown, its error shown, or no answer before the time ran out. */
-export type ShotStatus = "ready" | "error" | "timeout";
+/** How the frame ended: its story shown, its error shown, given up on what it loads, or no answer in time. */
+export type ShotStatus = "ready" | "error" | "pending" | "timeout";
 
 /** What `forgebook-shot` reports. */
 export type StoryShot = {

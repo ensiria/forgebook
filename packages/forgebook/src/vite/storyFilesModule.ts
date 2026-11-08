@@ -169,6 +169,26 @@ export type IndexedStoryFile = {
   readonly index: StoryFileIndex;
 };
 
+/** A story file a group lists whose index cannot be read: the others still draw. */
+export type RefusedStoryFile = {
+  /** Its path relative to the declaring module. */
+  readonly key: string;
+  /** The group's first pattern that lists it. */
+  readonly pattern: string;
+  /** Its absolute path. */
+  readonly file: string;
+  /** Why, naming the file (with its line and column when they are known). */
+  readonly problem: string;
+};
+
+/** A group's story files read: those indexed, and those that cannot be. */
+export type StoryFilesRead = {
+  /** The story files indexed. */
+  readonly files: readonly IndexedStoryFile[];
+  /** The story files that cannot be. */
+  readonly refused: readonly RefusedStoryFile[];
+};
+
 /** A group's index as it is kept between starts, by file key. */
 export type KeptIndex = Readonly<Record<string, StoryFileIndex>>;
 
@@ -192,14 +212,61 @@ export const storyFileIndex = (root: string, pattern: string, key: string): Stor
 };
 
 /**
- * Every story file a group's patterns list, indexed.
+ * Every story file a group's patterns list, indexed, and those that cannot be. Only the former are kept between starts:
+ * the stamps of the others would only say what is already known, and their next read costs one file.
+ *
+ * @param root - the declaring module's folder.
+ * @param patterns - the patterns (`storyFileKeys`).
+ * @param watch - adds a file whose edit renews the module that read it: a refused one too, as its fix must.
+ * @param cache - the index kept between starts, which holds while the files it came from do; none reads them all.
+ * @param isKept - whether a listed file may be read; every one by default.
+ */
+export const readStoryFiles = (
+  root: string,
+  patterns: readonly string[],
+  watch: (file: string) => void,
+  cache?: DiskCache<KeptIndex>,
+  isKept: IsFileKept = EVERY_FILE
+): StoryFilesRead => {
+  const name = storyFilesGroupText(VITE_PATHS.normalize(root), patterns);
+  const since = nowNs();
+  const kept = cache?.read(name);
+  const listed = listedFiles(root, patterns).filter(({ key }) => isKept(VITE_PATHS.resolve(root, key)));
+  const files: IndexedStoryFile[] = [];
+  const refused: RefusedStoryFile[] = [];
+  for (const { key, pattern } of listed) {
+    const file = VITE_PATHS.resolve(root, key);
+    watch(file);
+    const index = kept?.[key] ?? storyFileIndex(root, pattern, key);
+    if (typeof index === "string") refused.push({ key, pattern, file, problem: index });
+    else files.push({ key, pattern, file, index });
+  }
+  // kept again when anything was read anew: a file added, or the kept index out of date
+  if (cache !== undefined && files.some(({ key }) => kept?.[key] === undefined)) {
+    const stamps = stampPaths(files.map((each) => each.file));
+    const index = Object.fromEntries(files.map((each) => [each.key, each.index]));
+    if (isSettledSince(stamps, since)) cache.write(name, index, stamps);
+  }
+  return { files, refused };
+};
+
+/**
+ * What fails a module that cannot go on without its files: every file refused, a line each.
+ *
+ * @param refused - the files, at least one.
+ */
+export const refusalError = (refused: readonly RefusedStoryFile[]): Error =>
+  new Error(refused.map(({ problem }) => problem).join("\n"));
+
+/**
+ * Every story file a group's patterns list, indexed, for those who cannot go on without one: a build, a test.
  *
  * @param root - the declaring module's folder.
  * @param patterns - the patterns (`storyFileKeys`).
  * @param watch - adds a file whose edit renews the module that read it.
  * @param cache - the index kept between starts, which holds while the files it came from do; none reads them all.
  * @param isKept - whether a listed file may be read; every one by default.
- * @throws when a story file cannot be indexed.
+ * @throws when a story file cannot be indexed, naming every one that cannot.
  */
 export const indexedStoryFiles = (
   root: string,
@@ -208,26 +275,9 @@ export const indexedStoryFiles = (
   cache?: DiskCache<KeptIndex>,
   isKept: IsFileKept = EVERY_FILE
 ): IndexedStoryFile[] => {
-  const name = storyFilesGroupText(VITE_PATHS.normalize(root), patterns);
-  const since = nowNs();
-  const kept = cache?.read(name);
-  const listed = listedFiles(root, patterns).filter(({ key }) => isKept(VITE_PATHS.resolve(root, key)));
-  const files = listed.map(({ key, pattern }) => {
-    const file = VITE_PATHS.resolve(root, key);
-    watch(file);
-    const known = kept?.[key];
-    if (known !== undefined) return { key, pattern, file, index: known };
-    const index = storyFileIndex(root, pattern, key);
-    if (typeof index === "string") throw new Error(index);
-    return { key, pattern, file, index };
-  });
-  // kept again when anything was read anew: a file added, or the kept index out of date
-  if (cache !== undefined && files.some(({ key }) => kept?.[key] === undefined)) {
-    const stamps = stampPaths(files.map((each) => each.file));
-    const index = Object.fromEntries(files.map((each) => [each.key, each.index]));
-    if (isSettledSince(stamps, since)) cache.write(name, index, stamps);
-  }
-  return files;
+  const { files, refused } = readStoryFiles(root, patterns, watch, cache, isKept);
+  if (refused.length > 0) throw refusalError(refused);
+  return [...files];
 };
 
 /** The loaders a group offers besides its story files'. */
@@ -259,6 +309,66 @@ export const storyFilesModule = (
 ): string => storyFilesCode(root, patterns, indexedStoryFiles(root, patterns, watch, cache), loaders);
 
 /**
+ * The stories a group needs before its stories are written as rows (`indexCode`). Rows write each key once and the
+ * objects once per story, but rows need the function that turns them back, which a small group's first load pays for
+ * more than it saves: gzip already shares a key repeated in every story. On the generated library, rows cost the shell's
+ * first load 11 bytes more at 100 stories and saved 92 at 500, so the two meet near 150; past 300 they save without
+ * doubt, and the build's own weight falls by a quarter of the index.
+ */
+export const ROWS_FROM_STORIES = 300;
+
+/** The function the generated module rebuilds each file's stories with, from their rows. */
+const STORY_TABLE = "storyTable";
+
+/**
+ * The keys of a group's stories, each once, in the order the first story to have each writes it.
+ *
+ * @param files - the group's story files, indexed.
+ */
+const storyKeysOf = (files: readonly IndexedStoryFile[]): readonly string[] => [
+  ...new Set(
+    files.flatMap(({ index }) =>
+      index.stories.flatMap((story) =>
+        Object.keys(story).filter((key) => Reflect.get(story, key) !== undefined)
+      )
+    )
+  )
+];
+
+/**
+ * A story file's index as code: its stories as rows of values in the group's key order, which the module turns back
+ * into the same objects (`STORY_TABLE`), in a group of `ROWS_FROM_STORIES` stories or more.
+ *
+ * @remarks
+ * A catalogue's first load fetches every group's index, and an object per story writes its keys again for every
+ * story: on a library of 500 stories, a quarter of the index was the words `exportName` and `description`. A row
+ * writes each value once and leaves a key a story does not have as a hole, which the module leaves out of its object
+ * as the literal did.
+ *
+ * @param index - the file's index.
+ * @param keys - the group's keys (`storyKeysOf`).
+ */
+const indexCode = (index: StoryFileIndex, keys: readonly string[]): string => {
+  const rows = index.stories.map((story) => {
+    const values = keys.map((key) => {
+      const value: unknown = Reflect.get(story, key);
+      return value === undefined ? "" : codeLiteral(value);
+    });
+    // a story's last keys it does not have are left out: a row ends with its last value, never with a hole
+    while (values.at(-1) === "") values.pop();
+    return `[${values.join(",")}]`;
+  });
+  const fields = Object.entries(index)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) =>
+      key === "stories"
+        ? `${codeLiteral(key)}:${STORY_TABLE}([${rows.join(",")}])`
+        : `${codeLiteral(key)}:${codeLiteral(value)}`
+    );
+  return `{${fields.join(",")}}`;
+};
+
+/**
  * The code of the module for one group, from its story files indexed.
  *
  * @internal
@@ -268,13 +378,17 @@ export const storyFilesModule = (
  * @param loaders - the group's loaders besides its story files'.
  * @param hasTexts - a build's: whether each file's docs, code and page come from the group's texts module, in the
  * rows' order (`TEXTS_PREFIX`), and not each from its query.
+ * @param refused - the story files it lists that cannot be indexed, which the catalogue names among its problems.
+ * @param scriptProblems - the project's other scripts that do not parse, named among them too.
  */
 export const storyFilesCode = (
   root: string,
   patterns: readonly string[],
   files: readonly IndexedStoryFile[],
   loaders: GroupLoaders,
-  hasTexts = false
+  hasTexts = false,
+  refused: readonly RefusedStoryFile[] = [],
+  scriptProblems: readonly string[] = []
 ): string => {
   const { hasDocs = true, hasUsage, hasReach } = loaders;
   // the group's id in Vite's form, as the plugin names the declaring module's folder
@@ -300,12 +414,26 @@ export const storyFilesCode = (
         ];
   // a row per file, its name written once and not once per column (its index, each loader): a large catalogue's
   // names are a tenth of its index
+  const keys = storyKeysOf(files);
+  const isTable = files.reduce((count, { index }) => count + index.stories.length, 0) >= ROWS_FROM_STORIES;
   const rows = files.map(({ key, index }) =>
-    [codeLiteral(key), codeLiteral(index), `() => import(${path(key)})`, ...textLoaders(key)].join(", ")
+    [
+      codeLiteral(key),
+      isTable ? indexCode(index, keys) : codeLiteral(index),
+      `() => import(${path(key)})`,
+      ...textLoaders(key)
+    ].join(", ")
   );
   const written = `[${rows.map((row) => `[${row}]`).join(",\n")}]`;
   return [
     ...(hasTexts ? [`import texts from ${texts};`] : []),
+    ...(isTable
+      ? [
+          `const storyKeys = ${codeLiteral(keys)};`,
+          // `flatMap` passes over a row's holes, the keys its story lacks
+          `const ${STORY_TABLE} = (rows) => rows.map((row) => Object.fromEntries(row.flatMap((value, at) => [[storyKeys[at], value]])));`
+        ]
+      : []),
     // a build's texts are their module's rows, in the same order: each joins its file's
     `const rows = ${hasTexts ? `${written}.map((row, at) => row.concat(texts[at]))` : written};`,
     "const column = (at) => Object.fromEntries(rows.map((row) => [row[0], row[at]]));",
@@ -315,6 +443,9 @@ export const storyFilesCode = (
     hasDocs ? "docs: column(3)," : "docs: {},",
     "code: column(4),",
     "pages: column(5),",
+    ...(refused.length === 0 && scriptProblems.length === 0
+      ? []
+      : [`problems: ${codeLiteral([...refused.map(({ problem }) => problem), ...scriptProblems])},`]),
     `search: () => import(${search}).then((module) => module.default),`,
     ...(hasUsage ? [`usage: () => import(${usage}).then((module) => module.default),`] : []),
     ...(hasReach ? [`reach: () => import(${reach}).then((module) => module.default),`] : []),

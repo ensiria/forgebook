@@ -16,7 +16,8 @@ import {
   declaredArgProps
 } from "../src/addressArgs.ts";
 import type { PropDocs } from "../src/componentDocs.ts";
-import type { PanelArgs } from "../src/messages.ts";
+import { type PanelArgs, UNSET_ARG } from "../src/messages.ts";
+import { isFileList, isValueOfShape } from "../src/shapeValues.ts";
 
 /** A component's props as its types give them. */
 const PROPS: readonly PropDocs[] = [
@@ -72,7 +73,9 @@ const DECLARATION: ArgDeclaration = {
 
 /** The names the check left out. */
 const droppedNames = (args: PanelArgs, declaration: ArgDeclaration = DECLARATION): readonly string[] =>
-  checkedAddressArgs(args, declaration).dropped.map((each) => each.name);
+  checkedAddressArgs(args, declaration, undefined, { isFileList, isValueOfShape }).dropped.map(
+    (each) => each.name
+  );
 
 describe("the panel's values an address names", () => {
   it("keeps every value the panel itself could set, as a shared link writes it", () => {
@@ -183,11 +186,32 @@ describe("the panel's values an address names", () => {
       props: [],
       argTypes: {},
       controls: "all",
-      storyArgs: { title: "x", none: null, picks: ["a"] },
+      storyArgs: { title: "x", none: null, picks: ["a"], config: { depth: 1 } },
       namedValues: {}
     };
-    expect(declaredArgProps(declaration).map((prop) => [prop.name, prop.kind])).toEqual([["title", "text"]]);
-    expect(droppedNames({ title: "y", none: null, picks: ["a"] }, declaration)).toEqual(["none", "picks"]);
+    expect(declaredArgProps(declaration).map((prop) => [prop.name, prop.kind])).toEqual([
+      ["title", "text"],
+      ["picks", "other"],
+      ["config", "other"]
+    ]);
+    expect(droppedNames({ title: "y", none: null }, declaration)).toEqual(["none"]);
+    // what the story's own arg looks like is what a link may give
+    expect(droppedNames({ picks: [1], config: { depth: 2, extra: 1 } }, declaration)).toEqual([
+      "picks",
+      "config"
+    ]);
+    expect(droppedNames({ picks: ["b", "c"], config: { depth: 2 } }, declaration)).toEqual([]);
+    // until what checks a shape has loaded, such a value is neither taken nor left out
+    expect(checkedAddressArgs({ title: "y", picks: ["b"] }, declaration)).toMatchObject({
+      isWaiting: true,
+      accepted: { title: "y" },
+      dropped: []
+    });
+  });
+
+  it('takes the panel\'s "no value" for any prop it sets, and nothing else under that name', () => {
+    expect(droppedNames({ label: UNSET_ARG }, DECLARATION)).toEqual([]);
+    expect(droppedNames({ undeclared: UNSET_ARG }, DECLARATION)).toEqual(["undeclared"]);
   });
 });
 
@@ -205,7 +229,12 @@ describe("the message that gives a frame its values", () => {
       .filter((file) => readFileSync(join(sources, file), "utf8").includes('"forgebook:args"'))
       .map((file) => file.replaceAll("\\", "/"))
       .sort();
-    // the check's, the message's type and guard, and the frame that hears it
-    expect(writers).toEqual(["addressArgs.ts", "frame/mountFrame.ts", "messages.ts"]);
+    // the check's, the message's type, and the frame that hears it and its guard
+    expect(writers).toEqual([
+      "addressArgs.ts",
+      "frame/mountFrame.ts",
+      "frame/shellMessageCheck.ts",
+      "messages.ts"
+    ]);
   });
 });

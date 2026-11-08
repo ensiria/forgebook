@@ -17,7 +17,8 @@ import { resolve } from "node:path";
 
 import { createServer, type ViteDevServer } from "vite";
 
-import { AGENT_INDEX_FILE, indexAnswer, isAgentIndex } from "../../src/vite/agentIndex.ts";
+import { AGENT_INDEX_FILE } from "../../src/agentIndexFile.ts";
+import { indexAnswer, isAgentIndex } from "../../src/vite/agentIndex.ts";
 import {
   AGENT_API,
   type AgentAnswer,
@@ -27,6 +28,7 @@ import {
   rootHeaderValue
 } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
+import { withoutTrailingSlashes } from "../../src/vite/storyPatterns.ts";
 import { commandServerVite } from "./commandServer.ts";
 
 /** Where `forgebook dev` serves when no port is given: Vite's default. */
@@ -110,7 +112,7 @@ const indexSource = (from: string): { readonly text: () => Promise<string>; read
   if (!/^https?:\/\//i.test(from)) {
     return { text: () => readFile(resolve(from, AGENT_INDEX_FILE), "utf8"), origin: "" };
   }
-  const origin = from.replace(/\/+$/, "");
+  const origin = withoutTrailingSlashes(from);
   const address = `${origin}/${AGENT_INDEX_FILE}`;
   const text = async (): Promise<string> => {
     const response = await fetch(address, { signal: AbortSignal.timeout(INDEX_TIMEOUT) });
@@ -191,7 +193,8 @@ const ownListening = async (config: ResolvedConfig, port: number): Promise<Serve
     await server.close();
     throw error;
   }
-  const address = server.resolvedUrls?.local[0]?.replace(/\/+$/, "");
+  const local = server.resolvedUrls?.local[0];
+  const address = local === undefined ? undefined : withoutTrailingSlashes(local);
   if (address === undefined) {
     await server.close();
     throw new Error("The catalogue's dev server started with no address");
@@ -205,12 +208,16 @@ const ownListening = async (config: ResolvedConfig, port: number): Promise<Serve
  *
  * @param config - the catalogue's configuration.
  * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param isOwn - serve it for the run whatever runs at the address; `false` by default.
  */
 export const servedCatalogue = async (
   config: ResolvedConfig,
-  url: string | undefined
+  url: string | undefined,
+  isOwn = false
 ): Promise<ServedCatalogue> => {
-  const origin = (url ?? DEFAULT_ORIGIN).replace(/\/+$/, "");
+  // a run that has just written a file serves it itself: a running server may still answer with its earlier module
+  if (isOwn) return ownListening(config, 0);
+  const origin = withoutTrailingSlashes(url ?? DEFAULT_ORIGIN);
   const running = await runningClient(origin, config);
   if (running !== undefined) return { origin, runningAt: origin, close: async () => undefined };
   return ownListening(config, 0);
@@ -227,7 +234,7 @@ export const catalogueClient = async (
   config: ResolvedConfig,
   url: string | undefined
 ): Promise<CatalogueClient> => {
-  const origin = (url ?? DEFAULT_ORIGIN).replace(/\/+$/, "");
+  const origin = withoutTrailingSlashes(url ?? DEFAULT_ORIGIN);
   return (await runningClient(origin, config)) ?? ownClient(config, origin);
 };
 

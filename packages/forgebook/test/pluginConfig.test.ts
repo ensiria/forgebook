@@ -39,6 +39,18 @@ const DIR: string = import.meta.dirname;
 const problemOf = (plugins: readonly ForgebookPlugin[]): string | undefined =>
   pluginsProblem(plugins, "react", DIR);
 
+describe("a plugin's switches", () => {
+  it("leave what a value brings to the catalogue", () => {
+    const values = JSON.parse('[{ "value": "a", "label": "A", "implies": { "theme": "dark" } }]');
+    const plugin: ForgebookPlugin = {
+      apiVersion: 1,
+      id: "acme",
+      switches: [{ id: "look", label: "Look", default: "a", apply: { kind: "code" }, values }]
+    };
+    expect(pluginsProblem([plugin], "react", DIR)).toContain("those are the catalogue's");
+  });
+});
+
 describe("the contract's version", () => {
   it("is the first", () => {
     expect(SUPPORTED_PLUGIN_API_VERSIONS).toEqual([1]);

@@ -13,10 +13,11 @@
  */
 
 import type { FrameRenderer, MountedStory, StoryDrawing } from "forgebook/renderer";
-import { storyContextOf } from "forgebook/renderer";
+import { contentSettled, storyContextOf } from "forgebook/renderer";
 import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
+import { checkedContent, contentOfRoot, SETTLED } from "./rootContent.tsx";
 import { StoryErrorBoundary } from "./StoryErrorBoundary.tsx";
 import { storyElement } from "./storyElement.ts";
 import { inProviders } from "./storyProviders.tsx";
@@ -50,6 +51,7 @@ export const reactFrameRenderer: FrameRenderer = {
       markDrawn = resolve;
     });
     let drawing = first;
+    let isGone = false;
     const draw = (): void => {
       root.render(
         inProviders(
@@ -71,11 +73,16 @@ export const reactFrameRenderer: FrameRenderer = {
     draw();
     return {
       drawn,
+      settled: async (timeout: number) =>
+        checkedContent(await contentSettled(() => (isGone ? SETTLED : contentOfRoot(root)), timeout), isGone),
       update: (next: StoryDrawing): void => {
         drawing = next;
         draw();
       },
-      unmount: (): void => root.unmount()
+      unmount: (): void => {
+        isGone = true;
+        root.unmount();
+      }
     };
   }
 };

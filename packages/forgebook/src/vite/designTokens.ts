@@ -39,6 +39,33 @@ export type DesignToken = {
   readonly isThemeOnly?: true;
   /** The source that gives it, by its id or, when it writes none, by its module; none for the catalogue's own. */
   readonly source?: string;
+  /** Where the application itself declares it, for a token read from its style sheets or its Tailwind configuration. */
+  readonly origin?: TokenOrigin;
+  /** The end of a Tailwind class that writes it (`primary` for `bg-primary`), when it makes utilities. */
+  readonly utility?: string;
+};
+
+/** What one file gave a catalogue's tokens. */
+export type TokenSource = {
+  /** What kind of file: a tokens file the catalogue names, or what an application already has. */
+  readonly kind: "tokens-file" | "components-json" | TokenOriginKind;
+  /** The file, relative to the catalogue. */
+  readonly file: string;
+  /** How many tokens it gives; none for a tokens file, whose names later files may replace. */
+  readonly tokens?: number;
+};
+
+/** What a token read from an application was read from. */
+export type TokenOriginKind = "css-variables" | "tailwind-theme" | "tailwind-config" | "tailwind-default";
+
+/** Where an application declares a token. */
+export type TokenOrigin = {
+  /** What kind of source. */
+  readonly kind: TokenOriginKind;
+  /** Its file, relative to the catalogue. */
+  readonly file: string;
+  /** The line, from 1. */
+  readonly line?: number;
 };
 
 /** What the files gave. */
@@ -382,7 +409,10 @@ const resolvedValue = (
     return `${raw.name}: it says ${raw.ownType}, its alias is ${targetType}`;
   }
   try {
-    return { text: valueText(followed(raw.value, byName, new Set([raw.name])), type), type };
+    const text = valueText(followed(raw.value, byName, new Set([raw.name])), type);
+    // an empty value draws nothing, and a browser drops it in silence
+    if (text.trim() === "") return `${raw.name}: its value comes to nothing, so a browser gives it none`;
+    return { text, type };
   } catch (error) {
     return `${raw.name}: ${error instanceof Error ? error.message : String(error)}`;
   }

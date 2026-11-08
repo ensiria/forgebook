@@ -5,7 +5,12 @@
 See every component in every theme, contrast, language and width. Write CSF stories, run `forgebook dev`: one frame
 per story, switches for theme, contrast, motion and language, and a props table from the components' types.
 
-> **Status:** 0.x, early. Its author's design system runs on it; the API may still change between minor versions.
+> **Status:** 0.x, early. Its author's design system runs on it; the API may still change between minor versions, each
+> break in the changelog and, where the rewrite is mechanical, in `forgebook migrate`
+> ([version policy and the path to 1.0](CONTRIBUTING.md#version-policy)).
+
+New to it? Read the [documentation](docs/README.md): [getting started](docs/getting-started.md), the how-to guides
+and [troubleshooting](docs/troubleshooting.md).
 
 This repository holds Forgebook's packages; each has its own README, which is also its npm page.
 
@@ -29,9 +34,11 @@ This repository holds Forgebook's packages; each has its own README, which is al
 | [`@forgebook/plugin-figma`](packages/plugin-figma) | A story's design in the panel, and beside the story |
 | [`@forgebook/plugin-msw`](packages/plugin-msw) | A story's API answered by its handlers, and a Network tab |
 
-Requirements: Node 22.18 or later and Vite 8.3.4+; React 19, Vue 3.5, Svelte 5, Solid 1.9, Preact 10.19 or 11, Lit 3,
+Requirements: Node 22.18 or later (Vite 8 comes with it, beside any Vite the project has); React 18.2 or 19, Vue 3.5, Svelte 5, Solid 1.9, Preact 10.19 or 11, Lit 3,
 Angular 20 to 22 or no framework, Next.js 15 and 16 through `@forgebook/nextjs`, Nuxt 3 or 4 through `@forgebook/nuxt`,
-SvelteKit 2 or 3 through `@forgebook/sveltekit`, React Native through react-native-web.
-[MIT licence](LICENSE).
+SvelteKit 2 or 3 through `@forgebook/sveltekit`, React Native through react-native-web. Which versions of each are
+tested, and with what result, including the next ones: [docs/compatibility.md](docs/compatibility.md), written by a
+weekly CI run. What each package installs, and what `npm audit` finds in it: [docs/dependencies.md](docs/dependencies.md),
+written by another. [MIT licence](LICENSE).
 
 Bugs, proposals and pull requests: [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md).

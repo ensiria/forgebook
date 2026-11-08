@@ -1,0 +1,211 @@
+{
+  "id": "password-strength",
+  "app": "shadcn-admin",
+  "prompt": "Add a password strength meter to PasswordInput (src/components/password-input.tsx), shown only when a new `showStrength` prop is true. It rates what is typed as Weak, Fair or Strong: at least 12 characters mixing letters, digits and symbols is Strong; at least 8 characters with two of those three kinds is Fair; anything else is Weak. Show the word under the input together with a bar. Nothing shows while the field is empty. Turn it on for the Password field of the sign-up form, not for Confirm Password.",
+  "scope": ["src/components/password-input.tsx", "src/features/auth/sign-up/"],
+  "constraints": [
+    {
+      "id": "reuse",
+      "text": "Built on the app's existing components and its `cn` helper; PasswordInput keeps its props and its show/hide button."
+    },
+    {
+      "id": "tokens",
+      "text": "The bar's colours and sizes come from the theme's tokens (destructive, primary, muted…) and Tailwind's scale, none typed by hand."
+    },
+    {
+      "id": "states",
+      "text": "Empty, Weak, Fair and Strong each look right, in the dark theme and in a narrow window; a long password does not break the layout."
+    },
+    {
+      "id": "a11y",
+      "text": "The rating is announced to screen readers as it changes, and it is not shown by colour alone."
+    },
+    {
+      "id": "scope",
+      "text": "Only PasswordInput and the sign-up form change; the other forms using PasswordInput look and behave as before, and no test is removed."
+    }
+  ],
+  "states": [
+    {
+      "name": "empty",
+      "description": "The sign-up form as it opens: no meter yet.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        }
+      ]
+    },
+    {
+      "name": "weak",
+      "description": "A short password typed in Password.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "abc"
+        }
+      ]
+    },
+    {
+      "name": "fair",
+      "description": "Eight characters, letters and digits.",
+      "viewport": "desktop",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "abcd1234"
+        }
+      ]
+    },
+    {
+      "name": "strong-dark",
+      "description": "A strong password, in the dark theme.",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "Tr0ub4dor&3xyz!"
+        }
+      ]
+    },
+    {
+      "name": "long-narrow",
+      "description": "A very long password in a phone-sized window.",
+      "viewport": "narrow",
+      "scheme": "light",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "correct-horse-battery-staple-correct-horse-battery-staple-42!"
+        }
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "name": "a short password is rated Weak",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "abc"
+        },
+        {
+          "expectVisible": {
+            "text": "Weak"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eight letters and digits are rated Fair",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "abcd1234"
+        },
+        {
+          "expectVisible": {
+            "text": "Fair"
+          }
+        }
+      ]
+    },
+    {
+      "name": "twelve mixed characters are rated Strong",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Password"
+          },
+          "value": "Tr0ub4dor&3xyz!"
+        },
+        {
+          "expectVisible": {
+            "text": "Strong"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nothing shows while Password is empty",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "expectVisible": {
+            "label": "Password"
+          }
+        },
+        {
+          "expectHidden": {
+            "text": "Weak"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm Password has no meter",
+      "steps": [
+        {
+          "goto": "/sign-up"
+        },
+        {
+          "fill": {
+            "label": "Confirm Password"
+          },
+          "value": "abc"
+        },
+        {
+          "expectHidden": {
+            "text": "Weak"
+          }
+        }
+      ]
+    }
+  ],
+  "probes": [
+    {
+      "source": "probes/PasswordInput.stories.tsx",
+      "target": "src/components/password-input.eval-probe.stories.tsx"
+    }
+  ]
+}

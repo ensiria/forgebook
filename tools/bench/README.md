@@ -52,7 +52,9 @@ configuration, so `--parity` takes the generated library only.
 
 Times are the median and range of `--runs` samples; HMR has `--edits` samples and a p95, which needs at least 20 to mean
 anything. A metric a tool cannot have is `n/a`, never a zero. A metric that fails is recorded, the run goes on, and the
-command exits non-zero at the end.
+command exits non-zero at the end. The report is written whole all the same, to its file and with `--json` to stdout,
+with what went wrong in its `problems`: a failed metric, a time that did not reproduce, a limit passed, stories not
+listed or not drawn.
 
 ## Being fair
 
@@ -60,7 +62,10 @@ command exits non-zero at the end.
   on one tool, and forward then backward, so no tool always follows the same one. Install and HMR run in a block per tool.
 - **The story measured** sits in the middle of the library, at the end of a chain of four components. The start, HMR and
   page metrics load that story, so what the size of the library changes in them is the index, not the story.
-- **Memory** is resident memory summed over the process tree, so a tool of several processes reads a little high.
+- **Memory** is resident memory summed over the process tree, so a tool of several processes reads a little high. A
+  server's peak lands in one of two places from run to run, about a fifth of the runs some hundred megabytes higher, so
+  each memory metric takes 7 runs, and the report keeps every sample (`values`) beside the median, where such a spread
+  shows.
 - **The library** is generated without a clock or random numbers, so two machines measure the same files. It is a
   TypeScript project with a `tsconfig.json`, as the README describes one. Forgebook and Storybook get identical CSF 3
   stories. Ladle gets the same stories as functions with `.args`, without play functions,
@@ -145,6 +150,10 @@ node tools/bench/bench.mts --corpus primer --compare --work /some/folder
   configuration leaves out, its definition leaves out too, with `!` patterns (Carbon's `forgebook.config.ts` reads the
   library's own list of them), so both tools index the same stories. A run that lists
   fewer stories, or draws fewer than it lists, fails at the end with the difference; the timings are still in the report.
+- **`failsInStorybook`** names, by Forgebook's id and with the reason, the stories that do not draw in the library's own
+  Storybook at that commit either (Aksel's three resize stories with no render, whose component needs a parent's
+  context). They may fail here without failing the run; one of them that draws fails it, so the list never outlives what
+  the library does. A story goes in it only once it was opened in that Storybook and seen to fail.
 - **The install metrics** are absent: what the tool adds to a library is measured on the generated one.
 
 Each report is `report-<name>.json` in `--work`. A corpus's edits write `bench-edit-<n>` into text the story shows, and put

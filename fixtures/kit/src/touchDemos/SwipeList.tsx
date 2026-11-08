@@ -163,6 +163,8 @@ export type SwipeListProps = {
 /**
  * A list of messages with swipe actions.
  *
+ * @deprecated Use a list with a menu on each row: a swipe hides what a row can do.
+ *
  * @param props - the list's props.
  */
 export const SwipeList = ({ title }: SwipeListProps): ReactNode => {

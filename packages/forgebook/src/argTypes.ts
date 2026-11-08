@@ -1,22 +1,25 @@
 /**
- * A story's `argTypes` (Storybook's): read in the frame from the meta and the story, sent to the shell in a form that
- * crosses between the documents, laid over the props the component's types give, and their `mapping` applied to the
- * args the story receives.
+ * A story's `argTypes` (Storybook's) as the shell reads them: in the form that crosses between the documents, laid over the
+ * props the component's types give. What reads them from the story's module is `storyArgTypes.ts`.
  *
  * @remarks
  * The panel's props come from the component's types (`componentDocs.ts`); `argTypes` say otherwise where a story
  * means another control, other options, other names, or an arg the types do not name. Without `argTypes` the panel
  * shows the props exactly as the types give them. Option values that cannot cross (a component, a function) are
- * sent as their `mapping` keys, which the frame turns back into the values. `object` and `file` controls have no
- * control in the panel: their args are listed for reading. Pure.
+ * sent as their `mapping` keys, which the frame turns back into the values. An `object` control edits the prop by the
+ * shape its type gives (`valueShape.ts`), by what the story's own arg looks like without one, as JSON when nothing says.
+ * Pure.
  *
  * @module
  */
 
 import type { StoryControlsSetting } from "@forgebook/story-format/source";
 
+import { type ArgCondition, isArgCondition } from "./argConditions.ts";
 import type { PropDocs } from "./componentDocs.ts";
+import type { ArgValue } from "./messages.ts";
 import type { NamedValues } from "./namedValues.ts";
+import type { ValueShape } from "./valueShape.ts";
 
 /** A control as the panel draws it; `none` for an arg the panel lists without a control. */
 export type PanelControl =
@@ -30,7 +33,22 @@ export type PanelControl =
   | "range"
   | "color"
   | "date"
+  | "object"
+  | "textarea"
+  | "token"
+  | "file"
   | "none";
+
+/** Which of the catalogue's design tokens a `token` control offers, and what the story receives for one. */
+export type TokenRequest = {
+  /** A token's type (`color`, `dimension`) or a part of its name (`space`, `radius`): what it offers. */
+  readonly of: string;
+  /**
+   * What the story receives, with `{name}` for the token's name in CSS's form and `{value}` for its value
+   * (`var(--{name})`); its value by default.
+   */
+  readonly format?: string;
+};
 
 /** How the panel shows one arg, from its `argTypes` entry: what crosses from the frame to the shell. */
 export type PanelArgType = {
@@ -52,6 +70,16 @@ export type PanelArgType = {
   readonly max?: number;
   /** A range's or a number's step. */
   readonly step?: number;
+  /** When the panel shows the arg (`if`); none always. */
+  readonly if?: ArgCondition;
+  /** A `token` control's tokens. */
+  readonly tokens?: TokenRequest;
+  /** The files a `file` control takes, as `<input accept>` writes it. */
+  readonly accept?: string;
+  /** The custom control it names, of those `argControls` registers: any name that is none of the panel's. */
+  readonly customControl?: string;
+  /** The custom control's `settings`. */
+  readonly settings?: ArgValue;
 };
 
 /** The panel's arg types, by arg. */
@@ -71,6 +99,14 @@ export type PanelProp = PropDocs & {
   readonly max?: number;
   /** A range's or a number's step. */
   readonly step?: number;
+  /** A `token` control's tokens. */
+  readonly tokens?: TokenRequest;
+  /** The files a `file` control takes. */
+  readonly accept?: string;
+  /** The custom control it names. */
+  readonly customControl?: string;
+  /** The custom control's `settings`. */
+  readonly settings?: ArgValue;
 };
 
 /**
@@ -95,7 +131,8 @@ export const isNamedProp = (prop: PanelProp, namedValues: NamedValues): boolean 
 
 /**
  * The props the panel can set: a prop of a type the source names values for is chosen among them, a node that takes a
- * text is set as one; any other `other` prop, and an event, cannot be set; nor a prop the story's controls leave out.
+ * text is set as one, a prop with a shape by its fields; any other `other` prop, and an event, cannot be set; nor a prop
+ * the story's controls leave out.
  *
  * @param props - the component's props, with the story's `argTypes` laid over them.
  * @param controls - the props the story lets the panel set.
@@ -108,7 +145,12 @@ export const settableProps = (
 ): PanelProp[] =>
   props.filter(
     (prop) =>
-      (prop.kind !== "other" || prop.canTakeText === true || isNamedProp(prop, namedValues)) &&
+      (prop.kind !== "other" ||
+        prop.canTakeText === true ||
+        prop.control === "file" ||
+        prop.customControl !== undefined ||
+        isNamedProp(prop, namedValues) ||
+        prop.shape !== undefined) &&
       prop.kind !== "event" &&
       (controls === "all" || controls.includes(prop.name))
   );
@@ -116,154 +158,6 @@ export const settableProps = (
 /** Whether a value is a plain object. */
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** Storybook's control names, as the panel draws them (the inline variants look the same here). */
-const CONTROLS: Readonly<Record<string, PanelControl>> = {
-  select: "select",
-  radio: "radio",
-  "inline-radio": "radio",
-  check: "check",
-  "inline-check": "check",
-  "multi-select": "multi-select",
-  boolean: "boolean",
-  text: "text",
-  number: "number",
-  range: "range",
-  color: "color",
-  date: "date",
-  object: "none",
-  file: "none"
-};
-
-/** The panel controls, for the check on arrival. */
-const PANEL_CONTROLS: readonly PanelControl[] = [...new Set(Object.values(CONTROLS))];
-
-/** A number field of an object, when it is a finite number. */
-const numberOf = (part: Readonly<Record<string, unknown>>, name: string): number | undefined => {
-  const value = part[name];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-};
-
-/** The labels of a control, when every one is a text. */
-const labelsOf = (value: unknown): Readonly<Record<string, string>> | undefined =>
-  isRecord(value) && Object.values(value).every((label) => typeof label === "string")
-    ? Object.fromEntries(Object.entries(value).map(([option, label]) => [option, String(label)]))
-    : undefined;
-
-/**
- * The control an entry names: `false` and a disabled control are none, a name or `{ type }` is that control, and
- * options without a control make a select.
- */
-const controlOf = (entry: Readonly<Record<string, unknown>>): PanelControl | undefined => {
-  const control = entry["control"];
-  if (control === false) return "none";
-  if (typeof control === "string") return CONTROLS[control];
-  if (isRecord(control)) {
-    if (control["disable"] === true) return "none";
-    if (typeof control["type"] === "string") return CONTROLS[control["type"]];
-  }
-  return Array.isArray(entry["options"]) ? "select" : undefined;
-};
-
-/**
- * The options as they cross: texts and numbers as they are; any other value only through `mapping`, whose keys are
- * the options then.
- */
-const optionsOf = (entry: Readonly<Record<string, unknown>>): readonly (string | number)[] | undefined => {
-  const options = entry["options"];
-  if (!Array.isArray(options)) return undefined;
-  return options.filter(
-    (option): option is string | number => typeof option === "string" || typeof option === "number"
-  );
-};
-
-/**
- * One entry as the panel reads it.
- *
- * @param entry - the `argTypes` entry, the story's laid over the meta's.
- * @param isExcluded - whether `parameters.controls.exclude` names the arg.
- */
-const panelArgTypeOf = (entry: Readonly<Record<string, unknown>>, isExcluded: boolean): PanelArgType => {
-  const control = controlOf(entry);
-  const options = optionsOf(entry);
-  const settings = isRecord(entry["control"]) ? entry["control"] : {};
-  const table = entry["table"];
-  const name = entry["name"];
-  const description = entry["description"];
-  const labels = labelsOf(settings["labels"]);
-  const min = numberOf(settings, "min");
-  const max = numberOf(settings, "max");
-  const step = numberOf(settings, "step");
-  return {
-    isHidden: isExcluded || (isRecord(table) && table["disable"] === true),
-    ...(typeof name === "string" ? { label: name } : {}),
-    ...(typeof description === "string" ? { description } : {}),
-    ...(control === undefined ? {} : { control }),
-    ...(options === undefined ? {} : { options }),
-    ...(labels === undefined ? {} : { labels }),
-    ...(min === undefined ? {} : { min }),
-    ...(max === undefined ? {} : { max }),
-    ...(step === undefined ? {} : { step })
-  };
-};
-
-/**
- * The `argTypes` of the meta and the story, merged: each arg's entry from both, the story's fields over the meta's.
- *
- * @param meta - the meta's `argTypes`.
- * @param story - the story's `argTypes`.
- */
-export const mergedArgTypes = (
-  meta: unknown,
-  story: unknown
-): Readonly<Record<string, Readonly<Record<string, unknown>>>> => {
-  const merged: Record<string, Readonly<Record<string, unknown>>> = {};
-  for (const part of [meta, story]) {
-    if (!isRecord(part)) continue;
-    for (const [name, entry] of Object.entries(part)) {
-      if (isRecord(entry)) merged[name] = { ...merged[name], ...entry };
-    }
-  }
-  return merged;
-};
-
-/**
- * The arg types the frame sends: each entry read, and the args `parameters.controls.exclude` names hidden.
- *
- * @param argTypes - the merged `argTypes`.
- * @param excluded - the args `parameters.controls.exclude` names.
- */
-export const panelArgTypesOf = (
-  argTypes: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
-  excluded: readonly string[]
-): PanelArgTypes => {
-  const names = [...new Set([...Object.keys(argTypes), ...excluded])];
-  return Object.fromEntries(
-    names.map((name) => [name, panelArgTypeOf(argTypes[name] ?? {}, excluded.includes(name))])
-  );
-};
-
-/**
- * The args with each `mapping` applied: an arg whose value is a key of its entry's `mapping` receives the value the
- * key stands for, as Storybook's (an arg written as the key in the story, or chosen in the panel).
- *
- * @param args - the args.
- * @param argTypes - the merged `argTypes`.
- */
-export const mappedArgs = (
-  args: Readonly<Record<string, unknown>>,
-  argTypes: Readonly<Record<string, Readonly<Record<string, unknown>>>>
-): Readonly<Record<string, unknown>> =>
-  Object.fromEntries(
-    Object.entries(args).map(([name, value]) => {
-      const mapping = argTypes[name]?.["mapping"];
-      if (!isRecord(mapping) || (typeof value !== "string" && typeof value !== "number"))
-        return [name, value];
-      const key = String(value);
-      // the mapping's own keys only: a value a shared link chose (`constructor`) never reaches its prototype
-      return [name, Object.hasOwn(mapping, key) ? mapping[key] : value];
-    })
-  );
 
 /** The prop kind a control sets, for the panel's groups. */
 const KIND_OF_CONTROL: Readonly<Record<PanelControl, PropDocs["kind"]>> = {
@@ -277,7 +171,37 @@ const KIND_OF_CONTROL: Readonly<Record<PanelControl, PropDocs["kind"]>> = {
   range: "number",
   color: "text",
   date: "number",
+  object: "other",
+  textarea: "text",
+  token: "text",
+  file: "other",
   none: "other"
+};
+
+/**
+ * What a prop's editor reads of its arg type: an `object` control's shape, from its type, else from the story's own value,
+ * else JSON; a `token` control's tokens; what a `file` control takes.
+ */
+const editorFieldsOf = (
+  prop: PropDocs,
+  argType: PanelArgType,
+  own: ArgValue | undefined
+): Partial<Pick<PanelProp, "kind" | "shape" | "tokens" | "accept" | "customControl" | "settings">> => {
+  const shapeOfOwn: ValueShape =
+    own === undefined || own === null ? { kind: "json" } : { kind: "like", value: own };
+  return {
+    ...(argType.control === "object" ? { shape: prop.shape ?? shapeOfOwn } : {}),
+    // a `token` control that names no tokens asks for those named after its arg
+    ...(argType.control === "token" ? { tokens: argType.tokens ?? { of: prop.name } } : {}),
+    ...(argType.accept === undefined ? {} : { accept: argType.accept }),
+    ...(argType.customControl === undefined
+      ? {}
+      : {
+          kind: "other",
+          customControl: argType.customControl,
+          ...(argType.settings === undefined ? {} : { settings: argType.settings })
+        })
+  };
 };
 
 /**
@@ -285,14 +209,17 @@ const KIND_OF_CONTROL: Readonly<Record<PanelControl, PropDocs["kind"]>> = {
  *
  * @param prop - the prop as the types give it.
  * @param argType - its arg type.
+ * @param own - the story's own value of the arg: what an `object` control with no type to read draws its fields from.
  */
-const withArgType = (prop: PropDocs, argType: PanelArgType): PanelProp => {
+const withArgType = (prop: PropDocs, argType: PanelArgType, own: ArgValue | undefined): PanelProp => {
   const { control } = argType;
   // a control the panel cannot draw makes the prop one it lists for reading, never one that takes a text
   const isReadOnly = control === "none";
   const { canTakeText: _canTakeText, ...rest } = prop;
+  // a control the story names decides what its value is: the type's shape no longer draws nor checks it
+  const { shape: _shape, ...shapeless } = isReadOnly || argType.customControl !== undefined ? rest : prop;
   return {
-    ...(isReadOnly ? rest : prop),
+    ...(control === undefined && argType.customControl === undefined ? prop : shapeless),
     ...(control === undefined ? {} : { kind: KIND_OF_CONTROL[control], control }),
     ...(argType.options === undefined ? {} : { choices: argType.options }),
     ...(argType.description === undefined ? {} : { description: argType.description }),
@@ -300,13 +227,20 @@ const withArgType = (prop: PropDocs, argType: PanelArgType): PanelProp => {
     ...(argType.labels === undefined ? {} : { labels: argType.labels }),
     ...(argType.min === undefined ? {} : { min: argType.min }),
     ...(argType.max === undefined ? {} : { max: argType.max }),
-    ...(argType.step === undefined ? {} : { step: argType.step })
+    ...(argType.step === undefined ? {} : { step: argType.step }),
+    ...editorFieldsOf(prop, argType, own)
   };
 };
 
 /** A prop the types do not name, made from its arg type alone: a text when it names no control. */
-const propOfArgType = (name: string, argType: PanelArgType): PanelProp =>
-  withArgType({ name, kind: "text", type: "", description: "", isRequired: false }, argType);
+const propOfArgType = (name: string, argType: PanelArgType, own: ArgValue | undefined): PanelProp =>
+  withArgType({ name, kind: "text", type: "", description: "", isRequired: false }, argType, own);
+
+/** A prop as its TSDoc asks: chosen among the tokens `@token` names, when it is set as a text. */
+const propAsDocumented = (prop: PropDocs): PanelProp =>
+  prop.token !== undefined && (prop.kind === "text" || prop.canTakeText === true)
+    ? { ...prop, kind: "text", control: "token", tokens: { of: prop.token } }
+    : prop;
 
 /**
  * The panel's props: the component's, with their arg types laid over them, the hidden ones left out, then the args
@@ -314,49 +248,43 @@ const propOfArgType = (name: string, argType: PanelArgType): PanelProp =>
  *
  * @param props - the props the component's types give.
  * @param argTypes - the story's arg types; none leaves the props as they are.
+ * @param storyArgs - the story's own args, for an `object` control no type describes; none by default.
  */
-export const panelProps = (props: readonly PropDocs[], argTypes: PanelArgTypes): readonly PanelProp[] => {
+export const panelProps = (
+  props: readonly PropDocs[],
+  argTypes: PanelArgTypes,
+  storyArgs: Readonly<Record<string, ArgValue>> = {}
+): readonly PanelProp[] => {
   const typed = new Set(props.map((prop) => prop.name));
   const fromTypes = props.flatMap((prop): PanelProp[] => {
     const argType = argTypes[prop.name];
-    if (argType === undefined) return [prop];
-    return argType.isHidden ? [] : [withArgType(prop, argType)];
+    if (argType === undefined) return [propAsDocumented(prop)];
+    if (argType.isHidden) return [];
+    return [
+      withArgType(
+        argType.control === undefined ? propAsDocumented(prop) : prop,
+        argType,
+        storyArgs[prop.name]
+      )
+    ];
   });
   const fromArgTypes = Object.entries(argTypes).flatMap(([name, argType]): PanelProp[] =>
-    typed.has(name) || argType.isHidden ? [] : [propOfArgType(name, argType)]
+    typed.has(name) || argType.isHidden ? [] : [propOfArgType(name, argType, storyArgs[name])]
   );
   return [...fromTypes, ...fromArgTypes];
-};
-
-/**
- * The props the panel can set, as the story's parameters say: `false` none, a list or `{ include }` those, anything
- * else every one.
- *
- * @param value - `parameters.controls`.
- */
-export const controlsOfParameter = (value: unknown): StoryControlsSetting => {
-  if (value === false) return [];
-  if (Array.isArray(value) && value.every((name) => typeof name === "string")) return value;
-  const include = isRecord(value) ? value["include"] : undefined;
-  if (Array.isArray(include) && include.every((name) => typeof name === "string")) return include;
-  return "all";
-};
-
-/**
- * The args `parameters.controls.exclude` hides.
- *
- * @param value - `parameters.controls`.
- */
-export const excludedControls = (value: unknown): readonly string[] => {
-  const exclude = isRecord(value) ? value["exclude"] : undefined;
-  return Array.isArray(exclude) ? exclude.filter((name): name is string => typeof name === "string") : [];
 };
 
 /** Whether a value is one arg's panel arg type. */
 const isPanelArgType = (value: unknown): value is PanelArgType =>
   isRecord(value) &&
   typeof value["isHidden"] === "boolean" &&
-  (value["control"] === undefined || PANEL_CONTROLS.some((control) => control === value["control"])) &&
+  (value["if"] === undefined || isArgCondition(value["if"])) &&
+  (value["control"] === undefined ||
+    (typeof value["control"] === "string" && Object.hasOwn(KIND_OF_CONTROL, value["control"]))) &&
+  (value["tokens"] === undefined ||
+    (isRecord(value["tokens"]) && typeof value["tokens"]["of"] === "string")) &&
+  (value["accept"] === undefined || typeof value["accept"] === "string") &&
+  (value["customControl"] === undefined || typeof value["customControl"] === "string") &&
   (value["options"] === undefined ||
     (Array.isArray(value["options"]) &&
       value["options"].every((option) => typeof option === "string" || typeof option === "number")));
@@ -368,25 +296,3 @@ const isPanelArgType = (value: unknown): value is PanelArgType =>
  */
 export const isPanelArgTypes = (value: unknown): value is PanelArgTypes =>
   isRecord(value) && Object.values(value).every(isPanelArgType);
-
-/** Whether a value is a spy (`fn()` of `storybook/test` or Vitest): a function with its calls under `mock`. */
-const isSpy = (value: unknown): boolean => typeof value === "function" && "mock" in value;
-
-/**
- * The args whose calls the Events tab records as actions: those whose value is a spy, and those whose `argTypes`
- * entry names an `action`. Explicit only: no arg is recorded for its name alone.
- *
- * @param args - the story's args.
- * @param argTypes - the merged `argTypes`.
- */
-export const actionNames = (
-  args: Readonly<Record<string, unknown>>,
-  argTypes: Readonly<Record<string, Readonly<Record<string, unknown>>>>
-): readonly string[] => [
-  ...new Set([
-    ...Object.entries(args).flatMap(([name, value]) => (isSpy(value) ? [name] : [])),
-    ...Object.entries(argTypes).flatMap(([name, entry]) =>
-      typeof entry["action"] === "string" || entry["action"] === true ? [name] : []
-    )
-  ])
-];

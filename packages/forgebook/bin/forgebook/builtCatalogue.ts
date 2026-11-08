@@ -12,7 +12,8 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import { AGENT_INDEX_FILE, indexProblems, isAgentIndex } from "../../src/vite/agentIndex.ts";
+import { AGENT_INDEX_FILE } from "../../src/agentIndexFile.ts";
+import { indexProblems, isAgentIndex } from "../../src/vite/agentIndex.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { answerMcpMessage, type McpServer, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
 import { pluginsDocument } from "../../src/vite/pluginConfig.ts";
@@ -40,8 +41,8 @@ export const settleAgentIndex = async (
     return;
   }
   const client = await catalogueClient(config, undefined);
-  const answer = await client.ask("agent-index", new URLSearchParams());
-  await client.close();
+  // its server closes whatever the answer: a watch asks again after every build
+  const answer = await client.ask("agent-index", new URLSearchParams()).finally(() => client.close());
   if (answer.status !== 200 || !isAgentIndex(answer.body)) {
     throw new ScriptError(`The catalogue's index could not be read: ${JSON.stringify(answer.body)}`);
   }
@@ -77,11 +78,14 @@ export const builtCatalogueServer = async (from: string, version: string): Promi
     ask,
     writeNew: unreachable,
     check: unreachable,
+    stress: unreachable,
     checkPage: unreachable,
     shot: unreachable,
+    verify: unreachable,
     servePreview: unreachable,
-    // a built index keeps no configuration, so it lists no plugins; list_plugins is not among its tools
-    plugins: pluginsDocument([])
+    // a built index keeps no configuration, so it lists no plugins or switches; neither tool is among its tools
+    plugins: pluginsDocument([]),
+    switches: { schema: 1, switches: [] }
   }).filter((tool) => READ_ONLY_TOOLS.has(tool.name));
   return {
     info: { name: "forgebook", version },

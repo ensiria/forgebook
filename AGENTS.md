@@ -22,8 +22,8 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   `fixtures/svelte`, `fixtures/solid`, `fixtures/preact`, `fixtures/web-components`, `fixtures/html`,
   `fixtures/angular`, `fixtures/react-native`) and small
   SvelteKit, Next.js and Nuxt apps (`fixtures/sveltekit`, `fixtures/nextjs`, `fixtures/nuxt`) whose catalogues they
-  open beside it.
-- `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`).
+  open beside it, and a SvelteKit 2 app (`fixtures/sveltekit2`) for the older line the SvelteKit package supports.
+- `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`, `cold-suite`, `eval`).
 
 ## Before you say a change is done
 
@@ -33,6 +33,10 @@ pnpm --filter @fixture/app exec playwright install chromium   # once
 pnpm --filter @fixture/app test:shell                      # when the shell, the frame or the plugin changed
 FORGEBOOK_SHELL_GROUP=1/3 pnpm --filter @fixture/app test:shell  # the same, a third of the catalogues at a time, short of memory
 ```
+
+A new screen, panel or menu of the shell gets its state in `fixtures/app/shell/a11y.e2e.ts`, which runs axe over the
+shell in both appearances (the stories in their frames are left out), and its stops in `keyboardWalk.e2e.ts` when the
+main flow crosses it.
 
 Both must pass. A rule is never silenced to get a green run: an ignore comment only where the rule is wrong for that
 case, with the reason (`// biome-ignore lint/…: the protocol names this field`).

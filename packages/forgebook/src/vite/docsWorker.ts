@@ -7,7 +7,8 @@
  * Started by `docsExtractor.ts` with the framework's docs module (`adapter.ts`), which it loads once; it keeps the
  * programs of `docsProgram.ts` between requests, so only a package's first
  * read builds one, and a changed source file (`{ kind: "changed" }`) renews them on their next read. A usage request
- * (`{ kind: "usage", id, files }`) is answered from the same programs (`usageGraph.ts`). A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
+ * (`{ kind: "usage", id, files }`) is answered from the same programs (`usageGraph.ts`). A build names its story files
+ * first (`{ kind: "stories", files }`), so its programs hold what they reach (`readStoryFilesOnly`). A request is `{ id, storyFile }`, the answer `{ id, result }`, `extractStoryComponent`'s result as
  * it is (plain data), with the files it can change with (`docsDependencies.ts`), which the dev server keeps it on disk
  * with. Unasked, it says `{ kind: "loaded" }` once its modules are loaded.
  *
@@ -25,7 +26,7 @@ import type {
   DocsWorkerData,
   DocsWorkerLoaded
 } from "./docsExtractor.ts";
-import { markSourcesChanged, readAskedFilesOnly } from "./docsProgram.ts";
+import { markSourcesChanged, readAskedFilesOnly, readStoryFilesOnly } from "./docsProgram.ts";
 import { usageGraph } from "./usageGraph.ts";
 
 /** Whether the worker's data names a docs module. */
@@ -103,6 +104,10 @@ parentPort?.on("message", (request: DocsRequest): void => {
     void docsModule.then((module): void => {
       if (typeof module !== "string") module.sourcesChanged?.();
     });
+    return;
+  }
+  if (request.kind === "stories") {
+    readStoryFilesOnly(request.files);
     return;
   }
   if (request.kind === "usage") {

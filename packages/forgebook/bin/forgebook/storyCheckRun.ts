@@ -37,10 +37,26 @@ import { formerIdOf, namedComponent, namedStory } from "../../src/vite/agentIds.
 import { AGENT_API } from "../../src/vite/agentRoutes.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { servedCatalogue } from "./agentClient.ts";
+import { idsOfFiles } from "./storyFileIds.ts";
 
 /** What the project installs to run the stories in a browser, and how. */
 const INSTALL =
-  "Stories run in a browser with @forgebook/testing: npm install -D @forgebook/testing @playwright/test, then npx playwright install chromium";
+  "Stories run in a browser with @forgebook/testing: npm install -D @forgebook/testing @playwright/test, then forgebook browser";
+
+/** How many pages a run on several stories opens at once: enough to matter, few enough for a laptop or a CI runner. */
+const STORIES_AT_ONCE = 4;
+
+/** What a run on several stories is asked: their ids, and whether to run every variant. */
+export type StoriesCheckInput = {
+  /** The stories' ids. */
+  readonly ids: readonly string[];
+  /** Story files, absolute, whose stories run too: a file just written has no id a caller knows yet. */
+  readonly files?: readonly string[];
+  /** Serve the catalogue for the run even when a dev server runs: a file just written must be read as it is now. */
+  readonly isOwnServer?: boolean;
+  /** Run every variant the catalogue's browser tests check; else the default view. */
+  readonly isAllVariants: boolean;
+};
 
 /** What a run is asked: the id, the views and whether to run every variant. */
 export type StoryCheckInput = {
@@ -69,6 +85,7 @@ const checkedStory = (
   const formerId = formerIdOf(component, story);
   return {
     id: story.id,
+    file: story.file,
     ...(formerId === undefined ? {} : { formerId }),
     ...(story.height === undefined ? {} : { height: story.height }),
     ...(story.isLogic ? { isLogic: true } : {}),
@@ -131,8 +148,12 @@ export const testingFunction = async (
   let resolved: string;
   try {
     resolved = createRequire(join(dir, "package.json")).resolve(specifier);
-  } catch {
-    return INSTALL;
+  } catch (error) {
+    // installed, and older than the function asked for
+    const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+    return code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
+      ? `${specifier} is not in this @forgebook/testing: update it`
+      : INSTALL;
   }
   const module: unknown = await import(pathToFileURL(resolved).href);
   if (typeof module !== "object" || module === null || !(name in module))
@@ -150,7 +171,7 @@ export const testingFunction = async (
  *
  * @param origin - where it is served.
  */
-const storiesAt = async (origin: string): Promise<StoriesDocument | string> => {
+export const storiesAt = async (origin: string): Promise<StoriesDocument | string> => {
   const response = await fetch(`${origin}${AGENT_API}stories`);
   const body: unknown = await response.json();
   return isStoriesDocument(body) ? body : `The catalogue answered ${response.status} for its stories`;
@@ -168,24 +189,33 @@ const storiesAt = async (origin: string): Promise<StoriesDocument | string> => {
 const runOnStories = async (
   config: ResolvedConfig,
   url: string | undefined,
-  input: StoryCheckInput,
+  input: StoryCheckInput | (StoriesCheckInput & { readonly views?: undefined }),
   run: {
     readonly specifier: string;
     readonly name: string;
     readonly extra: (document: StoriesDocument) => Readonly<Record<string, unknown>>;
+    /** The server to use and no other: a comparison must not draw one side from a server of its own. */
+    readonly exactOrigin?: string;
   }
 ): Promise<unknown> => {
   const call = await testingFunction(config.dir, run.specifier, run.name);
   if (typeof call === "string") return call;
   const switches = catalogueSwitches(config.switches, config.languages, config.lists.controls);
-  const views = queriesOf(input.views, switches);
+  const views = queriesOf(input.views ?? [], switches);
   if (typeof views === "string") return views;
-  const served = await servedCatalogue(config, url);
+  const served =
+    run.exactOrigin === undefined
+      ? await servedCatalogue(config, url, "ids" in input && input.isOwnServer === true)
+      : { origin: run.exactOrigin, close: async (): Promise<void> => undefined };
   try {
     const document = await storiesAt(served.origin);
     if (typeof document === "string") return document;
-    const stories = storiesNamed(document, input.id, deviceDefaultOf(NO_DEVICE, config.lists.device));
-    if (stories.length === 0) return `No story or component "${input.id}"`;
+    const ids =
+      "ids" in input ? [...input.ids, ...idsOfFiles(document, config.dir, input.files ?? [])] : [input.id];
+    const stories = ids.flatMap((id) =>
+      storiesNamed(document, id, deviceDefaultOf(NO_DEVICE, config.lists.device))
+    );
+    if (stories.length === 0) return `No story or component "${ids.join(", ")}"`;
     const request: StoryCheckRequest = {
       frameUrl: `${served.origin}/frame.html`,
       stories,
@@ -194,7 +224,11 @@ const runOnStories = async (
       views,
       isAllVariants: input.isAllVariants
     };
-    return await call({ ...request, ...run.extra(document) });
+    return await call({
+      ...request,
+      ...("ids" in input ? { concurrency: STORIES_AT_ONCE } : {}),
+      ...run.extra(document)
+    });
   } finally {
     await served.close();
   }
@@ -221,6 +255,28 @@ export const runStoryCheck = async (
     specifier: "@forgebook/testing/check",
     name: "checkStories",
     extra: () => (semantic === undefined ? {} : { semantic })
+  });
+  if (typeof answer === "string" || isStoryCheckReport(answer)) return answer;
+  return "@forgebook/testing/check answered something that is not a check's report";
+};
+
+/**
+ * Runs the catalogue's checks on several stories, on one browser and one server: what `verify` asks.
+ *
+ * @param config - the catalogue's configuration.
+ * @param url - where `forgebook dev` runs, when not at Vite's default address.
+ * @param input - the stories, and whether to check every variant.
+ * @returns the report, or why the check could not run.
+ */
+export const runStoriesCheck = async (
+  config: ResolvedConfig,
+  url: string | undefined,
+  input: StoriesCheckInput
+): Promise<StoryCheckReport | string> => {
+  const answer = await runOnStories(config, url, input, {
+    specifier: "@forgebook/testing/check",
+    name: "checkStories",
+    extra: () => ({})
   });
   if (typeof answer === "string" || isStoryCheckReport(answer)) return answer;
   return "@forgebook/testing/check answered something that is not a check's report";
@@ -286,6 +342,57 @@ export const runStoryDiff = async (
     specifier: "@forgebook/testing/diff",
     name: "diffStories",
     extra: (document: StoriesDocument) => ({ ...folders, ...diffedComponent(document, input.id) })
+  });
+  if (typeof answer === "string" || isStoryDiffReport(answer)) return answer;
+  return "@forgebook/testing/diff answered something that is not a comparison's report";
+};
+
+/**
+ * Takes several stories' pictures from one server and no other: what `proof` asks of each side.
+ *
+ * @param config - the catalogue's configuration, whose testing package and switches both sides are drawn with.
+ * @param origin - the server.
+ * @param input - the stories, and whether to picture every variant.
+ * @param outDir - the folder the pictures go in, absolute.
+ * @returns the pictures, or why they could not be taken.
+ */
+export const runStoriesShot = async (
+  config: ResolvedConfig,
+  origin: string,
+  input: StoriesCheckInput,
+  outDir: string
+): Promise<StoryShotReport | string> => {
+  const answer = await runOnStories(config, origin, input, {
+    specifier: "@forgebook/testing/shot",
+    name: "shotStories",
+    exactOrigin: origin,
+    extra: () => ({ outDir })
+  });
+  if (typeof answer === "string" || isStoryShotReport(answer)) return answer;
+  return "@forgebook/testing/shot answered something that is not a picture run's report";
+};
+
+/**
+ * Compares several stories' pictures with a folder of pictures, from one server and no other: what `proof` asks of the
+ * change.
+ *
+ * @param config - the catalogue's configuration.
+ * @param origin - the server.
+ * @param input - the stories, and whether to compare every variant.
+ * @param folders - the pictures to compare with and the folder the new ones go in, absolute.
+ * @returns the results, or why they could not be had.
+ */
+export const runStoriesDiff = async (
+  config: ResolvedConfig,
+  origin: string,
+  input: StoriesCheckInput,
+  folders: { readonly baselines: string; readonly outDir: string }
+): Promise<StoryDiffReport | string> => {
+  const answer = await runOnStories(config, origin, input, {
+    specifier: "@forgebook/testing/diff",
+    name: "diffStories",
+    exactOrigin: origin,
+    extra: () => folders
   });
   if (typeof answer === "string" || isStoryDiffReport(answer)) return answer;
   return "@forgebook/testing/diff answered something that is not a comparison's report";

@@ -64,7 +64,7 @@ test.describe("audiences of a component's page", () => {
     await expect(tokens.getByText("dark: #b28bff").first()).toBeVisible();
     await expect(tokens.getByRole("rowheader", { name: "color.accent" })).toBeHidden();
     // the catalogue's own tokens and those its sources declare
-    await tokens.getByText("6 tokens of the whole catalogue").click();
+    await tokens.getByText("9 tokens of the whole catalogue").click();
     await expect(tokens.getByRole("rowheader", { name: "color.accent" })).toBeVisible();
   });
 

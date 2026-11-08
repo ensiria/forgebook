@@ -11,14 +11,14 @@
  */
 import { readFileSync } from "node:fs";
 
-import type { StoryMarkdown } from "@forgebook/story-format/source";
+import type { StoryArgsCode, StoryCode, StoryFileCode, StoryMarkdown } from "@forgebook/story-format/source";
 
 import { codeLiteral } from "../codeLiteral.ts";
 import type { ComponentFiles } from "./adapter.ts";
 import { componentImport } from "./componentImport.ts";
 import { type DiskCache, isSettledSince, nowNs, stampPaths } from "./diskCache.ts";
 import { moduleSummaryOf } from "./moduleSummary.ts";
-import { storyCode } from "./storyCode.ts";
+import { type StoryFileCodeRead, storyCode } from "./storyCode.ts";
 import { CODE_QUERY, MARKDOWN_QUERY, PAGE_QUERY } from "./textQueries.ts";
 
 /** A module the plugin answers. */
@@ -34,33 +34,37 @@ const valueModule = (value: unknown): AnsweredModule => ({
   moduleType: "js"
 });
 
-/** A story file's code as the Code tab reads it: each story's `render` text and its coloured HTML, or why it cannot. */
-export type KeptCode =
-  | { readonly error: string }
-  | Readonly<Record<string, { readonly text: string; readonly html: string }>>;
+/**
+ * A story file's code as the Code tab reads it: each story's `render` text and its coloured HTML, or the args it writes
+ * as code, or why it cannot.
+ */
+export type KeptCode = { readonly error: string } | StoryFileCode;
 
 /** Whether what a cache file holds is a story file's code. */
 export const isKeptCode = (value: unknown): value is KeptCode =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * Each story's `render` text with its coloured HTML.
+ * Each story's `render` text with its coloured HTML, and each args story's args as written.
  *
  * @remarks
  * The colouring loads the TypeScript compiler, tens of megabytes the server then holds for as long as it runs: only a
  * file with a `render` to colour loads it. A file whose stories are all args has none, and its Code tab writes them
- * from the args (the framework's code writer), so a story's page of a library written that way leaves the compiler to
- * the docs worker; a component's page or a Markdown page still loads it, to colour their examples.
+ * from the args (the framework's code writer, with the args the file writes as code), so a story's page of a library
+ * written that way leaves the compiler to the docs worker; a component's page or a Markdown page still loads it, to
+ * colour their examples.
  *
- * @param code - each story's `render` text, by export name.
+ * @param code - each story's `render` text and written args, by export name.
  */
-const colouredCode = async (code: Readonly<Record<string, string>>): Promise<KeptCode> => {
-  const entries = Object.entries(code);
-  if (entries.length === 0) return {};
+const colouredCode = async ({ renders, args }: StoryFileCodeRead): Promise<KeptCode> => {
+  const written = Object.entries(args).map(([name, each]): [string, StoryArgsCode] => [name, { args: each }]);
+  const entries = Object.entries(renders);
+  if (entries.length === 0) return Object.fromEntries(written);
   const { highlightCode } = await import("./highlightCode.ts");
-  return Object.fromEntries(
-    entries.map(([name, text]) => [name, { text, html: highlightCode(text, "tsx") }])
-  );
+  return Object.fromEntries([
+    ...written,
+    ...entries.map(([name, text]): [string, StoryCode] => [name, { text, html: highlightCode(text, "tsx") }])
+  ]);
 };
 
 /**

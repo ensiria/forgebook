@@ -8,17 +8,41 @@
  *
  * @module
  */
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { codeLiteral } from "../codeLiteral.ts";
 import type { CheckedCodeDocument } from "./agent.types.ts";
 import type { AgentAnswer } from "./agentRoutes.ts";
-import { addedLines, checkedCode, deletedTests, fileLines } from "./checkCode.ts";
+import { smallFileText } from "./appTokenFiles.ts";
+import { type AppTokens, readAppTokens } from "./appTokens.ts";
+import {
+  type AddedLine,
+  addedLines,
+  type CodeFindings,
+  codeFindings,
+  deletedTests,
+  excusedValues,
+  fileLines,
+  LEFT_ALONE
+} from "./checkCode.ts";
+import { currentComponents } from "./componentCache.ts";
+import { graphDocument } from "./componentGraph.ts";
+import { COMPONENT_FILE } from "./componentScan.ts";
+import { compositionFindings } from "./compositionCheck.ts";
 import type { ResolvedConfig } from "./configFile.ts";
-import { gitChange, gitOutput } from "./gitChange.ts";
+import type { DesignToken } from "./designTokens.ts";
+import { type GitChange, gitChange, gitOutput } from "./gitChange.ts";
+import { type ProjectFile, workspacePackages } from "./projectFiles.ts";
+import { type ReuseFindings, reuseFindings } from "./reuseCheck.ts";
 import { readTokenFiles, type SourceTokens, sourceTokensIn } from "./sourceTokens.ts";
 import { TOKEN_ANSWERS, type TokenReading, tokenSummary } from "./tokenAnswers.ts";
+
+/** How many component files a change may touch and still be compared: past this it is a move or a rewrite. */
+const MOST_REUSE_FILES = 300;
+
+/** Fewer colours than this in what an application declares is no palette to compare with. */
+const FEWEST_COLORS = 5;
 
 /** Finds the file of a source's module specifier. */
 export type ResolveSource = (specifier: string) => Promise<string | undefined>;
@@ -49,14 +73,14 @@ const sourceDeclaration = async (
 };
 
 /**
- * The catalogue's tokens, read at each question, so an edited file answers at once and costs nothing unasked. Sources
- * are read from their modules' text, each source's files before the catalogue's, which win a clash.
+ * The tokens a catalogue and its sources name, read at each question, so an edited file answers at once and costs nothing
+ * unasked. Sources are read from their modules' text, each source's files before the catalogue's, which win a clash.
  *
  * @param config - the catalogue's configuration.
  * @param resolveSource - finds the file of a source's module.
  * @param watch - told of every file read: the sources' modules and the tokens files; none by default.
  */
-export const catalogueTokens = async (
+const namedTokens = async (
   config: ResolvedConfig,
   resolveSource: ResolveSource,
   watch: (file: string) => void = (): undefined => undefined
@@ -74,7 +98,55 @@ export const catalogueTokens = async (
     clashes,
     problems: [...declaring, ...problems],
     unread: declared.flatMap((source) => (source.unread === undefined ? [] : [source.unread])),
-    isConfigured: files.length > 0 || declaring.length > 0
+    isConfigured: files.length > 0 || declaring.length > 0,
+    sources: files.map(({ label }) => ({ kind: "tokens-file", file: label })),
+    notes: []
+  };
+};
+
+/** What the application declares; a failure of the system (a folder gone) is a note, with no machine's path in it. */
+const appTokensOf = (dir: string): AppTokens => {
+  try {
+    return readAppTokens(dir);
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String(error.code) : "an error";
+    return {
+      tokens: [],
+      clashes: [],
+      sources: [],
+      files: [],
+      problems: [],
+      unread: [`the application's files: ${code}`]
+    };
+  }
+};
+
+/**
+ * The tokens an agent is answered from: what the catalogue and its sources name or, when they name none, what the
+ * application already declares, which is read from its files and never run. A catalogue that says `tokens: []` wants
+ * none, so a named file is not the only way to say so.
+ *
+ * @param config - the catalogue's configuration.
+ * @param resolveSource - finds the file of a source's module.
+ * @param watch - told of every file read; none by default.
+ */
+export const catalogueTokens = async (
+  config: ResolvedConfig,
+  resolveSource: ResolveSource,
+  watch: (file: string) => void = (): undefined => undefined
+): Promise<TokenReading> => {
+  const named = await namedTokens(config, resolveSource, watch);
+  if (named.isConfigured || config.isAppTokensOff === true) return named;
+  const app = appTokensOf(config.dir);
+  for (const file of app.files) watch(file);
+  return {
+    ...named,
+    tokens: app.tokens,
+    problems: app.problems,
+    clashes: app.clashes,
+    isConfigured: app.tokens.length > 0,
+    sources: app.sources,
+    notes: app.unread
   };
 };
 
@@ -92,12 +164,138 @@ export const tokensModule = async (
   watch: (file: string) => void,
   resolveSource: ResolveSource
 ): Promise<{ code: string; moduleType: "js" }> => {
-  const { tokens, problems, unread } = await catalogueTokens(config, resolveSource, watch);
+  const { tokens, problems, unread } = await namedTokens(config, resolveSource, watch);
   // in both forms: Vite's, and the system's, which a Windows error message writes
   const shown = (problem: string): string =>
     problem.replaceAll(config.dir, ".").replaceAll(resolve(config.dir), ".");
   const value = { tokens: tokens.map(tokenSummary), problems: [...unread, ...problems].map(shown) };
   return { code: `export default ${codeLiteral(value)};`, moduleType: "js" };
+};
+
+/**
+ * The tokens worth comparing a change with. A named tokens file is the system whatever its size. In what an application
+ * merely declares, a handful of colours (a brand colour, a chart's) is no palette: against it every colour written by hand
+ * would read as a mistake, and a check that says so on every line gets turned off.
+ */
+const checkableTokens = ({ tokens, sources }: TokenReading): readonly DesignToken[] => {
+  if (sources.some((source) => source.kind === "tokens-file")) return tokens;
+  const colors = tokens.filter((token) => token.type === "color").length;
+  return colors >= FEWEST_COLORS ? tokens : tokens.filter((token) => token.type !== "color");
+};
+
+/** How many sizes in objects that may not be styles an answer lists: past this, a file of options would bury the rest. */
+const MOST_CODE_ADVICE = 20;
+
+/**
+ * What added lines break: values only in the catalogue's folder when the tokens are what that folder's application
+ * declares, since a repository's other packages have systems of their own. A turned-off check is one everywhere. Only
+ * the compared values give advice: with no tokens there is nothing to weigh.
+ */
+const codeFindingsOf = (
+  added: readonly AddedLine[],
+  tokens: readonly DesignToken[],
+  inFolder: (file: string) => boolean
+): CodeFindings => {
+  const compared = codeFindings(
+    added.filter(({ file }) => inFolder(file)),
+    tokens
+  );
+  const elsewhere = codeFindings(
+    added.filter(({ file }) => !inFolder(file)),
+    []
+  );
+  return { problems: [...compared.problems, ...elsewhere.problems], advice: compared.advice };
+};
+
+/** What a change's values were not compared with, and why, in the words `skipped` gives. */
+const notCheckedLine = (hasColors: boolean, hasSizes: boolean, { tokens }: TokenReading): string[] => {
+  if (hasColors && hasSizes) return [];
+  const what = [...(hasColors ? [] : ["colours"]), ...(hasSizes ? [] : ["sizes"])].join(" and ");
+  const reason =
+    tokens.length === 0
+      ? "no tokens file"
+      : `too few tokens of that kind in the application (${tokens.length})`;
+  return [`${what} not checked: ${reason}`];
+};
+
+/** What a change's files were, at the commit it starts from: a file it adds has none. */
+const filesAtBase = async (
+  root: string,
+  base: string,
+  files: readonly string[]
+): Promise<readonly ProjectFile[]> => {
+  const read = await Promise.all(
+    files.map(async (file) => ({
+      file,
+      text: await gitOutput(root, "show", `${base}:${file}`).catch(() => undefined)
+    }))
+  );
+  return read.flatMap(({ file, text }) => (text === undefined ? [] : [{ file, text }]));
+};
+
+/**
+ * What a change adds against the project's components, read over the whole repository, since the one a new component
+ * copies may live in another package. Only a change to a component's file costs this reading.
+ */
+const reuseOf = async (
+  root: string,
+  change: GitChange,
+  added: readonly AddedLine[]
+): Promise<ReuseFindings & { readonly notes: readonly string[]; readonly hasRules: boolean }> => {
+  try {
+    return await readReuse(root, change, added);
+  } catch (error) {
+    // a crafted file past what a walk can take costs this part of the answer, and says so
+    const reason = error instanceof RangeError ? "a file nests too deep" : "it could not be read";
+    return {
+      problems: [],
+      advice: [],
+      excused: [],
+      hasRules: false,
+      notes: [`components not compared: ${reason}`]
+    };
+  }
+};
+
+/** What `reuseOf` reads. */
+const readReuse = async (
+  root: string,
+  change: GitChange,
+  added: readonly AddedLine[]
+): Promise<ReuseFindings & { readonly notes: readonly string[]; readonly hasRules: boolean }> => {
+  const isComponent = (file: string): boolean => COMPONENT_FILE.test(file) && !LEFT_ALONE.test(file);
+  const touched = new Set(added.flatMap(({ file }) => (isComponent(file) ? [file] : [])));
+  const empty = { problems: [], advice: [], excused: [], notes: [], hasRules: false };
+  if (touched.size === 0) return empty;
+  const deleted = change.deleted.filter(isComponent);
+  if (touched.size + deleted.length > MOST_REUSE_FILES) {
+    return {
+      ...empty,
+      notes: [`components not compared: the change touches more than ${MOST_REUSE_FILES} of them`]
+    };
+  }
+  const notes: string[] = [];
+  const components = currentComponents(root, notes);
+  const changed = [...touched].flatMap((file) => {
+    const text = smallFileText(join(root, file));
+    return text === undefined ? [] : [{ file, text }];
+  });
+  const packages = workspacePackages(root);
+  const composition = compositionFindings(added, changed, components, packages);
+  const findings = reuseFindings({
+    added,
+    changed,
+    previous: await filesAtBase(root, change.base, [...touched, ...deleted]),
+    components,
+    packages
+  });
+  return {
+    problems: [...findings.problems, ...composition.problems],
+    advice: findings.advice,
+    excused: [...findings.excused, ...composition.excused],
+    hasRules: components.some((each) => each.rules !== undefined),
+    notes: notes.map((note) => `components not all compared: ${note}`)
+  };
 };
 
 /**
@@ -115,7 +313,9 @@ const checkCodeAnswer = async (
   resolveSource: ResolveSource
 ): Promise<AgentAnswer> => {
   const since = params.get("since") || "HEAD";
-  const { tokens, problems, unread } = await catalogueTokens(config, resolveSource);
+  const reading = await catalogueTokens(config, resolveSource);
+  const { problems, unread } = reading;
+  const tokens = checkableTokens(reading);
   if (problems.length > 0) {
     return { status: 400, body: { error: `The tokens files have problems: ${problems.join("; ")}` } };
   }
@@ -127,23 +327,62 @@ const checkCodeAnswer = async (
       fileLines(file, await readFile(join(root, file), "utf8").catch(() => ""))
     )
   );
-  const hasTokens = tokens.length > 0;
+  const hasNamedFile = reading.sources.some((source) => source.kind === "tokens-file");
+  const added = [...addedLines(change.diff), ...fresh.flat()];
+  const folder = relative(root, await realpath(config.dir)).replaceAll("\\", "/");
+  const isInCatalogue = (file: string): boolean =>
+    folder === "" || file === folder || file.startsWith(`${folder}/`);
+  const inFolder = (file: string): boolean => hasNamedFile || isInCatalogue(file);
+  const hasColors = tokens.some((token) => token.type === "color") || (hasNamedFile && tokens.length > 0);
+  const hasSizes = tokens.some((token) => token.type === "dimension") || (hasNamedFile && tokens.length > 0);
+  const reuse = await reuseOf(
+    root,
+    change,
+    added.filter(({ file }) => isInCatalogue(file))
+  );
+  const code = codeFindingsOf(added, tokens, inFolder);
   const body: CheckedCodeDocument = {
     schema: 1,
     since,
-    checked: hasTokens
-      ? ["raw-color", "raw-size", "suppression", "deleted-test"]
-      : ["suppression", "deleted-test"],
-    skipped: [
-      ...(hasTokens ? [] : ["Colours and sizes: this catalogue names no tokens file."]),
-      ...unread.map((source) => `Tokens of a source: ${source}`)
+    checked: [
+      ...(hasColors ? (["raw-color"] as const) : []),
+      ...(hasSizes ? (["raw-size"] as const) : []),
+      "suppression",
+      "deleted-test",
+      "deprecated-component",
+      "duplicate-component",
+      ...(reuse.hasRules ? (["composition"] as const) : [])
     ],
-    problems: [
-      ...checkedCode([...addedLines(change.diff), ...fresh.flat()], tokens),
-      ...deletedTests(change.deleted)
-    ]
+    skipped: [
+      ...notCheckedLine(hasColors, hasSizes, reading),
+      ...reuse.notes,
+      ...unread.map((source) => `tokens of a source not checked: ${source}`),
+      ...(code.advice.length > MOST_CODE_ADVICE
+        ? [`${code.advice.length - MOST_CODE_ADVICE} more sizes in objects to weigh not listed`]
+        : [])
+    ],
+    problems: [...code.problems, ...deletedTests(change.deleted), ...reuse.problems],
+    advice: [...code.advice.slice(0, MOST_CODE_ADVICE), ...reuse.advice],
+    tokenSources: reading.sources,
+    tokenClashes: reading.clashes.length,
+    tokenNotes: [...reading.notes],
+    notCompared: [...new Set(added.flatMap(({ file }) => (inFolder(file) ? [] : [file])))],
+    excused: [...excusedValues(added.filter(({ file }) => inFolder(file))), ...reuse.excused]
   };
   return { status: 200, body };
+};
+
+/** The map of the project, for a client with no shell. */
+const graphAnswer = async (config: ResolvedConfig, params: URLSearchParams): Promise<AgentAnswer> => {
+  const limit = Number(params.get("limit"));
+  return {
+    status: 200,
+    body: graphDocument(config.dir, {
+      component: params.get("component") || undefined,
+      intent: params.get("intent") || undefined,
+      limit: Number.isInteger(limit) && limit > 0 ? limit : undefined
+    })
+  };
 };
 
 /** The answers that need nothing of the stories, so a story broken mid-edit cannot take them down. */
@@ -163,5 +402,6 @@ export const STORYLESS_ROUTES: Readonly<
       ): Promise<AgentAnswer> => answer(await catalogueTokens(config, resolveSource), params)
     ])
   ),
-  "check-code": checkCodeAnswer
+  "check-code": checkCodeAnswer,
+  graph: graphAnswer
 };

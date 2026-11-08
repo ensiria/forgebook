@@ -5,10 +5,9 @@
  * @module
  */
 
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
+import { agentsSection, guideTopic } from "../bin/forgebook/agentGuide.ts";
 import {
   AGENTS_END,
   AGENTS_START,
@@ -19,6 +18,16 @@ import {
 import { DEVICE_IDS } from "../src/deviceView.ts";
 
 describe("withAgentsSection", () => {
+  it("appends after trailing blank lines, and is not slowed by a run of them inside the file", () => {
+    const section = `${AGENTS_START}\n## Stories\n${AGENTS_END}\n`;
+    expect(withAgentsSection("# Notes\n\n\n", "## Stories\n")).toBe(`# Notes\n\n${section}`);
+    const notes = `# Notes${"\n".repeat(200_000)}end`;
+    const start = performance.now();
+    expect(withAgentsSection(notes, "## Stories\n")).toBe(`${notes}\n\n${section}`);
+    // a pattern anchored at the end takes more than ten seconds on this
+    expect(performance.now() - start).toBeLessThan(5000);
+  });
+
   it("writes the section alone into a file that does not exist yet", () => {
     expect(withAgentsSection(undefined, "## Stories\n")).toBe(`${AGENTS_START}\n## Stories\n${AGENTS_END}\n`);
   });
@@ -45,8 +54,7 @@ describe("agentsSkill", () => {
   });
 
   it("meets the Agent Skills standard, on the real text", () => {
-    const text = readFileSync(new URL("../bin/forgebook/agents.md", import.meta.url), "utf8");
-    const skill = agentsSkill(text);
+    const skill = agentsSkill(agentsSection(["react"]));
     const [, frontmatter = ""] = /^---\n(.*?)\n---\n/s.exec(skill) ?? [];
     const fields = new Map(
       frontmatter.split("\n").map((line) => {
@@ -71,9 +79,9 @@ describe("SKILL_FOLDERS", () => {
   });
 });
 
-describe("the agents' section on devices", () => {
+describe("the agents' guide on devices", () => {
   it("names every device model, so an agent can write any of them", () => {
-    const section = readFileSync(new URL("../bin/forgebook/agents.md", import.meta.url), "utf8");
-    for (const id of DEVICE_IDS) expect(section).toContain(`\`${id}\``);
+    const guide = guideTopic("devices")?.text;
+    for (const id of DEVICE_IDS) expect(guide).toContain(`\`${id}\``);
   });
 });

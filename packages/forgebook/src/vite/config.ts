@@ -18,6 +18,7 @@ import type { ForgebookPlugin } from "../plugin.ts";
 import type { ShellOptions } from "../shellTheme.types.ts";
 import type { ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
+import type { AppBuildOption } from "./appBuildOption.ts";
 import type { FramesOption } from "./framesConfig.ts";
 
 /** What a library's preset gives a catalogue. */
@@ -79,9 +80,17 @@ export type ForgebookConfig = CatalogueLists & {
   /**
    * Its design tokens, DTCG 2025.10 files by path from the configuration's folder, the base first; a theme is a file of
    * its own (`["tokens.json", { file: "dark.tokens.json", mode: "dark" }]`). What tools and agents read tokens from,
-   * after each source's: a name given twice takes the catalogue's value, and tools report the clash.
+   * after each source's: a name given twice takes the catalogue's value, and tools report the clash. With none named here
+   * or on a source, what the application already declares is read instead (custom properties, Tailwind, `components.json`);
+   * `[]` says there is no system, so nothing is.
    */
   readonly tokens?: readonly TokensFile[];
+  /**
+   * Custom controls of the props panel, by the name a story's `argTypes` use (`{ rating: "./controls/rating.ts" }`): each a
+   * module, by path from the configuration's folder or a package's specifier, exporting `mount` and `schema`. It loads when
+   * a story names it, and runs in the shell's page with a plugin's trust.
+   */
+  readonly argControls?: Readonly<Record<string, string>>;
   /** Its preview's path from the configuration's folder; `forgebook.preview.ts` (or `.tsx`) beside it when there. */
   readonly preview?: string;
   /** Tags for every frame's `<head>` (a font's link); none by default. */
@@ -100,6 +109,29 @@ export type ForgebookConfig = CatalogueLists & {
   readonly frames?: FramesOption;
   /** How `forgebook build` writes the catalogue. */
   readonly build?: BuildOptions;
+  /**
+   * How much of the app's own build its stories are drawn with: `tsconfig.json`'s `paths`, the `vite.config` beside this
+   * file (its aliases, its plugins except the framework's and those only an app's build needs) and its PostCSS. All by
+   * default; loading a `vite.config` or a `postcss.config` runs its code, as the app's build does. `false` reads none,
+   * and each part can be turned off.
+   */
+  readonly appBuild?: AppBuildOption;
+  /**
+   * Other catalogues, built and deployed, shown in the sidebar after this one's stories, by an id of lower-case words
+   * (`{ "design-system": { title: "Design system", url: "https://ds.example.com/" } }`). Each is read from the index
+   * its `forgebook build --agent-index` writes, when its section is first opened, and its stories are drawn by its own
+   * page on its own origin, read-only, with this catalogue's switches. Its host must let this catalogue fetch the index
+   * (CORS) and frame its page. None by default.
+   */
+  readonly refs?: Readonly<Record<string, RefOption>>;
+};
+
+/** A catalogue shown in another's sidebar (`refs`). */
+export type RefOption = {
+  /** Its name, as its section's heading. */
+  readonly title: string;
+  /** The address it is served at, its folder (`https://ds.example.com/catalogue/`). */
+  readonly url: string;
 };
 
 /** How `forgebook build` writes the catalogue. */

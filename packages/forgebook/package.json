@@ -40,6 +40,7 @@
     "./shell": "./src/shell/mountShell.tsx",
     "./shell/home": "./src/shell/AuthoredHome.tsx",
     "./shell/plugin-hosts": "./src/shell/pluginHosts.ts",
+    "./shell/refs": "./src/shell/refParts.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
     "./renderer": "./src/frame/renderer.ts",
@@ -47,6 +48,8 @@
     "./story-module": "./src/frame/storyModule.ts",
     "./messages": "./src/messages.ts",
     "./jsx-code": "./src/jsxCode.ts",
+    "./arg-expression": "./src/argExpression.ts",
+    "./arg-control": "./src/argControl.ts",
     "./component-docs": "./src/componentDocs.ts",
     "./vite/adapter": "./src/vite/adapter.ts",
     "./vite/docs-program": "./src/vite/docsProgram.ts",
@@ -56,6 +59,7 @@
     "./vite/signature-docs": "./src/vite/signatureDocs.ts",
     "./vite/usage-guidance": "./src/vite/usageGuidance.ts",
     "./vite/function-component-docs": "./src/vite/functionComponentDocs.ts",
+    "./vite/jsx-call-sites": "./src/vite/jsxCallSites.ts",
     "./catalogue-docs": "./bin/forgebook-docs/collectDocs.ts",
     "./catalogue-markdown": "./bin/forgebook-docs/catalogueMarkdown.ts",
     "./catalogue-options": "./bin/forgebook-docs/catalogueOptions.ts",
@@ -73,6 +77,7 @@
     "./vite/index-story-file": "./src/vite/indexStoryFile.ts",
     "./vite/story-files-module": "./src/vite/storyFilesModule.ts",
     "./vite/paths": "./src/vite/vitePaths.ts",
+    "./vite/project-postcss": "./src/vite/projectPostcss.ts",
     "./switches": "./src/switches.ts",
     "./catalogue": "./src/catalogue.ts",
     "./story-check": "./src/storyCheck.ts",
@@ -98,15 +103,15 @@
     "axe-core": "4.14.0",
     "lightningcss": "1.33.0",
     "marked": "18.1.0",
-    "typescript-6": "npm:typescript@6.0.3"
+    "typescript-6": "npm:typescript@6.0.3",
+    "vite": "^8.3.4"
   },
   "peerDependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/user-event": "^14.6.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "sass-embedded": "^1.80.0",
-    "vite": "^8.3.4"
+    "react": "^18.2.0 || ^19.0.0",
+    "react-dom": "^18.2.0 || ^19.0.0",
+    "sass-embedded": "^1.80.0"
   },
   "devDependencies": {
     "@forgebook/tools": "workspace:*",
@@ -165,6 +170,10 @@
         "types": "./dist/src/shell/pluginHosts.d.ts",
         "default": "./dist/src/shell/pluginHosts.js"
       },
+      "./shell/refs": {
+        "types": "./dist/src/shell/refParts.d.ts",
+        "default": "./dist/src/shell/refParts.js"
+      },
       "./frame": {
         "types": "./dist/src/frame/mountFrame.d.ts",
         "default": "./dist/src/frame/mountFrame.js"
@@ -192,6 +201,14 @@
       "./jsx-code": {
         "types": "./dist/src/jsxCode.d.ts",
         "default": "./dist/src/jsxCode.js"
+      },
+      "./arg-expression": {
+        "types": "./dist/src/argExpression.d.ts",
+        "default": "./dist/src/argExpression.js"
+      },
+      "./arg-control": {
+        "types": "./dist/src/argControl.d.ts",
+        "default": "./dist/src/argControl.js"
       },
       "./component-docs": {
         "types": "./dist/src/componentDocs.d.ts",
@@ -228,6 +245,10 @@
       "./vite/function-component-docs": {
         "types": "./dist/src/vite/functionComponentDocs.d.ts",
         "default": "./dist/src/vite/functionComponentDocs.js"
+      },
+      "./vite/jsx-call-sites": {
+        "types": "./dist/src/vite/jsxCallSites.d.ts",
+        "default": "./dist/src/vite/jsxCallSites.js"
       },
       "./catalogue-docs": {
         "types": "./dist/bin/forgebook-docs/collectDocs.d.ts",
@@ -296,6 +317,10 @@
       "./vite/paths": {
         "types": "./dist/src/vite/vitePaths.d.ts",
         "default": "./dist/src/vite/vitePaths.js"
+      },
+      "./vite/project-postcss": {
+        "types": "./dist/src/vite/projectPostcss.d.ts",
+        "default": "./dist/src/vite/projectPostcss.js"
       },
       "./switches": {
         "types": "./dist/src/switches.d.ts",

@@ -13,7 +13,8 @@
  *
  * @module
  */
-import { type ArgValue, isNamedArg, type PanelArgs } from "forgebook/messages";
+import { argExpression } from "forgebook/arg-expression";
+import { type ArgValue, isNamedArg, type NamedArg, type PanelArgs } from "forgebook/messages";
 import type { StoryCodeWriter } from "forgebook/renderer";
 
 import { isBindingName } from "./bindingName.ts";
@@ -49,8 +50,11 @@ const binding = (name: string, value: ArgValue): string => {
     return value.includes("{{") ? `[${name}]="${expression(value)}"` : `${name}="${attributeText(value)}"`;
   // a named value is written by its name, as the source's module exports it
   if (isNamedArg(value)) return isIdentifier(value.named) ? `[${name}]="${value.named}"` : `[${name}]="null"`;
-  if (Array.isArray(value)) return `[${name}]="[${value.map(expression).join(", ")}]"`;
-  return `[${name}]="${String(value)}"`;
+  const written = argExpression(value, {
+    text: expression,
+    named: (named: NamedArg): string => (isIdentifier(named.named) ? named.named : "null")
+  });
+  return `[${name}]="${written}"`;
 };
 
 /** The longest line the bindings stay on one line for, in characters. */

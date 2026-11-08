@@ -129,6 +129,11 @@ export type StoryFileIndex = {
   readonly propGroups?: readonly string[];
   /** The meta's `parameters.docs.description.component`, when written plainly. */
   readonly description?: string;
+  /**
+   * The meta's own tags, when it writes any, with its `parameters.status` among them: what the file says of the
+   * component as a whole (`review`, `deprecated`), whatever each story adds or takes away.
+   */
+  readonly tags?: readonly string[];
   /** What the index noticed without refusing the file (a title written by code, placed by its path). */
   readonly notes?: readonly string[];
   /** Its stories, in the order of the file (or of its `__namedExportsOrder`). */
@@ -178,8 +183,21 @@ export type StoryCode = {
   readonly html: string;
 };
 
-/** Each story's `render` as written in its file, by export name; a story without one is left out. */
-export type StoryFileCode = Readonly<Record<string, StoryCode>>;
+/**
+ * A story drawn from its args: each arg its file writes as code (a function, an element, a constant), as written, by
+ * name, the meta's under the story's. The catalogue writes the component with them in the framework's code, and with
+ * the values of the moment for the rest, which are plain data and read the same.
+ */
+export type StoryArgsCode = {
+  /** Each arg's expression as written (`<IconStar />`, `fn()`), by name, in the order the file sets them. */
+  readonly args: Readonly<Record<string, string>>;
+};
+
+/**
+ * Each story's code as written in its file, by export name: its `render`, or for a story drawn from its args the args
+ * it writes as code; a story with neither is left out.
+ */
+export type StoryFileCode = Readonly<Record<string, StoryCode | StoryArgsCode>>;
 
 /**
  * A group of story files, as the catalogue's plugin answers a `?forgebook-files` import: each file's index, and the
@@ -193,7 +211,7 @@ export type StoryFiles = {
   readonly stories: Readonly<Record<string, () => Promise<unknown>>>;
   /** Each file's component docs, for the props panel (`{ error }` when they cannot be read, `{ name: null }` for none). */
   readonly docs: Readonly<Record<string, () => Promise<unknown>>>;
-  /** Each file's code: each story's `render` as written, for the Code tab. */
+  /** Each file's code: each story's `render`, or the args it writes as code, as written, for the Code tab. */
   readonly code: Readonly<Record<string, () => Promise<unknown>>>;
   /** Each file's component page: its Markdown documentation, beside the story file, as HTML (`{ none: true }` without). */
   readonly pages: Readonly<Record<string, () => Promise<unknown>>>;
@@ -209,14 +227,15 @@ export type StoryFiles = {
    * for files indexed before it existed: the search then finds them by their names.
    */
   readonly search?: () => Promise<unknown>;
+  /**
+   * The story files of the group that cannot be read, each named with why (and its line and column when they are
+   * known): on a dev server the others still draw, and the catalogue lists these. None when every file was read.
+   */
+  readonly problems?: readonly string[];
 };
 
-/**
- * The colour of the page a source's stories open on, by theme and contrast: the catalogue paints a story's box with it
- * while the story loads, so the box is not white before a dark story and does not change colour when the story shows.
- * A CSS colour each; the more-contrast ones fall back to their scheme's.
- */
-export type StoryBackground = {
+/** A page's colours by theme and contrast: a CSS colour each; the more-contrast ones fall back to their scheme's. */
+export type StoryBackgroundColours = {
   /** The light theme's. */
   readonly light: string;
   /** The dark theme's. */
@@ -225,6 +244,19 @@ export type StoryBackground = {
   readonly lightMore?: string;
   /** The dark theme's with more contrast; `dark` when left out. */
   readonly darkMore?: string;
+};
+
+/**
+ * The colour of the page a source's stories open on, by theme and contrast: the catalogue paints a story's box with it
+ * while the story loads, so the box is not white before a dark story and does not change colour when the story shows.
+ */
+export type StoryBackground = StoryBackgroundColours & {
+  /**
+   * The colours of a switch's values, by switch id then value, for a page whose colour follows another switch than the
+   * theme (`{ brand: { night: { dark: "#0b1020" } } }`). The first declared switch whose value gives the scheme's colour
+   * wins; a value that gives none leaves it to the next switch, then to the colours above. None by default.
+   */
+  readonly bySwitch?: Readonly<Record<string, Readonly<Record<string, Partial<StoryBackgroundColours>>>>>;
 };
 
 /** A Markdown file as the catalogue's plugin answers a `?forgebook-markdown` import: its text as HTML. */

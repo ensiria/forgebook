@@ -6,7 +6,7 @@ through `useRoute`, `navigateTo` and `NuxtLink`, `useFetch` and `useAsyncData`, 
 `useRuntimeConfig` and `useAppConfig`. It is [`@forgebook/vue`](https://www.npmjs.com/package/@forgebook/vue) with a
 Vite plugin and a story's own Nuxt.
 
-**Requirements:** Nuxt 3 or 4 · Vue 3.5 · vue-router 4.5 or 5 (Nuxt's) · `forgebook` · Vite 8.3.4+ · React in the project, for
+**Requirements:** Nuxt 3 or 4 · Vue 3.5 · vue-router 4.5 or 5 (Nuxt's) · `forgebook` · React in the project, for
 the catalogue's own interface (the frames that draw your components load none) ·
 [MIT licence](https://github.com/ensiria/forgebook/blob/develop/packages/nuxt/LICENSE)
 
@@ -111,9 +111,16 @@ leave the frame's head alone, `definePageMeta` and route middleware do nothing, 
 `useError` instead of drawing Nuxt's error page. The generated server tests run no `useAsyncData` handler: they draw
 the story's `data`, or nothing.
 
-Nuxt's own build is not run, so the work of a Nuxt module or plugin is not done: a component that needs what one
-provides (a Pinia store, i18n) gets it from a decorator, and a module's components and composables are not
-auto-imported. `#build/…` modules are Nuxt's build's own and fail by name. Nuxt layers (`extends`) and
+Nuxt's own build is not run. The project's modules are loaded with its own Nuxt, as `nuxt dev` loads them, and what
+they give components is taken: their Vite plugins (Nuxt UI's Tailwind CSS, UnoCSS), their style sheets, their components
+and auto-imports (`UButton`, `useToast`), and the files they write in `.nuxt` (`#build/ui.css`, `#build/app.config`),
+which are written there as `nuxt prepare` writes them, so a project where `nuxt prepare` has not run is told to run it.
+That runs the modules' code, and a module may fetch from the network (a fonts module does). It happens on every start of
+the catalogue; `nuxt({ loadModules: false })`, or `appBuild: false` in the configuration, turns it off. What a module or
+a plugin sets up when Nuxt's app runs is not done: a component that needs what one provides (a Pinia store, i18n's
+messages) gets it from the preview's `setup` of `@forgebook/vue/setup` (`setup((app) => app.use(createPinia()))`, run
+after Nuxt prepares the story's app), and a `#build/…` module only Nuxt's build makes fails by name. Nuxt layers
+(`extends`) and
 `definePageMeta`'s `path` and `name` are not read. A Nuxt function this package does not stand in for is not given: a
 file that uses one fails on it by name.
 

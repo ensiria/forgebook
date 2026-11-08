@@ -6,7 +6,8 @@
  * @module
  */
 
-import { describe, expect, it, vi } from "vitest";
+import type { StepFunction } from "@forgebook/story-format/csf";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { heldFrameClock } from "../src/frame/frameClock.ts";
 import type { PlayToolsLoader } from "../src/frame/playStory.ts";
@@ -19,7 +20,13 @@ import {
   type StoryRunOptions
 } from "../src/frame/storyRun.ts";
 import type { PanelArgs } from "../src/messages.ts";
+import type { PlayTrace } from "../src/playTrace.ts";
 import { domRenderer } from "./domRenderer.ts";
+
+// a frame loads the play runner with its first play: loaded here first, a test's play starts within the turn it waits
+beforeAll(async () => {
+  await import("../src/frame/playStory.ts");
+});
 
 /** What a run told the frame. */
 type Reports = {
@@ -63,7 +70,8 @@ const run = async (
   story: LoadedStory,
   playTools?: PlayToolsLoader,
   onEvent: StoryRunOptions["onEvent"] = (): undefined => undefined,
-  pluginSetups: StoryRunOptions["pluginSetups"] = []
+  pluginSetups: StoryRunOptions["pluginSetups"] = [],
+  overrides: Partial<StoryRunOptions> = {}
 ): Promise<{
   readonly container: HTMLElement;
   readonly reports: Reports;
@@ -93,7 +101,8 @@ const run = async (
     onError: (message: string): void => {
       reports.errors.push(message);
     },
-    onTrace: () => undefined
+    onTrace: () => undefined,
+    ...overrides
   };
   const running = runStory(options);
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -105,6 +114,75 @@ const controlsOf = (reports: Reports): StoryControls => {
   if (reports.controls === undefined) throw new Error("The story never got ready");
   return reports.controls;
 };
+
+describe("the play switch", () => {
+  it("keeps a play from running on a mount, says so, and runs it when asked, once", async () => {
+    let played = 0;
+    const statuses: string[] = [];
+    const { reports } = await run(
+      badge({
+        play: (): void => {
+          played += 1;
+        }
+      }),
+      undefined,
+      undefined,
+      [],
+      { playsOnOpen: false, onTrace: (trace: PlayTrace): void => void statuses.push(trace.status) }
+    );
+    expect(played).toBe(0);
+    expect(statuses).toEqual(["off"]);
+    expect(reports.controls).toBeDefined();
+    controlsOf(reports).playAgain();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(1);
+    expect(statuses.at(-1)).toBe("passed");
+    controlsOf(reports).restartClock();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(1);
+  });
+
+  it("says nothing of a story with no play", async () => {
+    const statuses: string[] = [];
+    await run(badge({}), undefined, undefined, [], {
+      playsOnOpen: false,
+      onTrace: (trace: PlayTrace): void => void statuses.push(trace.status)
+    });
+    expect(statuses).toEqual([]);
+  });
+});
+
+describe("stepping through a play", () => {
+  it("pauses only the mount it was asked for: Replay's next mount runs on its own", async () => {
+    let played = 0;
+    const paused: (string | undefined)[] = [];
+    const { reports } = await run(
+      badge({
+        play: async ({ step }: { readonly step: StepFunction }): Promise<void> => {
+          await step("first", () => {
+            played += 1;
+          });
+        }
+      }),
+      undefined,
+      undefined,
+      [],
+      { onTrace: (trace: PlayTrace): void => void paused.push(trace.pausedAt) }
+    );
+    expect(played).toBe(1);
+    const controls = controlsOf(reports);
+    controls.stepPlay("start");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(1);
+    expect(paused.at(-1)).toBe("first");
+    controls.stepPlay("next");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(2);
+    controls.restartClock();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(played).toBe(3);
+  });
+});
 
 describe("runStory with a second framework", () => {
   it("draws the story in a canvas with its layout, then plays it on that canvas and is ready", async () => {

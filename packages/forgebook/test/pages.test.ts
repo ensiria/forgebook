@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { codeLiteral } from "../src/codeLiteral.ts";
 import { SAME_ORIGIN } from "../src/frameOrigins.ts";
 import type { ForgebookPlugin } from "../src/plugin.ts";
+import { resolvedAppBuild } from "../src/vite/appBuildOption.ts";
 import type { ResolvedConfig } from "../src/vite/configFile.ts";
 import { ISOLATED_FRAMES } from "../src/vite/framesConfig.ts";
 import {
@@ -33,6 +34,7 @@ const CONFIG: ResolvedConfig = {
   dir: "/catalogue",
   framework: STUB_FRAMEWORK,
   title: "Acme <UI>",
+  argControls: {},
   logo: "/catalogue/logo.svg",
   heights: "story-heights.json",
   stories: ["src/**/*.stories.tsx"],
@@ -50,7 +52,9 @@ const CONFIG: ResolvedConfig = {
   hasPlayTools: false,
   plugins: [],
   frames: ISOLATED_FRAMES,
-  build: { readableNames: false }
+  build: { readableNames: false },
+  refs: [],
+  appBuild: resolvedAppBuild(false)
 };
 
 describe("the generated pages", () => {
@@ -85,6 +89,9 @@ describe("the generated pages", () => {
     expect(frame).toContain('addEventListener("error"');
     expect(frame.indexOf("<script>")).toBeLessThan(frame.indexOf('<script type="module"'));
     expect(pageHtml("index.html", CONFIG, SAME_ORIGIN)).not.toContain('addEventListener("error"');
+    // every frame page carries it: no indent, no comment line
+    const guard = frame.slice(frame.indexOf("<script>"), frame.indexOf("</script>"));
+    expect(guard.split("\n").filter((line) => line !== line.trim() || line.startsWith("//"))).toEqual([]);
   });
 
   it("mounts the shell with the data, the logo, the own stories before the packages' and the code writer", () => {
@@ -111,6 +118,24 @@ describe("the generated pages", () => {
     );
     expect(source).toContain("  docs: [docs],");
     expect(storiesSourceModule(CONFIG)).not.toContain("docs:");
+  });
+
+  it("hands the shell the composed catalogues and the way to their code only when there are some", () => {
+    expect(shellEntry(CONFIG)).not.toContain("refs");
+    const entry = shellEntry({
+      ...CONFIG,
+      refs: [{ id: "ds", title: "</script>", url: "https://ds.example.com/" }]
+    });
+    expect(entry).toContain(
+      'catalogues: [{"id":"ds","title":"\\u003c\\u002fscript\\u003e","url":"https:\\u002f\\u002fds.example.com\\u002f"}],'
+    );
+    expect(entry).toContain(
+      `load: () => import(${codeLiteral("forgebook/shell/refs")}).then((module) => module.RefPart)`
+    );
+    // loaded on first use: no static import, so a catalogue's first load carries none of it
+    expect(entry.split("\n").filter((line) => line.startsWith("import ") && line.includes("refs"))).toEqual(
+      []
+    );
   });
 
   it("hands the shell how the framework's stories take an address's texts, when it says", () => {
@@ -187,8 +212,18 @@ describe("the generated pages", () => {
   });
 
   it("hands the pages the configuration's data, and the own stories as one source named after the catalogue", () => {
-    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 })).toBe(
-      'export default {"title":"Acme \\u003cUI\\u003e","heights":"story-heights.json","languages":[{"id":"it","label":"Italiano"}],"lists":{},"frames":{"kind":"ports","catalogue":5173,"frames":5174}};'
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, true)).toBe(
+      'export default {"title":"Acme \\u003cUI\\u003e","heights":"story-heights.json","storyGlobs":["src\\u002f**\\u002f*.stories.tsx"],"languages":[{"id":"it","label":"Italiano"}],"lists":{},"frames":{"kind":"ports","catalogue":5173,"frames":5174}};'
+    );
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, false)).not.toContain(
+      "storyGlobs"
+    );
+    // a reader of published docs did not ask for a story to play; a dev server's author did
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, false)).toContain(
+      '"play":"off"'
+    );
+    expect(configModule(CONFIG, { kind: "ports", catalogue: 5173, frames: 5174 }, true)).not.toContain(
+      '"play"'
     );
     const source = storiesSourceModule(CONFIG);
     expect(source).toContain(
@@ -389,5 +424,13 @@ describe("the generated modules' paths on Windows", () => {
   it("imports the project's own stories by their module's path in Vite's form", () => {
     const own = { ...CONFIG, dir: "C:/Users/ada/app" };
     expect(shellEntry(own)).toContain(`from ${codeLiteral("C:/Users/ada/app/.forgebook-stories.ts")};`);
+  });
+});
+
+describe("the custom controls in the shell's entry", () => {
+  it("are imported on use, and are nothing for a catalogue with none", () => {
+    expect(shellEntry(CONFIG)).not.toContain("argControls");
+    const entry = shellEntry({ ...CONFIG, argControls: { rating: "/catalogue/controls/rating.tsx" } });
+    expect(entry).toContain('"rating": () => import("\\u002fcatalogue\\u002fcontrols\\u002frating.tsx")');
   });
 });

@@ -20,7 +20,7 @@ import { existsSync } from "node:fs";
 
 import { expect, type Page, test } from "@playwright/test";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
-import { STATUS_ATTRIBUTE } from "forgebook/frame-status";
+import { PENDING_REASON_ATTRIBUTE, STATUS_ATTRIBUTE } from "forgebook/frame-status";
 import type { StoryProblem } from "forgebook/story-check";
 import { heldClockAddress } from "forgebook/story-clock";
 import { formerStoryId, storyTree, testedStoryLocations } from "forgebook/story-tree";
@@ -31,6 +31,12 @@ import { isOverlayChecked } from "./overlays.ts";
 import { axeProblems, overlayProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
 import { indexedSource, type StoryFilesOptions } from "./storyFiles.ts";
 import { type PlannedStoryTest, plannedStoryTests } from "./storyTestPlan.ts";
+
+/**
+ * How long a test waits for a frame's answer, in ms: past the 10 s a frame waits by default for what its story loads and
+ * the same again after its play, so that wait ends as the frame's own `pending`, and short of the 30 s a test may take.
+ */
+const FRAME_ANSWER_MS = 25_000;
 
 /** One way of showing every story. */
 export type StoryVariant = {
@@ -183,7 +189,14 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
             backdrop: "plain"
           };
           await page.goto(heldClockAddress(frameAddress(frameUrl, story.id, view, switches)));
-          await expect(page.locator("html")).toHaveAttribute(STATUS_ATTRIBUTE, "ready");
+          // past the wait of a frame for what its story loads, then `ready` or the frame's own reason
+          await expect(page.locator("html")).toHaveAttribute(STATUS_ATTRIBUTE, /^(?:ready|error|pending)$/, {
+            timeout: FRAME_ANSWER_MS
+          });
+          expect(
+            await page.locator("html").getAttribute(STATUS_ATTRIBUTE),
+            (await page.locator("html").getAttribute(PENDING_REASON_ATTRIBUTE)) ?? "the frame's status"
+          ).toBe("ready");
           if (screenshot) {
             const name = screenshotName(
               story.id,

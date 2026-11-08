@@ -18,7 +18,9 @@ const STORY_IDS = [
   "inputs-badge--from-template",
   "inputs-badge--removable",
   "inputs-counter--default",
+  "inputs-stepped--default",
   "states-awaited--default",
+  "states-awaited--in-a-boundary-of-its-own",
   "states-fragile--default",
   "states-greeting--live",
   "logic-use-toggle--default"
@@ -73,6 +75,15 @@ test.describe("what a story draws", () => {
     await expect(page.getByRole("tab", { name: /Interactions/ })).toContainText("passed");
   });
 
+  test("a boundary the story wrote is waited for: at ready its content is there and its fallback gone", async ({
+    page
+  }) => {
+    await page.goto("/frame.html?story=vue:states-awaited--in-a-boundary-of-its-own");
+    await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "ready");
+    expect(await page.getByTestId("late").count()).toBe(1);
+    expect(await page.getByTestId("fallback").count()).toBe(0);
+  });
+
   test("a play's result shows while the component's docs are still read", async ({ page }) => {
     // a first read of a project's docs can take longer than an assertion waits: held here until the play is seen
     let releaseDocs = (): void => undefined;
@@ -104,8 +115,8 @@ test.describe("the panel on a Vue component", () => {
   test("lists the props, slots and events read from a single-file component", async ({ page }) => {
     await page.goto(story("inputs-badge--default"));
     await isReady(page);
-    await expect(page.getByLabel("label")).toHaveValue("New");
-    await expect(page.getByLabel("#default")).toBeVisible();
+    await expect(page.getByLabel("label", { exact: true })).toHaveValue("New");
+    await expect(page.getByLabel("#default", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Events" }).click();
     await expect(page.getByText("onRemove")).toBeVisible();
     await expect(page.getByText("The person took it away.")).toBeVisible();
@@ -114,9 +125,9 @@ test.describe("the panel on a Vue component", () => {
   test("changes a prop, and a slot from its text", async ({ page }) => {
     await page.goto(story("inputs-badge--default"));
     await isReady(page);
-    await page.getByLabel("label").fill("Changed");
+    await page.getByLabel("label", { exact: true }).fill("Changed");
     await expect(frameOf(page).locator(".badge")).toContainText("Changed");
-    await page.getByLabel("#default").fill("in the slot");
+    await page.getByLabel("#default", { exact: true }).fill("in the slot");
     await expect(frameOf(page).locator(".badge")).toContainText("in the slot");
   });
 
@@ -125,7 +136,7 @@ test.describe("the panel on a Vue component", () => {
     await isReady(page);
     await frameOf(page).getByTestId("counter").click();
     await expect(frameOf(page).getByTestId("counter")).toHaveText("Clicks: 1");
-    await page.getByLabel("label").fill("Taps");
+    await page.getByLabel("label", { exact: true }).fill("Taps");
     await expect(frameOf(page).getByTestId("counter")).toHaveText("Taps: 1");
   });
 
@@ -149,9 +160,9 @@ test.describe("the panel on a Vue component", () => {
   test("shows a story's error, and leaves it when the value changes back", async ({ page }) => {
     await page.goto(story("states-fragile--default"));
     await isReady(page);
-    await page.getByLabel("text").fill("boom");
+    await page.getByLabel("text", { exact: true }).fill("boom");
     await expect(frameOf(page).locator("body")).toContainText("Fragile broke");
-    await page.getByLabel("text").fill("Fine again");
+    await page.getByLabel("text", { exact: true }).fill("Fine again");
     await expect(frameOf(page).getByTestId("fragile")).toHaveText("Fine again");
     await expect(frameOf(page).locator("body")).not.toContainText("Fragile broke");
   });
@@ -172,4 +183,19 @@ test("a composable's story shows its signature first", async ({ page }) => {
   await isReady(page);
   await expect(page.getByRole("tab", { name: "Signature" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("Ref<boolean>").first()).toBeVisible();
+});
+
+test("a custom control written in Vue sets a prop, and its value comes back from the link", async ({
+  page
+}) => {
+  await page.goto(story("inputs-stepped--default"));
+  await isReady(page);
+  const control = page.locator('[data-control="stepper"]');
+  await expect(control.getByTestId("stepper")).toHaveText("2");
+  await control.getByRole("button", { name: "One more" }).click();
+  await expect(frameOf(page).locator(".badge, [class*=badge]").first()).toBeAttached();
+  await expect.poll(() => new URL(page.url()).searchParams.get("args")).toBe('{"count":3}');
+  await page.reload();
+  await isReady(page);
+  await expect(page.locator('[data-control="stepper"]').getByTestId("stepper")).toHaveText("3");
 });

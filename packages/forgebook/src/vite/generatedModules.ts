@@ -1,6 +1,6 @@
 /**
  * The modules the plugin generates for a catalogue's pages: the shell's and the frame's entries, the project's own
- * stories' source, the agents' sources and the pages' HTML, and the ids imports name them by.
+ * stories' source, the agents' sources, the galleries' previews and the pages' HTML, and the ids imports name them by.
  *
  * @remarks
  * The configuration's data is not among them: it waits for the frames' placement, which only the plugin knows.
@@ -23,8 +23,10 @@ import {
   pageHtml,
   pageModuleOf,
   pageModulePath,
+  SWITCH_PREVIEWS_MODULE,
   shellEntry,
-  storiesSourceModule
+  storiesSourceModule,
+  switchPreviewsModule
 } from "./pages.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -45,6 +47,7 @@ export const generatedModule = (
   config: ResolvedConfig,
   command: ConfigEnv["command"]
 ): { code: string; moduleType: "js" } | string | undefined => {
+  if (id === `\0${SWITCH_PREVIEWS_MODULE}`) return { code: switchPreviewsModule(config), moduleType: "js" };
   const named = pageModuleOf(id, config.dir);
   if (named === undefined) return undefined;
   if (named.kind === "entry") {

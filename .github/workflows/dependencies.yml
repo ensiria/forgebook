@@ -1,0 +1,86 @@
+# What each published package brings into a project and what `npm audit` finds in it: each package's `latest` installed
+# alone in an empty project (the lockfile only, no install script), audited, then docs/dependencies.md written from the
+# results only. Weekly and by hand, because advisories are published without a commit here; on a pull request only when
+# the command itself changes, and then the page is kept as an artefact, never published. A pull request's own checks
+# never run the audit: an advisory published overnight would fail pull requests that did not cause it. See
+# tools/dependencies/README.md. Actions are pinned to a commit, as in `checks.yml`.
+name: dependencies
+
+on:
+  schedule:
+    # Monday 04:47 UTC: after the weekend's releases, apart from the compat run at 04:17
+    - cron: "47 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "tools/dependencies/**"
+      - "tools/github-pull-request/**"
+      - ".github/workflows/dependencies.yml"
+
+# a newer run of the same ref replaces the one before it
+concurrency:
+  group: dependencies-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node tools/dependencies/dependencies.mts measure
+        env:
+          DEPENDENCIES_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - run: node tools/dependencies/dependencies.mts table
+      - run: cat docs/dependencies.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-report
+          path: |
+            docs/dependencies.json
+            docs/dependencies.md
+          retention-days: 30
+
+  # develop takes no direct push: a changed report becomes a pull request a maintainer merges. Its own job, with the
+  # release app's token made for it and revoked at its end, because a pull request opened with the workflow's own token
+  # starts no checks; only from develop, so a run started by hand on another branch publishes nothing
+  publish:
+    needs: measure
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dependency-report
+          path: docs
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - run: node tools/dependencies/dependencies.mts publish
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}

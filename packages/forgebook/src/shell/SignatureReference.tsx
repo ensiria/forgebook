@@ -8,8 +8,10 @@
 import type { ReactNode } from "react";
 
 import type { FunctionSignatureDocs } from "../componentDocs.ts";
+import { ApiTableBox } from "./ApiTableBox.tsx";
 import { Code } from "./Code.tsx";
 import { CodeText } from "./CodeText.tsx";
+import { LATER_STRINGS } from "./laterStrings.ts";
 import { STRINGS } from "./strings.ts";
 
 /**
@@ -54,15 +56,15 @@ export const SignatureReference = ({
       />
     </pre>
     {signature.parameters.length === 0 ? (
-      <p className="forgebook-tab-note">{STRINGS.signatureNone}</p>
+      <p className="forgebook-tab-note">{LATER_STRINGS.signatureNone}</p>
     ) : (
-      <div className="forgebook-api">
+      <ApiTableBox>
         <table className="forgebook-api__table">
           <thead>
             <tr>
-              <th scope="col">{STRINGS.signatureParameter}</th>
-              <th scope="col">{STRINGS.apiType}</th>
-              <th scope="col">{STRINGS.apiWhat}</th>
+              <th scope="col">{LATER_STRINGS.signatureParameter}</th>
+              <th scope="col">{LATER_STRINGS.apiType}</th>
+              <th scope="col">{LATER_STRINGS.apiWhat}</th>
             </tr>
           </thead>
           <tbody>
@@ -90,9 +92,9 @@ export const SignatureReference = ({
             ))}
           </tbody>
         </table>
-      </div>
+      </ApiTableBox>
     )}
-    <h3 className="forgebook-signature__returns">{STRINGS.signatureReturns}</h3>
+    <h3 className="forgebook-signature__returns">{LATER_STRINGS.signatureReturns}</h3>
     <p>
       <code className="forgebook-inline-code">{signature.returns}</code>
       {signature.returnsDescription === "" ? null : (

@@ -8,5 +8,5 @@
     "jsx": "preserve",
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "stories.ts", "forgebook.preview.ts"]
+  "include": ["src", "controls", "stories.ts", "forgebook.preview.ts"]
 }

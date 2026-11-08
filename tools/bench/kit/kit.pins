@@ -3,12 +3,12 @@
 # the Visual C++ runtime: the hash in the path of Microsoft's own download, where aka.ms/vs/17/release/vc_redist.<arch>.exe
 # leads).
 # One key=value per line, read by start-bench.ps1 and start-bench.sh alike.
-# The commit holds the kit's Node part and the benchmark the launchers run, and the Forgebook measured: the release
-# 0.2.0 and what develop added after it (a component's required props first), with this kit.
+# The commit holds the kit's Node part and the benchmark the launchers run, and the Forgebook measured: develop as it
+# stood when the kit was last rebuilt, so a run measures the current code, with this kit.
 # Node is 24.14.0, the version the reference numbers were measured with: in 24.22.2 the fetch the harness polls servers
 # with throws setTypeOfService EINVAL from a socket callback on macOS, which ends the run and leaves its servers behind.
 forgebook.repository=https://github.com/ensiria/forgebook.git
-forgebook.commit=6d1f80595cb9e372396081c6e7b69cf600afd280
+forgebook.commit=1632ced436ce5c70f575eee2a5065dad85f1a937
 node.version=24.14.0
 node.win-x64.url=https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip
 node.win-x64.sha256=313fa40c0d7b18575821de8cb17483031fe07d95de5994f6f435f3b345f85c66

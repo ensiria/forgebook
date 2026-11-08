@@ -47,6 +47,8 @@ export const nextjs = (options: NextjsOptions = {}): FrameworkAdapter => {
     // beside this module, with its extension: `.ts` in the sources, `.js` once built for npm
     docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
     pages: { frame: "@forgebook/nextjs/frame", code: base.pages.code },
+    // a Next.js app is React: JavaScript files may hold its JSX as they do in React's adapter
+    compilesJsxInScripts: true,
     // Next.js's own components the stand-ins keep, pre-bundled with React's modules
     browserDependencies: [
       ...(base.browserDependencies ?? []),

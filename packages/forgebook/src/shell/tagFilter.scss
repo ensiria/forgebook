@@ -1,0 +1,57 @@
+// The sidebar's tag filter, loaded with it (`TagFilter.tsx`).
+@use "../styles/tokens" as *;
+
+@layer catalogue {
+  .forgebook-tag-filter {
+    flex: none;
+  }
+
+  .forgebook-tag-filter .forgebook-icon-button[data-on] {
+    width: auto;
+    min-width: 1.625rem;
+    padding-inline: $space-1;
+    color: $accent-text;
+  }
+
+  .forgebook-tag-filter__count {
+    margin-inline-start: 0.125rem;
+    font: $text-row-compact;
+  }
+
+  // as wide as the search's row, against which it sits: the sidebar clips what passes its edge however narrow it is
+  .forgebook-tag-filter__panel {
+    right: 0;
+    white-space: normal;
+  }
+
+  .forgebook-tag-filter__list {
+    margin: 0 0 $space-1-5;
+    padding: 0;
+    max-height: 18rem;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .forgebook-tag-filter__row {
+    display: flex;
+    align-items: center;
+    gap: $space-1-5;
+  }
+
+  .forgebook-tag-filter__tag {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: $space-1-5;
+    min-width: 0;
+    min-height: 1.75rem;
+    font: $text-row-compact;
+    color: $text;
+  }
+
+  .forgebook-tag-filter__name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

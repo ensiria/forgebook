@@ -26,6 +26,9 @@ const BEHIND_FILE = fileURLToPath(
 /** The catalogue's preview, whose globals a story of the hot-edit file shows. */
 const PREVIEW_FILE = fileURLToPath(new URL("../forgebook.preview.ts", import.meta.url));
 
+/** The component the hot-edit file's stories draw. */
+const NOTE_FIELD_FILE = fileURLToPath(new URL("../../storybook/src/NoteField.tsx", import.meta.url));
+
 /** The address of a story of the hot-edit file. */
 const story = (name: string, query = ""): string =>
   `/?story=sb:storybook-hot-edit--${name}${query === "" ? "" : `&${query}`}`;
@@ -61,7 +64,7 @@ test("draws the edit in place: the text typed in the story stays, and Code shows
   fileEdits
 }) => {
   await page.goto(story("own", "tab=code"));
-  const field = frameOf(page).getByLabel("Note");
+  const field = frameOf(page).getByLabel("Note", { exact: true });
   await field.fill("typed before the edit");
   await fileEdits.write(OWN_FILE, replacing('"Written here"', '"Edited here"'));
   await expect(frameOf(page).getByText("Edited here")).toBeVisible();
@@ -85,12 +88,83 @@ test("draws the fix of an edit that threw while the file loaded", async ({ page,
   await expect(frameOf(page).getByText("Fixed here")).toBeVisible();
 });
 
+test("names an edit that does not parse, keeps the story drawn, and draws its fix in place", async ({
+  page,
+  fileEdits
+}) => {
+  await page.goto(story("own"));
+  const field = frameOf(page).getByLabel("Note");
+  await field.fill("typed before the edit");
+  await fileEdits.write(
+    OWN_FILE,
+    replacing("export default meta;", "export default meta;\nexport const = ;")
+  );
+  const problems = page.locator(".forgebook-problems");
+  await expect(problems).toContainText(/HotEdit\.stories\.tsx:\d+:\d+ does not parse/);
+  // tools read the same
+  const stories = await (await page.request.get("/__forgebook/api/stories")).json();
+  expect(stories.problems).toEqual([expect.stringMatching(/HotEdit\.stories\.tsx:\d+:\d+ does not parse/)]);
+  await expect(field).toHaveValue("typed before the edit");
+  await fileEdits.write(OWN_FILE, replacing('"Written here"', '"Fixed here"'));
+  await expect(frameOf(page).getByText("Fixed here")).toBeVisible();
+  await expect(field).toHaveValue("typed before the edit");
+  await expect(problems).toHaveCount(0);
+});
+
+test("a page opened while a story file does not parse draws the others, and lists its stories once it is fixed", async ({
+  page,
+  fileEdits
+}) => {
+  await fileEdits.write(
+    OWN_FILE,
+    replacing("export default meta;", "export default meta;\nexport const = ;")
+  );
+  await page.goto("/");
+  await expect(page.locator(".forgebook-problems")).toContainText(
+    /HotEdit\.stories\.tsx:\d+:\d+ does not parse/
+  );
+  const hotEdit = page.getByRole("button", { name: "Hot edit" });
+  await expect(hotEdit).toHaveCount(0);
+  await fileEdits.write(OWN_FILE, replacing('"Written here"', '"Fixed here"'));
+  await expect(page.locator(".forgebook-problems")).toHaveCount(0);
+  await page.goto(story("own"));
+  await expect(frameOf(page).getByText("Fixed here")).toBeVisible();
+});
+
+test("a frame says why a module it imports could not be served, with its place", async ({
+  page,
+  fileEdits
+}) => {
+  await fileEdits.write(NOTE_FIELD_FILE, (original) => `${original}\nexport const = ;\n`);
+  await page.goto("/frame.html?story=sb:storybook-hot-edit--own");
+  await expect(page.locator("html")).toHaveAttribute("data-forgebook-status", "error");
+  await expect(page.locator(".forgebook-frame-error__message")).toContainText(/NoteField\.tsx:\d+:\d+: /);
+});
+
+test("names a component an edit leaves unparsable once, to people and tools, and no longer once it is fixed", async ({
+  page,
+  fileEdits
+}) => {
+  await page.goto(story("own"));
+  await expect(frameOf(page).getByLabel("Note")).toBeVisible();
+  await fileEdits.write(NOTE_FIELD_FILE, (original) => `${original}\nexport const = ;\n`);
+  const problems = page.locator(".forgebook-problems");
+  await expect(problems).toContainText(/NoteField\.tsx:\d+:\d+ does not parse/);
+  // tools read the same, once, with no frame needed
+  const broken = await (await page.request.get("/__forgebook/api/errors")).json();
+  expect(broken.problems).toEqual([expect.stringMatching(/NoteField\.tsx:\d+:\d+ does not parse/)]);
+  await fileEdits.write(NOTE_FIELD_FILE, (original) => original);
+  await expect(problems).toHaveCount(0);
+  const fixed = await (await page.request.get("/__forgebook/api/errors")).json();
+  expect(fixed.problems).toEqual([]);
+});
+
 test("draws an edit of the file its story is re-exported from, and keeps the text typed in it", async ({
   page,
   fileEdits
 }) => {
   await page.goto(story("behind"));
-  const field = frameOf(page).getByLabel("Note");
+  const field = frameOf(page).getByLabel("Note", { exact: true });
   await field.fill("typed before the edit");
   await fileEdits.write(BEHIND_FILE, replacing('"Written behind a re-export"', '"Edited behind"'));
   await expect(frameOf(page).getByText("Edited behind")).toBeVisible();
